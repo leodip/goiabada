@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
 // A request /auth/authorize refuses before it has assigned a state writes no auth context (#436).
@@ -34,13 +34,13 @@ func TestHandleAuthorizeGet_ARefusalWritesNoAuthContext(t *testing.T) {
 		name         string
 		query        string
 		validatorErr error
-		expect       func(pageRenderer *mocks_handlers.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request)
+		expect       func(pageRenderer *handlersmocks.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request)
 	}{
 		{
 			name:         "an unknown client_id is refused on a page",
 			query:        "client_id=no-such-client&redirect_uri=https://example.com&response_type=code&scope=openid",
 			validatorErr: i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientNotFound, nil),
-			expect: func(pageRenderer *mocks_handlers.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request) {
+			expect: func(pageRenderer *handlersmocks.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request) {
 				pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 					mock.MatchedBy(func(data map[string]interface{}) bool {
 						return data["_httpStatus"] == http.StatusOK
@@ -51,7 +51,7 @@ func TestHandleAuthorizeGet_ARefusalWritesNoAuthContext(t *testing.T) {
 			name:         "an unregistered redirect_uri is refused on a page",
 			query:        "client_id=test-client&redirect_uri=https://elsewhere.example&response_type=code&scope=openid",
 			validatorErr: i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURINotRegistered, nil),
-			expect: func(pageRenderer *mocks_handlers.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request) {
+			expect: func(pageRenderer *handlersmocks.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request) {
 				pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 					mock.MatchedBy(func(data map[string]interface{}) bool {
 						return data["_httpStatus"] == http.StatusOK
@@ -62,14 +62,14 @@ func TestHandleAuthorizeGet_ARefusalWritesNoAuthContext(t *testing.T) {
 			name:         "a validator fault answers 500",
 			query:        "client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid",
 			validatorErr: validatorFault,
-			expect: func(pageRenderer *mocks_handlers.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request) {
+			expect: func(pageRenderer *handlersmocks.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request) {
 				pageRenderer.On("InternalServerError", rr, req, validatorFault).Return().Once()
 			},
 		},
 		{
 			name:  "response_mode=jwt is refused 400 on a page",
 			query: "client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&response_mode=jwt",
-			expect: func(pageRenderer *mocks_handlers.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request) {
+			expect: func(pageRenderer *handlersmocks.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request) {
 				pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 					mock.MatchedBy(func(data map[string]interface{}) bool {
 						return data["_httpStatus"] == http.StatusBadRequest
@@ -78,14 +78,14 @@ func TestHandleAuthorizeGet_ARefusalWritesNoAuthContext(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			database := mocks_data.NewDatabase(t)
-			authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			permissionChecker := mocks_handlers.NewPermissionChecker(t)
-			tokenParser := mocks_handlers.NewTokenParser(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			database := datamocks.NewDatabase(t)
+			authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
+			tokenParser := handlersmocks.NewTokenParser(t)
 
 			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
 				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
@@ -164,15 +164,15 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			database := mocks_data.NewDatabase(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			database := datamocks.NewDatabase(t)
 			stubRegisteredRedirectURI(database, "https://example.com")
-			authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			permissionChecker := mocks_handlers.NewPermissionChecker(t)
-			tokenParser := mocks_handlers.NewTokenParser(t)
+			authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
+			tokenParser := handlersmocks.NewTokenParser(t)
 
 			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
 				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)

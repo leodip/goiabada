@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +17,7 @@ import (
 // deliberately. Once trailing-slash handling is consistent, six of the root
 // chain's eight adjacencies have no other observable watching them (#335).
 func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
-	s := newStaticBranchTestServer(mocks_data.NewDatabase(t))
+	s := newStaticBranchTestServer(datamocks.NewDatabase(t))
 	branches := s.initMiddleware()
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
 	probe := func(w http.ResponseWriter, _ *http.Request) {

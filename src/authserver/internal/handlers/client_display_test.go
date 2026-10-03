@@ -8,12 +8,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 )
 
 func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("ShowDisplayName true with DisplayName set - should use DisplayName", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,
@@ -35,7 +35,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	})
 
 	t.Run("ShowDisplayName true but DisplayName empty - should fallback to ClientIdentifier", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,
@@ -57,7 +57,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	})
 
 	t.Run("ShowDisplayName false - should fallback to ClientIdentifier", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,
@@ -79,7 +79,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	})
 
 	t.Run("ShowLogo true and client has logo - should set HasLogo and LogoURL", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,
@@ -102,7 +102,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	})
 
 	t.Run("ShowLogo true but client does not have logo - should not set HasLogo", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,
@@ -125,7 +125,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	})
 
 	t.Run("ShowLogo false - should not call ClientHasLogo", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,
@@ -146,7 +146,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	})
 
 	t.Run("ShowDescription true with Description set - should include Description", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,
@@ -168,7 +168,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	})
 
 	t.Run("ShowDescription true but Description empty - should not include Description", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,
@@ -190,7 +190,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	})
 
 	t.Run("ShowDescription false - should not include Description", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,
@@ -212,7 +212,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	})
 
 	t.Run("ShowWebsiteURL true with WebsiteURL set - should include WebsiteURL", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,
@@ -234,7 +234,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	})
 
 	t.Run("ShowWebsiteURL true but WebsiteURL empty - should not include WebsiteURL", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,
@@ -256,7 +256,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	})
 
 	t.Run("ShowWebsiteURL false - should not include WebsiteURL", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,
@@ -278,7 +278,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	})
 
 	t.Run("All fields enabled and populated - should include all", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,
@@ -307,7 +307,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	})
 
 	t.Run("All fields disabled - should still show ClientIdentifier", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,
@@ -334,7 +334,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	})
 
 	t.Run("CreatedViaDCR with a Description - getClientDisplayInfo is unaffected by the column", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,
@@ -354,7 +354,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	})
 
 	t.Run("ClientHasLogo returns error - should default to false and log warning", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
 			Id:               1,

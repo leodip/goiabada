@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -123,19 +123,19 @@ func (s *ctxRecordingApiClient) UploadClientLogo(ctx context.Context, _ string, 
 func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) {
 	testCases := []struct {
 		name    string
-		build   func(httpHelper *mocks_handlers.HttpHelper, apiClient *ctxRecordingApiClient) http.HandlerFunc
+		build   func(httpHelper *handlersmocks.HttpHelper, apiClient *ctxRecordingApiClient) http.HandlerFunc
 		request *http.Request
 	}{
 		{
 			name: "HandleListGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleListGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandlePermissionsGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandlePermissionsGet(h, newTestSessionStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/permissions",
@@ -143,7 +143,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleLogoGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleLogoGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/logo",
@@ -151,7 +151,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleDeleteGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/delete",
@@ -159,7 +159,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleTokensGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleTokensGet(h, newTestSessionStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/tokens",
@@ -167,7 +167,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleSettingsGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleSettingsGet(h, newTestSessionStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/settings",
@@ -175,7 +175,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleOAuth2FlowsGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleOAuth2FlowsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/oauth2-flows",
@@ -183,7 +183,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleRedirectURIsGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleRedirectURIsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/redirect-uris",
@@ -191,7 +191,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleUserSessionsGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleUserSessionsGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions",
@@ -199,7 +199,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleUserSessionsPost",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleUserSessionsPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/clients/3/user-sessions",
@@ -211,7 +211,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("EncodeJSON", mock.Anything, mock.Anything, mock.Anything).Maybe()

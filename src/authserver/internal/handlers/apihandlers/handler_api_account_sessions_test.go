@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -37,8 +37,8 @@ func accountSessionDeleteRequest(sessionId string, subject string) *http.Request
 // site: revocation.LogTerminatedUserSession is shared, but which session row each handler hands it is not, and
 // this is the site that resolves the row through an ownership check first.
 func TestHandleAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	const subject = "the-user"
 	user := &record.User{Id: 42, Enabled: true}
@@ -90,8 +90,8 @@ func TestHandleAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) 
 // terminated somebody else's session and THEN refused would leave it green. The strict mock is the
 // mechanism: no termination expectation is registered, so any call fails the test.
 func TestHandleAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	const subject = "the-user"
 	// The session belongs to user 7; the caller is user 42.
@@ -116,8 +116,8 @@ func TestHandleAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 // second site deliberately. The two audit emitters are adjacent in both handlers, so leaving the
 // first one outside the error check is a one-line mistake that the other site's test cannot see.
 func TestHandleAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	const subject = "the-user"
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).
@@ -125,7 +125,7 @@ func TestHandleAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
 		Return(&record.User{Id: 42, Enabled: true}, nil).Once()
 	// The deletion, which since #139 is the first write inside the termination transaction.
-	stub := mocks_data.ExpectRunInTransaction(database, apiTerminateTx)
+	stub := datamocks.ExpectRunInTransaction(database, apiTerminateTx)
 	database.On("DeleteUserSession", mock.Anything, apiTerminateTx, int64(100)).
 		Return(errors.New("the session delete failed")).Once()
 

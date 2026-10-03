@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
-	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -42,7 +42,7 @@ func (u unusedRenderer) RenderTemplate(w http.ResponseWriter, r *http.Request, l
 // driving repeated verifications resets it, which in production is a fresh code each time.
 type verificationEnv struct {
 	handler  http.Handler
-	database *mocks_data.Database
+	database *datamocks.Database
 	user     *record.User
 }
 
@@ -61,8 +61,8 @@ const (
 func newVerificationEnv(t *testing.T) *verificationEnv {
 	t.Helper()
 
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	encrypted, err := testDataCipher.Encrypt(verificationCode)
 	require.NoError(t, err)
@@ -210,10 +210,10 @@ func TestHandleAccountEmailVerificationPost_CodeComparison(t *testing.T) {
 // The emailed verification link points at the admin console base URL the handler was handed,
 // not at the configured one (#434).
 func TestHandleAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHanded(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	database := mocks_data.NewDatabase(t)
-	emailSender := mocks_accounthandlers.NewEmailSender(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
+	emailSender := accounthandlersmocks.NewEmailSender(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
 		testDataCipher, testAdminConsoleBaseURL)
@@ -266,8 +266,8 @@ func TestHandleAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *test
 	pending, err := testDataCipher.Encrypt(verificationCode)
 	require.NoError(t, err)
 
-	send := func(t *testing.T, user *record.User, database *mocks_data.Database, pageRenderer *mocks_handlers.PageRenderer,
-		emailSender *mocks_accounthandlers.EmailSender, auditLogger *mocks_handlers.AuditLogger) api.AccountEmailVerificationSendResponse {
+	send := func(t *testing.T, user *record.User, database *datamocks.Database, pageRenderer *handlersmocks.PageRenderer,
+		emailSender *accounthandlersmocks.EmailSender, auditLogger *handlersmocks.AuditLogger) api.AccountEmailVerificationSendResponse {
 		t.Helper()
 		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil)
 
@@ -298,9 +298,9 @@ func TestHandleAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *test
 				EmailVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Add(-4 * time.Minute), Valid: true}}
 
 			// The renderer, the sender and the logger expect nothing, so a send fails the case.
-			database := mocks_data.NewDatabase(t)
-			resp := send(t, user, database, mocks_handlers.NewPageRenderer(t), mocks_accounthandlers.NewEmailSender(t),
-				mocks_handlers.NewAuditLogger(t))
+			database := datamocks.NewDatabase(t)
+			resp := send(t, user, database, handlersmocks.NewPageRenderer(t), accounthandlersmocks.NewEmailSender(t),
+				handlersmocks.NewAuditLogger(t))
 			database.AssertNotCalled(t, "TryStoreEmailVerificationCode", mock.Anything, mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
@@ -313,14 +313,14 @@ func TestHandleAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *test
 	t.Run("a code issued over five minutes ago, none pending, lets the send through", func(t *testing.T) {
 		user := &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com",
 			EmailVerificationCodeIssuedAt: sql.NullTime{Time: time.Now().UTC().Add(-5*time.Minute - time.Second), Valid: true}}
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(&bytes.Buffer{}, nil).Once()
 		emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		auditLogger.On("Log", mock.Anything, audit.EventSentEmailVerificationMessage, mock.Anything).Return().Once()
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "anyone@example.com",
 			mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
 
@@ -332,8 +332,8 @@ func TestHandleAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *test
 }
 
 // sendVerification drives one send through the handler on database and returns the response.
-func sendVerification(t *testing.T, database *mocks_data.Database, pageRenderer *mocks_handlers.PageRenderer,
-	emailSender *mocks_accounthandlers.EmailSender, auditLogger *mocks_handlers.AuditLogger) *httptest.ResponseRecorder {
+func sendVerification(t *testing.T, database *datamocks.Database, pageRenderer *handlersmocks.PageRenderer,
+	emailSender *accounthandlersmocks.EmailSender, auditLogger *handlersmocks.AuditLogger) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": verificationSubject})
@@ -350,10 +350,10 @@ func sendVerification(t *testing.T, database *mocks_data.Database, pageRenderer 
 // the mail goes to, its cutoff is exactly one code lifetime before the issued-at it stores, and
 // what it stores is the code the mail carries, encrypted.
 func TestHandleAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditionalWrite(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	emailSender := mocks_accounthandlers.NewEmailSender(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	emailSender := accounthandlersmocks.NewEmailSender(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	user := &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com"}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil).Once()
@@ -431,7 +431,7 @@ func TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testin
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
+			database := datamocks.NewDatabase(t)
 			first := &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com"}
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(first, nil).Once()
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(tc.reread, nil).Once()
@@ -440,8 +440,8 @@ func TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testin
 
 			// The renderer, the sender and the logger expect nothing, so a mail or an audit entry
 			// fails the case.
-			rr := sendVerification(t, database, mocks_handlers.NewPageRenderer(t), mocks_accounthandlers.NewEmailSender(t),
-				mocks_handlers.NewAuditLogger(t))
+			rr := sendVerification(t, database, handlersmocks.NewPageRenderer(t), accounthandlersmocks.NewEmailSender(t),
+				handlersmocks.NewAuditLogger(t))
 
 			tc.check(t, rr)
 		})
@@ -450,7 +450,7 @@ func TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testin
 
 // verifyDirect submits a code to the verification handler with no limiter in front, so the
 // recorder counts what the handler itself charges.
-func verifyDirect(t *testing.T, database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger,
+func verifyDirect(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 	credentials CredentialFailureRecorder, submitted string) *httptest.ResponseRecorder {
 	t.Helper()
 	body, err := json.Marshal(api.VerifyAccountEmailRequest{VerificationCode: submitted})
@@ -479,8 +479,8 @@ func pendingCodeUser(t *testing.T) *record.User {
 // decrypted and compared, so the code that was checked is the code spent, and narrow, so
 // nothing else of the row the request loaded is written back.
 func TestHandleAccountEmailVerificationPost_VerifiesThroughTheConditionalWrite(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	user := pendingCodeUser(t)
 	compared := user.EmailVerificationCodeEncrypted
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil).Once()
@@ -535,7 +535,7 @@ func TestHandleAccountEmailVerificationPost_ALostWriteIsNotAGuess(t *testing.T) 
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
+			database := datamocks.NewDatabase(t)
 			user := pendingCodeUser(t)
 			reread := tc.reread(user)
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil).Once()
@@ -545,7 +545,7 @@ func TestHandleAccountEmailVerificationPost_ALostWriteIsNotAGuess(t *testing.T) 
 			credentials := &countingCredentials{}
 
 			// The logger expects nothing, so an audit entry of either kind fails the case.
-			rr := verifyDirect(t, database, mocks_handlers.NewAuditLogger(t), credentials, verificationCode)
+			rr := verifyDirect(t, database, handlersmocks.NewAuditLogger(t), credentials, verificationCode)
 
 			require.Equal(t, tc.wantStatus, rr.Code, rr.Body.String())
 			if tc.wantStatus == http.StatusOK {

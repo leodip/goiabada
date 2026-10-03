@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
@@ -47,11 +47,11 @@ func lostTheAssociationKey() error {
 // A read left outside it would decide from a copy no other statement of the attempt sees, which is
 // the shape that makes a rerun decide "absent" twice.
 func TestBumpUserSession_ReadsAndWritesOnTheTransaction(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	manager := &Manager{database: database}
 
 	session := bumpedSession()
-	stub := mocks_data.ExpectRunInTransaction(database, txSentinel)
+	stub := datamocks.ExpectRunInTransaction(database, txSentinel)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 	database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(nil).Once()
 	database.On("UpdateUserSession", mock.Anything, txSentinel, session).Return(nil).Once()
@@ -72,14 +72,14 @@ func TestBumpUserSession_ReadsAndWritesOnTheTransaction(t *testing.T) {
 // once, the update once, and what the caller gets back is the attempt that committed, one
 // association and not two.
 func TestBumpUserSession_ALostAssociationKeyRunsOnceMoreAndFindsThePair(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	manager := &Manager{database: database}
 
 	first := bumpedSession()
 	second := bumpedSession(record.UserSessionClient{Id: 9, UserSessionId: 1, ClientId: 456, LastAccessed: time.Now().UTC().Add(-time.Minute)})
 
-	attempt1 := mocks_data.ExpectRunInTransaction(database, txSentinel)
-	attempt2 := mocks_data.ExpectRunInTransaction(database, txSentinel)
+	attempt1 := datamocks.ExpectRunInTransaction(database, txSentinel)
+	attempt2 := datamocks.ExpectRunInTransaction(database, txSentinel)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(first, nil).Once()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(second, nil).Once()
 	database.On("UserSessionLoadClients", mock.Anything, txSentinel, first).Return(nil).Once()
@@ -106,11 +106,11 @@ func TestBumpUserSession_ALostAssociationKeyRunsOnceMoreAndFindsThePair(t *testi
 // The retry is bounded at two attempts: a third collision would mean a writer that keeps creating
 // the association this one keeps failing to read, which is a fault and not a race.
 func TestBumpUserSession_ASecondLossIsAFaultAndIsNotRetriedAgain(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	manager := &Manager{database: database}
 
-	mocks_data.ExpectRunInTransaction(database, txSentinel)
-	mocks_data.ExpectRunInTransaction(database, txSentinel)
+	datamocks.ExpectRunInTransaction(database, txSentinel)
+	datamocks.ExpectRunInTransaction(database, txSentinel)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).
 		Return(bumpedSession(), nil).Twice()
 	database.On("UserSessionLoadClients", mock.Anything, txSentinel, mock.Anything).Return(nil).Twice()
@@ -131,21 +131,21 @@ func TestBumpUserSession_AFailureOtherThanTheKeyIsNotRetried(t *testing.T) {
 
 	for _, tc := range []struct {
 		name string
-		arm  func(database *mocks_data.Database, session *record.UserSession)
+		arm  func(database *datamocks.Database, session *record.UserSession)
 	}{
-		{"the session read fails", func(database *mocks_data.Database, _ *record.UserSession) {
+		{"the session read fails", func(database *datamocks.Database, _ *record.UserSession) {
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(nil, boom).Once()
 		}},
-		{"the association read fails", func(database *mocks_data.Database, session *record.UserSession) {
+		{"the association read fails", func(database *datamocks.Database, session *record.UserSession) {
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 			database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(boom).Once()
 		}},
-		{"the session write fails", func(database *mocks_data.Database, session *record.UserSession) {
+		{"the session write fails", func(database *datamocks.Database, session *record.UserSession) {
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 			database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(nil).Once()
 			database.On("UpdateUserSession", mock.Anything, txSentinel, session).Return(boom).Once()
 		}},
-		{"the association insert fails", func(database *mocks_data.Database, session *record.UserSession) {
+		{"the association insert fails", func(database *datamocks.Database, session *record.UserSession) {
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 			database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(nil).Once()
 			database.On("UpdateUserSession", mock.Anything, txSentinel, session).Return(nil).Once()
@@ -153,10 +153,10 @@ func TestBumpUserSession_AFailureOtherThanTheKeyIsNotRetried(t *testing.T) {
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
+			database := datamocks.NewDatabase(t)
 			manager := &Manager{database: database}
 
-			stub := mocks_data.ExpectRunInTransaction(database, txSentinel)
+			stub := datamocks.ExpectRunInTransaction(database, txSentinel)
 			tc.arm(database, bumpedSession())
 
 			result, err := manager.BumpUserSession(context.Background(), bumpSessionIdentifier, 456, "", "", "")
@@ -172,12 +172,12 @@ func TestBumpUserSession_AFailureOtherThanTheKeyIsNotRetried(t *testing.T) {
 // A commit the engine refuses returns no session either, though the body ran to the end and set
 // what it would have returned.
 func TestBumpUserSession_ARefusedCommitReturnsNoSession(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	manager := &Manager{database: database}
 
 	refused := errs.New("commit refused")
 	session := bumpedSession()
-	mocks_data.ExpectRunInTransactionThenFail(database, txSentinel, refused)
+	datamocks.ExpectRunInTransactionThenFail(database, txSentinel, refused)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 	database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(nil).Once()
 	database.On("UpdateUserSession", mock.Anything, txSentinel, session).Return(nil).Once()
@@ -194,12 +194,12 @@ func TestBumpUserSession_ARefusedCommitReturnsNoSession(t *testing.T) {
 // association another bump committed meanwhile and updates it. A body that reused the first read
 // would insert the same pair a second time, which the key would now refuse.
 func TestBumpUserSession_ADeadlockRerunDecidesFromAFreshRead(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	manager := &Manager{database: database}
 
 	first := bumpedSession()
 	second := bumpedSession(record.UserSessionClient{Id: 9, UserSessionId: 1, ClientId: 456})
-	stub := mocks_data.ExpectRunInTransactionRerun(database, txSentinel)
+	stub := datamocks.ExpectRunInTransactionRerun(database, txSentinel)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(first, nil).Once()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(second, nil).Once()
 	database.On("UserSessionLoadClients", mock.Anything, txSentinel, mock.Anything).Return(nil).Twice()

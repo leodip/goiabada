@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
 // TestHandleAuthorizeGet_MaxAge covers what /auth/authorize does with max_age itself: the raw value
@@ -32,11 +32,11 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		"The max_age parameter must be a non-negative integer.", http.StatusBadRequest)
 
 	type fixture struct {
-		pageRenderer       *mocks_handlers.PageRenderer
-		ceremonyStore      *mocks_handlers.CeremonyStore
-		userSessionManager *mocks_handlers.UserSessionManager
-		database           *mocks_data.Database
-		authorizeValidator *mocks_handlers.AuthorizeValidator
+		pageRenderer       *handlersmocks.PageRenderer
+		ceremonyStore      *handlersmocks.CeremonyStore
+		userSessionManager *handlersmocks.UserSessionManager
+		database           *datamocks.Database
+		authorizeValidator *handlersmocks.AuthorizeValidator
 		handler            http.HandlerFunc
 		req                *http.Request
 		rr                 *httptest.ResponseRecorder
@@ -47,15 +47,15 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 	// and the stubs every row shares up to the session predicate.
 	arrange := func(t *testing.T, query string) *fixture {
 		f := &fixture{
-			pageRenderer:       mocks_handlers.NewPageRenderer(t),
-			ceremonyStore:      mocks_handlers.NewCeremonyStore(t),
-			userSessionManager: mocks_handlers.NewUserSessionManager(t),
-			database:           mocks_data.NewDatabase(t),
-			authorizeValidator: mocks_handlers.NewAuthorizeValidator(t),
+			pageRenderer:       handlersmocks.NewPageRenderer(t),
+			ceremonyStore:      handlersmocks.NewCeremonyStore(t),
+			userSessionManager: handlersmocks.NewUserSessionManager(t),
+			database:           datamocks.NewDatabase(t),
+			authorizeValidator: handlersmocks.NewAuthorizeValidator(t),
 		}
 		f.handler = HandleAuthorizeGet(f.pageRenderer, f.ceremonyStore, f.userSessionManager, f.database, nil,
-			f.authorizeValidator, mocks_handlers.NewAuditLogger(t), mocks_handlers.NewPermissionChecker(t),
-			mocks_handlers.NewTokenParser(t), testBaseURL)
+			f.authorizeValidator, handlersmocks.NewAuditLogger(t), handlersmocks.NewPermissionChecker(t),
+			handlersmocks.NewTokenParser(t), testBaseURL)
 
 		target := "/authorize?client_id=test-client&redirect_uri=" + url.QueryEscape(redirectURI) +
 			"&response_type=code&scope=openid&state=s1&" + query

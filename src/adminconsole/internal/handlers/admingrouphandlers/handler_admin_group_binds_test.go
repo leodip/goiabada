@@ -10,12 +10,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/sessionstore"
-	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
+	"github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
 // Seam 3 for the group family (#350).
@@ -57,11 +57,11 @@ func (*groupBindApiClient) UpdateGroup(context.Context, string, int64, *api.Upda
 }
 
 func renderGroupPage(t *testing.T, client *groupBindApiClient, target, page string,
-	handler func(*mocks_handlers.HttpHelper) http.HandlerFunc) map[string]interface{} {
+	handler func(*handlersmocks.HttpHelper) http.HandlerFunc) map[string]interface{} {
 
 	t.Helper()
 
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", page).Maybe()
 
@@ -88,7 +88,7 @@ func TestHandleAttributesGet_BindsTheGroupAndItsAttributes(t *testing.T) {
 	}
 
 	bind := renderGroupPage(t, client, "/admin/groups/4/attributes", "/admin_groups_attributes.html",
-		func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
+		func(h *handlersmocks.HttpHelper) http.HandlerFunc {
 			return HandleAttributesGet(h, client)
 		})
 
@@ -114,7 +114,7 @@ func TestHandleDeleteGet_BindsTheMemberCountOffTheResponse(t *testing.T) {
 	}
 
 	bind := renderGroupPage(t, client, "/admin/groups/4/delete", "/admin_groups_delete.html",
-		func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
+		func(h *handlersmocks.HttpHelper) http.HandlerFunc {
 			return HandleDeleteGet(h, client)
 		})
 
@@ -135,12 +135,12 @@ func TestHandleSettingsGet_BindsBothTokenFlags(t *testing.T) {
 			IncludeInIdToken: true, IncludeInAccessToken: false},
 	}
 
-	httpSession := mocks_sessionstore.NewStore(t)
+	httpSession := sessionstoremocks.NewStore(t)
 	httpSession.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
 		Return(&sessionstore.Session{Values: map[string]any{}}, nil)
 
 	bind := renderGroupPage(t, client, "/admin/groups/4/settings", "/admin_groups_settings.html",
-		func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
+		func(h *handlersmocks.HttpHelper) http.HandlerFunc {
 			return HandleSettingsGet(h, httpSession, client)
 		})
 

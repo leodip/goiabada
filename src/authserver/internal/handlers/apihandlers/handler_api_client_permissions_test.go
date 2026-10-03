@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,8 +23,8 @@ func TestHandleClientPermissionsPut_ClientCredentialsOffIsRefusedBeforeTheTransa
 		t.Fatalf("grantSaves[2] is %q, not the client permission save", save.name)
 	}
 
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), grantOwnerId).
 		Return(&record.Client{Id: grantOwnerId, ClientIdentifier: "a-web-app", ClientCredentialsEnabled: false}, nil).Once()
 

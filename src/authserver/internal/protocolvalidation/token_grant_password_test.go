@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 )
 
 // =============================================================================
@@ -25,9 +25,9 @@ import (
 // =============================================================================
 
 func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -77,9 +77,9 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 }
 
 func TestValidateTokenRequest_ROPC_GlobalDisabled(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -115,9 +115,9 @@ func TestValidateTokenRequest_ROPC_GlobalDisabled(t *testing.T) {
 }
 
 func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -165,9 +165,9 @@ func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 }
 
 func TestValidateTokenRequest_ROPC_ClientOverrideDisabled(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -202,9 +202,9 @@ func TestValidateTokenRequest_ROPC_ClientOverrideDisabled(t *testing.T) {
 }
 
 func TestValidateTokenRequest_ROPC_MissingUsername(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -242,9 +242,9 @@ func TestValidateTokenRequest_ROPC_MissingUsername(t *testing.T) {
 }
 
 func TestValidateTokenRequest_ROPC_MissingPassword(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -284,9 +284,9 @@ func TestValidateTokenRequest_ROPC_MissingPassword(t *testing.T) {
 func TestValidateTokenRequest_ROPC_PublicClientWithSecret_Fails(t *testing.T) {
 	// Decision 11's symmetry, the password arm. Its own branch, independent of the
 	// refresh_token arm's, so neutralising one leaves the other proving itself (#245).
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -328,9 +328,9 @@ func TestValidateTokenRequest_ROPC_PublicClientWithSecret_Fails(t *testing.T) {
 }
 
 func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -378,9 +378,9 @@ func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
 // The mock's expectation is exact-argument, so with the normalization removed the
 // lookup is called with "  Bob@Example.com  " and no expectation matches.
 func TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -423,9 +423,9 @@ func TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup(t *testing.T) {
 // is what the per-account failure counter keys on, so moving the trim above the check
 // would silently stop counting a whole class of guess (#219 decision 7).
 func TestValidateTokenRequest_ROPC_WhitespaceOnlyUsernameIsInvalidGrant(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -462,9 +462,9 @@ func TestValidateTokenRequest_ROPC_WhitespaceOnlyUsernameIsInvalidGrant(t *testi
 }
 
 func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -511,9 +511,9 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 }
 
 func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -563,9 +563,9 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 }
 
 func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -613,9 +613,9 @@ func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 }
 
 func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -655,9 +655,9 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T
 }
 
 func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -704,9 +704,9 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T
 // refusal is the decrypt failure itself, not an invalid_client answer, since the stored row cannot
 // be read at all (#434).
 func TestValidateTokenRequest_ROPC_ConfidentialClient_OpensTheSecretWithItsOwnCipher(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	otherCipher, err := encryption.NewDataCipher([]byte("fedcba9876543210fedcba9876543210"))
 	require.NoError(t, err)
@@ -742,9 +742,9 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_OpensTheSecretWithItsOwnCi
 }
 
 func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -798,9 +798,9 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 }
 
 func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -847,9 +847,9 @@ func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 }
 
 func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -903,9 +903,9 @@ func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 func TestValidateTokenRequest_ROPC_ClaimScopesWithoutOpenid(t *testing.T) {
 	for _, scope := range []string{"profile", "groups"} {
 		t.Run(scope, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
-			mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-			mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+			mockDB := datamocks.NewDatabase(t)
+			mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+			mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -955,9 +955,9 @@ func TestValidateTokenRequest_ROPC_ClaimScopesWithoutOpenid(t *testing.T) {
 }
 
 func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1008,9 +1008,9 @@ func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 }
 
 func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1069,9 +1069,9 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 }
 
 func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1143,13 +1143,13 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 	for _, tc := range []struct {
 		name     string
 		scope    string
-		setup    func(*mocks_data.Database)
+		setup    func(*datamocks.Database)
 		wantDesc string
 	}{
 		{
 			name:  "unknown resource",
 			scope: "openid nope-api:read",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "nope-api").Return(nil, nil).Once()
 			},
 			wantDesc: "Invalid scope: 'nope-api:read'. Could not find a resource with identifier 'nope-api'.",
@@ -1157,7 +1157,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 		{
 			name:  "permission does not exist on the requested resource",
 			scope: "openid api:delete",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "api").
 					Return(&record.Resource{Id: 1, ResourceIdentifier: "api"}, nil).Once()
 				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).
@@ -1170,7 +1170,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 			// request for it is refused as any unknown permission is.
 			name:  "authserver:userinfo, a permission the authserver resource no longer has",
 			scope: "openid authserver:userinfo",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				builtIns := make([]record.Permission, 0, len(builtin.AuthServerPermissionIdentifiers()))
 				for i, identifier := range builtin.AuthServerPermissionIdentifiers() {
 					builtIns = append(builtIns, record.Permission{Id: int64(40 + i), PermissionIdentifier: identifier, ResourceId: 4})
@@ -1183,8 +1183,8 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
-			validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
+			mockDB := datamocks.NewDatabase(t)
+			validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 			settings := &record.Settings{ResourceOwnerPasswordCredentialsEnabled: true}
 			ctx := context.Background()

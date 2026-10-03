@@ -27,4 +27,4 @@ packages:
       Store:
         config:
           dir: "./sessionstore/mocks"
-          pkgname: "mocks_sessionstore"
+          pkgname: "sessionstoremocks"

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 )
 
 // =============================================================================
@@ -160,7 +160,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	}
 
 	t.Run("Step-up: level1 to level2_optional upgrades ACR and updates AuthMethods", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
 		// Session starts at level1 with password only
@@ -170,7 +170,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
 			Return(nil)
-		mocks_data.ExpectRunInTransaction(database, txSentinel)
+		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
 			// Verify the session was updated with new ACR and AuthMethods
 			return s.AcrLevel == record.AcrLevel2Optional &&
@@ -191,7 +191,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	})
 
 	t.Run("Step-up: level1 to level2_mandatory upgrades ACR and updates AuthMethods", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
 		userSession := createUserSession(record.AcrLevel1, "pwd")
@@ -200,7 +200,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
 			Return(nil)
-		mocks_data.ExpectRunInTransaction(database, txSentinel)
+		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
 			return s.AcrLevel == record.AcrLevel2Mandatory &&
 				s.AuthMethods == "pwd otp"
@@ -219,7 +219,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	})
 
 	t.Run("Step-up: level2_optional to level2_mandatory upgrades ACR", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
 		// Already at level2_optional with pwd+otp
@@ -229,7 +229,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
 			Return(nil)
-		mocks_data.ExpectRunInTransaction(database, txSentinel)
+		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
 			// ACR should upgrade, AuthMethods should stay the same
 			return s.AcrLevel == record.AcrLevel2Mandatory &&
@@ -248,7 +248,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	})
 
 	t.Run("No downgrade: level2_mandatory to level1 preserves higher ACR", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
 		// Session is at level2_mandatory
@@ -258,7 +258,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
 			Return(nil)
-		mocks_data.ExpectRunInTransaction(database, txSentinel)
+		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
 			// ACR should NOT be downgraded, should remain level2_mandatory
 			return s.AcrLevel == record.AcrLevel2Mandatory
@@ -278,7 +278,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	})
 
 	t.Run("No downgrade: level2_optional to level1 preserves higher ACR", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
 		userSession := createUserSession(record.AcrLevel2Optional, "pwd otp")
@@ -287,7 +287,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
 			Return(nil)
-		mocks_data.ExpectRunInTransaction(database, txSentinel)
+		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
 			return s.AcrLevel == record.AcrLevel2Optional
 		})).Return(nil)
@@ -305,7 +305,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	})
 
 	t.Run("Same level: no ACR change when levels are equal", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
 		userSession := createUserSession(record.AcrLevel2Optional, "pwd otp")
@@ -314,7 +314,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
 			Return(nil)
-		mocks_data.ExpectRunInTransaction(database, txSentinel)
+		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
 			return s.AcrLevel == record.AcrLevel2Optional &&
 				s.AuthMethods == "pwd otp"
@@ -332,7 +332,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	})
 
 	t.Run("Empty authMethods preserves existing AuthMethods", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
 		userSession := createUserSession(record.AcrLevel1, "pwd")
@@ -341,7 +341,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
 			Return(nil)
-		mocks_data.ExpectRunInTransaction(database, txSentinel)
+		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
 			// AuthMethods should remain "pwd" when empty string passed
 			return s.AuthMethods == "pwd"
@@ -361,7 +361,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	})
 
 	t.Run("Empty acrLevel preserves existing AcrLevel", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
 		userSession := createUserSession(record.AcrLevel2Optional, "pwd otp")
@@ -370,7 +370,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
 			Return(nil)
-		mocks_data.ExpectRunInTransaction(database, txSentinel)
+		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
 			// AcrLevel should remain level2_optional when empty string passed
 			return s.AcrLevel == record.AcrLevel2Optional
@@ -390,7 +390,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	})
 
 	t.Run("Both empty strings preserve existing ACR and AuthMethods (refresh token scenario)", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
 		userSession := createUserSession(record.AcrLevel2Mandatory, "pwd otp")
@@ -399,7 +399,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
 			Return(nil)
-		mocks_data.ExpectRunInTransaction(database, txSentinel)
+		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
 			// Both should be preserved
 			return s.AcrLevel == record.AcrLevel2Mandatory &&
@@ -419,7 +419,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	})
 
 	t.Run("AuthMethods updated when different (same ACR level)", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
 		// Edge case: same ACR but different auth methods string
@@ -430,7 +430,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
 			Return(nil)
-		mocks_data.ExpectRunInTransaction(database, txSentinel)
+		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
 			// AuthMethods should be updated
 			return s.AuthMethods == "pwd otp"
@@ -448,11 +448,11 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	})
 
 	t.Run("Session not found returns error", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
 		// The read is on the transaction, since the decision it feeds is taken there (#249).
-		stub := mocks_data.ExpectRunInTransaction(database, txSentinel)
+		stub := datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, "non-existent-session").
 			Return(nil, nil).Once()
 
@@ -475,7 +475,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 func TestBumpUserSession_ClientTracking(t *testing.T) {
 	t.Run("New client is added to session", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
 		userSession := &record.UserSession{
@@ -495,7 +495,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
 			Return(nil)
-		mocks_data.ExpectRunInTransaction(database, txSentinel)
+		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, userSession).Return(nil)
 		database.On("UpdateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.MatchedBy(func(c *record.UserSessionClient) bool {
@@ -513,7 +513,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 	})
 
 	t.Run("Existing client updates LastAccessed", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
 		oldTime := time.Now().UTC().Add(-1 * time.Hour)
@@ -534,7 +534,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
 			Return(nil)
-		mocks_data.ExpectRunInTransaction(database, txSentinel)
+		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, userSession).Return(nil)
 		database.On("UpdateUserSessionClient", mock.Anything, mock.Anything, mock.MatchedBy(func(c *record.UserSessionClient) bool {
 			// LastAccessed should be updated to a newer time
@@ -574,7 +574,7 @@ func TestBumpUserSession_RecordsTheLatestAddress(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
+			database := datamocks.NewDatabase(t)
 			manager := &Manager{database: database}
 
 			userSession := &record.UserSession{
@@ -592,7 +592,7 @@ func TestBumpUserSession_RecordsTheLatestAddress(t *testing.T) {
 				Return(userSession, nil)
 			database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
 				Return(nil)
-			mocks_data.ExpectRunInTransaction(database, txSentinel)
+			datamocks.ExpectRunInTransaction(database, txSentinel)
 			database.On("UpdateUserSession", mock.Anything, txSentinel, mock.MatchedBy(func(s *record.UserSession) bool {
 				return s.IpAddress == tc.wantAfter
 			})).Return(nil).Once()

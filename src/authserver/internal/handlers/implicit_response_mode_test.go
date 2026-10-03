@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
 // The implicit flow's response mode (#231, decision 15). A request for a response type that returns
@@ -285,14 +285,14 @@ func TestIssueImplicitTokens_FragmentIsTheDefault(t *testing.T) {
 // cleared before the tokens leave, as it is for the fragment. The issuer, the audit event and the
 // registration gate are the fragment case's, unchanged.
 func TestHandleIssueGet_ImplicitFlow_FormPost(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-	codeIssuer := mocks_handlers.NewCodeIssuer(t)
-	implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
-	permissionChecker := mocks_handlers.NewPermissionChecker(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	codeIssuer := handlersmocks.NewCodeIssuer(t)
+	implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	userSessionManager := handlersmocks.NewUserSessionManager(t)
+	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 	handler := HandleIssueGet(pageRenderer, ceremonyStore, web.TemplateFS(), codeIssuer, implicitTokenIssuer, database,
 		auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)

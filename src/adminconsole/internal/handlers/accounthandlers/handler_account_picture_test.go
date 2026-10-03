@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -74,7 +74,7 @@ func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			switch {
 			case testCase.wantNotFound:
 				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
@@ -198,7 +198,7 @@ func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			var captured error
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
@@ -261,7 +261,7 @@ func TestAccountProfilePicturePost_ABodyTheLimitCut(t *testing.T) {
 	form, contentType := multipartPicture(t, "picture")
 	body := form.Bytes()
 
-	serve := func(t *testing.T, limit int, httpHelper *mocks_handlers.HttpHelper, apiClient *uploadRecorder) *httptest.ResponseRecorder {
+	serve := func(t *testing.T, limit int, httpHelper *handlersmocks.HttpHelper, apiClient *uploadRecorder) *httptest.ResponseRecorder {
 		rr := httptest.NewRecorder()
 		req := handlertest.Request(http.MethodPost, "/account/picture",
 			handlertest.WithContentType(contentType), handlertest.WithAccessToken())
@@ -274,14 +274,14 @@ func TestAccountProfilePicturePost_ABodyTheLimitCut(t *testing.T) {
 	t.Run("at exactly the limit the picture is forwarded", func(t *testing.T) {
 		apiClient := &uploadRecorder{}
 
-		rr := serve(t, len(body), mocks_handlers.NewHttpHelper(t), apiClient)
+		rr := serve(t, len(body), handlersmocks.NewHttpHelper(t), apiClient)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		assert.Equal(t, []byte("not really a jpeg, but bytes are bytes here"), apiClient.picture)
 	})
 
 	t.Run("one byte short it is the JSON 400 and nothing is forwarded", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHttpHelper(t)
 		httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 			var detail *oauth.ErrorDetail
 			return errors.As(err, &detail) && detail.Code() == "invalid_request_body" &&
@@ -325,7 +325,7 @@ func TestAccountProfilePictureDelete_AnswersThroughTheSharedJsonWriters(t *testi
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			var captured error
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {

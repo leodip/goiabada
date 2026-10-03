@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 )
@@ -28,8 +28,8 @@ func newSyntaxAuthorizeEndpoint(t *testing.T) *authorizeEndpoint {
 	t.Helper()
 	e := newAuthorizeEndpoint(t)
 	e.handler = HandleAuthorizeGet(e.pageRenderer, e.ceremonyStore, e.userSessionManager, e.database, nil,
-		protocolvalidation.NewAuthorizeValidator(e.database), mocks_handlers.NewAuditLogger(t),
-		mocks_handlers.NewPermissionChecker(t), mocks_handlers.NewTokenParser(t), testBaseURL)
+		protocolvalidation.NewAuthorizeValidator(e.database), handlersmocks.NewAuditLogger(t),
+		handlersmocks.NewPermissionChecker(t), handlersmocks.NewTokenParser(t), testBaseURL)
 
 	implicit := true
 	client := &record.Client{

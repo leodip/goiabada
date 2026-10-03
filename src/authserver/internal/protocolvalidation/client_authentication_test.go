@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
-	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -43,8 +43,8 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 	// request through to it.
 	type grantFixture struct {
 		grant   oidc.GrantType
-		arrange func(t *testing.T, mockDB *mocks_data.Database, client *record.Client, input *ValidateTokenRequestInput)
-		passed  func(t *testing.T, mockDB *mocks_data.Database, client *record.Client,
+		arrange func(t *testing.T, mockDB *datamocks.Database, client *record.Client, input *ValidateTokenRequestInput)
+		passed  func(t *testing.T, mockDB *datamocks.Database, client *record.Client,
 			result TokenGrant, err error)
 	}
 
@@ -61,7 +61,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 	fixtures := []grantFixture{
 		{
 			grant: oidc.GrantTypeAuthorizationCode,
-			arrange: func(t *testing.T, mockDB *mocks_data.Database, client *record.Client, input *ValidateTokenRequestInput) {
+			arrange: func(t *testing.T, mockDB *datamocks.Database, client *record.Client, input *ValidateTokenRequestInput) {
 				client.AuthorizationCodeEnabled = true
 				input.Code = "the_code"
 				input.RedirectURI = "https://example.com/callback"
@@ -78,7 +78,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 				mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil).Once()
 				mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil).Once()
 			},
-			passed: func(t *testing.T, _ *mocks_data.Database, client *record.Client, result TokenGrant, err error) {
+			passed: func(t *testing.T, _ *datamocks.Database, client *record.Client, result TokenGrant, err error) {
 				assert.Nil(t, result)
 				if client.IsPublic {
 					refusedWith(t, err, refusal{"invalid_grant",
@@ -93,10 +93,10 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 		},
 		{
 			grant: oidc.GrantTypeClientCredentials,
-			arrange: func(t *testing.T, _ *mocks_data.Database, client *record.Client, _ *ValidateTokenRequestInput) {
+			arrange: func(t *testing.T, _ *datamocks.Database, client *record.Client, _ *ValidateTokenRequestInput) {
 				client.ClientCredentialsEnabled = true
 			},
-			passed: func(t *testing.T, mockDB *mocks_data.Database, client *record.Client, result TokenGrant, err error) {
+			passed: func(t *testing.T, mockDB *datamocks.Database, client *record.Client, result TokenGrant, err error) {
 				require.NoError(t, err)
 				require.NotNil(t, result)
 				assert.Same(t, client, grantAs[*ClientCredentialsGrant](t, result).Client)
@@ -106,8 +106,8 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 			grant: oidc.GrantTypeRefreshToken,
 			// Authentication is the first thing the refresh grant does; no refresh_token is sent,
 			// so the refusal that follows it is the missing parameter.
-			arrange: func(*testing.T, *mocks_data.Database, *record.Client, *ValidateTokenRequestInput) {},
-			passed: func(t *testing.T, _ *mocks_data.Database, _ *record.Client, result TokenGrant, err error) {
+			arrange: func(*testing.T, *datamocks.Database, *record.Client, *ValidateTokenRequestInput) {},
+			passed: func(t *testing.T, _ *datamocks.Database, _ *record.Client, result TokenGrant, err error) {
 				assert.Nil(t, result)
 				refusedWith(t, err, refusal{"invalid_request", "Missing required refresh_token parameter.",
 					http.StatusBadRequest, ""})
@@ -115,13 +115,13 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 		},
 		{
 			grant: oidc.GrantTypePassword,
-			arrange: func(t *testing.T, _ *mocks_data.Database, client *record.Client, input *ValidateTokenRequestInput) {
+			arrange: func(t *testing.T, _ *datamocks.Database, client *record.Client, input *ValidateTokenRequestInput) {
 				enabled := true
 				client.ResourceOwnerPasswordCredentialsEnabled = &enabled
 				input.Username = "someone@example.com"
 				input.Password = "a password"
 			},
-			passed: func(t *testing.T, _ *mocks_data.Database, _ *record.Client, result TokenGrant, err error) {
+			passed: func(t *testing.T, _ *datamocks.Database, _ *record.Client, result TokenGrant, err error) {
 				assert.Nil(t, result)
 				refusedWith(t, err, refusal{"invalid_grant", "Invalid resource owner credentials.",
 					http.StatusBadRequest, ""})
@@ -160,9 +160,9 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 	for _, f := range fixtures {
 		for _, r := range rows {
 			t.Run(f.grant.String()+": "+r.name, func(t *testing.T) {
-				mockDB := mocks_data.NewDatabase(t)
-				validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t),
-					mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
+				mockDB := datamocks.NewDatabase(t)
+				validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
+					protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 				encryptedSecret, err := testDataCipher.Encrypt(theSecret)
 				require.NoError(t, err)
@@ -262,9 +262,9 @@ func TestValidateTokenRequest_PreludeInvalidClient(t *testing.T) {
 				continue
 			}
 			t.Run(grant.String()+": "+r.name, func(t *testing.T) {
-				mockDB := mocks_data.NewDatabase(t)
-				validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t),
-					mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
+				mockDB := datamocks.NewDatabase(t)
+				validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
+					protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 				mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "the_client").Return(r.client, nil).Once()
 
 				result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
@@ -281,9 +281,9 @@ func TestValidateTokenRequest_PreludeInvalidClient(t *testing.T) {
 		}
 
 		t.Run(grant.String()+": missing client_id", func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
-			validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t),
-				mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
+			mockDB := datamocks.NewDatabase(t)
+			validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
+				protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 			result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
 				&ValidateTokenRequestInput{GrantType: grant, ClientSecret: "a_secret"})

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -45,7 +45,7 @@ func markedSettingsContext() context.Context {
 // The accept arm: the read Load makes is issued under the context Load was given.
 func TestDatabaseBackend_LoadReadsUnderTheCallersContext(t *testing.T) {
 	const owner, id = "owner", "propagation-id"
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("GetBrowserSessionByOwnerAndSessionIdHash", theCallersContext(), (*sql.Tx)(nil),
 		owner, hashutil.HashString(id), fixedNow).
@@ -67,7 +67,7 @@ func TestDatabaseBackend_LoadReadsUnderTheCallersContext(t *testing.T) {
 // the one the /auth/authorize request supplies before it has validated anything.
 func TestDatabaseBackend_CreateWritesUnderTheCallersContext(t *testing.T) {
 	const owner, id = "owner", "propagation-create"
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("CreateBrowserSession", theCallersContext(), (*sql.Tx)(nil), mock.Anything).
 		Return(nil).Once()
@@ -84,7 +84,7 @@ func TestDatabaseBackend_CreateWritesUnderTheCallersContext(t *testing.T) {
 // Without it the two accept arms would also pass on a backend that wrote unconditionally.
 func TestDatabaseBackend_UpdateOfAnAbsentSessionReachesNoInsert(t *testing.T) {
 	const owner, id = "owner", "propagation-absent"
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("UpdateBrowserSessionData", theCallersContext(), (*sql.Tx)(nil),
 		owner, hashutil.HashString(id), "data", fixedNow, mock.Anything).

@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -37,7 +37,7 @@ func assertJSONInternalServerError(t *testing.T, rr *httptest.ResponseRecorder) 
 }
 
 func TestHandleUserConsentsGet_Success(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	handler := HandleUserConsentsGet(database)
 
 	user := &record.User{Id: 7}
@@ -61,7 +61,7 @@ func TestHandleUserConsentsGet_Success(t *testing.T) {
 }
 
 func TestHandleUserConsentsGet_GetUserFails_JSON500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	handler := HandleUserConsentsGet(database)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/7/consents", nil)
@@ -77,7 +77,7 @@ func TestHandleUserConsentsGet_GetUserFails_JSON500(t *testing.T) {
 }
 
 func TestHandleUserConsentsGet_GetConsentsFails_JSON500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	handler := HandleUserConsentsGet(database)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/7/consents", nil)
@@ -94,7 +94,7 @@ func TestHandleUserConsentsGet_GetConsentsFails_JSON500(t *testing.T) {
 }
 
 func TestHandleUserConsentsGet_LoadClientsFails_JSON500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	handler := HandleUserConsentsGet(database)
 
 	consents := []record.UserConsent{{Id: 1, UserId: 7, ClientId: 3}}
@@ -114,8 +114,8 @@ func TestHandleUserConsentsGet_LoadClientsFails_JSON500(t *testing.T) {
 }
 
 func TestHandleUserConsentDelete_Success(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	handler := HandleUserConsentDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/user-consents/5", nil)
@@ -140,8 +140,8 @@ func TestHandleUserConsentDelete_Success(t *testing.T) {
 }
 
 func TestHandleUserConsentDelete_GetConsentFails_JSON500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	handler := HandleUserConsentDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/user-consents/5", nil)
@@ -157,8 +157,8 @@ func TestHandleUserConsentDelete_GetConsentFails_JSON500(t *testing.T) {
 }
 
 func TestHandleUserConsentDelete_DeleteFails_JSON500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	handler := HandleUserConsentDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/user-consents/5", nil)

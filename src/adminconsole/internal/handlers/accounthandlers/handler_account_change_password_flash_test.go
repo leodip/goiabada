@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
@@ -104,7 +104,7 @@ func TestHandleChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T) {
 	store := newFlashTestStore()
 
 	// The POST: the API accepts the change, the handler flashes and redirects.
-	postHelper := mocks_handlers.NewHttpHelper(t)
+	postHelper := handlersmocks.NewHttpHelper(t)
 	form := url.Values{
 		"currentPassword":         {"P4ss!word"},
 		"newPassword":             {"N3w!word"},
@@ -125,7 +125,7 @@ func TestHandleChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T) {
 	require.NotEmpty(t, jar.cookies, "the POST must have named a session for the GET to find")
 
 	// The first GET: the notice is there.
-	firstHelper := mocks_handlers.NewHttpHelper(t)
+	firstHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.ExpectRender(firstHelper, "/layouts/menu_layout.html", "/account_change_password.html").Once()
 	firstRec := httptest.NewRecorder()
 	firstReq := jar.send(handlertest.Request(http.MethodGet, "/account/change-password",
@@ -138,7 +138,7 @@ func TestHandleChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T) {
 		"the notice the POST flashed must reach the page that renders it")
 
 	// The second GET: it is gone, and gone because the first GET saved the consumption.
-	secondHelper := mocks_handlers.NewHttpHelper(t)
+	secondHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.ExpectRender(secondHelper,
 		"/layouts/menu_layout.html", "/account_change_password.html").Once()
 	secondReq := jar.send(handlertest.Request(http.MethodGet, "/account/change-password",
@@ -154,7 +154,7 @@ func TestHandleChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T) {
 // TestHandleChangePasswordGet_NoFlashIsNoNotice is the negative half: without it the
 // case above is satisfied by a handler that binds true unconditionally.
 func TestHandleChangePasswordGet_NoFlashIsNoNotice(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_change_password.html").Once()
 
 	req := handlertest.Request(http.MethodGet, "/account/change-password", handlertest.WithAccessToken())

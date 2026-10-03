@@ -16,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 
-	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
+	"github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
 // The marker tests run against a real store rather than the store mock. The marker's
@@ -497,7 +497,7 @@ func TestLinkMarkerStoreFailures(t *testing.T) {
 	expectedError := errors.New("session store is unavailable")
 
 	t.Run("save", func(t *testing.T) {
-		store := mocks_sessionstore.NewStore(t)
+		store := sessionstoremocks.NewStore(t)
 		store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(nil, expectedError)
 
 		rejection, err := SaveLinkMarker(store, httptest.NewRecorder(),
@@ -509,7 +509,7 @@ func TestLinkMarkerStoreFailures(t *testing.T) {
 	})
 
 	t.Run("get", func(t *testing.T) {
-		store := mocks_sessionstore.NewStore(t)
+		store := sessionstoremocks.NewStore(t)
 		store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(nil, expectedError)
 
 		marker, rejection, err := GetLinkMarker(store,
@@ -521,7 +521,7 @@ func TestLinkMarkerStoreFailures(t *testing.T) {
 	})
 
 	t.Run("clear", func(t *testing.T) {
-		store := mocks_sessionstore.NewStore(t)
+		store := sessionstoremocks.NewStore(t)
 		store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(nil, expectedError)
 
 		err := ClearLinkMarker(store, httptest.NewRecorder(),

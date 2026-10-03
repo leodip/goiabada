@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -38,7 +38,7 @@ func (c *countingPhoneApiClient) UpdateUserPhone(_ context.Context, _ string, _ 
 // serves both, as the router's does, so a copy kept in its closure would be caught as well.
 func TestHandlePhoneGet_TwoRequestsAskForTheCountriesTwice(t *testing.T) {
 	apiClient := &countingPhoneApiClient{}
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_phone.html").Twice()
 

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -31,7 +31,7 @@ import (
 // =============================================================================
 
 func TestPublicSettings_Success(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	handler := NewPublicSettings(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
@@ -61,7 +61,7 @@ func TestPublicSettings_OnlyGetIsAllowed(t *testing.T) {
 		t.Run(method, func(t *testing.T) {
 			// NewDatabase(t) fails on any unexpected call, so the absence of a
 			// GetSettingsById expectation proves the method check short circuits.
-			database := mocks_data.NewDatabase(t)
+			database := datamocks.NewDatabase(t)
 			handler := NewPublicSettings(database)
 
 			recorder := httptest.NewRecorder()
@@ -77,7 +77,7 @@ func TestPublicSettings_OnlyGetIsAllowed(t *testing.T) {
 }
 
 func TestPublicSettings_DatabaseError(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	handler := NewPublicSettings(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).
@@ -97,7 +97,7 @@ func TestPublicSettings_DatabaseError(t *testing.T) {
 // the handler dereferenced it, which panicked an endpoint reachable without any
 // authentication.
 func TestPublicSettings_MissingSettingsRowDoesNotPanic(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	handler := NewPublicSettings(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, nil).Once()
@@ -133,7 +133,7 @@ func (f *failingResponseWriter) Write([]byte) (int, error) {
 func (f *failingResponseWriter) WriteHeader(int) {}
 
 func TestPublicSettings_EncodeFailure(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	handler := NewPublicSettings(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
@@ -188,7 +188,7 @@ func TestPublicSettingsResponse_ExposesOnlyAllowlistedFields(t *testing.T) {
 // them reach the response body. This catches the case the struct check cannot,
 // namely someone replacing the DTO mapping with a direct encode of settings.
 func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	handler := NewPublicSettings(database)
 
 	aesKey := []byte("SENTINEL-legacy-aes-encryption-key")

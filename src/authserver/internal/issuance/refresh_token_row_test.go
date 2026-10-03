@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
@@ -16,7 +16,7 @@ import (
 )
 
 func TestGenerateRefreshToken_Offline(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -86,7 +86,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 }
 
 func TestGenerateRefreshToken_Refresh(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -160,7 +160,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 }
 
 func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -240,7 +240,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 }
 
 func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -338,7 +338,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 }
 
 func TestGetRefreshTokenExpiration(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	now := time.Now().UTC()
@@ -401,7 +401,7 @@ func TestGetRefreshTokenExpiration(t *testing.T) {
 }
 
 func TestGetRefreshTokenMaxLifetime(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	now := time.Now().UTC()

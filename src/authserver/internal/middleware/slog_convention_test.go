@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -22,7 +22,7 @@ import (
 func TestSlogConvention_SettingsReadFailureIsError(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("database error"))
 
 	rr := httptest.NewRecorder()
@@ -56,7 +56,7 @@ func TestSlogConvention_SettingsReadFailureIsError(t *testing.T) {
 func TestSlogConvention_CorsConfigurationFailureIsError(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	mockDB.On("WebOriginExists", mock.Anything, mock.Anything, "https://app.example.com").
 		Return(false, errors.New("the database is unreachable"))
 

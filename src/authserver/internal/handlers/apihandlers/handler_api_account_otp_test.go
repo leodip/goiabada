@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -123,8 +123,8 @@ func otpTestUser(t *testing.T, password string) *record.User {
 // TestHandleAccountOTPPut_Enable_ReplayIsRefused is the one that matters. A refused claim must draw
 // the identical body a wrong code draws, must record the replay, and must not enable OTP.
 func TestHandleAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -174,8 +174,8 @@ func TestHandleAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 // TestHandleAccountOTPPut_Enable_ClaimErrorIs500 pins fail-closed. A database fault must not be
 // collapsed into either answer: refusing valid codes is bad and accepting replays is worse.
 func TestHandleAccountOTPPut_Enable_ClaimErrorIs500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -203,8 +203,8 @@ func TestHandleAccountOTPPut_Enable_ClaimErrorIs500(t *testing.T) {
 // attributable. A code that does not match must stop at the matcher, so the claim is never reached and
 // nothing is audited.
 func TestHandleAccountOTPPut_Enable_WrongCodeDoesNotClaim(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -237,8 +237,8 @@ func TestHandleAccountOTPPut_Enable_WrongCodeDoesNotClaim(t *testing.T) {
 // The call shape is what distinguishes this from a sequential pair of writes, which is why it is
 // asserted through a mock: end to end, a caller observes the same final row either way.
 func TestHandleAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -249,7 +249,7 @@ func TestHandleAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T) {
 		Return(true, nil).Once()
 
 	var calls []string
-	mocks_data.ExpectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
+	datamocks.ExpectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
 	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).Return(int64(1), nil).
@@ -285,8 +285,8 @@ func TestHandleAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T) {
 // not new: #111 claims the step before the enable write precisely so a failed enable cannot leave
 // OTP switched on, and the user types the next code.
 func TestHandleAccountOTPPut_Enable_CounterFailureRollsBack(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -296,7 +296,7 @@ func TestHandleAccountOTPPut_Enable_CounterFailureRollsBack(t *testing.T) {
 	database.On("TryConsumeUserOTPStep", mock.Anything, (*sql.Tx)(nil), user.Id, mock.Anything, false).
 		Return(true, nil).Once()
 
-	stub := mocks_data.ExpectRunInTransaction(database, otpDisableTx)
+	stub := datamocks.ExpectRunInTransaction(database, otpDisableTx)
 	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).Once()
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).
 		Return(int64(0), errors.New("the database is unwell")).Once()
@@ -347,8 +347,8 @@ func accountOTPDisableRequest(t *testing.T, subject, password string) *http.Requ
 // distinguishes them, which is why this is asserted through a mock and why the order is asserted too:
 // both writes inside, commit last.
 func TestHandleAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -358,7 +358,7 @@ func TestHandleAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T) {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 	var calls []string
-	mocks_data.ExpectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
+	datamocks.ExpectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
 	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
 	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.Id).Return(nil).
@@ -390,8 +390,8 @@ func TestHandleAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T) {
 // half-removed. Committing here would strand the row at otp_enabled = false with a live marker, which
 // is a lockout on re-enrollment until the marker's step passes.
 func TestHandleAccountOTPPut_Disable_ResetFailureRollsBack(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -399,7 +399,7 @@ func TestHandleAccountOTPPut_Disable_ResetFailureRollsBack(t *testing.T) {
 	user.OTPEnabled = true
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
-	stub := mocks_data.ExpectRunInTransaction(database, otpDisableTx)
+	stub := datamocks.ExpectRunInTransaction(database, otpDisableTx)
 	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).Once()
 	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.Id).
 		Return(errors.New("the database is unwell")).Once()
@@ -438,8 +438,8 @@ func wrongButWellFormedCode(t *testing.T) string {
 // comparing against a copy of the literal would pass with both copies wrong.
 func wrongCodeDescription(t *testing.T) string {
 	t.Helper()
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	const subject = "oracle-subject"
 	const password = "P4ss!word"
@@ -507,8 +507,8 @@ func decodeEnrollment(t *testing.T, rr *httptest.ResponseRecorder) api.AccountOT
 // That is the assertion: mockery's NewOtpSecretGenerator(t) registers a cleanup that refuses an
 // unexpected call.
 func TestHandleAccountOTPEnrollmentGet_LivePendingIsReturnedUnchanged(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	generator := mocks_handlers.NewOtpSecretGenerator(t)
+	database := datamocks.NewDatabase(t)
+	generator := handlersmocks.NewOtpSecretGenerator(t)
 
 	const subject = "enrolling-subject"
 	user := otpTestUser(t, "P4ss!word")
@@ -534,8 +534,8 @@ func TestHandleAccountOTPEnrollmentGet_LivePendingIsReturnedUnchanged(t *testing
 // A pending enrollment older than otpEnrollmentLifetime is not honoured: it is replaced. Without
 // decision 12's expiry an abandoned seed would sit on the user row with nothing to sweep it.
 func TestHandleAccountOTPEnrollmentGet_ExpiredPendingIsReplaced(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	generator := mocks_handlers.NewOtpSecretGenerator(t)
+	database := datamocks.NewDatabase(t)
+	generator := handlersmocks.NewOtpSecretGenerator(t)
 
 	const subject = "enrolling-subject"
 	user := otpTestUser(t, "P4ss!word")
@@ -574,8 +574,8 @@ func TestHandleAccountOTPEnrollmentGet_ExpiredPendingIsReplaced(t *testing.T) {
 // Two concurrent enrollment calls must agree on one QR code: handing out the unstored one would
 // give the user a code the PUT can never accept.
 func TestHandleAccountOTPEnrollmentGet_LostRaceAnswersWithTheStoredSeed(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	generator := mocks_handlers.NewOtpSecretGenerator(t)
+	database := datamocks.NewDatabase(t)
+	generator := handlersmocks.NewOtpSecretGenerator(t)
 
 	const subject = "enrolling-subject"
 	loser := otpTestUser(t, "P4ss!word")
@@ -607,8 +607,8 @@ func TestHandleAccountOTPEnrollmentGet_LostRaceAnswersWithTheStoredSeed(t *testi
 // A caller that lost the race to a user who has finished enrolling gets the ordinary refusal, not a
 // 500 and not a seed. Enrollment is over for them.
 func TestHandleAccountOTPEnrollmentGet_LostRaceToACompletedEnrollment(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	generator := mocks_handlers.NewOtpSecretGenerator(t)
+	database := datamocks.NewDatabase(t)
+	generator := handlersmocks.NewOtpSecretGenerator(t)
 
 	const subject = "enrolling-subject"
 	user := otpTestUser(t, "P4ss!word")
@@ -655,8 +655,8 @@ func TestHandleAccountOTPPut_SecretKeyIsRefused(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// No expectations on either mock: the refusal must land before the user is
 			// loaded, so any database call fails this test.
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			req := accountOTPRawRequest(t, "the-subject", map[string]interface{}{
 				"enabled":   true,
@@ -679,8 +679,8 @@ func TestHandleAccountOTPPut_SecretKeyIsRefused(t *testing.T) {
 // A disable request carrying secretKey is refused too. The rule is about the shape of the request,
 // not about the branch it would have taken.
 func TestHandleAccountOTPPut_SecretKeyIsRefusedOnDisableToo(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	req := accountOTPRawRequest(t, "the-subject", map[string]interface{}{
 		"enabled":   false,
@@ -721,8 +721,8 @@ func (c *countingCredentials) RecordCredentialFailure(*http.Request) { c.failure
 func TestHandleAccountOTPPut_OversizedBodyIsRefused(t *testing.T) {
 	// Expectation-free: an oversized body must be refused before the user is loaded, so any
 	// database or audit call is a failure, and the limiter is asked afterwards.
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	limiter := &countingCredentials{}
 
 	req := accountOTPRawRequest(t, "the-subject", map[string]interface{}{
@@ -781,8 +781,8 @@ func TestHandleAccountOTPPut_Enable_RefusedWithoutALivePendingEnrollment(t *test
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			const subject = "the-subject"
 			const password = "P4ss!word"
@@ -814,8 +814,8 @@ func TestHandleAccountOTPPut_Enable_RefusedWithoutALivePendingEnrollment(t *test
 // still reading a caller-supplied secret would find none and could not reach the claim at all.
 // What the case pins is the other half: the value that reaches the row.
 func TestHandleAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -825,7 +825,7 @@ func TestHandleAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 		Return(true, nil).Once()
 
 	tx := &sql.Tx{}
-	mocks_data.ExpectRunInTransaction(database, tx)
+	datamocks.ExpectRunInTransaction(database, tx)
 	database.On("UpdateUser", mock.Anything, tx, user).Return(nil).Once()
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, tx, user.Id).Return(int64(4), nil).Once()
 	// The clear rides in the enable's own transaction, so no committed state has OTP on with a
@@ -851,8 +851,8 @@ func TestHandleAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 // secret left the request, and a renamed error code is a published contract change that nothing
 // else in the suite observes.
 func TestHandleAccountOTPPut_Enable_BlankCodeIsRefusedByName(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	mocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
@@ -86,7 +86,7 @@ func TestLogger_ConsoleRecordCarriesTheEventAndTheDetails(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
 
 			// Console enabled, database disabled, so the strict mock refuses any write.
-			mockDB := mocks.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 
 			NewLogger(mockDB, consoleOnly()).Log(context.Background(), tc.event, tc.details)
 
@@ -105,7 +105,7 @@ func TestLogger_ConsoleRecordCarriesTheEventAndTheDetails(t *testing.T) {
 func TestLoggerDisabled(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 
-	mockDB := mocks.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 
 	auditLogger := NewLogger(mockDB, noTarget())
 
@@ -122,7 +122,7 @@ func TestLoggerDisabled(t *testing.T) {
 }
 
 func TestLogger_DBPersistence_Enabled(t *testing.T) {
-	mockDB := mocks.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 
 	// Expect CreateAuditLog to be called
 	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.MatchedBy(func(log *record.AuditLog) bool {
@@ -142,7 +142,7 @@ func TestLogger_DBPersistence_Enabled(t *testing.T) {
 }
 
 func TestLogger_DBPersistence_Disabled(t *testing.T) {
-	mockDB := mocks.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 
 	// CreateAuditLog should NOT be called
 	// (no mock.On call means assertion will fail if it's called)
@@ -159,7 +159,7 @@ func TestLogger_DBPersistence_Disabled(t *testing.T) {
 // TestLogger_SwitchesError is the port failing: the event is logged as lost and written
 // nowhere, and the request it came from is not failed.
 func TestLogger_SwitchesError(t *testing.T) {
-	mockDB := mocks.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 
 	logs := logtest.CaptureSlog(t)
 
@@ -183,7 +183,7 @@ func TestLogger_SwitchesError(t *testing.T) {
 }
 
 func TestLogger_DBPersistence_CreateError(t *testing.T) {
-	mockDB := mocks.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 
 	// Mock CreateAuditLog to return error
 	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
@@ -205,7 +205,7 @@ func TestLogger_DBPersistence_CreateError(t *testing.T) {
 }
 
 func TestLogger_DBPersistence_JSONMarshalError(t *testing.T) {
-	mockDB := mocks.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 
 	// CreateAuditLog should NOT be called due to marshal error
 
@@ -225,7 +225,7 @@ func TestLogger_DBPersistence_JSONMarshalError(t *testing.T) {
 }
 
 func TestLogger_BothConsoleAndDB(t *testing.T) {
-	mockDB := mocks.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	logs := logtest.CaptureSlog(t)
@@ -243,7 +243,7 @@ func TestLogger_BothConsoleAndDB(t *testing.T) {
 }
 
 func TestLogger_ConsoleEnabledDBDisabled(t *testing.T) {
-	mockDB := mocks.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 
 	logs := logtest.CaptureSlog(t)
 
@@ -275,7 +275,7 @@ func TestLogger_NilDependencies(t *testing.T) {
 	})
 
 	t.Run("no switches", func(t *testing.T) {
-		mockDB := mocks.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		auditLogger := NewLogger(mockDB, nil)
 
 		assert.NotPanics(t, func() {
@@ -291,7 +291,7 @@ func TestLogger_NilDependencies(t *testing.T) {
 // its port and nowhere else, once for each event, on a context still carrying the caller's
 // values -- which is what lets the adapter find the request's settings rather than read the row.
 func TestLogger_AsksTheSwitchesOncePerEventWithTheCallersValues(t *testing.T) {
-	mockDB := mocks.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	switches := noTarget()
 	auditLogger := NewLogger(mockDB, switches)
 
@@ -329,7 +329,7 @@ func TestLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 		// switches and setup arrange the one record this row is about, and nothing else: each row
 		// disables the target it is not testing so exactly one record is written.
 		switches func() *fakeSwitches
-		setup    func(mockDB *mocks.Database)
+		setup    func(mockDB *datamocks.Database)
 		details  map[string]interface{}
 		level    slog.Level
 		message  string
@@ -337,7 +337,7 @@ func TestLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 		{
 			name:     "the console record",
 			switches: consoleOnly,
-			setup:    func(mockDB *mocks.Database) {},
+			setup:    func(mockDB *datamocks.Database) {},
 			details:  map[string]interface{}{"email": "jane@example.com"},
 			level:    slog.LevelInfo,
 			message:  "audit event",
@@ -345,7 +345,7 @@ func TestLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 		{
 			name:     "the switches could not be read",
 			switches: func() *fakeSwitches { return &fakeSwitches{err: assert.AnError} },
-			setup:    func(mockDB *mocks.Database) {},
+			setup:    func(mockDB *datamocks.Database) {},
 			details:  map[string]interface{}{"email": "jane@example.com"},
 			level:    slog.LevelError,
 			message:  "unable to read the audit switches",
@@ -353,7 +353,7 @@ func TestLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 		{
 			name:     "the details could not be marshalled",
 			switches: databaseOnly,
-			setup:    func(mockDB *mocks.Database) {},
+			setup:    func(mockDB *datamocks.Database) {},
 			// A channel is the value json.Marshal refuses, so this row reaches the marshal failure
 			// rather than the persist one; CreateAuditLog is left unexpected, so the mock fails the
 			// test if the row is written anyway.
@@ -364,7 +364,7 @@ func TestLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 		{
 			name:     "the row could not be persisted",
 			switches: databaseOnly,
-			setup: func(mockDB *mocks.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
 			},
 			details: map[string]interface{}{"email": "jane@example.com"},
@@ -376,7 +376,7 @@ func TestLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 	for _, rec := range records {
 		t.Run(rec.name+", under the request's context", func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
-			mockDB := mocks.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			rec.setup(mockDB)
 
 			NewLogger(mockDB, rec.switches()).Log(requestContext(requestId), "auth_failed_pwd", rec.details)
@@ -391,7 +391,7 @@ func TestLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 
 		t.Run(rec.name+", under a context carrying no request", func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
-			mockDB := mocks.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			rec.setup(mockDB)
 
 			NewLogger(mockDB, rec.switches()).Log(context.Background(), "auth_failed_pwd", rec.details)
@@ -476,7 +476,7 @@ func TestLogger_TheRowCarriesTheRequestIdTheLogCarries(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
 
 			var row *record.AuditLog
-			mockDB := mocks.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) { row = args.Get(2).(*record.AuditLog) }).
 				Return(nil).Once()

@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -47,7 +47,7 @@ func (d *dcrWriteRecorder) CreateRedirectURI(ctx context.Context, tx *sql.Tx, re
 }
 
 func registerThroughTheHandler(t *testing.T, db *dcrWriteRecorder,
-	auditLogger *mocks_handlers.AuditLogger) *httptest.ResponseRecorder {
+	auditLogger *handlersmocks.AuditLogger) *httptest.ResponseRecorder {
 
 	t.Helper()
 	body, err := json.Marshal(oidc.DynamicClientRegistrationRequest{
@@ -74,7 +74,7 @@ func TestDCR_AFailedSecondRedirectURIWriteLeavesNoClientAndNoRedirectURI(t *test
 	db := &dcrWriteRecorder{Database: database, failAt: 2}
 
 	// A strict mock with no expectations: the audit event may not happen, and the status says no 201 did.
-	rr := registerThroughTheHandler(t, db, mocks_handlers.NewAuditLogger(t))
+	rr := registerThroughTheHandler(t, db, handlersmocks.NewAuditLogger(t))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	require.NotNil(t, db.created, "the client write was reached")
@@ -94,7 +94,7 @@ func TestDCR_AFailedSecondRedirectURIWriteLeavesNoClientAndNoRedirectURI(t *test
 func TestDCR_ARegistrationWithNoFailureCommitsTheClientAndItsRedirectURIs(t *testing.T) {
 	db := &dcrWriteRecorder{Database: database}
 
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	auditLogger.On("Log", mock.Anything, audit.EventDynamicClientRegistration, mock.Anything).Return().Once()
 
 	rr := registerThroughTheHandler(t, db, auditLogger)

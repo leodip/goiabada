@@ -29,21 +29,21 @@ packages:
       AuthHelper:
         config:
           dir: "./internal/middleware/mocks"
-          pkgname: "mocks_middleware"
+          pkgname: "middlewaremocks"
       # Unexported, so the global structname template would emit an unusable
       # lowercase type name outside the generated package. Name it explicitly (#338).
       tokenParser:
         config:
           dir: "./internal/middleware/mocks"
-          pkgname: "mocks_middleware"
+          pkgname: "middlewaremocks"
           structname: "TokenParser"
   # This module's renderer port. Its implementation is internal/render, which
   # #385 split out of core so each application owns the renderer it actually uses. The
   # mock sits beside the port, not the renderer: a generated mock lives in
-  # <declaring package>/mocks, package mocks_<declaring package> (#431).
+  # <declaring package>/mocks, package <declaring package>mocks (#431).
   github.com/leodip/goiabada/adminconsole/internal/handlers:
     interfaces:
       HttpHelper:
         config:
           dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
+          pkgname: "handlersmocks"

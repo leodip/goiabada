@@ -9,8 +9,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/data"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -58,7 +58,7 @@ func adminEmailPutRequest(t *testing.T) *http.Request {
 
 // stubAdminEmailUpdate answers every read before the write, the validator's included, as an
 // address no other user holds, and the write with updateErr.
-func stubAdminEmailUpdate(database *mocks_data.Database, updateErr error) {
+func stubAdminEmailUpdate(database *datamocks.Database, updateErr error) {
 	database.On("GetUserById", mock.Anything, mock.Anything, emailTestUserId).
 		Return(&record.User{Id: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com"}, nil).Once()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
@@ -68,8 +68,8 @@ func stubAdminEmailUpdate(database *mocks_data.Database, updateErr error) {
 }
 
 func TestHandleUserEmailPut_ALostRaceForTheAddressAnswers409(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	stubAdminEmailUpdate(database, uniqueViolationOnUpdate)
 
 	rr := httptest.NewRecorder()
@@ -85,8 +85,8 @@ func TestHandleUserEmailPut_ALostRaceForTheAddressAnswers409(t *testing.T) {
 // server's, and a 409 for it would send the caller to change an address that was never the
 // problem.
 func TestHandleUserEmailPut_AnyOtherWriteFailureAnswers500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	stubAdminEmailUpdate(database, errs.New("the connection was reset"))
 
 	rr := httptest.NewRecorder()

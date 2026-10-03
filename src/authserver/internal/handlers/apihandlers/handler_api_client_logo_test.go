@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -21,7 +21,7 @@ import (
 // =============================================================================
 
 func TestHandleClientLogoGet_NoClientId(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	handler := HandleClientLogoGet(database, testBaseURL)
 
@@ -39,7 +39,7 @@ func TestHandleClientLogoGet_NoClientId(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_InvalidClientId(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	handler := HandleClientLogoGet(database, testBaseURL)
 
@@ -58,7 +58,7 @@ func TestHandleClientLogoGet_InvalidClientId(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_ClientNotFound(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	handler := HandleClientLogoGet(database, testBaseURL)
 
@@ -81,7 +81,7 @@ func TestHandleClientLogoGet_ClientNotFound(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_HasLogo(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	handler := HandleClientLogoGet(database, testBaseURL)
 
@@ -104,7 +104,7 @@ func TestHandleClientLogoGet_HasLogo(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_NoLogo(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	handler := HandleClientLogoGet(database, testBaseURL)
 
@@ -131,8 +131,8 @@ func TestHandleClientLogoGet_NoLogo(t *testing.T) {
 // =============================================================================
 
 func TestHandleClientLogoPost_NoClientId(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
@@ -150,8 +150,8 @@ func TestHandleClientLogoPost_NoClientId(t *testing.T) {
 }
 
 func TestHandleClientLogoPost_InvalidClientId(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
@@ -170,8 +170,8 @@ func TestHandleClientLogoPost_InvalidClientId(t *testing.T) {
 }
 
 func TestHandleClientLogoPost_ClientNotFound(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
@@ -196,8 +196,8 @@ func TestHandleClientLogoPost_ClientNotFound(t *testing.T) {
 }
 
 func TestHandleClientLogoPost_InvalidImage(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
@@ -227,8 +227,8 @@ func TestHandleClientLogoPost_InvalidImage(t *testing.T) {
 // The size cap is the one the handler was handed, not the configured default: an image the
 // default accepts is refused under a smaller injected cap, and the refusal names that cap (#434).
 func TestHandleClientLogoPost_RefusesAnImageOverTheCapItWasHanded(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, 64)
 
@@ -254,8 +254,8 @@ func TestHandleClientLogoPost_RefusesAnImageOverTheCapItWasHanded(t *testing.T) 
 }
 
 func TestHandleClientLogoPost_CreateNew(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
@@ -290,8 +290,8 @@ func TestHandleClientLogoPost_CreateNew(t *testing.T) {
 }
 
 func TestHandleClientLogoPost_UpdateExisting(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
@@ -336,8 +336,8 @@ func TestHandleClientLogoPost_UpdateExisting(t *testing.T) {
 // =============================================================================
 
 func TestHandleClientLogoDelete_NoClientId(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleClientLogoDelete(database, auditLogger)
 
@@ -355,8 +355,8 @@ func TestHandleClientLogoDelete_NoClientId(t *testing.T) {
 }
 
 func TestHandleClientLogoDelete_InvalidClientId(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleClientLogoDelete(database, auditLogger)
 
@@ -375,8 +375,8 @@ func TestHandleClientLogoDelete_InvalidClientId(t *testing.T) {
 }
 
 func TestHandleClientLogoDelete_ClientNotFound(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleClientLogoDelete(database, auditLogger)
 
@@ -399,8 +399,8 @@ func TestHandleClientLogoDelete_ClientNotFound(t *testing.T) {
 }
 
 func TestHandleClientLogoDelete_Success(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleClientLogoDelete(database, auditLogger)
 
@@ -430,8 +430,8 @@ func TestHandleClientLogoDelete_Success(t *testing.T) {
 }
 
 func TestHandleClientLogoDelete_DatabaseError(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleClientLogoDelete(database, auditLogger)
 

@@ -9,7 +9,7 @@ import (
 
 	"errors"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/gender"
@@ -75,7 +75,7 @@ var profileErrorMessages = map[string]string{
 // =============================================================================
 
 func TestValidateName_Accepted(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	testCases := []struct {
 		name  string
@@ -107,7 +107,7 @@ func TestValidateName_Accepted(t *testing.T) {
 // separator. That rules out a value made entirely of separators and any value
 // spanning multiple lines.
 func TestValidateName_RejectsWhitespaceOnlyAndControlCharacters(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	testCases := []struct {
 		name  string
@@ -138,7 +138,7 @@ func TestValidateName_RejectsWhitespaceOnlyAndControlCharacters(t *testing.T) {
 // Padding with spaces is still accepted as long as a letter is present; the
 // pattern is not a trimming rule.
 func TestValidateName_AcceptsPaddedNames(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	for _, value := range []string{" Jane", "Jane ", "  Jane  "} {
 		t.Run(value, func(t *testing.T) {
@@ -155,15 +155,15 @@ func TestValidateName_AcceptsPaddedNames(t *testing.T) {
 func TestValidateProfile_UnresolvableSubjectReturnsError(t *testing.T) {
 	testCases := []struct {
 		name           string
-		usernameLookup func(mockDB *mocks_data.Database)
+		usernameLookup func(mockDB *datamocks.Database)
 	}{
 		{
 			name:           "username is free",
-			usernameLookup: func(mockDB *mocks_data.Database) {},
+			usernameLookup: func(mockDB *datamocks.Database) {},
 		},
 		{
 			name: "username is taken by another user",
-			usernameLookup: func(mockDB *mocks_data.Database) {
+			usernameLookup: func(mockDB *datamocks.Database) {
 				// Never reached: the subject check short circuits first.
 			},
 		},
@@ -171,7 +171,7 @@ func TestValidateProfile_UnresolvableSubjectReturnsError(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			validator := NewProfileValidator(mockDB)
 
 			mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "unknown-subject").Return(nil, nil).Once()
@@ -191,7 +191,7 @@ func TestValidateProfile_UnresolvableSubjectReturnsError(t *testing.T) {
 }
 
 func TestValidateName_Rejected(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	testCases := []struct {
 		name  string
@@ -225,7 +225,7 @@ func TestValidateName_Rejected(t *testing.T) {
 // The caller chooses the error code so the localized message names the right
 // field. ValidateName must return whichever code it was given.
 func TestValidateName_ReturnsTheCallerSuppliedCode(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	codes := []string{
 		i18n.ErrCodeProfileGivenNameInvalid,
@@ -247,7 +247,7 @@ func TestValidateName_ReturnsTheCallerSuppliedCode(t *testing.T) {
 // =============================================================================
 
 func TestValidateProfile_EmptyInputIsValid(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	// With no username there is no database lookup at all; NewDatabase(t) would
 	// fail the test if one happened.
@@ -290,7 +290,7 @@ func TestValidateProfile_UsernameFormat(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			validator := NewProfileValidator(mockDB)
 
 			// The format check runs after the uniqueness lookups, so both are
@@ -314,7 +314,7 @@ func TestValidateProfile_UsernameFormat(t *testing.T) {
 }
 
 func TestValidateProfile_UsernameTakenByAnotherUser(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewProfileValidator(mockDB)
 
 	subject := fake.UUID()
@@ -336,7 +336,7 @@ func TestValidateProfile_UsernameTakenByAnotherUser(t *testing.T) {
 
 // Keeping your own username must not be reported as taken.
 func TestValidateProfile_UsernameOwnedBySameUserIsAllowed(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewProfileValidator(mockDB)
 
 	subject := fake.UUID()
@@ -358,7 +358,7 @@ func TestValidateProfile_UsernameLookupErrorsPropagate(t *testing.T) {
 	dbErr := errors.New("database is down")
 
 	t.Run("GetUserBySubject fails", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		validator := NewProfileValidator(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(nil, dbErr).Once()
@@ -374,7 +374,7 @@ func TestValidateProfile_UsernameLookupErrorsPropagate(t *testing.T) {
 	})
 
 	t.Run("GetUserByUsername fails", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		validator := NewProfileValidator(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
@@ -423,7 +423,7 @@ func TestValidateProfile_NameFieldsReportTheirOwnCode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			validator := NewProfileValidator(mocks_data.NewDatabase(t))
+			validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 			err := validator.ValidateProfile(context.Background(), &tc.input)
 
@@ -435,7 +435,7 @@ func TestValidateProfile_NameFieldsReportTheirOwnCode(t *testing.T) {
 // The given name is checked before the middle name, which is checked before the
 // family name. That ordering decides which error the user sees first.
 func TestValidateProfile_NameFieldsAreCheckedInOrder(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
 		GivenName:  "J",
@@ -448,7 +448,7 @@ func TestValidateProfile_NameFieldsAreCheckedInOrder(t *testing.T) {
 }
 
 func TestValidateProfile_ValidNamesPass(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
 		GivenName:  "Jane",
@@ -483,7 +483,7 @@ func TestValidateProfile_Nickname(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			validator := NewProfileValidator(mocks_data.NewDatabase(t))
+			validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{Nickname: tc.nickname})
 
@@ -520,7 +520,7 @@ func TestValidateProfile_Website(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			validator := NewProfileValidator(mocks_data.NewDatabase(t))
+			validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{Website: tc.website})
 
@@ -536,7 +536,7 @@ func TestValidateProfile_Website(t *testing.T) {
 // The website length cap is 96 characters. Note that the format check runs
 // first, so an over-long value must still be a well-formed URL to reach it.
 func TestValidateProfile_WebsiteTooLong(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	// "https://" (8) + host + "/" + padding, over 96 characters in total.
 	longWebsite := "https://example.com/" + strings.Repeat("a", 80)
@@ -555,7 +555,7 @@ func TestValidateProfile_WebsiteTooLong(t *testing.T) {
 }
 
 func TestValidateProfile_WebsiteAtTheLengthLimitIsAccepted(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	prefix := "https://example.com/"
 	website := prefix + strings.Repeat("a", 96-len(prefix))
@@ -589,7 +589,7 @@ func TestValidateProfile_Gender(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			validator := NewProfileValidator(mocks_data.NewDatabase(t))
+			validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{Gender: tc.gender})
 
@@ -627,7 +627,7 @@ func TestValidateProfile_DateOfBirthFormat(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			validator := NewProfileValidator(mocks_data.NewDatabase(t))
+			validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{DateOfBirth: tc.dob})
 
@@ -650,7 +650,7 @@ func TestValidateProfile_DateOfBirthFormat(t *testing.T) {
 // TestValidateProfile_DateOfBirthTimezoneToleranceBoundary pins the resolution without
 // depending on the clock.
 func TestValidateProfile_DateOfBirthInTheFuture(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	dayAfterTomorrow := time.Now().UTC().AddDate(0, 0, 2).Format("2006-01-02")
 
@@ -682,7 +682,7 @@ func TestValidateProfile_DateOfBirthTimezoneToleranceBoundary(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			validator := NewProfileValidator(mocks_data.NewDatabase(t))
+			validator := NewProfileValidator(datamocks.NewDatabase(t))
 			date := utcNow.AddDate(0, 0, tc.daysAhead).Format("2006-01-02")
 
 			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{DateOfBirth: date})
@@ -703,7 +703,7 @@ func TestValidateProfile_DateOfBirthTimezoneToleranceBoundary(t *testing.T) {
 // local components again, but only during the hours where local and UTC dates
 // differ, so read a failure here as a timezone-anchoring bug rather than flake.
 func TestValidateProfile_DateOfBirthTodayIsAccepted(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	today := time.Now().UTC().Format("2006-01-02")
 
@@ -715,7 +715,7 @@ func TestValidateProfile_DateOfBirthTodayIsAccepted(t *testing.T) {
 // The local date is also accepted, whether it is the same day as UTC or the day
 // before. This covers the other side of a timezone offset.
 func TestValidateProfile_DateOfBirthLocalTodayIsAccepted(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	localToday := time.Now().Format("2006-01-02")
 
@@ -725,7 +725,7 @@ func TestValidateProfile_DateOfBirthLocalTodayIsAccepted(t *testing.T) {
 }
 
 func TestValidateProfile_DateOfBirthYesterdayIsAccepted(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
 
@@ -737,7 +737,7 @@ func TestValidateProfile_DateOfBirthYesterdayIsAccepted(t *testing.T) {
 // A date comfortably in the past is accepted regardless of timezone, so this
 // case holds no matter where the server runs.
 func TestValidateProfile_DateOfBirthWellInThePastIsAccepted(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{DateOfBirth: "1990-05-15"})
 
@@ -756,7 +756,7 @@ func TestValidateProfile_DateOfBirthWellInThePastIsAccepted(t *testing.T) {
 // timezones table, or both must be empty. Europe/Berlin is listed under several countries
 // (Germany and Sweden among them), which is why a zone ID alone does not name a row.
 func TestValidateProfile_ZoneInfo(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	accepted := []struct {
 		name        string
@@ -807,7 +807,7 @@ func TestValidateProfile_ZoneInfo(t *testing.T) {
 }
 
 func TestValidateProfile_Locale(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	t.Run("a locale from the catalog is accepted", func(t *testing.T) {
 		err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{Locale: "pt-BR"})
@@ -838,7 +838,7 @@ func TestValidateProfile_Locale(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 func TestValidateProfile_FullyPopulatedValidProfile(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewProfileValidator(mockDB)
 
 	subject := fake.UUID()

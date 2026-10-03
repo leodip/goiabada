@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 )
 
@@ -31,16 +31,16 @@ import (
 // wrappedTokenRequest wires a token handler whose validator answers failure, and returns the parts
 // a case needs to drive one authorization_code request through it.
 func wrappedTokenRequest(t *testing.T, failure error) (
-	*mocks_handlers.JSONWriter, *mocks_handlers.AuditLogger, *mocks_data.Database,
+	*handlersmocks.JSONWriter, *handlersmocks.AuditLogger, *datamocks.Database,
 	*httptest.ResponseRecorder, *http.Request, http.Handler,
 ) {
 	t.Helper()
 
-	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-	tokenValidator := mocks_handlers.NewTokenValidator(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	jsonWriter := handlersmocks.NewJSONWriter(t)
+	database := datamocks.NewDatabase(t)
+	tokenIssuer := handlersmocks.NewTokenIssuer(t)
+	tokenValidator := handlersmocks.NewTokenValidator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator,
 		auditLogger, noCredentialFailures{})
@@ -58,7 +58,7 @@ func wrappedTokenRequest(t *testing.T, failure error) (
 }
 
 // expectJSONErrorWithDetail registers the one JSONError call and captures what it was handed.
-func expectJSONErrorWithDetail(jsonWriter *mocks_handlers.JSONWriter) *error {
+func expectJSONErrorWithDetail(jsonWriter *handlersmocks.JSONWriter) *error {
 	var captured error
 	jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -161,7 +161,7 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 	jsonWriter, auditLogger, database, rr, req, handler := wrappedTokenRequest(t,
 		errs.Wrap(reuse, "unable to validate the token request"))
 
-	mocks_data.ExpectRunInTransaction(database, revokeTx)
+	datamocks.ExpectRunInTransaction(database, revokeTx)
 	database.EXPECT().AcquireUserSessionRow(mock.Anything, revokeTx, "sid-reused").Return(true, nil).Once()
 	database.EXPECT().GetRefreshTokensBySessionIdentifier(mock.Anything, revokeTx, "sid-reused").
 		Return(nil, nil).Once()

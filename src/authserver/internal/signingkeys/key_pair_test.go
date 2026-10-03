@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
@@ -137,7 +137,7 @@ func TestNewKeyPair_TheTokenParserReadsBothLabels(t *testing.T) {
 			}).SignedString(privateKey)
 			require.NoError(t, err)
 
-			database := mocks_data.NewDatabase(t)
+			database := datamocks.NewDatabase(t)
 			database.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(row, nil).Once()
 
 			result, err := NewTokenParser(database).DecodeAndValidateTokenString(context.Background(), token, true)

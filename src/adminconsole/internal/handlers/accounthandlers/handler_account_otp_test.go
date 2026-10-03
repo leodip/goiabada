@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -140,7 +140,7 @@ func TestHandleOtpPost_EveryEnrollmentRerenderCarriesTheQRAndTheSeed(t *testing.
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
 			client := newStubApiClient(false)
@@ -172,7 +172,7 @@ func TestHandleOtpPost_EveryEnrollmentRerenderCarriesTheQRAndTheSeed(t *testing.
 // redrawing the form. Redrawing it would call the enrolment endpoint, which refuses for the same
 // reason, turning a race that resolved correctly into an error page.
 func TestHandleOtpPost_AlreadyEnabledReloadsRatherThanRedrawing(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 
 	client := newStubApiClient(false)
 	client.updateErr = apiError("OTP_ALREADY_ENABLED")
@@ -192,7 +192,7 @@ func TestHandleOtpPost_AlreadyEnabledReloadsRatherThanRedrawing(t *testing.T) {
 // The disable form has no QR code and no seed, and must not acquire one: fetching an enrolment for
 // a user who has OTP enabled is refused by the API.
 func TestHandleOtpPost_DisableErrorFetchesNoEnrollment(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
 	client := newStubApiClient(true)
@@ -211,7 +211,7 @@ func TestHandleOtpPost_DisableErrorFetchesNoEnrollment(t *testing.T) {
 
 // A successful enable redirects, and the request it sent carries only the password and the code.
 func TestHandleOtpPost_EnableSendsOnlyThePasswordAndTheCode(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 
 	client := newStubApiClient(false)
 

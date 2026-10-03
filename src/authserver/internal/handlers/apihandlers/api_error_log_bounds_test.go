@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5/middleware"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -78,7 +78,7 @@ func TestHandleAuditLogsGet_ErrorRecordBoundsBothFilters(t *testing.T) {
 	rawEvent, wantEvent := oversized(t, forgedLine)
 	rawRequestId, wantRequestId := oversized(t, "abc\ndef")
 
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, rawEvent, rawRequestId).
 		Return([]record.AuditLog(nil), 0, errs.New("engine is down"))
 
@@ -110,7 +110,7 @@ func TestHandleAuditLogsGet_ErrorRecordBoundsBothFilters(t *testing.T) {
 func TestHandleUsersSearchGet_ErrorRecordBoundsTheQuery(t *testing.T) {
 	rawQuery, wantQuery := oversized(t, forgedLine)
 
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("SearchUsersPaginated", mock.Anything, mock.Anything, rawQuery, 1, 10).
 		Return([]record.User(nil), 0, errs.New("engine is down"))
 
@@ -135,7 +135,7 @@ func TestErrorRecordFiltersOfOrdinaryLengthAreUnchanged(t *testing.T) {
 	const event = "user_login"
 	const filterId = "goiabada/abc123-7"
 
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, event, filterId).
 		Return([]record.AuditLog(nil), 0, errs.New("engine is down"))
 
@@ -160,7 +160,7 @@ func TestErrorRecordFiltersOfOrdinaryLengthAreUnchanged(t *testing.T) {
 
 // searchThatSucceeds lets the search itself pass with one user, which is what carries a case past
 // the first error record and into the annotation branch.
-func searchThatSucceeds(database *mocks_data.Database, rawQuery string) {
+func searchThatSucceeds(database *datamocks.Database, rawQuery string) {
 	database.On("SearchUsersPaginated", mock.Anything, mock.Anything, rawQuery, 1, 10).
 		Return([]record.User{{Id: 42}}, 1, nil)
 }
@@ -168,7 +168,7 @@ func searchThatSucceeds(database *mocks_data.Database, rawQuery string) {
 func TestHandleUsersSearchGet_ErrorRecordBoundsTheQueryWhenTheGroupLookupFails(t *testing.T) {
 	rawQuery, wantQuery := oversized(t, forgedLine)
 
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	searchThatSucceeds(database, rawQuery)
 	database.On("GetGroupById", mock.Anything, mock.Anything, int64(7)).
 		Return(nil, errs.New("engine is down"))
@@ -193,7 +193,7 @@ func TestHandleUsersSearchGet_ErrorRecordBoundsTheQueryWhenTheGroupLookupFails(t
 func TestHandleUsersSearchGet_ErrorRecordBoundsTheQueryWhenLoadingGroupsFails(t *testing.T) {
 	rawQuery, wantQuery := oversized(t, forgedLine)
 
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	searchThatSucceeds(database, rawQuery)
 	database.On("GetGroupById", mock.Anything, mock.Anything, int64(7)).Return(&record.Group{Id: 7}, nil)
 	database.On("UsersLoadGroups", mock.Anything, mock.Anything, mock.Anything).

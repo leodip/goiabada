@@ -6,20 +6,20 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
-	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
+	"github.com/leodip/goiabada/core/sessionstore/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestSessionIdentifier(t *testing.T) {
 	t.Run("Session store error", func(t *testing.T) {
-		mockSessionStore := mocks_sessionstore.NewStore(t)
-		mockDB := mocks_data.NewDatabase(t)
+		mockSessionStore := sessionstoremocks.NewStore(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		mockSessionStore.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(nil, errors.New("session store error"))
 
@@ -34,8 +34,8 @@ func TestSessionIdentifier(t *testing.T) {
 	})
 
 	t.Run("No session identifier", func(t *testing.T) {
-		mockSessionStore := mocks_sessionstore.NewStore(t)
-		mockDB := mocks_data.NewDatabase(t)
+		mockSessionStore := sessionstoremocks.NewStore(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		session := sessionstore.NewSession(mockSessionStore, sessionkeys.AuthServerSessionName)
 		mockSessionStore.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(session, nil)
@@ -54,8 +54,8 @@ func TestSessionIdentifier(t *testing.T) {
 	})
 
 	t.Run("Valid session identifier", func(t *testing.T) {
-		mockSessionStore := mocks_sessionstore.NewStore(t)
-		mockDB := mocks_data.NewDatabase(t)
+		mockSessionStore := sessionstoremocks.NewStore(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		session := sessionstore.NewSession(mockSessionStore, sessionkeys.AuthServerSessionName)
 		session.Values[sessionkeys.SessionIdentifier] = "valid-session-id"
@@ -79,8 +79,8 @@ func TestSessionIdentifier(t *testing.T) {
 	})
 
 	t.Run("Invalid session identifier", func(t *testing.T) {
-		mockSessionStore := mocks_sessionstore.NewStore(t)
-		mockDB := mocks_data.NewDatabase(t)
+		mockSessionStore := sessionstoremocks.NewStore(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		session := sessionstore.NewSession(mockSessionStore, sessionkeys.AuthServerSessionName)
 		session.Values[sessionkeys.SessionIdentifier] = "invalid-session-id"
@@ -103,8 +103,8 @@ func TestSessionIdentifier(t *testing.T) {
 	})
 
 	t.Run("Invalid session identifier preserves other session values", func(t *testing.T) {
-		mockSessionStore := mocks_sessionstore.NewStore(t)
-		mockDB := mocks_data.NewDatabase(t)
+		mockSessionStore := sessionstoremocks.NewStore(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		session := sessionstore.NewSession(mockSessionStore, sessionkeys.AuthServerSessionName)
 		session.Values[sessionkeys.SessionIdentifier] = "invalid-session-id"
@@ -132,8 +132,8 @@ func TestSessionIdentifier(t *testing.T) {
 	})
 
 	t.Run("Database error", func(t *testing.T) {
-		mockSessionStore := mocks_sessionstore.NewStore(t)
-		mockDB := mocks_data.NewDatabase(t)
+		mockSessionStore := sessionstoremocks.NewStore(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		session := sessionstore.NewSession(mockSessionStore, sessionkeys.AuthServerSessionName)
 		session.Values[sessionkeys.SessionIdentifier] = "error-session-id"

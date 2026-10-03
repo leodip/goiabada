@@ -12,9 +12,9 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 
@@ -46,7 +46,7 @@ func assertSelfRegistrationDisabledLogged(t *testing.T, logs *logtest.SlogCaptur
 
 func TestHandleRegisterGet(t *testing.T) {
 	t.Run("Self registration enabled", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
 		handler := HandleRegisterGet(pageRenderer)
 
 		req, _ := http.NewRequest("GET", "/account/register", nil)
@@ -68,7 +68,7 @@ func TestHandleRegisterGet(t *testing.T) {
 	})
 
 	t.Run("Self registration disabled", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
 		handler := HandleRegisterGet(pageRenderer)
 
 		req, _ := http.NewRequest("GET", "/account/register", nil)
@@ -93,13 +93,13 @@ func TestHandleRegisterGet(t *testing.T) {
 
 func TestHandleRegisterPost(t *testing.T) {
 	t.Run("No email and email is required", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
-		passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		emailValidator := accounthandlersmocks.NewEmailValidator(t)
+		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
@@ -124,13 +124,13 @@ func TestHandleRegisterPost(t *testing.T) {
 	})
 
 	t.Run("Invalid email given", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
-		passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		emailValidator := accounthandlersmocks.NewEmailValidator(t)
+		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
@@ -159,13 +159,13 @@ func TestHandleRegisterPost(t *testing.T) {
 	})
 
 	t.Run("Email is already registered", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
-		passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		emailValidator := accounthandlersmocks.NewEmailValidator(t)
+		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
@@ -195,13 +195,13 @@ func TestHandleRegisterPost(t *testing.T) {
 	})
 
 	t.Run("Pre registration already exists", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
-		passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		emailValidator := accounthandlersmocks.NewEmailValidator(t)
+		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
@@ -232,13 +232,13 @@ func TestHandleRegisterPost(t *testing.T) {
 	})
 
 	t.Run("Password not given", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
-		passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		emailValidator := accounthandlersmocks.NewEmailValidator(t)
+		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
@@ -276,13 +276,13 @@ func TestHandleRegisterPost(t *testing.T) {
 	// and userCreator are given no expectations, so reaching either fails the test on an
 	// unexpected call (#202).
 	t.Run("Password in the query alone", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
-		passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		emailValidator := accounthandlersmocks.NewEmailValidator(t)
+		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
@@ -329,13 +329,13 @@ func TestHandleRegisterPost(t *testing.T) {
 	// the account would be created. passwordValidator and userCreator are given no
 	// expectations, so reaching either fails the test on an unexpected call (#202).
 	t.Run("Password confirmation in the query alone", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
-		passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		emailValidator := accounthandlersmocks.NewEmailValidator(t)
+		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
@@ -374,13 +374,13 @@ func TestHandleRegisterPost(t *testing.T) {
 	})
 
 	t.Run("Password confirmation is required", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
-		passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		emailValidator := accounthandlersmocks.NewEmailValidator(t)
+		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
@@ -412,13 +412,13 @@ func TestHandleRegisterPost(t *testing.T) {
 	})
 
 	t.Run("Password confirmation does not match", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
-		passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		emailValidator := accounthandlersmocks.NewEmailValidator(t)
+		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
@@ -451,13 +451,13 @@ func TestHandleRegisterPost(t *testing.T) {
 	})
 
 	t.Run("ValidatePassword fails", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
-		passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		emailValidator := accounthandlersmocks.NewEmailValidator(t)
+		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
@@ -491,13 +491,13 @@ func TestHandleRegisterPost(t *testing.T) {
 	})
 
 	t.Run("Self registration is disabled", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
-		passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		emailValidator := accounthandlersmocks.NewEmailValidator(t)
+		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
@@ -537,13 +537,13 @@ func TestHandleRegisterPost(t *testing.T) {
 	})
 
 	t.Run("SMTP enabled and requires email verification", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
-		passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		emailValidator := accounthandlersmocks.NewEmailValidator(t)
+		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
@@ -630,13 +630,13 @@ func TestHandleRegisterPost(t *testing.T) {
 	})
 
 	t.Run("Direct registration without email verification", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
-		passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		emailValidator := accounthandlersmocks.NewEmailValidator(t)
+		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
@@ -693,13 +693,13 @@ func TestHandleRegisterPost(t *testing.T) {
 	})
 
 	t.Run("SMTP enabled but does not require email verification", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
-		passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		emailValidator := accounthandlersmocks.NewEmailValidator(t)
+		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
@@ -797,13 +797,13 @@ func TestHandleRegisterPost_AWrappedRefusalStillRedrawsTheForm(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			database := mocks_data.NewDatabase(t)
-			userCreator := mocks_accounthandlers.NewUserCreator(t)
-			emailValidator := mocks_accounthandlers.NewEmailValidator(t)
-			passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
-			emailSender := mocks_accounthandlers.NewEmailSender(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			database := datamocks.NewDatabase(t)
+			userCreator := accounthandlersmocks.NewUserCreator(t)
+			emailValidator := accounthandlersmocks.NewEmailValidator(t)
+			passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+			emailSender := accounthandlersmocks.NewEmailSender(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator,
 				passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)

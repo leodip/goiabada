@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -25,7 +25,7 @@ func malformedText(parameter string) string {
 // there. Every refused row is an accepted spelling plus one token, one space, or one character that
 // is not a separator, so that is what is refused.
 func TestValidateRequest_ResponseTypeSpellings(t *testing.T) {
-	validator := NewAuthorizeValidator(mocks_data.NewDatabase(t))
+	validator := NewAuthorizeValidator(datamocks.NewDatabase(t))
 
 	request := func(responseType string) *ValidateRequestInput {
 		return &ValidateRequestInput{
@@ -137,7 +137,7 @@ func TestValidateRequest_ResponseTypeSpellings(t *testing.T) {
 // so a scope joined by a tab, a newline or a no-break space is one value that is not openid, exactly
 // as SetScope stored it (#244). Its grammar is ValidateScopes' question, which sees the raw value.
 func TestValidateRequest_OpenidScopeIsFoundThroughTheSharedSplitter(t *testing.T) {
-	validator := NewAuthorizeValidator(mocks_data.NewDatabase(t))
+	validator := NewAuthorizeValidator(datamocks.NewDatabase(t))
 
 	request := func(scope string) *ValidateRequestInput {
 		return &ValidateRequestInput{ResponseType: "id_token", ImplicitGrantEnabled: true, Scope: scope, Nonce: "n"}
@@ -172,7 +172,7 @@ func TestValidateRequest_OpenidScopeIsFoundThroughTheSharedSplitter(t *testing.T
 // two refusals that come first; and prompt is held to the space-delimited grammar, one space between
 // each two values and none at either end, with no other character separating.
 func TestValidatePrompt_SelectAccountAndSeparators(t *testing.T) {
-	validator := NewAuthorizeValidator(mocks_data.NewDatabase(t))
+	validator := NewAuthorizeValidator(datamocks.NewDatabase(t))
 
 	const selectAccountText = "prompt=select_account is not supported: the authorization server cannot ask the end user to select an account."
 

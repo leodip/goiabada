@@ -7,7 +7,7 @@
 
 //go:build !production
 
-package mocks_accounthandlers
+package accounthandlersmocks
 
 import (
 	"github.com/leodip/goiabada/authserver/internal/record"

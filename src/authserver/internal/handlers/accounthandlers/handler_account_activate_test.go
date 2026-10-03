@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
-	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
@@ -77,7 +77,7 @@ func preRegistrationWithCode(t *testing.T, id int64, email, code string, issuedA
 // (no _httpStatus), since mail scanners treat a 4xx as a broken link. A single matcher
 // everywhere is deliberate, since these paths differing would tell a caller which of them
 // happened.
-func expectRenderedLinkExpired(pageRenderer *mocks_handlers.PageRenderer) {
+func expectRenderedLinkExpired(pageRenderer *handlersmocks.PageRenderer) {
 	pageRenderer.On("RenderTemplate",
 		mock.Anything,
 		mock.Anything,
@@ -96,7 +96,7 @@ func expectRenderedLinkExpired(pageRenderer *mocks_handlers.PageRenderer) {
 // reset flow's entry has: the client IP always, no address anywhere, and preRegistrationId only on
 // the branches where the lookup resolved a row the code matched. Pass 0 to require the key is
 // ABSENT rather than zero, since a payload naming row 0 asserts a row that does not exist (#435).
-func expectAuditFailedActivationCode(auditLogger *mocks_handlers.AuditLogger, wantReason string,
+func expectAuditFailedActivationCode(auditLogger *handlersmocks.AuditLogger, wantReason string,
 	wantPreRegistrationId int64) {
 
 	auditLogger.On("Log", mock.Anything, audit.EventFailedAccountActivationCode,
@@ -136,10 +136,10 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 	const code = "the-emitted-code"
 
 	t.Run("a valid code marks the session and redirects to a clean URL", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC().Add(-time.Minute))
@@ -178,10 +178,10 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 	// A consumed code is the same case: the activation deletes the row, so a link clicked twice
 	// resolves to nothing. It used to answer the 500 page with an error-level stack (#425).
 	t.Run("a code matching no row is refused", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		store := newMarkerTestStore()
 		logs := logtest.CaptureSlog(t)
 
@@ -202,10 +202,10 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 	})
 
 	t.Run("a hash hit whose stored code does not match is refused", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		store := newMarkerTestStore()
 		logs := logtest.CaptureSlog(t)
 
@@ -242,10 +242,10 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 	// its stack, and writes no refusal entry that would file it under a user's old link. The
 	// strict audit mock has no expectation, so an entry fails the case.
 	t.Run("a stored code that will not decrypt stays a server error", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		store := newMarkerTestStore()
 		logs := logtest.CaptureSlog(t)
 
@@ -269,10 +269,10 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 	// interleaved first hops used to make the redirect already in flight activate the other
 	// registration. First writer wins instead (#112 decision 13).
 	t.Run("a second link followed while one is in flight is refused", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
 		// The second link is valid on its own: it is refused for the marker it would have
@@ -316,10 +316,10 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 	// it started in, which is the retarget in three navigations rather than one
 	// (#112 decision 14).
 	t.Run("a link followed while a reset continuation is in flight is refused", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
 		preReg, codeHash := preRegistrationWithCode(t, 99, "second@example.com", code, time.Now().UTC().Add(-time.Minute))
@@ -353,10 +353,10 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 	})
 
 	t.Run("an expired code deletes the pending registration and asks for another", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC().Add(-6*time.Minute))
@@ -389,10 +389,10 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 			{"just outside the window", time.Now().UTC().Add(-verificationCodeLifetime - 2*time.Second), true},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				pageRenderer := mocks_handlers.NewPageRenderer(t)
-				database := mocks_data.NewDatabase(t)
-				userCreator := mocks_accounthandlers.NewUserCreator(t)
-				auditLogger := mocks_handlers.NewAuditLogger(t)
+				pageRenderer := handlersmocks.NewPageRenderer(t)
+				database := datamocks.NewDatabase(t)
+				userCreator := accounthandlersmocks.NewUserCreator(t)
+				auditLogger := handlersmocks.NewAuditLogger(t)
 				store := newMarkerTestStore()
 
 				preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, tc.issuedAt)
@@ -428,10 +428,10 @@ func TestHandleActivateGet_Clean(t *testing.T) {
 	const code = "the-emitted-code"
 
 	t.Run("the marker completes the activation", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_accounthandlers.NewUserCreator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		userCreator := accounthandlersmocks.NewUserCreator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
@@ -520,10 +520,10 @@ func TestHandleActivateGet_Clean(t *testing.T) {
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				pageRenderer := mocks_handlers.NewPageRenderer(t)
-				database := mocks_data.NewDatabase(t)
-				userCreator := mocks_accounthandlers.NewUserCreator(t)
-				auditLogger := mocks_handlers.NewAuditLogger(t)
+				pageRenderer := handlersmocks.NewPageRenderer(t)
+				database := datamocks.NewDatabase(t)
+				userCreator := accounthandlersmocks.NewUserCreator(t)
+				auditLogger := handlersmocks.NewAuditLogger(t)
 				store := newMarkerTestStore()
 
 				if tc.resolves {
@@ -580,10 +580,10 @@ func TestHandleActivateGet_SelfRegistrationDisabled(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			database := mocks_data.NewDatabase(t)
-			userCreator := mocks_accounthandlers.NewUserCreator(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			database := datamocks.NewDatabase(t)
+			userCreator := accounthandlersmocks.NewUserCreator(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 			store := newMarkerTestStore()
 
 			_, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
@@ -610,8 +610,8 @@ func TestHandleActivateGet_SelfRegistrationDisabled(t *testing.T) {
 func TestRefuseActivationLink_AuditPayload(t *testing.T) {
 	capture := func(t *testing.T, r *http.Request, preRegistrationId int64, reason string) map[string]interface{} {
 		t.Helper()
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		expectRenderedLinkExpired(pageRenderer)
 		var captured map[string]interface{}
 		auditLogger.On("Log", mock.Anything, audit.EventFailedAccountActivationCode, mock.Anything).

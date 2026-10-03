@@ -12,11 +12,11 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
-	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -89,14 +89,14 @@ func TestHandleUserEnabledPut_RevocationConditionality(t *testing.T) {
 		},
 	} {
 		t.Run(tc.label, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).
 				Return(&record.User{Id: userId}, nil).Once()
 
 			// Set on the disabling rows, which are the ones that open a transaction.
-			var stub *mocks_data.RunInTransactionStub
+			var stub *datamocks.RunInTransactionStub
 			if tc.requestedEnabled {
 				// Enabling: the compare-and-set runs outside a transaction, since there is no
 				// sweep to be atomic with. Both directions go through it, so neither stays on
@@ -104,7 +104,7 @@ func TestHandleUserEnabledPut_RevocationConditionality(t *testing.T) {
 				database.On("TrySetUserEnabled", mock.Anything, (*sql.Tx)(nil), userId, false, true).
 					Return(tc.transitioned, nil).Once()
 			} else {
-				stub = mocks_data.ExpectRunInTransaction(database, apiRevokeTx)
+				stub = datamocks.ExpectRunInTransaction(database, apiRevokeTx)
 				database.On("TrySetUserEnabled", mock.Anything, apiRevokeTx, userId, true, false).
 					Return(tc.transitioned, nil).Once()
 				if tc.transitioned {
@@ -177,11 +177,11 @@ func TestHandleUserEnabledPut_RevocationConditionality(t *testing.T) {
 // claims otherwise.
 func TestHandleUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 	const userId = int64(42)
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(&record.User{Id: userId}, nil).Once()
-	stub := mocks_data.ExpectRunInTransaction(database, apiRevokeTx)
+	stub := datamocks.ExpectRunInTransaction(database, apiRevokeTx)
 	database.On("TrySetUserEnabled", mock.Anything, apiRevokeTx, userId, true, false).Return(true, nil).Once()
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).
 		Return(int64(0), assert.AnError).Once()
@@ -206,8 +206,8 @@ func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 	const userId = int64(42)
 	const newPassword = "N3wP4ss!word"
 
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	passwordValidator := accountvalidation.NewPasswordValidator()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(&record.User{Id: userId}, nil).Once()
@@ -268,14 +268,14 @@ func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	const userId = int64(42)
 
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	user := &record.User{Id: userId, Enabled: true, OTPEnabled: true}
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(user, nil).Once()
 
 	var calls []string
-	mocks_data.ExpectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
+	datamocks.ExpectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
 	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
 	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, userId).Return(nil).
@@ -319,11 +319,11 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 // comes back, since the link carries the code and no email address (#112), so a hash of
 // anything else leaves the new user unable to set a password at all.
 func TestHandleUserCreatePost_StoresResetCodeHash(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	database := mocks_data.NewDatabase(t)
-	userCreator := mocks_accounthandlers.NewUserCreator(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
-	emailSender := mocks_accounthandlers.NewEmailSender(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
+	userCreator := accounthandlersmocks.NewUserCreator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	emailSender := accounthandlersmocks.NewEmailSender(t)
 
 	handler := HandleUserCreatePost(pageRenderer, database, userCreator,
 		accountvalidation.NewEmailValidator(database),
@@ -400,11 +400,11 @@ func TestHandleUserCreatePost_StoresResetCodeHash(t *testing.T) {
 // wraps, the user creator wraps -- because a bare type assertion or a comparison against the
 // outermost error would pass on an untouched sentinel and fail on the real one.
 func TestHandleUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	database := mocks_data.NewDatabase(t)
-	userCreator := mocks_accounthandlers.NewUserCreator(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
-	emailSender := mocks_accounthandlers.NewEmailSender(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
+	userCreator := accounthandlersmocks.NewUserCreator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	emailSender := accounthandlersmocks.NewEmailSender(t)
 
 	handler := HandleUserCreatePost(pageRenderer, database, userCreator,
 		accountvalidation.NewEmailValidator(database),
@@ -454,11 +454,11 @@ func TestHandleUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 // retry with a different address; told 500, it reports the failure, which is the right thing to do
 // when the write failed for a reason no address change fixes.
 func TestHandleUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	database := mocks_data.NewDatabase(t)
-	userCreator := mocks_accounthandlers.NewUserCreator(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
-	emailSender := mocks_accounthandlers.NewEmailSender(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
+	userCreator := accounthandlersmocks.NewUserCreator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	emailSender := accounthandlersmocks.NewEmailSender(t)
 
 	handler := HandleUserCreatePost(pageRenderer, database, userCreator,
 		accountvalidation.NewEmailValidator(database),
@@ -577,11 +577,11 @@ func TestHandleUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 			wantMessage: "setPasswordType"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			database := mocks_data.NewDatabase(t)
-			userCreator := mocks_accounthandlers.NewUserCreator(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			emailSender := mocks_accounthandlers.NewEmailSender(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			database := datamocks.NewDatabase(t)
+			userCreator := accounthandlersmocks.NewUserCreator(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			emailSender := accounthandlersmocks.NewEmailSender(t)
 
 			handler := HandleUserCreatePost(pageRenderer, database, userCreator,
 				accountvalidation.NewEmailValidator(database),

@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
 // handlePromptNone's steps 4 to 6 through the handler: each answer the step-up rule gives reaches
@@ -70,15 +70,15 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			database := mocks_data.NewDatabase(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			database := datamocks.NewDatabase(t)
 			stubRegisteredRedirectURI(database, "https://example.com")
-			authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			permissionChecker := mocks_handlers.NewPermissionChecker(t)
-			tokenParser := mocks_handlers.NewTokenParser(t)
+			authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
+			tokenParser := handlersmocks.NewTokenParser(t)
 
 			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
 				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
@@ -150,14 +150,14 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			database := mocks_data.NewDatabase(t)
-			authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			permissionChecker := mocks_handlers.NewPermissionChecker(t)
-			tokenParser := mocks_handlers.NewTokenParser(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			database := datamocks.NewDatabase(t)
+			authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
+			tokenParser := handlersmocks.NewTokenParser(t)
 
 			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
 				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)

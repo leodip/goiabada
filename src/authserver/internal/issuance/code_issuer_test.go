@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
@@ -40,7 +40,7 @@ func assertAuthCodeShape(t *testing.T, authCode string) {
 }
 
 func TestCreateAuthCode(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	codeIssuer := NewCodeIssuer(mockDB)
 
 	testClient := &record.Client{
@@ -135,7 +135,7 @@ func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			codeIssuer := NewCodeIssuer(mockDB)
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
@@ -171,7 +171,7 @@ func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
 }
 
 func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	codeIssuer := NewCodeIssuer(mockDB)
 
 	testClient := &record.Client{
@@ -199,7 +199,7 @@ func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {
 }
 
 func TestCreateAuthCode_ScopeHandling(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	codeIssuer := NewCodeIssuer(mockDB)
 
 	testClient := &record.Client{
@@ -258,7 +258,7 @@ func TestCreateAuthCode_ScopeHandling(t *testing.T) {
 }
 
 func TestCreateAuthCode_DatabaseError(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	codeIssuer := NewCodeIssuer(mockDB)
 
 	testClient := &record.Client{
@@ -297,7 +297,7 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 // is answered the way a vanished session is, by restarting the browser at level 1 or telling a
 // silent request login_required, and not by a 500 that reads as a fault in this server.
 func TestCreateAuthCode_RefusesAMissingClient(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	codeIssuer := NewCodeIssuer(mockDB)
 
 	// nil, nil is the shape GetClientByClientIdentifier reports for a client that is not there:
@@ -346,13 +346,13 @@ func issueCodeInput() *CreateCodeInput {
 // termination is the data tier's, in TestIssuanceOrdering_AgainstTermination, which calls
 // IssueAuthCode itself.
 func TestIssueAuthCodeTx_TakesTheSessionRowBeforeTheInsert(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 
 	var order []string
 	note := func(what string) func(mock.Arguments) {
 		return func(mock.Arguments) { order = append(order, what) }
 	}
-	mocks_data.ExpectRunInTransaction(mockDB, issueTx, func(edge string) { order = append(order, edge) })
+	datamocks.ExpectRunInTransaction(mockDB, issueTx, func(edge string) { order = append(order, edge) })
 	mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Run(note("session row")).Return(true, nil).Once()
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").Run(note("client")).
 		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
@@ -377,19 +377,19 @@ func TestIssueAuthCodeTx_RefusesOnlyAfterTheRollback(t *testing.T) {
 	cases := []struct {
 		name     string
 		sentinel error
-		setup    func(db *mocks_data.Database)
+		setup    func(db *datamocks.Database)
 	}{
 		{
 			name:     "the session row is gone",
 			sentinel: ErrIssuingSessionGone,
-			setup: func(db *mocks_data.Database) {
+			setup: func(db *datamocks.Database) {
 				db.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(false, nil).Once()
 			},
 		},
 		{
 			name:     "the client is gone",
 			sentinel: ErrIssuingClientGone,
-			setup: func(db *mocks_data.Database) {
+			setup: func(db *datamocks.Database) {
 				db.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(true, nil).Once()
 				db.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").Return(nil, nil).Once()
 			},
@@ -398,10 +398,10 @@ func TestIssueAuthCodeTx_RefusesOnlyAfterTheRollback(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 
 			var order []string
-			stub := mocks_data.ExpectRunInTransaction(mockDB, issueTx, func(edge string) { order = append(order, edge) })
+			stub := datamocks.ExpectRunInTransaction(mockDB, issueTx, func(edge string) { order = append(order, edge) })
 			tc.setup(mockDB)
 
 			code, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), issueCodeInput())
@@ -417,8 +417,8 @@ func TestIssueAuthCodeTx_RefusesOnlyAfterTheRollback(t *testing.T) {
 	}
 
 	t.Run("a gone session is not looked up any further", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mocks_data.ExpectRunInTransaction(mockDB, issueTx)
+		mockDB := datamocks.NewDatabase(t)
+		datamocks.ExpectRunInTransaction(mockDB, issueTx)
 		mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(false, nil).Once()
 
 		_, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), issueCodeInput())
@@ -432,7 +432,7 @@ func TestIssueAuthCodeTx_RefusesOnlyAfterTheRollback(t *testing.T) {
 // TestIssueAuthCode_RefusesANilTransaction holds the precondition at entry: on an autocommitted
 // statement the acquisition releases the row before the insert, which is the whole of what it buys.
 func TestIssueAuthCode_RefusesANilTransaction(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 
 	code, err := NewCodeIssuer(mockDB).IssueAuthCode(context.Background(), nil, issueCodeInput())
 
@@ -449,8 +449,8 @@ func TestIssueAuthCodeTx_FailuresAreNotRefusals(t *testing.T) {
 	boom := errors.New("connection refused")
 
 	t.Run("the acquisition fails", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		stub := mocks_data.ExpectRunInTransaction(mockDB, issueTx)
+		mockDB := datamocks.NewDatabase(t)
+		stub := datamocks.ExpectRunInTransaction(mockDB, issueTx)
 		mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(false, boom).Once()
 
 		code, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), issueCodeInput())
@@ -463,8 +463,8 @@ func TestIssueAuthCodeTx_FailuresAreNotRefusals(t *testing.T) {
 	})
 
 	t.Run("the commit fails", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mocks_data.ExpectRunInTransactionThenFail(mockDB, issueTx, boom)
+		mockDB := datamocks.NewDatabase(t)
+		datamocks.ExpectRunInTransactionThenFail(mockDB, issueTx, boom)
 		mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(true, nil).Once()
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").
 			Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
@@ -482,8 +482,8 @@ func TestIssueAuthCodeTx_FailuresAreNotRefusals(t *testing.T) {
 // RunInTransaction (#301), and the first attempt's code never committed, so the code returned must
 // be the one the second attempt inserted.
 func TestIssueAuthCodeTx_ARerunReturnsTheCommittingAttemptsCode(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mocks_data.ExpectRunInTransactionRerun(mockDB, issueTx)
+	mockDB := datamocks.NewDatabase(t)
+	datamocks.ExpectRunInTransactionRerun(mockDB, issueTx)
 	mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(true, nil).Twice()
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").
 		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Twice()

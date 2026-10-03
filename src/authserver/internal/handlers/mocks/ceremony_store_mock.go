@@ -7,7 +7,7 @@
 
 //go:build !production
 
-package mocks_handlers
+package handlersmocks
 
 import (
 	"net/http"

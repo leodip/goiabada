@@ -7,7 +7,7 @@
 
 //go:build !production
 
-package mocks_sessionstore
+package sessionstoremocks
 
 import (
 	"net/http"

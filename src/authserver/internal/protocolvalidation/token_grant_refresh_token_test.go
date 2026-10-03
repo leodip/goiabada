@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 )
 
 func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
@@ -35,9 +35,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		// gate's sentence lands on.
 		const grantUserId = int64(7)
 
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -108,9 +108,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Missing client secret for confidential client", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -146,9 +146,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Incorrect client secret for confidential client", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -188,9 +188,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Missing refresh token", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -224,9 +224,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Invalid refresh token", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -262,9 +262,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Refresh token without JTI claim", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -299,9 +299,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Refresh token not found in database", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -352,9 +352,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Refresh token with mismatched client", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -415,9 +415,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Refresh token for disabled user", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -482,9 +482,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Refresh token with nil session", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -553,9 +553,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Refresh token with invalid session", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -631,9 +631,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Expired offline refresh token", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -699,9 +699,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Offline refresh token without max lifetime claim", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -762,9 +762,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Refresh token with invalid typ claim", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -824,9 +824,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Refresh token with scope not in original grant", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -908,9 +908,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Valid offline refresh token", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -985,9 +985,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Consent is looked up once for a multi-scope refresh", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1062,9 +1062,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Valid refresh token with reduced scope", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1145,9 +1145,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Refresh token with revoked consent", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1229,9 +1229,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Refresh token with a scope missing from the consent", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1320,9 +1320,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 	})
 
 	t.Run("Refresh token with revoked user permission", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1413,9 +1413,9 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 
 	const grantUserId = int64(7)
 
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
@@ -1528,9 +1528,9 @@ func TestValidateTokenRequest_RefreshToken_NoPKCEUsed_ConfidentialClient_Succeed
 func TestValidateTokenRequest_RefreshToken_PublicClientWithSecret_Fails(t *testing.T) {
 	// Decision 11's symmetry, the refresh_token arm. The authorization_code arm has always
 	// refused a superfluous secret from a public client; this arm used to ignore it.
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{}
@@ -1580,12 +1580,12 @@ type storedGrant struct {
 // the consent row come after that comparison, so they are stubbed only when reachesUser is set, and
 // a case that stops at the comparison fails if it reads either.
 func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, reachesUser bool) (
-	*TokenValidator, *mocks_protocolvalidation.PermissionChecker, *record.Settings, *ValidateTokenRequestInput) {
+	*TokenValidator, *protocolvalidationmocks.PermissionChecker, *record.Settings, *ValidateTokenRequestInput) {
 	t.Helper()
 
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
@@ -2008,9 +2008,9 @@ func TestValidateTokenRequest_RefreshToken_StoredGrantNamingUserinfo(t *testing.
 // expired token could reach the lookup it could still trigger a family cascade long after
 // the protocol stopped accepting it. The horizon is bounded and protocol-defined instead.
 func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{}
@@ -2070,9 +2070,9 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 	setup := func(t *testing.T, sessionUserId int64) (*TokenValidator, *ValidateTokenRequestInput, *record.Settings) {
 		t.Helper()
 
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{
@@ -2202,9 +2202,9 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 	setup := func(t *testing.T, sessionOwner *int64, lookupErr error, expired bool) (*TokenValidator, *ValidateTokenRequestInput, *record.Settings) {
 		t.Helper()
 
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{}
@@ -2257,7 +2257,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 
 		switch {
 		case expired:
-			// Deliberately no expectation. mocks_data.Database is strict, so a lookup here
+			// Deliberately no expectation. datamocks.Database is strict, so a lookup here
 			// fails the test, which is the whole assertion.
 		case lookupErr != nil:
 			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).Return(nil, lookupErr).Once()
@@ -2385,7 +2385,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 		},
 		{
 			// The panic path #123 reports: a resource scope takes the branch that reads user.Id.
-			// No UserHasScopePermission expectation is registered, and mocks_protocolvalidation.NewPermissionChecker(t)
+			// No UserHasScopePermission expectation is registered, and protocolvalidationmocks.NewPermissionChecker(t)
 			// fails on an unexpected call, so this also proves the refusal happens before the loop.
 			name:        "a resource scope is refused before the permission re-check",
 			storedScope: "billing-api:read",
@@ -2394,9 +2394,9 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
-			mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-			mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+			mockDB := datamocks.NewDatabase(t)
+			mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+			mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 			settings := &record.Settings{}

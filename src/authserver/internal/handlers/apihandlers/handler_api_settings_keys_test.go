@@ -11,8 +11,8 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -49,8 +49,8 @@ func signingKey(id int64, state record.KeyState) record.KeyPair {
 // classify read inside it. The commit and the rollback are the helper's and never reach the mock;
 // the returned stub records what the body handed the helper, which is how the refusal cases below
 // assert that nothing was committed.
-func stubRotateRead(database *mocks_data.Database, keys []record.KeyPair) *mocks_data.RunInTransactionStub {
-	stub := mocks_data.ExpectRunInTransaction(database, rotateTx)
+func stubRotateRead(database *datamocks.Database, keys []record.KeyPair) *datamocks.RunInTransactionStub {
+	stub := datamocks.ExpectRunInTransaction(database, rotateTx)
 	database.On("GetAllSigningKeys", mock.Anything, rotateTx).Return(keys, nil).Once()
 	return stub
 }
@@ -73,8 +73,8 @@ func rotateRequest() *http.Request {
 // audit entry is written once. It also pins that the audit happens only after a commit, which is the
 // property the three refusal cases below assert the other half of.
 func TestHandleSettingsKeysRotatePost_Success(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	stub := stubRotateRead(database, []record.KeyPair{
 		signingKey(1, record.KeyStatePrevious),
@@ -112,8 +112,8 @@ func TestHandleSettingsKeysRotatePost_Success(t *testing.T) {
 // 200 because this call rotated nothing, and no audit entry because the log must carry exactly one
 // entry per rotation that happened.
 func TestHandleSettingsKeysRotatePost_RotationInProgress(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	stub := stubRotateRead(database, []record.KeyPair{
 		signingKey(2, record.KeyStateCurrent),
@@ -144,8 +144,8 @@ func TestHandleSettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 // test if the handler destroys the previous key on its way to refusing, which is exactly what the
 // old handler did.
 func TestHandleSettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	stub := stubRotateRead(database, []record.KeyPair{
 		signingKey(1, record.KeyStatePrevious),
@@ -184,10 +184,10 @@ func TestHandleSettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 // engine failure keeps the generic code, so a caller cannot mistake a broken database for a lost
 // race and retry into it.
 func TestHandleSettingsKeysRotatePost_InternalError(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	mocks_data.ExpectRunInTransaction(database, rotateTx)
+	datamocks.ExpectRunInTransaction(database, rotateTx)
 	database.On("GetAllSigningKeys", mock.Anything, rotateTx).
 		Return([]record.KeyPair(nil), assert.AnError).Once()
 
@@ -256,7 +256,7 @@ func TestHandleSettingsKeysGet_OrdersNextCurrentPrevious(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
+			database := datamocks.NewDatabase(t)
 
 			keys := make([]record.KeyPair, 0, len(tc.given))
 			for i, state := range tc.given {

@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/hashutil"
 )
@@ -34,7 +34,7 @@ func parkedRow(id int64, handle string, form url.Values) *record.AuthorizeReques
 // The handle is the whole of what makes a parked request single use and unguessable, so its shape
 // is pinned: 256 bits, in an alphabet a URL carries unescaped, and never repeated.
 func TestPark_IssuesAHandleThatIsFortyThreeUnpaddedURLSafeCharacters(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	db.On("CreateAuthorizeRequest", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Times(3)
 
 	seen := map[string]bool{}
@@ -53,7 +53,7 @@ func TestPark_IssuesAHandleThatIsFortyThreeUnpaddedURLSafeCharacters(t *testing.
 // Only the digest is stored, so a reader of the table (a backup, a slow query log, a support
 // export) holds nothing a browser could present.
 func TestPark_StoresTheDigestAndNeverTheHandle(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	var stored *record.AuthorizeRequest
 	db.On("CreateAuthorizeRequest", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Run(func(args mock.Arguments) { stored = args.Get(2).(*record.AuthorizeRequest) }).Return(nil).Once()
@@ -78,7 +78,7 @@ func TestPark_StoresTheDigestAndNeverTheHandle(t *testing.T) {
 // The parked form is the request's parameters, every copy of each and the order of copies, so the
 // GET reads what the POST received.
 func TestPark_TheFormIsStoredEncodedAndKeepsEveryCopy(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	var stored *record.AuthorizeRequest
 	db.On("CreateAuthorizeRequest", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Run(func(args mock.Arguments) { stored = args.Get(2).(*record.AuthorizeRequest) }).Return(nil).Once()
@@ -98,7 +98,7 @@ func TestPark_TheFormIsStoredEncodedAndKeepsEveryCopy(t *testing.T) {
 }
 
 func TestPark_AFailedInsertIsAnErrorAndNoHandle(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	db.On("CreateAuthorizeRequest", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("disk full")).Once()
 
 	handle, err := Park(context.Background(), db, url.Values{"client_id": {"c"}})
@@ -137,7 +137,7 @@ func TestIsWellFormedHandle(t *testing.T) {
 // A handle that cannot have been issued costs the database nothing: the strict mock fails the case
 // on any statement or transaction.
 func TestConsume_AMalformedHandleReadsNothing(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 
 	for _, handle := range []string{"", "short", strings.Repeat("A", 44), strings.Repeat("A", 42) + "B"} {
 		form, found, err := Consume(context.Background(), db, handle)
@@ -151,9 +151,9 @@ func TestConsume_TheWinnerGetsTheFormAndTheRowIsClaimedByItsId(t *testing.T) {
 	handle := strings.Repeat("A", 43)
 	form := url.Values{"client_id": {"c"}, "state": {"one", "two"}, "nonce": {"a&b=c;d%e+f"}}
 
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	var edges []string
-	mocks_data.ExpectRunInTransaction(db, tx, func(edge string) { edges = append(edges, edge) })
+	datamocks.ExpectRunInTransaction(db, tx, func(edge string) { edges = append(edges, edge) })
 	db.On("GetAuthorizeRequestByHandleHash", mock.Anything, tx, hashutil.HashString(handle), mock.Anything).
 		Run(func(mock.Arguments) { edges = append(edges, "read") }).
 		Return(parkedRow(41, handle, form), nil).Once()
@@ -170,8 +170,8 @@ func TestConsume_TheWinnerGetsTheFormAndTheRowIsClaimedByItsId(t *testing.T) {
 
 func TestConsume_TheReadIsHandedTheCurrentTimeAsItsExpiryPredicate(t *testing.T) {
 	handle := strings.Repeat("A", 43)
-	db := mocks_data.NewDatabase(t)
-	mocks_data.ExpectRunInTransaction(db, tx)
+	db := datamocks.NewDatabase(t)
+	datamocks.ExpectRunInTransaction(db, tx)
 
 	var passed time.Time
 	db.On("GetAuthorizeRequestByHandleHash", mock.Anything, tx, mock.Anything, mock.Anything).
@@ -189,8 +189,8 @@ func TestConsume_TheReadIsHandedTheCurrentTimeAsItsExpiryPredicate(t *testing.T)
 // row read as nothing, and a consumed row is gone.
 func TestConsume_NothingToReadIsAnswerFalseWithoutClaiming(t *testing.T) {
 	handle := strings.Repeat("A", 43)
-	db := mocks_data.NewDatabase(t)
-	mocks_data.ExpectRunInTransaction(db, tx)
+	db := datamocks.NewDatabase(t)
+	datamocks.ExpectRunInTransaction(db, tx)
 	db.On("GetAuthorizeRequestByHandleHash", mock.Anything, tx, mock.Anything, mock.Anything).Return(nil, nil).Once()
 
 	form, found, err := Consume(context.Background(), db, handle)
@@ -205,8 +205,8 @@ func TestConsume_NothingToReadIsAnswerFalseWithoutClaiming(t *testing.T) {
 // both running the ceremony.
 func TestConsume_ALostClaimIsAnswerFalseAndTheFormIsNotReturned(t *testing.T) {
 	handle := strings.Repeat("A", 43)
-	db := mocks_data.NewDatabase(t)
-	mocks_data.ExpectRunInTransaction(db, tx)
+	db := datamocks.NewDatabase(t)
+	datamocks.ExpectRunInTransaction(db, tx)
 	db.On("GetAuthorizeRequestByHandleHash", mock.Anything, tx, mock.Anything, mock.Anything).
 		Return(parkedRow(41, handle, url.Values{"client_id": {"c"}}), nil).Once()
 	db.On("ClaimAuthorizeRequest", mock.Anything, tx, int64(41)).Return(false, nil).Once()
@@ -219,8 +219,8 @@ func TestConsume_ALostClaimIsAnswerFalseAndTheFormIsNotReturned(t *testing.T) {
 
 func TestConsume_AFailedReadIsAnErrorAndNotARefusal(t *testing.T) {
 	handle := strings.Repeat("A", 43)
-	db := mocks_data.NewDatabase(t)
-	stub := mocks_data.ExpectRunInTransaction(db, tx)
+	db := datamocks.NewDatabase(t)
+	stub := datamocks.ExpectRunInTransaction(db, tx)
 	db.On("GetAuthorizeRequestByHandleHash", mock.Anything, tx, mock.Anything, mock.Anything).
 		Return(nil, errors.New("connection reset")).Once()
 
@@ -232,8 +232,8 @@ func TestConsume_AFailedReadIsAnErrorAndNotARefusal(t *testing.T) {
 
 func TestConsume_AFailedClaimIsAnErrorAndRollsBack(t *testing.T) {
 	handle := strings.Repeat("A", 43)
-	db := mocks_data.NewDatabase(t)
-	stub := mocks_data.ExpectRunInTransaction(db, tx)
+	db := datamocks.NewDatabase(t)
+	stub := datamocks.ExpectRunInTransaction(db, tx)
 	db.On("GetAuthorizeRequestByHandleHash", mock.Anything, tx, mock.Anything, mock.Anything).
 		Return(parkedRow(41, handle, url.Values{"client_id": {"c"}}), nil).Once()
 	db.On("ClaimAuthorizeRequest", mock.Anything, tx, int64(41)).Return(false, errors.New("connection reset")).Once()
@@ -246,8 +246,8 @@ func TestConsume_AFailedClaimIsAnErrorAndRollsBack(t *testing.T) {
 
 func TestConsume_ACommitTheEngineRefusesIsAnErrorAndNoForm(t *testing.T) {
 	handle := strings.Repeat("A", 43)
-	db := mocks_data.NewDatabase(t)
-	mocks_data.ExpectRunInTransactionThenFail(db, tx, errors.New("commit refused"))
+	db := datamocks.NewDatabase(t)
+	datamocks.ExpectRunInTransactionThenFail(db, tx, errors.New("commit refused"))
 	db.On("GetAuthorizeRequestByHandleHash", mock.Anything, tx, mock.Anything, mock.Anything).
 		Return(parkedRow(41, handle, url.Values{"client_id": {"c"}}), nil).Once()
 	db.On("ClaimAuthorizeRequest", mock.Anything, tx, int64(41)).Return(true, nil).Once()
@@ -262,8 +262,8 @@ func TestConsume_ACommitTheEngineRefusesIsAnErrorAndNoForm(t *testing.T) {
 // found and claimed never committed, so the winner of the second attempt is the one reported.
 func TestConsume_ARerunAfterADeadlockStartsFromWhatTheDatabaseHoldsNow(t *testing.T) {
 	handle := strings.Repeat("A", 43)
-	db := mocks_data.NewDatabase(t)
-	mocks_data.ExpectRunInTransactionRerun(db, tx)
+	db := datamocks.NewDatabase(t)
+	datamocks.ExpectRunInTransactionRerun(db, tx)
 	db.On("GetAuthorizeRequestByHandleHash", mock.Anything, tx, mock.Anything, mock.Anything).
 		Return(parkedRow(41, handle, url.Values{"client_id": {"c"}}), nil).Once()
 	db.On("ClaimAuthorizeRequest", mock.Anything, tx, int64(41)).Return(true, nil).Once()
@@ -284,8 +284,8 @@ func TestConsume_ARowThatDoesNotParseIsClaimedAndRefused(t *testing.T) {
 	handle := strings.Repeat("A", 43)
 	corrupt := &record.AuthorizeRequest{Id: 41, HandleHash: hashutil.HashString(handle), RequestForm: "client_id=%zz"}
 
-	db := mocks_data.NewDatabase(t)
-	mocks_data.ExpectRunInTransaction(db, tx)
+	db := datamocks.NewDatabase(t)
+	datamocks.ExpectRunInTransaction(db, tx)
 	db.On("GetAuthorizeRequestByHandleHash", mock.Anything, tx, mock.Anything, mock.Anything).Return(corrupt, nil).Once()
 	db.On("ClaimAuthorizeRequest", mock.Anything, tx, int64(41)).Return(true, nil).Once()
 

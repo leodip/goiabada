@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient/oauthclienttest"
@@ -100,7 +100,7 @@ type callbackHarness struct {
 	backend    *armableBackend
 	store      *sessionstore.ServerSideStore
 	parser     *oauthclient.JWKSTokenParser
-	httpHelper *mocks_handlers.HttpHelper
+	httpHelper *handlersmocks.HttpHelper
 	logs       *logtest.SlogCapture
 }
 
@@ -126,7 +126,7 @@ func newCallbackHarness(t *testing.T) *callbackHarness {
 		backend:    backend,
 		store:      store,
 		parser:     parser,
-		httpHelper: mocks_handlers.NewHttpHelper(t),
+		httpHelper: handlersmocks.NewHttpHelper(t),
 		logs:       logtest.CaptureSlog(t),
 	}
 }

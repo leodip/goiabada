@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
 // authorizeWorld is what HandleAuthorizeGet would load, answered from the row instead of from a
@@ -347,8 +347,8 @@ func TestValidateAuthorizeRequest(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-			tokenParser := mocks_handlers.NewTokenParser(t)
+			authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+			tokenParser := handlersmocks.NewTokenParser(t)
 			var calls []string
 			recordCall := func(name string) func(mock.Arguments) {
 				return func(mock.Arguments) { calls = append(calls, name) }

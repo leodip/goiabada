@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -78,7 +78,7 @@ func TestCheckEmailCaseBeforeMigrating_Skips(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			db := mocks_data.NewDatabase(t)
+			db := datamocks.NewDatabase(t)
 
 			err := CheckEmailCaseBeforeMigrating(context.Background(), db, tc.recorded, tc.target)
 
@@ -92,7 +92,7 @@ func TestCheckEmailCaseBeforeMigrating_Skips(t *testing.T) {
 // and decide which account keeps the address, and this server deliberately will not choose for
 // them, so a message naming one row of a pair turns one outage into two.
 func TestCheckEmailCaseBeforeMigrating_RefusesACollision(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	db.EXPECT().ScanEmailCase(mock.Anything).Return([]record.EmailCaseRow{
 		row(1, "Alice@example.com"),
 		row(2, "alice@example.com"),
@@ -124,7 +124,7 @@ func TestCheckEmailCaseBeforeMigrating_RefusesACollision(t *testing.T) {
 // unreachable by every credential path, all of which lowercase in Go first, which is the silent
 // outcome this refusal exists to prevent.
 func TestCheckEmailCaseBeforeMigrating_RefusesAnAddressTheEngineWillNotReduce(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	db.EXPECT().ScanEmailCase(mock.Anything).Return([]record.EmailCaseRow{
 		row(1, "alice@example.com"),
 		// SQL Server and SQLite both leave U+1E9E alone; Go maps it to U+00DF.
@@ -152,7 +152,7 @@ func TestCheckEmailCaseBeforeMigrating_RefusesAnAddressTheEngineWillNotReduce(t 
 // closest to a hazard without being one: an address the migration WILL repair, and two addresses
 // that differ by more than case.
 func TestCheckEmailCaseBeforeMigrating_PassesACleanTable(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	db.EXPECT().ScanEmailCase(mock.Anything).Return([]record.EmailCaseRow{
 		row(1, "alice@example.com"),
 		row(2, "Bob@example.com"),
@@ -166,7 +166,7 @@ func TestCheckEmailCaseBeforeMigrating_PassesACleanTable(t *testing.T) {
 // TestCheckEmailCaseBeforeMigrating_PassesAnEmptyTable covers the deployment that has a users
 // table and nothing in it, which is every install between the first migration and the seeder.
 func TestCheckEmailCaseBeforeMigrating_PassesAnEmptyTable(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	db.EXPECT().ScanEmailCase(mock.Anything).Return(nil, nil)
 
 	assert.NoError(t, CheckEmailCaseBeforeMigrating(context.Background(), db, LowercaseEmailsVersion-1, LowercaseEmailsVersion))
@@ -177,7 +177,7 @@ func TestCheckEmailCaseBeforeMigrating_PassesAnEmptyTable(t *testing.T) {
 // database this check exists to stop, and the operator would meet DirtyError instead of a message.
 func TestCheckEmailCaseBeforeMigrating_AScanFailureIsFatal(t *testing.T) {
 	boom := errors.New("storage is unavailable")
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	db.EXPECT().ScanEmailCase(mock.Anything).Return(nil, boom)
 
 	err := CheckEmailCaseBeforeMigrating(context.Background(), db, LowercaseEmailsVersion-1, LowercaseEmailsVersion)

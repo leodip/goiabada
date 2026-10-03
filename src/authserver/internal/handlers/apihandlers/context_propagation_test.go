@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/mock"
@@ -39,7 +39,7 @@ func theApiRequestsContext() interface{} {
 // also the read most worth cancelling, since it is the one an operator can make arbitrarily
 // expensive from the query string.
 func TestHandleUsersSearchGet_SearchesUnderTheRequestsContext(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("SearchUsersPaginated", theApiRequestsContext(), mock.Anything, "ada", 1, 10).
 		Return([]record.User{{Id: 1, Subject: "sub-1", Email: "ada@example.com"}}, 1, nil).Once()
@@ -54,7 +54,7 @@ func TestHandleUsersSearchGet_SearchesUnderTheRequestsContext(t *testing.T) {
 // The reject arm: two annotations that cannot be combined are refused after the search but before
 // either annotation read, so neither annotating port is reached at all.
 func TestHandleUsersSearchGet_ConflictingAnnotationsReachNoAnnotationPort(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("SearchUsersPaginated", theApiRequestsContext(), mock.Anything, "ada", 1, 10).
 		Return([]record.User{{Id: 1, Subject: "sub-1"}}, 1, nil).Once()
@@ -90,7 +90,7 @@ func apiSessionsRequest(userId string) *http.Request {
 // authorized -- carry the request's own context, including the loader, which reaches the database
 // a second time inside commondb.
 func TestHandleUserSessionsGet_ReadsSessionsUnderTheRequestsContext(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("GetUserById", theApiRequestsContext(), mock.Anything, int64(7)).
 		Return(&record.User{Id: 7, Subject: "sub-7"}, nil).Once()
@@ -109,7 +109,7 @@ func TestHandleUserSessionsGet_ReadsSessionsUnderTheRequestsContext(t *testing.T
 // The reject arm: an id that is not a number is refused before the first query, so no session
 // port is reached at all and there is no context to get wrong.
 func TestHandleUserSessionsGet_MalformedIdReachesNoSessionPort(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
 	HandleUserSessionsGet(database).ServeHTTP(rr, apiSessionsRequest("not-a-number"))
@@ -138,7 +138,7 @@ func apiClientRequest(clientId string) *http.Request {
 // time inside commondb and is the shape that would keep compiling with a context.Background()
 // under it.
 func TestHandleClientsGet_ListsClientsUnderTheRequestsContext(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("GetAllClients", theApiRequestsContext(), mock.Anything).
 		Return([]record.Client{{Id: 3, ClientIdentifier: "portal"}}, nil).Once()
@@ -157,7 +157,7 @@ func TestHandleClientsGet_ListsClientsUnderTheRequestsContext(t *testing.T) {
 // The reject arm: an id that is not a number is refused before the first query, so neither the
 // client read nor either loader is reached and there is no context to get wrong.
 func TestHandleClientGet_MalformedIdReachesNoClientPort(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
 	HandleClientGet(database, testDataCipher).ServeHTTP(rr, apiClientRequest("not-a-number"))
@@ -179,7 +179,7 @@ func apiResourcePermissionsRequest(resourceId string) *http.Request {
 // The accept arm for the permission half: the listing and the resource hydration that follows it
 // are both issued on behalf of the request that asked.
 func TestHandlePermissionsByResourceGet_ReadsPermissionsUnderTheRequestsContext(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("GetPermissionsByResourceId", theApiRequestsContext(), mock.Anything, int64(4)).
 		Return([]record.Permission{{Id: 11, PermissionIdentifier: "read", ResourceId: 4}}, nil).Once()
@@ -196,7 +196,7 @@ func TestHandlePermissionsByResourceGet_ReadsPermissionsUnderTheRequestsContext(
 // The reject arm: a resource id that is not a number is refused before the listing, so neither
 // permission port is reached.
 func TestHandlePermissionsByResourceGet_MalformedResourceIdReachesNoPermissionPort(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
 	HandlePermissionsByResourceGet(database).ServeHTTP(rr, apiResourcePermissionsRequest("not-a-number"))

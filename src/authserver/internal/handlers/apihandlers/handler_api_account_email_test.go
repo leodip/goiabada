@@ -16,10 +16,10 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
-	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -76,16 +76,16 @@ func accountEmailSettings() *record.Settings {
 
 // accountEmailHandler is the handler as routes.go wires it, with a renderer and a sender that
 // expect nothing: a case that expects the notice sets their expectations before running the job.
-func accountEmailHandler(t *testing.T, database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger,
+func accountEmailHandler(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 	credentials CredentialFailureRecorder, jobs *heldJobs) http.Handler {
 	t.Helper()
 	return accountEmailHandlerWith(database, auditLogger, credentials, jobs,
-		mocks_handlers.NewPageRenderer(t), mocks_accounthandlers.NewEmailSender(t))
+		handlersmocks.NewPageRenderer(t), accounthandlersmocks.NewEmailSender(t))
 }
 
-func accountEmailHandlerWith(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger,
-	credentials CredentialFailureRecorder, jobs *heldJobs, pageRenderer *mocks_handlers.PageRenderer,
-	emailSender *mocks_accounthandlers.EmailSender) http.Handler {
+func accountEmailHandlerWith(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
+	credentials CredentialFailureRecorder, jobs *heldJobs, pageRenderer *handlersmocks.PageRenderer,
+	emailSender *accounthandlersmocks.EmailSender) http.Handler {
 	return HandleAccountEmailPut(pageRenderer, database, accountvalidation.NewEmailValidator(database),
 		emailSender, auditLogger, credentials, jobs)
 }
@@ -122,7 +122,7 @@ func accountEmailPutRequest(t *testing.T) *http.Request {
 
 // stubAccountEmailUpdate answers the handler's own read and the validator's, and the address as
 // held by nobody, then the narrow write with updateErr.
-func stubAccountEmailUpdate(t *testing.T, database *mocks_data.Database, updateErr error) {
+func stubAccountEmailUpdate(t *testing.T, database *datamocks.Database, updateErr error) {
 	t.Helper()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
 		Return(&record.User{Id: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com",
@@ -137,8 +137,8 @@ func stubAccountEmailUpdate(t *testing.T, database *mocks_data.Database, updateE
 // keyed on the caller's own id, and never writes back the user row it loaded at the start of the
 // request, which would undo a concurrent disable, password change or OTP change.
 func TestHandleAccountEmailPut_SavesThroughTheNarrowWrite(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	jobs := &heldJobs{}
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
 		Return(&record.User{
@@ -178,8 +178,8 @@ func TestHandleAccountEmailPut_SavesThroughTheNarrowWrite(t *testing.T) {
 }
 
 func TestHandleAccountEmailPut_ALostRaceForTheAddressAnswers409(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	jobs := &heldJobs{}
 	stubAccountEmailUpdate(t, database, uniqueViolationOnUpdate)
 
@@ -193,8 +193,8 @@ func TestHandleAccountEmailPut_ALostRaceForTheAddressAnswers409(t *testing.T) {
 }
 
 func TestHandleAccountEmailPut_AnyOtherWriteFailureAnswers500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	jobs := &heldJobs{}
 	stubAccountEmailUpdate(t, database, errs.New("the connection was reset"))
 
@@ -221,8 +221,8 @@ func TestHandleAccountEmailPut_ABlankCurrentPasswordIsRefusedAndChargesNothing(t
 		{"whitespace", api.UpdateAccountEmailRequest{Email: "new@example.com", CurrentPassword: "   "}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 			jobs := &heldJobs{}
 			credentials := &countingCredentials{}
 
@@ -258,8 +258,8 @@ func TestHandleAccountEmailPut_AWrongPasswordIsRefusedBeforeTheAddressIsLookedAt
 		{"the account's own address", "old@example.com"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 			jobs := &heldJobs{}
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
 				Return(&record.User{Id: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com",
@@ -288,8 +288,8 @@ func TestHandleAccountEmailPut_AWrongPasswordIsRefusedBeforeTheAddressIsLookedAt
 // verification code survive, and no audit event is logged. The validator is not consulted
 // (GetUserByEmail has no expectation), so the account's own address is never refused as taken.
 func TestHandleAccountEmailPut_ResubmittingTheCurrentAddressChangesNothing(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	jobs := &heldJobs{}
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
 		Return(&record.User{
@@ -342,7 +342,7 @@ func changingUser(t *testing.T, locale string) *record.User {
 // stubSuccessfulChange answers a change from old@example.com to new@example.com: the reads, the
 // narrow write, and the one updated_own_email entry. The audit expectation is the only one the
 // logger has, so an entry the notice wrote of its own would fail the case.
-func stubSuccessfulChange(t *testing.T, database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger, user *record.User) {
+func stubSuccessfulChange(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User) {
 	t.Helper()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).Return(user, nil).Twice()
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, nil).Once()
@@ -374,10 +374,10 @@ func TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testin
 		{"a user with no stored locale", "", "en", "Your email address was changed"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			emailSender := mocks_accounthandlers.NewEmailSender(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			emailSender := accounthandlersmocks.NewEmailSender(t)
 			jobs := &heldJobs{}
 			stubSuccessfulChange(t, database, auditLogger, changingUser(t, tc.locale))
 
@@ -432,8 +432,8 @@ func TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testin
 // TestHandleAccountEmailPut_SendsNoNoticeWithSMTPOff is #404 decision 11: with SMTP disabled
 // the change is saved and answered, and nothing is left to run after it.
 func TestHandleAccountEmailPut_SendsNoNoticeWithSMTPOff(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	jobs := &heldJobs{}
 	stubSuccessfulChange(t, database, auditLogger, changingUser(t, "en"))
 
@@ -456,8 +456,8 @@ func TestHandleAccountEmailPut_SendsNoNoticeWithSMTPOff(t *testing.T) {
 // an unconditional write every one of them notified the previous address, so one verification
 // bought as many mails as requests sent at once.
 func TestHandleAccountEmailPut_AChangeThatLostTheRowAnswers409AndTellsNobody(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	jobs := &heldJobs{}
 	user := changingUser(t, "en")
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).Return(user, nil).Twice()
@@ -483,8 +483,8 @@ func TestHandleAccountEmailPut_AChangeThatLostTheRowAnswers409AndTellsNobody(t *
 // do not hold and change away from it again, which would otherwise mail that address once per
 // request. The change itself is saved and answered as any other.
 func TestHandleAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	jobs := &heldJobs{}
 	user := changingUser(t, "en")
 	user.EmailVerified = false
@@ -514,10 +514,10 @@ func TestHandleAccountEmailPut_AFailedNoticeIsAnErrorRecordAndNothingElse(t *tes
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			capture := logtest.CaptureSlog(t)
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			emailSender := mocks_accounthandlers.NewEmailSender(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			emailSender := accounthandlersmocks.NewEmailSender(t)
 			jobs := &heldJobs{}
 			stubSuccessfulChange(t, database, auditLogger, changingUser(t, "en"))
 

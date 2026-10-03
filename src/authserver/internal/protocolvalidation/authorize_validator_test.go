@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/i18n"
@@ -19,7 +19,7 @@ import (
 )
 
 func TestValidateScopes(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	tests := []struct {
@@ -160,18 +160,18 @@ func TestValidateScopes(t *testing.T) {
 func TestValidateScopes_DatabaseFailurePropagates(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
-		setup func(*mocks_data.Database)
+		setup func(*datamocks.Database)
 	}{
 		{
 			name: "GetResourceByResourceIdentifier error propagates",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "billing-api").
 					Return(nil, errors.New("database is down"))
 			},
 		},
 		{
 			name: "GetPermissionsByResourceId error propagates",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "billing-api").
 					Return(&record.Resource{Id: 1, ResourceIdentifier: "billing-api"}, nil)
 				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).
@@ -180,7 +180,7 @@ func TestValidateScopes_DatabaseFailurePropagates(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			tc.setup(mockDB)
 
 			err := NewAuthorizeValidator(mockDB).ValidateScopes(context.Background(), "billing-api:read")
@@ -193,7 +193,7 @@ func TestValidateScopes_DatabaseFailurePropagates(t *testing.T) {
 }
 
 func TestValidateClientAndRedirectURI_MissingClientId(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "", RedirectURI: "http://example.com"}
@@ -206,7 +206,7 @@ func TestValidateClientAndRedirectURI_MissingClientId(t *testing.T) {
 }
 
 func TestValidateClientAndRedirectURI_NonExistentClient(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "non-existent").Return(nil, nil)
@@ -221,7 +221,7 @@ func TestValidateClientAndRedirectURI_NonExistentClient(t *testing.T) {
 }
 
 func TestValidateClientAndRedirectURI_DisabledClient(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "disabled-client").Return(&record.Client{Enabled: false}, nil)
@@ -236,7 +236,7 @@ func TestValidateClientAndRedirectURI_DisabledClient(t *testing.T) {
 }
 
 func TestValidateClientAndRedirectURI_ClientWithoutAuthorizationCodeFlow(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "no-auth-code-client").Return(&record.Client{Enabled: true, AuthorizationCodeEnabled: false}, nil)
@@ -251,7 +251,7 @@ func TestValidateClientAndRedirectURI_ClientWithoutAuthorizationCodeFlow(t *test
 }
 
 func TestValidateClientAndRedirectURI_MissingRedirectURI(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid-client").Return(&record.Client{Enabled: true, AuthorizationCodeEnabled: true}, nil)
@@ -307,7 +307,7 @@ func TestValidateClientAndRedirectURI_ValidClientAndRedirectURI(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			validator := NewAuthorizeValidator(mockDB)
 
 			client := &record.Client{
@@ -463,7 +463,7 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			validator := NewAuthorizeValidator(mockDB)
 
 			client := &record.Client{
@@ -471,7 +471,7 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 				AuthorizationCodeEnabled: true,
 			}
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid-client").Return(client, nil)
-			// Maybe, not a mandatory expectation. mocks_data.NewDatabase registers
+			// Maybe, not a mandatory expectation. datamocks.NewDatabase registers
 			// AssertExpectations on cleanup, and the absolute-URI gate short-circuits
 			// before this load, so a mandatory expectation would fail every gate row for
 			// the wrong reason.
@@ -513,7 +513,7 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 }
 
 func TestValidateRequest_InvalidResponseType(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
@@ -529,7 +529,7 @@ func TestValidateRequest_InvalidResponseType(t *testing.T) {
 }
 
 func TestValidateRequest_ImplicitFlowNotEnabled(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
@@ -545,7 +545,7 @@ func TestValidateRequest_ImplicitFlowNotEnabled(t *testing.T) {
 }
 
 func TestValidateRequest_InvalidCodeChallengeMethod(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// When PKCE is optional but provided, invalid method should be rejected
@@ -563,7 +563,7 @@ func TestValidateRequest_InvalidCodeChallengeMethod(t *testing.T) {
 }
 
 func TestValidateRequest_InvalidCodeChallengeMethod_PKCERequired(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// When PKCE is required, missing or invalid method should show different message
@@ -581,7 +581,7 @@ func TestValidateRequest_InvalidCodeChallengeMethod_PKCERequired(t *testing.T) {
 }
 
 func TestValidateRequest_CodeChallengeTooShort(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// When PKCE is optional but provided, invalid challenge length should be rejected
@@ -599,7 +599,7 @@ func TestValidateRequest_CodeChallengeTooShort(t *testing.T) {
 }
 
 func TestValidateRequest_CodeChallengeTooShort_PKCERequired(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// When PKCE is required, invalid challenge length shows different message
@@ -617,7 +617,7 @@ func TestValidateRequest_CodeChallengeTooShort_PKCERequired(t *testing.T) {
 }
 
 func TestValidateRequest_CodeChallengeTooLong(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// When PKCE is optional but provided, invalid challenge length should be rejected
@@ -635,7 +635,7 @@ func TestValidateRequest_CodeChallengeTooLong(t *testing.T) {
 }
 
 func TestValidateRequest_CodeChallengeTooLong_PKCERequired(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// When PKCE is required, invalid challenge length shows different message
@@ -653,7 +653,7 @@ func TestValidateRequest_CodeChallengeTooLong_PKCERequired(t *testing.T) {
 }
 
 func TestValidateRequest_InvalidResponseMode(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
@@ -717,7 +717,7 @@ func TestSupportedResponseTypes(t *testing.T) {
 	types := SupportedResponseTypes()
 	assert.Equal(t, []string{"code", "token", "id_token", "id_token token"}, types)
 
-	validator := NewAuthorizeValidator(mocks_data.NewDatabase(t))
+	validator := NewAuthorizeValidator(datamocks.NewDatabase(t))
 	for _, responseType := range types {
 		input := ValidateRequestInput{
 			ResponseType:         responseType,
@@ -735,7 +735,7 @@ func TestSupportedResponseTypes(t *testing.T) {
 }
 
 func TestValidateRequest_ValidInput(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
@@ -753,7 +753,7 @@ func TestValidateRequest_ValidInput(t *testing.T) {
 // every shape: an accepted value passes, a refused one answers invalid_request with the one
 // description, and nothing else about the request decides it (#243).
 func TestValidateRequest_MaxAge(t *testing.T) {
-	validator := NewAuthorizeValidator(mocks_data.NewDatabase(t))
+	validator := NewAuthorizeValidator(datamocks.NewDatabase(t))
 	inputWith := func(maxAge string) *ValidateRequestInput {
 		return &ValidateRequestInput{
 			ResponseType:        "code",
@@ -779,7 +779,7 @@ func TestValidateRequest_MaxAge(t *testing.T) {
 }
 
 func TestValidateScopes_MultipleScopesInSingleRequest(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource1").Return(&record.Resource{Id: 1}, nil)
@@ -803,7 +803,7 @@ func TestValidateScopes_WithLeadingAndTrailingSpaces(t *testing.T) {
 		" openid", "openid ", "openid  profile", " ", "   ",
 	} {
 		t.Run(scope, func(t *testing.T) {
-			validator := NewAuthorizeValidator(mocks_data.NewDatabase(t))
+			validator := NewAuthorizeValidator(datamocks.NewDatabase(t))
 
 			err := validator.ValidateScopes(context.Background(), scope)
 
@@ -817,7 +817,7 @@ func TestValidateScopes_WithLeadingAndTrailingSpaces(t *testing.T) {
 }
 
 func TestValidateClientAndRedirectURI_ExtremelyLongClientId(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	longClientId := strings.Repeat("a", 1000)
@@ -833,7 +833,7 @@ func TestValidateClientAndRedirectURI_ExtremelyLongClientId(t *testing.T) {
 }
 
 func TestValidateClientAndRedirectURI_ExtremelyLongRedirectURI(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	client := &record.Client{
@@ -857,7 +857,7 @@ func TestValidateClientAndRedirectURI_ExtremelyLongRedirectURI(t *testing.T) {
 }
 
 func TestValidateRequest_EmptyResponseMode(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
@@ -872,7 +872,7 @@ func TestValidateRequest_EmptyResponseMode(t *testing.T) {
 }
 
 func TestValidateScopes_MaximumNumberOfScopes(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// Assuming a theoretical maximum of 100 scopes. The names are short so the whole scope stays
@@ -898,7 +898,7 @@ func TestValidateScopes_MaximumNumberOfScopes(t *testing.T) {
 // ============================================================================
 
 func TestValidateRequest_PKCEOptional_NoPKCEParams_Success(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// When PKCE is optional and no PKCE params provided, should succeed
@@ -915,7 +915,7 @@ func TestValidateRequest_PKCEOptional_NoPKCEParams_Success(t *testing.T) {
 }
 
 func TestValidateRequest_PKCEOptional_ValidPKCEParams_Success(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// When PKCE is optional and valid PKCE params provided, should succeed
@@ -932,7 +932,7 @@ func TestValidateRequest_PKCEOptional_ValidPKCEParams_Success(t *testing.T) {
 }
 
 func TestValidateRequest_PKCEOptional_OnlyCodeChallenge_Fails(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// When PKCE is optional but only code_challenge is provided (partial PKCE),
@@ -952,7 +952,7 @@ func TestValidateRequest_PKCEOptional_OnlyCodeChallenge_Fails(t *testing.T) {
 }
 
 func TestValidateRequest_PKCEOptional_OnlyCodeChallengeMethod_Fails(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// When PKCE is optional but only code_challenge_method is provided (partial PKCE),
@@ -972,7 +972,7 @@ func TestValidateRequest_PKCEOptional_OnlyCodeChallengeMethod_Fails(t *testing.T
 }
 
 func TestValidateRequest_PKCERequired_NoPKCEParams_Fails(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// When PKCE is required and no PKCE params provided, should fail
@@ -991,7 +991,7 @@ func TestValidateRequest_PKCERequired_NoPKCEParams_Fails(t *testing.T) {
 }
 
 func TestValidateRequest_PKCERequired_ValidPKCEParams_Success(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// When PKCE is required and valid PKCE params provided, should succeed
@@ -1008,7 +1008,7 @@ func TestValidateRequest_PKCERequired_ValidPKCEParams_Success(t *testing.T) {
 }
 
 func TestValidateRequest_CodeChallenge_Exactly43Chars_Success(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// Boundary test: exactly 43 characters should be valid
@@ -1026,7 +1026,7 @@ func TestValidateRequest_CodeChallenge_Exactly43Chars_Success(t *testing.T) {
 }
 
 func TestValidateRequest_CodeChallenge_Exactly42Chars_Fails(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// Boundary test: 42 characters should be invalid (just under minimum)
@@ -1046,7 +1046,7 @@ func TestValidateRequest_CodeChallenge_Exactly42Chars_Fails(t *testing.T) {
 }
 
 func TestValidateRequest_CodeChallenge_Exactly128Chars_Success(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// Boundary test: exactly 128 characters should be valid
@@ -1064,7 +1064,7 @@ func TestValidateRequest_CodeChallenge_Exactly128Chars_Success(t *testing.T) {
 }
 
 func TestValidateRequest_CodeChallenge_Exactly129Chars_Fails(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// Boundary test: 129 characters should be invalid (just over maximum)
@@ -1084,7 +1084,7 @@ func TestValidateRequest_CodeChallenge_Exactly129Chars_Fails(t *testing.T) {
 }
 
 func TestValidateRequest_ValidResponseModes(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	validModes := []string{"query", "fragment", "form_post"}
@@ -1110,7 +1110,7 @@ func TestValidateRequest_ValidResponseModes(t *testing.T) {
 // ============================================================================
 
 func TestValidateRequest_ImplicitFlow_ResponseTypeToken_Success(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
@@ -1124,7 +1124,7 @@ func TestValidateRequest_ImplicitFlow_ResponseTypeToken_Success(t *testing.T) {
 }
 
 func TestValidateRequest_ImplicitFlow_ResponseTypeIdToken_Success(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
@@ -1139,7 +1139,7 @@ func TestValidateRequest_ImplicitFlow_ResponseTypeIdToken_Success(t *testing.T) 
 }
 
 func TestValidateRequest_ImplicitFlow_ResponseTypeIdTokenToken_Success(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
@@ -1154,7 +1154,7 @@ func TestValidateRequest_ImplicitFlow_ResponseTypeIdTokenToken_Success(t *testin
 }
 
 func TestValidateRequest_ImplicitFlow_ResponseTypeTokenIdToken_OrderIndependent(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// Test that "token id_token" works the same as "id_token token"
@@ -1170,7 +1170,7 @@ func TestValidateRequest_ImplicitFlow_ResponseTypeTokenIdToken_OrderIndependent(
 }
 
 func TestValidateRequest_ImplicitFlow_IdToken_RequiresOpenIdScope(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
@@ -1188,7 +1188,7 @@ func TestValidateRequest_ImplicitFlow_IdToken_RequiresOpenIdScope(t *testing.T) 
 }
 
 func TestValidateRequest_ImplicitFlow_IdTokenToken_RequiresOpenIdScope(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
@@ -1205,7 +1205,7 @@ func TestValidateRequest_ImplicitFlow_IdTokenToken_RequiresOpenIdScope(t *testin
 }
 
 func TestValidateRequest_ImplicitFlow_IdToken_RequiresNonce(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
@@ -1223,7 +1223,7 @@ func TestValidateRequest_ImplicitFlow_IdToken_RequiresNonce(t *testing.T) {
 }
 
 func TestValidateRequest_ImplicitFlow_IdTokenToken_RequiresNonce(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
@@ -1240,7 +1240,7 @@ func TestValidateRequest_ImplicitFlow_IdTokenToken_RequiresNonce(t *testing.T) {
 }
 
 func TestValidateRequest_ImplicitFlow_Token_DoesNotRequireNonce(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// response_type=token does NOT require nonce (only id_token does)
@@ -1256,7 +1256,7 @@ func TestValidateRequest_ImplicitFlow_Token_DoesNotRequireNonce(t *testing.T) {
 }
 
 func TestValidateRequest_ImplicitFlow_NoPKCERequired(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// Implicit flow should NOT require PKCE (PKCE is for authorization code flow only)
@@ -1273,7 +1273,7 @@ func TestValidateRequest_ImplicitFlow_NoPKCERequired(t *testing.T) {
 }
 
 func TestValidateRequest_ImplicitFlow_ClientNotEnabled(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	testCases := []struct {
@@ -1305,7 +1305,7 @@ func TestValidateRequest_ImplicitFlow_ClientNotEnabled(t *testing.T) {
 }
 
 func TestValidateRequest_UnsupportedResponseTypeCombination_CodeToken(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// "code token" is a hybrid flow - not supported
@@ -1322,7 +1322,7 @@ func TestValidateRequest_UnsupportedResponseTypeCombination_CodeToken(t *testing
 }
 
 func TestValidateRequest_UnsupportedResponseTypeCombination_CodeIdToken(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// "code id_token" is a hybrid flow - not supported
@@ -1338,7 +1338,7 @@ func TestValidateRequest_UnsupportedResponseTypeCombination_CodeIdToken(t *testi
 }
 
 func TestValidateRequest_UnsupportedResponseTypeCombination_CodeIdTokenToken(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// "code id_token token" is a hybrid flow - not supported
@@ -1354,7 +1354,7 @@ func TestValidateRequest_UnsupportedResponseTypeCombination_CodeIdTokenToken(t *
 }
 
 func TestValidateRequest_MissingResponseType(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
@@ -1369,7 +1369,7 @@ func TestValidateRequest_MissingResponseType(t *testing.T) {
 }
 
 func TestValidateRequest_AllSupportedResponseTypes(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	testCases := []struct {
@@ -1406,7 +1406,7 @@ func TestValidateRequest_AllSupportedResponseTypes(t *testing.T) {
 }
 
 func TestValidateClientAndRedirectURI_ImplicitFlow_DoesNotRequireAuthCodeEnabled(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	client := &record.Client{
@@ -1435,7 +1435,7 @@ func TestValidateClientAndRedirectURI_ImplicitFlow_DoesNotRequireAuthCodeEnabled
 }
 
 func TestValidateClientAndRedirectURI_AuthCodeFlow_RequiresAuthCodeEnabled(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	client := &record.Client{
@@ -1467,7 +1467,7 @@ func TestValidateClientAndRedirectURI_AuthCodeFlow_RequiresAuthCodeEnabled(t *te
 // ============================================================================
 
 func TestValidatePrompt_EmptyString(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("")
@@ -1478,7 +1478,7 @@ func TestValidatePrompt_EmptyString(t *testing.T) {
 
 // A prompt of spaces alone was trimmed and read as absent; it is malformed (#244).
 func TestValidatePrompt_WhitespaceOnly(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("   ")
@@ -1498,7 +1498,7 @@ func assertPromptMalformed(t *testing.T, result string, err error) {
 }
 
 func TestValidatePrompt_SingleValue_None(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("none")
@@ -1508,7 +1508,7 @@ func TestValidatePrompt_SingleValue_None(t *testing.T) {
 }
 
 func TestValidatePrompt_SingleValue_Login(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("login")
@@ -1518,7 +1518,7 @@ func TestValidatePrompt_SingleValue_Login(t *testing.T) {
 }
 
 func TestValidatePrompt_SingleValue_Consent(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("consent")
@@ -1528,7 +1528,7 @@ func TestValidatePrompt_SingleValue_Consent(t *testing.T) {
 }
 
 func TestValidatePrompt_MultipleValues_LoginConsent(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("login consent")
@@ -1540,7 +1540,7 @@ func TestValidatePrompt_MultipleValues_LoginConsent(t *testing.T) {
 // A run of spaces between two values used to be collapsed; it is malformed (#244).
 // TestValidatePrompt_MultipleValues_LoginConsent is the single-space control.
 func TestValidatePrompt_MultipleSpaces(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("login  consent")
@@ -1551,7 +1551,7 @@ func TestValidatePrompt_MultipleSpaces(t *testing.T) {
 // Spaces around a value used to be trimmed; they are malformed (#244).
 // TestValidatePrompt_SingleValue_Login is the control.
 func TestValidatePrompt_LeadingTrailingSpaces(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	for _, prompt := range []string{"  login  ", " login", "login "} {
@@ -1562,7 +1562,7 @@ func TestValidatePrompt_LeadingTrailingSpaces(t *testing.T) {
 }
 
 func TestValidatePrompt_Duplicates(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("login login")
@@ -1572,7 +1572,7 @@ func TestValidatePrompt_Duplicates(t *testing.T) {
 }
 
 func TestValidatePrompt_DuplicatesWithMultiple(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("login consent login")
@@ -1582,7 +1582,7 @@ func TestValidatePrompt_DuplicatesWithMultiple(t *testing.T) {
 }
 
 func TestValidatePrompt_InvalidValue(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("foo")
@@ -1595,7 +1595,7 @@ func TestValidatePrompt_InvalidValue(t *testing.T) {
 }
 
 func TestValidatePrompt_CaseSensitive_Uppercase(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("LOGIN")
@@ -1608,7 +1608,7 @@ func TestValidatePrompt_CaseSensitive_Uppercase(t *testing.T) {
 }
 
 func TestValidatePrompt_CaseSensitive_MixedCase(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("Login")
@@ -1624,7 +1624,7 @@ func TestValidatePrompt_CaseSensitive_MixedCase(t *testing.T) {
 // answered account_selection_required and not as an unknown value (#244). The combinations are in
 // authorize_request_syntax_test.go.
 func TestValidatePrompt_SelectAccountIsKnownButNotSupported(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("select_account")
@@ -1638,7 +1638,7 @@ func TestValidatePrompt_SelectAccountIsKnownButNotSupported(t *testing.T) {
 }
 
 func TestValidatePrompt_ConflictNoneWithLogin(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("none login")
@@ -1651,7 +1651,7 @@ func TestValidatePrompt_ConflictNoneWithLogin(t *testing.T) {
 }
 
 func TestValidatePrompt_ConflictNoneWithConsent(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("none consent")
@@ -1664,7 +1664,7 @@ func TestValidatePrompt_ConflictNoneWithConsent(t *testing.T) {
 }
 
 func TestValidatePrompt_ConflictNoneWithLoginConsent(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("none login consent")
@@ -1677,7 +1677,7 @@ func TestValidatePrompt_ConflictNoneWithLoginConsent(t *testing.T) {
 }
 
 func TestValidatePrompt_ConflictLoginNone_OrderMatters(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// Order shouldn't matter for conflict detection
@@ -1691,7 +1691,7 @@ func TestValidatePrompt_ConflictLoginNone_OrderMatters(t *testing.T) {
 }
 
 func TestValidatePrompt_InvalidValueInCombination(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("login foo")
@@ -1704,7 +1704,7 @@ func TestValidatePrompt_InvalidValueInCombination(t *testing.T) {
 }
 
 func TestValidateUnsupportedRequestParameters_HasRequest(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	err := validator.ValidateUnsupportedRequestParameters(&ValidateUnsupportedRequestParametersInput{
@@ -1719,7 +1719,7 @@ func TestValidateUnsupportedRequestParameters_HasRequest(t *testing.T) {
 }
 
 func TestValidateUnsupportedRequestParameters_HasRequestURI(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	err := validator.ValidateUnsupportedRequestParameters(&ValidateUnsupportedRequestParametersInput{
@@ -1734,7 +1734,7 @@ func TestValidateUnsupportedRequestParameters_HasRequestURI(t *testing.T) {
 }
 
 func TestValidateUnsupportedRequestParameters_BothFalse(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	err := validator.ValidateUnsupportedRequestParameters(&ValidateUnsupportedRequestParametersInput{})
@@ -1744,7 +1744,7 @@ func TestValidateUnsupportedRequestParameters_BothFalse(t *testing.T) {
 
 func TestValidateUnsupportedRequestParameters_BothTrue_RequestWins(t *testing.T) {
 	// When both parameters are present, request_not_supported is returned (checked first).
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	err := validator.ValidateUnsupportedRequestParameters(&ValidateUnsupportedRequestParametersInput{

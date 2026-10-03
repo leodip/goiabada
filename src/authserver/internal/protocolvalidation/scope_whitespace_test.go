@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 )
 
 // The separator rule is pinned once, in core/oauth's own tables; these are the four validator
@@ -54,7 +54,7 @@ var billingPermissions = []record.Permission{
 	{Id: 11, PermissionIdentifier: "write", ResourceId: 1, Resource: billingResource},
 }
 
-func expectBillingResolution(mockDB *mocks_data.Database) {
+func expectBillingResolution(mockDB *datamocks.Database) {
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "billing-api").
 		Return(&billingResource, nil)
 	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).
@@ -71,7 +71,7 @@ func assertRefusedAsOneElement(t *testing.T, err error, description string) {
 
 func TestValidateScopes_ScopeWhitespace(t *testing.T) {
 	t.Run("one space separates", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		expectBillingResolution(mockDB)
 
 		assert.NoError(t, NewAuthorizeValidator(mockDB).ValidateScopes(context.Background(), singleSpaceSpelling))
@@ -83,7 +83,7 @@ func TestValidateScopes_ScopeWhitespace(t *testing.T) {
 		{"leading and trailing space", " " + singleSpaceSpelling + " "},
 	} {
 		t.Run(tc.name+" is malformed", func(t *testing.T) {
-			err := NewAuthorizeValidator(mocks_data.NewDatabase(t)).ValidateScopes(context.Background(), tc.scope)
+			err := NewAuthorizeValidator(datamocks.NewDatabase(t)).ValidateScopes(context.Background(), tc.scope)
 
 			assertRefusedAsOneElement(t, err, malformedText("scope"))
 		})
@@ -91,7 +91,7 @@ func TestValidateScopes_ScopeWhitespace(t *testing.T) {
 
 	for _, tc := range oneElementSpellings {
 		t.Run(tc.name+" is not a separator", func(t *testing.T) {
-			err := NewAuthorizeValidator(mocks_data.NewDatabase(t)).ValidateScopes(context.Background(), tc.scope)
+			err := NewAuthorizeValidator(datamocks.NewDatabase(t)).ValidateScopes(context.Background(), tc.scope)
 
 			assertRefusedAsOneElement(t, err, fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", tc.scope))
 		})
@@ -126,10 +126,10 @@ func TestValidateTokenRequest_RefreshToken_ScopeWhitespace(t *testing.T) {
 	}
 }
 
-func newWhitespaceClientCredentials(t *testing.T, scope string) (*TokenValidator, *mocks_data.Database, *ValidateTokenRequestInput) {
+func newWhitespaceClientCredentials(t *testing.T, scope string) (*TokenValidator, *datamocks.Database, *ValidateTokenRequestInput) {
 	t.Helper()
-	mockDB := mocks_data.NewDatabase(t)
-	validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
+	mockDB := datamocks.NewDatabase(t)
+	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 	clientSecretEncrypted, err := testDataCipher.Encrypt("valid_secret")
 	require.NoError(t, err)
@@ -178,11 +178,11 @@ func TestValidateTokenRequest_ClientCredentials_ScopeWhitespace(t *testing.T) {
 	}
 }
 
-func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *mocks_data.Database, *mocks_protocolvalidation.PermissionChecker, *record.Settings, *ValidateTokenRequestInput) {
+func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *datamocks.Database, *protocolvalidationmocks.PermissionChecker, *record.Settings, *ValidateTokenRequestInput) {
 	t.Helper()
-	mockDB := mocks_data.NewDatabase(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
-	validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mockPermissionChecker, testDataCipher)
+	mockDB := datamocks.NewDatabase(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
+	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), mockPermissionChecker, testDataCipher)
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}

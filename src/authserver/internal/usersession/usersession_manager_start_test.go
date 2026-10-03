@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 )
 
 // =============================================================================
@@ -38,7 +38,7 @@ import (
 // transaction, where the manager passes nil. A nil here -- which is what the BeginTransaction stubs
 // it replaced handed over, and what this package's own copy of the stub handed over until #198
 // -- makes those two indistinguishable, so a sweep moved back outside the transaction would
-// pass on call count alone. mocks_data.ExpectRunInTransaction now refuses a nil outright, so
+// pass on call count alone. datamocks.ExpectRunInTransaction now refuses a nil outright, so
 // what was this package's convention is the shared stub's rule (#422).
 var txSentinel = &sql.Tx{}
 
@@ -102,7 +102,7 @@ func (b *armableBackend) Create(ctx context.Context, id string, data []byte, aut
 // the browser is read back through the store with the cookies a browser would hold.
 type startSessionMocks struct {
 	t       *testing.T
-	db      *mocks_data.Database
+	db      *datamocks.Database
 	backend *armableBackend
 	store   *sessionstore.ServerSideStore
 	manager *Manager
@@ -110,7 +110,7 @@ type startSessionMocks struct {
 
 func newStartSessionMocks(t *testing.T) *startSessionMocks {
 	t.Helper()
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	backend := &armableBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
 	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionIdentifier, false,
 		sessionstore.PersistentCookie, sessionstore.KeyPair{
@@ -207,7 +207,7 @@ func newSessionRequest(remoteAddr string, userAgent string) *http.Request {
 func (m *startSessionMocks) expectPersistThroughCommit(userId int64, existingSessions []record.UserSession) **record.UserSession {
 	captured := new(*record.UserSession)
 
-	mocks_data.ExpectRunInTransaction(m.db, txSentinel)
+	datamocks.ExpectRunInTransaction(m.db, txSentinel)
 	m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		created := args.Get(2).(*record.UserSession)
 		created.Id = 99 // stand in for the generated primary key
@@ -308,7 +308,7 @@ func TestStartNewUserSession_RecordsTheClient(t *testing.T) {
 	req := newSessionRequest("10.0.0.1:1234", chromeUserAgent)
 
 	var capturedClient *record.UserSessionClient
-	mocks_data.ExpectRunInTransaction(m.db, txSentinel)
+	datamocks.ExpectRunInTransaction(m.db, txSentinel)
 	m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		args.Get(2).(*record.UserSession).Id = 99
 	}).Return(nil).Once()
@@ -507,7 +507,7 @@ func TestStartNewUserSession_DoesNotDeleteTheSessionItJustCreated(t *testing.T) 
 	req := newSessionRequest("192.168.1.50:54321", chromeUserAgent)
 
 	var newIdentifier string
-	mocks_data.ExpectRunInTransaction(m.db, txSentinel)
+	datamocks.ExpectRunInTransaction(m.db, txSentinel)
 	m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		created := args.Get(2).(*record.UserSession)
 		created.Id = 99
@@ -682,7 +682,7 @@ func TestStartNewUserSession_ARerunReportsTheCommittedAttemptsRemovalsOnce(t *te
 		return record.UserSession{Id: id, SessionIdentifier: fmt.Sprintf("row-%d", id), IpAddress: "192.168.1.50", UserAgent: chromeUserAgent}
 	}
 
-	mocks_data.ExpectRunInTransactionRerun(m.db, txSentinel)
+	datamocks.ExpectRunInTransactionRerun(m.db, txSentinel)
 	m.db.On("CreateUserSession", mock.Anything, txSentinel, mock.Anything).Run(func(args mock.Arguments) {
 		args.Get(2).(*record.UserSession).Id = 99
 	}).Return(nil).Twice()
@@ -714,7 +714,7 @@ func TestStartNewUserSession_AnUncommittedTransactionReportsNoRemovals(t *testin
 
 	t.Run("a later delete fails and the body rolls back", func(t *testing.T) {
 		m := newStartSessionMocks(t)
-		stub := mocks_data.ExpectRunInTransaction(m.db, txSentinel)
+		stub := datamocks.ExpectRunInTransaction(m.db, txSentinel)
 		m.db.On("CreateUserSession", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
 		m.db.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
 		m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return(sweep, nil).Once()
@@ -733,7 +733,7 @@ func TestStartNewUserSession_AnUncommittedTransactionReportsNoRemovals(t *testin
 
 	t.Run("the commit is refused", func(t *testing.T) {
 		m := newStartSessionMocks(t)
-		mocks_data.ExpectRunInTransactionThenFail(m.db, txSentinel, dbErr)
+		datamocks.ExpectRunInTransactionThenFail(m.db, txSentinel, dbErr)
 		m.db.On("CreateUserSession", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
 		m.db.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
 		m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return(sweep, nil).Once()
@@ -803,14 +803,14 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 		{
 			name: "the transaction cannot be opened",
 			setup: func(m *startSessionMocks) func(*testing.T) {
-				mocks_data.ExpectRunInTransactionRefused(m.db, dbErr)
+				datamocks.ExpectRunInTransactionRefused(m.db, dbErr)
 				return nil
 			},
 		},
 		{
 			name: "CreateUserSession fails",
 			setup: func(m *startSessionMocks) func(*testing.T) {
-				mocks_data.ExpectRunInTransaction(m.db, txSentinel)
+				datamocks.ExpectRunInTransaction(m.db, txSentinel)
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Return(dbErr).Once()
 				return nil
 			},
@@ -818,7 +818,7 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 		{
 			name: "CreateUserSessionClient fails",
 			setup: func(m *startSessionMocks) func(*testing.T) {
-				mocks_data.ExpectRunInTransaction(m.db, txSentinel)
+				datamocks.ExpectRunInTransaction(m.db, txSentinel)
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(dbErr).Once()
 				return nil
@@ -827,7 +827,7 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 		{
 			name: "the commit fails",
 			setup: func(m *startSessionMocks) func(*testing.T) {
-				mocks_data.ExpectRunInTransactionThenFail(m.db, txSentinel, dbErr)
+				datamocks.ExpectRunInTransactionThenFail(m.db, txSentinel, dbErr)
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return(nil, nil).Once()
@@ -841,7 +841,7 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 			// the helper rolling back exactly when the body errs.
 			name: "the sibling read fails inside the transaction",
 			setup: func(m *startSessionMocks) func(*testing.T) {
-				stub := mocks_data.ExpectRunInTransaction(m.db, txSentinel)
+				stub := datamocks.ExpectRunInTransaction(m.db, txSentinel)
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return(nil, dbErr).Once()
@@ -858,7 +858,7 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 			name: "a sibling delete fails inside the transaction",
 			setup: func(m *startSessionMocks) func(*testing.T) {
 				req := newSessionRequest("192.168.1.50:54321", chromeUserAgent)
-				stub := mocks_data.ExpectRunInTransaction(m.db, txSentinel)
+				stub := datamocks.ExpectRunInTransaction(m.db, txSentinel)
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return([]record.UserSession{{

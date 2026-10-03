@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +23,7 @@ import (
 
 // expectClientFamilyRecords expects one record per family, on the revoking transaction, carrying the
 // reason a client's revocation gives.
-func expectClientFamilyRecords(db *mocks_data.Database, families ...string) {
+func expectClientFamilyRecords(db *datamocks.Database, families ...string) {
 	for _, family := range families {
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, family, ReasonClientBecamePublic).
 			Return(true, nil).Once()
@@ -35,7 +35,7 @@ func expectClientFamilyRecords(db *mocks_data.Database, families ...string) {
 // Two members of one family are one record, and a token with no family identifier is skipped, since
 // no issuer writes one and recording an empty jti is refused as a caller bug.
 func TestRevokeClientGrants_RecordsEachFamilyOnceWhateverItsMembersState(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	tokens := []*record.RefreshToken{
 		{Id: 1, RefreshTokenJti: "a-1", FirstRefreshTokenJti: "fam-all-revoked", Revoked: true},
 		{Id: 2, RefreshTokenJti: "a-2", FirstRefreshTokenJti: "fam-all-revoked", Revoked: true},
@@ -59,7 +59,7 @@ func TestRevokeClientGrants_RecordsEachFamilyOnceWhateverItsMembersState(t *test
 // A record that cannot be written leaves the revocation as an error, with no token swept: the
 // transaction rolls back, so a caller never audits a revocation that did not happen.
 func TestRevokeClientGrants_AFailedRecordSweepsNothing(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	tokens := clientGrantFixture()
 	boom := errs.New("connection refused")
 	db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Once()
@@ -82,9 +82,9 @@ func TestRevokeClientGrantsTx_ALostKeyRunsTheRevocationOnceMore(t *testing.T) {
 	lostTheKey := errs.Errorf("%w: a containment recorded the family first", data.ErrUniqueViolation)
 
 	t.Run("the second attempt commits", func(t *testing.T) {
-		db := mocks_data.NewDatabase(t)
-		first := mocks_data.ExpectRunInTransaction(db, revokeTx)
-		second := mocks_data.ExpectRunInTransaction(db, revokeTx)
+		db := datamocks.NewDatabase(t)
+		first := datamocks.ExpectRunInTransaction(db, revokeTx)
+		second := datamocks.ExpectRunInTransaction(db, revokeTx)
 		db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Twice()
 		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
 		db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
@@ -110,9 +110,9 @@ func TestRevokeClientGrantsTx_ALostKeyRunsTheRevocationOnceMore(t *testing.T) {
 	})
 
 	t.Run("a second loss is an error with the zero result", func(t *testing.T) {
-		db := mocks_data.NewDatabase(t)
-		mocks_data.ExpectRunInTransaction(db, revokeTx)
-		mocks_data.ExpectRunInTransaction(db, revokeTx)
+		db := datamocks.NewDatabase(t)
+		datamocks.ExpectRunInTransaction(db, revokeTx)
+		datamocks.ExpectRunInTransaction(db, revokeTx)
 		db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Twice()
 		db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
 			Return([]*record.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}}, nil).Twice()

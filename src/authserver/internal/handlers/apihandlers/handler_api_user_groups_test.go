@@ -12,8 +12,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
@@ -35,7 +35,7 @@ func loadGroupsOnto(groups ...record.Group) func(mock.Arguments) {
 
 // usergroups/get-count.
 func TestHandleUserGroupsGet_AFailedCountAnswers500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(42)).
 		Return(&record.User{Id: 42, Subject: "sub-42"}, nil).Once()
 	database.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).
@@ -54,15 +54,15 @@ func TestHandleUserGroupsGet_AFailedCountAnswers500(t *testing.T) {
 // so the 500 answers a request whose effect stands. What the case pins is that the response does
 // not then claim the group has no members.
 func TestHandleUserGroupsPut_AFailedCountAnswers500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(42)).
 		Return(&record.User{Id: 42, Subject: "sub-42"}, nil).Once()
 	database.On("GetGroupsByIds", mock.Anything, mock.Anything, []int64{5}).
 		Return([]record.Group{{Id: 5, GroupIdentifier: "admins"}}, nil).Once()
 	// The user holds no group before the request and the one it names after it.
-	mocks_data.ExpectRunInTransaction(database, userGroupsTx)
+	datamocks.ExpectRunInTransaction(database, userGroupsTx)
 	database.On("GetUserGroupsByUserId", mock.Anything, userGroupsTx, int64(42)).Return([]record.UserGroup{}, nil).Once()
 	database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.Anything).Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventUserAddedToGroup, mock.Anything).Return().Once()
@@ -100,7 +100,7 @@ type membershipRow struct {
 }
 
 // serveUserGroupsSave runs the save on a PUT carrying the wanted and loaded group ids.
-func serveUserGroupsSave(t *testing.T, database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger, wanted, expected []int64) *httptest.ResponseRecorder {
+func serveUserGroupsSave(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, wanted, expected []int64) *httptest.ResponseRecorder {
 	t.Helper()
 	body, err := json.Marshal(map[string]any{"groupIds": wanted, "expectedGroupIds": expected})
 	require.NoError(t, err)
@@ -108,7 +108,7 @@ func serveUserGroupsSave(t *testing.T, database *mocks_data.Database, auditLogge
 }
 
 // serveUserGroupsBody runs the save on a PUT carrying body as written.
-func serveUserGroupsBody(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger, body string) *httptest.ResponseRecorder {
+func serveUserGroupsBody(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/groups", strings.NewReader(body))
 	req = setChiURLParam(req, "id", "42")
 	rr := httptest.NewRecorder()
@@ -118,7 +118,7 @@ func serveUserGroupsBody(database *mocks_data.Database, auditLogger *mocks_handl
 
 // expectUserAndGroups registers the reads the save makes before the transaction: the user, and the
 // one lookup of the wanted groups, which every one of them answers.
-func expectUserAndGroups(database *mocks_data.Database, wanted ...int64) {
+func expectUserAndGroups(database *datamocks.Database, wanted ...int64) {
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userGroupsOwnerId).
 		Return(&record.User{Id: userGroupsOwnerId, Subject: "sub-42"}, nil).Once()
 	if len(wanted) == 0 {
@@ -132,7 +132,7 @@ func expectUserAndGroups(database *mocks_data.Database, wanted ...int64) {
 }
 
 // expectStoredMemberships registers the read of the stored memberships on the save's transaction.
-func expectStoredMemberships(database *mocks_data.Database, rows ...membershipRow) {
+func expectStoredMemberships(database *datamocks.Database, rows ...membershipRow) {
 	stored := make([]record.UserGroup, 0, len(rows))
 	for _, r := range rows {
 		stored = append(stored, record.UserGroup{Id: r.id, UserId: userGroupsOwnerId, GroupId: r.groupId})
@@ -142,7 +142,7 @@ func expectStoredMemberships(database *mocks_data.Database, rows ...membershipRo
 
 // expectReload registers the reload the answer is built from, after the commit. It finds no groups,
 // so no member count follows.
-func expectReload(database *mocks_data.Database, order *[]string) {
+func expectReload(database *datamocks.Database, order *[]string) {
 	database.On("UserLoadGroups", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Run(func(args mock.Arguments) {
 			loadGroupsOnto()(args)
@@ -154,7 +154,7 @@ func expectReload(database *mocks_data.Database, order *[]string) {
 
 // recordMembershipAudits accepts every Log call and collects them as event and group id, checking
 // each names the user and the caller.
-func recordMembershipAudits(t *testing.T, auditLogger *mocks_handlers.AuditLogger, order *[]string) *[]auditRecord {
+func recordMembershipAudits(t *testing.T, auditLogger *handlersmocks.AuditLogger, order *[]string) *[]auditRecord {
 	records := &[]auditRecord{}
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -174,12 +174,12 @@ func recordMembershipAudits(t *testing.T, auditLogger *mocks_handlers.AuditLogge
 // inserts, on that transaction. One audit event per membership added and removed follows the
 // commit, and the answer's reload follows those (#428).
 func TestHandleUserGroupsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectUserAndGroups(database, 4, 6)
 	var order []string
-	stub := mocks_data.ExpectRunInTransaction(database, userGroupsTx, func(edge string) { order = append(order, edge) })
+	stub := datamocks.ExpectRunInTransaction(database, userGroupsTx, func(edge string) { order = append(order, edge) })
 	expectStoredMemberships(database, membershipRow{id: 21, groupId: 3}, membershipRow{id: 22, groupId: 4})
 	var deleted []int64
 	database.On("DeleteUserGroup", mock.Anything, userGroupsTx, mock.Anything).
@@ -213,11 +213,11 @@ func TestHandleUserGroupsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
 // in both copies when it is removed, and audited as one removal. An extra copy of a membership that
 // is kept is deleted as a repair and audited as nothing (#428).
 func TestHandleUserGroupsPut_AStoredDuplicateIsRemovedWithItsOriginal(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectUserAndGroups(database, 4)
-	mocks_data.ExpectRunInTransaction(database, userGroupsTx)
+	datamocks.ExpectRunInTransaction(database, userGroupsTx)
 	expectStoredMemberships(database,
 		membershipRow{id: 21, groupId: 3}, membershipRow{id: 22, groupId: 3},
 		membershipRow{id: 23, groupId: 4}, membershipRow{id: 24, groupId: 4},
@@ -243,11 +243,11 @@ func TestHandleUserGroupsPut_AStoredDuplicateIsRemovedWithItsOriginal(t *testing
 // reload. Written autocommitted, as this save was, the membership removed before the failure
 // stayed removed, and audited, under the 500 (#428).
 func TestHandleUserGroupsPut_AFailedWriteCommitsNothing(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectUserAndGroups(database, 6)
-	stub := mocks_data.ExpectRunInTransaction(database, userGroupsTx)
+	stub := datamocks.ExpectRunInTransaction(database, userGroupsTx)
 	expectStoredMemberships(database, membershipRow{id: 21, groupId: 3})
 	database.On("DeleteUserGroup", mock.Anything, userGroupsTx, int64(21)).Return(nil).Once()
 	diskFull := errors.New("the disk is full")
@@ -279,11 +279,11 @@ func TestHandleUserGroupsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
 
 	for _, variant := range variants {
 		t.Run(variant.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			expectUserAndGroups(database)
-			stub := mocks_data.ExpectRunInTransaction(database, userGroupsTx)
+			stub := datamocks.ExpectRunInTransaction(database, userGroupsTx)
 			loadErr := errors.New("the read failed")
 			database.On("GetUserGroupsByUserId", mock.Anything, userGroupsTx, userGroupsOwnerId).Return(nil, loadErr).Once()
 
@@ -304,8 +304,8 @@ func TestHandleUserGroupsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
 // and audits once: the plan is recomputed from a fresh read on each attempt, and the events are
 // emitted from the attempt that committed, after it did (#301, #428).
 func TestHandleUserGroupsPut_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectUserAndGroups(database, 6)
 
@@ -345,11 +345,11 @@ func TestHandleUserGroupsPut_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
 
 // The helper giving up, a deadlock on every attempt, is one 500 and no audit event.
 func TestHandleUserGroupsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectUserAndGroups(database, 6)
-	mocks_data.ExpectRunInTransactionRefused(database, errors.New("transaction aborted as a deadlock victim on all 3 attempts"))
+	datamocks.ExpectRunInTransactionRefused(database, errors.New("transaction aborted as a deadlock victim on all 3 attempts"))
 
 	rr := serveUserGroupsSave(t, database, auditLogger, []int64{6}, []int64{})
 
@@ -364,11 +364,11 @@ func TestHandleUserGroupsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
 // whole set would silently put the user back into a group another administrator had just removed
 // them from (#428).
 func TestHandleUserGroupsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectUserAndGroups(database, 3, 4, 6)
-	stub := mocks_data.ExpectRunInTransaction(database, userGroupsTx)
+	stub := datamocks.ExpectRunInTransaction(database, userGroupsTx)
 	// Group 3 was removed by another save after this caller loaded {3, 4}.
 	expectStoredMemberships(database, membershipRow{id: 22, groupId: 4})
 
@@ -398,11 +398,11 @@ func TestHandleUserGroupsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
 
 	for _, variant := range variants {
 		t.Run(variant.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			expectUserAndGroups(database, 6)
-			mocks_data.ExpectRunInTransaction(database, userGroupsTx)
+			datamocks.ExpectRunInTransaction(database, userGroupsTx)
 			expectStoredMemberships(database, variant.stored...)
 			for _, row := range variant.stored {
 				database.On("DeleteUserGroup", mock.Anything, userGroupsTx, row.id).Return(nil).Once()
@@ -468,8 +468,8 @@ func TestHandleUserGroupsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.T) 
 
 	for _, variant := range variants {
 		t.Run(variant.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			if variant.readsUser {
 				database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userGroupsOwnerId).
@@ -496,11 +496,11 @@ func TestHandleUserGroupsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.T) 
 // permission saves. The lookup answers each group once, so the repeat used to be refused as a
 // group that does not exist (#428).
 func TestHandleUserGroupsPut_ARepeatedIdIsAddedOnce(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectUserAndGroups(database, 6)
-	mocks_data.ExpectRunInTransaction(database, userGroupsTx)
+	datamocks.ExpectRunInTransaction(database, userGroupsTx)
 	expectStoredMemberships(database)
 	database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.Anything).Return(nil).Once()
 	records := recordMembershipAudits(t, auditLogger, nil)

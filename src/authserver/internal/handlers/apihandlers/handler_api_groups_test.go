@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -50,7 +50,7 @@ func requireCountFailureAnswered500(t *testing.T, rr *httptest.ResponseRecorder,
 }
 
 func TestCountGroupMembers_CountsEveryGroup(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(2, nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(6)).Return(0, nil).Once()
 
@@ -64,7 +64,7 @@ func TestCountGroupMembers_CountsEveryGroup(t *testing.T) {
 // the ones that succeeded beside a 0 for the one that did not, and the group after it is never
 // asked.
 func TestCountGroupMembers_StopsAtTheFirstFailureAndNamesTheGroup(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(2, nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(6)).Return(0, errCountFailed).Once()
 
@@ -77,7 +77,7 @@ func TestCountGroupMembers_StopsAtTheFirstFailureAndNamesTheGroup(t *testing.T) 
 }
 
 func TestCountGroupMembers_NoGroupsIsAnEmptyMap(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	counts, err := countGroupMembers(context.Background(), database, nil)
 
@@ -87,7 +87,7 @@ func TestCountGroupMembers_NoGroupsIsAnEmptyMap(t *testing.T) {
 
 // groups/list-count: the list used to render the failed group with 0 members.
 func TestHandleGroupsGet_AFailedCountAnswers500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetAllGroups", mock.Anything, mock.Anything).
 		Return([]record.Group{{Id: 5, GroupIdentifier: "admins"}, {Id: 6, GroupIdentifier: "staff"}}, nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(2, nil).Once()
@@ -102,7 +102,7 @@ func TestHandleGroupsGet_AFailedCountAnswers500(t *testing.T) {
 
 // The accept arm beside it: every count reaches its own group in the body.
 func TestHandleGroupsGet_PublishesEachGroupsOwnCount(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetAllGroups", mock.Anything, mock.Anything).
 		Return([]record.Group{{Id: 5, GroupIdentifier: "admins"}, {Id: 6, GroupIdentifier: "staff"}}, nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(2, nil).Once()
@@ -126,7 +126,7 @@ func TestHandleGroupsGet_PublishesEachGroupsOwnCount(t *testing.T) {
 
 // groups/get-count already answered 500; it now does so through the same helper.
 func TestHandleGroupGet_AFailedCountAnswers500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetGroupById", mock.Anything, mock.Anything, int64(5)).
 		Return(&record.Group{Id: 5, GroupIdentifier: "admins"}, nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(0, errCountFailed).Once()

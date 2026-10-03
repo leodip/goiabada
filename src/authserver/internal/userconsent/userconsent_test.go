@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
@@ -27,8 +27,8 @@ const (
 var consentTx = &sql.Tx{}
 
 func TestRecord_CreatesAConsentWhenNoneIsStored(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
-	stub := mocks_data.ExpectRunInTransaction(db, consentTx)
+	db := datamocks.NewDatabase(t)
+	stub := datamocks.ExpectRunInTransaction(db, consentTx)
 	db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Once()
 
 	var created *record.UserConsent
@@ -63,8 +63,8 @@ func TestRecord_ReplacesAStoredConsentWholeAndRefreshesItsDate(t *testing.T) {
 	stored := &record.UserConsent{
 		Id: 5, UserId: consentUserId, ClientId: consentClientId, Scope: "openid profile email", GrantedAt: grantedAt,
 	}
-	db := mocks_data.NewDatabase(t)
-	stub := mocks_data.ExpectRunInTransaction(db, consentTx)
+	db := datamocks.NewDatabase(t)
+	stub := datamocks.ExpectRunInTransaction(db, consentTx)
 	db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(stored, nil).Once()
 	db.On("UpdateUserConsent", mock.Anything, consentTx, stored).Return(nil).Once()
 
@@ -90,9 +90,9 @@ func TestRecord_ReplacesAStoredConsentWholeAndRefreshesItsDate(t *testing.T) {
 func TestRecord_ASaveThatLosesTheKeyRunsOnceMoreAndRewritesTheWinnersRow(t *testing.T) {
 	lostTheKey := errs.Errorf("%w: another save created the consent first", data.ErrUniqueViolation)
 
-	db := mocks_data.NewDatabase(t)
-	first := mocks_data.ExpectRunInTransaction(db, consentTx)
-	second := mocks_data.ExpectRunInTransaction(db, consentTx)
+	db := datamocks.NewDatabase(t)
+	first := datamocks.ExpectRunInTransaction(db, consentTx)
+	second := datamocks.ExpectRunInTransaction(db, consentTx)
 	winners := &record.UserConsent{Id: 5, UserId: consentUserId, ClientId: consentClientId, Scope: "openid"}
 	db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Once()
 	db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(winners, nil).Once()
@@ -115,9 +115,9 @@ func TestRecord_ASaveThatLosesTheKeyRunsOnceMoreAndRewritesTheWinnersRow(t *test
 func TestRecord_ASecondLossIsAFaultAndIsNotRetriedAgain(t *testing.T) {
 	lostTheKey := errs.Errorf("%w: another save created the consent first", data.ErrUniqueViolation)
 
-	db := mocks_data.NewDatabase(t)
-	mocks_data.ExpectRunInTransaction(db, consentTx)
-	mocks_data.ExpectRunInTransaction(db, consentTx)
+	db := datamocks.NewDatabase(t)
+	datamocks.ExpectRunInTransaction(db, consentTx)
+	datamocks.ExpectRunInTransaction(db, consentTx)
 	db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Twice()
 	db.On("CreateUserConsent", mock.Anything, consentTx, mock.Anything).Return(lostTheKey).Twice()
 
@@ -132,8 +132,8 @@ func TestRecord_Failures(t *testing.T) {
 	boom := errors.New("boom")
 
 	t.Run("the read failing writes nothing", func(t *testing.T) {
-		db := mocks_data.NewDatabase(t)
-		stub := mocks_data.ExpectRunInTransaction(db, consentTx)
+		db := datamocks.NewDatabase(t)
+		stub := datamocks.ExpectRunInTransaction(db, consentTx)
 		db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, boom).Once()
 
 		consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid")
@@ -145,8 +145,8 @@ func TestRecord_Failures(t *testing.T) {
 	})
 
 	t.Run("the create failing returns no row and is not retried", func(t *testing.T) {
-		db := mocks_data.NewDatabase(t)
-		stub := mocks_data.ExpectRunInTransaction(db, consentTx)
+		db := datamocks.NewDatabase(t)
+		stub := datamocks.ExpectRunInTransaction(db, consentTx)
 		db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Once()
 		db.On("CreateUserConsent", mock.Anything, consentTx, mock.Anything).Return(boom).Once()
 
@@ -157,8 +157,8 @@ func TestRecord_Failures(t *testing.T) {
 	})
 
 	t.Run("the update failing returns no row and is not retried", func(t *testing.T) {
-		db := mocks_data.NewDatabase(t)
-		stub := mocks_data.ExpectRunInTransaction(db, consentTx)
+		db := datamocks.NewDatabase(t)
+		stub := datamocks.ExpectRunInTransaction(db, consentTx)
 		db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).
 			Return(&record.UserConsent{Id: 5, UserId: consentUserId, ClientId: consentClientId}, nil).Once()
 		db.On("UpdateUserConsent", mock.Anything, consentTx, mock.Anything).Return(boom).Once()
@@ -170,8 +170,8 @@ func TestRecord_Failures(t *testing.T) {
 	})
 
 	t.Run("a commit the engine refuses returns no row, though the body ran to the end", func(t *testing.T) {
-		db := mocks_data.NewDatabase(t)
-		mocks_data.ExpectRunInTransactionThenFail(db, consentTx, boom)
+		db := datamocks.NewDatabase(t)
+		datamocks.ExpectRunInTransactionThenFail(db, consentTx, boom)
 		db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Once()
 		db.On("CreateUserConsent", mock.Anything, consentTx, mock.Anything).Return(nil).Once()
 
@@ -181,8 +181,8 @@ func TestRecord_Failures(t *testing.T) {
 	})
 
 	t.Run("a transaction that cannot open writes nothing", func(t *testing.T) {
-		db := mocks_data.NewDatabase(t)
-		mocks_data.ExpectRunInTransactionRefused(db, boom)
+		db := datamocks.NewDatabase(t)
+		datamocks.ExpectRunInTransactionRefused(db, boom)
 
 		consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid")
 		assert.ErrorIs(t, err, boom)

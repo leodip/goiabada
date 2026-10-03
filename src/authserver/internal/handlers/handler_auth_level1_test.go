@@ -9,8 +9,8 @@ import (
 	"testing/fstest"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/oauth"
@@ -21,10 +21,10 @@ import (
 
 func TestHandleAuthLevel1Get(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		handler := HandleAuthLevel1Get(pageRenderer, ceremonyStore, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1?ceremony="+testCeremonyId, nil)
@@ -48,10 +48,10 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		handler := HandleAuthLevel1Get(pageRenderer, ceremonyStore, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1?ceremony="+testCeremonyId, nil)
@@ -76,10 +76,10 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 	})
 
 	t.Run("Successful flow", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		handler := HandleAuthLevel1Get(pageRenderer, ceremonyStore, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1?ceremony="+testCeremonyId, nil)
@@ -111,12 +111,12 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 
 func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
@@ -139,12 +139,12 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
@@ -172,12 +172,12 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	})
 
 	t.Run("Successful flow, redirect to level2", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
@@ -234,12 +234,12 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	// The step-up rule refuses to judge a session level it does not know, and this hop answers 500
 	// where prompt=none answers interaction_required: each caller decides (#437).
 	t.Run("an unknown session level answers 500 and saves nothing", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
@@ -272,12 +272,12 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	})
 
 	t.Run("Successful flow, redirect to completed", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
@@ -332,12 +332,12 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	})
 
 	t.Run("No session, auth completed", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
@@ -393,12 +393,12 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	// written: NewDatabase(t) fails on an unregistered call, and the explicit AssertNotCalled
 	// below says so in its own words, because that deletion is the whole of part 1.1 (#242).
 	t.Run("OTP config generation has moved since the session answered", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
@@ -541,12 +541,12 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				pageRenderer := mocks_handlers.NewPageRenderer(t)
-				ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-				userSessionManager := mocks_handlers.NewUserSessionManager(t)
-				database := mocks_data.NewDatabase(t)
+				pageRenderer := handlersmocks.NewPageRenderer(t)
+				ceremonyStore := handlersmocks.NewCeremonyStore(t)
+				userSessionManager := handlersmocks.NewUserSessionManager(t)
+				database := datamocks.NewDatabase(t)
 
-				auditLogger := mocks_handlers.NewAuditLogger(t)
+				auditLogger := handlersmocks.NewAuditLogger(t)
 				handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 				req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
@@ -670,12 +670,12 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				pageRenderer := mocks_handlers.NewPageRenderer(t)
-				ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-				userSessionManager := mocks_handlers.NewUserSessionManager(t)
-				database := mocks_data.NewDatabase(t)
+				pageRenderer := handlersmocks.NewPageRenderer(t)
+				ceremonyStore := handlersmocks.NewCeremonyStore(t)
+				userSessionManager := handlersmocks.NewUserSessionManager(t)
+				database := datamocks.NewDatabase(t)
 
-				auditLogger := mocks_handlers.NewAuditLogger(t)
+				auditLogger := handlersmocks.NewAuditLogger(t)
 				handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 				req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
@@ -776,12 +776,12 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		ceremony.AuthStateLevel1ExistingSession,
 	} {
 		t.Run("answers the client on "+string(state), func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			database := mocks_data.NewDatabase(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			database := datamocks.NewDatabase(t)
 
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 			handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 			req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
@@ -822,12 +822,12 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 	// anonymous browser. It is delivered before anything reads max_age or the session, which is why
 	// RequestedMaxAge reading such a value as 0 is never what answers this ceremony (#243).
 	t.Run("a parked max_age refusal is delivered without asking about a session", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req := withSessionSettings(httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil))
@@ -856,12 +856,12 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 	})
 
 	t.Run("a failing clear still answers the client, with server_error", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
@@ -891,10 +891,10 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 	})
 
 	t.Run("an unusable form_post template answers 500", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 
 		// Deliberately malformed, an unclosed action, so template.ParseFS fails. form_post is the
 		// only response mode whose arm can fail after the redirect URI has been validated, and it
@@ -904,7 +904,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
@@ -929,12 +929,12 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 	})
 
 	t.Run("a self-registered client gets the refusal page, not the redirect", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
@@ -961,12 +961,12 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 	})
 
 	t.Run("no parked error leaves today's step-up decision alone", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)

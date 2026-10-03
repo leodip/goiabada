@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -32,9 +32,9 @@ func isErrNoSettings(err error) bool {
 
 // A browser page answers the 500 page through PageRenderer.
 func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-	database := mocks_data.NewDatabase(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	database := datamocks.NewDatabase(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/pwd?ceremony="+testCeremonyId, nil)
 	rr := httptest.NewRecorder()
@@ -46,7 +46,7 @@ func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 	}, nil)
 	pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
 	pageRenderer.AssertExpectations(t)
@@ -57,8 +57,8 @@ func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 // every other failure there is answered, and it is refused before the validator sees the request
 // (#435).
 func TestMissingSettings_TheTokenEndpointAnswersItsOwn500(t *testing.T) {
-	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	tokenValidator := mocks_handlers.NewTokenValidator(t)
+	jsonWriter := handlersmocks.NewJSONWriter(t)
+	tokenValidator := handlersmocks.NewTokenValidator(t)
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/token",
 		strings.NewReader("grant_type=client_credentials&client_id=test-client&client_secret=secret"))
@@ -67,8 +67,8 @@ func TestMissingSettings_TheTokenEndpointAnswersItsOwn500(t *testing.T) {
 
 	jsonWriter.On("JSONError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
-	HandleTokenPost(jsonWriter, mocks_data.NewDatabase(t),
-		mocks_handlers.NewTokenIssuer(t), tokenValidator, mocks_handlers.NewAuditLogger(t),
+	HandleTokenPost(jsonWriter, datamocks.NewDatabase(t),
+		handlersmocks.NewTokenIssuer(t), tokenValidator, handlersmocks.NewAuditLogger(t),
 		noCredentialFailures{}).ServeHTTP(rr, req)
 
 	jsonWriter.AssertExpectations(t)
@@ -78,7 +78,7 @@ func TestMissingSettings_TheTokenEndpointAnswersItsOwn500(t *testing.T) {
 // Dynamic client registration keeps RFC 7591 section 3.2.2's envelope for this 500 as for its
 // others, and logs the sentinel once.
 func TestMissingSettings_DynamicClientRegistrationAnswersTheRFC7591Envelope(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	body, err := json.Marshal(oidc.DynamicClientRegistrationRequest{
 		ClientName:   "A Test Client",
@@ -91,7 +91,7 @@ func TestMissingSettings_DynamicClientRegistrationAnswersTheRFC7591Envelope(t *t
 
 	capture := logtest.CaptureSlog(t)
 	HandleDynamicClientRegistrationPost(database,
-		mocks_handlers.NewAuditLogger(t), testDataCipher).ServeHTTP(rr, req)
+		handlersmocks.NewAuditLogger(t), testDataCipher).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	var envelope map[string]any

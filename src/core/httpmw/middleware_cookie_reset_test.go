@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/core/sessionstore"
-	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
+	"github.com/leodip/goiabada/core/sessionstore/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -19,7 +19,7 @@ func TestCookieReset(t *testing.T) {
 	const testSessionName = "test-session"
 
 	t.Run("No error", func(t *testing.T) {
-		mockStore := new(mocks_sessionstore.Store)
+		mockStore := new(sessionstoremocks.Store)
 		mockStore.On("Get", mock.Anything, testSessionName).Return(&sessionstore.Session{}, nil)
 
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
@@ -42,7 +42,7 @@ func TestCookieReset(t *testing.T) {
 	// logged, and they are answered from the same memoised pair this Get installed
 	// (decision 11, #270).
 	t.Run("A storage error is passed along, with no cookie and no redirect", func(t *testing.T) {
-		mockStore := new(mocks_sessionstore.Store)
+		mockStore := new(sessionstoremocks.Store)
 		mockStore.On("Get", mock.Anything, testSessionName).Return(nil, errors.New("the database is unreachable"))
 
 		reached := false

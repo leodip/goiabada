@@ -22,8 +22,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
 // Seam 4 of #437 for /auth/issue's re-checks and for the implicit grant's transaction: each outcome
@@ -37,12 +37,12 @@ import (
 const recheckGeneration = 5
 
 type recheckFixture struct {
-	pageRenderer   *mocks_handlers.PageRenderer
-	ceremonyStore  *mocks_handlers.CeremonyStore
-	codeIssuer     *mocks_handlers.CodeIssuer
-	implicitIssuer *mocks_handlers.ImplicitTokenIssuer
-	database       *mocks_data.Database
-	auditLogger    *mocks_handlers.AuditLogger
+	pageRenderer   *handlersmocks.PageRenderer
+	ceremonyStore  *handlersmocks.CeremonyStore
+	codeIssuer     *handlersmocks.CodeIssuer
+	implicitIssuer *handlersmocks.ImplicitTokenIssuer
+	database       *datamocks.Database
+	auditLogger    *handlersmocks.AuditLogger
 	settings       *record.Settings
 	client         *record.Client
 	user           *record.User
@@ -70,12 +70,12 @@ func newRecheckFixtureFor(t *testing.T, responseType string, prompt string, sess
 	const callback = "https://example.com/callback"
 
 	f := &recheckFixture{
-		pageRenderer:   mocks_handlers.NewPageRenderer(t),
-		ceremonyStore:  mocks_handlers.NewCeremonyStore(t),
-		codeIssuer:     mocks_handlers.NewCodeIssuer(t),
-		implicitIssuer: mocks_handlers.NewImplicitTokenIssuer(t),
-		database:       mocks_data.NewDatabase(t),
-		auditLogger:    mocks_handlers.NewAuditLogger(t),
+		pageRenderer:   handlersmocks.NewPageRenderer(t),
+		ceremonyStore:  handlersmocks.NewCeremonyStore(t),
+		codeIssuer:     handlersmocks.NewCodeIssuer(t),
+		implicitIssuer: handlersmocks.NewImplicitTokenIssuer(t),
+		database:       datamocks.NewDatabase(t),
+		auditLogger:    handlersmocks.NewAuditLogger(t),
 		settings: &record.Settings{
 			UserSessionIdleTimeoutInSeconds: testIdleTimeoutInSeconds,
 			UserSessionMaxLifetimeInSeconds: testMaxLifetimeInSeconds,
@@ -124,11 +124,11 @@ func newRecheckFixtureFor(t *testing.T, responseType string, prompt string, sess
 	f.database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
 		Return(&record.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil).Maybe()
 
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
+	userSessionManager := handlersmocks.NewUserSessionManager(t)
 	// As the real manager answers: a row that does not resolve is not valid.
 	userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).
 		Return(func(session *record.UserSession, _ int, _ int, _ *int64) bool { return session != nil }).Maybe()
-	permissionChecker := mocks_handlers.NewPermissionChecker(t)
+	permissionChecker := handlersmocks.NewPermissionChecker(t)
 	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
 		Return(func(_ context.Context, scope string, _ *record.User) string { return scope }, nil).Maybe()
 

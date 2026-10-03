@@ -19,8 +19,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mock_middleware "github.com/leodip/goiabada/adminconsole/internal/middleware/mocks"
-	mock_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/middleware/mocks"
+	"github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
 // recordingErrorRenderer captures what the middleware handed the error page. It
@@ -64,10 +64,10 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 			name:      "the session cannot be read",
 			wantCause: "unable to get the session",
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
-				store := new(mock_sessionstore.Store)
+				store := new(sessionstoremocks.Store)
 				store.On("Get", mock.Anything, sessionName).Return(nil, assert.AnError)
 
-				m := NewJWT(store, sessionName, new(mock_middleware.TokenParser), nil, new(mock_middleware.AuthHelper), rec, "http://localhost:9091", "")
+				m := NewJWT(store, sessionName, new(middlewaremocks.TokenParser), nil, new(middlewaremocks.AuthHelper), rec, "http://localhost:9091", "")
 
 				return m.SessionHandler()(mustNotRun(t)), httptest.NewRequest(http.MethodGet, "/", nil)
 			},
@@ -76,12 +76,12 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 			name:      "the session holds something that is not a TokenResponse",
 			wantCause: "unable to cast the session value to TokenResponse",
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
-				store := new(mock_sessionstore.Store)
+				store := new(sessionstoremocks.Store)
 				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
 					Values: map[string]any{sessionkeys.JWT: "not a token response"},
 				}, nil)
 
-				m := NewJWT(store, sessionName, new(mock_middleware.TokenParser), nil, new(mock_middleware.AuthHelper), rec, "http://localhost:9091", "")
+				m := NewJWT(store, sessionName, new(middlewaremocks.TokenParser), nil, new(middlewaremocks.AuthHelper), rec, "http://localhost:9091", "")
 
 				return m.SessionHandler()(mustNotRun(t)), httptest.NewRequest(http.MethodGet, "/", nil)
 			},
@@ -90,7 +90,7 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 			name:      "signing out a session with no recorded expiry cannot be saved",
 			wantCause: "unable to save the session",
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
-				store := new(mock_sessionstore.Store)
+				store := new(sessionstoremocks.Store)
 				// No recorded expiry, as a session signed in before #427, so the middleware
 				// signs it out without consulting the parser.
 				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
@@ -100,7 +100,7 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 				}, nil)
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
 
-				m := NewJWT(store, sessionName, mock_middleware.NewTokenParser(t), nil, new(mock_middleware.AuthHelper), rec, "http://localhost:9091", "")
+				m := NewJWT(store, sessionName, middlewaremocks.NewTokenParser(t), nil, new(middlewaremocks.AuthHelper), rec, "http://localhost:9091", "")
 
 				return m.SessionHandler()(mustNotRun(t)), httptest.NewRequest(http.MethodGet, "/", nil)
 			},
@@ -109,7 +109,7 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 			name:      "clearing a session whose ID token is foreign cannot be saved",
 			wantCause: "unable to save the session",
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
-				store := new(mock_sessionstore.Store)
+				store := new(sessionstoremocks.Store)
 				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
 					Values: map[string]any{
 						sessionkeys.JWT:          oauth.TokenResponse{AccessToken: "a", IdToken: "foreign"},
@@ -118,11 +118,11 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 				}, nil)
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
 
-				parser := mock_middleware.NewTokenParser(t)
+				parser := middlewaremocks.NewTokenParser(t)
 				parser.On("DecodeAndValidateStoredIDToken", mock.Anything, "foreign").
 					Return(nil, errs.Wrap(oauthclient.ErrForeignToken, "the id token's iss is another"))
 
-				m := NewJWT(store, sessionName, parser, nil, new(mock_middleware.AuthHelper), rec, "http://localhost:9091", "")
+				m := NewJWT(store, sessionName, parser, nil, new(middlewaremocks.AuthHelper), rec, "http://localhost:9091", "")
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -135,14 +135,14 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
 				jwtInfo := oauthclient.JwtInfo{}
 
-				helper := new(mock_middleware.AuthHelper)
+				helper := new(middlewaremocks.AuthHelper)
 				helper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
 				helper.On("IsAuthenticated", jwtInfo).Return(false)
 				helper.On("RedirToAuthorize", mock.Anything, mock.Anything,
 					builtin.AdminConsoleClientIdentifier, mock.AnythingOfType("string"),
 					mock.AnythingOfType("string")).Return(assert.AnError)
 
-				m := NewJWT(new(mock_sessionstore.Store), sessionName, new(mock_middleware.TokenParser), nil, helper, rec, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
+				m := NewJWT(new(sessionstoremocks.Store), sessionName, new(middlewaremocks.TokenParser), nil, helper, rec, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
 				req = req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))

@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
@@ -17,8 +17,8 @@ import (
 
 func TestHandleCertsGet(t *testing.T) {
 	t.Run("Successfully returns JWKS", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		database := mocks_data.NewDatabase(t)
+		jsonWriter := handlersmocks.NewJSONWriter(t)
+		database := datamocks.NewDatabase(t)
 
 		handler := HandleCertsGet(jsonWriter, database)
 
@@ -60,8 +60,8 @@ func TestHandleCertsGet(t *testing.T) {
 	})
 
 	t.Run("Successfully returns JWKS with only current key", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		database := mocks_data.NewDatabase(t)
+		jsonWriter := handlersmocks.NewJSONWriter(t)
+		database := datamocks.NewDatabase(t)
 
 		handler := HandleCertsGet(jsonWriter, database)
 
@@ -93,8 +93,8 @@ func TestHandleCertsGet(t *testing.T) {
 	})
 
 	t.Run("Database error", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		database := mocks_data.NewDatabase(t)
+		jsonWriter := handlersmocks.NewJSONWriter(t)
+		database := datamocks.NewDatabase(t)
 
 		handler := HandleCertsGet(jsonWriter, database)
 
@@ -116,8 +116,8 @@ func TestHandleCertsGet(t *testing.T) {
 	})
 
 	t.Run("Invalid key state", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		database := mocks_data.NewDatabase(t)
+		jsonWriter := handlersmocks.NewJSONWriter(t)
+		database := datamocks.NewDatabase(t)
 
 		handler := HandleCertsGet(jsonWriter, database)
 
@@ -146,8 +146,8 @@ func TestHandleCertsGet(t *testing.T) {
 	})
 
 	t.Run("Invalid JSON in PublicKeyJWK", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		database := mocks_data.NewDatabase(t)
+		jsonWriter := handlersmocks.NewJSONWriter(t)
+		database := datamocks.NewDatabase(t)
 
 		handler := HandleCertsGet(jsonWriter, database)
 
@@ -176,8 +176,8 @@ func TestHandleCertsGet(t *testing.T) {
 	})
 
 	t.Run("No keys found", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		database := mocks_data.NewDatabase(t)
+		jsonWriter := handlersmocks.NewJSONWriter(t)
+		database := datamocks.NewDatabase(t)
 
 		handler := HandleCertsGet(jsonWriter, database)
 

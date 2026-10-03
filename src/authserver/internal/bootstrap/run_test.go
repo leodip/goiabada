@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -28,7 +28,7 @@ func TestRun_AlreadySeeded_ContinuesWithoutWritingInEveryMode(t *testing.T) {
 		"neither":     {},
 	} {
 		t.Run(name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
+			database := datamocks.NewDatabase(t)
 			database.On("IsEmpty", mock.Anything).Return(false, nil).Once()
 			logs := logtest.CaptureSlog(t)
 
@@ -46,7 +46,7 @@ func TestRun_AlreadySeeded_ContinuesWithoutWritingInEveryMode(t *testing.T) {
 }
 
 func TestRun_IsEmptyFails_RefusesAndSaysWhich(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("IsEmpty", mock.Anything).Return(false, errs.New("connection reset")).Once()
 
 	outcome, err := Run(context.Background(), database, testDataCipher, Config{OAuthClientSecret: "secret"})
@@ -58,7 +58,7 @@ func TestRun_IsEmptyFails_RefusesAndSaysWhich(t *testing.T) {
 }
 
 func TestRun_NeitherModeConfigured_RefusesWithoutWriting(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("IsEmpty", mock.Anything).Return(true, nil).Once()
 	logs := logtest.CaptureSlog(t)
 
@@ -81,7 +81,7 @@ func TestOutcome_ZeroValueRefuses(t *testing.T) {
 // emptiness check, so any write the seed reached would panic the test. Before #409 this password
 // was hashed with the error discarded, after the first insert, and stored as an empty hash.
 func TestRun_RefusesAnOverlongAdminPasswordBeforeAnyWrite(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("IsEmpty", mock.Anything).Return(true, nil).Once()
 	target := filepath.Join(t.TempDir(), "bootstrap.env")
 
@@ -131,7 +131,7 @@ func TestCheckAdminPasswordLength_CountsBytes(t *testing.T) {
 // The production key size and the production rename, which the tests below replace: a runner built
 // any other way than through newRunner does not reach production.
 func TestNewRunner_ProductionDefaults(t *testing.T) {
-	r := newRunner(mocks_data.NewDatabase(t), testDataCipher, Config{})
+	r := newRunner(datamocks.NewDatabase(t), testDataCipher, Config{})
 
 	assert.Equal(t, 4096, r.keySizeBits)
 	assert.Equal(t, reflect.ValueOf(os.Rename).Pointer(), reflect.ValueOf(r.rename).Pointer())

@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 )
 
 // expectRedirectURIStillRegistered arms the registration read #241 added at the very end of the
@@ -29,7 +29,7 @@ import (
 // owned by TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered, which asserts
 // both that it fires and, through the ABSENCE of this expectation, that it does not fire above
 // client authentication and PKCE.
-func expectRedirectURIStillRegistered(mockDB *mocks_data.Database, uri string) {
+func expectRedirectURIStillRegistered(mockDB *datamocks.Database, uri string) {
 	mockDB.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Client")).
 		Run(func(args mock.Arguments) {
 			c := args.Get(2).(*record.Client)
@@ -47,9 +47,9 @@ func grantAs[G TokenGrant](t *testing.T, grant TokenGrant) G {
 }
 
 func TestValidateTokenRequest(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -198,9 +198,9 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 			{"superseded code is rejected", 3, 4, false},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				mockDB := mocks_data.NewDatabase(t)
-				mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-				mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+				mockDB := datamocks.NewDatabase(t)
+				mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+				mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 				settings := &record.Settings{}
 				ctx := context.Background()
@@ -279,9 +279,9 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				mockDB := mocks_data.NewDatabase(t)
-				mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-				mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+				mockDB := datamocks.NewDatabase(t)
+				mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+				mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 				settings := &record.Settings{
 					UserSessionIdleTimeoutInSeconds: 3600,
@@ -368,9 +368,9 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 			{"superseded token is rejected", 3, 4, false},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				mockDB := mocks_data.NewDatabase(t)
-				mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-				mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+				mockDB := datamocks.NewDatabase(t)
+				mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+				mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 				settings := &record.Settings{}
 				ctx := context.Background()
@@ -444,10 +444,10 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 // Two positive controls, one per grant type, because a check that rejected everything would
 // satisfy every negative row here.
 func TestValidateTokenRequest_RevokedCode(t *testing.T) {
-	newValidator := func(t *testing.T) (*TokenValidator, *mocks_data.Database, *mocks_protocolvalidation.TokenParser) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	newValidator := func(t *testing.T) (*TokenValidator, *datamocks.Database, *protocolvalidationmocks.TokenParser) {
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 		return NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher), mockDB, mockTokenParser
 	}
 

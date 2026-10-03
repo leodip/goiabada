@@ -13,7 +13,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -58,8 +58,8 @@ func assertStepLocation(t testing.TB, location string, path string, msgAndArgs .
 
 // expectCeremonyMismatch sets the two calls rejectCeremonyMismatch makes, and asserts the page it
 // renders is the 400 error page rather than anything belonging to the flow that was submitted.
-func expectCeremonyMismatch(t *testing.T, pageRenderer *mocks_handlers.PageRenderer,
-	auditLogger *mocks_handlers.AuditLogger, rr *httptest.ResponseRecorder, req *http.Request) {
+func expectCeremonyMismatch(t *testing.T, pageRenderer *handlersmocks.PageRenderer,
+	auditLogger *handlersmocks.AuditLogger, rr *httptest.ResponseRecorder, req *http.Request) {
 	t.Helper()
 
 	auditLogger.On("Log", mock.Anything, audit.EventAuthCeremonyMismatch, mock.Anything).Return().Once()
@@ -77,7 +77,7 @@ func expectCeremonyMismatch(t *testing.T, pageRenderer *mocks_handlers.PageRende
 // It asserts the state_mismatch pair specifically and not merely "some title": the ceremony
 // mismatch page beside it says another sign-in was started in this browser, which is not what the
 // Back button did, and a helper that accepted either would let the two pages be confused.
-func expectAuthStateMismatch(t *testing.T, pageRenderer *mocks_handlers.PageRenderer,
+func expectAuthStateMismatch(t *testing.T, pageRenderer *handlersmocks.PageRenderer,
 	rr *httptest.ResponseRecorder, req *http.Request) {
 	t.Helper()
 
@@ -276,9 +276,9 @@ func TestLoadAuthContext(t *testing.T) {
 	t.Run("a missing context redirects to the account page with a warn line", func(t *testing.T) {
 		logged := logtest.CaptureSlog(t)
 
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		rr := httptest.NewRecorder()
 		req := renderableRequest("/auth/level1")
 
@@ -299,9 +299,9 @@ func TestLoadAuthContext(t *testing.T) {
 	})
 
 	t.Run("a wrapped missing context is still a missing context", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		rr := httptest.NewRecorder()
 		req := renderableRequest("/auth/level1")
 
@@ -315,9 +315,9 @@ func TestLoadAuthContext(t *testing.T) {
 	})
 
 	t.Run("any other failure is a 500 carrying that error", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		rr := httptest.NewRecorder()
 		req := renderableRequest("/auth/level1")
 
@@ -334,9 +334,9 @@ func TestLoadAuthContext(t *testing.T) {
 	t.Run("a present context the request names passes through, writing nothing", func(t *testing.T) {
 		logged := logtest.CaptureSlog(t)
 
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		rr := httptest.NewRecorder()
 		req := renderableRequest("/auth/level1?ceremony=" + testCeremonyId)
 
@@ -425,9 +425,9 @@ func TestLoadAuthContext_CeremonyId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 			rr := httptest.NewRecorder()
 			req := stepRequestFor(tc.method, "/auth/pwd", tc.inQuery, tc.inForm)
 
@@ -460,9 +460,9 @@ func TestLoadAuthContext_CeremonyId(t *testing.T) {
 	t.Run("a missing context is still the account page, whatever the request names", func(t *testing.T) {
 		for _, method := range []string{http.MethodGet, http.MethodPost} {
 			t.Run(method, func(t *testing.T) {
-				pageRenderer := mocks_handlers.NewPageRenderer(t)
-				ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-				auditLogger := mocks_handlers.NewAuditLogger(t)
+				pageRenderer := handlersmocks.NewPageRenderer(t)
+				ceremonyStore := handlersmocks.NewCeremonyStore(t)
+				auditLogger := handlersmocks.NewAuditLogger(t)
 				rr := httptest.NewRecorder()
 				req := stepRequestFor(method, "/auth/pwd", testCeremonyId, testCeremonyId)
 
@@ -556,8 +556,8 @@ func renderableRequest(target string) *http.Request {
 func TestRejectCeremonyMismatch_AuditsUnderTheRequestsContext(t *testing.T) {
 	const requestId = "goiabada/req-ceremony-1"
 
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	req, err := http.NewRequest("POST", "/auth/pwd", nil)
 	require.NoError(t, err)

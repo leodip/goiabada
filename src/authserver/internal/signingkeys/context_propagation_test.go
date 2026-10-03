@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -52,7 +52,7 @@ func signedToken(t *testing.T, privateKey *rsa.PrivateKey) string {
 // The accept arm: the current signing key is read on behalf of whoever asked for the token to be
 // parsed.
 func TestDecodeAndValidateTokenString_ReadsTheKeyUnderTheCallersContext(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tp := NewTokenParser(mockDB)
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -70,7 +70,7 @@ func TestDecodeAndValidateTokenString_ReadsTheKeyUnderTheCallersContext(t *testi
 // The fallback arm: a token the current key does not verify sends the parser to the whole key set,
 // and that read is on the caller's behalf too.
 func TestDecodeAndValidateTokenString_ReadsTheFallbackKeysUnderTheCallersContext(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tp := NewTokenParser(mockDB)
 
 	currentKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -93,7 +93,7 @@ func TestDecodeAndValidateTokenString_ReadsTheFallbackKeysUnderTheCallersContext
 // downstream is reached and there is no context to get wrong. Without it the accept arm would also
 // pass on a parser that read the key and then ignored the answer.
 func TestDecodeAndValidateTokenString_AFailedKeyReadReachesNoSecondPort(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tp := NewTokenParser(mockDB)
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)

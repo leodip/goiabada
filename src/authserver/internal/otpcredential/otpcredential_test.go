@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -59,11 +59,11 @@ func codeFor(t *testing.T, seed string, now time.Time) string {
 // transaction, in that order, and the generation the caller gets is the committing attempt's
 // read-back rather than anything computed here (#242 decision 2, #247).
 func TestEstablish_WritesTheUserTheGenerationAndTheClearInOneTransaction(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	user := enrollableUser()
 
 	var calls []string
-	mocks_data.ExpectRunInTransaction(database, otpTx, func(edge string) { calls = append(calls, edge) })
+	datamocks.ExpectRunInTransaction(database, otpTx, func(edge string) { calls = append(calls, edge) })
 
 	database.EXPECT().UpdateUser(mock.Anything, otpTx, mock.MatchedBy(func(u *record.User) bool {
 		// otp_enabled is on and the seed is stored encrypted, both of which were the caller's
@@ -109,10 +109,10 @@ func TestEstablish_WritesTheUserTheGenerationAndTheClearInOneTransaction(t *test
 // The rollback arm of the same property. A failing write hands its error to the helper, which is
 // what "nothing committed" looks like one layer up, and the caller gets no generation.
 func TestEstablish_AFailedWriteRollsTheWholeTransactionBack(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	writeErr := errors.New("update refused")
 
-	stub := mocks_data.ExpectRunInTransaction(database, otpTx)
+	stub := datamocks.ExpectRunInTransaction(database, otpTx)
 	database.EXPECT().UpdateUser(mock.Anything, otpTx, mock.Anything).Return(writeErr).Once()
 
 	generation, err := Establish(context.Background(), database, testDataCipher, enrollableUser(), otpSeed)
@@ -129,10 +129,10 @@ func TestEstablish_AFailedWriteRollsTheWholeTransactionBack(t *testing.T) {
 // A commit the engine refuses after every statement landed is still a failed establish: the caller
 // is told, and is not handed a generation the database never committed.
 func TestEstablish_ACommitFailureYieldsNoGeneration(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	commitErr := errors.New("commit refused")
 
-	mocks_data.ExpectRunInTransactionThenFail(database, otpTx, commitErr)
+	datamocks.ExpectRunInTransactionThenFail(database, otpTx, commitErr)
 	database.EXPECT().UpdateUser(mock.Anything, otpTx, mock.Anything).Return(nil).Once()
 	database.EXPECT().IncrementUserOtpConfigGeneration(mock.Anything, otpTx, otpUserId).Return(11, nil).Once()
 	database.EXPECT().ClearPendingOTPEnrollment(mock.Anything, otpTx, otpUserId).Return(nil).Once()
@@ -146,10 +146,10 @@ func TestEstablish_ACommitFailureYieldsNoGeneration(t *testing.T) {
 // A transaction that never opens: the body never runs, so no write is attempted and the helper's
 // error is what the caller sees.
 func TestEstablish_ARefusedTransactionWritesNothing(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	beginErr := errors.New("cannot begin")
 
-	mocks_data.ExpectRunInTransactionRefused(database, beginErr)
+	datamocks.ExpectRunInTransactionRefused(database, beginErr)
 
 	generation, err := Establish(context.Background(), database, testDataCipher, enrollableUser(), otpSeed)
 
@@ -162,11 +162,11 @@ func TestEstablish_ARefusedTransactionWritesNothing(t *testing.T) {
 // transaction, in decision 10's order: otp_enabled cleared before the marker (#111 decisions 4,
 // 10 and 13).
 func TestRemove_ClearsDisablesResetsAndAdvancesInOneTransaction(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	user := enrolledUser(t)
 
 	var calls []string
-	mocks_data.ExpectRunInTransaction(database, otpTx, func(edge string) { calls = append(calls, edge) })
+	datamocks.ExpectRunInTransaction(database, otpTx, func(edge string) { calls = append(calls, edge) })
 
 	database.EXPECT().UpdateUser(mock.Anything, otpTx, mock.MatchedBy(func(u *record.User) bool {
 		return !u.OTPEnabled && len(u.OTPSecretEncrypted) == 0
@@ -199,10 +199,10 @@ func TestRemove_ClearsDisablesResetsAndAdvancesInOneTransaction(t *testing.T) {
 // The counter advance is not best-effort. A removal that commits without it is exactly the state
 // the re-prompt exists to prevent, so its error is returned and the transaction rolls back.
 func TestRemove_AFailedGenerationAdvanceFailsTheRemoval(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	incrementErr := errors.New("increment refused")
 
-	stub := mocks_data.ExpectRunInTransaction(database, otpTx)
+	stub := datamocks.ExpectRunInTransaction(database, otpTx)
 	database.EXPECT().UpdateUser(mock.Anything, otpTx, mock.Anything).Return(nil).Once()
 	database.EXPECT().ResetUserOTPStep(mock.Anything, otpTx, otpUserId).Return(nil).Once()
 	database.EXPECT().IncrementUserOtpConfigGeneration(mock.Anything, otpTx, otpUserId).
@@ -221,7 +221,7 @@ func TestVerifyStored(t *testing.T) {
 	now := time.Now().UTC()
 
 	t.Run("a code the enrolled seed produces matches and claims its step", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		database.EXPECT().
 			TryConsumeUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, true).
 			Return(true, nil).Once()
@@ -235,7 +235,7 @@ func TestVerifyStored(t *testing.T) {
 	})
 
 	t.Run("a wrong code is refused without claiming anything", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), "000000", now)
 
@@ -249,7 +249,7 @@ func TestVerifyStored(t *testing.T) {
 	})
 
 	t.Run("a step already spent is reported as a replay, with the step", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		database.EXPECT().
 			TryConsumeUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, true).
 			Return(false, nil).Once()
@@ -264,7 +264,7 @@ func TestVerifyStored(t *testing.T) {
 	})
 
 	t.Run("a failing claim is an error rather than a refusal", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		claimErr := errors.New("claim refused")
 		database.EXPECT().
 			TryConsumeUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, true).
@@ -279,7 +279,7 @@ func TestVerifyStored(t *testing.T) {
 	})
 
 	t.Run("a stored seed that will not decrypt is an error", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		user := enrolledUser(t)
 		user.OTPSecretEncrypted = []byte("not ciphertext this cipher produced")
 
@@ -298,7 +298,7 @@ func TestVerifySupplied(t *testing.T) {
 	const suppliedSeed = "ZP2Z5KXRBAPPHWXEHH65PY5H7EKLVHRZ"
 
 	t.Run("a code the supplied seed produces matches, and the stored seed is not consulted", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		database.EXPECT().
 			TryConsumeUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, false).
 			Return(true, nil).Once()
@@ -313,7 +313,7 @@ func TestVerifySupplied(t *testing.T) {
 	})
 
 	t.Run("a code from the stored seed does not verify against the supplied one", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		result, err := VerifySupplied(context.Background(), database, enrolledUser(t), suppliedSeed,
 			codeFor(t, otpSeed, now), now)
@@ -325,7 +325,7 @@ func TestVerifySupplied(t *testing.T) {
 	})
 
 	t.Run("a step already spent is reported as a replay", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		database.EXPECT().
 			TryConsumeUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, false).
 			Return(false, nil).Once()

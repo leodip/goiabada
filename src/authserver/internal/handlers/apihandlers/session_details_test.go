@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -53,7 +53,7 @@ func liveSession(id int64, identifier string, clientIds ...int64) record.UserSes
 // a deployment has. Nothing above this tier can see that, because the response is identical
 // either way, which is why the strict mock's Once is the assertion.
 func TestBuildSessionDetails_LoadsEveryClientInOneQuery(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	sessions := []record.UserSession{
 		liveSession(1, "sid-1", 5, 6),
@@ -87,7 +87,7 @@ func TestBuildSessionDetails_LoadsEveryClientInOneQuery(t *testing.T) {
 
 // A session with no clients must not make the helper ask for an empty id list.
 func TestBuildSessionDetails_NoClientsRunsNoQuery(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	details, err := buildSessionDetails(context.Background(), database, []record.UserSession{liveSession(1, "sid-1")}, sessionSettings, "")
 
@@ -102,7 +102,7 @@ func TestBuildSessionDetails_NoClientsRunsNoQuery(t *testing.T) {
 // Decision 2: the endpoints list what is live. An expired session is omitted rather than reported
 // with a flag, and it must not reach the hydrating query either.
 func TestBuildSessionDetails_DropsSessionsThatAreNoLongerValid(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	now := time.Now().UTC()
 	idle := liveSession(2, "sid-idle", 9)
@@ -132,7 +132,7 @@ func TestBuildSessionDetails_DropsSessionsThatAreNoLongerValid(t *testing.T) {
 // currentSid reaches the mapper. The mapper owns the comparison; this owns the wiring, which is
 // the half that was wrong before: two of the three producers never passed a sid at all.
 func TestBuildSessionDetails_PassesTheCallersSidThrough(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	details, err := buildSessionDetails(context.Background(), database,
 		[]record.UserSession{liveSession(1, "sid-1"), liveSession(2, "sid-2")},
@@ -147,7 +147,7 @@ func TestBuildSessionDetails_PassesTheCallersSidThrough(t *testing.T) {
 // The error is returned rather than swallowed into a short list: a page silently missing the
 // sessions whose clients failed to load is worse than a 500, because nobody can tell.
 func TestBuildSessionDetails_SurfacesTheClientQueryError(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(nil, errors.New("connection reset")).Once()
@@ -164,7 +164,7 @@ func TestBuildSessionDetails_SurfacesTheClientQueryError(t *testing.T) {
 // refused it before this helper replaced that call. Keeping the refusal is deliberate: answering
 // 200 with the client quietly absent from clientIdentifiers would hide it for good.
 func TestBuildSessionDetails_RefusesAClientIdWithNoRow(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return([]record.Client{{Id: 5, ClientIdentifier: "portal"}}, nil).Once()
@@ -180,7 +180,7 @@ func TestBuildSessionDetails_RefusesAClientIdWithNoRow(t *testing.T) {
 // An empty list is an empty slice and never nil, because the response wraps it in a required
 // array: GetUserSessionsResponse{Sessions: nil} marshals to "sessions":null.
 func TestBuildSessionDetails_EmptyListIsAnEmptySlice(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	details, err := buildSessionDetails(context.Background(), database, nil, sessionSettings, "")
 
@@ -197,7 +197,7 @@ func TestBuildSessionDetails_LoadsClientsUnderTheCallersContext(t *testing.T) {
 	type marker struct{}
 	ctx := context.WithValue(context.Background(), marker{}, "the caller's own")
 
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetClientsByIds", mock.MatchedBy(func(got context.Context) bool {
 		return got.Value(marker{}) == "the caller's own"
 	}), (*sql.Tx)(nil), mock.Anything).

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,7 +42,7 @@ const implicitQueryRefusal = "Implicit flow does not support response_mode=query
 // form_post row is the leniency decision 15 chose on purpose: a request that used to be refused and
 // is served now, so it fails if the refusal comes back.
 func TestValidateRequest_ImplicitFlow_ResponseModeAccepted(t *testing.T) {
-	validator := NewAuthorizeValidator(mocks_data.NewDatabase(t))
+	validator := NewAuthorizeValidator(datamocks.NewDatabase(t))
 
 	for _, responseType := range implicitResponseTypes {
 		for _, mode := range []string{"", "fragment", "form_post"} {
@@ -58,7 +58,7 @@ func TestValidateRequest_ImplicitFlow_ResponseModeAccepted(t *testing.T) {
 // parameter and the two modes that work, and the request differs from the accepted row above in the
 // mode alone.
 func TestValidateRequest_ImplicitFlow_ResponseModeQueryRefused(t *testing.T) {
-	validator := NewAuthorizeValidator(mocks_data.NewDatabase(t))
+	validator := NewAuthorizeValidator(datamocks.NewDatabase(t))
 
 	for _, responseType := range implicitResponseTypes {
 		t.Run(responseType, func(t *testing.T) {
@@ -77,7 +77,7 @@ func TestValidateRequest_ImplicitFlow_ResponseModeQueryRefused(t *testing.T) {
 // The rule is the implicit flow's. The code flow keeps all three modes, its default query included,
 // so the change moves nothing for a client that never asked for tokens.
 func TestValidateRequest_CodeFlow_ResponseModeUnchanged(t *testing.T) {
-	validator := NewAuthorizeValidator(mocks_data.NewDatabase(t))
+	validator := NewAuthorizeValidator(datamocks.NewDatabase(t))
 
 	for _, mode := range []string{"", "query", "fragment", "form_post"} {
 		t.Run("response_mode="+mode, func(t *testing.T) {
@@ -96,7 +96,7 @@ func TestValidateRequest_CodeFlow_ResponseModeUnchanged(t *testing.T) {
 // A mode nothing implements is refused by the general rule, ahead of the implicit one: the answer for
 // "jwt" is the same whatever the response type, and the implicit refusal is reserved for the query.
 func TestValidateRequest_ImplicitFlow_UnsupportedResponseModeIsTheGeneralRefusal(t *testing.T) {
-	validator := NewAuthorizeValidator(mocks_data.NewDatabase(t))
+	validator := NewAuthorizeValidator(datamocks.NewDatabase(t))
 
 	for _, mode := range []string{"jwt", "Query", "FORM_POST"} {
 		t.Run("response_mode="+mode, func(t *testing.T) {

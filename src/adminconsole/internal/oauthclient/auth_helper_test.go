@@ -19,7 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
-	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
+	"github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
 const (
@@ -40,7 +40,7 @@ const (
 func redirToAuthorize(t *testing.T) (*sessionstore.Session, *httptest.ResponseRecorder) {
 	t.Helper()
 	sess := &sessionstore.Session{Values: map[string]any{}}
-	store := mocks_sessionstore.NewStore(t)
+	store := sessionstoremocks.NewStore(t)
 	store.On("Get", mock.Anything, helperSessionName).Return(sess, nil).Once()
 	store.On("Save", mock.Anything, mock.Anything, sess).Return(nil).Once()
 
@@ -122,18 +122,18 @@ func TestRedirToAuthorize_MintsFreshValuesEachTime(t *testing.T) {
 func TestRedirToAuthorize_SessionFailures(t *testing.T) {
 	testCases := []struct {
 		name  string
-		setup func(store *mocks_sessionstore.Store)
+		setup func(store *sessionstoremocks.Store)
 	}{
 		{
 			name: "get fails",
-			setup: func(store *mocks_sessionstore.Store) {
+			setup: func(store *sessionstoremocks.Store) {
 				store.On("Get", mock.Anything, helperSessionName).
 					Return(&sessionstore.Session{Values: map[string]any{}}, errs.New("the store is down")).Once()
 			},
 		},
 		{
 			name: "save fails",
-			setup: func(store *mocks_sessionstore.Store) {
+			setup: func(store *sessionstoremocks.Store) {
 				store.On("Get", mock.Anything, helperSessionName).
 					Return(&sessionstore.Session{Values: map[string]any{}}, nil).Once()
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).
@@ -144,7 +144,7 @@ func TestRedirToAuthorize_SessionFailures(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			store := mocks_sessionstore.NewStore(t)
+			store := sessionstoremocks.NewStore(t)
 			tc.setup(store)
 
 			w := httptest.NewRecorder()

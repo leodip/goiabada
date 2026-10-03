@@ -16,15 +16,15 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mock_middleware "github.com/leodip/goiabada/adminconsole/internal/middleware/mocks"
-	mock_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/middleware/mocks"
+	"github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
 func TestSessionHandler_InvalidSession(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_middleware.TokenParser)
-	mockAuthHelper := new(mock_middleware.AuthHelper)
-	mockSessionStore := new(mock_sessionstore.Store)
+	mockTokenParser := new(middlewaremocks.TokenParser)
+	mockAuthHelper := new(middlewaremocks.AuthHelper)
+	mockSessionStore := new(sessionstoremocks.Store)
 
 	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", "")
 
@@ -46,9 +46,9 @@ func TestSessionHandler_InvalidSession(t *testing.T) {
 
 func TestRequiresScope_Authorized(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_middleware.TokenParser)
-	mockAuthHelper := new(mock_middleware.AuthHelper)
-	mockSessionStore := new(mock_sessionstore.Store)
+	mockTokenParser := new(middlewaremocks.TokenParser)
+	mockAuthHelper := new(middlewaremocks.AuthHelper)
+	mockSessionStore := new(sessionstoremocks.Store)
 
 	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", "")
 
@@ -79,9 +79,9 @@ func TestRequiresScope_Authorized(t *testing.T) {
 
 func TestRequiresScope_Unauthorized(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_middleware.TokenParser)
-	mockAuthHelper := new(mock_middleware.AuthHelper)
-	mockSessionStore := new(mock_sessionstore.Store)
+	mockTokenParser := new(middlewaremocks.TokenParser)
+	mockAuthHelper := new(middlewaremocks.AuthHelper)
+	mockSessionStore := new(sessionstoremocks.Store)
 
 	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", "")
 
@@ -117,9 +117,9 @@ func TestRequiresScope_Unauthorized(t *testing.T) {
 // identity, and the argument here is what reaches RedirToAuthorize (#285).
 func TestRequiresScope_Unauthenticated(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_middleware.TokenParser)
-	mockAuthHelper := new(mock_middleware.AuthHelper)
-	mockSessionStore := new(mock_sessionstore.Store)
+	mockTokenParser := new(middlewaremocks.TokenParser)
+	mockAuthHelper := new(middlewaremocks.AuthHelper)
+	mockSessionStore := new(sessionstoremocks.Store)
 
 	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
@@ -147,9 +147,9 @@ func TestRequiresScope_Unauthenticated(t *testing.T) {
 
 func TestRequiresScope_NoJwtInfo(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_middleware.TokenParser)
-	mockAuthHelper := new(mock_middleware.AuthHelper)
-	mockSessionStore := new(mock_sessionstore.Store)
+	mockTokenParser := new(middlewaremocks.TokenParser)
+	mockAuthHelper := new(middlewaremocks.AuthHelper)
+	mockSessionStore := new(sessionstoremocks.Store)
 
 	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
@@ -172,9 +172,9 @@ func TestRequiresScope_NoJwtInfo(t *testing.T) {
 
 func TestRequiresScope_RedirectError(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_middleware.TokenParser)
-	mockAuthHelper := new(mock_middleware.AuthHelper)
-	mockSessionStore := new(mock_sessionstore.Store)
+	mockTokenParser := new(middlewaremocks.TokenParser)
+	mockAuthHelper := new(middlewaremocks.AuthHelper)
+	mockSessionStore := new(sessionstoremocks.Store)
 
 	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
@@ -215,8 +215,8 @@ func TestRequiresScope_ReturnsToTheBaseURLPlusPathAndQuery(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			mockAuthHelper := new(mock_middleware.AuthHelper)
-			middleware := NewJWT(new(mock_sessionstore.Store), "test-session", new(mock_middleware.TokenParser), nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
+			mockAuthHelper := new(middlewaremocks.AuthHelper)
+			middleware := NewJWT(new(sessionstoremocks.Store), "test-session", new(middlewaremocks.TokenParser), nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 			req := httptest.NewRequest("GET", testCase.requestLine, nil)
 			require.Equal(t, testCase.requestLine, req.RequestURI, "the request line did not reach the request as sent")

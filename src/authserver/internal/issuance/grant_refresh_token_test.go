@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
@@ -19,7 +19,7 @@ import (
 )
 
 func TestMintCodeRefreshTokens(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -201,7 +201,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 }
 
 func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -367,7 +367,7 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 
 // TestMintROPCRefreshTokens tests ROPC refresh token flow
 func TestMintROPCRefreshTokens(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -492,7 +492,7 @@ func TestMintROPCRefreshTokens(t *testing.T) {
 
 // TestMintROPCRefreshTokens_ScopeDowngrade tests requesting fewer scopes on refresh
 func TestMintROPCRefreshTokens_ScopeDowngrade(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)

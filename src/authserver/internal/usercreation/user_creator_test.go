@@ -7,7 +7,7 @@ import (
 
 	"errors"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
@@ -28,7 +28,7 @@ import (
 // transaction, where the creator passes nil. A nil here -- which is what the BeginTransaction stubs
 // it replaced handed over, and what this package's own copy of the stub handed over until #198
 // -- makes those two indistinguishable, so a sweep moved back outside the transaction would
-// pass on call count alone. mocks_data.ExpectRunInTransaction now refuses a nil outright, so
+// pass on call count alone. datamocks.ExpectRunInTransaction now refuses a nil outright, so
 // what was this package's convention is the shared stub's rule (#422).
 var txSentinel = &sql.Tx{}
 
@@ -36,7 +36,7 @@ const accountPermissionId = int64(31)
 
 // expectAccountPermissionLookup registers the two reads that precede the transaction: the
 // authserver resource and its permissions.
-func expectAccountPermissionLookup(db *mocks_data.Database, permissions []record.Permission) {
+func expectAccountPermissionLookup(db *datamocks.Database, permissions []record.Permission) {
 	db.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, builtin.AuthServerResourceIdentifier).
 		Return(&record.Resource{Id: 3}, nil).Once()
 	db.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(3)).Return(permissions, nil).Once()
@@ -50,11 +50,11 @@ func accountPermissions() []record.Permission {
 }
 
 func TestCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransaction(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	expectAccountPermissionLookup(db, accountPermissions())
 
 	var calls []string
-	stub := mocks_data.ExpectRunInTransaction(db, txSentinel)
+	stub := datamocks.ExpectRunInTransaction(db, txSentinel)
 	db.On("CreateUser", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		created := args.Get(2).(*record.User)
 		created.Id = 77 // stand in for the generated primary key
@@ -90,11 +90,11 @@ func TestCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransaction
 }
 
 func TestCreator_CreateUser_AFailedUserInsertReachesTheHelperAndWritesNoPermission(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	expectAccountPermissionLookup(db, accountPermissions())
 
 	boom := errors.New("the engine refused the insert")
-	stub := mocks_data.ExpectRunInTransaction(db, txSentinel)
+	stub := datamocks.ExpectRunInTransaction(db, txSentinel)
 	db.On("CreateUser", mock.Anything, mock.Anything, mock.Anything).Return(boom).Once()
 
 	user, err := New(db).CreateUser(context.Background(), &Input{Email: "ada@example.com"})
@@ -106,11 +106,11 @@ func TestCreator_CreateUser_AFailedUserInsertReachesTheHelperAndWritesNoPermissi
 }
 
 func TestCreator_CreateUser_ATransactionThatCannotOpenIsReported(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	expectAccountPermissionLookup(db, accountPermissions())
 
 	boom := errors.New("cannot begin")
-	mocks_data.ExpectRunInTransactionRefused(db, boom)
+	datamocks.ExpectRunInTransactionRefused(db, boom)
 
 	user, err := New(db).CreateUser(context.Background(), &Input{Email: "ada@example.com"})
 
@@ -120,7 +120,7 @@ func TestCreator_CreateUser_ATransactionThatCannotOpenIsReported(t *testing.T) {
 }
 
 func TestCreator_CreateUser_RefusesWithoutTheAccountPermissionBeforeAnyTransaction(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	expectAccountPermissionLookup(db, []record.Permission{
 		{Id: 30, PermissionIdentifier: "something-else"},
 	})
@@ -137,7 +137,7 @@ func TestCreator_CreateUser_RefusesWithoutTheAccountPermissionBeforeAnyTransacti
 // that nil and panic; it refuses instead, naming the resource, before any other read and before
 // any transaction opens (#425).
 func TestCreator_CreateUser_RefusesWhenTheAuthServerResourceIsMissing(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	db.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, builtin.AuthServerResourceIdentifier).
 		Return(nil, nil).Once()
 
@@ -154,11 +154,11 @@ func TestCreator_CreateUser_RefusesWhenTheAuthServerResourceIsMissing(t *testing
 // second run of the body, as after a deadlock, inserts the user again and names the id THAT
 // insert assigned, not the one the rolled-back attempt left on the model.
 func TestCreator_CreateUser_TheBodyIsSafeToRerun(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	expectAccountPermissionLookup(db, accountPermissions())
 
 	// A stub that runs the body twice, as the helper does after a deadlock on the first attempt.
-	// The shared stub in mocks_data runs the body once, so this one stays local; it hands over
+	// The shared stub in datamocks runs the body once, so this one stays local; it hands over
 	// txSentinel for the same reason the shared one refuses a nil.
 	db.EXPECT().RunInTransaction(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error {
 		if err := fn(txSentinel); err != nil {

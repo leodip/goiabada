@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -38,7 +38,7 @@ func theSettingsRequestsContext() interface{} {
 
 // The accept arm: the settings read is issued on behalf of the request that triggered it.
 func TestSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	db.On("GetSettingsById", theSettingsRequestsContext(), mock.Anything, int64(1)).
 		Return(&record.Settings{Id: 1, AppName: "TestApp"}, nil).Once()
 

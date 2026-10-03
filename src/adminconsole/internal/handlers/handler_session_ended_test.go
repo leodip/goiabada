@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
@@ -21,7 +21,7 @@ import (
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
-	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
+	"github.com/leodip/goiabada/core/sessionstore/mocks"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
 
@@ -101,7 +101,7 @@ func TestHandleSessionEndedGet_ClearsTheTokensAndLeavesTheNoticeForTheNextReques
 	logs := logtest.CaptureSlog(t)
 	cookies := seedSession(t, store, signedInValues())
 
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	w := httptest.NewRecorder()
 	HandleSessionEndedGet(httpHelper, store).ServeHTTP(w,
 		withCookies(handlertest.Request(http.MethodGet, "/auth/session-ended"), cookies))
@@ -137,13 +137,13 @@ func TestHandleSessionEndedGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSa
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			store := mocks_sessionstore.NewStore(t)
+			store := sessionstoremocks.NewStore(t)
 			store.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
 				Return(&sessionstore.Session{Values: signedInValues()}, testCase.getErr)
 			if testCase.getErr == nil {
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(testCase.saveErr)
 			}
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 			w := httptest.NewRecorder()
@@ -159,7 +159,7 @@ func TestHandleSessionEndedGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSa
 // serveIndex answers one home page request with cookies, and returns the bind it rendered with.
 func serveIndex(t *testing.T, store sessionstore.Store, cookies []*http.Cookie) map[string]interface{} {
 	t.Helper()
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/index.html").Once()
 	HandleIndexGet(nil, httpHelper, store, indexAuthServerBaseURL).ServeHTTP(httptest.NewRecorder(),
 		withCookies(handlertest.Request(http.MethodGet, "/"), cookies))
@@ -171,13 +171,13 @@ func serveIndex(t *testing.T, store sessionstore.Store, cookies []*http.Cookie) 
 // visitor without a token set is anonymous rather than a fault. The real AuthHelper decides, so a
 // token set the reader lost on the way would read as anonymous here.
 func TestHandleIndexGet_ReadsTheSignedInAdministratorFromTheTokenSet(t *testing.T) {
-	store := mocks_sessionstore.NewStore(t)
+	store := sessionstoremocks.NewStore(t)
 	store.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
 		Return(&sessionstore.Session{Values: map[string]any{}}, nil)
 	authHelper := oauthclient.NewAuthHelper(store, builtin.AdminConsoleSessionName, "", "")
 
 	serve := func(opts ...handlertest.Option) map[string]interface{} {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHttpHelper(t)
 		handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/index.html").Once()
 		HandleIndexGet(authHelper, httpHelper, store, indexAuthServerBaseURL).ServeHTTP(httptest.NewRecorder(),
 			handlertest.Request(http.MethodGet, "/", opts...))
@@ -224,7 +224,7 @@ func TestHandleIndexGet_NoNoticeWithoutTheFlash(t *testing.T) {
 // The home page saves only when it took a notice: an anonymous visit writes nothing, which the mock
 // store proves by failing on a Save nobody expected.
 func TestHandleIndexGet_SavesOnlyWhenItTookTheNotice(t *testing.T) {
-	store := mocks_sessionstore.NewStore(t)
+	store := sessionstoremocks.NewStore(t)
 	store.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
 		Return(&sessionstore.Session{Values: map[string]any{}}, nil)
 
@@ -243,13 +243,13 @@ func TestHandleIndexGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSaved(t *
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			store := mocks_sessionstore.NewStore(t)
+			store := sessionstoremocks.NewStore(t)
 			store.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
 				Return(&sessionstore.Session{Values: map[string]any{flashSessionEnded: "true"}}, testCase.getErr)
 			if testCase.getErr == nil {
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(testCase.saveErr)
 			}
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 			HandleIndexGet(nil, httpHelper, store, indexAuthServerBaseURL).ServeHTTP(httptest.NewRecorder(),
@@ -263,7 +263,7 @@ func TestHandleIndexGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSaved(t *
 // #427 decision 18: the page RequiresScope sends a signed-in administrator without the scope to is a
 // 403, since a 401 owes a WWW-Authenticate challenge the console does not have.
 func TestHandleUnauthorizedGet_Answers403(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/unauthorized.html").Once()
 
 	HandleUnauthorizedGet(httpHelper).ServeHTTP(httptest.NewRecorder(),

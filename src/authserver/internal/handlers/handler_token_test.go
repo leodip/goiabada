@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -49,11 +49,11 @@ func TestHandleTokenPost(t *testing.T) {
 		}
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
-				jsonWriter := mocks_handlers.NewJSONWriter(t)
-				database := mocks_data.NewDatabase(t)
+				jsonWriter := handlersmocks.NewJSONWriter(t)
+				database := datamocks.NewDatabase(t)
 				handler := HandleTokenPost(jsonWriter, database,
-					mocks_handlers.NewTokenIssuer(t), mocks_handlers.NewTokenValidator(t),
-					mocks_handlers.NewAuditLogger(t), noCredentialFailures{})
+					handlersmocks.NewTokenIssuer(t), handlersmocks.NewTokenValidator(t),
+					handlersmocks.NewAuditLogger(t), noCredentialFailures{})
 
 				rr := httptest.NewRecorder()
 				req, _ := http.NewRequest("POST", "/token", test.body(rr))
@@ -78,14 +78,14 @@ func TestHandleTokenPost(t *testing.T) {
 		// whole, and every field of it reaches the validator.
 		t.Run("the same body at exactly the limit", func(t *testing.T) {
 			refused := oauth.NewErrorDetailWithHTTPStatus("invalid_client", "Client authentication failed.", http.StatusUnauthorized)
-			tokenValidator := mocks_handlers.NewTokenValidator(t)
+			tokenValidator := handlersmocks.NewTokenValidator(t)
 			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.MatchedBy(func(input *protocolvalidation.ValidateTokenRequestInput) bool {
 				return input.GrantType == "client_credentials" && input.ClientId == "a-client" && input.ClientSecret == "a-secret"
 			})).Return(nil, refused).Once()
-			jsonWriter := mocks_handlers.NewJSONWriter(t)
+			jsonWriter := handlersmocks.NewJSONWriter(t)
 
-			handler := HandleTokenPost(jsonWriter, mocks_data.NewDatabase(t),
-				mocks_handlers.NewTokenIssuer(t), tokenValidator, mocks_handlers.NewAuditLogger(t), noCredentialFailures{})
+			handler := HandleTokenPost(jsonWriter, datamocks.NewDatabase(t),
+				handlersmocks.NewTokenIssuer(t), tokenValidator, handlersmocks.NewAuditLogger(t), noCredentialFailures{})
 
 			rr := httptest.NewRecorder()
 			req, _ := http.NewRequest("POST", "/token",
@@ -108,11 +108,11 @@ func TestHandleTokenPost(t *testing.T) {
 		// request through, and net/http leaves an empty form behind for the handler's. The real
 		// validator answers that empty form, which names no client.
 		t.Run("a body cut before the handler, as the ROPC limiter leaves it", func(t *testing.T) {
-			jsonWriter := mocks_handlers.NewJSONWriter(t)
-			database := mocks_data.NewDatabase(t)
+			jsonWriter := handlersmocks.NewJSONWriter(t)
+			database := datamocks.NewDatabase(t)
 			handler := HandleTokenPost(jsonWriter, database,
-				mocks_handlers.NewTokenIssuer(t), protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher),
-				mocks_handlers.NewAuditLogger(t), noCredentialFailures{})
+				handlersmocks.NewTokenIssuer(t), protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher),
+				handlersmocks.NewAuditLogger(t), noCredentialFailures{})
 
 			rr := httptest.NewRecorder()
 			req, _ := http.NewRequest("POST", "/token",
@@ -158,11 +158,11 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("ValidateTokenRequest gives error", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-		tokenValidator := mocks_handlers.NewTokenValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		jsonWriter := handlersmocks.NewJSONWriter(t)
+		database := datamocks.NewDatabase(t)
+		tokenIssuer := handlersmocks.NewTokenIssuer(t)
+		tokenValidator := handlersmocks.NewTokenValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
@@ -469,11 +469,11 @@ func (unansweredGrant) GrantType() oidc.GrantType { return "device_code" }
 // tokenEndpoint is one HandleTokenPost wired to fresh strict doubles, for a case that drives one
 // request through it. The validator answers whatever validates names.
 type tokenEndpoint struct {
-	jsonWriter  *mocks_handlers.JSONWriter
-	database    *mocks_data.Database
-	issuer      *mocks_handlers.TokenIssuer
-	validator   *mocks_handlers.TokenValidator
-	auditLogger *mocks_handlers.AuditLogger
+	jsonWriter  *handlersmocks.JSONWriter
+	database    *datamocks.Database
+	issuer      *handlersmocks.TokenIssuer
+	validator   *handlersmocks.TokenValidator
+	auditLogger *handlersmocks.AuditLogger
 	settings    *record.Settings
 	handler     http.HandlerFunc
 }
@@ -481,11 +481,11 @@ type tokenEndpoint struct {
 func newTokenEndpoint(t *testing.T) *tokenEndpoint {
 	t.Helper()
 	endpoint := &tokenEndpoint{
-		jsonWriter:  mocks_handlers.NewJSONWriter(t),
-		database:    mocks_data.NewDatabase(t),
-		issuer:      mocks_handlers.NewTokenIssuer(t),
-		validator:   mocks_handlers.NewTokenValidator(t),
-		auditLogger: mocks_handlers.NewAuditLogger(t),
+		jsonWriter:  handlersmocks.NewJSONWriter(t),
+		database:    datamocks.NewDatabase(t),
+		issuer:      handlersmocks.NewTokenIssuer(t),
+		validator:   handlersmocks.NewTokenValidator(t),
+		auditLogger: handlersmocks.NewAuditLogger(t),
 		settings:    &record.Settings{},
 	}
 	endpoint.handler = HandleTokenPost(endpoint.jsonWriter, endpoint.database, endpoint.issuer,
@@ -816,11 +816,11 @@ func TestExtractClientCredentials(t *testing.T) {
 // that looks like a clean denial while linked tokens may still be live.
 // It must also skip the audit log, which fires only after a successful commit.
 func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
-	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-	tokenValidator := mocks_handlers.NewTokenValidator(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	jsonWriter := handlersmocks.NewJSONWriter(t)
+	database := datamocks.NewDatabase(t)
+	tokenIssuer := handlersmocks.NewTokenIssuer(t)
+	tokenValidator := handlersmocks.NewTokenValidator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
@@ -844,7 +844,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 		Return(nil, reuseErr)
 
-	stub := mocks_data.ExpectRunInTransaction(database, revokeTx)
+	stub := datamocks.ExpectRunInTransaction(database, revokeTx)
 
 	// The session row is taken first, ahead of the grants that hang off it (#139). Stubbed as
 	// succeeding so this case still fails where it means to, at the token read below. Both reads
@@ -881,11 +881,11 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 // the earliest failure point: BeginTransaction itself errors. The handler
 // must still surface a 500 and skip both the audit log and the invalid_grant.
 func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *testing.T) {
-	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-	tokenValidator := mocks_handlers.NewTokenValidator(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	jsonWriter := handlersmocks.NewJSONWriter(t)
+	database := datamocks.NewDatabase(t)
+	tokenIssuer := handlersmocks.NewTokenIssuer(t)
+	tokenValidator := handlersmocks.NewTokenValidator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
@@ -907,7 +907,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 		Return(nil, reuseErr)
 
 	beginErr := errors.New("tx begin failed")
-	mocks_data.ExpectRunInTransactionRefused(database, beginErr)
+	datamocks.ExpectRunInTransactionRefused(database, beginErr)
 
 	jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
 		return err != nil && strings.Contains(err.Error(), "tx begin failed")
@@ -929,13 +929,13 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 // shares the one connection the reuse transaction holds, so an audit written inside it would wait
 // on itself; and a row written before a commit that then failed would list JTIs never revoked.
 func TestHandleTokenPost_AuthCodeReuse_AuditsAfterTheCommit(t *testing.T) {
-	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	database := mocks_data.NewDatabase(t)
-	tokenValidator := mocks_handlers.NewTokenValidator(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	jsonWriter := handlersmocks.NewJSONWriter(t)
+	database := datamocks.NewDatabase(t)
+	tokenValidator := handlersmocks.NewTokenValidator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleTokenPost(jsonWriter, database,
-		mocks_handlers.NewTokenIssuer(t), tokenValidator, auditLogger, noCredentialFailures{})
+		handlersmocks.NewTokenIssuer(t), tokenValidator, auditLogger, noCredentialFailures{})
 
 	formData := "grant_type=authorization_code&code=replayed&redirect_uri=http://example.com&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -955,7 +955,7 @@ func TestHandleTokenPost_AuthCodeReuse_AuditsAfterTheCommit(t *testing.T) {
 		return func(mock.Arguments) { order = append(order, what) }
 	}
 	token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
-	mocks_data.ExpectRunInTransaction(database, revokeTx, func(edge string) { order = append(order, edge) })
+	datamocks.ExpectRunInTransaction(database, revokeTx, func(edge string) { order = append(order, edge) })
 	database.On("AcquireUserSessionRow", mock.Anything, revokeTx, "sid-reused").Return(true, nil).Once()
 	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, "sid-reused").
 		Return([]*record.RefreshToken{token}, nil).Once()
@@ -1274,11 +1274,11 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			jsonWriter := mocks_handlers.NewJSONWriter(t)
-			database := mocks_data.NewDatabase(t)
-			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-			tokenValidator := mocks_handlers.NewTokenValidator(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			jsonWriter := handlersmocks.NewJSONWriter(t)
+			database := datamocks.NewDatabase(t)
+			tokenIssuer := handlersmocks.NewTokenIssuer(t)
+			tokenValidator := handlersmocks.NewTokenValidator(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
@@ -1312,7 +1312,7 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 				return
 			}
 
-			// Rejected before the validator runs. mocks_handlers.NewTokenValidator(t) fails the
+			// Rejected before the validator runs. handlersmocks.NewTokenValidator(t) fails the
 			// test if ValidateTokenRequest is called with no expectation registered, so registering
 			// none is the assertion that it was not reached.
 			var rejection *oauth.ErrorDetail
@@ -1348,14 +1348,14 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 // these four cases pin is that a denial reaches the audit logger, that the predicate is not gated on
 // grant type, and that there is exactly one call site.
 func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
-	newHandler := func(t *testing.T) (*mocks_handlers.JSONWriter, *mocks_handlers.TokenValidator,
-		*mocks_handlers.TokenIssuer, *mocks_handlers.AuditLogger, http.HandlerFunc) {
+	newHandler := func(t *testing.T) (*handlersmocks.JSONWriter, *handlersmocks.TokenValidator,
+		*handlersmocks.TokenIssuer, *handlersmocks.AuditLogger, http.HandlerFunc) {
 		t.Helper()
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-		tokenValidator := mocks_handlers.NewTokenValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		jsonWriter := handlersmocks.NewJSONWriter(t)
+		database := datamocks.NewDatabase(t)
+		tokenIssuer := handlersmocks.NewTokenIssuer(t)
+		tokenValidator := handlersmocks.NewTokenValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		return jsonWriter, tokenValidator, tokenIssuer, auditLogger,
 			HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 	}
@@ -1451,7 +1451,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		})).Return()
 
 		// No auditLogger expectation is registered, and none is registered on the validator either.
-		// mocks_handlers.NewAuditLogger(t) fails the test if Log is called without a matching
+		// handlersmocks.NewAuditLogger(t) fails the test if Log is called without a matching
 		// expectation, so registering nothing IS the assertion.
 		handler.ServeHTTP(rr, req)
 
@@ -1518,11 +1518,11 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 // identifier deliberately present in the context to prove it is ignored rather than merely
 // absent (#106).
 func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
-	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-	tokenValidator := mocks_handlers.NewTokenValidator(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	jsonWriter := handlersmocks.NewJSONWriter(t)
+	database := datamocks.NewDatabase(t)
+	tokenIssuer := handlersmocks.NewTokenIssuer(t)
+	tokenValidator := handlersmocks.NewTokenValidator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 	form := "grant_type=password&client_id=test_client&username=u&password=p&scope=openid"
@@ -1570,11 +1570,11 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 // which is not a UserDisabledError and not invalid_scope, so a superseded refresh token must not
 // be recorded as either. Stage 5 adds the event that does cover this.
 func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
-	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-	tokenValidator := mocks_handlers.NewTokenValidator(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	jsonWriter := handlersmocks.NewJSONWriter(t)
+	database := datamocks.NewDatabase(t)
+	tokenIssuer := handlersmocks.NewTokenIssuer(t)
+	tokenValidator := handlersmocks.NewTokenValidator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
@@ -1620,12 +1620,12 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 
 	// newHandler wires one handler behind its own limiter, the way routes.go does. failure
 	// is what ValidateTokenRequest answers every time; nil means the grant succeeds.
-	newHandler := func(t *testing.T, failure error) (http.Handler, *mocks_handlers.AuditLogger) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-		tokenValidator := mocks_handlers.NewTokenValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+	newHandler := func(t *testing.T, failure error) (http.Handler, *handlersmocks.AuditLogger) {
+		jsonWriter := handlersmocks.NewJSONWriter(t)
+		database := datamocks.NewDatabase(t)
+		tokenIssuer := handlersmocks.NewTokenIssuer(t)
+		tokenValidator := handlersmocks.NewTokenValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		if failure != nil {
 			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
@@ -1844,14 +1844,14 @@ func TestHandleTokenPost_Refresh_FlowDisabledAnswer(t *testing.T) {
 // cases pin is the discrimination, which is the whole of decision 8's name-not-payload rule: the
 // event fires on the sentinel and on nothing else that carries invalid_grant.
 func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
-	newHandler := func(t *testing.T) (*mocks_handlers.JSONWriter, *mocks_handlers.TokenValidator,
-		*mocks_handlers.AuditLogger, http.HandlerFunc) {
+	newHandler := func(t *testing.T) (*handlersmocks.JSONWriter, *handlersmocks.TokenValidator,
+		*handlersmocks.AuditLogger, http.HandlerFunc) {
 		t.Helper()
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-		tokenValidator := mocks_handlers.NewTokenValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		jsonWriter := handlersmocks.NewJSONWriter(t)
+		database := datamocks.NewDatabase(t)
+		tokenIssuer := handlersmocks.NewTokenIssuer(t)
+		tokenValidator := handlersmocks.NewTokenValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		return jsonWriter, tokenValidator, auditLogger,
 			HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 	}

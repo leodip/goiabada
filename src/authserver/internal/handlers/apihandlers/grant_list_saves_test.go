@@ -12,8 +12,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -54,7 +54,7 @@ type grantSave struct {
 	// addedEvent and deletedEvent.
 	consolidatedEvent string
 	ownerKey          string
-	handler           func(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) http.HandlerFunc
+	handler           func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.HandlerFunc
 	body              func(t *testing.T, wanted, expected []int64) string
 }
 
@@ -83,7 +83,7 @@ var grantSaves = []grantSave{
 		addedEvent:   audit.EventAddedUserPermission,
 		deletedEvent: audit.EventDeletedUserPermission,
 		ownerKey:     "userId",
-		handler: func(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) http.HandlerFunc {
+		handler: func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.HandlerFunc {
 			return HandleUserPermissionsPut(database, auditLogger)
 		},
 		body: func(t *testing.T, wanted, expected []int64) string {
@@ -115,7 +115,7 @@ var grantSaves = []grantSave{
 		addedEvent:   audit.EventAddedGroupPermission,
 		deletedEvent: audit.EventDeletedGroupPermission,
 		ownerKey:     "groupId",
-		handler: func(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) http.HandlerFunc {
+		handler: func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.HandlerFunc {
 			return HandleGroupPermissionsPut(database, auditLogger)
 		},
 		body: func(t *testing.T, wanted, expected []int64) string {
@@ -148,7 +148,7 @@ var grantSaves = []grantSave{
 		},
 		consolidatedEvent: audit.EventUpdatedClientPermissions,
 		ownerKey:          "clientId",
-		handler: func(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) http.HandlerFunc {
+		handler: func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.HandlerFunc {
 			return HandleClientPermissionsPut(database, auditLogger)
 		},
 		body: func(t *testing.T, wanted, expected []int64) string {
@@ -161,7 +161,7 @@ var grantSaves = []grantSave{
 }
 
 // serve runs the save on a PUT carrying body.
-func (s grantSave) serve(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger, body string) *httptest.ResponseRecorder {
+func (s grantSave) serve(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, body string) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(http.MethodPut, s.path, strings.NewReader(body))
 	r = setChiURLParam(r, "id", "5")
 	rr := httptest.NewRecorder()
@@ -170,13 +170,13 @@ func (s grantSave) serve(database *mocks_data.Database, auditLogger *mocks_handl
 }
 
 // expectOwner registers the owner read the save makes before it validates.
-func (s grantSave) expectOwner(database *mocks_data.Database) {
+func (s grantSave) expectOwner(database *datamocks.Database) {
 	database.On(s.ownerRead, mock.Anything, (*sql.Tx)(nil), grantOwnerId).Return(s.owner, nil).Once()
 }
 
 // expectPermissionsExist registers the validation read of each wanted permission, outside the
 // transaction.
-func expectPermissionsExist(database *mocks_data.Database, permissionIds ...int64) {
+func expectPermissionsExist(database *datamocks.Database, permissionIds ...int64) {
 	for _, id := range permissionIds {
 		database.On("GetPermissionById", mock.Anything, (*sql.Tx)(nil), id).
 			Return(&record.Permission{Id: id, PermissionIdentifier: "p"}, nil).Once()
@@ -184,7 +184,7 @@ func expectPermissionsExist(database *mocks_data.Database, permissionIds ...int6
 }
 
 // expectStored registers the read of the stored grants on the save's transaction.
-func (s grantSave) expectStored(database *mocks_data.Database, rows ...grantRow) {
+func (s grantSave) expectStored(database *datamocks.Database, rows ...grantRow) {
 	database.On(s.readMethod, mock.Anything, grantsTx, grantOwnerId).Return(s.storedRows(rows), nil).Once()
 }
 
@@ -215,7 +215,7 @@ func (s grantSave) wantAudits(granted, revoked []int64) []auditRecord {
 
 // recordAudits accepts every Log call and collects them, checking each names the owner and the
 // caller, in order.
-func (s grantSave) recordAudits(t *testing.T, auditLogger *mocks_handlers.AuditLogger, order *[]string) *[]auditRecord {
+func (s grantSave) recordAudits(t *testing.T, auditLogger *handlersmocks.AuditLogger, order *[]string) *[]auditRecord {
 	records := &[]auditRecord{}
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -242,13 +242,13 @@ func (s grantSave) recordAudits(t *testing.T, auditLogger *mocks_handlers.AuditL
 func TestGrantListSaves_SaveTheExactPlanInOneTransaction(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 4, 6)
 			var order []string
-			stub := mocks_data.ExpectRunInTransaction(database, grantsTx, func(edge string) { order = append(order, edge) })
+			stub := datamocks.ExpectRunInTransaction(database, grantsTx, func(edge string) { order = append(order, edge) })
 			save.expectStored(database, grantRow{id: 21, permissionId: 3}, grantRow{id: 22, permissionId: 4})
 			var deleted []int64
 			database.On(save.deleteMethod, mock.Anything, grantsTx, mock.Anything).
@@ -292,12 +292,12 @@ func TestGrantListSaves_SaveTheExactPlanInOneTransaction(t *testing.T) {
 func TestGrantListSaves_AStoredDuplicateIsRemovedWithItsOriginal(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 4)
-			mocks_data.ExpectRunInTransaction(database, grantsTx)
+			datamocks.ExpectRunInTransaction(database, grantsTx)
 			save.expectStored(database,
 				grantRow{id: 21, permissionId: 3}, grantRow{id: 22, permissionId: 3},
 				grantRow{id: 23, permissionId: 4}, grantRow{id: 24, permissionId: 4},
@@ -326,12 +326,12 @@ func TestGrantListSaves_AStoredDuplicateIsRemovedWithItsOriginal(t *testing.T) {
 func TestGrantListSaves_AFailedWriteCommitsNothing(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 6)
-			stub := mocks_data.ExpectRunInTransaction(database, grantsTx)
+			stub := datamocks.ExpectRunInTransaction(database, grantsTx)
 			save.expectStored(database, grantRow{id: 21, permissionId: 3})
 			database.On(save.deleteMethod, mock.Anything, grantsTx, int64(21)).Return(nil).Once()
 			diskFull := errors.New("the disk is full")
@@ -366,11 +366,11 @@ func TestGrantListSaves_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
 	for _, save := range grantSaves {
 		for _, variant := range variants {
 			t.Run(save.name+"/"+variant.name, func(t *testing.T) {
-				database := mocks_data.NewDatabase(t)
-				auditLogger := mocks_handlers.NewAuditLogger(t)
+				database := datamocks.NewDatabase(t)
+				auditLogger := handlersmocks.NewAuditLogger(t)
 
 				save.expectOwner(database)
-				stub := mocks_data.ExpectRunInTransaction(database, grantsTx)
+				stub := datamocks.ExpectRunInTransaction(database, grantsTx)
 				loadErr := errors.New("the read failed")
 				database.On(save.readMethod, mock.Anything, grantsTx, grantOwnerId).Return(nil, loadErr).Once()
 
@@ -394,8 +394,8 @@ func TestGrantListSaves_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
 func TestGrantListSaves_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 6)
@@ -439,12 +439,12 @@ func TestGrantListSaves_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
 func TestGrantListSaves_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 6)
-			mocks_data.ExpectRunInTransactionRefused(database, errors.New("transaction aborted as a deadlock victim on all 3 attempts"))
+			datamocks.ExpectRunInTransactionRefused(database, errors.New("transaction aborted as a deadlock victim on all 3 attempts"))
 
 			rr := save.serve(database, auditLogger, save.body(t, []int64{6}, []int64{}))
 
@@ -462,12 +462,12 @@ func TestGrantListSaves_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
 func TestGrantListSaves_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 3, 4, 6)
-			stub := mocks_data.ExpectRunInTransaction(database, grantsTx)
+			stub := datamocks.ExpectRunInTransaction(database, grantsTx)
 			// Permission 3 was revoked by another save after this caller loaded {3, 4}.
 			save.expectStored(database, grantRow{id: 22, permissionId: 4})
 
@@ -499,12 +499,12 @@ func TestGrantListSaves_ALoadedListEqualAsASetProceeds(t *testing.T) {
 	for _, save := range grantSaves {
 		for _, variant := range variants {
 			t.Run(save.name+"/"+variant.name, func(t *testing.T) {
-				database := mocks_data.NewDatabase(t)
-				auditLogger := mocks_handlers.NewAuditLogger(t)
+				database := datamocks.NewDatabase(t)
+				auditLogger := handlersmocks.NewAuditLogger(t)
 
 				save.expectOwner(database)
 				expectPermissionsExist(database, 6)
-				mocks_data.ExpectRunInTransaction(database, grantsTx)
+				datamocks.ExpectRunInTransaction(database, grantsTx)
 				save.expectStored(database, variant.stored...)
 				for _, row := range variant.stored {
 					database.On(save.deleteMethod, mock.Anything, grantsTx, row.id).Return(nil).Once()
@@ -561,8 +561,8 @@ func TestGrantListSaves_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
 	for _, save := range grantSaves {
 		for _, variant := range variants {
 			t.Run(save.name+"/"+variant.name, func(t *testing.T) {
-				database := mocks_data.NewDatabase(t)
-				auditLogger := mocks_handlers.NewAuditLogger(t)
+				database := datamocks.NewDatabase(t)
+				auditLogger := handlersmocks.NewAuditLogger(t)
 
 				save.expectOwner(database)
 				if variant.missing != 0 {
@@ -590,12 +590,12 @@ func TestGrantListSaves_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
 func TestGrantListSaves_ARepeatedIdIsGrantedOnce(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 6)
-			mocks_data.ExpectRunInTransaction(database, grantsTx)
+			datamocks.ExpectRunInTransaction(database, grantsTx)
 			save.expectStored(database)
 			database.On(save.createMethod, mock.Anything, grantsTx, mock.Anything).Return(nil).Once()
 			records := save.recordAudits(t, auditLogger, nil)

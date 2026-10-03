@@ -7,7 +7,7 @@
 
 //go:build !production
 
-package mocks_middleware
+package middlewaremocks
 
 import (
 	"context"

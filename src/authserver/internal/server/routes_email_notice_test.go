@@ -17,7 +17,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -56,7 +56,7 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 	t.Run("a self-service change notifies the previous address", func(t *testing.T) {
 		capture := newSMTPCapture(t)
 
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&record.User{
 			Id:            1,
 			Enabled:       true,
@@ -80,7 +80,7 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 	t.Run("an administrator's change notifies neither address", func(t *testing.T) {
 		capture := newSMTPCapture(t)
 
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
 			Id:      1,
 			Enabled: true,
@@ -116,7 +116,7 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 
 // noticeTestServer runs the real initRoutes on database, with the server's own after-response
 // runner, which is what the notice tests wait on before they read their capture.
-func noticeTestServer(t *testing.T, database *mocks_data.Database) *Server {
+func noticeTestServer(t *testing.T, database *datamocks.Database) *Server {
 	t.Helper()
 	s := &Server{
 		router:       chi.NewRouter(),
@@ -173,7 +173,7 @@ func TestInitRoutes_ConcurrentEmailChangesNotifyThePreviousAddressOnce(t *testin
 	arrived := 0
 	allArrived := make(chan struct{})
 
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.EXPECT().GetUserBySubject(mock.Anything, mock.Anything, routesTestSubject).
 		RunAndReturn(func(context.Context, *sql.Tx, string) (*record.User, error) {
 			mu.Lock()

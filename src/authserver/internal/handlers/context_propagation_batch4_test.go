@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -23,8 +23,8 @@ import (
 // The accept arm for the key read: /certs serves whatever key pairs the install holds, on behalf
 // of the request that asked for them.
 func TestHandleCertsGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
-	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	database := mocks_data.NewDatabase(t)
+	jsonWriter := handlersmocks.NewJSONWriter(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("GetAllSigningKeys", theRequestsContext(), mock.Anything).
 		Return([]record.KeyPair{}, nil).Once()
@@ -39,7 +39,7 @@ func TestHandleCertsGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
 
 // The accept arm for the settings read.
 func TestPublicSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("GetSettingsById", theRequestsContext(), mock.Anything, int64(1)).
 		Return(&record.Settings{Id: 1, AppName: "TestApp"}, nil).Once()
@@ -55,7 +55,7 @@ func TestPublicSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
 // never reached and there is no context to get wrong. It is the arm that stops the accept arm
 // passing on a handler that read the settings before deciding whether to answer at all.
 func TestPublicSettings_AWrongMethodReachesNoSettingsPort(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
 	NewPublicSettings(database).ServeHTTP(rr, requestCarryingId(t, http.MethodPost, "/api/v1/public/settings"))

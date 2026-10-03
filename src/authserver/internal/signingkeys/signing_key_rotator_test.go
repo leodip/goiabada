@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
@@ -17,12 +17,12 @@ import (
 
 // These tests own seam 1 at the unit tier: the order of Rotate's statements, the guard
 // refusing before any write, both compare-and-set refusals, and that a failure at any step
-// commits nothing. They observe the rotator through mocks_data.Database, so what they can
+// commits nothing. They observe the rotator through datamocks.Database, so what they can
 // see is which calls were made, with which arguments, in which order, and that nothing was
 // committed. What they cannot see is whether the resulting SQL composes against a real
 // engine, which is signing_key_rotator_test.go at the data tier, on all four.
 //
-// mocks_data.NewDatabase(t) fails the test on any call that was not set up, so "the delete
+// datamocks.NewDatabase(t) fails the test on any call that was not set up, so "the delete
 // never ran" is asserted by the absence of an expectation as much as by AssertNotCalled.
 
 // rotatorTx is an opaque non-nil transaction. The rotator only ever hands it back to the
@@ -33,7 +33,7 @@ var rotatorTx = &sql.Tx{}
 // newTestRotator builds a rotator at the smallest key size crypto/rsa will still generate.
 // The replacement key is generated on every path now, including every refusal, so at 4096
 // each of the cases below would pay about 300ms for material most of them never store.
-func newTestRotator(database *mocks_data.Database) *Rotator {
+func newTestRotator(database *datamocks.Database) *Rotator {
 	rotator := NewRotator(database, testDataCipher)
 	rotator.keySizeBits = 1024
 	return rotator
@@ -59,14 +59,14 @@ func fullKeySet() []record.KeyPair {
 }
 
 func TestRotator_Rotate_Success(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	var calls []string
 	recordCall := func(name string) func(mock.Arguments) {
 		return func(mock.Arguments) { calls = append(calls, name) }
 	}
 
-	stub := mocks_data.ExpectRunInTransaction(database, rotatorTx)
+	stub := datamocks.ExpectRunInTransaction(database, rotatorTx)
 	database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once().
 		Run(recordCall("GetAllSigningKeys"))
 	database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(nil).Once().
@@ -127,9 +127,9 @@ func TestRotator_Rotate_Success(t *testing.T) {
 // TestRotator_Rotate_SucceedsWithNoPreviousKey covers the first rotation after
 // seeding, where there is nothing to delete.
 func TestRotator_Rotate_SucceedsWithNoPreviousKey(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
-	mocks_data.ExpectRunInTransaction(database, rotatorTx)
+	datamocks.ExpectRunInTransaction(database, rotatorTx)
 	database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return([]record.KeyPair{
 		keyPairInState(1, record.KeyStateCurrent.String()),
 		keyPairInState(2, record.KeyStateNext.String()),
@@ -174,8 +174,8 @@ func TestRotator_Rotate_GuardRefusesBeforeAnyWrite(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			stub := mocks_data.ExpectRunInTransaction(database, rotatorTx)
+			database := datamocks.NewDatabase(t)
+			stub := datamocks.ExpectRunInTransaction(database, rotatorTx)
 			database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(tc.keys, nil).Once()
 
 			err := newTestRotator(database).Rotate(context.Background())
@@ -196,9 +196,9 @@ func TestRotator_Rotate_GuardRefusesBeforeAnyWrite(t *testing.T) {
 // delete it has already issued rolls back with it, which is the property the whole
 // transaction exists for.
 func TestRotator_Rotate_LosesTheDemotion(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
-	stub := mocks_data.ExpectRunInTransaction(database, rotatorTx)
+	stub := datamocks.ExpectRunInTransaction(database, rotatorTx)
 	database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once()
 	database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(nil).Once()
 	database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(1),
@@ -220,9 +220,9 @@ func TestRotator_Rotate_LosesTheDemotion(t *testing.T) {
 // TestRotator_Rotate_LosesThePromotion is the same refusal one statement later:
 // another rotation promoted the next key between this one's read and its own write.
 func TestRotator_Rotate_LosesThePromotion(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
-	stub := mocks_data.ExpectRunInTransaction(database, rotatorTx)
+	stub := datamocks.ExpectRunInTransaction(database, rotatorTx)
 	database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once()
 	database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(nil).Once()
 	database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(1),
@@ -248,25 +248,25 @@ func TestRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 
 	testCases := []struct {
 		name  string
-		setUp func(database *mocks_data.Database)
+		setUp func(database *datamocks.Database)
 	}{
 		{
 			name: "GetAllSigningKeys",
-			setUp: func(database *mocks_data.Database) {
+			setUp: func(database *datamocks.Database) {
 				database.On("GetAllSigningKeys", mock.Anything, rotatorTx).
 					Return([]record.KeyPair(nil), failure).Once()
 			},
 		},
 		{
 			name: "DeleteKeyPair",
-			setUp: func(database *mocks_data.Database) {
+			setUp: func(database *datamocks.Database) {
 				database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once()
 				database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(failure).Once()
 			},
 		},
 		{
 			name: "UpdateKeyPairState demote",
-			setUp: func(database *mocks_data.Database) {
+			setUp: func(database *datamocks.Database) {
 				database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once()
 				database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(nil).Once()
 				database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(1),
@@ -276,7 +276,7 @@ func TestRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 		},
 		{
 			name: "UpdateKeyPairState promote",
-			setUp: func(database *mocks_data.Database) {
+			setUp: func(database *datamocks.Database) {
 				database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once()
 				database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(nil).Once()
 				database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(1),
@@ -289,7 +289,7 @@ func TestRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 		},
 		{
 			name: "CreateKeyPair",
-			setUp: func(database *mocks_data.Database) {
+			setUp: func(database *datamocks.Database) {
 				database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once()
 				database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(nil).Once()
 				database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(1),
@@ -303,7 +303,7 @@ func TestRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 		},
 		{
 			name: "unparseable key state",
-			setUp: func(database *mocks_data.Database) {
+			setUp: func(database *datamocks.Database) {
 				database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return([]record.KeyPair{
 					keyPairInState(1, "not-a-state"),
 				}, nil).Once()
@@ -313,8 +313,8 @@ func TestRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			stub := mocks_data.ExpectRunInTransaction(database, rotatorTx)
+			database := datamocks.NewDatabase(t)
+			stub := datamocks.ExpectRunInTransaction(database, rotatorTx)
 			tc.setUp(database)
 
 			err := newTestRotator(database).Rotate(context.Background())
@@ -336,10 +336,10 @@ func TestRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 // nothing to roll back that the deferred rollback will not handle, but the error must
 // still reach the caller rather than reporting a rotation that did not land.
 func TestRotator_Rotate_CommitFailureIsReported(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	failure := errors.New("commit failed")
 
-	mocks_data.ExpectRunInTransactionThenFail(database, rotatorTx, failure)
+	datamocks.ExpectRunInTransactionThenFail(database, rotatorTx, failure)
 	database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once()
 	database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(nil).Once()
 	database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(1),
@@ -355,10 +355,10 @@ func TestRotator_Rotate_CommitFailureIsReported(t *testing.T) {
 // before the body runs. It also pins that the key material is generated before the
 // transaction opens: nothing else is called.
 func TestRotator_Rotate_ATransactionThatCannotOpenIsReported(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	failure := errors.New("cannot begin")
 
-	mocks_data.ExpectRunInTransactionRefused(database, failure)
+	datamocks.ExpectRunInTransactionRefused(database, failure)
 
 	assert.ErrorIs(t, newTestRotator(database).Rotate(context.Background()), failure)
 	database.AssertNotCalled(t, "GetAllSigningKeys", mock.Anything, mock.Anything)
@@ -372,7 +372,7 @@ func TestRotator_Rotate_ATransactionThatCannotOpenIsReported(t *testing.T) {
 // three orders of magnitude, and holding a transaction open across it is what made the
 // window wide enough to hit (#251).
 func TestRotator_Rotate_GeneratesTheKeyBeforeOpeningTheTransaction(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	rotator := NewRotator(database, testDataCipher)
 	rotator.keySizeBits = 512 // crypto/rsa refuses anything under 1024
@@ -388,5 +388,5 @@ func TestRotator_Rotate_GeneratesTheKeyBeforeOpeningTheTransaction(t *testing.T)
 // which no exported surface carries. The tests above all lower it, so without this nothing
 // would notice it changing.
 func TestNewRotator_UsesFourThousandNinetySixBits(t *testing.T) {
-	assert.Equal(t, 4096, NewRotator(mocks_data.NewDatabase(t), testDataCipher).keySizeBits)
+	assert.Equal(t, 4096, NewRotator(datamocks.NewDatabase(t), testDataCipher).keySizeBits)
 }

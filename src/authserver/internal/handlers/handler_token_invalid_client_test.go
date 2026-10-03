@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
@@ -58,13 +58,13 @@ func TestHandleTokenPost_InvalidClientOnTheWire(t *testing.T) {
 				transport = "Basic"
 			}
 			t.Run(r.name+", "+transport, func(t *testing.T) {
-				validatorDB := mocks_data.NewDatabase(t)
+				validatorDB := datamocks.NewDatabase(t)
 				validatorDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "the_client").
 					Return(r.client, nil).Once()
-				handler := HandleTokenPost(render.New(nil), mocks_data.NewDatabase(t),
-					mocks_handlers.NewTokenIssuer(t),
+				handler := HandleTokenPost(render.New(nil), datamocks.NewDatabase(t),
+					handlersmocks.NewTokenIssuer(t),
 					protocolvalidation.NewTokenValidator(validatorDB, nil, nil, testDataCipher),
-					mocks_handlers.NewAuditLogger(t), noCredentialFailures{})
+					handlersmocks.NewAuditLogger(t), noCredentialFailures{})
 
 				form := url.Values{"grant_type": {"client_credentials"}}
 				if !basic {
@@ -96,10 +96,10 @@ func TestHandleTokenPost_InvalidClientOnTheWire(t *testing.T) {
 	// The control: a request naming no client stays invalid_request, 400, with no challenge, since
 	// no client failed to authenticate.
 	t.Run("missing client_id", func(t *testing.T) {
-		handler := HandleTokenPost(render.New(nil), mocks_data.NewDatabase(t),
-			mocks_handlers.NewTokenIssuer(t),
-			protocolvalidation.NewTokenValidator(mocks_data.NewDatabase(t), nil, nil, testDataCipher),
-			mocks_handlers.NewAuditLogger(t), noCredentialFailures{})
+		handler := HandleTokenPost(render.New(nil), datamocks.NewDatabase(t),
+			handlersmocks.NewTokenIssuer(t),
+			protocolvalidation.NewTokenValidator(datamocks.NewDatabase(t), nil, nil, testDataCipher),
+			handlersmocks.NewAuditLogger(t), noCredentialFailures{})
 
 		req, err := http.NewRequest("POST", "/auth/token", strings.NewReader("grant_type=client_credentials"))
 		require.NoError(t, err)

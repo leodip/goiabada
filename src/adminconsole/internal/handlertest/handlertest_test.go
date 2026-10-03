@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -117,7 +117,7 @@ func TestRequest_WithContentTypeCarriesTheCallersOwnEncoding(t *testing.T) {
 // The negative half of the case below: a handler that never faults must draw no report, or the
 // expectation would fail every test that registers it.
 func TestRefuseInternalServerError_SaysNothingWhenTheHandlerDoesNotFault(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 
 	report := guard.Run(func(reporter guard.Reporter) {
 		RefuseInternalServerError(reporter, httpHelper)
@@ -127,7 +127,7 @@ func TestRefuseInternalServerError_SaysNothingWhenTheHandlerDoesNotFault(t *test
 }
 
 func TestRefuseInternalServerError_NamesTheErrorTheHandlerAnsweredWith(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 
 	report := guard.Run(func(reporter guard.Reporter) {
 		RefuseInternalServerError(reporter, httpHelper)
@@ -145,7 +145,7 @@ func TestRefuseInternalServerError_NamesTheErrorTheHandlerAnsweredWith(t *testin
 // Once() sets it to 1 and Maybe() leaves it at 0 while setting an unexported flag, so the zero
 // here is read together with the call succeeding below.
 func TestExpectRender_AdmitsTheNamedPageAndIsLeftUnbounded(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	call := ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users.html")
 
 	assert.Equal(t, "RenderTemplate", call.Method)
@@ -157,7 +157,7 @@ func TestExpectRender_AdmitsTheNamedPageAndIsLeftUnbounded(t *testing.T) {
 }
 
 func TestBind_ReturnsTheMapTheHandlerRenderedWith(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	ExpectRender(httpHelper, mock.Anything, mock.Anything).Twice()
 
 	req := Request(http.MethodGet, "/admin/users")
@@ -171,7 +171,7 @@ func TestBind_ReturnsTheMapTheHandlerRenderedWith(t *testing.T) {
 }
 
 func TestBind_StopsTheTestWhenTheHandlerRenderedNothing(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 
 	report := guard.Run(func(reporter guard.Reporter) {
 		Bind(reporter, httpHelper)
@@ -183,7 +183,7 @@ func TestBind_StopsTheTestWhenTheHandlerRenderedNothing(t *testing.T) {
 
 // The AJAX half of the case above, and unbounded for the same reason.
 func TestExpectEncodeJSON_AdmitsTheCallAndIsLeftUnbounded(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	call := ExpectEncodeJSON(httpHelper)
 
 	assert.Equal(t, "EncodeJSON", call.Method)
@@ -196,7 +196,7 @@ func TestExpectEncodeJSON_AdmitsTheCallAndIsLeftUnbounded(t *testing.T) {
 // Two things at once: the last answer is the one returned, and it arrives marshalled, so a field
 // the handler left off its struct is absent from the map rather than present and false.
 func TestEncoded_ReturnsTheLastAnswerAsTheBrowserReadsIt(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	ExpectEncodeJSON(httpHelper).Twice()
 
 	req := Request(http.MethodPost, "/account/sessions")
@@ -214,7 +214,7 @@ func TestEncoded_ReturnsTheLastAnswerAsTheBrowserReadsIt(t *testing.T) {
 }
 
 func TestEncoded_StopsTheTestWhenTheHandlerAnsweredNothing(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 
 	report := guard.Run(func(reporter guard.Reporter) {
 		Encoded(reporter, httpHelper)
@@ -227,7 +227,7 @@ func TestEncoded_StopsTheTestWhenTheHandlerAnsweredNothing(t *testing.T) {
 // A value encoding/json cannot represent ends the test naming that, rather than returning an empty
 // map a case would then assert against and pass.
 func TestEncoded_StopsTheTestWhenTheAnswerDoesNotMarshal(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	ExpectEncodeJSON(httpHelper).Once()
 
 	httpHelper.EncodeJSON(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"),
@@ -246,7 +246,7 @@ func TestEncoded_StopsTheTestWhenTheAnswerDoesNotMarshal(t *testing.T) {
 // and is not a map, and a case asserting only that a field is absent would pass against a handler
 // that answered nothing at all.
 func TestEncoded_StopsTheTestWhenTheAnswerIsNull(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	ExpectEncodeJSON(httpHelper).Once()
 
 	httpHelper.EncodeJSON(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"), nil)
@@ -262,7 +262,7 @@ func TestEncoded_StopsTheTestWhenTheAnswerIsNull(t *testing.T) {
 // A handler that answers a bare array or a string is not one of these, and the failure says so
 // rather than reporting a nil map the caller would index into.
 func TestEncoded_StopsTheTestWhenTheAnswerIsNotAnObject(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	ExpectEncodeJSON(httpHelper).Once()
 
 	httpHelper.EncodeJSON(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"),
