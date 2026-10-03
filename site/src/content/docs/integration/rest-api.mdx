@@ -306,7 +306,7 @@ PUT /api/v1/admin/users/{id}/profile
 }
 ```
 
-`gender` is `"0"`, `"1"` or `"2"`, for female, male and other. `zoneInfoCountryName` must be the country `zoneInfo` is listed under in the time zone table, since one zone can serve several countries; send both, or both empty.
+`gender` is `"female"`, `"male"` or `"other"`, the word a `GET` returns, so a profile read can be written back unchanged; `"0"`, `"1"` and `"2"` name the same three, in that order. Either way the word is stored and returned, and an empty `gender` clears it. `zoneInfoCountryName` must be the country `zoneInfo` is listed under in the time zone table, since one zone can serve several countries; send both, or both empty.
 
 #### Update user email
 
@@ -1329,7 +1329,7 @@ PUT /api/v1/account/profile
 }
 ```
 
-`gender` and the zone pair follow the rules under [Update user profile](#update-user-profile).
+`gender` takes the word `GET /api/v1/account/profile` returns, `"female"`, `"male"` or `"other"`, or the digit `"0"`, `"1"` or `"2"` for the same three, and stores the word. It and the zone pair follow the rules under [Update user profile](#update-user-profile).
 
 ---
 

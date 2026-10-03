@@ -4081,7 +4081,7 @@ components:
           type: string
         gender:
           type: string
-          description: '"0", "1" or "2", for female, male and other'
+          description: '"female", "male" or "other", as GET returns it, or "0", "1" or "2" for the same three; stored as the word. Empty clears it'
         dateOfBirth:
           type: string
           description: Format YYYY-MM-DD

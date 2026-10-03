@@ -189,6 +189,9 @@ func TestAPIUserProfilePut_ValidGender(t *testing.T) {
 		{"female", "0", "female"},
 		{"male", "1", "male"},
 		{"other", "2", "other"},
+		{"the word female", "female", "female"},
+		{"the word male", "male", "male"},
+		{"the word other", "other", "other"},
 	}
 
 	for _, tc := range testCases {
@@ -215,6 +218,66 @@ func TestAPIUserProfilePut_ValidGender(t *testing.T) {
 			assert.Equal(t, tc.expectedGender, updateResponse.User.Gender)
 		})
 	}
+}
+
+// profileRequestFrom is the profile PUT body that writes back unchanged what GET returned.
+func profileRequestFrom(u api.UserResponse) api.UpdateUserProfileRequest {
+	dateOfBirth := ""
+	if u.BirthDate != nil {
+		dateOfBirth = u.BirthDate.Format("2006-01-02")
+	}
+	return api.UpdateUserProfileRequest{
+		Username:            u.Username,
+		GivenName:           u.GivenName,
+		MiddleName:          u.MiddleName,
+		FamilyName:          u.FamilyName,
+		Nickname:            u.Nickname,
+		Website:             u.Website,
+		Gender:              u.Gender,
+		DateOfBirth:         dateOfBirth,
+		ZoneInfoCountryName: u.ZoneInfoCountryName,
+		ZoneInfo:            u.ZoneInfo,
+		Locale:              u.Locale,
+	}
+}
+
+// A client that reads a user and writes the profile back unchanged is answered 200 with the same
+// gender: GET returns the word, and the PUT accepts it (#443 decision 13).
+func TestAPIUserProfilePut_WritesBackWhatGetReturned(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	testUser := &record.User{
+		Subject:    fake.UUID(),
+		Enabled:    true,
+		Email:      uniqueEmail("testuser@gender-roundtrip.test"),
+		GivenName:  "Test",
+		FamilyName: "User",
+		Gender:     "female",
+	}
+	err := database.CreateUser(context.Background(), nil, testUser)
+	assert.NoError(t, err)
+	defer func() {
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+	}()
+
+	userURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
+	getResp := makeAPIRequest(t, "GET", userURL, accessToken, nil)
+	defer func() { _ = getResp.Body.Close() }()
+	assert.Equal(t, http.StatusOK, getResp.StatusCode)
+	var got api.GetUserResponse
+	assert.NoError(t, json.NewDecoder(getResp.Body).Decode(&got))
+	assert.Equal(t, "female", got.User.Gender)
+
+	putResp := makeAPIRequest(t, "PUT", userURL+"/profile", accessToken, profileRequestFrom(got.User))
+	defer func() { _ = putResp.Body.Close() }()
+	assert.Equal(t, http.StatusOK, putResp.StatusCode)
+	var updated api.UpdateUserResponse
+	assert.NoError(t, json.NewDecoder(putResp.Body).Decode(&updated))
+	assert.Equal(t, "female", updated.User.Gender)
+
+	stored, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, "female", stored.Gender)
 }
 
 func TestAPIUserProfilePut_InvalidDateOfBirth(t *testing.T) {

@@ -570,17 +570,28 @@ func TestValidateProfile_WebsiteAtTheLengthLimitIsAccepted(t *testing.T) {
 // Gender
 // -----------------------------------------------------------------------------
 
+// TestValidateProfile_Gender holds both spellings a profile PUT accepts (#443 decision 13): the
+// digit the admin console's forms post and the word GET returns, so a client can write back what it
+// read. The words are literals, the strings the OIDC gender claim carries, not read off
+// gender.Gender.String, and the match is exact: a capital or a pad is no gender.
 func TestValidateProfile_Gender(t *testing.T) {
 	testCases := []struct {
 		name         string
 		gender       string
 		expectedCode string
 	}{
-		{"female", fmt.Sprintf("%d", int(gender.Female)), ""},
-		{"male", fmt.Sprintf("%d", int(gender.Male)), ""},
-		{"other", fmt.Sprintf("%d", int(gender.Other)), ""},
+		{"the digit for female", "0", ""},
+		{"the digit for male", "1", ""},
+		{"the digit for other", "2", ""},
+		{"the word female", "female", ""},
+		{"the word male", "male", ""},
+		{"the word other", "other", ""},
 		{"empty is allowed", "", ""},
-		{"not a number", "female", i18n.ErrCodeProfileGenderInvalid},
+		{"a capitalized word", "Male", i18n.ErrCodeProfileGenderInvalid},
+		{"an upper-case word", "FEMALE", i18n.ErrCodeProfileGenderInvalid},
+		{"a padded word", " male", i18n.ErrCodeProfileGenderInvalid},
+		{"no word", "x", i18n.ErrCodeProfileGenderInvalid},
+		{"a word for no gender", "unknown", i18n.ErrCodeProfileGenderInvalid},
 		{"out of range high", "3", i18n.ErrCodeProfileGenderInvalid},
 		{"negative", "-1", i18n.ErrCodeProfileGenderInvalid},
 		{"float", "1.5", i18n.ErrCodeProfileGenderInvalid},

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/gender"
 )
 
 // accountProfileDatabase is what the account profile endpoints need: the caller's own user row.
@@ -125,8 +123,8 @@ func HandleAccountProfilePut(
 		user.Website = input.Website
 
 		if len(input.Gender) > 0 {
-			if i, err := strconv.Atoi(input.Gender); err == nil && gender.IsValid(i) {
-				user.Gender = gender.Gender(i).String()
+			if g, ok := accountvalidation.ParseGender(input.Gender); ok {
+				user.Gender = g.String()
 			}
 		} else {
 			user.Gender = ""
