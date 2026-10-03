@@ -56,14 +56,20 @@ const (
 	// user row may be gone. All are answered identically.
 	auditReasonCodeNoLongerOutstanding = "code_no_longer_outstanding"
 	// auditReasonClaimLost is the conditional password write matching no row, which is the
-	// same imprecision one step later: a concurrent submission won, or the code stopped
-	// being outstanding between the lookup and the write.
+	// same imprecision one step later: a concurrent submission won, the code stopped being
+	// outstanding, or the account was disabled, between the lookup and the write.
 	auditReasonClaimLost = "claim_lost"
 	// auditReasonContinuationMismatch is a submitted form naming a continuation other than
 	// the one the session now holds, which is what refuses a page rendered for one account
 	// from acting on another. Determinable and distinct from every other rejection, so it
 	// gets its own name rather than being folded into one of them.
 	auditReasonContinuationMismatch = "continuation_mismatch"
+	// auditReasonAccountDisabled is a link, or a marker, resolving to an account an
+	// administrator has disabled. Refused at every step with the same response every other
+	// dead link gets, so a reset link stops working the moment its account is disabled
+	// (#404 decision 2). Emitted only once the link has resolved to the account, so the
+	// entry always names it.
+	auditReasonAccountDisabled = "account_disabled"
 )
 
 // continuationIdField is the hidden form field carrying the continuation id, and its name
@@ -248,6 +254,10 @@ func resolveResetPasswordMarker(pageRenderer PageRenderer, httpSession sessionst
 		rejectResetPassword(pageRenderer, auditLogger, w, r, 0, auditReasonCodeNoLongerOutstanding, httpStatus)
 		return nil, nil
 	}
+	if !user.Enabled {
+		rejectResetPassword(pageRenderer, auditLogger, w, r, user.Id, auditReasonAccountDisabled, httpStatus)
+		return nil, nil
+	}
 
 	return marker, user
 }
@@ -339,6 +349,13 @@ func handleResetPasswordLinkFollowed(pageRenderer PageRenderer, httpSession sess
 
 	if isForgotPasswordCodeExpired(user) {
 		rejectResetPassword(pageRenderer, auditLogger, w, r, user.Id, auditReasonCodeExpired, 0)
+		return
+	}
+
+	// Enabled and not verified: a link issued by the administrator's setup email goes to an
+	// address nobody has verified yet, and must keep working (#404 decision 1).
+	if !user.Enabled {
+		rejectResetPassword(pageRenderer, auditLogger, w, r, user.Id, auditReasonAccountDisabled, 0)
 		return
 	}
 
@@ -476,7 +493,9 @@ func HandleResetPasswordPost(
 		//
 		// Narrow rather than a full-row UpdateUser: this handler holds a user model loaded
 		// before the password was validated, so writing every column back would undo a
-		// concurrent admin disable (#106 decision 14).
+		// concurrent admin disable (#106 decision 14). The claim also requires the account
+		// to be enabled, so a disable landing after the check above refuses the reset rather
+		// than setting a password (#404 decision 2).
 		//
 		// Reset revokes everything, with no exceptSid: whoever is resetting a forgotten
 		// password is not necessarily the person holding the live sessions, which is the

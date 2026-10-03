@@ -166,7 +166,15 @@ type Database interface {
 	// outstanding code and would have to pass a meaningless predicate. An empty codeHash
 	// or a zero userId is an error rather than a false: '' is the dormant value on every
 	// row with no code outstanding, so an empty predicate would claim one of them (#112).
+	// It claims nothing on a disabled account, so a reset never sets a password there (#404).
 	TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string, passwordHash string) (bool, error)
+	// TryStoreForgotPasswordCode stores a reset code on a user, its encrypted form, its
+	// hash and when it was issued, only while the account is still enabled, its address
+	// is still verified and still the one given, and reports whether it did. Narrow and
+	// conditional rather than a full-row update of the user the request loaded, so a
+	// concurrent admin disable is neither undone by it nor followed by a mail (#404).
+	TryStoreForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte,
+		codeHash string, issuedAt time.Time) (bool, error)
 	// TrySetUserEnabled flips enabled from expected to desired, reporting whether this
 	// call made the transition. Compare-and-set for the same reason MarkCodeAsUsed is.
 	// The disable direction's return gates the revocation sweep (#106).
