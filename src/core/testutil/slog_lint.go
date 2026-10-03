@@ -306,6 +306,12 @@ var slogSpreadSites = []slogSpreadSite{
 // cancellation, and its one record, a job that panicked, is the request's to be filtered by.
 // Listing it is also what holds it to AssertRequestPathContext, since a context.Background() there
 // would cut every job's records and audit entries off from the request that started it (#404).
+//
+// adminconsole/internal/sessionbackend is listed by the commit that creates it, for the reason the
+// oauthclient note above gives: the HTTP session backend sat under adminconsole/internal/apiclient,
+// already listed, until #441 moved it out, and every admin console page loads its session through
+// it, so a move alone would have dropped all three rules this list gates with nothing going red.
+// It writes no record today.
 var slogRequestPathDirs = []string{
 	"authserver/internal/audit",
 	"authserver/internal/data/commondb",
@@ -338,6 +344,7 @@ var slogRequestPathDirs = []string{
 	"adminconsole/internal/middleware",
 	"adminconsole/internal/apiclient",
 	"adminconsole/internal/oauthclient",
+	"adminconsole/internal/sessionbackend",
 	"adminconsole/internal/handlerhelpers",
 	"core/middleware",
 	"core/validators",

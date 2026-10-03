@@ -3,6 +3,7 @@ package oauthclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -27,6 +28,13 @@ import (
 // bounds it (#338).
 func NewAuthServerHTTPClient() *http.Client {
 	return &http.Client{Timeout: TokenExchangeTimeout}
+}
+
+// TokenEndpointURL is the auth server's token endpoint under baseURL. The base URL comes from
+// configuration, and an operator writing it with a trailing slash is a matter of when rather
+// than whether.
+func TokenEndpointURL(baseURL string) string {
+	return strings.TrimSuffix(baseURL, "/") + "/auth/token"
 }
 
 // TokenClient is the admin console's client of the auth server's token endpoint. It is built
@@ -159,6 +167,73 @@ func (c *TokenClient) Refresh(ctx context.Context, refreshToken string) (*oauth.
 		tokenResponse.RefreshToken = refreshToken
 	}
 	return tokenResponse, nil
+}
+
+// ClientCredentials sends the client_credentials grant for scope: the bearer SessionTokenSource
+// caches for the browser-session endpoint. It is transport only, like the other two grants; the
+// cache decides what to do with the answer.
+//
+// Unlike them it keeps the caller's cancellation. client_credentials spends nothing: the auth
+// server issues a token and burns no grant, so a caller that goes away abandons nothing a later
+// request cannot ask for again, and the session lookup behind it ends with the page load that
+// asked for it. TokenExchangeTimeout still bounds it, since a browser context carries no
+// deadline (#441 decision 2).
+//
+// A refusal is the shared *TokenEndpointError, named with the client it was refused for and, for
+// the two codes that mean the client is not provisioned for this grant, what to fix (#441
+// decision 3).
+func (c *TokenClient) ClientCredentials(ctx context.Context, scope string) (*oauth.TokenResponse, error) {
+	form := url.Values{}
+	form.Set("grant_type", "client_credentials")
+	form.Set("client_id", c.clientID)
+	form.Set("client_secret", c.clientSecret)
+	form.Set("scope", scope)
+
+	ctx, cancel := context.WithTimeout(ctx, TokenExchangeTimeout)
+	defer cancel()
+
+	tokenResponse, err := c.post(ctx, form)
+	if err != nil {
+		var refusal *TokenEndpointError
+		if errors.As(err, &refusal) {
+			return nil, errs.Errorf("%w%s", err, c.clientCredentialsRemedy(refusal.ErrorCode, scope))
+		}
+		return nil, err
+	}
+	return tokenResponse, nil
+}
+
+// clientCredentialsRemedy is what a client-credentials refusal adds to the shared message: the
+// client that was refused and, where the refusal says the client is not provisioned for this,
+// the two things it needs.
+//
+// The reason it is worth more than a status code: a deployment this fails on cannot be repaired
+// through the admin console, because obtaining this token is what every admin console page
+// needs, so an administrator locked out by it has no page to fix it from. The route back in is
+// direct SQL, which is not discoverable from "answered 400" (#266).
+//
+// How a deployment reaches it, now that the client this authenticates as is the constant the
+// seeder writes rather than configuration (#285): both things migration 000035 provisions on
+// that client are editable from the admin console afterwards. An administrator can turn the
+// client credentials flow off on `admin-console-client`, or take the browser-sessions
+// permission away from it, and the next token request is refused. The two codes below are the
+// two ways the endpoint says which one happened: unauthorized_client when client credentials
+// is off, invalid_scope when the permission is gone.
+//
+// The remedy sentence is attached to exactly those two codes rather than to every refusal,
+// because a server_error or a gateway's 502 is not a provisioning fault and telling an operator
+// to grant a permission would send them to the wrong place. The code it is keyed on is the
+// conformed one, so a code the peer dressed up with a forbidden character does not earn it.
+func (c *TokenClient) clientCredentialsRemedy(code, scope string) string {
+	// %q rather than %s: the identifier is a constructor parameter, so it is only a compile time
+	// constant by convention, and a stray control character in it must not forge a line in the
+	// log this lands in.
+	remedy := fmt.Sprintf(" for client_id %q", c.clientID)
+	if code == "unauthorized_client" || code == "invalid_scope" {
+		remedy += fmt.Sprintf(", which needs the client credentials flow enabled and the"+
+			" %s permission granted", scope)
+	}
+	return remedy
 }
 
 // post sends one grant's form to the token endpoint and decodes the answer.

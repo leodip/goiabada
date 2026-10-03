@@ -1,4 +1,11 @@
-package apiclient
+// Package sessionbackend is the admin console's backend of core/sessionstore: the HTTP adapter
+// over the auth server's browser-session endpoint, where the console's server-side sessions live
+// in a row it reaches over the wire, since this process keeps no database connection. It is the
+// twin of the auth server's package of the same name, which is the database backend behind that
+// endpoint. The bearer it presents comes through TokenSource, its consumer's port, which
+// oauthclient.SessionTokenSource implements and main wires in; the backend knows nothing of the
+// grant behind it. It left apiclient, which is the admin API client and nothing else, in #441.
+package sessionbackend
 
 import (
 	"bytes"
@@ -47,7 +54,7 @@ type TokenSource interface {
 	Invalidate()
 }
 
-// httpBackend is the network transport of Backend: the admin console keeps no database
+// httpBackend is the network transport of sessionstore.Backend: the admin console keeps no database
 // connection, so its browser sessions live in a row on the auth server's side of the wire
 // and it reaches them through the endpoint (#266).
 //
@@ -60,12 +67,12 @@ type httpBackend struct {
 	tokens  TokenSource
 }
 
-// NewSessionBackend returns a sessionstore.Backend that reaches the session endpoint at baseURL.
+// New returns a sessionstore.Backend that reaches the session endpoint at baseURL.
 //
 // No owner parameter, matching the database backend: the endpoint's handlers hard-wire
 // the admin console's owner and accept no other, so there is nothing here a caller could
 // name an auth server session with however this is composed.
-func NewSessionBackend(baseURL string, tokens TokenSource) sessionstore.Backend {
+func New(baseURL string, tokens TokenSource) sessionstore.Backend {
 	return &httpBackend{
 		baseURL: strings.TrimSuffix(baseURL, "/"),
 		client:  &http.Client{Timeout: httpBackendTimeout},
