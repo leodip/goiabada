@@ -375,10 +375,10 @@ command itself and fails on a tree it changed.
 | `core/logging` | `FieldForLog` | kernel | — |
 | `core/logging` | `Install` | both-apps | — |
 | `core/logging` | `MaxLoggedField` | own-package | — |
+| `core/logging` | `RequestTargetForLog` | kernel | — |
 | `core/logging` | `SafeLogValue` | own-package | — |
-| `core/logging` | `SafeLogValueLen` | own-package | — |
-| `core/logging` | `TruncateCounted` | kernel | — |
-| `core/logging` | `TruncationMarker` | kernel | — |
+| `core/logging` | `TruncateCounted` | own-package | — |
+| `core/logging` | `TruncationMarker` | own-package | — |
 | `core/logging` | `WrapRequestID` | kernel | — |
 | `core/logging/logtest` | `CaptureSlog` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
 | `core/logging/logtest` | `CapturedRecord` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
@@ -393,7 +393,6 @@ command itself and fails on a tree it changed.
 | `core/middleware` | `MiddlewareSecurityHeaders` | both-apps | — |
 | `core/middleware` | `MiddlewareSkipCsrf` | both-apps | — |
 | `core/middleware` | `ParseTrustedProxies` | both-apps | — |
-| `core/middleware` | `RequestTargetForLog` | own-package | — |
 | `core/oauth` | `ConformErrorDescription` | both-apps | — |
 | `core/oauth` | `ErrorDetail` | both-apps | — |
 | `core/oauth` | `GeneratePKCECodeChallenge` | both-apps | — |

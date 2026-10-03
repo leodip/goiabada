@@ -13,8 +13,6 @@ import (
 
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging"
-	// Aliased because this file's own package is named middleware.
-	custom_middleware "github.com/leodip/goiabada/core/middleware"
 )
 
 const (
@@ -339,7 +337,7 @@ func APIDebugMiddleware(enabled bool) func(http.Handler) http.Handler {
 			// redaction the HTTP request log uses: r.URL.String() carries the query
 			// string verbatim, which is the same defect under a second flag, and
 			// these routes carry a user search string in `query` (#159).
-			debugLog(r.Method, custom_middleware.RequestTargetForLog(r.URL), reqBody, rw.statusCode, rw.captured(), duration, r)
+			debugLog(r.Method, logging.RequestTargetForLog(r.URL), reqBody, rw.statusCode, rw.captured(), duration, r)
 		})
 	}
 }

@@ -228,7 +228,7 @@ func MiddlewareCsrf() func(next http.Handler) http.Handler {
 				"remedy", remedy,
 				"error", err,
 				"method", logging.FieldForLog(r.Method),
-				"target", RequestTargetForLog(r.URL),
+				"target", logging.RequestTargetForLog(r.URL),
 				"request_host", logging.FieldForLog(r.Host),
 				"origin_header", logging.FieldForLog(headerOrPlaceholder(r, "Origin")),
 				"sec_fetch_site", logging.FieldForLog(headerOrPlaceholder(r, "Sec-Fetch-Site")),

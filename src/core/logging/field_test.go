@@ -93,11 +93,11 @@ func TestSafeLogValue(t *testing.T) {
 func TestSafeLogValueLen_MatchesSafeLogValue(t *testing.T) {
 	for b := 0; b < 256; b++ {
 		s := string([]byte{byte(b)})
-		assert.Equal(t, len(SafeLogValue(s)), SafeLogValueLen(s), "byte 0x%02X", b)
+		assert.Equal(t, len(SafeLogValue(s)), safeLogValueLen(s), "byte 0x%02X", b)
 	}
 
 	for _, s := range fieldCorpus() {
-		assert.Equal(t, len(SafeLogValue(s)), SafeLogValueLen(s), "input of %d bytes", len(s))
+		assert.Equal(t, len(SafeLogValue(s)), safeLogValueLen(s), "input of %d bytes", len(s))
 	}
 }
 

@@ -61,7 +61,7 @@ func SafeLogValue(s string) string {
 	}
 
 	var b strings.Builder
-	b.Grow(SafeLogValueLen(s))
+	b.Grow(safeLogValueLen(s))
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if c >= 0x20 && c <= 0x7e {
@@ -77,11 +77,13 @@ func SafeLogValue(s string) string {
 	return b.String()
 }
 
+// hexDigits is the hex alphabet SafeLogValue and escapePathForLog write a %XX
+// escape with.
 const hexDigits = "0123456789ABCDEF"
 
-// SafeLogValueLen returns the length SafeLogValue(s) would have, without
+// safeLogValueLen returns the length SafeLogValue(s) would have, without
 // building it.
-func SafeLogValueLen(s string) int {
+func safeLogValueLen(s string) int {
 	n := 0
 	for i := 0; i < len(s); i++ {
 		if s[i] >= 0x20 && s[i] <= 0x7e {
@@ -97,7 +99,7 @@ func SafeLogValueLen(s string) int {
 // so the bytes the limit counts are the bytes the log receives. Remove it and one
 // oversized header becomes one oversized log line (#159).
 //
-// Like the request logger's query-component renderer it escapes only as far as
+// Like RequestTargetForLog's query-component renderer it escapes only as far as
 // the clip reaches. SafeLogValue maps each byte independently, so escaping the
 // first MaxLoggedField bytes yields at least that many output bytes and they are
 // exactly the ones kept. This matters more here than anywhere else: chi's
@@ -106,7 +108,7 @@ func SafeLogValueLen(s string) int {
 // unauthenticated request carrying 900000 non-printable bytes in that header
 // cost 31 ms of CPU and 10 MB of allocation to render 128 bytes of log (#159).
 func FieldForLog(s string) string {
-	if len(s) <= MaxLoggedField && SafeLogValueLen(s) == len(s) {
+	if len(s) <= MaxLoggedField && safeLogValueLen(s) == len(s) {
 		// The common case, and the only one that runs per ordinary request: an
 		// unremarkable request id, method or IP, with nothing to escape and
 		// nothing to clip. It allocates nothing.
@@ -116,5 +118,5 @@ func FieldForLog(s string) string {
 	if len(head) > MaxLoggedField {
 		head = head[:MaxLoggedField]
 	}
-	return TruncateCounted(SafeLogValue(head), MaxLoggedField, SafeLogValueLen(s))
+	return TruncateCounted(SafeLogValue(head), MaxLoggedField, safeLogValueLen(s))
 }

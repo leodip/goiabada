@@ -384,10 +384,10 @@ func aliasTrailingBits(t *testing.T, compactJWE string, i int) string {
 func TestDecrypt_DiagnosticsAreBounded(t *testing.T) {
 	key := DeriveKey(testClientSecret)
 
-	// The ceiling these have to stay under is middleware's maxLoggedTarget, the whole
+	// The ceiling these have to stay under is logging's maxLoggedTarget, the whole
 	// rendered request target's budget. Written out rather than imported, because
-	// idtokenhint does not depend on core/middleware; that number moving would
-	// make this bound looser or tighter than the neighbouring one, never wrong.
+	// it is unexported in core/logging; that number moving would make this bound
+	// looser or tighter than the neighbouring one, never wrong.
 	const logRecordCeiling = 4096
 
 	cases := []struct {
