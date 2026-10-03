@@ -20,7 +20,7 @@ import (
 // worse and quieter: a redirect body mistaken for a form renders a form with no action.
 //
 // The bodies are literal JSON text, not marshalled from the structs under test, so a renamed tag on
-// either side is visible here. serves lives in user_client_test.go.
+// either side is visible here. serves lives in users_test.go.
 
 func TestAuthServerClient_CreateAccountLogoutRequestReadsTheFormInstruction(t *testing.T) {
 	client, recorded := serves(t, `{

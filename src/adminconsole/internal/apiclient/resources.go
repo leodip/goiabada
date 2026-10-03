@@ -8,6 +8,20 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
+// GetAllResources retrieves all resources from the auth server
+func (c *AuthServerClient) GetAllResources(ctx context.Context, accessToken string) ([]api.ResourceResponse, error) {
+	response, err := execute[api.GetResourcesResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           fmt.Sprintf("%s/api/v1/admin/resources", c.baseURL),
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return response.Resources, nil
+}
+
 // CreateResource creates a new resource via the auth server admin API
 func (c *AuthServerClient) CreateResource(ctx context.Context, accessToken string, request *api.CreateResourceRequest) (*api.ResourceResponse, error) {
 	response, err := execute[api.CreateResourceResponse](ctx, c, accessToken, apiRequest{

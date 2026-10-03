@@ -36,7 +36,7 @@ import (
 //
 // What a row does not pin: for the methods that send a caller-supplied request value, the expected
 // body is that value marshalled, so this proves the method sends the caller's value as the whole
-// body and does not prove core/api's json tags. That is user_client_test.go's job, which writes
+// body and does not prove core/api's json tags. That is users_test.go's job, which writes
 // its bodies as literal bytes for exactly that reason. The bodies built inside a method are
 // literals here, since there is no caller value to stand in for them.
 
@@ -253,7 +253,7 @@ func (b *failingBody) Read(p []byte) (int, error) {
 	return 0, errs.New("the connection dropped partway through the response")
 }
 
-// Round 2 finding 2. settings_keys_client.go is the only file whose methods read with
+// Round 2 finding 2. settings_keys.go is the only file whose methods read with
 // `body, _ := io.ReadAll(resp.Body)`, and the three do not behave alike. A shared executor that
 // owns bounded reading returns that error by default, which would turn a signing key rotation the
 // auth server completed into a 500 the administrator may retry -- rotating twice because the reply
@@ -272,7 +272,7 @@ func TestAuthServerClient_ThreeMethodsDiscardTheirBodyReadError(t *testing.T) {
 		}
 	}
 	require.Equal(t, []string{"GetSettingsKeys", "RotateSettingsKeys", "DeleteSettingsKey"}, discarding,
-		"only settings_keys_client.go's three methods discard their body-read error")
+		"only settings_keys.go's three methods discard their body-read error")
 
 	// GetSettingsKeys uses the body, so a partial one still fails -- as the decode error it is
 	// today, not as a read error.
