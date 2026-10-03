@@ -23,9 +23,9 @@ import (
 // still compiles, because the package references custom_middleware on six other lines.
 //
 // It is deliberately thin. The middleware's behaviour belongs to its own tests in
-// src/core/middleware, and the redaction table belongs to RequestTargetForLog. This owns one claim:
-// a real request through this server's real chain of eleven middlewares produces a log line, and
-// that line does not carry the id_token_hint (#159).
+// src/core/middleware, and the redaction table belongs to RequestTargetForLog in src/core/logging.
+// This owns one claim: a real request through this server's real chain of eleven middlewares
+// produces a log line, and that line does not carry the id_token_hint (#159).
 //
 // initMiddleware is an ordinary method and httptest drives it with no harness, which is what
 // server_csrf_test.go in the admin console established.

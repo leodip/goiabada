@@ -1,6 +1,6 @@
-// Package logging owns the slog handler both servers install at startup, and
-// the bound every client-chosen scalar attribute passes through before it
-// reaches a record (#320).
+// Package logging owns the slog handler both servers install at startup, the
+// bound every client-chosen scalar attribute passes through before it reaches a
+// record (#320), and the rendering of a request target for a record (#159).
 package logging
 
 import (

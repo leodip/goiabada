@@ -528,7 +528,9 @@ func TestMiddlewareCsrf_TheRefusalRecordIsBounded(t *testing.T) {
 
 	target, ok := record.Attrs["target"].(string)
 	require.True(t, ok, "target is a string attribute")
-	assert.LessOrEqual(t, len(target), maxLoggedTarget+len(logging.TruncationMarker(maxLoggedTarget, 1<<30)))
+	assert.Equal(t, logging.RequestTargetForLog(req.URL), target, "rendered as the request logger renders it")
+	// The renderer's whole-target bound, 4096, written out because it is unexported in logging.
+	assert.LessOrEqual(t, len(target), 4096+len(logging.TruncationMarker(4096, 1<<30)))
 	printable(t, "target", target)
 
 	// The request logger's key for the same value; the old "path" carried it raw.

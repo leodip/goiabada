@@ -22,8 +22,8 @@ import (
 //
 // It is deliberately thin, for the same reason its auth server twin is: the middleware's behaviour
 // belongs to its own tests in src/core/middleware, and the redaction table belongs to
-// RequestTargetForLog. This owns one claim, that a real request through this server's real chain
-// produces a log line and that the line carries no token (#159).
+// RequestTargetForLog in src/core/logging. This owns one claim, that a real request through this
+// server's real chain produces a log line and that the line carries no token (#159).
 
 // jwtLike is the three-segment shape a token arrives in. Nothing on the admin console issues one,
 // which is the point: an unassessed parameter is redacted by construction, whatever it holds.

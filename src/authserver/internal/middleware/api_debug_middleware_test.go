@@ -1069,7 +1069,7 @@ func TestAPIDebugMiddleware_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
 // redactor (#159).
 //
 // Two cases, one accept and one reject, thin on purpose: the exhaustive table
-// belongs to RequestTargetForLog in src/core/middleware, which owns the rule.
+// belongs to RequestTargetForLog in src/core/logging, which owns the rule.
 //
 // Both drive APIDebugMiddleware rather than calling debugLog directly, and that
 // is load-bearing. debugLog takes the URL as a string parameter, so a test
