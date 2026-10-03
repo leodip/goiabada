@@ -39,22 +39,7 @@ func HandleAccountManageConsentsGet(
 			return
 		}
 
-		consentInfoArr := []ConsentInfo{}
-		for _, c := range userConsents {
-			ci := ConsentInfo{
-				ConsentId:         c.Id,
-				Client:            c.ClientIdentifier,
-				ClientDescription: c.ClientDescription,
-				Scope:             c.Scope,
-				// grantedAt is nullable on the wire, where the column it comes from is not:
-				// a consent row always records when it was granted, so an absent value is a
-				// response this console cannot date rather than an ungranted consent (#350).
-				// It travels as the instant and the page formats it, so the date reads in
-				// the viewer's language rather than in English (#373).
-				GrantedAt: c.GrantedAt,
-			}
-			consentInfoArr = append(consentInfoArr, ci)
-		}
+		consentInfoArr := handlerhelpers.ConsentInfos(userConsents)
 
 		bind := map[string]interface{}{
 			"consents": consentInfoArr,

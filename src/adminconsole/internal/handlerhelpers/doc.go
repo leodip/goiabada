@@ -1,8 +1,9 @@
 // Package handlerhelpers renders this application's pages: the template parse, the bind map every
 // page reads, the 404 and 500 pages, and the JSON writers the AJAX handlers answer with. Beside
-// them are the classifiers that turn an admin API failure into one of those answers, and the
-// display-name join, which the handler packages take from here rather than from their parent
-// (#440).
+// them are the classifiers that turn an admin API failure into one of those answers, the
+// display-name join, and the session and consent rows and the profile form the account pages and
+// the admin user pages share, which the handler packages take from here rather than from their
+// parent or from each other (#440).
 //
 // It belongs to the admin console rather than to the shared kernel because half of what it does is
 // this console's alone. The bind map carries loggedInUser and isAdmin, read off the browser

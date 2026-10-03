@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
@@ -16,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/gender"
 	"github.com/leodip/goiabada/core/locales"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/timezones"
@@ -129,34 +126,10 @@ func HandleAdminUserProfilePost(
 			return
 		}
 
-		// Parse zoneInfo form value
-		zoneInfoValue := r.FormValue("zoneInfo")
-		zoneInfoCountry := ""
-		zoneInfo := ""
-
-		if zoneInfoValue != "" {
-			zoneInfoParts := strings.Split(zoneInfoValue, "___")
-			if len(zoneInfoParts) != 2 {
-				httpHelper.InternalServerError(w, r, errs.New("invalid zoneInfo"))
-				return
-			}
-			zoneInfoCountry = zoneInfoParts[0]
-			zoneInfo = zoneInfoParts[1]
-		}
-
-		// Create update request
-		request := &api.UpdateUserProfileRequest{
-			Username:            strings.TrimSpace(r.FormValue("username")),
-			GivenName:           strings.TrimSpace(r.FormValue("givenName")),
-			MiddleName:          strings.TrimSpace(r.FormValue("middleName")),
-			FamilyName:          strings.TrimSpace(r.FormValue("familyName")),
-			Nickname:            strings.TrimSpace(r.FormValue("nickname")),
-			Website:             strings.TrimSpace(r.FormValue("website")),
-			Gender:              r.FormValue("gender"),
-			DateOfBirth:         strings.TrimSpace(r.FormValue("dateOfBirth")),
-			ZoneInfoCountryName: zoneInfoCountry,
-			ZoneInfo:            zoneInfo,
-			Locale:              r.FormValue("locale"),
+		request, err := handlerhelpers.ParseProfileForm(r)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
 		}
 
 		// Call the profile update API
@@ -172,36 +145,7 @@ func HandleAdminUserProfilePost(
 				}
 
 				// Update user fields with form values for display
-				formUser.Username = request.Username
-				formUser.GivenName = request.GivenName
-				formUser.MiddleName = request.MiddleName
-				formUser.FamilyName = request.FamilyName
-				formUser.Nickname = request.Nickname
-				formUser.Website = request.Website
-				formUser.ZoneInfoCountryName = request.ZoneInfoCountryName
-				formUser.ZoneInfo = request.ZoneInfo
-				formUser.Locale = request.Locale
-
-				// Handle gender display
-				if len(request.Gender) > 0 {
-					i, parseErr := strconv.Atoi(request.Gender)
-					if parseErr == nil {
-						formUser.Gender = gender.Gender(i).String()
-					}
-				} else {
-					formUser.Gender = ""
-				}
-
-				// Handle date of birth display
-				if len(request.DateOfBirth) > 0 {
-					layout := "2006-01-02"
-					parsedTime, parseErr := time.Parse(layout, request.DateOfBirth)
-					if parseErr == nil {
-						formUser.BirthDate = &parsedTime
-					}
-				} else {
-					formUser.BirthDate = nil
-				}
+				handlerhelpers.EchoProfileForm(formUser, request)
 
 				bind := map[string]interface{}{
 					"user":      formUser,

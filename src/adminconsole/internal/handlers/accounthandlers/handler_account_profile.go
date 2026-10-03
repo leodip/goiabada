@@ -3,9 +3,6 @@ package accounthandlers
 import (
 	"context"
 	"net/http"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
@@ -15,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/gender"
 	"github.com/leodip/goiabada/core/locales"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/timezones"
@@ -107,33 +103,10 @@ func HandleAccountProfilePost(
 			return
 		}
 
-		zoneInfoValue := r.FormValue("zoneInfo")
-		zoneInfoCountryName := ""
-		zoneInfo := ""
-
-		if zoneInfoValue != "" {
-			zoneInfoParts := strings.Split(zoneInfoValue, "___")
-			if len(zoneInfoParts) != 2 {
-				httpHelper.InternalServerError(w, r, errs.New("invalid zoneInfo"))
-				return
-			}
-			zoneInfoCountryName = zoneInfoParts[0]
-			zoneInfo = zoneInfoParts[1]
-		}
-
-		// Build API request
-		request := &api.UpdateUserProfileRequest{
-			Username:            strings.TrimSpace(r.FormValue("username")),
-			GivenName:           strings.TrimSpace(r.FormValue("givenName")),
-			MiddleName:          strings.TrimSpace(r.FormValue("middleName")),
-			FamilyName:          strings.TrimSpace(r.FormValue("familyName")),
-			Nickname:            strings.TrimSpace(r.FormValue("nickname")),
-			Website:             strings.TrimSpace(r.FormValue("website")),
-			Gender:              r.FormValue("gender"),
-			DateOfBirth:         strings.TrimSpace(r.FormValue("dateOfBirth")),
-			ZoneInfoCountryName: zoneInfoCountryName,
-			ZoneInfo:            zoneInfo,
-			Locale:              r.FormValue("locale"),
+		request, err := handlerhelpers.ParseProfileForm(r)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
 		}
 
 		// Call API to update
@@ -142,32 +115,7 @@ func HandleAccountProfilePost(
 			// Render validation error retaining input
 			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				// reflect submitted values onto user for display
-				user.Username = request.Username
-				user.GivenName = request.GivenName
-				user.MiddleName = request.MiddleName
-				user.FamilyName = request.FamilyName
-				user.Nickname = request.Nickname
-				user.Website = request.Website
-				user.ZoneInfoCountryName = request.ZoneInfoCountryName
-				user.ZoneInfo = request.ZoneInfo
-				user.Locale = request.Locale
-
-				if len(request.Gender) > 0 {
-					if i, parseErr := strconv.Atoi(request.Gender); parseErr == nil {
-						user.Gender = gender.Gender(i).String()
-					}
-				} else {
-					user.Gender = ""
-				}
-
-				if len(request.DateOfBirth) > 0 {
-					layout := "2006-01-02"
-					if parsed, parseErr := time.Parse(layout, request.DateOfBirth); parseErr == nil {
-						user.BirthDate = &parsed
-					}
-				} else {
-					user.BirthDate = nil
-				}
+				handlerhelpers.EchoProfileForm(user, request)
 
 				bind := map[string]interface{}{
 					"user":      user,

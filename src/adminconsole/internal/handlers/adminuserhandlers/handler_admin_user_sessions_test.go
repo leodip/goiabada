@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
@@ -47,9 +48,10 @@ func (c *userSessionsApiClient) DeleteUserSessionById(_ context.Context, accessT
 	return nil
 }
 
-// The admin-side twin of the account page's case: this handler also rebuilds SessionInfo by hand,
-// so the copy has to be pinned here too. A guard added at one of three call sites and absent from
-// its siblings is exactly the shape a change like this ships with (#281 decision 6).
+// The admin-side twin of the account page's case. The mapping is handlerhelpers.SessionInfos,
+// shared with the account page and tested there (#440); this case pins that this page's rows still
+// come through it. A guard added at one call site and absent from its sibling is exactly the shape
+// a change like this ships with (#281 decision 6).
 func TestHandleAdminUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	const header = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15`
 
@@ -73,15 +75,15 @@ func TestHandleAdminUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 
 	bind := handlertest.Bind(t, httpHelper)
 
-	sessions, ok := bind["sessions"].([]SessionInfo)
+	sessions, ok := bind["sessions"].([]handlerhelpers.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 1)
 	assert.Equal(t, header, sessions[0].UserAgent)
 }
 
 // The admin-side twin of the account page's instants case, for the same reason the user-agent case
-// is written three times: this is the second of three hand-built SessionInfo literals, and a copy
-// dropped from one of them is invisible to every render case (#373).
+// is written on every session page: an instant dropped on the way to the bind is invisible to
+// every render case (#373).
 func TestHandleAdminUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
 	started := time.Date(2026, 9, 14, 21, 3, 0, 0, time.UTC)
 	lastAccessed := time.Date(2026, 9, 17, 8, 45, 0, 0, time.UTC)
@@ -104,7 +106,7 @@ func TestHandleAdminUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
 
 	HandleAdminUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
-	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]SessionInfo)
+	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]handlerhelpers.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 1)
 	require.NotNil(t, sessions[0].Started)
@@ -138,7 +140,7 @@ func TestHandleAdminUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) 
 
 	HandleAdminUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
-	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]SessionInfo)
+	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]handlerhelpers.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 2)
 

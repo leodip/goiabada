@@ -7,9 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlers/accounthandlers"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminclienthandlers"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/countries"
 	"github.com/leodip/goiabada/core/locales"
@@ -184,7 +183,7 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 			name: "account",
 			page: "/account_user_sessions.html",
 			bind: map[string]interface{}{
-				"sessions": []accounthandlers.SessionInfo{{
+				"sessions": []handlerhelpers.SessionInfo{{
 					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: header,
 				}},
@@ -195,7 +194,7 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 			page: "/admin_users_sessions.html",
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"sessions": []adminuserhandlers.SessionInfo{{
+				"sessions": []handlerhelpers.SessionInfo{{
 					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: header,
 				}},
@@ -263,7 +262,7 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 			name: "account",
 			page: "/account_user_sessions.html",
 			bind: map[string]interface{}{
-				"sessions": []accounthandlers.SessionInfo{{
+				"sessions": []handlerhelpers.SessionInfo{{
 					UserSessionId: 1, Started: &started, LastAccessed: &lastAccessed,
 				}},
 			},
@@ -273,7 +272,7 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 			page: "/admin_users_sessions.html",
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"sessions": []adminuserhandlers.SessionInfo{{
+				"sessions": []handlerhelpers.SessionInfo{{
 					UserSessionId: 1, Started: &started, LastAccessed: &lastAccessed,
 				}},
 				"page":  "1",
@@ -354,7 +353,7 @@ func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
 			name: "account",
 			page: "/account_user_sessions.html",
 			bind: map[string]interface{}{
-				"sessions": []accounthandlers.SessionInfo{{
+				"sessions": []handlerhelpers.SessionInfo{{
 					UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: "curl/8.5.0",
 				}},
@@ -366,7 +365,7 @@ func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
 			page: "/admin_users_sessions.html",
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"sessions": []adminuserhandlers.SessionInfo{{
+				"sessions": []handlerhelpers.SessionInfo{{
 					UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: "curl/8.5.0",
 				}},
@@ -445,7 +444,7 @@ func TestRender_SessionPagesPassEveryArgumentEndSessionClickDeclares(t *testing.
 			name: "account",
 			page: "/account_user_sessions.html",
 			bind: map[string]interface{}{
-				"sessions": []accounthandlers.SessionInfo{{
+				"sessions": []handlerhelpers.SessionInfo{{
 					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true,
 				}},
@@ -456,7 +455,7 @@ func TestRender_SessionPagesPassEveryArgumentEndSessionClickDeclares(t *testing.
 			page: "/admin_users_sessions.html",
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"sessions": []adminuserhandlers.SessionInfo{{
+				"sessions": []handlerhelpers.SessionInfo{{
 					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true,
 				}},
@@ -515,7 +514,7 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 			name: "account",
 			page: "/account_manage_consents.html",
 			bind: map[string]interface{}{
-				"consents": []accounthandlers.ConsentInfo{{
+				"consents": []handlerhelpers.ConsentInfo{{
 					ConsentId: 1, Client: "web-app", ClientDescription: "The web app",
 					GrantedAt: &granted, Scope: "openid profile",
 				}},
@@ -526,7 +525,7 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 			page: "/admin_users_consents.html",
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"consents": []adminuserhandlers.ConsentInfo{{
+				"consents": []handlerhelpers.ConsentInfo{{
 					ConsentId: 1, Client: "web-app", ClientDescription: "The web app",
 					GrantedAt: &granted, Scope: "openid profile",
 				}},
@@ -553,7 +552,7 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 // the formatter's own nil answer (#373).
 func TestRender_ConsentPageRendersAMissingGrantedAtAsBlank(t *testing.T) {
 	out := render(t, "/account_manage_consents.html", map[string]interface{}{
-		"consents": []accounthandlers.ConsentInfo{{
+		"consents": []handlerhelpers.ConsentInfo{{
 			ConsentId: 1, Client: "web-app", Scope: "openid",
 		}},
 	})

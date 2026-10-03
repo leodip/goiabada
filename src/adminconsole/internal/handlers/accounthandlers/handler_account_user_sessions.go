@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"sort"
 
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
@@ -41,26 +40,7 @@ func HandleAccountSessionsGet(
 			return
 		}
 
-		sessionInfoArr := []SessionInfo{}
-		for _, es := range sessions {
-			usi := SessionInfo{
-				UserSessionId: es.Id,
-				Started:       es.Started,
-				LastAccessed:  es.LastAccessed,
-				IpAddress:     es.IpAddress,
-				DeviceName:    es.DeviceName,
-				DeviceType:    es.DeviceType,
-				DeviceOS:      es.DeviceOS,
-				UserAgent:     es.UserAgent,
-				Clients:       es.ClientIdentifiers,
-				IsCurrent:     es.IsCurrent,
-			}
-			sessionInfoArr = append(sessionInfoArr, usi)
-		}
-
-		sort.Slice(sessionInfoArr, func(i, j int) bool {
-			return sessionInfoArr[i].UserSessionId > sessionInfoArr[j].UserSessionId
-		})
+		sessionInfoArr := handlerhelpers.SessionInfos(sessions)
 
 		bind := map[string]interface{}{
 			"sessions": sessionInfoArr,
