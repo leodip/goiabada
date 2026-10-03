@@ -28,7 +28,6 @@ func (c *invalidationRecorder) Invalidate() {
 // issuer before it saves, and answers the same one after, so an accepted save takes the ordinary
 // redirect rather than the sign-out an issuer change is.
 type settingsSaveAPI struct {
-	apiclient.ApiClient
 	saveErr error
 }
 
@@ -59,6 +58,16 @@ func (a settingsSaveAPI) UpdateSettingsUITheme(context.Context, string, *api.Upd
 		return nil, a.saveErr
 	}
 	return &api.SettingsUIThemeResponse{}, nil
+}
+
+// The rest of the ports settingsSaveAPI is passed to, which no test here reaches.
+
+func (settingsSaveAPI) GetSettingsEmail(context.Context, string) (*api.SettingsEmailResponse, error) {
+	panic("unexpected call to GetSettingsEmail")
+}
+
+func (settingsSaveAPI) SendTestEmail(context.Context, string, *api.SendTestEmailRequest) error {
+	panic("unexpected call to SendTestEmail")
 }
 
 // The three saves whose values the console itself renders from (the app name, the theme, whether

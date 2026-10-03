@@ -26,7 +26,6 @@ const accountEmailFormPassword = "My-Current-P4ss"
 // emailRecordingApiClient records the email change the handler sent and answers it with refusal,
 // or with success when refusal is nil.
 type emailRecordingApiClient struct {
-	apiclient.ApiClient
 	sent    []*api.UpdateAccountEmailRequest
 	refusal error
 }

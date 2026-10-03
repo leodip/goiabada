@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
@@ -26,79 +25,79 @@ import (
 func TestAccountHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T) {
 	testCases := []struct {
 		name    string
-		build   func(httpHelper *mocks_handlers.HttpHelper, apiClient apiclient.ApiClient) http.HandlerFunc
+		build   func(httpHelper *mocks_handlers.HttpHelper, apiClient *ctxRecordingApiClient) http.HandlerFunc
 		request *http.Request
 	}{
-		{"HandleAccountAddressGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountAddressGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountAddressGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/account/address")},
-		{"HandleAccountAddressPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountAddressPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountAddressPost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/account/address", handlertest.WithForm(url.Values{}))},
-		{"HandleAccountChangePasswordPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountChangePasswordPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountChangePasswordPost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/account/change-password", handlertest.WithForm(url.Values{
 			"currentPassword":         {"P4ss!word"},
 			"newPassword":             {"N3w!P4ssword"},
 			"newPasswordConfirmation": {"N3w!P4ssword"},
 		}))},
-		{"HandleAccountEmailGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountEmailGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountEmailGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/account/email")},
-		{"HandleAccountEmailPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountEmailPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountEmailPost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/account/email",
 			handlertest.WithForm(url.Values{"email": {"jane@example.com"}}))},
-		{"HandleAccountEmailSendVerificationPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountEmailSendVerificationPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountEmailSendVerificationPost(h, c)
 		}, handlertest.Request(http.MethodPost, "/account/email-send-verification")},
-		{"HandleAccountEmailVerificationGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountEmailVerificationGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountEmailVerificationGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/account/email-verification")},
-		{"HandleAccountEmailVerificationPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountEmailVerificationPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountEmailVerificationPost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/account/email-verification",
 			handlertest.WithForm(url.Values{"verificationCode": {"123456"}}))},
-		{"HandleAccountManageConsentsGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountManageConsentsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountManageConsentsGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/account/manage-consents")},
-		{"HandleAccountManageConsentsRevokePost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountManageConsentsRevokePost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountManageConsentsRevokePost(h, c)
 		}, handlertest.Request(http.MethodPost, "/account/manage-consents",
 			handlertest.WithBody(strings.NewReader(`{"consentId":13}`)), handlertest.WithContentType("application/json"))},
-		{"HandleAccountOtpGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountOtpGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountOtpGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/account/otp")},
-		{"HandleAccountOtpPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountOtpPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountOtpPost(h, c)
 		}, handlertest.Request(http.MethodPost, "/account/otp", handlertest.WithForm(url.Values{
 			"password": {"P4ss!word"}, "otp": {"123456"},
 		}))},
-		{"HandleAccountPhoneGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountPhoneGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountPhoneGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/account/phone")},
-		{"HandleAccountPhonePost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountPhonePost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountPhonePost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/account/phone", handlertest.WithForm(url.Values{}))},
-		{"HandleAccountPictureGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountPictureGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountPictureGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/account/picture")},
-		{"HandleAccountProfilePicturePost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountProfilePicturePost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountProfilePicturePost(h, c)
 		}, handlertest.Request(http.MethodPost, "/account/picture")},
-		{"HandleAccountProfilePictureDelete", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountProfilePictureDelete", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountProfilePictureDelete(h, c)
 		}, handlertest.Request(http.MethodDelete, "/account/picture")},
-		{"HandleAccountProfileGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountProfileGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountProfileGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/account/profile")},
-		{"HandleAccountProfilePost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountProfilePost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountProfilePost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/account/profile", handlertest.WithForm(url.Values{}))},
-		{"HandleAccountSessionsGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountSessionsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountSessionsGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/account/sessions")},
-		{"HandleAccountSessionsEndSessionPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAccountSessionsEndSessionPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountSessionsEndSessionPost(h, c)
 		}, handlertest.Request(http.MethodPost, "/account/sessions",
 			handlertest.WithBody(strings.NewReader(`{"userSessionId":31}`)), handlertest.WithContentType("application/json"))},

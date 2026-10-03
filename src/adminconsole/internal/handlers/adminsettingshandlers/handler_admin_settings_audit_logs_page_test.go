@@ -29,7 +29,6 @@ import (
 // empty table under a bar highlighting the last page (#305).
 
 type auditPagingApiClient struct {
-	apiclient.ApiClient
 	total int
 	asked []int
 	// events records the auditEvent filter each call carried, which the
@@ -64,6 +63,16 @@ func (c *auditPagingApiClient) GetAuditEventTypes(_ context.Context, accessToken
 		return nil, c.eventTypesErr
 	}
 	return &api.GetAuditEventTypesResponse{AuditEventTypes: c.eventTypes}, nil
+}
+
+// The rest of the ports auditPagingApiClient is passed to, which no test here reaches.
+
+func (*auditPagingApiClient) GetSettingsAuditLogs(context.Context, string) (*api.SettingsAuditLogsResponse, error) {
+	panic("unexpected call to GetSettingsAuditLogs")
+}
+
+func (*auditPagingApiClient) UpdateSettingsAuditLogs(context.Context, string, *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error) {
+	panic("unexpected call to UpdateSettingsAuditLogs")
 }
 
 // logsOnPage is the slice of a log of total entries that page holds, each

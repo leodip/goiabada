@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
@@ -20,7 +19,6 @@ import (
 // grantOneApiClient answers the reads the four grant-one handlers make, holding the user's or
 // group's current grants, and records the save each hands the API.
 type grantOneApiClient struct {
-	apiclient.ApiClient
 	current   []api.PermissionResponse
 	sentUser  *api.UpdateUserPermissionsRequest
 	sentGroup *api.UpdateGroupPermissionsRequest
@@ -50,6 +48,24 @@ func (c *grantOneApiClient) UpdateUserPermissions(_ context.Context, _ string, _
 func (c *grantOneApiClient) UpdateGroupPermissions(_ context.Context, _ string, _ int64, request *api.UpdateGroupPermissionsRequest) error {
 	c.sentGroup = request
 	return nil
+}
+
+// The rest of the ports grantOneApiClient is passed to, which no test here reaches.
+
+func (*grantOneApiClient) GetAllGroups(context.Context, string) ([]api.GroupResponse, error) {
+	panic("unexpected call to GetAllGroups")
+}
+
+func (*grantOneApiClient) GetUsersByPermission(context.Context, string, int64, int, int) ([]api.UserResponse, int, error) {
+	panic("unexpected call to GetUsersByPermission")
+}
+
+func (*grantOneApiClient) SearchGroupsWithPermissionAnnotation(context.Context, string, int64, int, int) ([]api.GroupWithPermissionResponse, int, error) {
+	panic("unexpected call to SearchGroupsWithPermissionAnnotation")
+}
+
+func (*grantOneApiClient) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
+	panic("unexpected call to SearchUsersWithPermissionAnnotation")
 }
 
 // The resource pages grant or revoke one permission by reading the user's or group's grants,

@@ -21,7 +21,6 @@ import (
 // resourcePermissionsSaveApiClient records the request the save hands the API and answers it with
 // err.
 type resourcePermissionsSaveApiClient struct {
-	apiclient.ApiClient
 	err  error
 	sent *api.UpdateResourcePermissionsRequest
 }
@@ -33,6 +32,12 @@ func (s *resourcePermissionsSaveApiClient) GetResourceById(_ context.Context, _ 
 func (s *resourcePermissionsSaveApiClient) UpdateResourcePermissions(_ context.Context, _ string, _ int64, request *api.UpdateResourcePermissionsRequest) error {
 	s.sent = request
 	return s.err
+}
+
+// The rest of the ports resourcePermissionsSaveApiClient is passed to, which no test here reaches.
+
+func (*resourcePermissionsSaveApiClient) GetPermissionsByResource(context.Context, string, int64) ([]api.PermissionResponse, error) {
+	panic("unexpected call to GetPermissionsByResource")
 }
 
 // serveResourcePermissionsSave posts body to the save through a router, so the resource id reaches

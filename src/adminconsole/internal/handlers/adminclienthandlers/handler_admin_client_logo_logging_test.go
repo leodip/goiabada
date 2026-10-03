@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -25,7 +24,6 @@ import (
 // lookup that is allowed to fail. Separate from stubApiClient so that adding a failing method
 // here cannot change what the redirect-URI cases see.
 type logoApiClient struct {
-	apiclient.ApiClient
 	logoErr error
 }
 
@@ -35,6 +33,16 @@ func (c *logoApiClient) GetClientById(_ context.Context, accessToken string, cli
 
 func (c *logoApiClient) GetClientLogo(_ context.Context, accessToken string, clientId int64) (*api.ClientLogoInfoResponse, error) {
 	return nil, c.logoErr
+}
+
+// The rest of the ports logoApiClient is passed to, which no test here reaches.
+
+func (*logoApiClient) DeleteClientLogo(context.Context, string, int64) error {
+	panic("unexpected call to DeleteClientLogo")
+}
+
+func (*logoApiClient) UploadClientLogo(context.Context, string, int64, []byte, string) (*api.ClientLogoUploadResponse, error) {
+	panic("unexpected call to UploadClientLogo")
 }
 
 // The logo lookup's refusal, which held the last non-snake attribute key in the tree (#320

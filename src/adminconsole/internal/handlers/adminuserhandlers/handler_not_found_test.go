@@ -25,17 +25,21 @@ import (
 // JWT middleware holds, and a 500 from the API is a server fault: both stay 500, and a sweep that
 // turned every InternalServerError in this file into a NotFound would fail here.
 //
-// notFoundUserApiClient answers the one call the handler makes before it decides, and embeds the
-// interface so any other method the handler reaches for panics rather than returning a helpful
-// zero value.
+// notFoundUserApiClient answers the one call the handler makes before it decides. The rest of the
+// ports it is passed to panic, rather than return a helpful zero value.
 type notFoundUserApiClient struct {
-	apiclient.ApiClient
 	entity *api.UserResponse
 	err    error
 }
 
 func (c *notFoundUserApiClient) GetUserById(_ context.Context, accessToken string, id int64) (*api.UserResponse, error) {
 	return c.entity, c.err
+}
+
+// The rest of the ports notFoundUserApiClient is passed to, which no test here reaches.
+
+func (*notFoundUserApiClient) UpdateUserEnabled(context.Context, string, int64, bool) (*api.UserResponse, error) {
+	panic("unexpected call to UpdateUserEnabled")
 }
 
 func TestUser_StaleOrMalformedUrlAnswers404(t *testing.T) {

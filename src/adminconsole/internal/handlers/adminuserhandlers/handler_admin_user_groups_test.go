@@ -19,7 +19,6 @@ import (
 
 // userGroupsSaveApiClient records the request the save hands the API and answers it with err.
 type userGroupsSaveApiClient struct {
-	apiclient.ApiClient
 	err  error
 	sent *api.UpdateUserGroupsRequest
 }
@@ -27,6 +26,16 @@ type userGroupsSaveApiClient struct {
 func (s *userGroupsSaveApiClient) UpdateUserGroups(_ context.Context, _ string, _ int64, request *api.UpdateUserGroupsRequest) (*api.UserResponse, []api.GroupResponse, error) {
 	s.sent = request
 	return nil, nil, s.err
+}
+
+// The rest of the ports userGroupsSaveApiClient is passed to, which no test here reaches.
+
+func (*userGroupsSaveApiClient) GetAllGroups(context.Context, string) ([]api.GroupResponse, error) {
+	panic("unexpected call to GetAllGroups")
+}
+
+func (*userGroupsSaveApiClient) GetUserGroups(context.Context, string, int64) (*api.UserResponse, []api.GroupResponse, error) {
+	panic("unexpected call to GetUserGroups")
 }
 
 // The page posts the set as it loaded it beside the set it wants, and the handler hands both to

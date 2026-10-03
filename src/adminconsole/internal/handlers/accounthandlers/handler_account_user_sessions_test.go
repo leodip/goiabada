@@ -23,11 +23,10 @@ import (
 )
 
 // accountSessionsApiClient answers the read this page performs and the delete its row buttons
-// perform. Its other methods come from the embedded nil interface, so a call this page has no
-// business making panics. Deletes are recorded rather than counted, so a case can say which
-// session was deleted and a case expecting none can say so by asserting the slice is empty.
+// perform, which is the whole of accountSessionsAPI. Deletes are recorded rather than counted, so a
+// case can say which session was deleted and a case expecting none can say so by asserting the
+// slice is empty.
 type accountSessionsApiClient struct {
-	apiclient.ApiClient
 	sessions    []api.UserSessionDetailResponse
 	sessionsErr error
 

@@ -29,12 +29,21 @@ import (
 // explanation in the log. Eight handlers carried that block. The 500 row is what stops a fix from
 // forwarding everything: a server fault still belongs in the log.
 type permissionsApiClient struct {
-	apiclient.ApiClient
 	err error
 }
 
 func (c *permissionsApiClient) UpdateClientPermissions(_ context.Context, accessToken string, clientId int64, request *api.UpdateClientPermissionsRequest) error {
 	return c.err
+}
+
+// The rest of the ports permissionsApiClient is passed to, which no test here reaches.
+
+func (*permissionsApiClient) GetAllResources(context.Context, string) ([]api.ResourceResponse, error) {
+	panic("unexpected call to GetAllResources")
+}
+
+func (*permissionsApiClient) GetClientPermissions(context.Context, string, int64) (*api.ClientResponse, []api.PermissionResponse, error) {
+	panic("unexpected call to GetClientPermissions")
 }
 
 func TestClientPermissionsPost_ForwardsTheApisAnswer(t *testing.T) {

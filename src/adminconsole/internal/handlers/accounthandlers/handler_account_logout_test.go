@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
@@ -24,11 +23,9 @@ import (
 // receive the form instruction and redirect anyway, or it could render a page built from something
 // other than the endpoint and parameters the API sent.
 
-// logoutApiClient answers CreateAccountLogoutRequest from a script and records what it was asked
-// for. The embedded interface means any other call panics naming its method.
+// logoutApiClient answers CreateAccountLogoutRequest, the logout page's one-method port, from a
+// script and records what it was asked for.
 type logoutApiClient struct {
-	apiclient.ApiClient
-
 	form     *api.AccountLogoutFormPostResponse
 	redirect *api.AccountLogoutRedirectResponse
 
@@ -113,8 +110,7 @@ func TestHandleAccountLogoutGet_StillFollowsARedirectResponse(t *testing.T) {
 }
 
 // A visitor missing either the verified ID token or the access token string never reaches the API
-// at all: the embedded interface would panic on the call, so these cases would fail loudly rather
-// than quietly.
+// at all.
 func TestHandleAccountLogoutGet_WithoutTokensGoesHomeWithoutCallingTheAPI(t *testing.T) {
 	testCases := []struct {
 		name string

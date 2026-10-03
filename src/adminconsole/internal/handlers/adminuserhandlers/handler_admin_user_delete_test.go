@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
@@ -18,7 +17,6 @@ import (
 // deleteUserApiClient answers the two reads the confirmation page performs, and records the
 // groups call so a handler that stopped making it is caught by more than an empty bind.
 type deleteUserApiClient struct {
-	apiclient.ApiClient
 	user       *api.UserResponse
 	groups     []api.GroupResponse
 	askedGroup []int64
@@ -33,6 +31,12 @@ func (c *deleteUserApiClient) GetUserGroups(_ context.Context, accessToken strin
 
 	c.askedGroup = append(c.askedGroup, userId)
 	return c.user, c.groups, nil
+}
+
+// The rest of the ports deleteUserApiClient is passed to, which no test here reaches.
+
+func (*deleteUserApiClient) DeleteUser(context.Context, string, int64) error {
+	panic("unexpected call to DeleteUser")
 }
 
 func renderUserDelete(t *testing.T, client *deleteUserApiClient) map[string]interface{} {

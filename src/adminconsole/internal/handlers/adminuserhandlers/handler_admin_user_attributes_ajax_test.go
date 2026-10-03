@@ -31,10 +31,9 @@ import (
 // applied to everything: a missing JWT context is an invariant the JWT middleware holds, and a 500
 // from the API is a server fault. Both stay 500, with the stack and the request id.
 //
-// attributesApiClient answers only the calls these handlers make and embeds the interface, so
-// reaching for anything else panics rather than returning a helpful zero value.
+// attributesApiClient answers only the calls these handlers make. The rest of the ports it is
+// passed to panic, rather than return a helpful zero value.
 type attributesApiClient struct {
-	apiclient.ApiClient
 	user       *api.UserResponse
 	userErr    error
 	attributes []api.UserAttributeResponse
@@ -50,6 +49,16 @@ func (c *attributesApiClient) GetUserAttributesByUserId(_ context.Context, acces
 
 func (c *attributesApiClient) DeleteUserAttribute(_ context.Context, accessToken string, attributeId int64) error {
 	return nil
+}
+
+// The rest of the ports attributesApiClient is passed to, which no test here reaches.
+
+func (*attributesApiClient) DeleteUserConsent(context.Context, string, int64) error {
+	panic("unexpected call to DeleteUserConsent")
+}
+
+func (*attributesApiClient) GetUserConsents(context.Context, string, int64) ([]api.UserConsentResponse, error) {
+	panic("unexpected call to GetUserConsents")
 }
 
 func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) {

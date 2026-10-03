@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
@@ -32,7 +31,6 @@ type settingsCtxMarkerKey struct{}
 // ctxRecordingApiClient records the context every settings method is called with and then refuses,
 // so the handler takes its error path in the same pass.
 type ctxRecordingApiClient struct {
-	apiclient.ApiClient
 	seen []context.Context
 }
 
@@ -141,33 +139,33 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 
 	testCases := []struct {
 		name    string
-		build   func(httpHelper *mocks_handlers.HttpHelper, apiClient apiclient.ApiClient) http.HandlerFunc
+		build   func(httpHelper *mocks_handlers.HttpHelper, apiClient *ctxRecordingApiClient) http.HandlerFunc
 		request *http.Request
 	}{
 		{
 			name: "HandleAdminSettingsAuditLogsGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsAuditLogsGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/audit-logs", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAdminSettingsAuditLogViewerGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsAuditLogViewerGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/audit-logs/viewer", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAdminSettingsEmailGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsEmailGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/email", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAdminSettingsEmailPost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsEmailPost(h, newSettingsTestStore(), c, settingsCache)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/email",
@@ -178,7 +176,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleAdminSettingsEmailSendTestGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsEmailSendTestGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/email/send-test",
@@ -186,7 +184,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleAdminSettingsEmailSendTestPost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsEmailSendTestPost(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/email/send-test",
@@ -196,14 +194,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleAdminSettingsGeneralGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsGeneralGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/general", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAdminSettingsGeneralPost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsGeneralPost(h, newSettingsTestStore(), c, settingsCache)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/general",
@@ -214,14 +212,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleAdminSettingsKeysGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsKeysGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/keys", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAdminSettingsKeysRotatePost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsKeysRotatePost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate",
@@ -229,7 +227,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleAdminSettingsKeysRevokePost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsKeysRevokePost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/keys/revoke",
@@ -237,14 +235,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleAdminSettingsSessionsGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsSessionsGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/sessions", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAdminSettingsSessionsPost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsSessionsPost(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/sessions",
@@ -255,14 +253,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleAdminSettingsTokensGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsTokensGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/tokens", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAdminSettingsTokensPost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsTokensPost(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/tokens",
@@ -274,14 +272,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleAdminSettingsUIThemeGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsUIThemeGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/ui-theme", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAdminSettingsUIThemePost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminSettingsUIThemePost(h, newSettingsTestStore(), c, settingsCache)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/ui-theme",

@@ -18,10 +18,9 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// stubAllClientsApiClient answers both reads the Web Origins page performs. It is separate from
-// stubApiClient next door only because that one stubs GetSettingsGeneral, which this page has no
-// business calling: leaving it embedded and unstubbed means a call to it panics, which is the
-// right outcome for a fetch this page should not be making.
+// stubAllClientsApiClient answers both reads the Web Origins page performs and its write, over
+// stubApiClient next door. The page's port has no GetSettingsGeneral, so a fetch this page should
+// not be making does not compile.
 type stubAllClientsApiClient struct {
 	stubApiClient
 	allClients []api.ClientResponse

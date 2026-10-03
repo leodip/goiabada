@@ -39,12 +39,8 @@ const (
 	accountOTPPath  = "/account/otp"
 )
 
-// stubApiClient embeds apiclient.ApiClient so its other methods come for free, and any of them a
-// test does not stub panics on the nil interface, which is the right outcome for a call the test
-// did not expect.
+// stubApiClient implements accountOTPAPI, the port both OTP handlers take.
 type stubApiClient struct {
-	apiclient.ApiClient
-
 	profile *api.UserResponse
 
 	enrollment    *api.AccountOTPEnrollmentResponse

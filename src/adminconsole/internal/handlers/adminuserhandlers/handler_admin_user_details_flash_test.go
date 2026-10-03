@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
@@ -31,11 +30,16 @@ import (
 
 // flashStubApiClient answers the one call the details GET makes.
 type flashStubApiClient struct {
-	apiclient.ApiClient
 }
 
 func (flashStubApiClient) GetUserById(_ context.Context, accessToken string, id int64) (*api.UserResponse, error) {
 	return &api.UserResponse{Id: id, Email: "someone@example.com"}, nil
+}
+
+// The rest of the ports flashStubApiClient is passed to, which no test here reaches.
+
+func (flashStubApiClient) UpdateUserEnabled(context.Context, string, int64, bool) (*api.UserResponse, error) {
+	panic("unexpected call to UpdateUserEnabled")
 }
 
 // newFlashTestStore is a real store over an in-memory backend, because a flash is only

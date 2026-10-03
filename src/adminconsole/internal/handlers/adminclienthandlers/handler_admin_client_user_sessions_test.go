@@ -26,7 +26,6 @@ import (
 // the per-session user read this page used to make is absent by assertion and not merely by
 // nobody having written a stub for it.
 type clientSessionsApiClient struct {
-	apiclient.ApiClient
 	client      *api.ClientResponse
 	sessions    []api.UserSessionDetailResponse
 	sessionsErr error

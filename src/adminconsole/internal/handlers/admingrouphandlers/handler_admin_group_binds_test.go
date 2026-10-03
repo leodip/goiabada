@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
@@ -26,10 +25,9 @@ import (
 // columns, so a field that stopped arriving renders an empty cell rather than failing. Each case
 // below reads one bind the template cannot do without.
 //
-// groupBindApiClient answers the reads each page performs and embeds the interface, so any other
-// method a handler reached for would panic rather than answer a helpful zero value.
+// groupBindApiClient answers the reads each page performs. The rest of the ports it is passed to
+// panic, rather than answer a helpful zero value.
 type groupBindApiClient struct {
-	apiclient.ApiClient
 	group      *api.GroupResponse
 	attributes []api.GroupAttributeResponse
 }
@@ -42,6 +40,20 @@ func (c *groupBindApiClient) GetGroupAttributesByGroupId(_ context.Context, acce
 	groupId int64) ([]api.GroupAttributeResponse, error) {
 
 	return c.attributes, nil
+}
+
+// The rest of the ports groupBindApiClient is passed to, which no test here reaches.
+
+func (*groupBindApiClient) DeleteGroup(context.Context, string, int64) error {
+	panic("unexpected call to DeleteGroup")
+}
+
+func (*groupBindApiClient) DeleteGroupAttribute(context.Context, string, int64) error {
+	panic("unexpected call to DeleteGroupAttribute")
+}
+
+func (*groupBindApiClient) UpdateGroup(context.Context, string, int64, *api.UpdateGroupRequest) (*api.GroupResponse, error) {
+	panic("unexpected call to UpdateGroup")
 }
 
 func renderGroupPage(t *testing.T, client *groupBindApiClient, target, page string,
