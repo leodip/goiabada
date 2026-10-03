@@ -114,6 +114,7 @@ func HandleAPIAccountEmailPut(
 			return
 		}
 		previousEmail := user.Email
+		previousEmailVerified := user.EmailVerified
 		user.Email = email
 		user.EmailVerified = false
 		user.EmailVerificationCodeEncrypted = nil
@@ -130,13 +131,20 @@ func HandleAPIAccountEmailPut(
 		resp := api.UpdateUserResponse{User: *apimapping.ToUserResponse(user)}
 		writeJSON(w, r, http.StatusOK, resp)
 
-		notifyPreviousAddress(r, pageRenderer, emailSender, afterResponse, previousEmail, user)
+		// Only a verified address is told. Any caller may set an address they do not hold and then
+		// change away from it, so an unverified one would let them mail any address on demand, one
+		// password-checked request per message. An address is verified only with a code read from
+		// its own mailbox, and every change clears the flag, so each notice costs a code read from
+		// the address it goes to (#404).
+		if previousEmailVerified {
+			notifyPreviousAddress(r, pageRenderer, emailSender, afterResponse, previousEmail, user)
+		}
 	}
 }
 
 // notifyPreviousAddress tells the address the account had that it was changed, which is what warns
-// an account holder whose password was stolen (#404 decisions 9 and 11). It is sent only when SMTP
-// is enabled, and after the response, so the change neither waits for the mail nor fails with it:
+// an account holder whose password was stolen (#404 decisions 9 and 11). It is sent only to a
+// verified address, which the caller decides, and only when SMTP is enabled, and after the response, so the change neither waits for the mail nor fails with it:
 // a notice that cannot be rendered or sent is an Error record on the request's id, and writes no
 // audit entry of its own.
 //

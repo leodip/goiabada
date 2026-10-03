@@ -445,6 +445,28 @@ func TestHandleAPIAccountEmailPut_SendsNoNoticeWithSMTPOff(t *testing.T) {
 	assert.Empty(t, jobs.jobs, "with SMTP off there is no notice to send")
 }
 
+// TestHandleAPIAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress is the notice's bound: an
+// address the account never verified is told nothing, because a caller may set any address they
+// do not hold and change away from it again, which would otherwise mail that address once per
+// request. The change itself is saved and answered as any other.
+func TestHandleAPIAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+	jobs := &heldJobs{}
+	user := changingUser(t, "en")
+	user.EmailVerified = false
+	stubSuccessfulChange(t, database, auditLogger, user)
+
+	rr := httptest.NewRecorder()
+	accountEmailHandler(t, database, auditLogger, &countingCredentials{}, jobs).ServeHTTP(rr, changeToNewAddress(t))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var resp api.UpdateUserResponse
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+	assert.Equal(t, "new@example.com", resp.User.Email)
+	assert.Empty(t, jobs.jobs, "an unverified previous address is sent no notice")
+}
+
 // TestHandleAPIAccountEmailPut_AFailedNoticeIsAnErrorRecordAndNothingElse is #404 decision 11: a
 // notice that cannot be rendered or sent never fails or undoes the change, which was answered 200
 // before the job ran. It is one Error record on the request's id, and no audit entry of its own.
