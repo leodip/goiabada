@@ -1381,6 +1381,8 @@ func codeHashOf(t *testing.T, code string) string {
 func createUserWithResetCode(t *testing.T) (*models.User, string) {
 	t.Helper()
 	user := createTestUser(t)
+	// Enabled, because the claim requires it (#404) and createTestUser randomises it.
+	user.Enabled = true
 	hash := codeHashOf(t, fake.UUID())
 	user.ForgotPasswordCodeEncrypted = []byte("PENDINGRESETCODE")
 	user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
@@ -1812,6 +1814,288 @@ func TestTryConsumeForgotPasswordCode_ConcurrentCallersProduceOneWinner(t *testi
 				round, reloaded.ForgotPasswordCodeHash)
 		}
 	}
+}
+
+// TestTryConsumeForgotPasswordCode_ADisabledAccountIsNotReset is decision 2's last write: an
+// administrator disables the account after the reset handler read it and before the password
+// write. The claim matches no row, so no password is set on a disabled account and the code
+// stays outstanding, refused at every step while the account is disabled (#404).
+func TestTryConsumeForgotPasswordCode_ADisabledAccountIsNotReset(t *testing.T) {
+	user, hash := createUserWithResetCode(t)
+	passwordBefore := passwordHashStored(t, user.Id)
+
+	disabled, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, true, false)
+	if err != nil || !disabled {
+		t.Fatalf("the concurrent disable must take effect: disabled=%v err=%v", disabled, err)
+	}
+
+	claimed, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, user.Id, hash, "passwordondisabled")
+	if err != nil {
+		t.Fatalf("a claim on a disabled account errored rather than reporting false: %v", err)
+	}
+	if claimed {
+		t.Error("a claim on a disabled account must report false")
+	}
+
+	after, err := database.GetUserById(context.Background(), nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload user: %v", err)
+	}
+	if after.PasswordHash != passwordBefore {
+		t.Errorf("PasswordHash = %q, want it unchanged at %q: a disabled account was given a password",
+			after.PasswordHash, passwordBefore)
+	}
+	if after.ForgotPasswordCodeHash != hash {
+		t.Errorf("the refused claim cleared the code hash, got %q want %q", after.ForgotPasswordCodeHash, hash)
+	}
+	if after.Enabled {
+		t.Error("the refused claim re-enabled the account")
+	}
+}
+
+func passwordHashStored(t *testing.T, userId int64) string {
+	t.Helper()
+	user, err := database.GetUserById(context.Background(), nil, userId)
+	if err != nil {
+		t.Fatalf("Failed to reload user: %v", err)
+	}
+	return user.PasswordHash
+}
+
+// createRecoverableTestUser returns a saved user forgot-password may issue a code to: enabled,
+// with a verified address and no code outstanding. createTestUser randomises the first two, so
+// a test relying on them would pass or fail by coin toss.
+func createRecoverableTestUser(t *testing.T) *models.User {
+	t.Helper()
+	user := createTestUser(t)
+	user.Enabled = true
+	user.EmailVerified = true
+	user.ForgotPasswordCodeEncrypted = nil
+	user.ForgotPasswordCodeIssuedAt = sql.NullTime{}
+	user.ForgotPasswordCodeHash = ""
+	if err := database.UpdateUser(context.Background(), nil, user); err != nil {
+		t.Fatalf("Failed to seed a recoverable user: %v", err)
+	}
+	return user
+}
+
+// TestTryStoreForgotPasswordCode is the conditional store forgot-password issues a code
+// through: it takes effect on an enabled account whose verified address is still the one the
+// request looked up, writes the three code columns and nothing else, and declines on every
+// other row without touching it (#404 decision 2).
+func TestTryStoreForgotPasswordCode(t *testing.T) {
+	codeEncrypted := []byte("ENCRYPTEDRESETCODE")
+	issuedAt := time.Now().UTC().Truncate(time.Microsecond)
+
+	t.Run("an enabled account with a verified address takes the code and nothing else", func(t *testing.T) {
+		user := createRecoverableTestUser(t)
+		before, err := database.GetUserById(context.Background(), nil, user.Id)
+		if err != nil {
+			t.Fatalf("Failed to reload user: %v", err)
+		}
+		hash := codeHashOf(t, fake.UUID())
+
+		stored, err := database.TryStoreForgotPasswordCode(context.Background(), nil, user.Id, user.Email,
+			codeEncrypted, hash, issuedAt)
+		if err != nil {
+			t.Fatalf("TryStoreForgotPasswordCode failed: %v", err)
+		}
+		if !stored {
+			t.Fatal("the store must take effect on an enabled account with a verified address")
+		}
+
+		after, err := database.GetUserById(context.Background(), nil, user.Id)
+		if err != nil {
+			t.Fatalf("Failed to reload user: %v", err)
+		}
+		if after.ForgotPasswordCodeHash != hash {
+			t.Errorf("ForgotPasswordCodeHash = %q, want %q", after.ForgotPasswordCodeHash, hash)
+		}
+		// Every other column is as it was, the code's encrypted form and issued-at aside.
+		expected := *before
+		expected.ForgotPasswordCodeEncrypted = codeEncrypted
+		expected.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: issuedAt, Valid: true}
+		compareUsers(t, &expected, after)
+		if !after.ForgotPasswordCodeIssuedAt.Valid {
+			t.Error("the issued-at must be stored as a value, not NULL")
+		}
+
+		// And the link finds it.
+		found, err := database.GetUserByForgotPasswordCodeHash(context.Background(), nil, hash)
+		if err != nil || found == nil || found.Id != user.Id {
+			t.Errorf("the stored hash must find the user it was stored on: found=%v err=%v", found, err)
+		}
+	})
+
+	declines := []struct {
+		name   string
+		mutate func(t *testing.T, user *models.User) string
+	}{
+		{
+			name: "a disabled account",
+			mutate: func(t *testing.T, user *models.User) string {
+				disabled, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, true, false)
+				if err != nil || !disabled {
+					t.Fatalf("the disable must take effect: disabled=%v err=%v", disabled, err)
+				}
+				return user.Email
+			},
+		},
+		{
+			// SetUserEmail clears the verified flag, which is the route by which an address
+			// stops being verified; it is the email change landing under the request.
+			name: "an address no longer verified",
+			mutate: func(t *testing.T, user *models.User) string {
+				fresh, err := database.GetUserById(context.Background(), nil, user.Id)
+				if err != nil {
+					t.Fatalf("Failed to reload user: %v", err)
+				}
+				fresh.EmailVerified = false
+				if updateErr := database.UpdateUser(context.Background(), nil, fresh); updateErr != nil {
+					t.Fatalf("Failed to clear the verified flag: %v", updateErr)
+				}
+				return user.Email
+			},
+		},
+		{
+			// The address changed and was verified again before the store: the mail would go
+			// to the address the request looked up, which is no longer the account's.
+			name: "an account re-addressed and verified again",
+			mutate: func(t *testing.T, user *models.User) string {
+				looked := user.Email
+				if err := database.SetUserEmail(context.Background(), nil, user.Id, "moved_"+fake.Email()); err != nil {
+					t.Fatalf("SetUserEmail failed: %v", err)
+				}
+				fresh, err := database.GetUserById(context.Background(), nil, user.Id)
+				if err != nil {
+					t.Fatalf("Failed to reload user: %v", err)
+				}
+				fresh.EmailVerified = true
+				if updateErr := database.UpdateUser(context.Background(), nil, fresh); updateErr != nil {
+					t.Fatalf("Failed to verify the new address: %v", updateErr)
+				}
+				return looked
+			},
+		},
+	}
+
+	for _, tc := range declines {
+		t.Run("declines on "+tc.name, func(t *testing.T) {
+			user := createRecoverableTestUser(t)
+			lookedUpEmail := tc.mutate(t, user)
+
+			before, err := database.GetUserById(context.Background(), nil, user.Id)
+			if err != nil {
+				t.Fatalf("Failed to reload user: %v", err)
+			}
+
+			stored, err := database.TryStoreForgotPasswordCode(context.Background(), nil, user.Id, lookedUpEmail,
+				codeEncrypted, codeHashOf(t, fake.UUID()), issuedAt)
+			if err != nil {
+				t.Fatalf("a declined store errored rather than reporting false: %v", err)
+			}
+			if stored {
+				t.Error("the store must report false")
+			}
+
+			after, err := database.GetUserById(context.Background(), nil, user.Id)
+			if err != nil {
+				t.Fatalf("Failed to reload user: %v", err)
+			}
+			compareUsers(t, before, after)
+			if after.ForgotPasswordCodeHash != "" {
+				t.Errorf("a declined store wrote the code hash %q", after.ForgotPasswordCodeHash)
+			}
+		})
+	}
+
+	t.Run("guards", func(t *testing.T) {
+		user := createRecoverableTestUser(t)
+		if _, err := database.TryStoreForgotPasswordCode(context.Background(), nil, 0, user.Email,
+			codeEncrypted, codeHashOf(t, fake.UUID()), issuedAt); err == nil {
+			t.Error("a zero user id must return an error")
+		}
+		// '' is the dormant value meaning no code outstanding, so storing it beside an
+		// encrypted code would leave a code no link can ever find.
+		if _, err := database.TryStoreForgotPasswordCode(context.Background(), nil, user.Id, user.Email,
+			codeEncrypted, "", issuedAt); err == nil {
+			t.Error("an empty code hash must return an error")
+		}
+		after, err := database.GetUserById(context.Background(), nil, user.Id)
+		if err != nil {
+			t.Fatalf("Failed to reload user: %v", err)
+		}
+		if len(after.ForgotPasswordCodeEncrypted) != 0 || after.ForgotPasswordCodeHash != "" {
+			t.Error("a guarded call must not touch the row")
+		}
+	})
+}
+
+// TestTryStoreForgotPasswordCode_AConcurrentDisableAndPasswordChangeSurvive is the hazard the
+// narrow write replaces. Forgot-password loads the user at the start of the request and used to
+// write that snapshot back with the code on it, which re-enabled an account an administrator
+// disabled under it and put back a password hash a concurrent change had replaced (#404
+// decision 2, the hazard #106 decision 14 removed elsewhere).
+func TestTryStoreForgotPasswordCode_AConcurrentDisableAndPasswordChangeSurvive(t *testing.T) {
+	t.Run("a disable lands under the request", func(t *testing.T) {
+		user := createRecoverableTestUser(t)
+		snapshot, err := database.GetUserByEmail(context.Background(), nil, user.Email)
+		if err != nil || snapshot == nil {
+			t.Fatalf("Failed to load the request-start snapshot: %v", err)
+		}
+
+		disabled, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, true, false)
+		if err != nil || !disabled {
+			t.Fatalf("the concurrent disable must take effect: disabled=%v err=%v", disabled, err)
+		}
+
+		stored, err := database.TryStoreForgotPasswordCode(context.Background(), nil, snapshot.Id, snapshot.Email,
+			[]byte("ENCRYPTEDRESETCODE"), codeHashOf(t, fake.UUID()), time.Now().UTC())
+		if err != nil {
+			t.Fatalf("TryStoreForgotPasswordCode failed: %v", err)
+		}
+		if stored {
+			t.Error("a code was stored on an account disabled under the request")
+		}
+
+		after, err := database.GetUserById(context.Background(), nil, user.Id)
+		if err != nil {
+			t.Fatalf("Failed to reload user: %v", err)
+		}
+		if after.Enabled {
+			t.Error("forgot-password re-enabled an account an administrator disabled under it")
+		}
+		if after.ForgotPasswordCodeHash != "" {
+			t.Errorf("a code hash %q was stored on the disabled account", after.ForgotPasswordCodeHash)
+		}
+	})
+
+	t.Run("a password change lands under the request", func(t *testing.T) {
+		user := createRecoverableTestUser(t)
+		snapshot, err := database.GetUserByEmail(context.Background(), nil, user.Email)
+		if err != nil || snapshot == nil {
+			t.Fatalf("Failed to load the request-start snapshot: %v", err)
+		}
+
+		if setErr := database.SetUserPasswordHash(context.Background(), nil, user.Id, "hash-set-meanwhile"); setErr != nil {
+			t.Fatalf("the concurrent password change failed: %v", setErr)
+		}
+
+		stored, err := database.TryStoreForgotPasswordCode(context.Background(), nil, snapshot.Id, snapshot.Email,
+			[]byte("ENCRYPTEDRESETCODE"), codeHashOf(t, fake.UUID()), time.Now().UTC())
+		if err != nil || !stored {
+			t.Fatalf("the store must still take effect on the enabled account: stored=%v err=%v", stored, err)
+		}
+
+		after, err := database.GetUserById(context.Background(), nil, user.Id)
+		if err != nil {
+			t.Fatalf("Failed to reload user: %v", err)
+		}
+		if after.PasswordHash != "hash-set-meanwhile" {
+			t.Errorf("PasswordHash = %q, want the concurrent change's %q: forgot-password put the old password back",
+				after.PasswordHash, "hash-set-meanwhile")
+		}
+	})
 }
 
 // TestGetUserByEmailIsCaseSensitive holds the sign-in lookup to one meaning on four

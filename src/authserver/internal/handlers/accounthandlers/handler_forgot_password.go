@@ -40,7 +40,19 @@ func HandleForgotPasswordGet(
 // code.
 type forgotPasswordDatabase interface {
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+	TryStoreForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte,
+		codeHash string, issuedAt time.Time) (bool, error)
+}
+
+// canRecoverPassword reports whether forgot-password may mail a reset link to this account:
+// only to an address the account has proven, and only while it is enabled (#404 decisions 1
+// and 2). Every other account is answered exactly as an address with no account is.
+//
+// Only issuance reads verification. Redeeming a link checks the account is enabled and not
+// whether its address is verified, so the administrator's setup link, issued to a new user's
+// possibly unverified address, keeps working.
+func canRecoverPassword(user *models.User) bool {
+	return user.Enabled && user.EmailVerified
 }
 
 func HandleForgotPasswordPost(
@@ -76,7 +88,7 @@ func HandleForgotPasswordPost(
 			return
 		}
 
-		if user != nil {
+		if user != nil && canRecoverPassword(user) {
 
 			verificationCode := stringutil.GenerateSecurityRandomString(32)
 			verificationCodeEncrypted, resetEmailErr := dataCipher.Encrypt(verificationCode)
@@ -90,13 +102,20 @@ func HandleForgotPasswordPost(
 			// proves a submitted code matches, where the hash only locates the row.
 			verificationCodeHash := hashutil.HashString(verificationCode)
 
-			user.ForgotPasswordCodeEncrypted = verificationCodeEncrypted
-			user.ForgotPasswordCodeHash = verificationCodeHash
-			utcNow := time.Now().UTC()
-			user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
-			resetEmailErr = database.UpdateUser(r.Context(), nil, user)
+			// Narrow and conditional rather than writing back the row loaded above, which
+			// carried enabled and would re-enable an account an administrator disabled
+			// meanwhile. The store takes effect only while the account is still enabled and
+			// its address still verified and still the one looked up; when it declines, the
+			// request is answered as one for an address with no account and nothing is
+			// mailed (#404 decision 2).
+			stored, resetEmailErr := database.TryStoreForgotPasswordCode(r.Context(), nil, user.Id, user.Email,
+				verificationCodeEncrypted, verificationCodeHash, time.Now().UTC())
 			if resetEmailErr != nil {
 				pageRenderer.InternalServerError(w, r, resetEmailErr)
+				return
+			}
+			if !stored {
+				renderForgotPasswordLinkSent(pageRenderer, w, r)
 				return
 			}
 
@@ -128,14 +147,18 @@ func HandleForgotPasswordPost(
 			}
 		}
 
-		bind := map[string]interface{}{
-			"linkSent": true,
-		}
+		renderForgotPasswordLinkSent(pageRenderer, w, r)
+	}
+}
 
-		err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
+// renderForgotPasswordLinkSent is the one answer to a well-formed request, whatever became of it,
+// so the page itself does not tell an address with no account from one that was mailed.
+func renderForgotPasswordLinkSent(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request) {
+	bind := map[string]interface{}{
+		"linkSent": true,
+	}
+
+	if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind); err != nil {
+		pageRenderer.InternalServerError(w, r, err)
 	}
 }

@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -64,11 +66,14 @@ func createResetTestUser(t *testing.T, email string) (*models.User, string) {
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 
+	// Verified, because recovery goes only to an address the account has proven (#404
+	// decision 1): an unverified one is sent nothing.
 	user := &models.User{
-		Subject:      fake.UUID(),
-		Enabled:      true,
-		Email:        email,
-		PasswordHash: passwordHashed,
+		Subject:       fake.UUID(),
+		Enabled:       true,
+		Email:         email,
+		EmailVerified: true,
+		PasswordHash:  passwordHashed,
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 	return user, password
@@ -77,6 +82,12 @@ func createResetTestUser(t *testing.T, email string) (*models.User, string) {
 // requestPasswordReset drives POST /forgot-password, which is what issues the code and sends
 // the email.
 func requestPasswordReset(t *testing.T, client *http.Client, email string) {
+	t.Helper()
+	_ = requestPasswordResetPage(t, client, email)
+}
+
+// requestPasswordResetPage is requestPasswordReset returning the page it was answered with.
+func requestPasswordResetPage(t *testing.T, client *http.Client, email string) string {
 	t.Helper()
 
 	target := appConfig.AuthServer.BaseURL + "/forgot-password"
@@ -91,6 +102,7 @@ func requestPasswordReset(t *testing.T, client *http.Client, email string) {
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
+	return bodyString(t, resp)
 }
 
 var resetLinkPattern = regexp.MustCompile(`https?://[^"'<>\s]+/reset-password[^"'<>\s]*`)
@@ -554,4 +566,141 @@ func TestResetPassword_OneCopiedMarkerLeavesExactlyOnePasswordChange(t *testing.
 		"the winner's password must be the one that stands")
 	assert.False(t, passwordhash.Verify(after, secondPassword),
 		"the second submission of one marker must not overwrite the first")
+}
+
+// linkSentText is the modal the forgot-password page shows once a request is accepted, whatever
+// became of it. Cut before the apostrophe, which the page's script escapes.
+const linkSentText = "a password reset link has been sent to your email address."
+
+// Recovery goes only to a verified address on an enabled account. An unverified address and a
+// disabled account are answered as an address with no account is, and nothing is mailed or
+// stored for them (#404 decisions 1 and 2). The live account beside them is the positive
+// control: without it, mail not arriving could mean SMTP was never on.
+func TestForgotPassword_SendsNothingUnlessTheAddressIsVerifiedAndTheAccountEnabled(t *testing.T) {
+	useMailpitSMTP(t)
+
+	unknown := plusAddress()
+	unverifiedEmail := plusAddress()
+	unverified, _ := createResetTestUser(t, unverifiedEmail)
+	unverified.EmailVerified = false
+	require.NoError(t, database.UpdateUser(context.Background(), nil, unverified))
+
+	disabledEmail := plusAddress()
+	disabled, _ := createResetTestUser(t, disabledEmail)
+	flipped, err := database.TrySetUserEnabled(context.Background(), nil, disabled.Id, true, false)
+	require.NoError(t, err)
+	require.True(t, flipped)
+
+	liveEmail := plusAddress()
+	createResetTestUser(t, liveEmail)
+
+	client := createHttpClient(t)
+	unknownPage := requestPasswordResetPage(t, client, unknown)
+	assert.Contains(t, unknownPage, linkSentText)
+
+	for _, tc := range []struct {
+		name  string
+		email string
+		user  *models.User
+	}{
+		{name: "an unverified address", email: unverifiedEmail, user: unverified},
+		{name: "a disabled account", email: disabledEmail, user: disabled},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			page := requestPasswordResetPage(t, client, tc.email)
+			assert.Contains(t, page, linkSentText, "answered as an address with no account is")
+
+			stored, err := database.GetUserById(context.Background(), nil, tc.user.Id)
+			require.NoError(t, err)
+			assert.Empty(t, stored.ForgotPasswordCodeHash, "no reset code may be stored")
+			assert.Empty(t, stored.ForgotPasswordCodeEncrypted, "no reset code may be stored")
+		})
+	}
+
+	requestPasswordReset(t, client, liveEmail)
+	require.NotEmpty(t, emailedResetLinks(t, liveEmail), "the live account is mailed, so SMTP was on")
+
+	assert.Empty(t, emailedResetLinks(t, unverifiedEmail), "an unverified address must be sent nothing")
+	assert.Empty(t, emailedResetLinks(t, disabledEmail), "a disabled account must be sent nothing")
+}
+
+// failedResetReasonsFor returns the reasons of every failed_reset_password_code record naming a
+// user, which is where a refusal's cause is visible, since the page is the same for all of them.
+func failedResetReasonsFor(t *testing.T, userId int64) []string {
+	t.Helper()
+
+	adminToken, _ := createAdminClientWithToken(t)
+	logs, resp := getAuditLogs(t, adminToken, "auditEvent="+audit.AuditFailedResetPasswordCode+"&size=200")
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	reasons := []string{}
+	for _, entry := range logs.AuditLogs {
+		var details map[string]interface{}
+		if err := json.Unmarshal([]byte(entry.Details), &details); err != nil {
+			continue
+		}
+		if id, ok := details["userId"].(float64); ok && int64(id) == userId {
+			reason, _ := details["reason"].(string)
+			reasons = append(reasons, reason)
+		}
+	}
+	return reasons
+}
+
+// A reset link stops working the moment its account is disabled, at each of the three steps,
+// and the refusal is the one every dead link gets (#404 decision 2). The steps are reached in
+// order on one browser, so each refusal is of a link that was live a moment before.
+func TestResetPassword_DisablingTheAccountStopsTheLinkAtEveryStep(t *testing.T) {
+	useMailpitSMTP(t)
+	requireDatabaseAuditLogs(t)
+
+	setEnabled := func(t *testing.T, userId int64, enabled bool) {
+		t.Helper()
+		flipped, err := database.TrySetUserEnabled(context.Background(), nil, userId, !enabled, enabled)
+		require.NoError(t, err)
+		require.True(t, flipped)
+	}
+
+	email := plusAddress()
+	user, oldPassword := createResetTestUser(t, email)
+	hashBefore := passwordHashOf(t, user.Id)
+
+	client := createHttpClient(t)
+	requestPasswordReset(t, client, email)
+	link := latestResetLink(t, email)
+
+	// 1. Following the emailed link.
+	setEnabled(t, user.Id, false)
+	resp := loadPage(t, client, link)
+	body := bodyString(t, resp)
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "the first hop keeps its 200, as for every dead link")
+	assert.Contains(t, body, resetCodeInvalidText)
+
+	// 2. Rendering the form, from a marker set while the account was enabled.
+	setEnabled(t, user.Id, true)
+	cleanURL := followResetLink(t, client, link)
+	continuationId := loadResetForm(t, client, cleanURL)
+
+	setEnabled(t, user.Id, false)
+	resp = loadPage(t, client, cleanURL)
+	body = bodyString(t, resp)
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, body, resetCodeInvalidText)
+	assert.NotContains(t, body, `name="password"`)
+
+	// 3. Submitting the form.
+	resp = postCleanReset(t, client, cleanURL, "N3wP4ss!word", continuationId)
+	body = bodyString(t, resp)
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Contains(t, body, resetCodeInvalidText)
+
+	assert.Equal(t, hashBefore, passwordHashOf(t, user.Id), "a disabled account must not be given a password")
+	assert.True(t, passwordhash.Verify(passwordHashOf(t, user.Id), oldPassword))
+
+	assert.Equal(t, []string{"account_disabled", "account_disabled", "account_disabled"},
+		failedResetReasonsFor(t, user.Id), "each refused step is audited with the reason account_disabled")
 }

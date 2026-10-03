@@ -913,7 +913,8 @@ func (d *Database) SetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, e
 //
 // **A false return is not proof of replay**, the same imprecision MarkCodeAsUsed
 // documents: the code may have been consumed already, cleared by an unrelated password
-// change, superseded by a newly issued one, or the user row may be gone. The caller
+// change, superseded by a newly issued one, the account may have been disabled, or the user
+// row may be gone. The caller
 // responds identically in all of them.
 //
 // Separate from SetUserPasswordHash rather than a fourth parameter on it: its other two
@@ -944,9 +945,12 @@ func (d *Database) TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx,
 		"forgot_password_code_hash = ''",
 		ub.Assign("updated_at", time.Now().UTC()),
 	)
+	// enabled is in the predicate so a disable landing between the reset handler's read and
+	// this write refuses the reset instead of setting a password (#404 decision 2).
 	ub.Where(
 		ub.Equal("id", userId),
 		ub.Equal("forgot_password_code_hash", codeHash),
+		ub.Equal("enabled", true),
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
@@ -964,6 +968,60 @@ func (d *Database) TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx,
 	// predicate requires a non-empty hash and the SET clears it to '', so the row always
 	// changes and MySQL's changed-rows accounting agrees with matched rows. That is the
 	// trap RevokeCodesBySessionIdentifier documents, and it does not bite here.
+	return rowsAffected == 1, nil
+}
+
+// TryStoreForgotPasswordCode stores an issued reset code (its encrypted form, the hash the
+// link finds it by, and when it was issued) only while the account is still enabled, its
+// address still verified and still the one the request looked up, reporting whether it did.
+//
+// Narrow for SetUserEmail's reason: forgot-password used to write back the whole row it loaded
+// at the start of the request, which re-enabled an account an administrator disabled meanwhile.
+// Conditional so that the same disable, an address change or anything else that unverified the
+// address since the lookup leaves the row untouched and the request mails nothing (#404
+// decision 2). A false return does not say which of them happened.
+func (d *Database) TryStoreForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, email string,
+	codeEncrypted []byte, codeHash string, issuedAt time.Time) (bool, error) {
+
+	if userId == 0 {
+		return false, errs.New("can't store a forgot password code for user with id 0")
+	}
+	// '' is the dormant value meaning no code outstanding, so a code stored with it could
+	// never be found by its link.
+	if codeHash == "" {
+		return false, errs.New("can't store an empty forgot password code hash")
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(
+		ub.Assign("forgot_password_code_encrypted", codeEncrypted),
+		ub.Assign("forgot_password_code_hash", codeHash),
+		ub.Assign("forgot_password_code_issued_at", issuedAt),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	// Bound Go bools, as TrySetUserEnabled does against users.enabled.
+	ub.Where(
+		ub.Equal("id", userId),
+		ub.Equal("email", email),
+		ub.Equal("enabled", true),
+		ub.Equal("email_verified", true),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to store forgot password code")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errs.Wrap(err, "unable to get rows affected when storing forgot password code")
+	}
+
+	// rowsAffected == 1 means the row was stored on all four engines: a fresh code's hash
+	// always differs from whatever the row carried, so the row always changes and MySQL's
+	// changed-rows accounting agrees with matched rows.
 	return rowsAffected == 1, nil
 }
 
