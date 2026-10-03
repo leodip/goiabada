@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -17,7 +18,7 @@ import (
 // accountEmailDatabase is what the account email endpoints need: the caller's own user row.
 type accountEmailDatabase interface {
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+	SetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string) error
 }
 
 // accountEmailValidator is the self-service change check: the address rules, and that no other
@@ -71,16 +72,17 @@ func HandleAPIAccountEmailPut(
 			return
 		}
 
-		// Apply updates
+		// A narrow write, not the row loaded above: writing that back would undo a concurrent
+		// disable, password change or OTP change (#404).
+		if err := database.SetUserEmail(r.Context(), nil, user.Id, email); err != nil {
+			writeEmailTakenOrInternalServerError(w, r, err)
+			return
+		}
 		user.Email = email
 		user.EmailVerified = false
 		user.EmailVerificationCodeEncrypted = nil
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
-
-		if err := database.UpdateUser(r.Context(), nil, user); err != nil {
-			writeEmailTakenOrInternalServerError(w, r, err)
-			return
-		}
+		user.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 		// Audit
 		auditLogger.Log(r.Context(), audit.AuditUpdatedOwnEmail, map[string]interface{}{

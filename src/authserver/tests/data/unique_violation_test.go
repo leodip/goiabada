@@ -73,6 +73,25 @@ func TestUpdateUser_DuplicateEmailIsErrUniqueViolation(t *testing.T) {
 	}
 }
 
+// TestSetUserEmail_DuplicateEmailIsErrUniqueViolation is the same refusal through the narrow
+// write the self-service email PUT saves with since #404, which answers a lost race 409 only if
+// it arrives tagged here too.
+func TestSetUserEmail_DuplicateEmailIsErrUniqueViolation(t *testing.T) {
+	first := createTestUser(t)
+	defer func() { _ = database.DeleteUser(context.Background(), nil, first.Id) }()
+	second := createTestUser(t)
+	defer func() { _ = database.DeleteUser(context.Background(), nil, second.Id) }()
+
+	err := database.SetUserEmail(context.Background(), nil, second.Id, first.Email)
+	if err == nil {
+		t.Fatal("a user was moved onto a taken email; users.email is supposed to be unique")
+	}
+	if !errors.Is(err, data.ErrUniqueViolation) {
+		t.Errorf("errors.Is(err, data.ErrUniqueViolation) = false for SetUserEmail on this engine, "+
+			"so the account email PUT cannot answer 409 here; err = %v", err)
+	}
+}
+
 // TestCreateWebOrigin_ADuplicateOriginIsErrUniqueViolation is what the web-origin save's 409 rests
 // on. web_origins carries a unique index on (origin, client_id), so two saves of one client adding
 // the same origin at the same moment end with the engine refusing the second insert, and the save
