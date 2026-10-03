@@ -20,8 +20,18 @@ import (
 
 // Jobs runs jobs after their responses and counts the ones in flight. The zero value is not used;
 // New builds one, and the server holds the one the routes hand to their handlers.
+//
+// A count and a channel rather than a sync.WaitGroup, because a WaitGroup can only be waited on by
+// blocking: Wait had to start a goroutine to do it and race that goroutine against its timer, so
+// with nothing in flight a short timeout could win and report jobs left over that did not exist,
+// which is how CI saw Wait(time.Millisecond) answer false, and every timeout leaked the goroutine.
+// Here nothing in flight is read under the lock and answered without the clock (#404).
 type Jobs struct {
-	running sync.WaitGroup
+	mu       sync.Mutex
+	inFlight int
+	// idle is closed when inFlight falls to zero, and replaced by an open one when it next rises
+	// from zero. It is only meaningful while inFlight is above zero.
+	idle chan struct{}
 }
 
 func New() *Jobs {
@@ -40,9 +50,9 @@ func New() *Jobs {
 // panic would end the process. It is recovered here as one Error record on the request's id.
 func (j *Jobs) Go(ctx context.Context, job func(ctx context.Context)) {
 	jobCtx := context.WithoutCancel(ctx)
-	j.running.Add(1)
+	j.started()
 	go func() {
-		defer j.running.Done()
+		defer j.finished()
 		defer func() {
 			if recovered := recover(); recovered != nil {
 				slog.ErrorContext(jobCtx, "a job run after its response panicked",
@@ -60,15 +70,40 @@ func (j *Jobs) Go(ctx context.Context, job func(ctx context.Context)) {
 // while it waits (#404 decision 8). A job still running when it gives up is abandoned with the
 // process, which loses that request's record and mail as a crash would.
 func (j *Jobs) Wait(timeout time.Duration) bool {
-	done := make(chan struct{})
-	go func() {
-		j.running.Wait()
-		close(done)
-	}()
-	select {
-	case <-done:
+	j.mu.Lock()
+	if j.inFlight == 0 {
+		j.mu.Unlock()
 		return true
-	case <-time.After(timeout):
+	}
+	idle := j.idle
+	j.mu.Unlock()
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-idle:
+		return true
+	case <-timer.C:
 		return false
+	}
+}
+
+// started counts one more job in flight, opening a fresh idle channel when it is the first.
+func (j *Jobs) started() {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if j.inFlight == 0 {
+		j.idle = make(chan struct{})
+	}
+	j.inFlight++
+}
+
+// finished counts one job done, closing the idle channel when it was the last.
+func (j *Jobs) finished() {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.inFlight--
+	if j.inFlight == 0 {
+		close(j.idle)
 	}
 }

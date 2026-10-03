@@ -112,8 +112,39 @@ func TestWait_WaitsForTheJobsInFlight(t *testing.T) {
 	}
 }
 
+// Nothing in flight is answered without the clock, so even a zero timeout reports it, both before
+// any job has run and after every one has finished. It was a 1 ms timeout raced against a
+// goroutine, which a busy CI runner lost (#404).
 func TestWait_WithNothingInFlightReturnsAtOnce(t *testing.T) {
-	assert.True(t, New().Wait(time.Millisecond))
+	jobs := New()
+	assert.True(t, jobs.Wait(0), "no job has run")
+
+	done := make(chan struct{})
+	jobs.Go(context.Background(), func(context.Context) { close(done) })
+	<-done
+	require.True(t, jobs.Wait(5*time.Second), "the job must finish")
+	assert.True(t, jobs.Wait(0), "every job has finished")
+}
+
+// A job still running when the timeout passes is reported, and a later Wait sees it finish: the
+// idle channel a first job opens serves every Wait until the last one closes it, and the next job
+// opens a fresh one.
+func TestWait_AJobStillRunningAtTheTimeoutIsReported(t *testing.T) {
+	jobs := New()
+	release := make(chan struct{})
+	jobs.Go(context.Background(), func(context.Context) { <-release })
+
+	assert.False(t, jobs.Wait(0), "the job is still running")
+	assert.False(t, jobs.Wait(10*time.Millisecond), "the job is still running")
+
+	close(release)
+	require.True(t, jobs.Wait(5*time.Second), "the job finished")
+
+	again := make(chan struct{})
+	jobs.Go(context.Background(), func(context.Context) { <-again })
+	assert.False(t, jobs.Wait(0), "a job started after the last one finished is in flight")
+	close(again)
+	assert.True(t, jobs.Wait(5*time.Second))
 }
 
 // A job that panics is not the request's, so the request's recovery cannot reach it and the panic
