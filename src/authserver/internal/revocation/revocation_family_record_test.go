@@ -25,7 +25,7 @@ import (
 // reason a client's revocation gives.
 func expectClientFamilyRecords(db *mocks_data.Database, families ...string) {
 	for _, family := range families {
-		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, family, RevocationReasonClientBecamePublic).
+		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, family, ReasonClientBecamePublic).
 			Return(true, nil).Once()
 	}
 }
@@ -64,7 +64,7 @@ func TestRevokeClientGrants_AFailedRecordSweepsNothing(t *testing.T) {
 	boom := errs.New("connection refused")
 	db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Once()
 	db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).Return(tokens, nil).Once()
-	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-session", RevocationReasonClientBecamePublic).
+	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-session", ReasonClientBecamePublic).
 		Return(false, boom).Once()
 
 	result, err := RevokeClientGrants(context.Background(), db, revokeTx, revokeClientId)
@@ -89,9 +89,9 @@ func TestRevokeClientGrantsTx_ALostKeyRunsTheRevocationOnceMore(t *testing.T) {
 		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
 		db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
 			Return([]*models.RefreshToken{token}, nil).Twice()
-		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", RevocationReasonClientBecamePublic).
+		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonClientBecamePublic).
 			Return(false, lostTheKey).Once()
-		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", RevocationReasonClientBecamePublic).
+		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonClientBecamePublic).
 			Return(false, nil).Once()
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
 
@@ -116,7 +116,7 @@ func TestRevokeClientGrantsTx_ALostKeyRunsTheRevocationOnceMore(t *testing.T) {
 		db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Twice()
 		db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
 			Return([]*models.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}}, nil).Twice()
-		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", RevocationReasonClientBecamePublic).
+		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonClientBecamePublic).
 			Return(false, lostTheKey).Twice()
 
 		result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, func(tx *sql.Tx) (bool, error) {

@@ -275,7 +275,7 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		return nil, nil, err
 	}
 
-	sess.Values[sessionkeys.SessionKeySessionIdentifier] = userSession.SessionIdentifier
+	sess.Values[sessionkeys.SessionIdentifier] = userSession.SessionIdentifier
 
 	// The browser session's identifier is replaced as the user session is bound to it, so
 	// no identifier that existed before this ceremony can name the session the ceremony

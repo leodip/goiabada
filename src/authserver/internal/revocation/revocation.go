@@ -65,12 +65,12 @@ func RevokeRefreshTokens(ctx context.Context, db Database, tx *sql.Tx, tokens []
 	return revokedJtis, nil
 }
 
-// RevocationResult reports what a revocation actually did. Its fields map one-to-one onto the
-// audit payload of #106 decision 7, so a caller spreads the result rather than threading
-// values separately, and a later field does not change every signature.
+// UserAuthStateResult reports what revoking a user's authentication state actually did. Its
+// fields map one-to-one onto the audit payload of #106 decision 7, so a caller spreads the result
+// rather than threading values separately, and a later field does not change every signature.
 //
 // The two slices are always non-nil, so a JSON audit payload carries [] rather than null.
-type RevocationResult struct {
+type UserAuthStateResult struct {
 	// TerminatedSessionIdentifiers lists the sessions deleted, excluding any preserved one.
 	TerminatedSessionIdentifiers []string
 	// RevokedRefreshTokenJtis lists only the tokens this call transitioned, per
@@ -105,8 +105,8 @@ type RevocationResult struct {
 // (decision 4). The caller owns the transaction, which is REQUIRED here rather than
 // optional, because IncrementUserAuthStateGeneration cannot read back its own increment
 // safely without one.
-func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId int64, exceptSid string) (RevocationResult, error) {
-	result := RevocationResult{
+func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId int64, exceptSid string) (UserAuthStateResult, error) {
+	result := UserAuthStateResult{
 		TerminatedSessionIdentifiers: []string{},
 		RevokedRefreshTokenJtis:      []string{},
 	}
@@ -261,21 +261,25 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	return result, nil
 }
 
-// Reasons for EventRevokedUserAuthState, one per credential site (#106 decision 7). Constants
-// rather than inline strings so the four sites cannot drift and a log consumer has something to
-// match against.
+// Reasons a revocation records. The first four are recorded on EventRevokedUserAuthState, one
+// per credential site (#106 decision 7). ReasonClientBecamePublic is recorded on
+// EventRevokedClientGrants, and is also the reason a family's revocation record carries when
+// RevokeClientGrants wrote it (#245, #259). Constants rather than inline strings so the sites
+// cannot drift and a log consumer has something to match against, and one block so the next
+// site's reason has one place to go. Every value is stored data: renaming a constant is free,
+// changing its string is not.
 //
-// These four are now the whole list, and this is now its only home. A fifth,
-// constants.RevocationReasonEmailCollisionBackfill, was declared in core because the site
-// emitting it was the startup pass that disabled the losers of an email case collision (#283),
-// and core cannot import this package. #351 replaced that pass with migration 000047 and a
-// pre-flight that refuses to migrate a colliding database instead of disabling an account, so
-// nothing in core revokes anything any more.
+// This is the list's only home. Another, constants.RevocationReasonEmailCollisionBackfill, was
+// declared in core because the site emitting it was the startup pass that disabled the losers of
+// an email case collision (#283), and core cannot import this package. #351 replaced that pass
+// with migration 000047 and a pre-flight that refuses to migrate a colliding database instead of
+// disabling an account, so nothing in core revokes anything any more.
 const (
-	RevocationReasonPasswordReset    = "password_reset"
-	RevocationReasonPasswordChange   = "password_change"
-	RevocationReasonAdminPasswordSet = "admin_password_set"
-	RevocationReasonAccountDisabled  = "account_disabled"
+	ReasonPasswordReset      = "password_reset"
+	ReasonPasswordChange     = "password_change"
+	ReasonAdminPasswordSet   = "admin_password_set"
+	ReasonAccountDisabled    = "account_disabled"
+	ReasonClientBecamePublic = "client_became_public"
 )
 
 // RevokeUserAuthStateTx runs a narrow credential write and the revocation sweep inside ONE
@@ -311,13 +315,13 @@ const (
 // distinct "commit outcome unknown" event, not a rollback, and neither is in scope for #106
 // (decision 5, finding 36).
 func RevokeUserAuthStateTx(ctx context.Context, db Database, userId int64, exceptSid string,
-	write func(tx *sql.Tx) error) (RevocationResult, error) {
+	write func(tx *sql.Tx) error) (UserAuthStateResult, error) {
 
 	// The write and the sweep in one transaction opened through RunInTransaction, so a deadlock
 	// reruns both together (#301). The body is safe to rerun: every write callback is a
 	// compare-and-set or an idempotent column write, the sweep reads the sessions and tokens
 	// afresh on each attempt, and result is whatever the attempt that committed produced.
-	var result RevocationResult
+	var result UserAuthStateResult
 	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		if err := write(tx); err != nil {
 			return err
@@ -328,7 +332,7 @@ func RevokeUserAuthStateTx(ctx context.Context, db Database, userId int64, excep
 		return err
 	})
 	if err != nil {
-		return RevocationResult{}, err
+		return UserAuthStateResult{}, err
 	}
 	return result, nil
 }
@@ -600,7 +604,7 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *models.Code
 // TerminationResult's two fields under a name that does not assert a session ended, and that
 // distinction is the whole reason it is a separate type (#245 decision 16): flipping a client to
 // public revokes the client's grants and deliberately leaves every session alone, so a result
-// carrying RevocationResult's terminated-sessions, preserved-session and generation fields would
+// carrying UserAuthStateResult's terminated-sessions, preserved-session and generation fields would
 // have three fields that can never fill, and an audit payload built from it would imply an action
 // this one does not take.
 type ClientGrantRevocationResult struct {
@@ -694,12 +698,6 @@ func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId i
 	}, nil
 }
 
-// RevocationReasonClientBecamePublic is the reason recorded on EventRevokedClientGrants. A
-// constant beside the RevocationReason* group above, for the same reason those are constants: a
-// log consumer needs something to match against, and there is one place to add the next site. It
-// is also the reason a family's revocation record carries when RevokeClientGrants wrote it.
-const RevocationReasonClientBecamePublic = "client_became_public"
-
 // recordClientFamilies writes the revocation record of every distinct rotation family among the
 // given refresh tokens, each once. A token with no family identifier carries no family to record:
 // no issuer writes one, and RecordRefreshTokenFamilyRevoked refuses an empty jti as a caller bug.
@@ -714,7 +712,7 @@ func recordClientFamilies(ctx context.Context, db Database, tx *sql.Tx, tokens [
 			continue
 		}
 		seen[jti] = struct{}{}
-		if _, err := db.RecordRefreshTokenFamilyRevoked(ctx, tx, jti, RevocationReasonClientBecamePublic); err != nil {
+		if _, err := db.RecordRefreshTokenFamilyRevoked(ctx, tx, jti, ReasonClientBecamePublic); err != nil {
 			return err
 		}
 	}
@@ -834,13 +832,13 @@ func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, client
 //
 // ctx is the request's, for the reason LogRevokedClientGrants states (#328).
 func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userId int64, reason string,
-	loggedInUser string, result RevocationResult) {
+	loggedInUser string, result UserAuthStateResult) {
 
 	auditLogger.Log(ctx, audit.EventRevokedUserAuthState, map[string]interface{}{
 		"userId":       userId,
 		"reason":       reason,
 		"loggedInUser": loggedInUser,
-		// Always present, and always a list rather than null: RevocationResult initialises
+		// Always present, and always a list rather than null: UserAuthStateResult initialises
 		// both slices, so an action that swept nothing logs [] (finding 8).
 		"terminatedSessionIdentifiers": result.TerminatedSessionIdentifiers,
 		"revokedRefreshTokenJtis":      result.RevokedRefreshTokenJtis,

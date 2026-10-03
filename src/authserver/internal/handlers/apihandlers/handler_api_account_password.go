@@ -138,7 +138,7 @@ func HandleAPIAccountPasswordPut(
 			"loggedInUser": subject,
 		})
 		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id,
-			revocation.RevocationReasonPasswordChange, subject, result)
+			revocation.ReasonPasswordChange, subject, result)
 
 		// Response
 		resp := api.UpdateUserResponse{User: *apimapping.ToUserResponse(user)}

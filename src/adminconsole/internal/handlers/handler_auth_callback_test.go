@@ -109,7 +109,7 @@ func newCallbackHarness(t *testing.T) *callbackHarness {
 	gob.Register(oauth.TokenResponse{})
 
 	backend := &armableBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
-	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionKeyJwt, false, sessionstore.BrowserSessionCookie,
+	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.JWT, false, sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{
 			AuthenticationKey: []byte("12345678901234567890123456789012"),
 			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
@@ -134,12 +134,12 @@ func newCallbackHarness(t *testing.T) *callbackHarness {
 // handshake is the six values RedirToAuthorize parks, as it parks them.
 func handshake() map[string]any {
 	return map[string]any{
-		sessionkeys.SessionKeyState:          callbackState,
-		sessionkeys.SessionKeyCodeVerifier:   callbackVerifier,
-		sessionkeys.SessionKeyRedirectURI:    callbackRedirectURI,
-		sessionkeys.SessionKeyNonce:          callbackRawNonce,
-		sessionkeys.SessionKeyRedirectBack:   callbackRedirectBack,
-		sessionkeys.SessionKeyRequestedScope: callbackRequestedScope,
+		sessionkeys.State:          callbackState,
+		sessionkeys.CodeVerifier:   callbackVerifier,
+		sessionkeys.RedirectURI:    callbackRedirectURI,
+		sessionkeys.Nonce:          callbackRawNonce,
+		sessionkeys.RedirectBack:   callbackRedirectBack,
+		sessionkeys.RequestedScope: callbackRequestedScope,
 	}
 }
 
@@ -537,11 +537,11 @@ func TestHandleAuthCallbackPost_ARotationThatFails(t *testing.T) {
 func assertSignedIn(t *testing.T, sess *sessionstore.Session, want oauth.TokenResponse, before, after time.Time) {
 	t.Helper()
 	require.False(t, sess.IsNew, "a session is stored")
-	stored, ok := sess.Values[sessionkeys.SessionKeyJwt].(oauth.TokenResponse)
+	stored, ok := sess.Values[sessionkeys.JWT].(oauth.TokenResponse)
 	require.True(t, ok, "the token response is stored")
 	assert.Equal(t, want, stored)
 
-	expiresAt, ok := sess.Values[sessionkeys.SessionKeyJwtExpiresAt].(int64)
+	expiresAt, ok := sess.Values[sessionkeys.JWTExpiresAt].(int64)
 	require.True(t, ok, "the expiry is stored as int64 Unix seconds")
 	assert.GreaterOrEqual(t, expiresAt, before.Unix()+want.ExpiresIn)
 	assert.LessOrEqual(t, expiresAt, after.Unix()+want.ExpiresIn)

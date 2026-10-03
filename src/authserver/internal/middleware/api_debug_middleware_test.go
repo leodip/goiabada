@@ -922,7 +922,7 @@ func TestDebugLog_LogsBodiesFaithfully(t *testing.T) {
 // this package because handlers/apihandlers imports this one, and reaching it would
 // need a mock database, a settings context value and a validated token. What is real
 // is what carries the credential: the response and request types, the seed and QR
-// derived from a real otp.OTPSecretGenerator key, a live TOTP code, and the same
+// derived from a real otp.KeyGenerator key, a live TOTP code, and the same
 // json.NewEncoder(w).Encode(resp) the endpoint writes its body with.
 // -----------------------------------------------------------------------------
 
@@ -946,8 +946,8 @@ func debugAPIRouter(t *testing.T, method, pattern string, handler http.HandlerFu
 func TestAPIDebug_DoesNotLogARealOTPEnrollmentResponse(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
-	generator := otp.OTPSecretGenerator{}
-	keyURL, err := generator.GenerateOTPSecret("seam2@example.com", "Goiabada")
+	generator := otp.KeyGenerator{}
+	keyURL, err := generator.GenerateKeyURL("seam2@example.com", "Goiabada")
 	assert.NoError(t, err)
 	base64Image, err := otp.RenderQRCodeImage(keyURL)
 	assert.NoError(t, err)
@@ -996,8 +996,8 @@ func TestAPIDebug_DoesNotLogARealOTPEnrollmentResponse(t *testing.T) {
 func TestAPIDebug_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
-	generator := otp.OTPSecretGenerator{}
-	keyURL, err := generator.GenerateOTPSecret("seam2@example.com", "Goiabada")
+	generator := otp.KeyGenerator{}
+	keyURL, err := generator.GenerateKeyURL("seam2@example.com", "Goiabada")
 	assert.NoError(t, err)
 	secretKey, err := otp.SecretFromKeyURL(keyURL)
 	assert.NoError(t, err)

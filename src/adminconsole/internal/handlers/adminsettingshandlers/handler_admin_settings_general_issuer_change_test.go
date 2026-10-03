@@ -47,8 +47,8 @@ func TestHandleAdminSettingsGeneralPost_AnIssuerChangeDeletesTheTokenResponseAnd
 	seedReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	seeded, err := store.Get(seedReq, builtin.AdminConsoleSessionName)
 	require.NoError(t, err)
-	seeded.Values[sessionkeys.SessionKeyJwt] = oauth.TokenResponse{AccessToken: "the-access-token"}
-	seeded.Values[sessionkeys.SessionKeyJwtExpiresAt] = int64(1_900_000_000)
+	seeded.Values[sessionkeys.JWT] = oauth.TokenResponse{AccessToken: "the-access-token"}
+	seeded.Values[sessionkeys.JWTExpiresAt] = int64(1_900_000_000)
 	seeded.Values["Unrelated"] = "kept"
 	seedW := httptest.NewRecorder()
 	require.NoError(t, store.Save(seedReq, seedW, seeded))
@@ -85,7 +85,7 @@ func TestHandleAdminSettingsGeneralPost_AnIssuerChangeDeletesTheTokenResponseAnd
 	readBack, err := store.Get(readReq, builtin.AdminConsoleSessionName)
 	require.NoError(t, err)
 	require.False(t, readBack.IsNew, "the session is still there")
-	assert.NotContains(t, readBack.Values, sessionkeys.SessionKeyJwt)
-	assert.NotContains(t, readBack.Values, sessionkeys.SessionKeyJwtExpiresAt)
+	assert.NotContains(t, readBack.Values, sessionkeys.JWT)
+	assert.NotContains(t, readBack.Values, sessionkeys.JWTExpiresAt)
 	assert.Equal(t, "kept", readBack.Values["Unrelated"])
 }

@@ -279,7 +279,7 @@ func TestDeadlockRetry_DeleteUserAgainstCredentialSweep(t *testing.T) {
 	pDB := pausedBeforeSessionDelete{Database: database, b: b}
 
 	type sweepResult struct {
-		result revocation.RevocationResult
+		result revocation.UserAuthStateResult
 		err    error
 	}
 	sweepDone := make(chan sweepResult, 1)

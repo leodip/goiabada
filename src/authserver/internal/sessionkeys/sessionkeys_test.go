@@ -15,14 +15,14 @@ import (
 // leave it asserting a session name this binary no longer uses, with nothing going red (#351).
 func TestSessionKeys_PinTheValuesCoreWritesOut(t *testing.T) {
 	assert.Equal(t, "authserver", AuthServerSessionName)
-	assert.Equal(t, "SessionIdentifier", SessionKeySessionIdentifier)
+	assert.Equal(t, "SessionIdentifier", SessionIdentifier)
 }
 
 // TestSessionKeys_AreStoredData holds the session key spellings, which are the map keys of a
 // server-side session row. A live session carries the old spelling, so changing one here signs
 // every logged-in user out at deploy rather than failing anywhere visible (#266).
 func TestSessionKeys_AreStoredData(t *testing.T) {
-	assert.Equal(t, "SessionIdentifier", SessionKeySessionIdentifier)
-	assert.Equal(t, "AuthContext", SessionKeyAuthContext)
-	assert.Equal(t, "LinkMarker", SessionKeyLinkMarker)
+	assert.Equal(t, "SessionIdentifier", SessionIdentifier)
+	assert.Equal(t, "AuthContext", AuthContext)
+	assert.Equal(t, "LinkMarker", LinkMarker)
 }

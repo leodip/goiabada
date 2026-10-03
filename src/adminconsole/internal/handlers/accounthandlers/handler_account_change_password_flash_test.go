@@ -48,7 +48,7 @@ func (flashStubApiClient) UpdateAccountPassword(_ context.Context, accessToken s
 func newFlashTestStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
 		sessiontest.NewMemoryBackend(),
-		sessionkeys.SessionKeyJwt,
+		sessionkeys.JWT,
 		false,
 		sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{

@@ -115,7 +115,7 @@ func newStaticBranchTestServer(database *mocks_data.Database) *Server {
 func newTestSessionStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
 		sessiontest.NewMemoryBackend(),
-		sessionkeys.SessionKeySessionIdentifier,
+		sessionkeys.SessionIdentifier,
 		false,
 		sessionstore.PersistentCookie,
 		sessionstore.KeyPair{

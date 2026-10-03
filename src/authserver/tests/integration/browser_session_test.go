@@ -337,7 +337,7 @@ func decodeSessionIdentifier(t *testing.T, cookie *http.Cookie) string {
 	encKey, err := hex.DecodeString(appConfig.AuthServer.SessionEncryptionKey)
 	require.NoError(t, err)
 
-	opener, err := sessionstore.NewServerSideStore(nil, sessionkeys.SessionKeySessionIdentifier, false, sessionstore.PersistentCookie,
+	opener, err := sessionstore.NewServerSideStore(nil, sessionkeys.SessionIdentifier, false, sessionstore.PersistentCookie,
 		sessionstore.KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey}, nil)
 	require.NoError(t, err)
 

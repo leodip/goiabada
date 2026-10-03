@@ -40,7 +40,7 @@ type RotationDatabase interface {
 	UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairId int64, fromState string, toState string) (bool, error)
 }
 
-// SigningKeyRotator performs the current -> previous -> deleted transition of the signing
+// Rotator performs the current -> previous -> deleted transition of the signing
 // keys, as one transaction whose every refusal happens before the commit.
 //
 // The reason it is a transaction, and the reason each state change is a compare-and-set
@@ -58,7 +58,7 @@ type RotationDatabase interface {
 // The transaction is opened through RunInTransaction, so a rotation the engine aborts as a
 // deadlock victim is rerun; the rerun reads the key set afresh, and if it lost the race
 // meanwhile its own compare-and-set refuses it (#301).
-type SigningKeyRotator struct {
+type Rotator struct {
 	database   RotationDatabase
 	dataCipher *encryption.DataCipher
 	// keySizeBits is unexported and has no setter, so no production caller can lower it.
@@ -68,8 +68,8 @@ type SigningKeyRotator struct {
 	keySizeBits int
 }
 
-func NewSigningKeyRotator(database RotationDatabase, dataCipher *encryption.DataCipher) *SigningKeyRotator {
-	return &SigningKeyRotator{
+func NewRotator(database RotationDatabase, dataCipher *encryption.DataCipher) *Rotator {
+	return &Rotator{
 		database:    database,
 		dataCipher:  dataCipher,
 		keySizeBits: 4096,
@@ -84,7 +84,7 @@ func NewSigningKeyRotator(database RotationDatabase, dataCipher *encryption.Data
 // The replacement key is generated before the transaction opens. That is deliberate: the
 // generation is the slow step by three orders of magnitude, and holding a transaction open
 // across it is what made the window wide enough to hit.
-func (r *SigningKeyRotator) Rotate(ctx context.Context) error {
+func (r *Rotator) Rotate(ctx context.Context) error {
 
 	newNextKey, err := NewKeyPair(r.dataCipher, models.KeyStateNext, r.keySizeBits)
 	if err != nil {

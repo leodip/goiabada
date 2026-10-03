@@ -15,14 +15,14 @@ import (
 // qrCodePixels is the width and height of the QR code image an enrolling user scans.
 const qrCodePixels = 180
 
-type OTPSecretGenerator struct {
+type KeyGenerator struct {
 }
 
-func NewOTPSecretGenerator() *OTPSecretGenerator {
-	return &OTPSecretGenerator{}
+func NewKeyGenerator() *KeyGenerator {
+	return &KeyGenerator{}
 }
 
-// GenerateOTPSecret creates a new TOTP key for a user and returns its otpauth:// URL.
+// GenerateKeyURL creates a new TOTP key for a user and returns its otpauth:// URL.
 //
 // The URL is the library's own canonical serialization of the whole key, carrying the secret
 // alongside algorithm=SHA1, digits=6 and period=30 explicitly, so nothing about the key has to
@@ -35,7 +35,7 @@ func NewOTPSecretGenerator() *OTPSecretGenerator {
 // about 5 KB on the wire per request while the session lived in the browser; since it became a
 // database row it is the same 2.4 KB written and read on every save for the duration of the
 // enrolment, so the saving moved rather than went away (#247, #266).
-func (g *OTPSecretGenerator) GenerateOTPSecret(email string, appName string) (string, error) {
+func (g *KeyGenerator) GenerateKeyURL(email string, appName string) (string, error) {
 
 	if strings.TrimSpace(email) == "" {
 		return "", errs.New("email is empty")

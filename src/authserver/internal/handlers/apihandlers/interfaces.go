@@ -69,7 +69,7 @@ type PasswordValidator interface {
 
 // UserCreator creates the user row and its default permissions in one transaction.
 type UserCreator interface {
-	CreateUser(ctx context.Context, input *usercreation.CreateUserInput) (*models.User, error)
+	CreateUser(ctx context.Context, input *usercreation.Input) (*models.User, error)
 }
 
 // CredentialFailureRecorder marks the credential check this request performed as failed, so
@@ -88,7 +88,7 @@ type CredentialFailureRecorder interface {
 // credential itself belongs to internal/otpcredential; this is the stateless primitive that
 // produces the seed (#387).
 type OtpSecretGenerator interface {
-	GenerateOTPSecret(email string, appName string) (string, error)
+	GenerateKeyURL(email string, appName string) (string, error)
 }
 
 // AfterResponse runs work a handler hands off so that its response does not wait for it. The job

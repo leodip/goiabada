@@ -35,8 +35,8 @@ func HandleSessionEndedGet(
 			return
 		}
 
-		delete(sess.Values, sessionkeys.SessionKeyJwt)
-		delete(sess.Values, sessionkeys.SessionKeyJwtExpiresAt)
+		delete(sess.Values, sessionkeys.JWT)
+		delete(sess.Values, sessionkeys.JWTExpiresAt)
 		sess.SetFlash(flashSessionEnded, "true")
 		if err = httpSession.Save(r, w, sess); err != nil {
 			httpHelper.InternalServerError(w, r, errs.Wrap(err, "unable to save the session"))

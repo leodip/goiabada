@@ -24,7 +24,7 @@ func newTestSessionStore() *sessionstore.ServerSideStore {
 func newTestSessionStoreOver(backend sessionstore.Backend) *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
 		backend,
-		sessionkeys.SessionKeyJwt,
+		sessionkeys.JWT,
 		false,
 		sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{

@@ -1,5 +1,5 @@
 // Package signingkeys owns the auth server's token-signing keys across their whole life: minted
-// here by NewKeyPair, rotated here by SigningKeyRotator, read here by TokenParser to verify a
+// here by NewKeyPair, rotated here by Rotator, read here by TokenParser to verify a
 // token, and decrypted here by ParsePrivateKey to sign one.
 package signingkeys
 

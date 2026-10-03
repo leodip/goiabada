@@ -252,7 +252,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		otpSecretGenerator.On("GenerateOTPSecret", "test@example.com", "TestApp").Return(generatedKeyURL, nil)
+		otpSecretGenerator.On("GenerateKeyURL", "test@example.com", "TestApp").Return(generatedKeyURL, nil)
 
 		pageRenderer.On("RenderTemplate",
 			mock.Anything,

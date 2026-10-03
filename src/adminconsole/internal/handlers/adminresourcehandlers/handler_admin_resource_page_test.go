@@ -147,7 +147,7 @@ func aPermission() []api.PermissionResponse {
 func testStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
 		sessiontest.NewMemoryBackend(),
-		sessionkeys.SessionKeyJwt,
+		sessionkeys.JWT,
 		false,
 		sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{

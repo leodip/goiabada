@@ -16,7 +16,7 @@ import (
 // stored. A method doing this on the record put a cipher and a JWT library behind every package
 // that names a stored row, and the record then answered a question — what does this key sign? —
 // that nothing about being a row can answer. This package already owns the other two halves of the
-// same capability, key-pair generation in SigningKeyRotator and public-key lookup in TokenParser,
+// same capability, key-pair generation in Rotator and public-key lookup in TokenParser,
 // so the private key's one read belongs beside them.
 //
 // The error is returned as it arrives, from the cipher or from the parser, which is what the four

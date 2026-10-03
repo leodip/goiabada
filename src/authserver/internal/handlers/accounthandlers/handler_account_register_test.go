@@ -661,7 +661,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
 		passwordValidator.On("ValidatePassword", mock.Anything, "password123").Return(nil)
 
-		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.CreateUserInput) bool {
+		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
 		})).Return(&models.User{}, nil)
 
@@ -729,7 +729,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		// The policy is the request's settings', passed by the handler (#433).
 		passwordValidator.On("ValidatePassword", models.PasswordPolicyHigh, "password123").Return(nil)
 
-		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.CreateUserInput) bool {
+		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
 		})).Return(&models.User{}, nil)
 

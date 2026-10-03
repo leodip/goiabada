@@ -130,7 +130,7 @@ func HandleAuthOtpGet(
 					pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 					return
 				}
-				keyURL, genErr := otpSecretGenerator.GenerateOTPSecret(user.Email, settings.AppName)
+				keyURL, genErr := otpSecretGenerator.GenerateKeyURL(user.Email, settings.AppName)
 				if genErr != nil {
 					pageRenderer.InternalServerError(w, r, genErr)
 					return

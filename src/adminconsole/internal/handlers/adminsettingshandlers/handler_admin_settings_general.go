@@ -162,8 +162,8 @@ func HandleAdminSettingsGeneralPost(
 			}
 
 			// Delete the JWT from session, and its recorded expiry with it
-			delete(sess.Values, sessionkeys.SessionKeyJwt)
-			delete(sess.Values, sessionkeys.SessionKeyJwtExpiresAt)
+			delete(sess.Values, sessionkeys.JWT)
+			delete(sess.Values, sessionkeys.JWTExpiresAt)
 
 			sessionErr = httpSession.Save(r, w, sess)
 			if sessionErr != nil {

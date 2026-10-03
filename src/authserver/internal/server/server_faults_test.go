@@ -150,7 +150,7 @@ func TestInitRoutes_ASessionFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 	minted := httptest.NewRecorder()
 	session, err := s.sessionStore.Get(mint, sessionkeys.AuthServerSessionName)
 	require.NoError(t, err)
-	session.Values[sessionkeys.SessionKeySessionIdentifier] = "sid-1"
+	session.Values[sessionkeys.SessionIdentifier] = "sid-1"
 	require.NoError(t, s.sessionStore.Save(mint, minted, session))
 	cookies := minted.Result().Cookies()
 	require.NotEmpty(t, cookies, "the store must have set the session cookie")

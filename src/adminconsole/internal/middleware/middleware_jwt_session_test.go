@@ -170,7 +170,7 @@ func newSessionHarness(t *testing.T) *sessionHarness {
 	t.Helper()
 	gob.Register(oauth.TokenResponse{})
 	backend := &contextHonouringBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
-	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionKeyJwt, false, sessionstore.BrowserSessionCookie,
+	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.JWT, false, sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{
 			AuthenticationKey: []byte("12345678901234567890123456789012"),
 			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
@@ -262,9 +262,9 @@ func storedResponse() oauth.TokenResponse {
 
 func signedIn(expiresAt int64) map[string]any {
 	return map[string]any{
-		sessionkeys.SessionKeyJwt:          storedResponse(),
-		sessionkeys.SessionKeyJwtExpiresAt: expiresAt,
-		"unrelated":                        "kept",
+		sessionkeys.JWT:          storedResponse(),
+		sessionkeys.JWTExpiresAt: expiresAt,
+		"unrelated":              "kept",
 	}
 }
 
@@ -279,8 +279,8 @@ func notDue() int64 { return time.Now().Add(time.Hour).Unix() }
 func (h *sessionHarness) assertSignedOut(cookies []*http.Cookie) {
 	h.t.Helper()
 	sess := h.readBack(cookies)
-	assert.NotContains(h.t, sess.Values, sessionkeys.SessionKeyJwt, "the token response is deleted")
-	assert.NotContains(h.t, sess.Values, sessionkeys.SessionKeyJwtExpiresAt, "and its expiry with it")
+	assert.NotContains(h.t, sess.Values, sessionkeys.JWT, "the token response is deleted")
+	assert.NotContains(h.t, sess.Values, sessionkeys.JWTExpiresAt, "and its expiry with it")
 	assert.Equal(h.t, "kept", sess.Values["unrelated"], "the session itself survives")
 }
 
@@ -343,19 +343,19 @@ func TestSessionHandler_SignsOutASessionItCannotVerify(t *testing.T) {
 	}{
 		{
 			name:    "no recorded expiry, as every session signed in before the upgrade",
-			values:  map[string]any{sessionkeys.SessionKeyJwt: storedResponse(), "unrelated": "kept"},
+			values:  map[string]any{sessionkeys.JWT: storedResponse(), "unrelated": "kept"},
 			message: "the session holds a token response with no recorded expiry, signing it out",
 		},
 		{
 			name: "an expiry of another type than int64",
-			values: map[string]any{sessionkeys.SessionKeyJwt: storedResponse(),
-				sessionkeys.SessionKeyJwtExpiresAt: "1700000000", "unrelated": "kept"},
+			values: map[string]any{sessionkeys.JWT: storedResponse(),
+				sessionkeys.JWTExpiresAt: "1700000000", "unrelated": "kept"},
 			message: "the session holds a token response with no recorded expiry, signing it out",
 		},
 		{
 			name: "no id token",
-			values: map[string]any{sessionkeys.SessionKeyJwt: noIDToken,
-				sessionkeys.SessionKeyJwtExpiresAt: due(), "unrelated": "kept"},
+			values: map[string]any{sessionkeys.JWT: noIDToken,
+				sessionkeys.JWTExpiresAt: due(), "unrelated": "kept"},
 			message: "the session holds a token response with no id token, signing it out",
 		},
 	}
@@ -430,9 +430,9 @@ func TestSessionHandler_AStoredIDTokenUnderAKeyUnpublishedAtTheFirstFetchIsSigne
 	response := storedResponse()
 	response.IdToken = oauthclienttest.SignRS256(t, retired, "retired", oauthclienttest.ValidClaims())
 	cookies := h.seed(map[string]any{
-		sessionkeys.SessionKeyJwt:          response,
-		sessionkeys.SessionKeyJwtExpiresAt: due(),
-		"unrelated":                        "kept",
+		sessionkeys.JWT:          response,
+		sessionkeys.JWTExpiresAt: due(),
+		"unrelated":              "kept",
 	})
 	h.refresher.answer = &oauth.TokenResponse{AccessToken: "new", IdToken: "new", RefreshToken: "new", ExpiresIn: 300}
 
@@ -471,9 +471,9 @@ func TestSessionHandler_AKeyRemovedAfterTheConsoleFetchedIt(t *testing.T) {
 		response := storedResponse()
 		response.IdToken = stored
 		return map[string]any{
-			sessionkeys.SessionKeyJwt:          response,
-			sessionkeys.SessionKeyJwtExpiresAt: expiresAt,
-			"unrelated":                        "kept",
+			sessionkeys.JWT:          response,
+			sessionkeys.JWTExpiresAt: expiresAt,
+			"unrelated":              "kept",
 		}
 	}
 
@@ -540,8 +540,8 @@ func TestSessionHandler_UsesTheStoredTokensUntilTheyAreDue(t *testing.T) {
 			assert.Empty(t, h.logs.Records())
 
 			sess := h.readBack(cookies)
-			assert.Equal(t, storedResponse(), sess.Values[sessionkeys.SessionKeyJwt])
-			assert.Equal(t, tc.expiresAt, sess.Values[sessionkeys.SessionKeyJwtExpiresAt])
+			assert.Equal(t, storedResponse(), sess.Values[sessionkeys.JWT])
+			assert.Equal(t, tc.expiresAt, sess.Values[sessionkeys.JWTExpiresAt])
 		})
 	}
 }
@@ -553,7 +553,7 @@ func (h *sessionHarness) expectRefreshValidation(cookies []*http.Cookie, accepte
 	refused error, heldAtValidation *any) {
 	h.parser.On("DecodeAndValidateRefreshResponse", mock.Anything, mock.Anything, verifiedStored).
 		Run(func(mock.Arguments) {
-			*heldAtValidation = h.readBack(cookies).Values[sessionkeys.SessionKeyJwt]
+			*heldAtValidation = h.readBack(cookies).Values[sessionkeys.JWT]
 		}).
 		Return(accepted, refused)
 }
@@ -645,9 +645,9 @@ func TestSessionHandler_AFailedRefreshGrantSignsTheSessionOut(t *testing.T) {
 		response := storedResponse()
 		response.RefreshToken = ""
 		cookies := h.seed(map[string]any{
-			sessionkeys.SessionKeyJwt:          response,
-			sessionkeys.SessionKeyJwtExpiresAt: due(),
-			"unrelated":                        "kept",
+			sessionkeys.JWT:          response,
+			sessionkeys.JWTExpiresAt: due(),
+			"unrelated":              "kept",
 		})
 		h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).Return(verifiedStored, nil)
 
@@ -750,14 +750,14 @@ func TestSessionHandler_ARefreshIsValidatedThenStored(t *testing.T) {
 			h.parser.AssertCalled(t, "DecodeAndValidateRefreshResponse", mock.Anything, &tc.answer, verifiedStored)
 
 			sess := h.readBack(cookies)
-			stored, ok := sess.Values[sessionkeys.SessionKeyJwt].(oauth.TokenResponse)
+			stored, ok := sess.Values[sessionkeys.JWT].(oauth.TokenResponse)
 			require.True(t, ok, "the accepted response is stored")
 			assert.Equal(t, "the-new-access-token", stored.AccessToken)
 			assert.Equal(t, tc.wantIDToken, stored.IdToken)
 			assert.Equal(t, tc.wantRefresh, stored.RefreshToken)
 			assert.Equal(t, tc.wantScope, stored.Scope, "the effective grant")
 
-			expiresAt, ok := sess.Values[sessionkeys.SessionKeyJwtExpiresAt].(int64)
+			expiresAt, ok := sess.Values[sessionkeys.JWTExpiresAt].(int64)
 			require.True(t, ok, "the expiry is recorded as int64")
 			if tc.wantLifetime == 0 {
 				assert.Zero(t, expiresAt, "an absent expires_in is an unknown expiry")
@@ -818,7 +818,7 @@ func TestSessionHandler_TheCheckAndTheWriteOutliveTheBrowser(t *testing.T) {
 	out := h.serveOn(ctx, h.parser, cookies)
 
 	assert.True(t, out.reached, "the chain continues")
-	stored, ok := h.readBack(cookies).Values[sessionkeys.SessionKeyJwt].(oauth.TokenResponse)
+	stored, ok := h.readBack(cookies).Values[sessionkeys.JWT].(oauth.TokenResponse)
 	require.True(t, ok, "the refreshed response reached the session")
 	assert.Equal(t, "the-new-access-token", stored.AccessToken)
 	assert.Equal(t, "the-new-refresh-token", stored.RefreshToken)

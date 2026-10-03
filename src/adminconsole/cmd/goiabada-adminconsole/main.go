@@ -282,6 +282,6 @@ func logBootstrapCredentialsNotConfigured() {
 // each lifetime writes, and this package's pin which one this binary passes (#431).
 func newSessionStore(backend sessionstore.Backend, secure bool,
 	current sessionstore.KeyPair, previous *sessionstore.KeyPair) (*sessionstore.ServerSideStore, error) {
-	return sessionstore.NewServerSideStore(backend, sessionkeys.SessionKeyJwt, secure,
+	return sessionstore.NewServerSideStore(backend, sessionkeys.JWT, secure,
 		sessionstore.BrowserSessionCookie, current, previous)
 }

@@ -94,7 +94,7 @@ func (i Inclusion) includesGroupAttribute(attribute models.GroupAttribute) bool 
 	return attribute.IncludeInIdToken
 }
 
-// Mapper writes OIDC claims from a stored user row. Its four fields are the port and the three
+// Mapper writes OIDC claims from a stored user row. Its three fields are the port and the two
 // divergences, so a call site reads as a statement of which of the two conversions it wants.
 type Mapper struct {
 	// Database backs the picture claim and is only reached under the profile scope.
@@ -105,7 +105,7 @@ type Mapper struct {
 	Inclusion Inclusion
 }
 
-// AddOpenIdConnectClaims writes the profile, email, address and phone claims the given scopes ask
+// AddOpenIDConnectClaims writes the profile, email, address and phone claims the given scopes ask
 // for. updated_at rides inside the profile arm with the rest of the claims OIDC Core 5.4 lists
 // under that scope, which is also what this repository's own documentation has always said
 // (site/src/content/docs/concepts/openid-connect.mdx and integration/endpoints.mdx).
@@ -119,7 +119,7 @@ type Mapper struct {
 // a transaction and reads on nil gets no error for it. sqlitedb has one connection, the read waits
 // for the connection the caller's transaction is holding until the context expires, and the
 // picture claim is silently dropped (#437). /userinfo runs in no transaction and passes nil.
-func (m Mapper) AddOpenIdConnectClaims(ctx context.Context, tx *sql.Tx, claims jwt.MapClaims, user *models.User, scopes []string) {
+func (m Mapper) AddOpenIDConnectClaims(ctx context.Context, tx *sql.Tx, claims jwt.MapClaims, user *models.User, scopes []string) {
 
 	if slices.Contains(scopes, "profile") {
 		claims["updated_at"] = user.UpdatedAt.Time.UTC().Unix()

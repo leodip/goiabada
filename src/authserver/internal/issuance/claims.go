@@ -205,7 +205,7 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 	mapper := t.claimMapper(userclaims.InclusionAccessToken)
 
 	if slices.Contains(scopes, "openid") && includeOpenIDConnectClaimsInAccessToken {
-		mapper.AddOpenIdConnectClaims(ctx, tx, claims, input.User, scopes)
+		mapper.AddOpenIDConnectClaims(ctx, tx, claims, input.User, scopes)
 	}
 
 	// groups and attributes (using the IncludeInAccessToken filter), outside the OIDC claim
@@ -280,7 +280,7 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, tx *sql.Tx, setti
 	mapper := t.claimMapper(userclaims.InclusionIdToken)
 
 	if includeOpenIDConnectClaimsInIdToken {
-		mapper.AddOpenIdConnectClaims(ctx, tx, claims, input.User, scopes)
+		mapper.AddOpenIDConnectClaims(ctx, tx, claims, input.User, scopes)
 	}
 
 	// groups and attributes (using the IncludeInIdToken filter), outside the OIDC claim setting

@@ -22,7 +22,7 @@ func TestGetAuthContext(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		ceremonyStore, store, _ := newRealStore(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.SessionKeyAuthContext: authContextJSON(t, &AuthContext{ClientId: "test-client"}),
+			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{ClientId: "test-client"}),
 		})
 
 		result, err := ceremonyStore.GetAuthContext(browserRequest(cookies))
@@ -34,7 +34,7 @@ func TestGetAuthContext(t *testing.T) {
 	t.Run("SessionError", func(t *testing.T) {
 		ceremonyStore, store, backend := newRealStore(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.SessionKeyAuthContext: authContextJSON(t, &AuthContext{ClientId: "test-client"}),
+			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{ClientId: "test-client"}),
 		})
 		backend.failLoad = true
 
@@ -57,7 +57,7 @@ func TestGetAuthContext(t *testing.T) {
 
 	t.Run("UnmarshalError", func(t *testing.T) {
 		ceremonyStore, store, _ := newRealStore(t)
-		cookies := seedBrowserSession(t, store, map[string]any{sessionkeys.SessionKeyAuthContext: "invalid json"})
+		cookies := seedBrowserSession(t, store, map[string]any{sessionkeys.AuthContext: "invalid json"})
 
 		result, err := ceremonyStore.GetAuthContext(browserRequest(cookies))
 
@@ -168,7 +168,7 @@ func newRealStore(t *testing.T) (*Store, *sessionstore.ServerSideStore, *armable
 	encKey := []byte("0123456789abcdef0123456789abcdef")
 	backend := &armableBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
 	store, err := sessionstore.NewServerSideStore(backend,
-		sessionkeys.SessionKeySessionIdentifier, false, sessionstore.PersistentCookie,
+		sessionkeys.SessionIdentifier, false, sessionstore.PersistentCookie,
 		sessionstore.KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey}, nil)
 	if err != nil {
 		// The keys are literals above and the derivation cannot fail on them, so this is
@@ -291,7 +291,7 @@ func TestClearAuthContext(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		ceremonyStore, store, _ := newRealStore(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.SessionKeyAuthContext: authContextJSON(t, &AuthContext{ClientId: "test-client"}),
+			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{ClientId: "test-client"}),
 		})
 
 		err := ceremonyStore.ClearAuthContext(httptest.NewRecorder(), browserRequest(cookies))
@@ -306,7 +306,7 @@ func TestClearAuthContext(t *testing.T) {
 	t.Run("SessionError", func(t *testing.T) {
 		ceremonyStore, store, backend := newRealStore(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.SessionKeyAuthContext: authContextJSON(t, &AuthContext{ClientId: "test-client"}),
+			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{ClientId: "test-client"}),
 		})
 		backend.failLoad = true
 		rr := httptest.NewRecorder()
@@ -467,7 +467,7 @@ func TestRegenerateSession(t *testing.T) {
 	seeded := func(t *testing.T, store *sessionstore.ServerSideStore) []*http.Cookie {
 		t.Helper()
 		return seedBrowserSession(t, store, map[string]any{
-			sessionkeys.SessionKeyAuthContext: authContextJSON(t, &AuthContext{ClientId: "test-client"}),
+			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{ClientId: "test-client"}),
 		})
 	}
 
@@ -547,7 +547,7 @@ func TestUILocales(t *testing.T) {
 			ceremonyStore, store, _ := newRealStore(t)
 			values := map[string]any{"unrelated": "value"}
 			if tt.authContext != nil {
-				values[sessionkeys.SessionKeyAuthContext] = authContextJSON(t, tt.authContext)
+				values[sessionkeys.AuthContext] = authContextJSON(t, tt.authContext)
 			}
 			cookies := seedBrowserSession(t, store, values)
 

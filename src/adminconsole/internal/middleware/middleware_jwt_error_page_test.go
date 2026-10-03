@@ -78,7 +78,7 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
 				store := new(mock_sessionstore.Store)
 				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
-					Values: map[string]any{sessionkeys.SessionKeyJwt: "not a token response"},
+					Values: map[string]any{sessionkeys.JWT: "not a token response"},
 				}, nil)
 
 				m := NewJWT(store, sessionName, new(mock_middleware.TokenParser), nil, new(mock_middleware.AuthHelper), rec, "http://localhost:9091", "")
@@ -95,7 +95,7 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 				// signs it out without consulting the parser.
 				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
 					Values: map[string]any{
-						sessionkeys.SessionKeyJwt: oauth.TokenResponse{AccessToken: "a", IdToken: "i"},
+						sessionkeys.JWT: oauth.TokenResponse{AccessToken: "a", IdToken: "i"},
 					},
 				}, nil)
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
@@ -112,8 +112,8 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 				store := new(mock_sessionstore.Store)
 				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
 					Values: map[string]any{
-						sessionkeys.SessionKeyJwt:          oauth.TokenResponse{AccessToken: "a", IdToken: "foreign"},
-						sessionkeys.SessionKeyJwtExpiresAt: int64(0),
+						sessionkeys.JWT:          oauth.TokenResponse{AccessToken: "a", IdToken: "foreign"},
+						sessionkeys.JWTExpiresAt: int64(0),
 					},
 				}, nil)
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)

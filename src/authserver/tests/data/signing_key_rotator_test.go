@@ -36,10 +36,10 @@ func seedOneKeyPerState(t *testing.T) (previous, current, next *models.KeyPair) 
 	return previous, current, next
 }
 
-func TestSigningKeyRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
+func TestRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	previous, current, next := seedOneKeyPerState(t)
 
-	if err := signingkeys.NewSigningKeyRotator(database, dataCipher).Rotate(context.Background()); err != nil {
+	if err := signingkeys.NewRotator(database, dataCipher).Rotate(context.Background()); err != nil {
 		t.Fatalf("Rotate failed: %v", err)
 	}
 
@@ -131,14 +131,14 @@ func TestSigningKeyRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	}
 }
 
-// TestSigningKeyRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious is the issue's own
+// TestRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious is the issue's own
 // first test: a rotation attempted with no next row refuses without deleting the previous
 // key. Against a real engine, so the refusal's rollback is a real rollback.
-func TestSigningKeyRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *testing.T) {
+func TestRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *testing.T) {
 	previous, current, _ := seedOneKeyPerState(t)
 	clearKeyPairState(t, models.KeyStateNext.String())
 
-	err := signingkeys.NewSigningKeyRotator(database, dataCipher).Rotate(context.Background())
+	err := signingkeys.NewRotator(database, dataCipher).Rotate(context.Background())
 	if err == nil {
 		t.Fatal("Expected the rotation to be refused")
 	}

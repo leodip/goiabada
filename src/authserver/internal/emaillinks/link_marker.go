@@ -183,7 +183,7 @@ func SaveLinkMarker(httpSession sessionstore.Store, w http.ResponseWriter, r *ht
 		return "", errs.Wrap(err, "unable to marshal link marker")
 	}
 
-	sess.Values[sessionkeys.SessionKeyLinkMarker] = string(jsonData)
+	sess.Values[sessionkeys.LinkMarker] = string(jsonData)
 	return "", httpSession.Save(r, w, sess)
 }
 
@@ -218,7 +218,7 @@ func GetLinkMarker(httpSession sessionstore.Store, r *http.Request,
 // A value that will not unmarshal is a fault rather than an empty slot: the session
 // cookie is encrypted and signed, so nobody outside this process can put one there.
 func decodeLinkMarker(sess *sessionstore.Session) (*LinkMarker, error) {
-	jsonData, ok := sess.Values[sessionkeys.SessionKeyLinkMarker].(string)
+	jsonData, ok := sess.Values[sessionkeys.LinkMarker].(string)
 	if !ok {
 		return nil, nil
 	}
@@ -274,6 +274,6 @@ func ClearLinkMarker(httpSession sessionstore.Store, w http.ResponseWriter, r *h
 		return err
 	}
 
-	delete(sess.Values, sessionkeys.SessionKeyLinkMarker)
+	delete(sess.Values, sessionkeys.LinkMarker)
 	return httpSession.Save(r, w, sess)
 }

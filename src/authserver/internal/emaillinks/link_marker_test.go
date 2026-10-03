@@ -31,7 +31,7 @@ import (
 func newMarkerTestStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
 		sessiontest.NewMemoryBackend(),
-		sessionkeys.SessionKeySessionIdentifier,
+		sessionkeys.SessionIdentifier,
 		false,
 		sessionstore.PersistentCookie,
 		sessionstore.KeyPair{
@@ -68,7 +68,7 @@ func writeRawMarker(t *testing.T, store sessionstore.Store, value interface{}) *
 
 	sess, err := store.Get(req, sessionkeys.AuthServerSessionName)
 	require.NoError(t, err)
-	sess.Values[sessionkeys.SessionKeyLinkMarker] = value
+	sess.Values[sessionkeys.LinkMarker] = value
 	require.NoError(t, store.Save(req, rr, sess))
 
 	return requestCarrying(t, rr)

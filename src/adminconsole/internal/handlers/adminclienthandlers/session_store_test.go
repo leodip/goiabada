@@ -18,7 +18,7 @@ import (
 func newTestSessionStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
 		sessiontest.NewMemoryBackend(),
-		sessionkeys.SessionKeyJwt,
+		sessionkeys.JWT,
 		false,
 		sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{

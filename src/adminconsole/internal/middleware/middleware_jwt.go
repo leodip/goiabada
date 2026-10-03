@@ -124,11 +124,11 @@ func (m *JWT) SessionHandler() func(http.Handler) http.Handler {
 				return
 			}
 
-			if sess.Values[sessionkeys.SessionKeyJwt] == nil {
+			if sess.Values[sessionkeys.JWT] == nil {
 				next.ServeHTTP(w, r)
 				return
 			}
-			tokenResponse, ok := sess.Values[sessionkeys.SessionKeyJwt].(oauth.TokenResponse)
+			tokenResponse, ok := sess.Values[sessionkeys.JWT].(oauth.TokenResponse)
 			if !ok {
 				m.errorRenderer.InternalServerError(w, r,
 					errs.New("unable to cast the session value to TokenResponse"))
@@ -138,7 +138,7 @@ func (m *JWT) SessionHandler() func(http.Handler) http.Handler {
 			// Step 2. The expiry is a plain int64 beside the token response rather than a field of
 			// a new persisted type, so a session written before it existed still decodes and is
 			// recognised here by the value's absence (#427 decision 15).
-			expiresAt, hasExpiry := sess.Values[sessionkeys.SessionKeyJwtExpiresAt].(int64)
+			expiresAt, hasExpiry := sess.Values[sessionkeys.JWTExpiresAt].(int64)
 			if !hasExpiry {
 				slog.WarnContext(ctx, "the session holds a token response with no recorded expiry, signing it out")
 				m.signOut(w, r, sess, next)
@@ -200,8 +200,8 @@ func (m *JWT) SessionHandler() func(http.Handler) http.Handler {
 // clearTokens deletes the token values from the session and saves it, answering the error page
 // when the save fails. It reports whether the session was saved.
 func (m *JWT) clearTokens(w http.ResponseWriter, r *http.Request, sess *sessionstore.Session) bool {
-	delete(sess.Values, sessionkeys.SessionKeyJwt)
-	delete(sess.Values, sessionkeys.SessionKeyJwtExpiresAt)
+	delete(sess.Values, sessionkeys.JWT)
+	delete(sess.Values, sessionkeys.JWTExpiresAt)
 	if err := m.sessionStore.Save(r, w, sess); err != nil {
 		m.errorRenderer.InternalServerError(w, r, errs.Wrap(err, "unable to save the session"))
 		return false
@@ -295,8 +295,8 @@ func (m *JWT) refreshToken(
 		return nil, nil, errs.Errorf("unable to get session: %v", err)
 	}
 
-	sess.Values[sessionkeys.SessionKeyJwt] = accepted.TokenResponse
-	sess.Values[sessionkeys.SessionKeyJwtExpiresAt] = oauthclient.ExpiresAt(&accepted.TokenResponse, time.Now())
+	sess.Values[sessionkeys.JWT] = accepted.TokenResponse
+	sess.Values[sessionkeys.JWTExpiresAt] = oauthclient.ExpiresAt(&accepted.TokenResponse, time.Now())
 	err = m.sessionStore.Save(detachedReq, w, sess)
 	if err != nil {
 		return nil, nil, errs.Errorf("unable to save the session: %v", err)
@@ -353,7 +353,7 @@ func (m *JWT) buildScopeString(customScopes []string) string {
 
 	// Default required scopes.
 	// "profile" is required for the locale claim to be emitted in tokens
-	// (see userclaims.Mapper.AddOpenIdConnectClaims, which the auth server's token
+	// (see userclaims.Mapper.AddOpenIDConnectClaims, which the auth server's token
 	// issuer calls), which adminconsole's
 	// JWT-locale refinement middleware reads to resolve the user's stored
 	// locale.

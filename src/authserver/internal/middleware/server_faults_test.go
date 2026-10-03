@@ -56,7 +56,7 @@ func faultRequest() *http.Request {
 // middleware to the database.
 func sessionWithIdentifier(store sessionstore.Store, sid string) *sessionstore.Session {
 	session := sessionstore.NewSession(store, sessionkeys.AuthServerSessionName)
-	session.Values[sessionkeys.SessionKeySessionIdentifier] = sid
+	session.Values[sessionkeys.SessionIdentifier] = sid
 	return session
 }
 

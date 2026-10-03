@@ -73,10 +73,10 @@ func TestRedirToAuthorize_SendsWhatItStores(t *testing.T) {
 	query, err := url.ParseQuery(strings.TrimPrefix(location, helperAuthorizePath))
 	require.NoError(t, err)
 
-	state := storedString(t, sess, sessionkeys.SessionKeyState)
-	nonce := storedString(t, sess, sessionkeys.SessionKeyNonce)
-	verifier := storedString(t, sess, sessionkeys.SessionKeyCodeVerifier)
-	redirectURI := storedString(t, sess, sessionkeys.SessionKeyRedirectURI)
+	state := storedString(t, sess, sessionkeys.State)
+	nonce := storedString(t, sess, sessionkeys.Nonce)
+	verifier := storedString(t, sess, sessionkeys.CodeVerifier)
+	redirectURI := storedString(t, sess, sessionkeys.RedirectURI)
 
 	assert.Equal(t, helperClientID, query.Get("client_id"))
 	assert.Equal(t, helperConsoleBase+"/auth/callback", redirectURI)
@@ -86,9 +86,9 @@ func TestRedirToAuthorize_SendsWhatItStores(t *testing.T) {
 	assert.Equal(t, "S256", query.Get("code_challenge_method"), "RFC 7636 section 4.2: S256 when the client is capable of it")
 	assert.Equal(t, state, query.Get("state"))
 	assert.Equal(t, helperScope, query.Get("scope"))
-	assert.Equal(t, helperScope, storedString(t, sess, sessionkeys.SessionKeyRequestedScope),
+	assert.Equal(t, helperScope, storedString(t, sess, sessionkeys.RequestedScope),
 		"the requested scope is kept for the callback, which takes the grant to equal it when the response names none")
-	assert.Equal(t, helperRedirectBack, storedString(t, sess, sessionkeys.SessionKeyRedirectBack))
+	assert.Equal(t, helperRedirectBack, storedString(t, sess, sessionkeys.RedirectBack))
 
 	challenge := sha256.Sum256([]byte(verifier))
 	assert.Equal(t, base64.RawURLEncoding.EncodeToString(challenge[:]), query.Get("code_challenge"),
@@ -112,7 +112,7 @@ func TestRedirToAuthorize_MintsFreshValuesEachTime(t *testing.T) {
 	first, _ := redirToAuthorize(t)
 	second, _ := redirToAuthorize(t)
 
-	for _, key := range []string{sessionkeys.SessionKeyState, sessionkeys.SessionKeyNonce, sessionkeys.SessionKeyCodeVerifier} {
+	for _, key := range []string{sessionkeys.State, sessionkeys.Nonce, sessionkeys.CodeVerifier} {
 		assert.NotEqualf(t, storedString(t, first, key), storedString(t, second, key), "%s is minted afresh", key)
 	}
 }

@@ -112,7 +112,7 @@ func newStartSessionMocks(t *testing.T) *startSessionMocks {
 	t.Helper()
 	db := mocks_data.NewDatabase(t)
 	backend := &armableBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
-	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionKeySessionIdentifier, false,
+	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionIdentifier, false,
 		sessionstore.PersistentCookie, sessionstore.KeyPair{
 			AuthenticationKey: []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
 			EncryptionKey:     []byte("0123456789abcdef0123456789abcdef"),
@@ -344,7 +344,7 @@ func TestStartNewUserSession_WritesIdentifierIntoTheCookieSession(t *testing.T) 
 	result, _, err := m.manager.StartNewUserSession(rr, req, 123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant(), "192.168.1.50", nil)
 
 	require.NoError(t, err)
-	assert.Equal(t, result.SessionIdentifier, m.readBack(rr.Result().Cookies()).Values[sessionkeys.SessionKeySessionIdentifier])
+	assert.Equal(t, result.SessionIdentifier, m.readBack(rr.Result().Cookies()).Values[sessionkeys.SessionIdentifier])
 }
 
 // -----------------------------------------------------------------------------
@@ -949,7 +949,7 @@ func TestStartNewUserSession_RotatesTheBrowserSessionIdentifierAndKeepsTheRow(t 
 		"the sign-in's cookie names a new browser session identifier")
 
 	sess := m.readBack(signedIn)
-	assert.Equal(t, result.SessionIdentifier, sess.Values[sessionkeys.SessionKeySessionIdentifier])
+	assert.Equal(t, result.SessionIdentifier, sess.Values[sessionkeys.SessionIdentifier])
 	assert.Equal(t, "kept", sess.Values["pre-sign-in"], "the rotation keeps what the session held")
 
 	assert.True(t, m.readBack(preSignIn).IsNew, "the pre-sign-in cookie names nothing any more")
