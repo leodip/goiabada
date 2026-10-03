@@ -16,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/securerandom"
 )
 
 func HandleForgotPasswordGet(
@@ -204,7 +204,7 @@ func finishForgotPassword(
 		return
 	}
 
-	verificationCode := stringutil.GenerateSecurityRandomString(32)
+	verificationCode := securerandom.String(32)
 	verificationCodeEncrypted, err := dataCipher.Encrypt(verificationCode)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to encrypt the password reset code", "user_id", user.Id, "error", err)

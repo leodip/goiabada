@@ -249,9 +249,10 @@ var slogSpreadSites = []slogSpreadSite{
 // later, and a directory absent from this list costs coverage silently, since the walk only fails
 // when it reaches no files at all.
 //
-// Left out on purpose, and the one ceiling left here: core/stringutil, whose one record is
-// written from a template function like addUrlParam below. A startup, worker or main package is
-// not a request path and is not listed.
+// Left out: core/securerandom, which writes no record. It was core/stringutil, and the one ceiling
+// here while it held ConvertToString, whose record is written from a template function, until #385
+// moved that function to its one caller (#442). A startup, worker or main package is not a request
+// path and is not listed.
 //
 // authserver/internal/audit was a ceiling until #328 gave AuditLogger.Log a context and its 126
 // call sites the request's, so a plain record there is refused from then onward. The compiler

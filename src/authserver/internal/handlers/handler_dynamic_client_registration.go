@@ -21,7 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/securerandom"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -87,7 +87,7 @@ func HandleDynamicClientRegistrationPost(
 		var clientSecret string
 
 		if !isPublic {
-			clientSecret = stringutil.GenerateSecurityRandomString(60)
+			clientSecret = securerandom.String(60)
 			var err error
 			clientSecretEncrypted, err = dataCipher.Encrypt(clientSecret)
 			if err != nil {

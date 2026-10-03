@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/securerandom"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -158,15 +158,15 @@ func queryKeys(u *url.URL) []string {
 // pass anything.
 func TestLinkCodeSurvivesTheRoundTrip(t *testing.T) {
 	codes := []string{
-		codeAlphabet, // every character the generator can emit, at once
-		stringutil.GenerateSecurityRandomString(32), // a real code, at the length both flows issue
-		"a+b",          // the character #112 is about: a bare '+' decodes to a space
-		"a%2b",         // a '%' that begins a valid escape, the second broken class
-		"a%26code%3dX", // an attempt to smuggle a second parameter
-		"a@b",          // would put an '@' back into a link
-		"a b",          // a literal space
-		"a&b=c",        // a bare separator
-		"",             // no code at all
+		codeAlphabet,            // every character the generator can emit, at once
+		securerandom.String(32), // a real code, at the length both flows issue
+		"a+b",                   // the character #112 is about: a bare '+' decodes to a space
+		"a%2b",                  // a '%' that begins a valid escape, the second broken class
+		"a%26code%3dX",          // an attempt to smuggle a second parameter
+		"a@b",                   // would put an '@' back into a link
+		"a b",                   // a literal space
+		"a&b=c",                 // a bare separator
+		"",                      // no code at all
 	}
 
 	for _, code := range codes {
@@ -209,7 +209,7 @@ func TestLinkCodeAlphabetIsUnreserved(t *testing.T) {
 	// Sampled rather than exhaustive: this is only guarding against the generator's
 	// alphabet drifting away from the copy above, and 8000 characters covers all 65
 	// with overwhelming probability.
-	generated := stringutil.GenerateSecurityRandomString(8000)
+	generated := securerandom.String(8000)
 	require.Len(t, generated, 8000)
 	for _, c := range generated {
 		assert.True(t, strings.ContainsRune(codeAlphabet, c),

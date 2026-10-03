@@ -62,9 +62,10 @@ func TestDigitN(t *testing.T) {
 // TestMustDraw_PanicsOnShortResult pins the fail-closed contract LetterN and
 // DigitN document, directly on the guard that carries it. It replaces a pair of
 // cases that swapped crypto/rand.Reader for a failing reader and called through
-// stringutil: since #211 that helper draws through crypto/rand.Read, which ends
-// the process on a read error rather than returning "", so those cases would now
-// take this whole test binary down instead of observing a panic.
+// core/stringutil, now core/securerandom: since #211 that package draws through
+// crypto/rand.Read, which ends the process on a read error rather than returning
+// "", so those cases would now take this whole test binary down instead of
+// observing a panic.
 //
 // Calling mustDraw directly is what is left, and it is what the guard is for:
 // nothing can produce a short draw today, and the panic is this package's own

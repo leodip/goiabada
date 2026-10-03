@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"regexp"
 	"testing"
 )
 
@@ -12,22 +13,11 @@ import (
 // right shape only most of the time would pass a single sample.
 func TestGenerateEmailVerificationCode_Format(t *testing.T) {
 	const draws = 2000
+	format := regexp.MustCompile(`^[A-Z]{4}[0-9]{4}$`)
 
 	for i := 0; i < draws; i++ {
-		code := generateEmailVerificationCode()
-
-		if len(code) != 8 {
-			t.Fatalf("draw %d: %q has length %d, want 8", i+1, code, len(code))
-		}
-		for j := 0; j < 4; j++ {
-			if c := code[j]; c < 'A' || c > 'Z' {
-				t.Fatalf("draw %d: %q has %q at position %d, want an uppercase letter", i+1, code, c, j)
-			}
-		}
-		for j := 4; j < 8; j++ {
-			if c := code[j]; c < '0' || c > '9' {
-				t.Fatalf("draw %d: %q has %q at position %d, want a digit", i+1, code, c, j)
-			}
+		if code := generateEmailVerificationCode(); !format.MatchString(code) {
+			t.Fatalf("draw %d: %q does not match %s", i+1, code, format)
 		}
 	}
 }

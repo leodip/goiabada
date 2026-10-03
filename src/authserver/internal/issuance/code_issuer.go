@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/securerandom"
 )
 
 // ErrIssuingClientGone is returned by IssueAuthCode when the client the ceremony is issuing for
@@ -196,7 +196,7 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 	}
 	scope = strings.TrimSpace(scope)
 
-	authCode := strings.ReplaceAll(uuidutil.New(), "-", "") + stringutil.GenerateSecurityRandomString(96)
+	authCode := strings.ReplaceAll(uuidutil.New(), "-", "") + securerandom.String(96)
 	authCodeHash := hashutil.HashString(authCode)
 	// Handle PKCE fields - store as NULL if not provided
 	var codeChallenge, codeChallengeMethod sql.NullString

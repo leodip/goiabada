@@ -22,7 +22,7 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/securerandom"
 )
 
 // linkMarkerLifetime bounds how long a validated emailed link stays usable after the
@@ -169,7 +169,7 @@ func SaveLinkMarker(httpSession sessionstore.Store, w http.ResponseWriter, r *ht
 		continuationId = held.ContinuationId
 	}
 	if continuationId == "" {
-		continuationId = stringutil.GenerateSecurityRandomString(continuationIdLength)
+		continuationId = securerandom.String(continuationIdLength)
 	}
 
 	jsonData, err := json.Marshal(&LinkMarker{

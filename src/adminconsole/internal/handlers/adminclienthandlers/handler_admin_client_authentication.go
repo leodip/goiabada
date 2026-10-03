@@ -12,8 +12,8 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/securerandom"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/leodip/goiabada/core/stringutil"
 )
 
 // clientAuthenticationAPI is what the client authentication page needs: the client, and its
@@ -215,7 +215,7 @@ func HandleAdminClientAuthenticationPost(
 
 func HandleAdminClientGenerateNewSecretGet(httpHelper HttpHelper) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		newSecret := stringutil.GenerateSecurityRandomString(60)
+		newSecret := securerandom.String(60)
 
 		result := map[string]string{
 			"NewSecret": newSecret,

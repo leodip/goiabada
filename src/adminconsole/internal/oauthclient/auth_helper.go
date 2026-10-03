@@ -8,8 +8,8 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/securerandom"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/leodip/goiabada/core/stringutil"
 )
 
 type AuthHelper struct {
@@ -41,10 +41,10 @@ func (s *AuthHelper) RedirToAuthorize(
 	}
 
 	redirectURI := s.baseURL + "/auth/callback"
-	codeVerifier := stringutil.GenerateSecurityRandomString(120)
+	codeVerifier := securerandom.String(120)
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
-	state := stringutil.GenerateSecurityRandomString(16)
-	nonce := stringutil.GenerateSecurityRandomString(16)
+	state := securerandom.String(16)
+	nonce := securerandom.String(16)
 
 	sess.Values[sessionkeys.SessionKeyState] = state
 	sess.Values[sessionkeys.SessionKeyNonce] = nonce

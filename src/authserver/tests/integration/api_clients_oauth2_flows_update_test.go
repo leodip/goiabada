@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/securerandom"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -62,7 +62,7 @@ func TestAPIClientOAuth2FlowsPut_Success_ConfidentialClient_ToggleBoth(t *testin
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create confidential client with a valid secret
-	clientSecret := stringutil.GenerateSecurityRandomString(60)
+	clientSecret := securerandom.String(60)
 	enc, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 	client := &models.Client{
@@ -231,7 +231,7 @@ func TestAPIClientOAuth2FlowsPut_BothDisabledAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Confidential client (has secret), start with auth code enabled
-	clientSecret := stringutil.GenerateSecurityRandomString(60)
+	clientSecret := securerandom.String(60)
 	enc, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 	client := &models.Client{

@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/securerandom"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +20,7 @@ func TestAPIClientAuthenticationPut_ConfidentialToPublic_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// inline createConfidentialClient
-	clientSecret := stringutil.GenerateSecurityRandomString(60)
+	clientSecret := securerandom.String(60)
 	enc, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 	client := &models.Client{
@@ -58,7 +58,7 @@ func TestAPIClientAuthenticationPut_PublicToConfidential_Success(t *testing.T) {
 	client := createPublicClient(t)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	newSecret := stringutil.GenerateSecurityRandomString(60)
+	newSecret := securerandom.String(60)
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: newSecret}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
@@ -180,7 +180,7 @@ func TestAPIClientAuthenticationPut_SystemLevelClientAllowed(t *testing.T) {
 
 	// Update authentication settings (should succeed for system-level client)
 	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysClient.Id, 10) + "/authentication"
-	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: stringutil.GenerateSecurityRandomString(60)}
+	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: securerandom.String(60)}
 	resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -195,7 +195,7 @@ func TestAPIClientAuthenticationPut_InsufficientScope(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/authentication"
-	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: stringutil.GenerateSecurityRandomString(60)}
+	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: securerandom.String(60)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)

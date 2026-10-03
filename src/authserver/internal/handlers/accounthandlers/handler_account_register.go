@@ -21,7 +21,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/securerandom"
 )
 
 // refuseSelfRegistrationDisabled answers a self-registration page, or an activation link, while
@@ -225,7 +225,7 @@ func HandleAccountRegisterPost(
 				return
 			}
 
-			verificationCode := stringutil.GenerateSecurityRandomString(32)
+			verificationCode := securerandom.String(32)
 			verificationCodeEncrypted, err := dataCipher.Encrypt(verificationCode)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)

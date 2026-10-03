@@ -1,9 +1,12 @@
 package apihandlers
 
-import (
-	"strings"
+import "github.com/leodip/goiabada/core/securerandom"
 
-	"github.com/leodip/goiabada/authserver/internal/randomstring"
+// The two halves of an email verification code draw from these. Each letter has probability
+// 1/26, as it had when the letter half was a draw over [A-Za-z] upper-cased (#442).
+const (
+	emailVerificationCodeLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	emailVerificationCodeDigits  = "0123456789"
 )
 
 // generateEmailVerificationCode returns the code an email verification check compares
@@ -22,6 +25,6 @@ import (
 // one, so the format cannot drift between the code that is sent and the code that is
 // checked.
 func generateEmailVerificationCode() string {
-	return strings.ToUpper(randomstring.Letters(4)) +
-		randomstring.Digits(4)
+	return securerandom.StringFromAlphabet(4, emailVerificationCodeLetters) +
+		securerandom.StringFromAlphabet(4, emailVerificationCodeDigits)
 }

@@ -3,7 +3,7 @@ package ceremony
 import (
 	"strings"
 
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/securerandom"
 )
 
 // IdLength is the length of a ceremony id. It matches the length of the continuation id emaillinks
@@ -12,9 +12,9 @@ import (
 // authorizes nothing on its own.
 const IdLength = 32
 
-// idAlphabet is what NewId draws from and IsWellFormedId accepts. It is stringutil's
-// GenerateSecurityRandomString alphabet, and every character of it is an RFC 3986 unreserved one, so
-// an id needs no escaping in the query it travels in.
+// idAlphabet is what NewId draws from and IsWellFormedId accepts. It is securerandom.String's
+// alphabet, and every character of it is an RFC 3986 unreserved one, so an id needs no escaping in
+// the query it travels in.
 const idAlphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_."
 
 // QueryParameter is the name a ceremony's id travels under in the URL of every step of it (#246,
@@ -27,7 +27,7 @@ const QueryParameter = "ceremony"
 // NewId draws a ceremony's id. Only HandleAuthorizeGet calls it, because that is the one place an
 // auth context is created.
 func NewId() string {
-	return stringutil.RandomStringFromAlphabet(IdLength, idAlphabet)
+	return securerandom.StringFromAlphabet(IdLength, idAlphabet)
 }
 
 // IsWellFormedId reports whether id has the length and the alphabet NewId produces. It is the shape

@@ -28,8 +28,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/randomstring"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/core/securerandom"
 )
 
 const (
@@ -63,10 +63,10 @@ func intn(n int) int {
 }
 
 // mustDraw returns s unless it is short of the n characters that were asked
-// for, in which case it panics. No caller can reach that panic today: the
-// stringutil helpers draw through crypto/rand.Read, which ends the process on a
+// for, in which case it panics. No caller can reach that panic today:
+// core/securerandom draws through crypto/rand.Read, which ends the process on a
 // CSPRNG failure rather than returning a short string (#211). The check is kept
-// as this package's own contract, independent of what stringutil promises: a
+// as this package's own contract, independent of what securerandom promises: a
 // fixture that quietly degrades to a shorter or constant value produces tests
 // that pass while every username is the same string, which is exactly the
 // collision #136 describes. TestMustDraw_PanicsOnShortResult is what holds it.
@@ -89,7 +89,7 @@ func LetterN(n uint) string {
 	if n == 0 {
 		n = 1
 	}
-	return mustDraw(randomstring.Letters(int(n)), n, "LetterN")
+	return mustDraw(securerandom.StringFromAlphabet(int(n), lowerChars+upperChars), n, "LetterN")
 }
 
 // DigitN returns n characters drawn from [0-9]. It stands in for the phone
@@ -103,7 +103,7 @@ func DigitN(n uint) string {
 	if n == 0 {
 		n = 1
 	}
-	return mustDraw(randomstring.Digits(int(n)), n, "DigitN")
+	return mustDraw(securerandom.StringFromAlphabet(int(n), digitChars), n, "DigitN")
 }
 
 // Password returns an n-character password containing at least one lowercase

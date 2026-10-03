@@ -8,8 +8,8 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/securerandom"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/leodip/goiabada/core/stringutil"
 )
 
 // accountLogoutAPI is what the account logout page needs: the logout request the auth server
@@ -57,7 +57,7 @@ func HandleAccountLogoutGet(
 		accessToken := jwtInfo.TokenResponse.AccessToken
 		req := &api.AccountLogoutRequest{
 			PostLogoutRedirectUri: baseURL,
-			State:                 stringutil.GenerateSecurityRandomString(32),
+			State:                 securerandom.String(32),
 			ResponseMode:          api.AccountLogoutResponseModeFormPost,
 		}
 
