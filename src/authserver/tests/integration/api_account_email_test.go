@@ -77,7 +77,6 @@ func TestAPIAccountEmailPut_Success(t *testing.T) {
 	assert.Equal(t, newEmail, updatedUser.Email)
 	assert.False(t, updatedUser.EmailVerified)
 	assert.Nil(t, updatedUser.EmailVerificationCodeEncrypted)
-	assert.False(t, updatedUser.EmailVerificationCodeIssuedAt.Valid)
 }
 
 func TestAPIAccountEmailPut_ValidationErrors(t *testing.T) {

@@ -165,7 +165,7 @@ func TestAPIAccountEmailVerification_VerifySuccess(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, updated.EmailVerified)
 	assert.Nil(t, updated.EmailVerificationCodeEncrypted)
-	assert.False(t, updated.EmailVerificationCodeIssuedAt.Valid)
+	assert.True(t, updated.EmailVerificationCodeIssuedAt.Valid, "the issued-at stays for the resend cooldown")
 }
 
 func TestAPIAccountEmailVerification_VerifyInvalidCode(t *testing.T) {

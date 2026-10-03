@@ -222,6 +222,8 @@ type RateLimiterMiddleware struct {
 	otp        *failureTier
 	// emailVerification bounds guessing at the account's own email verification code.
 	emailVerification *failureTier
+	// emailVerificationSend bounds the verification mail an account can have sent.
+	emailVerificationSend *requestTier
 	// accountPassword bounds guessing at the account's own password, at the two account API
 	// routes that verify it. One tier rather than two because it is one secret.
 	accountPassword *failureTier
@@ -272,6 +274,13 @@ func NewRateLimiterMiddleware(ceremonyStore authContextGetter, renderer errorRen
 		// too (#404), which shortens the chain without removing it. Failures only, so a user reading the code
 		// out of their inbox spends nothing (#219).
 		emailVerification: newFailureTier("email_verification", 5, 15*time.Minute),
+		// per-subject: verification mails sent, every request counted. The send mails a code to
+		// whatever address the account holds, and the account sets that address itself, so
+		// what this bounds is one account mailing addresses it does not own. The handler's own
+		// cooldown, one code per its five minute lifetime, holds whatever this switch says and
+		// allows 12 an hour; this is 5, which is room for a user whose first code went to spam
+		// or expired before a slow inbox delivered it (#404).
+		emailVerificationSend: newTier("email_verification_send", "", 5, 60*time.Minute),
 		// per-subject account password failures, one bucket for the three routes that check
 		// that password: PUT /api/v1/account/password, PUT /api/v1/account/otp and
 		// PUT /api/v1/account/email (#404). All three verify the same secret, so separate
@@ -577,6 +586,35 @@ func (m *RateLimiterMiddleware) LimitEmailVerification(next http.Handler) http.H
 	return m.limitFailuresPerSubject(next, m.emailVerification, rejectAPI, tokenSubject)
 }
 
+// LimitEmailVerificationSend rate limits the account's own verification mail, on the subject of
+// the access token presented. Every request counts, as on forgot-password's per-email tier: there
+// is no credential here to fail, and the harm is the mail itself.
+//
+// The subject rather than the address the mail goes to because the account chooses that address:
+// a per-address key would bucket the caller's own choice of recipient and bound nothing, the
+// reason LimitRegister gives for keying on the client block. A request with no readable token
+// passes through to the handler, which answers ACCESS_TOKEN_REQUIRED before sending anything.
+func (m *RateLimiterMiddleware) LimitEmailVerificationSend(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		key, audited, ok := tokenSubject(r)
+		if !ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if m.tripped(w, r, m.emailVerificationSend, key, rejectAPI, audited) {
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 // LimitAccountPassword rate limits the account's own password check, on the subject of the
 // access token presented. One middleware over three routes, PUT /api/v1/account/password,
 // PUT /api/v1/account/otp and PUT /api/v1/account/email (#404), which is what makes the bucket
@@ -600,7 +638,7 @@ func (m *RateLimiterMiddleware) LimitAccountPassword(next http.Handler) http.Han
 	return m.limitFailuresPerSubject(next, m.accountPassword, rejectAPI, tokenSubject)
 }
 
-// tokenSubject is the subject of the two account API limiters. The token's subject keys the
+// tokenSubject is the subject of the three account API limiters. The token's subject keys the
 // bucket and is what the event records, under loggedInUser, the name the account API's own
 // audit events give the caller.
 func tokenSubject(r *http.Request) (string, map[string]interface{}, bool) {

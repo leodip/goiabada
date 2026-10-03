@@ -1191,6 +1191,104 @@ func TestLimitEmailVerification_PerSubject(t *testing.T) {
 	})
 }
 
+// runVerificationSend drives one request through LimitEmailVerificationSend and reports the
+// status, whether the handler ran, and the response. A blank subject carries no token.
+func runVerificationSend(m *RateLimiterMiddleware, subject string) (int, bool, *httptest.ResponseRecorder) {
+	req := limiterRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
+	if subject != "" {
+		req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+	}
+	rr := httptest.NewRecorder()
+	reached := false
+	m.LimitEmailVerificationSend(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		w.WriteHeader(http.StatusTeapot)
+	})).ServeHTTP(rr, req)
+	return rr.Code, reached, rr
+}
+
+// TestLimitEmailVerificationSend_PerSubject is the verification mail's own tier (#404). The
+// account chooses the address the mail goes to, so every send counts against the account,
+// sent or not: 5 per hour, refused in the API's own envelope with the window as Retry-After,
+// and audited once with the subject, as the other two account API tiers audit theirs.
+func TestLimitEmailVerificationSend_PerSubject(t *testing.T) {
+	const budget = 5
+	const subject = "44444444-4444-4444-4444-444444444444"
+
+	t.Run("the budget is exactly 5 requests, then one refusal in the API's shape", func(t *testing.T) {
+		m, auditLog := newAuditedTestMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			if code, reached, _ := runVerificationSend(m, subject); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		code, reached, rr := runVerificationSend(m, subject)
+		if code != http.StatusTooManyRequests || reached {
+			t.Fatalf("request %d: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+		if got := rr.Header().Get("Retry-After"); got != "3600" {
+			t.Errorf("Retry-After = %q, want the hour the tier counts over", got)
+		}
+		if got := rr.Header().Get("Content-Type"); got != "application/json" {
+			t.Errorf("Content-Type = %q, want the account API's JSON envelope", got)
+		}
+		if len(auditLog.events) != 1 {
+			t.Fatalf("got %d audit events, want 1", len(auditLog.events))
+		}
+		want := map[string]interface{}{"limiter": "email_verification_send", "loggedInUser": subject}
+		if !reflect.DeepEqual(auditLog.events[0].details, want) {
+			t.Errorf("audit details = %v, want %v", auditLog.events[0].details, want)
+		}
+	})
+
+	t.Run("each subject has its own budget", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			runVerificationSend(m, subject)
+		}
+		if code, _, _ := runVerificationSend(m, subject); code != http.StatusTooManyRequests {
+			t.Fatalf("the exhausted subject got code %d, want %d", code, http.StatusTooManyRequests)
+		}
+		if code, reached, _ := runVerificationSend(m, "55555555-5555-5555-5555-555555555555"); code != http.StatusTeapot || !reached {
+			t.Errorf("second subject: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("it is not the verification check's budget", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			runVerificationSend(m, subject)
+		}
+		if code, reached, _ := runVerification(m, subject, true); code != http.StatusTeapot || !reached {
+			t.Errorf("the verification check got code %d, handler reached %v, with only the send's budget spent",
+				code, reached)
+		}
+	})
+
+	t.Run("a request carrying no token reaches the handler", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget*4; i++ {
+			if code, reached, _ := runVerificationSend(m, ""); code != http.StatusTeapot || !reached {
+				t.Fatalf("attempt %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+	})
+
+	t.Run("disabled limiter never blocks", func(t *testing.T) {
+		m := newTestMiddleware(nil, false)
+		for i := 0; i < budget*6; i++ {
+			if code, reached, _ := runVerificationSend(m, subject); code != http.StatusTeapot || !reached {
+				t.Fatalf("attempt %d: disabled limiter should never block, got code %d, handler reached %v",
+					i+1, code, reached)
+			}
+		}
+	})
+}
+
 // accountPasswordRequest builds a request at one of the two routes LimitAccountPassword
 // covers, carrying the validated token the account API's authentication middleware leaves on
 // the context. target is what tells the two routes apart, and the cases below use it to show
@@ -1942,8 +2040,8 @@ func TestBuiltLimiters_EachKeepsItsOwnRefusal(t *testing.T) {
 //
 // Over every tier the production constructor builds, found by walking the struct rather than by
 // listing them, because a listed set is green on the tier nobody added it to: the two keys a trip
-// test can reach today are two of thirteen tiers, and the next tier is what this exists for (#320
-// decision 3). The thirteen are eight request tiers and three failures-only ones, plus the two
+// test can reach today are two of fourteen tiers, and the next tier is what this exists for (#320
+// decision 3). The fourteen are nine request tiers and three failures-only ones, plus the two
 // failures-only tiers of the password gate, which ratelimit.AccountLimiter counts and accountTiers
 // names (#439).
 func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
@@ -1958,9 +2056,9 @@ func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
 	// The count is asserted because a walk that silently stopped matching would pass over an
 	// empty set exactly as it passes over a conformant one. It counts instances rather than
 	// distinct names, so a second tier carrying a name an earlier one already used is a
-	// fourteenth tier here rather than a replacement for the thirteenth.
-	if len(tiers) != 13 {
-		t.Fatalf("walked %d tiers, expected the 13 the constructor builds: %v", len(tiers), tiers)
+	// fifteenth tier here rather than a replacement for the fourteenth.
+	if len(tiers) != 14 {
+		t.Fatalf("walked %d tiers, expected the 14 the constructor builds: %v", len(tiers), tiers)
 	}
 	for _, found := range tiers {
 		if found.keyField == "" {

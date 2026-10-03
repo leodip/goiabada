@@ -118,7 +118,6 @@ func HandleAPIAccountEmailPut(
 		user.Email = email
 		user.EmailVerified = false
 		user.EmailVerificationCodeEncrypted = nil
-		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
 		user.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 		// Audit

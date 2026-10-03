@@ -150,7 +150,8 @@ type Database interface {
 	// update, so a concurrent admin disable cannot be undone by it (#106).
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
 	// SetUserEmail writes a user's address, clears the verified flag and any pending
-	// verification code in the same statement, and writes no other column. Narrow rather
+	// verification code in the same statement, and writes no other column; the code's
+	// issued-at stays, because the resend cooldown reads it (#404). Narrow rather
 	// than a full-row update, so the self-service email change cannot undo a concurrent
 	// admin disable, password change or OTP change (#404). A taken address is
 	// ErrUniqueViolation, as on UpdateUser.

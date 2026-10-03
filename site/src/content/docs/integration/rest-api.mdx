@@ -1371,7 +1371,7 @@ No request body required. Returns:
 ```
 
 <Aside type="caution">
-Rate limited to one request per 60 seconds. If rate limited, `tooManyRequests` will be `true` and `waitInSeconds` indicates the remaining cooldown.
+Limited to one code per 5 minutes per account, which is how long a code is valid, so an account has at most one live code at a time. If a code was issued less than 5 minutes ago, `tooManyRequests` will be `true` and `waitInSeconds` indicates the remaining cooldown. Changing the email address or verifying it does not reset this cooldown. When the built-in [rate limiter](/reference/environment-variables/) is enabled, the endpoint is also limited to 5 requests per hour per account, answered with `429 TOO_MANY_REQUESTS`.
 </Aside>
 
 #### Verify email

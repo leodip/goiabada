@@ -852,6 +852,12 @@ func (d *Database) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId i
 // and any pending verification code: the new address has not been verified, and a code
 // issued for the previous one must not verify it.
 //
+// The code's issued-at is kept. It is what the verification resend cooldown reads, and that
+// cooldown bounds the account rather than the address: clearing it here let a caller set any
+// address, have a code mailed to it, change away and back, and have it mailed again at once,
+// as often as they liked. A stale issued-at verifies nothing, because there is no code left
+// for it to date (#404).
+//
 // Narrow rather than going through UpdateUser, for SetUserPasswordHash's reason: the
 // self-service email change loads the user at the start of the request, and writing that
 // snapshot back would re-enable an account an administrator disabled under it, put back a
@@ -873,7 +879,6 @@ func (d *Database) SetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, e
 		ub.Assign("email", email),
 		ub.Assign("email_verified", false),
 		"email_verification_code_encrypted = NULL",
-		"email_verification_code_issued_at = NULL",
 		ub.Assign("updated_at", time.Now().UTC()),
 	)
 	ub.Where(ub.Equal("id", userId))
