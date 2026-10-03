@@ -484,7 +484,7 @@ func orEmpty(err error) { slog.Error("unable to load the embedded message catalo
 
 import "log/slog"
 
-func MiddlewareLocale() { slog.Debug("locale resolved") }
+func Locale() { slog.Debug("locale resolved") }
 
 func orEmpty2(err error) { slog.Error("not the admitted function", "error", err) }
 `)

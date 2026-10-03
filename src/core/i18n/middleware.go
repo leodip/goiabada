@@ -63,7 +63,7 @@ func SanitizeUILocales(raw string) []string {
 	return out
 }
 
-// MiddlewareLocale returns the global locale-resolution middleware. It
+// Locale returns the global locale-resolution middleware. It
 // runs early in the request chain (before identity is established) and
 // attaches a tentative localizer to the request context. uiLocalesReader may
 // be nil (adminconsole), in which case the in-flight UI-locales step is skipped.
@@ -79,7 +79,7 @@ func SanitizeUILocales(raw string) []string {
 // "explicit intent", which a non-explicit WithLocale call honors by leaving it
 // alone. This prevents user-locale refinement from clobbering an explicit
 // per-request preference.
-func MiddlewareLocale(uiLocalesReader UILocalesReader) func(http.Handler) http.Handler {
+func Locale(uiLocalesReader UILocalesReader) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := resolveLocale(r.Context(), r, uiLocalesReader)
@@ -90,9 +90,9 @@ func MiddlewareLocale(uiLocalesReader UILocalesReader) func(http.Handler) http.H
 
 // ResolveRequestLocale attaches a tentative localizer to ctx from the request
 // alone: ?ui_locales, then Accept-Language, then English. It is exactly what
-// MiddlewareLocale does when authHelper is nil.
+// Locale does when authHelper is nil.
 //
-// It exists for a middleware that answers a request before MiddlewareLocale has
+// It exists for a middleware that answers a request before Locale has
 // run and so has no localizer to reach for. httpmw.CSRF is the case: it is
 // mounted on the root router, above the branch that carries the locale
 // middleware, so that a route registered outside that branch cannot escape the

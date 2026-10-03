@@ -94,8 +94,8 @@ func TestSanitizeUILocales_ByteCap(t *testing.T) {
 	assert.LessOrEqual(t, used, maxUILocaleBytes, "result must respect byte cap")
 }
 
-func TestMiddlewareLocale_QueryParamWins(t *testing.T) {
-	mw := MiddlewareLocale(nil)
+func TestLocale_QueryParamWins(t *testing.T) {
+	mw := Locale(nil)
 	req := httptest.NewRequest("GET", "/auth/authorize?ui_locales=pt-BR", nil)
 	req.Header.Set("Accept-Language", "fr-FR")
 	rr := httptest.NewRecorder()
@@ -112,8 +112,8 @@ func TestMiddlewareLocale_QueryParamWins(t *testing.T) {
 // shared grammar reaches ui_locales first (#244): a query whose tags are separated by one space is an
 // explicit preference, and one whose tags are separated by a tab, or by two spaces, carries no usable
 // tag and falls through to Accept-Language.
-func TestMiddlewareLocale_UILocalesUsesTheSharedGrammar(t *testing.T) {
-	mw := MiddlewareLocale(nil)
+func TestLocale_UILocalesUsesTheSharedGrammar(t *testing.T) {
+	mw := Locale(nil)
 
 	run := func(query string) (title string, explicit bool) {
 		req := httptest.NewRequest("GET", "/auth/authorize?ui_locales="+query, nil)
@@ -137,8 +137,8 @@ func TestMiddlewareLocale_UILocalesUsesTheSharedGrammar(t *testing.T) {
 	}
 }
 
-func TestMiddlewareLocale_UILocalesReaderWinsOverHeader(t *testing.T) {
-	mw := MiddlewareLocale(&stubUILocalesReader{locales: []string{"pt-BR"}})
+func TestLocale_UILocalesReaderWinsOverHeader(t *testing.T) {
+	mw := Locale(&stubUILocalesReader{locales: []string{"pt-BR"}})
 	req := httptest.NewRequest("GET", "/auth/pwd", nil)
 	req.Header.Set("Accept-Language", "fr-FR")
 	rr := httptest.NewRecorder()
@@ -151,8 +151,8 @@ func TestMiddlewareLocale_UILocalesReaderWinsOverHeader(t *testing.T) {
 	assert.Equal(t, "Entrar", seen)
 }
 
-func TestMiddlewareLocale_EmptyUILocalesFallsBackToHeader(t *testing.T) {
-	mw := MiddlewareLocale(&stubUILocalesReader{})
+func TestLocale_EmptyUILocalesFallsBackToHeader(t *testing.T) {
+	mw := Locale(&stubUILocalesReader{})
 	req := httptest.NewRequest("GET", "/auth/pwd", nil)
 	req.Header.Set("Accept-Language", "pt-BR")
 	rr := httptest.NewRecorder()
@@ -165,9 +165,9 @@ func TestMiddlewareLocale_EmptyUILocalesFallsBackToHeader(t *testing.T) {
 	assert.Equal(t, "Entrar", seen)
 }
 
-func TestMiddlewareLocale_AcceptLanguageFallback(t *testing.T) {
+func TestLocale_AcceptLanguageFallback(t *testing.T) {
 	// No query or in-flight UI locales, just Accept-Language. pt-BR should resolve.
-	mw := MiddlewareLocale(nil)
+	mw := Locale(nil)
 	req := httptest.NewRequest("GET", "/auth/pwd", nil)
 	req.Header.Set("Accept-Language", "pt-BR,en;q=0.9")
 	rr := httptest.NewRecorder()
@@ -180,9 +180,9 @@ func TestMiddlewareLocale_AcceptLanguageFallback(t *testing.T) {
 	assert.Equal(t, "Entrar", seen)
 }
 
-func TestMiddlewareLocale_EnglishFallback(t *testing.T) {
+func TestLocale_EnglishFallback(t *testing.T) {
 	// No signals → English.
-	mw := MiddlewareLocale(nil)
+	mw := Locale(nil)
 	req := httptest.NewRequest("GET", "/auth/pwd", nil)
 	rr := httptest.NewRecorder()
 
@@ -194,15 +194,15 @@ func TestMiddlewareLocale_EnglishFallback(t *testing.T) {
 	assert.Equal(t, "Login", seen)
 }
 
-func TestMiddlewareLocale_DoesNotConsumePostBody(t *testing.T) {
-	// MiddlewareLocale must NOT call r.ParseForm — it would interfere
+func TestLocale_DoesNotConsumePostBody(t *testing.T) {
+	// Locale must NOT call r.ParseForm — it would interfere
 	// with the authorize handler's own form parsing on POST.
 	body := strings.NewReader("ui_locales=pt-BR&client_id=x")
 	req := httptest.NewRequest("POST", "/auth/authorize", body)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 
-	mw := MiddlewareLocale(nil)
+	mw := Locale(nil)
 	mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Reading the body inside the handler should still work — the
 		// middleware did not consume it.
@@ -346,7 +346,7 @@ func throughLocaleMiddleware(t *testing.T, req *http.Request) *http.Request {
 	t.Helper()
 
 	var inner *http.Request
-	MiddlewareLocale(nil)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+	Locale(nil)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		inner = r
 	})).ServeHTTP(httptest.NewRecorder(), req)
 	require.NotNil(t, inner)
@@ -354,7 +354,7 @@ func throughLocaleMiddleware(t *testing.T, req *http.Request) *http.Request {
 }
 
 // TestResolveRequestLocale covers the exported resolution a middleware answering
-// ahead of MiddlewareLocale uses for its own response. Same three signals as the
+// ahead of Locale uses for its own response. Same three signals as the
 // middleware, minus the AuthContext step, which has no reader to consult.
 //
 // The rows are the ones a rejection actually meets: an operator following a link

@@ -10,7 +10,7 @@
 //     ones (override files win on conflict) and refuses a catalog that does not
 //     parse, so a broken override stops the server at startup. The package
 //     reads no environment variable itself (#431).
-//   - MiddlewareLocale runs early in every request chain (before identity
+//   - Locale runs early in every request chain (before identity
 //     is established) and attaches a tentative localizer based on
 //     ?ui_locales, in-flight UI locales (authserver only),
 //     Accept-Language, then English.

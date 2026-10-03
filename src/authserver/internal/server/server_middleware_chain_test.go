@@ -57,7 +57,7 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 		"github.com/leodip/goiabada/authserver/internal/middleware.Settings.func1",
 		"github.com/leodip/goiabada/core/httpmw.CookieReset.func1",
 		"github.com/leodip/goiabada/authserver/internal/middleware.SessionIdentifier.func1",
-		"github.com/leodip/goiabada/core/i18n.MiddlewareLocale.func1",
+		"github.com/leodip/goiabada/core/i18n.Locale.func1",
 	)
 
 	require.Contains(t, chains, "/static/*", "the static route must have been walked")

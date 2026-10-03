@@ -600,14 +600,14 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 	return result, nil
 }
 
-// ClientGrantRevocationResult reports what revoking one client's grants actually did. It is
+// ClientGrantResult reports what revoking one client's grants actually did. It is
 // TerminationResult's two fields under a name that does not assert a session ended, and that
 // distinction is the whole reason it is a separate type (#245 decision 16): flipping a client to
 // public revokes the client's grants and deliberately leaves every session alone, so a result
 // carrying UserAuthStateResult's terminated-sessions, preserved-session and generation fields would
 // have three fields that can never fill, and an audit payload built from it would imply an action
 // this one does not take.
-type ClientGrantRevocationResult struct {
+type ClientGrantResult struct {
 	// RevokedCodeCount is how many codes this call TRANSITIONED from live to revoked, not how
 	// many the client has. A second flip of the same client reports 0, which is what makes the
 	// audit event answer the only question an auditor asks of it, whether this action revoked
@@ -658,8 +658,8 @@ type ClientGrantRevocationResult struct {
 // RevokeUserAuthState states about its own: the contract is atomicity across a marker and a
 // multi-row sweep, so the transaction is a precondition of the whole operation rather than an
 // argument one nested call happens to care about.
-func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId int64) (ClientGrantRevocationResult, error) {
-	result := ClientGrantRevocationResult{RevokedRefreshTokenJtis: []string{}}
+func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId int64) (ClientGrantResult, error) {
+	result := ClientGrantResult{RevokedRefreshTokenJtis: []string{}}
 
 	if tx == nil {
 		return result, errs.New("revoking a client's grants requires a transaction: the code marker and the sweep must not be separable")
@@ -667,12 +667,12 @@ func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId i
 
 	revokedCodeCount, err := db.RevokeCodesByClientId(ctx, tx, clientId)
 	if err != nil {
-		return ClientGrantRevocationResult{}, err
+		return ClientGrantResult{}, err
 	}
 
 	tokens, err := db.GetRefreshTokensByClientId(ctx, tx, clientId)
 	if err != nil {
-		return ClientGrantRevocationResult{}, err
+		return ClientGrantResult{}, err
 	}
 
 	// A record for every family the client holds a token of, live or not, written before the
@@ -684,15 +684,15 @@ func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId i
 	// inserted. A revoked member counts too: its sibling may be the one mid-rotation.
 	err = recordClientFamilies(ctx, db, tx, tokens)
 	if err != nil {
-		return ClientGrantRevocationResult{}, err
+		return ClientGrantResult{}, err
 	}
 
 	revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, tokens)
 	if err != nil {
-		return ClientGrantRevocationResult{}, err
+		return ClientGrantResult{}, err
 	}
 
-	return ClientGrantRevocationResult{
+	return ClientGrantResult{
 		RevokedCodeCount:        revokedCodeCount,
 		RevokedRefreshTokenJtis: revokedJtis,
 	}, nil
@@ -755,7 +755,7 @@ func recordClientFamilies(ctx context.Context, db Database, tx *sql.Tx, tokens [
 // failure is indeterminate, and the bounded consequence is a client left flipped and revoked with
 // no audit record of it, which is fail-closed on the security side and a gap on the forensic side.
 func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64,
-	write func(tx *sql.Tx) (bool, error)) (ClientGrantRevocationResult, error) {
+	write func(tx *sql.Tx) (bool, error)) (ClientGrantResult, error) {
 
 	// The write and the conditional sweep in one transaction opened through RunInTransaction, so
 	// a deadlock reruns both together (#301). Safe to rerun: the write is the compare-and-set
@@ -765,14 +765,14 @@ func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64,
 	// A family's record is written by a read-then-insert, so a containment of the same family that
 	// overlaps this transaction can win the key first. The helper reruns the body once, which then
 	// reads the record the containment committed and leaves it as it is.
-	var result ClientGrantRevocationResult
+	var result ClientGrantResult
 	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
 		revoke, err := write(tx)
 		if err != nil {
 			return err
 		}
 
-		result = ClientGrantRevocationResult{RevokedRefreshTokenJtis: []string{}}
+		result = ClientGrantResult{RevokedRefreshTokenJtis: []string{}}
 		if revoke {
 			result, err = RevokeClientGrants(ctx, db, tx, clientId)
 			if err != nil {
@@ -782,7 +782,7 @@ func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64,
 		return nil
 	})
 	if err != nil {
-		return ClientGrantRevocationResult{}, err
+		return ClientGrantResult{}, err
 	}
 	return result, nil
 }
@@ -809,7 +809,7 @@ type AuditLogger interface {
 // neither an *http.Request nor a context of its own and the event it raises has to be correlated
 // to the request that caused the revocation (#328). All of its callers are handlers.
 func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, clientId int64, reason string,
-	loggedInUser string, result ClientGrantRevocationResult) {
+	loggedInUser string, result ClientGrantResult) {
 
 	auditLogger.Log(ctx, audit.EventRevokedClientGrants, map[string]interface{}{
 		"clientId":     clientId,

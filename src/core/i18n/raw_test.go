@@ -53,7 +53,7 @@ func TestRaw_ResolvesTheLocaleTheSameWayTAsDoes(t *testing.T) {
 		req.Header.Set("Accept-Language", tc.acceptLanguage)
 
 		var gotRaw, gotT string
-		MiddlewareLocale(nil)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		Locale(nil)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 			gotRaw = Raw(r.Context(), "js.image_upload.upload_button")
 			gotT = T(r.Context(), "auth.pwd.title")
 		})).ServeHTTP(httptest.NewRecorder(), req)

@@ -60,7 +60,7 @@ func SettingsCache(settingsCache settingsGetter) func(http.Handler) http.Handler
 			// other 500 in this module renders: that page reads settings off the context for
 			// its layout, and settings are the thing that is missing here.
 			//
-			// They are localized, which they could not be until i18n.MiddlewareLocale was
+			// They are localized, which they could not be until i18n.Locale was
 			// moved ahead of this middleware on the application branch. Server.initMiddleware
 			// records why that reorder is safe.
 			if publicSettings.Issuer == "" {

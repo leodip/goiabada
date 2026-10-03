@@ -991,7 +991,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 		setup        func(db *datamocks.Database)
 		write        func(tx *sql.Tx) (bool, error)
 		notAttempted []string
-		extraAssert  func(t *testing.T, result ClientGrantRevocationResult)
+		extraAssert  func(t *testing.T, result ClientGrantResult)
 	}{
 		{
 			// The helper could not open a transaction, so the body never runs.
@@ -1032,7 +1032,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).Return(nil, boom).Once()
 			},
 			notAttempted: []string{"UpdateRefreshToken"},
-			extraAssert: func(t *testing.T, result ClientGrantRevocationResult) {
+			extraAssert: func(t *testing.T, result ClientGrantResult) {
 				assert.Equal(t, int64(0), result.RevokedCodeCount,
 					"the count must not survive a rolled-back transaction")
 			},
@@ -1056,7 +1056,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
 					Return([]*record.RefreshToken{}, nil).Once()
 			},
-			extraAssert: func(t *testing.T, result ClientGrantRevocationResult) {
+			extraAssert: func(t *testing.T, result ClientGrantResult) {
 				// The honest contract, documented on the helper: a reported commit failure means
 				// the durable outcome is INDETERMINATE and may in fact have applied. What the
 				// zero result buys is that no audit event claims it did.
@@ -1078,7 +1078,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, write)
 
 			require.ErrorIs(t, err, boom)
-			assert.Equal(t, ClientGrantRevocationResult{}, result,
+			assert.Equal(t, ClientGrantResult{}, result,
 				"the error path returns the zero value, and a caller must not audit it")
 			assertNotAttempted(t, db, tc.notAttempted...)
 			if tc.extraAssert != nil {

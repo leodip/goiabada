@@ -72,7 +72,7 @@ func runSettingsChainForRequest(t *testing.T, authServerBaseURL string, req *htt
 	// cases asserting the attribute are what would fail if the wrapper were removed (#320
 	// decision 2).
 	chimiddleware.RequestID(
-		i18n.MiddlewareLocale(nil)(
+		i18n.Locale(nil)(
 			SettingsCache(publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL), publicsettings.DefaultTTL))(next),
 		),
 	).ServeHTTP(recorder, req)

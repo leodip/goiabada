@@ -402,7 +402,7 @@ func (s *Server) initMiddleware() chi.Router {
 		// Accept-Language, and touches no settings, no session and no database.
 		// The authserver's copy of this chain does resolve locale last because
 		// its reader needs the session to be decoded first.
-		i18n.MiddlewareLocale(nil),
+		i18n.Locale(nil),
 
 		// Adds settings to the request context (fetched from cache, not database)
 		middleware.SettingsCache(s.settingsCache),

@@ -224,7 +224,7 @@ func acceptLanguageRequest(acceptLanguage string) *http.Request {
 }
 
 // ctxFor builds a context carrying the translator the current bundle resolves
-// for prefs — the shape MiddlewareLocale produces, without the HTTP layer.
+// for prefs — the shape Locale produces, without the HTTP layer.
 func ctxFor(prefs ...string) context.Context {
 	return ctxForBundle(current(), prefs...)
 }

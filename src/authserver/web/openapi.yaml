@@ -3831,6 +3831,7 @@ components:
           type: string
         gender:
           type: string
+          description: '"female", "male" or "other", or empty when unset'
         email:
           type: string
           format: email

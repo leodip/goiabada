@@ -239,7 +239,7 @@ func CSRF() func(next http.Handler) http.Handler {
 			// attack, tells the attacker which check refused them.
 			//
 			// This middleware is mounted on the root router, above the branch that carries
-			// i18n.MiddlewareLocale, so there is no localizer on the context to reach for:
+			// i18n.Locale, so there is no localizer on the context to reach for:
 			// mounting it below the branch would gain one at the cost of leaving any route
 			// registered outside that branch unprotected. ResolveRequestLocale is the same
 			// resolution the locale middleware performs, done here for this one response.
