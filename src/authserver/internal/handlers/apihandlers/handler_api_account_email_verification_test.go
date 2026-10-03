@@ -76,7 +76,8 @@ func newVerificationEnv(t *testing.T) *verificationEnv {
 	}
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil).Maybe()
-	database.On("UpdateUser", mock.Anything, (*sql.Tx)(nil), user).Return(nil).Maybe()
+	database.On("TryVerifyUserEmail", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com", mock.Anything).
+		Return(true, nil).Maybe()
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	rateLimiter := middleware.NewRateLimiterMiddleware(nil, unusedRenderer{t}, nil, nil, true)
@@ -219,7 +220,8 @@ func TestHandleAPIAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHa
 
 	user := &models.User{Id: 7, Subject: verificationSubject, Email: "someone@example.com"}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil)
-	database.On("UpdateUser", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
+	database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com",
+		mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	var emailedLink string
 	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 		"/emails/email_verification.html", mock.Anything).
@@ -264,12 +266,10 @@ func TestHandleAPIAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *t
 	pending, err := testDataCipher.Encrypt(verificationCode)
 	require.NoError(t, err)
 
-	send := func(t *testing.T, user *models.User, pageRenderer *mocks_handlers.PageRenderer,
+	send := func(t *testing.T, user *models.User, database *mocks_data.Database, pageRenderer *mocks_handlers.PageRenderer,
 		emailSender *mocks_accounthandlers.EmailSender, auditLogger *mocks_handlers.AuditLogger) api.AccountEmailVerificationSendResponse {
 		t.Helper()
-		database := mocks_data.NewDatabase(t)
 		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil)
-		database.On("UpdateUser", mock.Anything, (*sql.Tx)(nil), user).Return(nil).Maybe()
 
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
 		req = setTokenContextWithClaims(req, map[string]interface{}{"sub": verificationSubject})
@@ -298,8 +298,11 @@ func TestHandleAPIAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *t
 				EmailVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Add(-4 * time.Minute), Valid: true}}
 
 			// The renderer, the sender and the logger expect nothing, so a send fails the case.
-			resp := send(t, user, mocks_handlers.NewPageRenderer(t), mocks_accounthandlers.NewEmailSender(t),
+			database := mocks_data.NewDatabase(t)
+			resp := send(t, user, database, mocks_handlers.NewPageRenderer(t), mocks_accounthandlers.NewEmailSender(t),
 				mocks_handlers.NewAuditLogger(t))
+			database.AssertNotCalled(t, "TryStoreEmailVerificationCode", mock.Anything, mock.Anything, mock.Anything,
+				mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 			assert.True(t, resp.TooManyRequests)
 			assert.InDelta(t, 60, resp.WaitInSeconds, 2, "the wait is what is left of the five minutes")
@@ -317,10 +320,244 @@ func TestHandleAPIAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *t
 			Return(&bytes.Buffer{}, nil).Once()
 		emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		auditLogger.On("Log", mock.Anything, audit.AuditSentEmailVerificationMessage, mock.Anything).Return().Once()
+		database := mocks_data.NewDatabase(t)
+		database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "anyone@example.com",
+			mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
 
-		resp := send(t, user, pageRenderer, emailSender, auditLogger)
+		resp := send(t, user, database, pageRenderer, emailSender, auditLogger)
 
 		assert.True(t, resp.EmailVerificationSent)
 		assert.False(t, resp.TooManyRequests)
 	})
+}
+
+// sendVerification drives one send through the handler on database and returns the response.
+func sendVerification(t *testing.T, database *mocks_data.Database, pageRenderer *mocks_handlers.PageRenderer,
+	emailSender *mocks_accounthandlers.EmailSender, auditLogger *mocks_handlers.AuditLogger) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
+	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": verificationSubject})
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true, SMTPHost: "smtp.example.com"}))
+	rr := httptest.NewRecorder()
+	HandleAPIAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
+		testDataCipher, testAdminConsoleBaseURL).ServeHTTP(rr, req)
+	return rr
+}
+
+// TestHandleAPIAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditionalWrite is the
+// cooldown under concurrency (#404). The check the handler reads first cannot bound concurrent
+// sends, which all read the same old issued-at; the write decides. It is keyed on the address
+// the mail goes to, its cutoff is exactly one code lifetime before the issued-at it stores, and
+// what it stores is the code the mail carries, encrypted.
+func TestHandleAPIAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditionalWrite(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
+	emailSender := mocks_accounthandlers.NewEmailSender(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+
+	user := &models.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com"}
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil).Once()
+	var stored []byte
+	var issuedAt, issuedNotAfter time.Time
+	database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "anyone@example.com",
+		mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			stored = args.Get(4).([]byte)
+			issuedAt = args.Get(5).(time.Time)
+			issuedNotAfter = args.Get(6).(time.Time)
+		}).Return(true, nil).Once()
+	var mailedCode string
+	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, mock.Anything, "/emails/email_verification.html", mock.Anything).
+		Run(func(args mock.Arguments) {
+			mailedCode, _ = args.Get(3).(map[string]interface{})["verificationCode"].(string)
+		}).Return(&bytes.Buffer{}, nil).Once()
+	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	auditLogger.On("Log", mock.Anything, audit.AuditSentEmailVerificationMessage, mock.Anything).Return().Once()
+
+	rr := sendVerification(t, database, pageRenderer, emailSender, auditLogger)
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	assert.WithinDuration(t, time.Now().UTC(), issuedAt, 5*time.Second)
+	assert.Equal(t, issuedAt.Add(-5*time.Minute), issuedNotAfter, "the cutoff is one code lifetime before the issue")
+	decrypted, err := testDataCipher.Decrypt(stored)
+	require.NoError(t, err)
+	require.NotEmpty(t, mailedCode)
+	assert.Equal(t, mailedCode, decrypted, "the code stored is the code mailed")
+}
+
+// TestHandleAPIAccountEmailVerificationSendPost_ALostClaimSendsNothing is the other side of
+// the claim: a send whose write matched no row mails nothing and answers what the row says now,
+// read again. A concurrent send that claimed the code leaves a cooldown, a verification leaves
+// the address verified, and an email change leaves neither, which is a 409 (#404).
+func TestHandleAPIAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		reread *models.User
+		check  func(t *testing.T, rr *httptest.ResponseRecorder)
+	}{
+		{
+			name: "a concurrent send claimed the code",
+			reread: &models.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com",
+				EmailVerificationCodeIssuedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true}},
+			check: func(t *testing.T, rr *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+				var resp api.AccountEmailVerificationSendResponse
+				require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+				assert.True(t, resp.TooManyRequests)
+				assert.InDelta(t, 300, resp.WaitInSeconds, 2)
+				assert.False(t, resp.EmailVerificationSent)
+			},
+		},
+		{
+			name:   "a concurrent verification verified the address",
+			reread: &models.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com", EmailVerified: true},
+			check: func(t *testing.T, rr *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+				var resp api.AccountEmailVerificationSendResponse
+				require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+				assert.True(t, resp.EmailVerified)
+				assert.False(t, resp.EmailVerificationSent)
+			},
+		},
+		{
+			name:   "a concurrent email change moved the address",
+			reread: &models.User{Id: 7, Subject: verificationSubject, Email: "elsewhere@example.com"},
+			check: func(t *testing.T, rr *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusConflict, rr.Code, rr.Body.String())
+				var body map[string]string
+				require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+				assert.Equal(t, "CONCURRENT_UPDATE", body["error_code"])
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			database := mocks_data.NewDatabase(t)
+			first := &models.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com"}
+			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(first, nil).Once()
+			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(tc.reread, nil).Once()
+			database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "anyone@example.com",
+				mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
+
+			// The renderer, the sender and the logger expect nothing, so a mail or an audit entry
+			// fails the case.
+			rr := sendVerification(t, database, mocks_handlers.NewPageRenderer(t), mocks_accounthandlers.NewEmailSender(t),
+				mocks_handlers.NewAuditLogger(t))
+
+			tc.check(t, rr)
+		})
+	}
+}
+
+// verifyDirect submits a code to the verification handler with no limiter in front, so the
+// recorder counts what the handler itself charges.
+func verifyDirect(t *testing.T, database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger,
+	credentials CredentialFailureRecorder, submitted string) *httptest.ResponseRecorder {
+	t.Helper()
+	body, err := json.Marshal(api.VerifyAccountEmailRequest{VerificationCode: submitted})
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification", bytes.NewReader(body))
+	ctx := reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true})
+	req = setTokenContextWithClaims(req.WithContext(ctx), map[string]interface{}{"sub": verificationSubject})
+	rr := httptest.NewRecorder()
+	HandleAPIAccountEmailVerificationPost(database, auditLogger, credentials, testDataCipher).ServeHTTP(rr, req)
+	return rr
+}
+
+// pendingCodeUser is an account holding someone@example.com, unverified, with verificationCode
+// pending and issued a moment ago.
+func pendingCodeUser(t *testing.T) *models.User {
+	t.Helper()
+	encrypted, err := testDataCipher.Encrypt(verificationCode)
+	require.NoError(t, err)
+	return &models.User{Id: 7, Subject: verificationSubject, Enabled: true, Email: "someone@example.com",
+		EmailVerificationCodeEncrypted: encrypted,
+		EmailVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC(), Valid: true}}
+}
+
+// TestHandleAPIAccountEmailVerificationPost_VerifiesThroughTheConditionalWrite is the verify's
+// write (#404): conditional on the address read and on the exact ciphertext the handler
+// decrypted and compared, so the code that was checked is the code spent, and narrow, so
+// nothing else of the row the request loaded is written back.
+func TestHandleAPIAccountEmailVerificationPost_VerifiesThroughTheConditionalWrite(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+	user := pendingCodeUser(t)
+	compared := user.EmailVerificationCodeEncrypted
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil).Once()
+	database.On("TryVerifyUserEmail", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com", compared).
+		Return(true, nil).Once()
+	auditLogger.On("Log", mock.Anything, audit.AuditVerifiedEmail, mock.Anything).Return().Once()
+	credentials := &countingCredentials{}
+
+	rr := verifyDirect(t, database, auditLogger, credentials, verificationCode)
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var resp api.UpdateUserResponse
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+	assert.True(t, resp.User.EmailVerified)
+	assert.Equal(t, 0, credentials.failures)
+	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// TestHandleAPIAccountEmailVerificationPost_ALostWriteIsNotAGuess covers the verify whose
+// conditional write matched no row after the code compared right (#404). A twin submission that
+// verified first is answered as that one was; a code a new send or an email change replaced is
+// invalid. Neither was a guess, so neither spends the failure budget, and neither writes an
+// audit entry: the twin already wrote the verification's.
+func TestHandleAPIAccountEmailVerificationPost_ALostWriteIsNotAGuess(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		reread     func(user *models.User) *models.User
+		wantStatus int
+	}{
+		{
+			name: "a twin submission verified the address first",
+			reread: func(user *models.User) *models.User {
+				return &models.User{Id: 7, Subject: verificationSubject, Email: user.Email, EmailVerified: true}
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "a new send replaced the code",
+			reread: func(user *models.User) *models.User {
+				replaced := *user
+				replaced.EmailVerificationCodeEncrypted = []byte("another code's ciphertext")
+				return &replaced
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "an email change moved the address, verified meanwhile",
+			reread: func(user *models.User) *models.User {
+				return &models.User{Id: 7, Subject: verificationSubject, Email: "elsewhere@example.com", EmailVerified: true}
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			database := mocks_data.NewDatabase(t)
+			user := pendingCodeUser(t)
+			reread := tc.reread(user)
+			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil).Once()
+			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(reread, nil).Once()
+			database.On("TryVerifyUserEmail", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com", mock.Anything).
+				Return(false, nil).Once()
+			credentials := &countingCredentials{}
+
+			// The logger expects nothing, so an audit entry of either kind fails the case.
+			rr := verifyDirect(t, database, mocks_handlers.NewAuditLogger(t), credentials, verificationCode)
+
+			require.Equal(t, tc.wantStatus, rr.Code, rr.Body.String())
+			if tc.wantStatus == http.StatusOK {
+				var resp api.UpdateUserResponse
+				require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+				assert.True(t, resp.User.EmailVerified)
+			} else {
+				var body map[string]string
+				require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+				assert.Equal(t, "INVALID_OR_EXPIRED_VERIFICATION_CODE", body["error_code"])
+			}
+			assert.Equal(t, 0, credentials.failures, "a right code that lost the row is not a guess")
+		})
+	}
 }

@@ -128,11 +128,12 @@ func stubAccountEmailUpdate(t *testing.T, database *mocks_data.Database, updateE
 		Return(&models.User{Id: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com",
 			PasswordHash: accountEmailTestPasswordHash(t)}, nil).Twice()
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, emailTestAddress).Return(nil, nil).Once()
-	database.On("SetUserEmail", mock.Anything, mock.Anything, emailTestUserId, emailTestAddress).Return(updateErr).Once()
+	database.On("TrySetUserEmail", mock.Anything, mock.Anything, emailTestUserId, "old@example.com", false, emailTestAddress).
+		Return(updateErr == nil, updateErr).Once()
 }
 
 // TestHandleAPIAccountEmailPut_SavesThroughTheNarrowWrite is #404 decision 4: the change writes
-// the address, the cleared verified flag and the cleared verification code through SetUserEmail,
+// the address, the cleared verified flag and the cleared verification code through TrySetUserEmail,
 // keyed on the caller's own id, and never writes back the user row it loaded at the start of the
 // request, which would undo a concurrent disable, password change or OTP change.
 func TestHandleAPIAccountEmailPut_SavesThroughTheNarrowWrite(t *testing.T) {
@@ -151,7 +152,9 @@ func TestHandleAPIAccountEmailPut_SavesThroughTheNarrowWrite(t *testing.T) {
 			PasswordHash:                   accountEmailTestPasswordHash(t),
 		}, nil).Twice()
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, nil).Once()
-	database.On("SetUserEmail", mock.Anything, (*sql.Tx)(nil), emailTestUserId, "new@example.com").Return(nil).Once()
+	// Conditional on the address and the verified flag the request read.
+	database.On("TrySetUserEmail", mock.Anything, (*sql.Tx)(nil), emailTestUserId, "old@example.com", true, "new@example.com").
+		Return(true, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedOwnEmail, map[string]interface{}{
 		"userId":       emailTestUserId,
 		"loggedInUser": emailTestSubject,
@@ -231,7 +234,7 @@ func TestHandleAPIAccountEmailPut_ABlankCurrentPasswordIsRefusedAndChargesNothin
 			assert.Equal(t, "VALIDATION_ERROR", errorCodeOf(t, rr))
 			assert.Equal(t, "Current password is required.", descriptionOf(t, rr))
 			assert.Equal(t, 0, credentials.failures, "no password was compared, so nothing is charged")
-			database.AssertNotCalled(t, "SetUserEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "TrySetUserEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 			assert.Empty(t, jobs.jobs, "a refused change sends no notice")
 		})
@@ -272,7 +275,7 @@ func TestHandleAPIAccountEmailPut_AWrongPasswordIsRefusedBeforeTheAddressIsLooke
 			assert.Equal(t, "AUTHENTICATION_FAILED", errorCodeOf(t, rr))
 			assert.Equal(t, "Authentication failed. Check your current password and try again.", descriptionOf(t, rr))
 			assert.Equal(t, 1, credentials.failures, "a wrong password is charged exactly once")
-			database.AssertNotCalled(t, "SetUserEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "TrySetUserEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 			assert.Empty(t, jobs.jobs, "a refused change sends no notice")
 		})
@@ -313,7 +316,7 @@ func TestHandleAPIAccountEmailPut_ResubmittingTheCurrentAddressChangesNothing(t 
 	assert.Equal(t, "same@example.com", resp.User.Email)
 	assert.True(t, resp.User.EmailVerified, "re-saving the address keeps it verified")
 	assert.Equal(t, 0, credentials.failures)
-	database.AssertNotCalled(t, "SetUserEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "TrySetUserEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	assert.Empty(t, jobs.jobs, "a change that did not happen sends no notice, with SMTP on")
@@ -343,7 +346,8 @@ func stubSuccessfulChange(t *testing.T, database *mocks_data.Database, auditLogg
 	t.Helper()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).Return(user, nil).Twice()
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, nil).Once()
-	database.On("SetUserEmail", mock.Anything, (*sql.Tx)(nil), emailTestUserId, "new@example.com").Return(nil).Once()
+	database.On("TrySetUserEmail", mock.Anything, (*sql.Tx)(nil), emailTestUserId, user.Email, user.EmailVerified, "new@example.com").
+		Return(true, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedOwnEmail, mock.Anything).Return().Once()
 }
 
@@ -443,6 +447,35 @@ func TestHandleAPIAccountEmailPut_SendsNoNoticeWithSMTPOff(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.Empty(t, jobs.jobs, "with SMTP off there is no notice to send")
+}
+
+// TestHandleAPIAccountEmailPut_AChangeThatLostTheRowAnswers409AndTellsNobody is the notice's
+// bound under concurrency (#404). The write is conditional on the address and the verified flag
+// the request read, so of concurrent changes from one read only one matches the row. Each of the
+// others writes nothing, answers 409 CONCURRENT_UPDATE, audits nothing and queues no notice: with
+// an unconditional write every one of them notified the previous address, so one verification
+// bought as many mails as requests sent at once.
+func TestHandleAPIAccountEmailPut_AChangeThatLostTheRowAnswers409AndTellsNobody(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+	jobs := &heldJobs{}
+	user := changingUser(t, "en")
+	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).Return(user, nil).Twice()
+	database.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, nil).Once()
+	database.On("TrySetUserEmail", mock.Anything, (*sql.Tx)(nil), emailTestUserId, "old@example.com", true, "new@example.com").
+		Return(false, nil).Once()
+	credentials := &countingCredentials{}
+
+	rr := httptest.NewRecorder()
+	accountEmailHandler(t, database, auditLogger, credentials, jobs).ServeHTTP(rr, changeToNewAddress(t))
+
+	require.Equal(t, http.StatusConflict, rr.Code, rr.Body.String())
+	var body map[string]string
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+	assert.Equal(t, "CONCURRENT_UPDATE", body["error_code"])
+	assert.Empty(t, jobs.jobs, "a change that was not made notifies nobody")
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	assert.Equal(t, 0, credentials.failures, "the password was right; losing the row is not a failure")
 }
 
 // TestHandleAPIAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress is the notice's bound: an

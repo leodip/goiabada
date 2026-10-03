@@ -22,7 +22,7 @@ import (
 // accountEmailDatabase is what the account email endpoints need: the caller's own user row.
 type accountEmailDatabase interface {
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
-	SetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string) error
+	TrySetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, fromEmail string, fromVerified bool, toEmail string) (bool, error)
 }
 
 // accountEmailValidator is the self-service change check: the address rules, and that no other
@@ -102,17 +102,27 @@ func HandleAPIAccountEmailPut(
 		}
 
 		// Validate email (server-side rules; confirmation is a UI concern)
-		if err := emailValidator.ValidateEmailChange(r.Context(), email, user.Subject); err != nil {
-			writeValidationError(w, r, err)
+		if validationErr := emailValidator.ValidateEmailChange(r.Context(), email, user.Subject); validationErr != nil {
+			writeValidationError(w, r, validationErr)
 			return
 		}
 
 		// A narrow write, not the row loaded above: writing that back would undo a concurrent
-		// disable, password change or OTP change (#404).
-		if err := database.SetUserEmail(r.Context(), nil, user.Id, email); err != nil {
+		// disable, password change or OTP change. And a conditional one, on the address and the
+		// verified flag read above, so of concurrent changes from that read exactly one is made:
+		// each of the others answers 409 and sends nothing, where every one of them used to
+		// notify a previous address one verification had made eligible once (#404).
+		changed, err := database.TrySetUserEmail(r.Context(), nil, user.Id, user.Email, user.EmailVerified, email)
+		if err != nil {
 			writeEmailTakenOrInternalServerError(w, r, err)
 			return
 		}
+		if !changed {
+			writeJSONError(w, "The account was changed by another request after it was loaded. Nothing was saved: reload it and make the change again.", "CONCURRENT_UPDATE", http.StatusConflict)
+			return
+		}
+		// What the write matched, so what the notice below is decided on is what the row held
+		// when this request changed it, not merely what it held when the request read it.
 		previousEmail := user.Email
 		previousEmailVerified := user.EmailVerified
 		user.Email = email

@@ -86,7 +86,7 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 			PasswordHash:  passwordHash,
 		}, nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, newEmail).Return((*models.User)(nil), nil)
-		database.On("SetUserEmail", mock.Anything, mock.Anything, int64(1), newEmail).Return(nil).Once()
+		database.On("TrySetUserEmail", mock.Anything, mock.Anything, int64(1), previousEmail, true, newEmail).Return(true, nil).Once()
 		s := newServer(t, database)
 
 		body := `{"email":"` + newEmail + `","currentPassword":"` + password + `"}`

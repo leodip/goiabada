@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -24,7 +25,9 @@ import (
 // caller's own user row.
 type accountEmailVerificationDatabase interface {
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+	TryStoreEmailVerificationCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte,
+		issuedAt time.Time, issuedNotAfter time.Time) (bool, error)
+	TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte) (bool, error)
 }
 
 // emailVerificationCodeLifetime is how long an email verification code verifies, and also the
@@ -77,24 +80,8 @@ func HandleAPIAccountEmailVerificationSendPost(
 			return
 		}
 
-		// If already verified, inform client
-		if user.EmailVerified {
-			resp := api.AccountEmailVerificationSendResponse{EmailVerified: true}
-			writeJSON(w, r, http.StatusOK, resp)
+		if writeSendNotNeeded(w, r, user) {
 			return
-		}
-
-		// The resend cooldown is the account's, not the address's: it reads when a code was
-		// last issued whether or not that code is still pending. An email change clears the
-		// code and keeps this, so changing away from an address and back to it does not reopen
-		// a send to it (#404).
-		if user.EmailVerificationCodeIssuedAt.Valid {
-			remaining := int(user.EmailVerificationCodeIssuedAt.Time.Add(emailVerificationCodeLifetime).Sub(time.Now().UTC()).Seconds())
-			if remaining > 0 {
-				resp := api.AccountEmailVerificationSendResponse{TooManyRequests: true, WaitInSeconds: remaining}
-				writeJSON(w, r, http.StatusOK, resp)
-				return
-			}
 		}
 
 		// Generate code and store encrypted
@@ -104,12 +91,35 @@ func HandleAPIAccountEmailVerificationSendPost(
 			writeInternalServerError(w, r, errs.Wrap(err, "Failed to encrypt verification code"))
 			return
 		}
-		user.EmailVerificationCodeEncrypted = encrypted
-		user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
-		if updateUserErr := database.UpdateUser(r.Context(), nil, user); updateUserErr != nil {
-			writeInternalServerError(w, r, errs.Wrap(updateUserErr, "Failed to update user with verification code"), "user_id", user.Id)
+
+		// The check above answers the common case; this write is the one that decides. It
+		// stores the code only while the account still holds this address, unverified, with no
+		// code issued inside the cooldown, so of concurrent sends exactly one claims the code
+		// and mails it. The check alone let all of them through, and the account chooses the
+		// address the mail goes to (#404).
+		issuedAt := time.Now().UTC()
+		claimed, err := database.TryStoreEmailVerificationCode(r.Context(), nil, user.Id, user.Email, encrypted,
+			issuedAt, issuedAt.Add(-emailVerificationCodeLifetime))
+		if err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "Failed to store the verification code"), "user_id", user.Id)
 			return
 		}
+		if !claimed {
+			// Another request got there first: a send that claimed the code, a verification, or an
+			// email change. Read the row again and answer what it now says.
+			current, rereadErr := database.GetUserBySubject(r.Context(), nil, subject)
+			if rereadErr != nil {
+				writeInternalServerError(w, r, errs.Wrap(rereadErr, "Failed to get user by subject in email verification send (after a lost claim)"), "subject", subject)
+				return
+			}
+			if current != nil && writeSendNotNeeded(w, r, current) {
+				return
+			}
+			writeJSONError(w, "The account was changed by another request while the code was being sent. Nothing was sent: try again.", "CONCURRENT_UPDATE", http.StatusConflict)
+			return
+		}
+		user.EmailVerificationCodeEncrypted = encrypted
+		user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: issuedAt, Valid: true}
 
 		// Render email content
 		bind := map[string]interface{}{
@@ -148,6 +158,30 @@ func HandleAPIAccountEmailVerificationSendPost(
 		}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
+}
+
+// writeSendNotNeeded answers a send the account does not need, and reports whether it did: an
+// address already verified, or a code issued inside the cooldown.
+//
+// The resend cooldown is the account's, not the address's: it reads when a code was last issued
+// whether or not that code is still pending. An email change and a verification clear the code
+// and keep this, so changing away from an address and back to it does not reopen a send to it
+// (#404).
+func writeSendNotNeeded(w http.ResponseWriter, r *http.Request, user *models.User) bool {
+	if user.EmailVerified {
+		writeJSON(w, r, http.StatusOK, api.AccountEmailVerificationSendResponse{EmailVerified: true})
+		return true
+	}
+	if user.EmailVerificationCodeIssuedAt.Valid {
+		// Rounded up, so the last partial second still answers the wait rather than reaching a
+		// write whose cutoff refuses it.
+		remaining := int(math.Ceil(user.EmailVerificationCodeIssuedAt.Time.Add(emailVerificationCodeLifetime).Sub(time.Now().UTC()).Seconds()))
+		if remaining > 0 {
+			writeJSON(w, r, http.StatusOK, api.AccountEmailVerificationSendResponse{TooManyRequests: true, WaitInSeconds: remaining})
+			return true
+		}
+	}
+	return false
 }
 
 // HandleAPIAccountEmailVerificationPost - POST /api/v1/account/email/verification
@@ -244,13 +278,36 @@ func HandleAPIAccountEmailVerificationPost(
 
 		// The code is spent; its issued-at stays for the resend cooldown, which would otherwise
 		// let a send to an address the caller controls be followed at once by one to an address
-		// they do not, once they changed to it (#404).
-		user.EmailVerified = true
-		user.EmailVerificationCodeEncrypted = nil
-		if err := database.UpdateUser(r.Context(), nil, user); err != nil {
+		// they do not, once they changed to it. A narrow, conditional write: it verifies only
+		// while the account holds the address it read with the ciphertext it compared still
+		// pending, and writes back nothing else of the row it loaded, which could re-enable an
+		// account an administrator disabled meanwhile, or put back an address a concurrent change
+		// replaced (#404).
+		verified, err := database.TryVerifyUserEmail(r.Context(), nil, user.Id, user.Email, user.EmailVerificationCodeEncrypted)
+		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
+		if !verified {
+			// The code was right when compared and is gone now. Either a twin submission of it
+			// verified the address first, which this request answers as that one did, or a new
+			// send or an email change replaced it, which leaves it invalid. Neither was a guess,
+			// so neither spends the failure budget or writes a failed-code entry.
+			current, err := database.GetUserBySubject(r.Context(), nil, subject)
+			if err != nil {
+				writeInternalServerError(w, r, err)
+				return
+			}
+			if current != nil && current.EmailVerified && current.Email == user.Email {
+				writeJSON(w, r, http.StatusOK, api.UpdateUserResponse{User: *apimapping.ToUserResponse(current)})
+				return
+			}
+			writeJSONError(w, "Invalid or expired verification code", "INVALID_OR_EXPIRED_VERIFICATION_CODE", http.StatusBadRequest)
+			return
+		}
+		user.EmailVerified = true
+		user.EmailVerificationCodeEncrypted = nil
+		user.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 		auditLogger.Log(r.Context(), audit.AuditVerifiedEmail, map[string]interface{}{
 			"userId":       user.Id,

@@ -848,9 +848,17 @@ func (d *Database) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId i
 	return nil
 }
 
-// SetUserEmail writes a user's address and, in the same statement, clears the verified flag
-// and any pending verification code: the new address has not been verified, and a code
-// issued for the previous one must not verify it.
+// TrySetUserEmail moves a user's address from fromEmail to toEmail and, in the same
+// statement, clears the verified flag and any pending verification code: the new address has
+// not been verified, and a code issued for the previous one must not verify it. It reports
+// whether it made the change.
+//
+// Compare-and-set on the address and the verified flag the caller read, for the reason
+// TrySetUserEnabled gives. The self-service email change reads the user, checks the password,
+// and notifies the previous address when that address was verified; with an unconditional
+// write, concurrent changes from one read each believed they had made the change and each
+// queued a notice, so one verification bought as many mails as requests sent at once. Now one
+// of them matches the row and the rest match nothing (#404).
 //
 // The code's issued-at is kept. It is what the verification resend cooldown reads, and that
 // cooldown bounds the account rather than the address: clearing it here let a caller set any
@@ -864,10 +872,17 @@ func (d *Database) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId i
 // password hash a concurrent change or reset replaced after its revocation had run, or
 // undo a concurrent OTP change (#404). A taken address arrives as ErrUniqueViolation through
 // ExecSQL, as it does on UpdateUser.
-func (d *Database) SetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string) error {
+func (d *Database) TrySetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, fromEmail string,
+	fromVerified bool, toEmail string) (bool, error) {
 
 	if userId == 0 {
-		return errs.New("can't set the email of user with id 0")
+		return false, errs.New("can't set the email of user with id 0")
+	}
+	// The same address in and out would leave the row as it was, and MySQL counts a row it
+	// matched but did not change as unaffected, so the answer would depend on the engine. The
+	// caller answers that request without writing.
+	if fromEmail == toEmail {
+		return false, errs.New("can't move an email to the address it already has")
 	}
 
 	ub := d.Flavor.NewUpdateBuilder()
@@ -876,20 +891,136 @@ func (d *Database) SetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, e
 	// gives: the SQL Server driver types an untyped Go nil as nvarchar and refuses to convert it
 	// to varbinary(max).
 	ub.Set(
-		ub.Assign("email", email),
+		ub.Assign("email", toEmail),
 		ub.Assign("email_verified", false),
 		"email_verification_code_encrypted = NULL",
 		ub.Assign("updated_at", time.Now().UTC()),
 	)
-	ub.Where(ub.Equal("id", userId))
+	ub.Where(
+		ub.Equal("id", userId),
+		ub.Equal("email", fromEmail),
+		ub.Equal("email_verified", fromVerified),
+	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	_, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
-		return errs.Wrap(err, "unable to set user email")
+		return false, errs.Wrap(err, "unable to set user email")
 	}
 
-	return nil
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errs.Wrap(err, "unable to get rows affected when setting user email")
+	}
+
+	// The address always changes, so a matched row is a changed row on all four engines.
+	return rowsAffected == 1, nil
+}
+
+// TryStoreEmailVerificationCode stores a freshly issued verification code, encrypted, and
+// when it was issued, only while the account still holds email, unverified, and no code was
+// issued after issuedNotAfter. It reports whether it did.
+//
+// This is the resend cooldown, and it has to be one statement. The send used to read the
+// issued-at, decide, and write the whole row back, so concurrent sends all read the same old
+// issued-at, all passed, and all mailed a code: the cooldown bounded nothing the caller could
+// not parallelise past, and the account chooses the address the code is mailed to (#404). The
+// address is in the predicate too, so a code is never stored for an address the account moved
+// away from while the code was being issued, and the row the request loaded is never written
+// back, for TrySetUserEmail's reason.
+func (d *Database) TryStoreEmailVerificationCode(ctx context.Context, tx *sql.Tx, userId int64, email string,
+	codeEncrypted []byte, issuedAt time.Time, issuedNotAfter time.Time) (bool, error) {
+
+	if userId == 0 {
+		return false, errs.New("can't store an email verification code for user with id 0")
+	}
+	if len(codeEncrypted) == 0 {
+		return false, errs.New("can't store an empty email verification code")
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(
+		ub.Assign("email_verification_code_encrypted", codeEncrypted),
+		ub.Assign("email_verification_code_issued_at", issuedAt),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("id", userId),
+		ub.Equal("email", email),
+		ub.Equal("email_verified", false),
+		ub.Or(
+			ub.IsNull("email_verification_code_issued_at"),
+			ub.LessEqualThan("email_verification_code_issued_at", issuedNotAfter),
+		),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to store email verification code")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errs.Wrap(err, "unable to get rows affected when storing email verification code")
+	}
+
+	// A fresh ciphertext always differs from whatever the row carried, so a matched row is a
+	// changed row on all four engines, as in TryStoreForgotPasswordCode.
+	return rowsAffected == 1, nil
+}
+
+// TryVerifyUserEmail marks a user's address verified and clears the code, only while the
+// account still holds email, unverified, and codeEncrypted is still the pending code. It
+// reports whether it did.
+//
+// codeEncrypted is the ciphertext the caller decrypted and compared, so the predicate says the
+// code that was checked is the code being spent: one the account replaced with a new send, or
+// lost to an email change, between the comparison and this write matches nothing, and of two
+// submissions of one code only one verifies. The issued-at stays for the resend cooldown.
+// Narrow rather than writing back the row the request loaded, which would re-enable an account
+// an administrator disabled under it, or put back an address a concurrent change replaced
+// (#404).
+func (d *Database) TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string,
+	codeEncrypted []byte) (bool, error) {
+
+	if userId == 0 {
+		return false, errs.New("can't verify the email of user with id 0")
+	}
+	// An empty ciphertext is the dormant value, and NULL compares equal to nothing anyway.
+	if len(codeEncrypted) == 0 {
+		return false, errs.New("can't verify an email against an empty code")
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(
+		ub.Assign("email_verified", true),
+		"email_verification_code_encrypted = NULL",
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("id", userId),
+		ub.Equal("email", email),
+		ub.Equal("email_verified", false),
+		ub.Equal("email_verification_code_encrypted", codeEncrypted),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to verify user email")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errs.Wrap(err, "unable to get rows affected when verifying user email")
+	}
+
+	// email_verified always moves from false to true, so a matched row is a changed row on all
+	// four engines.
+	return rowsAffected == 1, nil
 }
 
 // TryConsumeForgotPasswordCode writes a new password hash and claims the outstanding

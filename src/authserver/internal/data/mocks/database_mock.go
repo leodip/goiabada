@@ -12541,75 +12541,6 @@ func (_c *Database_SetClientPublic_Call) RunAndReturn(run func(ctx context.Conte
 	return _c
 }
 
-// SetUserEmail provides a mock function for the type Database
-func (_mock *Database) SetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string) error {
-	ret := _mock.Called(ctx, tx, userId, email)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SetUserEmail")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string) error); ok {
-		r0 = returnFunc(ctx, tx, userId, email)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// Database_SetUserEmail_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetUserEmail'
-type Database_SetUserEmail_Call struct {
-	*mock.Call
-}
-
-// SetUserEmail is a helper method to define mock.On call
-//   - ctx context.Context
-//   - tx *sql.Tx
-//   - userId int64
-//   - email string
-func (_e *Database_Expecter) SetUserEmail(ctx any, tx any, userId any, email any) *Database_SetUserEmail_Call {
-	return &Database_SetUserEmail_Call{Call: _e.mock.On("SetUserEmail", ctx, tx, userId, email)}
-}
-
-func (_c *Database_SetUserEmail_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, email string)) *Database_SetUserEmail_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 *sql.Tx
-		if args[1] != nil {
-			arg1 = args[1].(*sql.Tx)
-		}
-		var arg2 int64
-		if args[2] != nil {
-			arg2 = args[2].(int64)
-		}
-		var arg3 string
-		if args[3] != nil {
-			arg3 = args[3].(string)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-			arg3,
-		)
-	})
-	return _c
-}
-
-func (_c *Database_SetUserEmail_Call) Return(err error) *Database_SetUserEmail_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *Database_SetUserEmail_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, email string) error) *Database_SetUserEmail_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // SetUserPasswordHash provides a mock function for the type Database
 func (_mock *Database) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error {
 	ret := _mock.Called(ctx, tx, userId, passwordHash)
@@ -13105,6 +13036,96 @@ func (_c *Database_TryInstallPendingOTPEnrollment_Call) RunAndReturn(run func(ct
 	return _c
 }
 
+// TrySetUserEmail provides a mock function for the type Database
+func (_mock *Database) TrySetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, fromEmail string, fromVerified bool, toEmail string) (bool, error) {
+	ret := _mock.Called(ctx, tx, userId, fromEmail, fromVerified, toEmail)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TrySetUserEmail")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string, bool, string) (bool, error)); ok {
+		return returnFunc(ctx, tx, userId, fromEmail, fromVerified, toEmail)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string, bool, string) bool); ok {
+		r0 = returnFunc(ctx, tx, userId, fromEmail, fromVerified, toEmail)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, string, bool, string) error); ok {
+		r1 = returnFunc(ctx, tx, userId, fromEmail, fromVerified, toEmail)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_TrySetUserEmail_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TrySetUserEmail'
+type Database_TrySetUserEmail_Call struct {
+	*mock.Call
+}
+
+// TrySetUserEmail is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+//   - fromEmail string
+//   - fromVerified bool
+//   - toEmail string
+func (_e *Database_Expecter) TrySetUserEmail(ctx any, tx any, userId any, fromEmail any, fromVerified any, toEmail any) *Database_TrySetUserEmail_Call {
+	return &Database_TrySetUserEmail_Call{Call: _e.mock.On("TrySetUserEmail", ctx, tx, userId, fromEmail, fromVerified, toEmail)}
+}
+
+func (_c *Database_TrySetUserEmail_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, fromEmail string, fromVerified bool, toEmail string)) *Database_TrySetUserEmail_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 bool
+		if args[4] != nil {
+			arg4 = args[4].(bool)
+		}
+		var arg5 string
+		if args[5] != nil {
+			arg5 = args[5].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_TrySetUserEmail_Call) Return(b bool, err error) *Database_TrySetUserEmail_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_TrySetUserEmail_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, fromEmail string, fromVerified bool, toEmail string) (bool, error)) *Database_TrySetUserEmail_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // TrySetUserEnabled provides a mock function for the type Database
 func (_mock *Database) TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error) {
 	ret := _mock.Called(ctx, tx, userId, expected, desired)
@@ -13185,6 +13206,102 @@ func (_c *Database_TrySetUserEnabled_Call) Return(b bool, err error) *Database_T
 }
 
 func (_c *Database_TrySetUserEnabled_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)) *Database_TrySetUserEnabled_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// TryStoreEmailVerificationCode provides a mock function for the type Database
+func (_mock *Database) TryStoreEmailVerificationCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte, issuedAt time.Time, issuedNotAfter time.Time) (bool, error) {
+	ret := _mock.Called(ctx, tx, userId, email, codeEncrypted, issuedAt, issuedNotAfter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TryStoreEmailVerificationCode")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string, []byte, time.Time, time.Time) (bool, error)); ok {
+		return returnFunc(ctx, tx, userId, email, codeEncrypted, issuedAt, issuedNotAfter)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string, []byte, time.Time, time.Time) bool); ok {
+		r0 = returnFunc(ctx, tx, userId, email, codeEncrypted, issuedAt, issuedNotAfter)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, string, []byte, time.Time, time.Time) error); ok {
+		r1 = returnFunc(ctx, tx, userId, email, codeEncrypted, issuedAt, issuedNotAfter)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_TryStoreEmailVerificationCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TryStoreEmailVerificationCode'
+type Database_TryStoreEmailVerificationCode_Call struct {
+	*mock.Call
+}
+
+// TryStoreEmailVerificationCode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+//   - email string
+//   - codeEncrypted []byte
+//   - issuedAt time.Time
+//   - issuedNotAfter time.Time
+func (_e *Database_Expecter) TryStoreEmailVerificationCode(ctx any, tx any, userId any, email any, codeEncrypted any, issuedAt any, issuedNotAfter any) *Database_TryStoreEmailVerificationCode_Call {
+	return &Database_TryStoreEmailVerificationCode_Call{Call: _e.mock.On("TryStoreEmailVerificationCode", ctx, tx, userId, email, codeEncrypted, issuedAt, issuedNotAfter)}
+}
+
+func (_c *Database_TryStoreEmailVerificationCode_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte, issuedAt time.Time, issuedNotAfter time.Time)) *Database_TryStoreEmailVerificationCode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 []byte
+		if args[4] != nil {
+			arg4 = args[4].([]byte)
+		}
+		var arg5 time.Time
+		if args[5] != nil {
+			arg5 = args[5].(time.Time)
+		}
+		var arg6 time.Time
+		if args[6] != nil {
+			arg6 = args[6].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_TryStoreEmailVerificationCode_Call) Return(b bool, err error) *Database_TryStoreEmailVerificationCode_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_TryStoreEmailVerificationCode_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte, issuedAt time.Time, issuedNotAfter time.Time) (bool, error)) *Database_TryStoreEmailVerificationCode_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -13281,6 +13398,90 @@ func (_c *Database_TryStoreForgotPasswordCode_Call) Return(b bool, err error) *D
 }
 
 func (_c *Database_TryStoreForgotPasswordCode_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte, codeHash string, issuedAt time.Time) (bool, error)) *Database_TryStoreForgotPasswordCode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// TryVerifyUserEmail provides a mock function for the type Database
+func (_mock *Database) TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte) (bool, error) {
+	ret := _mock.Called(ctx, tx, userId, email, codeEncrypted)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TryVerifyUserEmail")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string, []byte) (bool, error)); ok {
+		return returnFunc(ctx, tx, userId, email, codeEncrypted)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string, []byte) bool); ok {
+		r0 = returnFunc(ctx, tx, userId, email, codeEncrypted)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, string, []byte) error); ok {
+		r1 = returnFunc(ctx, tx, userId, email, codeEncrypted)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_TryVerifyUserEmail_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TryVerifyUserEmail'
+type Database_TryVerifyUserEmail_Call struct {
+	*mock.Call
+}
+
+// TryVerifyUserEmail is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+//   - email string
+//   - codeEncrypted []byte
+func (_e *Database_Expecter) TryVerifyUserEmail(ctx any, tx any, userId any, email any, codeEncrypted any) *Database_TryVerifyUserEmail_Call {
+	return &Database_TryVerifyUserEmail_Call{Call: _e.mock.On("TryVerifyUserEmail", ctx, tx, userId, email, codeEncrypted)}
+}
+
+func (_c *Database_TryVerifyUserEmail_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte)) *Database_TryVerifyUserEmail_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 []byte
+		if args[4] != nil {
+			arg4 = args[4].([]byte)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_TryVerifyUserEmail_Call) Return(b bool, err error) *Database_TryVerifyUserEmail_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_TryVerifyUserEmail_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte) (bool, error)) *Database_TryVerifyUserEmail_Call {
 	_c.Call.Return(run)
 	return _c
 }

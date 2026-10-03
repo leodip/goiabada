@@ -149,13 +149,28 @@ type Database interface {
 	// forgot-password code in the same statement. Narrow rather than a full-row
 	// update, so a concurrent admin disable cannot be undone by it (#106).
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
-	// SetUserEmail writes a user's address, clears the verified flag and any pending
-	// verification code in the same statement, and writes no other column; the code's
-	// issued-at stays, because the resend cooldown reads it (#404). Narrow rather
-	// than a full-row update, so the self-service email change cannot undo a concurrent
-	// admin disable, password change or OTP change (#404). A taken address is
-	// ErrUniqueViolation, as on UpdateUser.
-	SetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string) error
+	// TrySetUserEmail moves a user's address from fromEmail to toEmail, clears the verified
+	// flag and any pending verification code in the same statement, and writes no other
+	// column; the code's issued-at stays, because the resend cooldown reads it. It matches
+	// only while the row still carries fromEmail with fromVerified, and reports whether it
+	// did, so of two concurrent changes from one read exactly one is made and only that one
+	// notifies the previous address. Narrow rather than a full-row update, so the
+	// self-service email change cannot undo a concurrent admin disable, password change or
+	// OTP change. A taken address is ErrUniqueViolation, as on UpdateUser (#404).
+	TrySetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, fromEmail string, fromVerified bool, toEmail string) (bool, error)
+	// TryStoreEmailVerificationCode stores a verification code, encrypted, issued at
+	// issuedAt, only while the account still holds email, unverified, and no code was
+	// issued after issuedNotAfter, and reports whether it did. It is the resend cooldown
+	// as one conditional write: of concurrent sends exactly one claims the code and mails
+	// it, where a read then a write let every one of them pass the check (#404).
+	TryStoreEmailVerificationCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte,
+		issuedAt time.Time, issuedNotAfter time.Time) (bool, error)
+	// TryVerifyUserEmail marks a user's address verified and clears the code, only while
+	// the account still holds email, unverified, with codeEncrypted still the pending code,
+	// which is the ciphertext the caller compared; the issued-at stays for the resend
+	// cooldown. It reports whether it did. Narrow rather than writing back the row the
+	// request loaded, which could undo a concurrent admin disable or email change (#404).
+	TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte) (bool, error)
 	// TryConsumeForgotPasswordCode writes a password hash and claims the outstanding
 	// reset code in one conditional UPDATE, reporting whether this call is the one that
 	// made the transition. Compare-and-set for the same reason MarkCodeAsUsed is: a

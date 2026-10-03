@@ -2891,7 +2891,10 @@ paths:
             The email address was registered to another user between the
             duplicate check and the write. error_code is EMAIL_ALREADY_EXISTS.
             An address already taken when the request arrives is a 400 with
-            error_code validator.email.already_registered.
+            error_code validator.email.already_registered. Or another request
+            changed the account's address or its verification after this one
+            read it: error_code is CONCURRENT_UPDATE, nothing was saved and no
+            notice was sent. Read the account again and retry.
           content:
             application/json:
               schema:
@@ -2922,6 +2925,15 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Another request changed the account's address while the code was
+            being issued. error_code is CONCURRENT_UPDATE; nothing was sent.
+            Retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
