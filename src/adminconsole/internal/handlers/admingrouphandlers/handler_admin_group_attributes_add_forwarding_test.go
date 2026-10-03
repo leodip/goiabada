@@ -30,7 +30,6 @@ import (
 // HandleAPIErrorWithCallback is what tells them apart, and the three rows below are the three
 // answers it has to give.
 type attributesAddApiClient struct {
-	apiclient.ApiClient
 	err error
 }
 

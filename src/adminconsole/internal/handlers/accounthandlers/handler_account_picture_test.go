@@ -120,7 +120,6 @@ func TestHandleAccountPictureGet_AnswersAFailedPictureRead(t *testing.T) {
 // The 400 rows are the point of the whole stage: a request the browser got wrong is answered as
 // the browser's mistake. The 500 rows are what stops that from becoming "everything is a 4xx".
 type pictureApiClient struct {
-	apiclient.ApiClient
 	response *api.ProfilePictureUploadResponse
 	err      error
 }
@@ -241,13 +240,18 @@ func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing
 
 // uploadRecorder is an API client that keeps the picture it was handed.
 type uploadRecorder struct {
-	apiclient.ApiClient
 	picture []byte
 }
 
 func (c *uploadRecorder) UploadAccountProfilePicture(_ context.Context, _ string, pictureData []byte, _ string) (*api.ProfilePictureUploadResponse, error) {
 	c.picture = pictureData
 	return &api.ProfilePictureUploadResponse{Success: true, PictureUrl: "https://auth.example.com/userinfo/picture/a-subject"}, nil
+}
+
+// The rest of the ports uploadRecorder is passed to, which no test here reaches.
+
+func (*uploadRecorder) DeleteAccountProfilePicture(context.Context, string) error {
+	panic("unexpected call to DeleteAccountProfilePicture")
 }
 
 // A multipart body the request-body limit cut short answers the JSON 400 an unparseable form

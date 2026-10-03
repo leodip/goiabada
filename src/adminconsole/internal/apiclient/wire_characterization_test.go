@@ -21,7 +21,7 @@ import (
 // Before this file, collapsing 106 hand-written request builders onto one executor was an
 // unobserved change. Measured while the reviewer raised it: 28 of the 106 methods are called from
 // an apiclient test and 78 are not, and changing UpdateAccountAddress's path to /wrong-endpoint
-// left all 1,465 admin console tests green. Handler tests hold ApiClient doubles and never see a
+// left all 1,465 admin console tests green. Handler tests hold doubles of their ports and never see a
 // request at all, and there is no admin console integration tier. So any method's verb, path,
 // query, body, headers or success status could have moved and nothing would have said so.
 //
@@ -217,23 +217,24 @@ func TestAuthServerClient_EveryMethodClassifiesANonSuccessThroughParseAPIError(t
 	}
 }
 
-// The table must stay whole. Reflection over ApiClient rather than a hard-coded count so a method
-// added to the interface fails here rather than slipping past uncharacterized.
-func TestAuthServerClient_TheCharacterizationCoversEveryApiClientMethod(t *testing.T) {
-	iface := reflect.TypeOf((*ApiClient)(nil)).Elem()
+// The table must stay whole. Reflection over *AuthServerClient's exported methods rather than a
+// hard-coded count, so a method added to the client fails here rather than slipping past
+// uncharacterized. There is no interface to reflect over: each handler declares the port it calls.
+func TestAuthServerClient_TheCharacterizationCoversEveryMethod(t *testing.T) {
+	client := reflect.TypeOf((*AuthServerClient)(nil))
 
 	characterized := map[string]bool{}
 	for _, tc := range wireCharacterization() {
 		characterized[tc.name] = true
 	}
 
-	for i := 0; i < iface.NumMethod(); i++ {
-		name := iface.Method(i).Name
+	for i := 0; i < client.NumMethod(); i++ {
+		name := client.Method(i).Name
 		assert.True(t, characterized[name], "%s has no characterization row", name)
 	}
 
-	assert.Equal(t, iface.NumMethod(), len(characterized),
-		"every row names a method of ApiClient and every method has a row")
+	assert.Equal(t, client.NumMethod(), len(characterized),
+		"every row names a method of *AuthServerClient and every method has a row")
 }
 
 // failingBody answers the recorded bytes and then fails, which is what a connection dropped

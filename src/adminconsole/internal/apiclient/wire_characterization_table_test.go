@@ -6,7 +6,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// The table wire_characterization_test.go drives. One row per ApiClient method, in the order the
+// The table wire_characterization_test.go drives. One row per exported *AuthServerClient method, in the order the
 // files declare them. See that file's header for what a row pins and what it deliberately does
 // not.
 

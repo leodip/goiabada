@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
@@ -27,7 +26,6 @@ import (
 type resourceCtxMarkerKey struct{}
 
 type resourceCtxRecordingApiClient struct {
-	apiclient.ApiClient
 
 	// permissions is what the resource has. Empty is the arm of the Get that reads every group;
 	// one permission is the arm that asks the auth server to annotate them.
@@ -90,23 +88,35 @@ func (s *resourceCtxRecordingApiClient) GetGroupPermissions(ctx context.Context,
 	return nil, nil, s.record(ctx)
 }
 
+func (s *resourceCtxRecordingApiClient) CreateResource(ctx context.Context, _ string, _ *api.CreateResourceRequest) (*api.ResourceResponse, error) {
+	return nil, s.record(ctx)
+}
+
+func (s *resourceCtxRecordingApiClient) UpdateGroupPermissions(ctx context.Context, _ string, _ int64, _ *api.UpdateGroupPermissionsRequest) error {
+	return s.record(ctx)
+}
+
+func (s *resourceCtxRecordingApiClient) UpdateUserPermissions(ctx context.Context, _ string, _ int64, _ *api.UpdateUserPermissionsRequest) error {
+	return s.record(ctx)
+}
+
 func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) {
 	testCases := []struct {
 		name        string
 		permissions []api.PermissionResponse
-		build       func(httpHelper *mocks_handlers.HttpHelper, apiClient apiclient.ApiClient) http.HandlerFunc
+		build       func(httpHelper *mocks_handlers.HttpHelper, apiClient *resourceCtxRecordingApiClient) http.HandlerFunc
 		request     *http.Request
 	}{
 		{
 			name: "HandleAdminResourcesGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminResourcesGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAdminResourceSettingsGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminResourceSettingsGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/settings",
@@ -114,7 +124,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		},
 		{
 			name: "HandleAdminResourceDeleteGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminResourceDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/delete",
@@ -122,7 +132,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		},
 		{
 			name: "HandleAdminResourcePermissionsGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminResourcePermissionsGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/permissions",
@@ -131,7 +141,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		{
 			name:        "HandleAdminResourceUsersWithPermissionGet",
 			permissions: []api.PermissionResponse{{Id: 8, PermissionIdentifier: "read"}},
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminResourceUsersWithPermissionGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/users-with-permission",
@@ -139,7 +149,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		},
 		{
 			name: "HandleAdminResourceGroupsWithPermissionGet, no permission to annotate",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminResourceGroupsWithPermissionGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/groups-with-permission",
@@ -148,7 +158,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		{
 			name:        "HandleAdminResourceGroupsWithPermissionGet, one to annotate",
 			permissions: []api.PermissionResponse{{Id: 8, PermissionIdentifier: "read"}},
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminResourceGroupsWithPermissionGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/groups-with-permission",
@@ -156,7 +166,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		},
 		{
 			name: "HandleAdminResourceGroupsWithPermissionAddPermissionPost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminResourceGroupsWithPermissionAddPermissionPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/resources/3/groups-with-permission/5/add/8",
@@ -165,7 +175,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		},
 		{
 			name: "HandleAdminResourceGroupsWithPermissionRemovePermissionPost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminResourceGroupsWithPermissionRemovePermissionPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/resources/3/groups-with-permission/5/remove/8",

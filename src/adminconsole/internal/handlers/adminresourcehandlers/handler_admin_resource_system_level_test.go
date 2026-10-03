@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
@@ -28,7 +27,6 @@ import (
 // refuses. Both rows are here, so a return to the local rule fails the first and a hard-coded true
 // fails the second.
 type systemLevelApiClient struct {
-	apiclient.ApiClient
 	resource api.ResourceResponse
 }
 
@@ -40,6 +38,20 @@ func (c *systemLevelApiClient) GetResourceById(_ context.Context, accessToken st
 
 func (c *systemLevelApiClient) GetPermissionsByResource(_ context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
 	return nil, nil
+}
+
+// The rest of the ports systemLevelApiClient is passed to, which no test here reaches.
+
+func (*systemLevelApiClient) DeleteResource(context.Context, string, int64) error {
+	panic("unexpected call to DeleteResource")
+}
+
+func (*systemLevelApiClient) UpdateResource(context.Context, string, int64, *api.UpdateResourceRequest) (*api.ResourceResponse, error) {
+	panic("unexpected call to UpdateResource")
+}
+
+func (*systemLevelApiClient) UpdateResourcePermissions(context.Context, string, int64, *api.UpdateResourcePermissionsRequest) error {
+	panic("unexpected call to UpdateResourcePermissions")
 }
 
 // bindOfSystemLevelPage runs one resource GET and hands back what it rendered with.
@@ -100,8 +112,8 @@ func TestAdminResourcePages_TheSystemLevelFlagIsTheServersAnswer(t *testing.T) {
 
 // The delete POST refuses before it calls the API, and it refuses on the same flag. This is the one
 // of the nine call sites that decides rather than displays, so it gets a row of its own: the page
-// re-renders with the refusal and DeleteResource is never reached, which the embedded stub proves
-// by panicking if it is.
+// re-renders with the refusal and DeleteResource is never reached, which the stub proves by
+// panicking if it is.
 func TestAdminResourceDeletePost_RefusesOnTheServersFlag(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)

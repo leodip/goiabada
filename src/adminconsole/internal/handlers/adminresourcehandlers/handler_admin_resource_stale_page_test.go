@@ -30,6 +30,24 @@ func (c *stalePageApiClient) UpdateResourcePermissions(_ context.Context, _ stri
 	return nil
 }
 
+// The rest of the ports stalePageApiClient is passed to, which no test here reaches.
+
+func (*stalePageApiClient) GetAllGroups(context.Context, string) ([]api.GroupResponse, error) {
+	panic("unexpected call to GetAllGroups")
+}
+
+func (*stalePageApiClient) GetUsersByPermission(context.Context, string, int64, int, int) ([]api.UserResponse, int, error) {
+	panic("unexpected call to GetUsersByPermission")
+}
+
+func (*stalePageApiClient) SearchGroupsWithPermissionAnnotation(context.Context, string, int64, int, int) ([]api.GroupWithPermissionResponse, int, error) {
+	panic("unexpected call to SearchGroupsWithPermissionAnnotation")
+}
+
+func (*stalePageApiClient) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
+	panic("unexpected call to SearchUsersWithPermissionAnnotation")
+}
+
 // A click on a page loaded before another administrator's change is not a server fault, and is
 // no longer answered as one with a stack in the log (#440 decision 6):
 //

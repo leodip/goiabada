@@ -178,7 +178,7 @@ var _ *apiclient.APIError
 
 import ac "github.com/leodip/goiabada/adminconsole/internal/apiclient"
 
-var _ ac.ApiClient
+var _ *ac.AuthServerClient
 `)
 	writeEdgeFixture(t, dir, "dotted.go", `package handlerhelpers
 
@@ -219,7 +219,7 @@ var _ = apiclient.NewAuthServerClient
 	}
 	assert.ElementsMatch(t, []string{
 		"renderer.go:5:apiclient:NewAuthServerClient",
-		"aliased.go:5:ac:ApiClient",
+		"aliased.go:5:ac:AuthServerClient",
 		"dotted.go:3:.:",
 		"blank.go:3:_:",
 	}, got, "the finder matched the wrong set")

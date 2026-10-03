@@ -32,11 +32,24 @@ import (
 
 // settingsCarrierApiClient answers the one call these pages make before they read the settings.
 type settingsCarrierApiClient struct {
-	apiclient.ApiClient
 }
 
 func (settingsCarrierApiClient) GetAccountProfile(context.Context, string) (*api.UserResponse, error) {
 	return &api.UserResponse{Id: 11, Email: "someone@example.com", EmailVerified: true}, nil
+}
+
+// The rest of the ports settingsCarrierApiClient is passed to, which no test here reaches.
+
+func (settingsCarrierApiClient) SendAccountEmailVerification(context.Context, string) (*api.AccountEmailVerificationSendResponse, error) {
+	panic("unexpected call to SendAccountEmailVerification")
+}
+
+func (settingsCarrierApiClient) UpdateAccountEmail(context.Context, string, *api.UpdateAccountEmailRequest) (*api.UserResponse, error) {
+	panic("unexpected call to UpdateAccountEmail")
+}
+
+func (settingsCarrierApiClient) VerifyAccountEmail(context.Context, string, *api.VerifyAccountEmailRequest) (*api.UserResponse, error) {
+	panic("unexpected call to VerifyAccountEmail")
 }
 
 // publicSettings is what the settings-cache middleware puts on the context in production.
@@ -114,6 +127,12 @@ type verificationRefusingApiClient struct {
 
 func (c verificationRefusingApiClient) VerifyAccountEmail(context.Context, string, *api.VerifyAccountEmailRequest) (*api.UserResponse, error) {
 	return nil, c.err
+}
+
+// The rest of the ports verificationRefusingApiClient is passed to, which no test here reaches.
+
+func (verificationRefusingApiClient) SendAccountEmailVerification(context.Context, string) (*api.AccountEmailVerificationSendResponse, error) {
+	panic("unexpected call to SendAccountEmailVerification")
 }
 
 // A page that reads the settings and finds none answers the sentinel reqctx declares instead of

@@ -34,7 +34,6 @@ import (
 // the wire is the whole of what this pins; NewHttpHelper(nil) never reaches a template on a
 // JsonError path carrying a status.
 type savePermissionsApiClient struct {
-	apiclient.ApiClient
 	resource  *api.ResourceResponse
 	updateErr error
 }
@@ -46,6 +45,12 @@ func (c *savePermissionsApiClient) GetResourceById(_ context.Context, accessToke
 func (c *savePermissionsApiClient) UpdateResourcePermissions(_ context.Context, accessToken string, resourceId int64,
 	req *api.UpdateResourcePermissionsRequest) error {
 	return c.updateErr
+}
+
+// The rest of the ports savePermissionsApiClient is passed to, which no test here reaches.
+
+func (*savePermissionsApiClient) GetPermissionsByResource(context.Context, string, int64) ([]api.PermissionResponse, error) {
+	panic("unexpected call to GetPermissionsByResource")
 }
 
 func TestResourcePermissionsPost_ForwardsTheApisStatus(t *testing.T) {

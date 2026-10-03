@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
@@ -34,7 +33,6 @@ import (
 // query after a clamp visible -- and its absence, when the page was already
 // good, equally visible.
 type usersPagingApiClient struct {
-	apiclient.ApiClient
 	total int
 	asked []int
 }
@@ -243,7 +241,6 @@ func TestHandleAdminUsersGet_ASearchIsCarriedIntoTheSecondQuery(t *testing.T) {
 }
 
 type queryRecordingApiClient struct {
-	apiclient.ApiClient
 	total   int
 	queries []string
 	tokens  []string

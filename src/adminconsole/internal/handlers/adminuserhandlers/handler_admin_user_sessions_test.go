@@ -26,7 +26,6 @@ import (
 // perform, and nothing else. Deletes are recorded rather than counted, so a case can say which
 // session was deleted and a case expecting none can say so by asserting the slice is empty.
 type userSessionsApiClient struct {
-	apiclient.ApiClient
 	user        *api.UserResponse
 	sessions    []api.UserSessionDetailResponse
 	sessionsErr error

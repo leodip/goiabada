@@ -33,7 +33,6 @@ import (
 // so a handler that logged once would look correct against it (#279).
 
 type permissionsByResourceClient struct {
-	apiclient.ApiClient
 	permissions []api.PermissionResponse
 	err         error
 
@@ -48,7 +47,7 @@ func (c *permissionsByResourceClient) GetPermissionsByResource(ctx context.Conte
 
 // permissionRecords runs the handler over a chi router carrying the request id middleware, and
 // returns the response together with every ERROR line the whole chain wrote.
-func permissionRecords(t *testing.T, client apiclient.ApiClient, query string) (*httptest.ResponseRecorder, []string) {
+func permissionRecords(t *testing.T, client *permissionsByResourceClient, query string) (*httptest.ResponseRecorder, []string) {
 	t.Helper()
 
 	capture := logtest.CaptureSlog(t)

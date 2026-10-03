@@ -19,7 +19,6 @@ import (
 
 // clientPermissionsSaveApiClient records the request the save hands the API and answers it with err.
 type clientPermissionsSaveApiClient struct {
-	apiclient.ApiClient
 	err  error
 	sent *api.UpdateClientPermissionsRequest
 }
@@ -27,6 +26,16 @@ type clientPermissionsSaveApiClient struct {
 func (s *clientPermissionsSaveApiClient) UpdateClientPermissions(_ context.Context, _ string, _ int64, request *api.UpdateClientPermissionsRequest) error {
 	s.sent = request
 	return s.err
+}
+
+// The rest of the ports clientPermissionsSaveApiClient is passed to, which no test here reaches.
+
+func (*clientPermissionsSaveApiClient) GetAllResources(context.Context, string) ([]api.ResourceResponse, error) {
+	panic("unexpected call to GetAllResources")
+}
+
+func (*clientPermissionsSaveApiClient) GetClientPermissions(context.Context, string, int64) (*api.ClientResponse, []api.PermissionResponse, error) {
+	panic("unexpected call to GetClientPermissions")
 }
 
 // The page posts the set as it loaded it beside the set it wants, and the handler hands both to

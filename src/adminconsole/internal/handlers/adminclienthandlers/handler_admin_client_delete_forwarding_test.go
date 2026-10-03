@@ -27,7 +27,6 @@ import (
 // The 500 row is what keeps the fix narrow, and it is the row a sweep breaks: an API that is broken
 // is still a server fault and still belongs in the log.
 type deleteClientApiClient struct {
-	apiclient.ApiClient
 	err error
 }
 
@@ -36,6 +35,12 @@ func (c *deleteClientApiClient) GetClientPermissions(_ context.Context, accessTo
 		return nil, nil, c.err
 	}
 	return &api.ClientResponse{Id: clientId}, nil, nil
+}
+
+// The rest of the ports deleteClientApiClient is passed to, which no test here reaches.
+
+func (*deleteClientApiClient) DeleteClient(context.Context, string, int64) error {
+	panic("unexpected call to DeleteClient")
 }
 
 func TestClientDeleteGet_ForwardsTheApisStatus(t *testing.T) {

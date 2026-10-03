@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
@@ -34,11 +33,10 @@ import (
 type groupCtxMarkerKey struct{}
 
 // groupCtxRecordingApiClient records the context every stage-11 group method is called with and
-// then refuses, so the handler takes its error path in the same pass. It embeds ApiClient, so a
-// method a handler calls that is not stubbed here panics on a nil interface rather than passing
+// then refuses, so the handler takes its error path in the same pass. The tables below are typed on
+// it, so a method a handler's port gains and this fake lacks fails to compile rather than passing
 // silently.
 type groupCtxRecordingApiClient struct {
-	apiclient.ApiClient
 	seen []context.Context
 }
 
@@ -122,19 +120,19 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 	// here always refuses, so nil is never dereferenced.
 	testCases := []struct {
 		name    string
-		build   func(httpHelper *mocks_handlers.HttpHelper, apiClient apiclient.ApiClient) http.HandlerFunc
+		build   func(httpHelper *mocks_handlers.HttpHelper, apiClient *groupCtxRecordingApiClient) http.HandlerFunc
 		request *http.Request
 	}{
 		{
 			name: "HandleAdminGroupsGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupsGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAdminGroupNewPost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupNewPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/new",
@@ -143,7 +141,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupPermissionsGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupPermissionsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/permissions",
@@ -151,7 +149,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupSettingsGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupSettingsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/settings",
@@ -159,7 +157,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupSettingsPost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupSettingsPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/settings",
@@ -168,7 +166,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupDeleteGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/delete",
@@ -176,7 +174,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupDeletePost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupDeletePost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/delete",
@@ -185,7 +183,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupMembersGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupMembersGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/members",
@@ -193,7 +191,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupMembersAddGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupMembersAddGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/members/add",
@@ -201,7 +199,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupMembersSearchGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupMembersSearchGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/members/search?query=jane",
@@ -209,7 +207,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupMembersAddPost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupMembersAddPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/members/add?userId=42",
@@ -217,7 +215,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupMembersRemoveUserPost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupMembersRemoveUserPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/members/42/remove",
@@ -226,7 +224,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupPermissionsGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupPermissionsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/permissions",
@@ -234,7 +232,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupPermissionsPost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupPermissionsPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/permissions",
@@ -244,7 +242,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupAttributesGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupAttributesGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/attributes",
@@ -252,7 +250,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupAttributesRemovePost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupAttributesRemovePost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/attributes/11/remove",
@@ -261,7 +259,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupAttributesAddGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupAttributesAddGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/attributes/add",
@@ -269,7 +267,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupAttributesAddPost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupAttributesAddPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/attributes/add",
@@ -278,7 +276,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupAttributesEditGet",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupAttributesEditGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/attributes/11/edit",
@@ -287,7 +285,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAdminGroupAttributesEditPost",
-			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAdminGroupAttributesEditPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/attributes/11/edit",

@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
@@ -32,63 +31,63 @@ func TestAdminResourceHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *test
 		return handlertest.Request(method, target, opts...)
 	}
 
-	type build func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc
+	type build func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc
 	testCases := []struct {
 		name    string
 		build   build
 		request *http.Request
 	}{
-		{"HandleAdminResourcesGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourcesGet", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourcesGet(h, c)
 		}, request(http.MethodGet, "/admin/resources")},
-		{"HandleAdminResourceNewPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourceNewPost", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourceNewPost(h, c)
 		}, request(http.MethodPost, "/admin/resources/new",
 			handlertest.WithForm(url.Values{"resourceIdentifier": {"some-resource"}}))},
-		{"HandleAdminResourceSettingsGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourceSettingsGet", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourceSettingsGet(h, testStore(), c)
 		}, request(http.MethodGet, "/admin/resources/3/settings", routed)},
-		{"HandleAdminResourceSettingsPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourceSettingsPost", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourceSettingsPost(h, testStore(), c)
 		}, request(http.MethodPost, "/admin/resources/3/settings", routed, handlertest.WithForm(url.Values{}))},
-		{"HandleAdminResourceDeleteGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourceDeleteGet", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourceDeleteGet(h, c)
 		}, request(http.MethodGet, "/admin/resources/3/delete", routed)},
-		{"HandleAdminResourceDeletePost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourceDeletePost", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourceDeletePost(h, c)
 		}, request(http.MethodPost, "/admin/resources/3/delete", routed, handlertest.WithForm(url.Values{}))},
-		{"HandleAdminResourcePermissionsGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourcePermissionsGet", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourcePermissionsGet(h, testStore(), c)
 		}, request(http.MethodGet, "/admin/resources/3/permissions", routed)},
-		{"HandleAdminResourcePermissionsPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourcePermissionsPost", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourcePermissionsPost(h, testStore(), c)
 		}, request(http.MethodPost, "/admin/resources/3/permissions", routed,
 			handlertest.WithBody(strings.NewReader(`{"resourceId":3,"permissions":[],"expectedPermissions":[]}`)),
 			handlertest.WithContentType("application/json"))},
-		{"HandleAdminResourceUsersWithPermissionGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourceUsersWithPermissionGet", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourceUsersWithPermissionGet(h, testStore(), c)
 		}, request(http.MethodGet, "/admin/resources/3/users-with-permission", routed)},
-		{"HandleAdminResourceUsersWithPermissionAddGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourceUsersWithPermissionAddGet", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourceUsersWithPermissionAddGet(h, c)
 		}, request(http.MethodGet, "/admin/resources/3/users-with-permission-add/8", routed,
 			handlertest.WithRouteParam("permissionId", "8"))},
-		{"HandleAdminResourceUsersWithPermissionSearchGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourceUsersWithPermissionSearchGet", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourceUsersWithPermissionSearchGet(h, c)
 		}, request(http.MethodGet, "/admin/resources/3/users-with-permission-add/8/search?query=jdoe", routed,
 			handlertest.WithRouteParam("permissionId", "8"))},
-		{"HandleAdminResourceUsersWithPermissionAddPermissionPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourceUsersWithPermissionAddPermissionPost", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourceUsersWithPermissionAddPermissionPost(h, c)
 		}, request(http.MethodPost, "/admin/resources/3/users-with-permission/add/5/8", grant("userId")...)},
-		{"HandleAdminResourceUsersWithPermissionRemovePermissionPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourceUsersWithPermissionRemovePermissionPost", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourceUsersWithPermissionRemovePermissionPost(h, c)
 		}, request(http.MethodPost, "/admin/resources/3/users-with-permission/remove/5/8", grant("userId")...)},
-		{"HandleAdminResourceGroupsWithPermissionGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourceGroupsWithPermissionGet", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourceGroupsWithPermissionGet(h, testStore(), c)
 		}, request(http.MethodGet, "/admin/resources/3/groups-with-permission", routed)},
-		{"HandleAdminResourceGroupsWithPermissionAddPermissionPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourceGroupsWithPermissionAddPermissionPost", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourceGroupsWithPermissionAddPermissionPost(h, c)
 		}, request(http.MethodPost, "/admin/resources/3/groups-with-permission/add/5/8", grant("groupId")...)},
-		{"HandleAdminResourceGroupsWithPermissionRemovePermissionPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminResourceGroupsWithPermissionRemovePermissionPost", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourceGroupsWithPermissionRemovePermissionPost(h, c)
 		}, request(http.MethodPost, "/admin/resources/3/groups-with-permission/remove/5/8", grant("groupId")...)},
 	}

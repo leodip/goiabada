@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
@@ -74,11 +73,8 @@ func TestWithListPosition_RendersPlainValuesAsBefore(t *testing.T) {
 }
 
 // returnURLStubApiClient answers every call the ten saving handlers make on their way to the
-// redirect, each as a success for user 7. Anything else reaches the nil embedded interface and
-// panics, which names the call.
-type returnURLStubApiClient struct {
-	apiclient.ApiClient
-}
+// redirect, each as a success for user 7. The rest of their ports panic naming the call.
+type returnURLStubApiClient struct{}
 
 func (returnURLStubApiClient) GetUserById(_ context.Context, _ string, userId int64) (*api.UserResponse, error) {
 	return &api.UserResponse{Id: userId, Email: "someone@example.com"}, nil
@@ -135,6 +131,20 @@ func (returnURLStubApiClient) UpdateUserPhone(_ context.Context, _ string, userI
 func (returnURLStubApiClient) UpdateUserProfile(_ context.Context, _ string, userId int64,
 	_ *api.UpdateUserProfileRequest) (*api.UserResponse, error) {
 	return &api.UserResponse{Id: userId}, nil
+}
+
+// The rest of the ports returnURLStubApiClient is passed to, which no test here reaches.
+
+func (returnURLStubApiClient) GetUserGroups(context.Context, string, int64) (*api.UserResponse, []api.GroupResponse, error) {
+	panic("unexpected call to GetUserGroups")
+}
+
+func (returnURLStubApiClient) UpdateUserOTP(context.Context, string, int64, *api.UpdateUserOTPRequest) (*api.UserResponse, error) {
+	panic("unexpected call to UpdateUserOTP")
+}
+
+func (returnURLStubApiClient) UpdateUserPassword(context.Context, string, int64, *api.UpdateUserPasswordRequest) (*api.UserResponse, error) {
+	panic("unexpected call to UpdateUserPassword")
 }
 
 // Each of the ten handlers that return to the user list after a save, driven to that redirect with

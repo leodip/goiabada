@@ -19,7 +19,6 @@ import (
 
 // groupPermissionsSaveApiClient records the request the save hands the API and answers it with err.
 type groupPermissionsSaveApiClient struct {
-	apiclient.ApiClient
 	err  error
 	sent *api.UpdateGroupPermissionsRequest
 }
@@ -27,6 +26,16 @@ type groupPermissionsSaveApiClient struct {
 func (s *groupPermissionsSaveApiClient) UpdateGroupPermissions(_ context.Context, _ string, _ int64, request *api.UpdateGroupPermissionsRequest) error {
 	s.sent = request
 	return s.err
+}
+
+// The rest of the ports groupPermissionsSaveApiClient is passed to, which no test here reaches.
+
+func (*groupPermissionsSaveApiClient) GetAllResources(context.Context, string) ([]api.ResourceResponse, error) {
+	panic("unexpected call to GetAllResources")
+}
+
+func (*groupPermissionsSaveApiClient) GetGroupPermissions(context.Context, string, int64) (*api.GroupResponse, []api.PermissionResponse, error) {
+	panic("unexpected call to GetGroupPermissions")
 }
 
 // The page posts the set as it loaded it beside the set it wants, and the handler hands both to

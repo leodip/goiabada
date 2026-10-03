@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
@@ -36,7 +35,6 @@ import (
 
 // flashStubApiClient reports success on the one call the change-password POST makes.
 type flashStubApiClient struct {
-	apiclient.ApiClient
 }
 
 func (flashStubApiClient) UpdateAccountPassword(_ context.Context, accessToken string,

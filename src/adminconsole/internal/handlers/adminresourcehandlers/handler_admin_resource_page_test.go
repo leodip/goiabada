@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
@@ -41,7 +40,6 @@ import (
 // resourcePagingApiClient answers everything both handlers ask, from lists of a
 // fixed size, and records the pages it was asked for.
 type resourcePagingApiClient struct {
-	apiclient.ApiClient
 
 	// permissions is what the resource has; empty is the arm that paginates in
 	// the handler.
@@ -99,6 +97,28 @@ func (c *resourcePagingApiClient) GetUsersByPermission(_ context.Context, access
 		users = append(users, api.UserResponse{Id: int64(i + 1)})
 	}
 	return users, c.total, nil
+}
+
+// The rest of the ports resourcePagingApiClient is passed to, which no test here reaches.
+
+func (*resourcePagingApiClient) GetGroupPermissions(context.Context, string, int64) (*api.GroupResponse, []api.PermissionResponse, error) {
+	panic("unexpected call to GetGroupPermissions")
+}
+
+func (*resourcePagingApiClient) GetUserPermissions(context.Context, string, int64) (*api.UserResponse, []api.PermissionResponse, error) {
+	panic("unexpected call to GetUserPermissions")
+}
+
+func (*resourcePagingApiClient) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
+	panic("unexpected call to SearchUsersWithPermissionAnnotation")
+}
+
+func (*resourcePagingApiClient) UpdateGroupPermissions(context.Context, string, int64, *api.UpdateGroupPermissionsRequest) error {
+	panic("unexpected call to UpdateGroupPermissions")
+}
+
+func (*resourcePagingApiClient) UpdateUserPermissions(context.Context, string, int64, *api.UpdateUserPermissionsRequest) error {
+	panic("unexpected call to UpdateUserPermissions")
 }
 
 // window is the half-open range of a list of total items that page covers, and

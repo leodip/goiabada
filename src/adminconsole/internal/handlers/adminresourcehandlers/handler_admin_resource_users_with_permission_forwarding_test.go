@@ -33,12 +33,33 @@ import (
 // The 400 row is the reason the classifier rather than a bare JsonNotFound: forwarding the API's
 // own sentence is what the browser shows.
 type usersWithPermissionApiClient struct {
-	apiclient.ApiClient
 	err error
 }
 
 func (c *usersWithPermissionApiClient) GetResourceById(_ context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
 	return nil, c.err
+}
+
+// The rest of the ports usersWithPermissionApiClient is passed to, which no test here reaches.
+
+func (*usersWithPermissionApiClient) GetPermissionsByResource(context.Context, string, int64) ([]api.PermissionResponse, error) {
+	panic("unexpected call to GetPermissionsByResource")
+}
+
+func (*usersWithPermissionApiClient) GetUserPermissions(context.Context, string, int64) (*api.UserResponse, []api.PermissionResponse, error) {
+	panic("unexpected call to GetUserPermissions")
+}
+
+func (*usersWithPermissionApiClient) GetUsersByPermission(context.Context, string, int64, int, int) ([]api.UserResponse, int, error) {
+	panic("unexpected call to GetUsersByPermission")
+}
+
+func (*usersWithPermissionApiClient) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
+	panic("unexpected call to SearchUsersWithPermissionAnnotation")
+}
+
+func (*usersWithPermissionApiClient) UpdateUserPermissions(context.Context, string, int64, *api.UpdateUserPermissionsRequest) error {
+	panic("unexpected call to UpdateUserPermissions")
 }
 
 func TestResourceUsersWithPermissionRemovePost_ForwardsTheApisStatusAsJson(t *testing.T) {

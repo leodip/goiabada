@@ -26,6 +26,28 @@ func (c *systemResourceApiClient) GetResourceById(_ context.Context, accessToken
 	return &api.ResourceResponse{Id: resourceId, ResourceIdentifier: coreconstants.AuthServerResourceIdentifier}, nil
 }
 
+// The rest of the ports systemResourceApiClient is passed to, which no test here reaches.
+
+func (*systemResourceApiClient) GetGroupPermissions(context.Context, string, int64) (*api.GroupResponse, []api.PermissionResponse, error) {
+	panic("unexpected call to GetGroupPermissions")
+}
+
+func (*systemResourceApiClient) GetUserPermissions(context.Context, string, int64) (*api.UserResponse, []api.PermissionResponse, error) {
+	panic("unexpected call to GetUserPermissions")
+}
+
+func (*systemResourceApiClient) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
+	panic("unexpected call to SearchUsersWithPermissionAnnotation")
+}
+
+func (*systemResourceApiClient) UpdateGroupPermissions(context.Context, string, int64, *api.UpdateGroupPermissionsRequest) error {
+	panic("unexpected call to UpdateGroupPermissions")
+}
+
+func (*systemResourceApiClient) UpdateUserPermissions(context.Context, string, int64, *api.UpdateUserPermissionsRequest) error {
+	panic("unexpected call to UpdateUserPermissions")
+}
+
 func systemResourcePermissions() []api.PermissionResponse {
 	system := api.ResourceResponse{Id: 7, ResourceIdentifier: coreconstants.AuthServerResourceIdentifier}
 	return []api.PermissionResponse{

@@ -25,17 +25,29 @@ import (
 // JWT middleware holds, and a 500 from the API is a server fault: both stay 500, and a sweep that
 // turned every InternalServerError in this file into a NotFound would fail here.
 //
-// notFoundGroupApiClient answers the one call the handler makes before it decides, and embeds the
-// interface so any other method the handler reaches for panics rather than returning a helpful
-// zero value.
+// notFoundGroupApiClient answers the one call the handler makes before it decides. The rest of the
+// ports it is passed to panic, rather than return a helpful zero value.
 type notFoundGroupApiClient struct {
-	apiclient.ApiClient
 	entity *api.GroupResponse
 	err    error
 }
 
 func (c *notFoundGroupApiClient) GetGroupById(_ context.Context, accessToken string, id int64) (*api.GroupResponse, error) {
 	return c.entity, c.err
+}
+
+// The rest of the ports notFoundGroupApiClient is passed to, which no test here reaches.
+
+func (*notFoundGroupApiClient) DeleteGroupAttribute(context.Context, string, int64) error {
+	panic("unexpected call to DeleteGroupAttribute")
+}
+
+func (*notFoundGroupApiClient) GetGroupAttributesByGroupId(context.Context, string, int64) ([]api.GroupAttributeResponse, error) {
+	panic("unexpected call to GetGroupAttributesByGroupId")
+}
+
+func (*notFoundGroupApiClient) UpdateGroup(context.Context, string, int64, *api.UpdateGroupRequest) (*api.GroupResponse, error) {
+	panic("unexpected call to UpdateGroup")
 }
 
 func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {

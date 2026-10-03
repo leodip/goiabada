@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
@@ -30,84 +29,84 @@ func TestAdminClientHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testin
 
 	testCases := []struct {
 		name    string
-		build   func(httpHelper *mocks_handlers.HttpHelper, apiClient apiclient.ApiClient) http.HandlerFunc
+		build   func(httpHelper *mocks_handlers.HttpHelper, apiClient *ctxRecordingApiClient) http.HandlerFunc
 		request *http.Request
 	}{
-		{"HandleAdminClientsGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientsGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients")},
-		{"HandleAdminClientNewPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientNewPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientNewPost(h, c)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/new",
 			handlertest.WithForm(url.Values{"clientIdentifier": {"a-client"}}))},
-		{"HandleAdminClientAuthenticationGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientAuthenticationGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientAuthenticationGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/authentication", routed)},
-		{"HandleAdminClientAuthenticationPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientAuthenticationPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientAuthenticationPost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/authentication", routed,
 			handlertest.WithForm(url.Values{}))},
-		{"HandleAdminClientDeleteGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientDeleteGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientDeleteGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/delete", routed)},
-		{"HandleAdminClientDeletePost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientDeletePost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientDeletePost(h, c)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/delete", routed,
 			handlertest.WithForm(url.Values{"clientIdentifier": {"a-client"}}))},
-		{"HandleAdminClientLogoGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientLogoGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientLogoGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/logo", routed)},
-		{"HandleAdminClientLogoPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientLogoPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientLogoPost(h, c)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/logo", routed)},
-		{"HandleAdminClientLogoDelete", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientLogoDelete", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientLogoDelete(h, c)
 		}, handlertest.Request(http.MethodDelete, "/admin/clients/3/logo", routed)},
-		{"HandleAdminClientOAuth2FlowsGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientOAuth2FlowsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientOAuth2FlowsGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/oauth2-flows", routed)},
-		{"HandleAdminClientOAuth2FlowsPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientOAuth2FlowsPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientOAuth2FlowsPost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/oauth2-flows", routed,
 			handlertest.WithForm(url.Values{}))},
-		{"HandleAdminClientPermissionsGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientPermissionsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientPermissionsGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/permissions", routed)},
-		{"HandleAdminClientPermissionsPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientPermissionsPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientPermissionsPost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/permissions", routed, jsonBody())},
-		{"HandleAdminClientRedirectURIsGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientRedirectURIsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientRedirectURIsGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/redirect-uris", routed)},
-		{"HandleAdminClientRedirectURIsPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientRedirectURIsPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientRedirectURIsPost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/redirect-uris", routed, jsonBody())},
-		{"HandleAdminClientUserSessionsGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientUserSessionsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientUserSessionsGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions", routed)},
-		{"HandleAdminClientUserSessionsPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientUserSessionsPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientUserSessionsPost(h, c)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/user-sessions", routed,
 			handlertest.WithBody(strings.NewReader(`{"userSessionId":31}`)),
 			handlertest.WithContentType("application/json"))},
-		{"HandleAdminClientSettingsGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientSettingsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientSettingsGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/settings", routed)},
-		{"HandleAdminClientSettingsPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientSettingsPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientSettingsPost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/settings", routed,
 			handlertest.WithForm(url.Values{}))},
-		{"HandleAdminClientTokensGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientTokensGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientTokensGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/tokens", routed)},
-		{"HandleAdminClientTokensPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientTokensPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientTokensPost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/tokens", routed,
 			handlertest.WithForm(url.Values{}))},
-		{"HandleAdminClientWebOriginsGet", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientWebOriginsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientWebOriginsGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/web-origins", routed)},
-		{"HandleAdminClientWebOriginsPost", func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+		{"HandleAdminClientWebOriginsPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientWebOriginsPost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/web-origins", routed, jsonBody())},
 	}

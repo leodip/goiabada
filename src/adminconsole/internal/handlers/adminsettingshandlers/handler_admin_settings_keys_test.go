@@ -19,12 +19,10 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// stubApiClient embeds apiclient.ApiClient so its hundred-odd other methods come for free
-// and any of them that a test does not stub panics on a nil interface, which is the right
-// outcome for a call the test did not expect. There is no generated mock: adminconsole has
-// no .mockery.yaml. Same shape as adminclienthandlers' stub, for the same reason.
+// stubApiClient implements the keys page's port. The method no test here reaches panics, which is
+// the right outcome for a call the test did not expect. There is no generated mock: adminconsole
+// has no .mockery.yaml. Same shape as adminclienthandlers' stub, for the same reason.
 type stubApiClient struct {
-	apiclient.ApiClient
 	rotateErr error
 	keys      []api.SettingsSigningKeyResponse
 }
@@ -35,6 +33,12 @@ func (s *stubApiClient) RotateSettingsKeys(_ context.Context, accessToken string
 
 func (s *stubApiClient) GetSettingsKeys(_ context.Context, accessToken string) ([]api.SettingsSigningKeyResponse, error) {
 	return s.keys, nil
+}
+
+// The rest of the ports stubApiClient is passed to, which no test here reaches.
+
+func (*stubApiClient) DeleteSettingsKey(context.Context, string, int64) error {
+	panic("unexpected call to DeleteSettingsKey")
 }
 
 // TestHandleAdminSettingsKeysRotatePost_APIErrorReachesTheBrowser owns the wiring between

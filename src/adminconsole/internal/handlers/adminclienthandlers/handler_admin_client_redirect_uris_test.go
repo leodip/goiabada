@@ -18,12 +18,10 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// stubApiClient embeds apiclient.ApiClient so its hundred-odd other methods come for free
-// and any of them that a test does not stub panics on a nil interface, which is the right
-// outcome for a call the test did not expect. There is no generated mock: adminconsole has
-// no .mockery.yaml.
+// stubApiClient implements the redirect URIs page's port, and nothing beyond it, so a call the
+// page's port does not name does not compile. There is no generated mock: adminconsole has no
+// .mockery.yaml.
 type stubApiClient struct {
-	apiclient.ApiClient
 	updateErr error
 	client    *api.ClientResponse
 	settings  *api.SettingsGeneralResponse
