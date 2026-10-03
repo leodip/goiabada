@@ -456,6 +456,26 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 			accountPasswordWindow, shapeAPI)
 	})
 
+	t.Run("PUT /api/v1/account/email spends the same bucket", func(t *testing.T) {
+		// The email change verifies the same password, so it is the third route in that
+		// one bucket (#404 decision 3). Refusing the password route after the email route
+		// spent the budget is what says the wrapper is that bucket's and not a lookalike's.
+		server := newRoutesTestServer(t)
+		emailBody := `{"email":"attacker@example.com","currentPassword":"` + routesTestWrongPassword + `"}`
+
+		for i := 0; i < accountPasswordBudget; i++ {
+			assert.NotEqual(t, http.StatusTooManyRequests,
+				serve(server, apiRequest(http.MethodPut, "/api/v1/account/email", emailBody)).Code,
+				"guess %d must reach the handler", i+1)
+		}
+
+		passwordBody := `{"currentPassword":"` + routesTestWrongPassword + `","newPassword":"a new password"}`
+		assertRefused(t, serve(server, apiRequest(http.MethodPut, "/api/v1/account/password", passwordBody)),
+			accountPasswordWindow, shapeAPI)
+		assertRefused(t, serve(server, apiRequest(http.MethodPut, "/api/v1/account/email", emailBody)),
+			accountPasswordWindow, shapeAPI)
+	})
+
 	// The cases above pin every registration whose window or reject class differs from its
 	// neighbours'. Three pairs agree on both and so are still interchangeable from out
 	// here: registration and activation, either of those and forgot-password's IP tier,

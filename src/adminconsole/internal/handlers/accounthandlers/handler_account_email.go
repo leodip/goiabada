@@ -100,6 +100,11 @@ func HandleAccountEmailPost(
 
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 		emailConfirmation := strings.ToLower(strings.TrimSpace(r.FormValue("emailConfirmation")))
+		// The auth server refuses the change without the current password (#404). Read from the
+		// request body only, as the change-password page reads it: a password in the request
+		// target reaches the browser's history, Referers and proxy logs (#202). Never bound back
+		// into the page, so a re-render asks for it again.
+		currentPassword := r.PostFormValue("currentPassword")
 
 		// UI-level confirmation check
 		if email != emailConfirmation {
@@ -116,7 +121,10 @@ func HandleAccountEmailPost(
 			return
 		}
 
-		req := &api.UpdateAccountEmailRequest{Email: email}
+		req := &api.UpdateAccountEmailRequest{
+			Email:           email,
+			CurrentPassword: strings.TrimSpace(currentPassword),
+		}
 		_, err = apiClient.UpdateAccountEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
 			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {

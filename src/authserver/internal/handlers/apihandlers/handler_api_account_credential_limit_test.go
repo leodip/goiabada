@@ -30,20 +30,22 @@ type unlimitedCredentials struct{}
 
 func (unlimitedCredentials) RecordCredentialFailure(*http.Request) {}
 
-// credentialEnv is the two handlers that verify the account password, each behind the one
-// LimitAccountPassword middleware that routes.go wraps them both in. One middleware instance
+// credentialEnv is the three handlers that verify the account password, each behind the one
+// LimitAccountPassword middleware that routes.go wraps them all in. One middleware instance
 // is what makes the budget shared, and driving the handlers through it is the point of this
 // seam: the reservation lives in the request context, so a handler called directly has
 // nothing to convert and every assertion below would pass while proving nothing (#219).
 type credentialEnv struct {
 	password http.Handler
 	otp      http.Handler
+	email    http.Handler
 	database *mocks_data.Database
 }
 
 const (
 	credentialSubject  = "66666666-6666-6666-6666-666666666666"
 	credentialPassword = "C0rrect!Pass"
+	credentialEmail    = "credential@example.com"
 )
 
 func newCredentialEnv(t *testing.T) *credentialEnv {
@@ -61,7 +63,7 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 	// (#247). Nothing here gets as far as a write.
 	ciphertext, issuedAt := pendingEnrollment(t, otpTestKeyURL, time.Now().UTC())
 	user := &models.User{
-		Id: 91, Enabled: true, PasswordHash: hash, OTPEnabled: false,
+		Id: 91, Enabled: true, PasswordHash: hash, OTPEnabled: false, Email: credentialEmail,
 		OtpEnrollmentSecretEncrypted: ciphertext,
 		OtpEnrollmentIssuedAt:        issuedAt,
 	}
@@ -76,6 +78,8 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 			HandleAPIAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger, rateLimiter)),
 		otp: rateLimiter.LimitAccountPassword(
 			HandleAPIAccountOTPPut(database, auditLogger, rateLimiter, testDataCipher)),
+		email: rateLimiter.LimitAccountPassword(
+			HandleAPIAccountEmailPut(database, accountvalidation.NewEmailValidator(database), auditLogger, rateLimiter)),
 		database: database,
 	}
 }
@@ -121,6 +125,24 @@ func (e *credentialEnv) putOTP(t *testing.T, password, code string) *httptest.Re
 
 	rr := httptest.NewRecorder()
 	e.otp.ServeHTTP(rr, req)
+	return rr
+}
+
+// putEmail submits one email change and reports the response. Nothing here gets as far as the
+// address: a wrong or blank password stops before it, and a right one is only ever sent with the
+// account's own address, which is answered without a write (#404 decision 10).
+func (e *credentialEnv) putEmail(t *testing.T, password, email string) *httptest.ResponseRecorder {
+	t.Helper()
+	body, err := json.Marshal(map[string]string{"email": email, "currentPassword": password})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/account/email", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.RemoteAddr = "203.0.113.7:5000"
+	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": credentialSubject})
+
+	rr := httptest.NewRecorder()
+	e.email.ServeHTTP(rr, req)
 	return rr
 }
 
@@ -191,5 +213,80 @@ func TestAccountCredentialBudget_SharedAcrossPasswordAndOTP(t *testing.T) {
 		}
 		assert.Equal(t, http.StatusTooManyRequests,
 			env.putPassword(t, "wrong-password", "N3wP4ss!word").Code)
+	})
+}
+
+// TestAccountCredentialBudget_TheEmailChangeSpendsTheSameBudget is #404 decision 3: the email
+// change verifies the same password as the two routes above, so it spends their one budget. A
+// separate bucket would hand an attacker five more guesses at the password; no bucket at all
+// would hand them unbounded ones.
+func TestAccountCredentialBudget_TheEmailChangeSpendsTheSameBudget(t *testing.T) {
+	const budget = 5 // password failures per 15 minutes per token subject
+
+	t.Run("five failures split across the three routes refuse the sixth", func(t *testing.T) {
+		env := newCredentialEnv(t)
+
+		for i := 0; i < budget; i++ {
+			var rr *httptest.ResponseRecorder
+			switch i % 3 {
+			case 0:
+				rr = env.putEmail(t, "wrong-password", "attacker@example.com")
+			case 1:
+				rr = env.putPassword(t, "wrong-password", "N3wP4ss!word")
+			default:
+				rr = env.putOTP(t, "wrong-password", wrongButWellFormedCode(t))
+			}
+			require.Equal(t, http.StatusBadRequest, rr.Code, "failure %d should reach the handler", i+1)
+			assert.Equal(t, "AUTHENTICATION_FAILED", errorCodeOf(t, rr))
+		}
+
+		rr := env.putEmail(t, "wrong-password", "attacker@example.com")
+		assert.Equal(t, http.StatusTooManyRequests, rr.Code,
+			"attempt %d, at the email route, should be refused", budget+1)
+		assert.Equal(t, "TOO_MANY_REQUESTS", errorCodeOf(t, rr))
+		assert.Equal(t, http.StatusTooManyRequests,
+			env.putPassword(t, "wrong-password", "N3wP4ss!word").Code,
+			"the password route should be refused by the bucket the email route helped exhaust")
+	})
+
+	t.Run("five failures at the email route alone refuse the other two", func(t *testing.T) {
+		env := newCredentialEnv(t)
+
+		for i := 0; i < budget; i++ {
+			rr := env.putEmail(t, "wrong-password", "attacker@example.com")
+			require.Equal(t, http.StatusBadRequest, rr.Code, "failure %d should reach the handler", i+1)
+			assert.Equal(t, "AUTHENTICATION_FAILED", errorCodeOf(t, rr))
+		}
+
+		assert.Equal(t, http.StatusTooManyRequests,
+			env.putOTP(t, "wrong-password", wrongButWellFormedCode(t)).Code)
+		assert.Equal(t, http.StatusTooManyRequests,
+			env.putPassword(t, "wrong-password", "N3wP4ss!word").Code)
+	})
+
+	t.Run("a blank password and a right one spend nothing", func(t *testing.T) {
+		env := newCredentialEnv(t)
+
+		// Well past the budget. A blank password compares nothing (#219), and the right one
+		// is not a failure; the right one is sent with the account's own address, which is
+		// answered without a write, so the case reaches no database method it did not stub.
+		for i := 0; i < budget*2; i++ {
+			rr := env.putEmail(t, "", "attacker@example.com")
+			require.Equal(t, http.StatusBadRequest, rr.Code, "blank attempt %d", i+1)
+			assert.Equal(t, "VALIDATION_ERROR", errorCodeOf(t, rr))
+		}
+		for i := 0; i < budget*2; i++ {
+			rr := env.putEmail(t, credentialPassword, credentialEmail)
+			require.Equal(t, http.StatusOK, rr.Code, "right-password attempt %d: %s", i+1, rr.Body.String())
+		}
+
+		// And the whole budget is still there.
+		for i := 0; i < budget; i++ {
+			require.Equal(t, http.StatusBadRequest,
+				env.putEmail(t, "wrong-password", "attacker@example.com").Code,
+				"failure %d should still reach the handler", i+1)
+		}
+		assert.Equal(t, http.StatusTooManyRequests,
+			env.putEmail(t, "wrong-password", "attacker@example.com").Code)
 	})
 }

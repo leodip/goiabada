@@ -241,8 +241,9 @@ When enabled, Goiabada applies rate limits to security-sensitive endpoints:
 | `POST /auth/pwd` (password login) | 30 / min | every request | IP address (IPv6 grouped by /64) |
 | `POST /auth/otp` (OTP verification) | 5 / 15min | failed codes | user ID |
 | `POST /api/v1/account/email/verification` | 5 / 15min | failed codes | access token subject |
-| `PUT /api/v1/account/password` | 5 / 15min | failed passwords | access token subject, shared with `PUT /api/v1/account/otp` |
-| `PUT /api/v1/account/otp` | 5 / 15min | failed passwords | access token subject, shared with `PUT /api/v1/account/password` |
+| `PUT /api/v1/account/password` | 5 / 15min | failed passwords | access token subject, shared with `PUT /api/v1/account/otp` and `PUT /api/v1/account/email` |
+| `PUT /api/v1/account/otp` | 5 / 15min | failed passwords | access token subject, shared with `PUT /api/v1/account/password` and `PUT /api/v1/account/email` |
+| `PUT /api/v1/account/email` | 5 / 15min | failed passwords | access token subject, shared with `PUT /api/v1/account/password` and `PUT /api/v1/account/otp` |
 | `POST /forgot-password` | 5 / 5min | every request | email (lowercased) |
 | `POST /forgot-password` | 20 / 5min | every request | IP address (IPv6 grouped by /64) |
 | `GET` and `POST /reset-password` | 30 / 5min | every request | IP address (IPv6 grouped by /64) |
@@ -255,7 +256,7 @@ When enabled, Goiabada applies rate limits to security-sensitive endpoints:
 
 A limit that counts failures is not spent by a successful sign-in, so signing in normally never uses it up.
 
-Shared means one budget, not two of the same size: a wrong password counts the same whether it arrives at the login form or at the password grant.
+Shared means one budget, not two of the same size: a wrong password counts the same whether it arrives at the login form or at the password grant, and the same whether it arrives at the password, OTP or email change.
 
 Counters are held in the process, so a deployment running several replicas multiplies every budget by the replica count and resets them on deploy.
 

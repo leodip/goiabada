@@ -357,7 +357,10 @@ func (s *Server) initRoutes(branches appBranches) {
 
 		r.Get("/profile", apihandlers.HandleAPIAccountProfileGet(s.database))
 		r.Put("/profile", apihandlers.HandleAPIAccountProfilePut(s.database, profileValidator, auditLogger))
-		r.Put("/email", apihandlers.HandleAPIAccountEmailPut(s.database, emailValidator, auditLogger))
+		// The email change verifies the account password too, so it spends the same bucket as
+		// the password and OTP changes below (#404).
+		r.With(rateLimiter.LimitAccountPassword).Put("/email",
+			apihandlers.HandleAPIAccountEmailPut(s.database, emailValidator, auditLogger, rateLimiter))
 		r.Post("/email/verification/send", apihandlers.HandleAPIAccountEmailVerificationSendPost(httpHelper, s.database, emailSender, auditLogger, s.dataCipher, adminConsoleBaseURL))
 		// The verification check is limited, the send beside it is not: sending checks no
 		// credential and already carries its own 60 second resend cooldown.
@@ -365,9 +368,10 @@ func (s *Server) initRoutes(branches appBranches) {
 			apihandlers.HandleAPIAccountEmailVerificationPost(s.database, auditLogger, rateLimiter, s.dataCipher))
 		r.Put("/phone", apihandlers.HandleAPIAccountPhonePut(s.database, phoneValidator, auditLogger))
 		r.Put("/address", apihandlers.HandleAPIAccountAddressPut(s.database, addressValidator, auditLogger))
-		// One limiter over both PUTs, which is what makes the failure budget shared: they
-		// verify the same password, so two buckets would hand an attacker ten guesses by
-		// alternating. The enrollment GET between them checks no credential.
+		// One limiter over these PUTs and the email change above, which is what makes the
+		// failure budget shared: they verify the same password, so separate buckets would hand
+		// an attacker more guesses by alternating. The enrollment GET between them checks no
+		// credential.
 		r.With(rateLimiter.LimitAccountPassword).Put("/password",
 			apihandlers.HandleAPIAccountPasswordPut(s.database, passwordValidator, auditLogger, rateLimiter))
 		r.Get("/otp/enrollment", apihandlers.HandleAPIAccountOTPEnrollmentGet(s.database, otpSecretGenerator, s.dataCipher))
