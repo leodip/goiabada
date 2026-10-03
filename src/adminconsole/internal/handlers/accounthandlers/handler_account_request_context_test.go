@@ -100,11 +100,11 @@ func (s *ctxRecordingApiClient) RevokeAccountConsent(ctx context.Context, _ stri
 	return s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetAccountProfilePicture(ctx context.Context, _ string) (*apiclient.ProfilePictureInfo, error) {
+func (s *ctxRecordingApiClient) GetAccountProfilePicture(ctx context.Context, _ string) (*api.ProfilePictureInfoResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UploadAccountProfilePicture(ctx context.Context, _ string, _ []byte, _ string) (*apiclient.ProfilePictureUploadResponse, error) {
+func (s *ctxRecordingApiClient) UploadAccountProfilePicture(ctx context.Context, _ string, _ []byte, _ string) (*api.ProfilePictureUploadResponse, error) {
 	return nil, s.record(ctx)
 }
 

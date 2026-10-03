@@ -33,7 +33,7 @@ func (c *logoApiClient) GetClientById(_ context.Context, accessToken string, cli
 	return &api.ClientResponse{Id: clientId, ClientIdentifier: "an-client"}, nil
 }
 
-func (c *logoApiClient) GetClientLogo(_ context.Context, accessToken string, clientId int64) (*apiclient.ClientLogoInfo, error) {
+func (c *logoApiClient) GetClientLogo(_ context.Context, accessToken string, clientId int64) (*api.ClientLogoInfoResponse, error) {
 	return nil, c.logoErr
 }
 

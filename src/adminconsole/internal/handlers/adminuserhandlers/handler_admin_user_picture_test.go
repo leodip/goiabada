@@ -23,7 +23,7 @@ import (
 // with HasPicture false, so every error here is a real one, and it now goes through the classifier
 // like the user read above it (#425).
 type userPictureApiClient struct {
-	picture *apiclient.ProfilePictureInfo
+	picture *api.ProfilePictureInfoResponse
 	err     error
 }
 
@@ -31,14 +31,14 @@ func (c *userPictureApiClient) GetUserById(_ context.Context, accessToken string
 	return &api.UserResponse{Id: userId}, nil
 }
 
-func (c *userPictureApiClient) GetUserProfilePicture(_ context.Context, accessToken string, userId int64) (*apiclient.ProfilePictureInfo, error) {
+func (c *userPictureApiClient) GetUserProfilePicture(_ context.Context, accessToken string, userId int64) (*api.ProfilePictureInfoResponse, error) {
 	return c.picture, c.err
 }
 
 func TestHandleAdminUserPictureGet_AnswersAFailedPictureRead(t *testing.T) {
 	testCases := []struct {
 		name         string
-		picture      *apiclient.ProfilePictureInfo
+		picture      *api.ProfilePictureInfoResponse
 		err          error
 		wantNotFound bool
 		wantError    bool
@@ -62,12 +62,12 @@ func TestHandleAdminUserPictureGet_AnswersAFailedPictureRead(t *testing.T) {
 		},
 		{
 			name:          "a picture renders the page with its address",
-			picture:       &apiclient.ProfilePictureInfo{HasPicture: true, PictureUrl: "https://auth.example/picture/42"},
+			picture:       &api.ProfilePictureInfoResponse{HasPicture: true, PictureUrl: "https://auth.example/picture/42"},
 			wantUrlPrefix: "https://auth.example/picture/42?t=",
 		},
 		{
 			name:    "no picture renders the page without one",
-			picture: &apiclient.ProfilePictureInfo{HasPicture: false},
+			picture: &api.ProfilePictureInfoResponse{HasPicture: false},
 		},
 	}
 

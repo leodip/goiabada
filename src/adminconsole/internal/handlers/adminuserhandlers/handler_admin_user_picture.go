@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -20,7 +19,7 @@ import (
 // userPictureAPI is what the user picture endpoint needs: the user, and the picture it serves.
 type userPictureAPI interface {
 	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
-	GetUserProfilePicture(ctx context.Context, accessToken string, userId int64) (*apiclient.ProfilePictureInfo, error)
+	GetUserProfilePicture(ctx context.Context, accessToken string, userId int64) (*api.ProfilePictureInfoResponse, error)
 }
 
 func HandleAdminUserPictureGet(
@@ -91,7 +90,7 @@ func HandleAdminUserPictureGet(
 // userProfilePictureAPI is what the user profile picture page needs: the upload, and the delete.
 type userProfilePictureAPI interface {
 	DeleteUserProfilePicture(ctx context.Context, accessToken string, userId int64) error
-	UploadUserProfilePicture(ctx context.Context, accessToken string, userId int64, pictureData []byte, filename string) (*apiclient.ProfilePictureUploadResponse, error)
+	UploadUserProfilePicture(ctx context.Context, accessToken string, userId int64, pictureData []byte, filename string) (*api.ProfilePictureUploadResponse, error)
 }
 
 // The error surface here answers through the console's shared JSON writers rather than the

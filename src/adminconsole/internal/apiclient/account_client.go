@@ -10,12 +10,6 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// ProfilePictureUploadResponse represents the response from uploading a profile picture
-type ProfilePictureUploadResponse struct {
-	Success    bool   `json:"success"`
-	PictureUrl string `json:"pictureUrl"`
-}
-
 // GetAccountProfile retrieves the current user's profile
 func (c *AuthServerClient) GetAccountProfile(ctx context.Context, accessToken string) (*api.UserResponse, error) {
 	response, err := execute[api.GetUserResponse](ctx, c, accessToken, apiRequest{
@@ -219,8 +213,8 @@ func (c *AuthServerClient) RevokeAccountConsent(ctx context.Context, accessToken
 }
 
 // GetAccountProfilePicture retrieves the current user's profile picture info
-func (c *AuthServerClient) GetAccountProfilePicture(ctx context.Context, accessToken string) (*ProfilePictureInfo, error) {
-	return execute[ProfilePictureInfo](ctx, c, accessToken, apiRequest{
+func (c *AuthServerClient) GetAccountProfilePicture(ctx context.Context, accessToken string) (*api.ProfilePictureInfoResponse, error) {
+	return execute[api.ProfilePictureInfoResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
 		url:           c.baseURL + "/api/v1/account/profile-picture",
 		contentType:   contentTypeJSON,
@@ -229,13 +223,13 @@ func (c *AuthServerClient) GetAccountProfilePicture(ctx context.Context, accessT
 }
 
 // UploadAccountProfilePicture uploads a profile picture for the current user
-func (c *AuthServerClient) UploadAccountProfilePicture(ctx context.Context, accessToken string, pictureData []byte, filename string) (*ProfilePictureUploadResponse, error) {
+func (c *AuthServerClient) UploadAccountProfilePicture(ctx context.Context, accessToken string, pictureData []byte, filename string) (*api.ProfilePictureUploadResponse, error) {
 	body, contentType, err := multipartPicture(filename, pictureData)
 	if err != nil {
 		return nil, err
 	}
 
-	return execute[ProfilePictureUploadResponse](ctx, c, accessToken, apiRequest{
+	return execute[api.ProfilePictureUploadResponse](ctx, c, accessToken, apiRequest{
 		method:        "POST",
 		url:           c.baseURL + "/api/v1/account/profile-picture",
 		rawBody:       body,

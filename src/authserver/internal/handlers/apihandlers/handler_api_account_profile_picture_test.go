@@ -145,11 +145,7 @@ func TestHandleAPIAccountProfilePictureGet_HasPicture(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var response map[string]interface{}
-	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.True(t, response["hasPicture"].(bool))
-	assert.Equal(t, testBaseURL+"/userinfo/picture/"+sub, response["pictureUrl"])
+	assert.JSONEq(t, `{"hasPicture":true,"pictureUrl":"`+testBaseURL+`/userinfo/picture/`+sub+`"}`, rr.Body.String())
 
 	database.AssertExpectations(t)
 }
@@ -172,11 +168,7 @@ func TestHandleAPIAccountProfilePictureGet_NoPicture(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var response map[string]interface{}
-	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.False(t, response["hasPicture"].(bool))
-	assert.Nil(t, response["pictureUrl"])
+	assert.JSONEq(t, `{"hasPicture":false}`, rr.Body.String())
 
 	database.AssertExpectations(t)
 }
@@ -357,11 +349,7 @@ func TestHandleAPIAccountProfilePicturePost_CreateNew(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var response map[string]interface{}
-	err = json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.True(t, response["success"].(bool))
-	assert.Equal(t, testBaseURL+"/userinfo/picture/"+sub, response["pictureUrl"])
+	assert.JSONEq(t, `{"success":true,"pictureUrl":"`+testBaseURL+`/userinfo/picture/`+sub+`"}`, rr.Body.String())
 
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
@@ -402,10 +390,7 @@ func TestHandleAPIAccountProfilePicturePost_UpdateExisting(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var response map[string]interface{}
-	err = json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.True(t, response["success"].(bool))
+	assert.JSONEq(t, `{"success":true,"pictureUrl":"`+testBaseURL+`/userinfo/picture/`+sub+`"}`, rr.Body.String())
 
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
@@ -468,10 +453,7 @@ func TestHandleAPIAccountProfilePictureDelete_Success(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var response map[string]interface{}
-	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.True(t, response["success"].(bool))
+	assert.JSONEq(t, `{"success":true}`, rr.Body.String())
 
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)

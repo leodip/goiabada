@@ -20,7 +20,7 @@ type ApiClient interface {
 	UpdateUserOTP(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserOTPRequest) (*api.UserResponse, error)
 	CreateUserAdmin(ctx context.Context, accessToken string, request *api.CreateUserAdminRequest) (*api.UserResponse, error)
 	DeleteUser(ctx context.Context, accessToken string, userId int64) error
-	GetUserProfilePicture(ctx context.Context, accessToken string, userId int64) (*ProfilePictureInfo, error)
+	GetUserProfilePicture(ctx context.Context, accessToken string, userId int64) (*api.ProfilePictureInfoResponse, error)
 	GetUserAttributesByUserId(ctx context.Context, accessToken string, userId int64) ([]api.UserAttributeResponse, error)
 	GetUserAttributeById(ctx context.Context, accessToken string, attributeId int64) (*api.UserAttributeResponse, error)
 	CreateUserAttribute(ctx context.Context, accessToken string, request *api.CreateUserAttributeRequest) (*api.UserAttributeResponse, error)
@@ -120,15 +120,15 @@ type ApiClient interface {
 	RevokeAccountConsent(ctx context.Context, accessToken string, consentId int64) error
 	CreateAccountLogoutRequest(ctx context.Context, accessToken string, request *api.AccountLogoutRequest) (*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error)
 	// Account - Profile Picture
-	GetAccountProfilePicture(ctx context.Context, accessToken string) (*ProfilePictureInfo, error)
-	UploadAccountProfilePicture(ctx context.Context, accessToken string, pictureData []byte, filename string) (*ProfilePictureUploadResponse, error)
+	GetAccountProfilePicture(ctx context.Context, accessToken string) (*api.ProfilePictureInfoResponse, error)
+	UploadAccountProfilePicture(ctx context.Context, accessToken string, pictureData []byte, filename string) (*api.ProfilePictureUploadResponse, error)
 	DeleteAccountProfilePicture(ctx context.Context, accessToken string) error
 	// Admin - User Profile Picture
-	UploadUserProfilePicture(ctx context.Context, accessToken string, userId int64, pictureData []byte, filename string) (*ProfilePictureUploadResponse, error)
+	UploadUserProfilePicture(ctx context.Context, accessToken string, userId int64, pictureData []byte, filename string) (*api.ProfilePictureUploadResponse, error)
 	DeleteUserProfilePicture(ctx context.Context, accessToken string, userId int64) error
 	// Admin - Client Logo
-	GetClientLogo(ctx context.Context, accessToken string, clientId int64) (*ClientLogoInfo, error)
-	UploadClientLogo(ctx context.Context, accessToken string, clientId int64, logoData []byte, filename string) (*ClientLogoUploadResponse, error)
+	GetClientLogo(ctx context.Context, accessToken string, clientId int64) (*api.ClientLogoInfoResponse, error)
+	UploadClientLogo(ctx context.Context, accessToken string, clientId int64, logoData []byte, filename string) (*api.ClientLogoUploadResponse, error)
 	DeleteClientLogo(ctx context.Context, accessToken string, clientId int64) error
 }
 

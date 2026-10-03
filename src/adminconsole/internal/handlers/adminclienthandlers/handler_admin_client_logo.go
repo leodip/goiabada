@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/core/api"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -24,8 +23,8 @@ import (
 type clientLogoAPI interface {
 	DeleteClientLogo(ctx context.Context, accessToken string, clientId int64) error
 	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
-	GetClientLogo(ctx context.Context, accessToken string, clientId int64) (*apiclient.ClientLogoInfo, error)
-	UploadClientLogo(ctx context.Context, accessToken string, clientId int64, logoData []byte, filename string) (*apiclient.ClientLogoUploadResponse, error)
+	GetClientLogo(ctx context.Context, accessToken string, clientId int64) (*api.ClientLogoInfoResponse, error)
+	UploadClientLogo(ctx context.Context, accessToken string, clientId int64, logoData []byte, filename string) (*api.ClientLogoUploadResponse, error)
 }
 
 // The error surface here answers through the console's shared JSON writers rather than the

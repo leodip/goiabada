@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/imageupload"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -99,10 +100,9 @@ func HandleAPIAccountProfilePicturePost(
 			"userId": user.Id,
 		})
 
-		// Return success response
-		response := map[string]interface{}{
-			"success":    true,
-			"pictureUrl": baseURL + "/userinfo/picture/" + user.Subject,
+		response := api.ProfilePictureUploadResponse{
+			Success:    true,
+			PictureUrl: baseURL + "/userinfo/picture/" + user.Subject,
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -152,10 +152,7 @@ func HandleAPIAccountProfilePictureDelete(
 			"userId": user.Id,
 		})
 
-		// Return success response
-		response := map[string]interface{}{
-			"success": true,
-		}
+		response := api.SuccessResponse{Success: true}
 
 		writeJSON(w, r, http.StatusOK, response)
 	}
@@ -199,12 +196,9 @@ func HandleAPIAccountProfilePictureGet(
 			return
 		}
 
-		response := map[string]interface{}{
-			"hasPicture": hasPicture,
-		}
-
+		response := api.ProfilePictureInfoResponse{HasPicture: hasPicture}
 		if hasPicture {
-			response["pictureUrl"] = baseURL + "/userinfo/picture/" + user.Subject
+			response.PictureUrl = baseURL + "/userinfo/picture/" + user.Subject
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
