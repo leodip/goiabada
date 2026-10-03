@@ -1,17 +1,24 @@
 package middleware
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
-	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
+// settingsGetter is what the middleware needs of the public settings cache: the settings, from the
+// cache or from the one fetch every request arriving during it shares (#441).
+type settingsGetter interface {
+	Get(ctx context.Context) (*api.PublicSettingsResponse, error)
+}
+
 // MiddlewareSettingsCache adds settings to the request context by fetching from the cache
-func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handler) http.Handler {
+func MiddlewareSettingsCache(settingsCache settingsGetter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Fetch settings from cache (auto-refreshes if expired)

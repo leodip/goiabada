@@ -312,6 +312,12 @@ var slogSpreadSites = []slogSpreadSite{
 // already listed, until #441 moved it out, and every admin console page loads its session through
 // it, so a move alone would have dropped all three rules this list gates with nothing going red.
 // It writes no record today.
+//
+// adminconsole/internal/publicsettings is listed by the commit that creates it, on the same terms:
+// its client sat under adminconsole/internal/apiclient, already listed, until #441 moved it here
+// beside the cache it fills, and every admin console page reads its settings through that cache
+// before it renders. It writes no record today, and its shared fetch is detached from the request's
+// cancellation but keeps the request's values, which AssertRequestPathContext holds it to.
 var slogRequestPathDirs = []string{
 	"authserver/internal/audit",
 	"authserver/internal/data/commondb",
@@ -345,6 +351,7 @@ var slogRequestPathDirs = []string{
 	"adminconsole/internal/apiclient",
 	"adminconsole/internal/oauthclient",
 	"adminconsole/internal/sessionbackend",
+	"adminconsole/internal/publicsettings",
 	"adminconsole/internal/handlerhelpers",
 	"core/middleware",
 	"core/validators",

@@ -13,9 +13,9 @@ import (
 	_ "time/tzdata" // embeds the zone database localzone.Install resolves TZ against (#49, #331, #432)
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/adminconsole/internal/server"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionbackend"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
@@ -188,7 +188,8 @@ func main() {
 
 	// Initialize settings cache (fetches from authserver public API)
 	// Prefer internal base URL for server-to-server communication
-	settingsCache := cache.NewSettingsCache(config.GetAuthServer().GetEffectiveBaseURL())
+	settingsCache := publicsettings.NewCache(
+		publicsettings.NewClient(config.GetAuthServer().GetEffectiveBaseURL()), publicsettings.DefaultTTL)
 	slog.Info("initialized settings cache with 30s TTL")
 
 	r := chi.NewRouter()

@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
+	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/core/logging/logtest"
 )
 
@@ -66,7 +66,7 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 	s := &Server{
 		router:        chi.NewRouter(),
 		sessionStore:  newTestSessionStore(),
-		settingsCache: cache.NewSettingsCache(authServer.URL),
+		settingsCache: publicsettings.NewCache(publicsettings.NewClient(authServer.URL), publicsettings.DefaultTTL),
 	}
 	s.initMiddleware()
 	s.router.Get("/admin/clients", func(w http.ResponseWriter, _ *http.Request) {
