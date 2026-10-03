@@ -361,9 +361,11 @@ func (s *Server) initRoutes(branches appBranches) {
 		// the password and OTP changes below (#404).
 		r.With(rateLimiter.LimitAccountPassword).Put("/email",
 			apihandlers.HandleAPIAccountEmailPut(httpHelper, s.database, emailValidator, emailSender, auditLogger, rateLimiter, s.jobs))
-		r.Post("/email/verification/send", apihandlers.HandleAPIAccountEmailVerificationSendPost(httpHelper, s.database, emailSender, auditLogger, s.dataCipher, adminConsoleBaseURL))
-		// The verification check is limited, the send beside it is not: sending checks no
-		// credential and already carries its own 60 second resend cooldown.
+		// The send counts every request on the account, beside its own five minute resend cooldown:
+		// the account chooses the address it mails, so each send is a mail to any address (#404).
+		r.With(rateLimiter.LimitEmailVerificationSend).Post("/email/verification/send",
+			apihandlers.HandleAPIAccountEmailVerificationSendPost(httpHelper, s.database, emailSender, auditLogger, s.dataCipher, adminConsoleBaseURL))
+		// The verification check counts failures only, in a bucket of its own.
 		r.With(rateLimiter.LimitEmailVerification).Post("/email/verification",
 			apihandlers.HandleAPIAccountEmailVerificationPost(s.database, auditLogger, rateLimiter, s.dataCipher))
 		r.Put("/phone", apihandlers.HandleAPIAccountPhonePut(s.database, phoneValidator, auditLogger))

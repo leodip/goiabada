@@ -239,3 +239,88 @@ func TestHandleAPIAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHa
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.Equal(t, "https://admin.test/account/email-verification", emailedLink)
 }
+
+// TestHandleAPIAccountEmailVerificationPost_KeepsTheIssuedAt is the verify's half of the resend
+// cooldown's bound: a verified code is spent, and its issued-at stays for the cooldown to read,
+// so verifying an address the caller holds does not let the next send, to whatever address they
+// change to, go out at once (#404).
+func TestHandleAPIAccountEmailVerificationPost_KeepsTheIssuedAt(t *testing.T) {
+	env := newVerificationEnv(t)
+	issuedAt := env.user.EmailVerificationCodeIssuedAt
+
+	require.Equal(t, http.StatusOK, env.post(t, verificationCode).Code)
+
+	assert.True(t, env.user.EmailVerified)
+	assert.Nil(t, env.user.EmailVerificationCodeEncrypted, "the verified code is spent")
+	assert.Equal(t, issuedAt, env.user.EmailVerificationCodeIssuedAt, "the issued-at stays for the resend cooldown")
+}
+
+// TestHandleAPIAccountEmailVerificationSendPost_TheCooldownIsTheAccounts is the resend
+// cooldown's bound (#404): one code per five minutes, the code's own lifetime, read from when a
+// code was last issued whether or not that code is still pending. An email change and a verification both clear the code and keep the issued-at,
+// so neither reopens a send; before, either cleared both, and setting an address, changing away
+// and back again had a code mailed to it on every cycle, to any address the caller named.
+func TestHandleAPIAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *testing.T) {
+	pending, err := testDataCipher.Encrypt(verificationCode)
+	require.NoError(t, err)
+
+	send := func(t *testing.T, user *models.User, pageRenderer *mocks_handlers.PageRenderer,
+		emailSender *mocks_accounthandlers.EmailSender, auditLogger *mocks_handlers.AuditLogger) api.AccountEmailVerificationSendResponse {
+		t.Helper()
+		database := mocks_data.NewDatabase(t)
+		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil)
+		database.On("UpdateUser", mock.Anything, (*sql.Tx)(nil), user).Return(nil).Maybe()
+
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
+		req = setTokenContextWithClaims(req, map[string]interface{}{"sub": verificationSubject})
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true, SMTPHost: "smtp.example.com"}))
+		rr := httptest.NewRecorder()
+		HandleAPIAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
+			testDataCipher, testAdminConsoleBaseURL).ServeHTTP(rr, req)
+
+		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+		var resp api.AccountEmailVerificationSendResponse
+		require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+		return resp
+	}
+
+	for _, tc := range []struct {
+		name string
+		code []byte
+	}{
+		{"a code still pending", pending},
+		{"no code pending, as an email change or a verification leaves it", nil},
+	} {
+		t.Run("a code issued four minutes ago refuses the send, with "+tc.name, func(t *testing.T) {
+			// Past the minute the cooldown used to be, so this is the five minutes refusing.
+			user := &models.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com",
+				EmailVerificationCodeEncrypted: tc.code,
+				EmailVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Add(-4 * time.Minute), Valid: true}}
+
+			// The renderer, the sender and the logger expect nothing, so a send fails the case.
+			resp := send(t, user, mocks_handlers.NewPageRenderer(t), mocks_accounthandlers.NewEmailSender(t),
+				mocks_handlers.NewAuditLogger(t))
+
+			assert.True(t, resp.TooManyRequests)
+			assert.InDelta(t, 60, resp.WaitInSeconds, 2, "the wait is what is left of the five minutes")
+			assert.False(t, resp.EmailVerificationSent)
+		})
+	}
+
+	t.Run("a code issued over five minutes ago, none pending, lets the send through", func(t *testing.T) {
+		user := &models.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com",
+			EmailVerificationCodeIssuedAt: sql.NullTime{Time: time.Now().UTC().Add(-5*time.Minute - time.Second), Valid: true}}
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
+		emailSender := mocks_accounthandlers.NewEmailSender(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(&bytes.Buffer{}, nil).Once()
+		emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		auditLogger.On("Log", mock.Anything, audit.AuditSentEmailVerificationMessage, mock.Anything).Return().Once()
+
+		resp := send(t, user, pageRenderer, emailSender, auditLogger)
+
+		assert.True(t, resp.EmailVerificationSent)
+		assert.False(t, resp.TooManyRequests)
+	})
+}

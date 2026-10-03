@@ -82,7 +82,7 @@ func HandleAPIUserEmailVerificationCodePost(
 			"loggedInUser": loggedInUser,
 		})
 
-		expiresAt := issuedAt.Add(5 * time.Minute)
+		expiresAt := issuedAt.Add(emailVerificationCodeLifetime)
 		response := api.GenerateUserEmailVerificationCodeResponse{
 			VerificationCode:          verificationCode,
 			VerificationCodeExpiresAt: &expiresAt,

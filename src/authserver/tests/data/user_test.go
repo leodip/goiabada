@@ -824,7 +824,8 @@ func TestTrySetUserEnabled(t *testing.T) {
 
 // TestSetUserEmail pins the self-service email change's write: the address is set, the
 // verified flag and the pending verification code are cleared, and no other column moves
-// (#404 decision 4).
+// (#404 decision 4). The code's issued-at is one of those that do not: the resend cooldown
+// reads it, and clearing it with the address let any address be mailed a code on demand.
 func TestSetUserEmail(t *testing.T) {
 	user := createTestUser(t)
 	user.EmailVerified = true
@@ -859,8 +860,9 @@ func TestSetUserEmail(t *testing.T) {
 	if len(after.EmailVerificationCodeEncrypted) != 0 {
 		t.Error("a pending verification code must be cleared: it was issued for the previous address")
 	}
-	if after.EmailVerificationCodeIssuedAt.Valid {
-		t.Error("the verification code's issued-at must be cleared with the code")
+	if !after.EmailVerificationCodeIssuedAt.Valid ||
+		!after.EmailVerificationCodeIssuedAt.Time.Equal(before.EmailVerificationCodeIssuedAt.Time) {
+		t.Error("the verification code's issued-at must survive the change: the resend cooldown reads it")
 	}
 
 	// Every other column is as it was.
@@ -868,7 +870,6 @@ func TestSetUserEmail(t *testing.T) {
 	expected.Email = newEmail
 	expected.EmailVerified = false
 	expected.EmailVerificationCodeEncrypted = nil
-	expected.EmailVerificationCodeIssuedAt = sql.NullTime{}
 	compareUsers(t, &expected, after)
 
 	if err := database.SetUserEmail(context.Background(), nil, 0, "x@example.com"); err == nil {

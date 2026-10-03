@@ -75,19 +75,21 @@ const (
 	// Each budget is paired with the window it is spent over, because the window is what
 	// the refusal carries as Retry-After and is therefore how a case tells one tier from
 	// another that publishes the same number.
-	registerBudget          = 20  // requests per 5 minutes per /64
-	registerWindow          = 300 // seconds
-	activateBudget          = 20  // requests per 5 minutes per /64
-	activateWindow          = 300
-	forgotPwdIpBudget       = 20 // requests per 5 minutes per /64
-	forgotPwdEmailBudget    = 5  // requests per 5 minutes per address
-	forgotPwdWindow         = 300
-	emailVerificationBudget = 5 // failures per 15 minutes per token subject
-	emailVerificationWindow = 900
-	accountPasswordBudget   = 5 // failures per 15 minutes per token subject, shared by two routes
-	accountPasswordWindow   = 900
-	otpBudget               = 5 // failures per 15 minutes per user id
-	otpWindow               = 900
+	registerBudget              = 20  // requests per 5 minutes per /64
+	registerWindow              = 300 // seconds
+	activateBudget              = 20  // requests per 5 minutes per /64
+	activateWindow              = 300
+	forgotPwdIpBudget           = 20 // requests per 5 minutes per /64
+	forgotPwdEmailBudget        = 5  // requests per 5 minutes per address
+	forgotPwdWindow             = 300
+	emailVerificationBudget     = 5 // failures per 15 minutes per token subject
+	emailVerificationWindow     = 900
+	emailVerificationSendBudget = 5 // requests per 60 minutes per token subject
+	emailVerificationSendWindow = 3600
+	accountPasswordBudget       = 5 // failures per 15 minutes per token subject, shared by two routes
+	accountPasswordWindow       = 900
+	otpBudget                   = 5 // failures per 15 minutes per user id
+	otpWindow                   = 900
 
 	routesTestClientId   = "test-client"
 	routesTestCeremonyId = "9f1c2c2f-2a0f-4a3b-8b6d-1f0a5c9e7d21"
@@ -353,6 +355,27 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 		assertRefused(t, exhaust(t, server, emailVerificationBudget, func(int) *http.Request {
 			return apiRequest(http.MethodPost, "/api/v1/account/email/verification", wrongCode)
 		}), emailVerificationWindow, shapeAPI)
+	})
+
+	t.Run("POST /api/v1/account/email/verification/send is limited", func(t *testing.T) {
+		server := newRoutesTestServer(t)
+
+		// Every request counts. SMTP is off on these, so the handler answers each with
+		// SMTP_NOT_ENABLED and sends nothing, which keeps the case about the limiter; the
+		// hour's Retry-After is what no other tier answers with, so this is the send's own
+		// limiter and not one of its lookalikes.
+		sendRequest := func(int) *http.Request {
+			r := apiRequest(http.MethodPost, "/api/v1/account/email/verification/send", "")
+			settings := routesTestSettings()
+			settings.SMTPEnabled = false
+			return r.WithContext(reqctx.WithSettings(r.Context(), settings))
+		}
+		assertRefused(t, exhaust(t, server, emailVerificationSendBudget, sendRequest),
+			emailVerificationSendWindow, shapeAPI)
+
+		assert.True(t, reachesHandler(server, apiRequest(http.MethodPost, "/api/v1/account/email/verification",
+			`{"verificationCode":"ABCD1234"}`)),
+			"the verification check keeps its own budget when the send's is spent")
 	})
 
 	// One case for both routes, because one limiter instance covers them: five failures

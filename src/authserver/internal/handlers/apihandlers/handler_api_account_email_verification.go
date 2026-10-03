@@ -27,6 +27,13 @@ type accountEmailVerificationDatabase interface {
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
 }
 
+// emailVerificationCodeLifetime is how long an email verification code verifies, and also the
+// resend cooldown: an account may have a code sent once per lifetime, so it holds at most one
+// live code at a time. The cooldown is what bounds the mail an account can have sent with the
+// rate limiter off, its default, and the account chooses the address that mail goes to, so the
+// two are one value rather than two that could drift apart (#404).
+const emailVerificationCodeLifetime = 5 * time.Minute
+
 // HandleAPIAccountEmailVerificationSendPost - POST /api/v1/account/email/verification/send
 func HandleAPIAccountEmailVerificationSendPost(
 	pageRenderer PageRenderer,
@@ -77,10 +84,12 @@ func HandleAPIAccountEmailVerificationSendPost(
 			return
 		}
 
-		// Enforce resend cooldown
-		if len(user.EmailVerificationCodeEncrypted) > 0 && user.EmailVerificationCodeIssuedAt.Valid {
-			const waitTime = 60 * time.Second
-			remaining := int(user.EmailVerificationCodeIssuedAt.Time.Add(waitTime).Sub(time.Now().UTC()).Seconds())
+		// The resend cooldown is the account's, not the address's: it reads when a code was
+		// last issued whether or not that code is still pending. An email change clears the
+		// code and keeps this, so changing away from an address and back to it does not reopen
+		// a send to it (#404).
+		if user.EmailVerificationCodeIssuedAt.Valid {
+			remaining := int(user.EmailVerificationCodeIssuedAt.Time.Add(emailVerificationCodeLifetime).Sub(time.Now().UTC()).Seconds())
 			if remaining > 0 {
 				resp := api.AccountEmailVerificationSendResponse{TooManyRequests: true, WaitInSeconds: remaining}
 				writeJSON(w, r, http.StatusOK, resp)
@@ -216,7 +225,7 @@ func HandleAPIAccountEmailVerificationPost(
 			subtle.ConstantTimeCompare([]byte(storedCode), []byte(strings.ToUpper(code))) == 1
 
 		if !codeMatches || !user.EmailVerificationCodeIssuedAt.Valid ||
-			user.EmailVerificationCodeIssuedAt.Time.Add(5*time.Minute).Before(time.Now().UTC()) {
+			user.EmailVerificationCodeIssuedAt.Time.Add(emailVerificationCodeLifetime).Before(time.Now().UTC()) {
 
 			// The only branch that is a guess against the code. A missing token, a blank
 			// subject, disabled SMTP and an unknown user are refused before anything is
@@ -233,9 +242,11 @@ func HandleAPIAccountEmailVerificationPost(
 			return
 		}
 
+		// The code is spent; its issued-at stays for the resend cooldown, which would otherwise
+		// let a send to an address the caller controls be followed at once by one to an address
+		// they do not, once they changed to it (#404).
 		user.EmailVerified = true
 		user.EmailVerificationCodeEncrypted = nil
-		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
 		if err := database.UpdateUser(r.Context(), nil, user); err != nil {
 			writeInternalServerError(w, r, err)
 			return

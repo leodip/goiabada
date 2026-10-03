@@ -2905,7 +2905,7 @@ paths:
     post:
       tags: [Account]
       summary: Send verification email
-      description: Send email verification code (rate limited to 60s)
+      description: Send email verification code (one per 5 minutes per account, the code's lifetime; 5 per hour when the rate limiter is enabled)
       operationId: sendAccountEmailVerification
       responses:
         '200':
@@ -2922,6 +2922,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
