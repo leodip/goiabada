@@ -26,7 +26,8 @@ import (
 // `catalogs/` subdirectory under the overrides directory. There is no
 // reference-data layer: country and phone-country names come from CLDR, and
 // timezone labels are assembled from the CLDR-localized country name, IANA
-// zone ID, and optional English comment (see RefCountry/RefPhoneCountry/RefTimezone).
+// zone ID, and optional English comment (see the admin console's
+// handlerhelpers/reference_labels.go).
 func loadOverrideCatalogs(dir string) ([]catalogFile, error) {
 	catalogsDir := filepath.Join(dir, "catalogs")
 	info, err := os.Stat(catalogsDir)

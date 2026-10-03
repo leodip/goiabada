@@ -1,11 +1,17 @@
-package i18n
+package handlerhelpers
 
 import (
 	"context"
 	"time"
+
+	"github.com/leodip/goiabada/core/i18n"
 )
 
-// Catalog keys backing the two formatters.
+// The DateTime and Since template functions' formatters. They were
+// core/i18n.FormatDateTime and FormatSince until #442, which moved them here
+// with their one caller: they read the catalogs through i18n.T alone, and the
+// auth server's pages render no dates. The keys stay in core/i18n's catalogs,
+// which both processes compile.
 //
 // The layout key holds a Go reference-time layout carrying no English, which
 // is what makes the format itself translatable: time.Format has no locale of
@@ -27,42 +33,49 @@ const (
 // cell rather than a date (#373).
 const fallbackDateTimeLayout = "2006-01-02 15:04"
 
-// FormatDateTime renders t in the active locale's numeric date and time
+// formatDateTime renders t in the active locale's numeric date and time
 // layout, in whatever zone t carries; every caller today passes UTC, which is
 // what the pages have always shown.
 //
 // A nil or zero instant renders the empty string, so a column that was never
 // set renders blank rather than year 1.
-func FormatDateTime(ctx context.Context, t *time.Time) string {
+func formatDateTime(ctx context.Context, t *time.Time) string {
 	if t == nil || t.IsZero() {
 		return ""
 	}
-	layout := T(ctx, keyDateTimeLayout)
+	return formatDateTimeIn(i18n.T(ctx, keyDateTimeLayout), *t)
+}
+
+// formatDateTimeIn renders t in the layout formatDateTime looked up, which is
+// the key itself when no catalog carries it: i18n.T answers a miss with the
+// key. Taking the looked-up layout as a parameter is what lets a test reach
+// the fallback without a catalog that lacks the key.
+func formatDateTimeIn(layout string, t time.Time) string {
 	if layout == keyDateTimeLayout {
 		layout = fallbackDateTimeLayout
 	}
 	return t.Format(layout)
 }
 
-// FormatSince renders how long ago t was as a whole phrase read from the
+// formatSince renders how long ago t was as a whole phrase read from the
 // catalog, rather than a number with a translated suffix glued to it: the
 // count sits inside the translated string, so word order belongs to the
 // translator and pt-BR gives "há 3 dias" where en gives "3 days ago" (#373).
 //
 // now is a parameter rather than time.Now() so the table beside this can pin
-// an instant; the DateTime/Since template functions supply time.Now().UTC().
+// an instant; the Since template function supplies time.Now().UTC().
 //
 // A nil or zero instant renders the empty string. An instant under a second
 // old renders "just now", and so does one in the future, which is what clock
 // skew between a database server and this one produces — a negative count
 // would be the alternative.
-func FormatSince(ctx context.Context, t *time.Time, now time.Time) string {
+func formatSince(ctx context.Context, t *time.Time, now time.Time) string {
 	if t == nil || t.IsZero() {
 		return ""
 	}
 	elapsed := now.Sub(*t)
 	if elapsed < time.Second {
-		return T(ctx, keySinceJustNow)
+		return i18n.T(ctx, keySinceJustNow)
 	}
 
 	// ceiling: day is the largest unit, so a year-old consent reads "412 days
@@ -89,5 +102,5 @@ func FormatSince(ctx context.Context, t *time.Time, now time.Time) string {
 	if count == 1 {
 		form = "one"
 	}
-	return T(ctx, keySincePrefix+unit+"."+form, map[string]any{"count": count})
+	return i18n.T(ctx, keySincePrefix+unit+"."+form, map[string]any{"count": count})
 }

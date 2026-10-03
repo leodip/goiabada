@@ -96,8 +96,8 @@ func convertToString(v interface{}) string {
 	}
 }
 
-// instantOf normalizes whatever a template binds into the pointer the i18n
-// formatters take. The console's responses carry both shapes on purpose — a
+// instantOf normalizes whatever a template binds into the pointer the
+// formatters in timefmt.go take. The console's responses carry both shapes on purpose — a
 // nullable column reaches the wire as *time.Time and a NOT NULL one, like an
 // audit entry's createdAt, as time.Time — and a template cannot take the
 // address of a value, so the adapter belongs at this boundary rather than in
@@ -148,43 +148,35 @@ var templateFuncMap = template.FuncMap{
 	// through instantOf and renders "" for a nil or absent one, so a template
 	// can bind a nullable column straight into a cell (#373).
 	"DateTime": func(ctx context.Context, v any) string {
-		return i18n.FormatDateTime(ctx, instantOf(v))
+		return formatDateTime(ctx, instantOf(v))
 	},
 	// Since renders how long ago an instant was, as one translated phrase
 	// rather than a Go duration with a translated suffix after it. It supplies
 	// the clock, so a template reads {{ Since $.ctx .Started }} (#373).
 	"Since": func(ctx context.Context, v any) string {
-		return i18n.FormatSince(ctx, instantOf(v), time.Now().UTC())
+		return formatSince(ctx, instantOf(v), time.Now().UTC())
 	},
 
 	// RefCountry / RefPhoneCountry / RefTimezone resolve a country code,
 	// phone country, or IANA zone to its localized label. Country names come
-	// from CLDR (golang.org/x/text/display) for the active locale. The
+	// from CLDR (golang.org/x/text/language/display) for the active locale. The
 	// trailing fallback (the existing English struct field or pre-assembled
 	// label) is rendered when the code or locale tag is unparseable or CLDR
 	// has no name.
-	"RefCountry": func(ctx context.Context, alpha2, fallback string) string {
-		return i18n.RefCountry(ctx, alpha2, fallback)
-	},
+	"RefCountry": refCountry,
 	// RefPhoneCountry rebuilds the "<emoji> - <country> (<code>)" label with
 	// the country name localized; emoji and calling code pass through.
-	"RefPhoneCountry": func(ctx context.Context, emoji, alpha2, callingCode, fallback string) string {
-		return i18n.RefPhoneCountry(ctx, emoji, alpha2, callingCode, fallback)
-	},
+	"RefPhoneCountry": refPhoneCountry,
 	// LocaleLabel renders a locale-picker option as "<native> (<english>)"
 	// (e.g. "português (Brasil) (Portuguese (Brazil))"), so users recognize
 	// their language regardless of the UI's current language. The label is
 	// viewer-independent, so it takes no context.
-	"LocaleLabel": func(id, englishName string) string {
-		return i18n.LocaleLabel(id, englishName)
-	},
+	"LocaleLabel": localeLabel,
 	// RefTimezone takes the zone identifier plus the country code and
 	// English country name from the timezones table. The country portion
 	// of the assembled label gets localized via CLDR; the IANA zone ID
 	// and comments stay in English.
-	"RefTimezone": func(ctx context.Context, zoneID, countryCode, countryName, comments string) string {
-		return i18n.RefTimezone(ctx, zoneID, countryCode, countryName, comments)
-	},
+	"RefTimezone": refTimezone,
 
 	// JSBootstrap renders a <script> block that populates window.i18n with
 	// the strings client-side JS needs (session-expired modal, image-upload

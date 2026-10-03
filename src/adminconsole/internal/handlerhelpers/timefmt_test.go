@@ -1,20 +1,11 @@
-package i18n
+package handlerhelpers
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/text/language"
 )
-
-// timeFmtLocale builds a context carrying the translator for tag, the same way
-// the locale middleware does, so the assertions below read the real embedded
-// catalogs rather than a stub.
-func timeFmtLocale(tag string) context.Context {
-	return context.WithValue(context.Background(), ctxKeyLocalizer, current().localizerFor([]string{tag}))
-}
 
 // timeFmtInstant is the instant every absolute-format case below renders:
 // 2026-09-14 21:03:07 UTC, a date whose day and month cannot be confused
@@ -37,7 +28,7 @@ func TestFormatDateTime_PerLocale(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.locale, func(t *testing.T) {
 			instant := timeFmtInstant
-			assert.Equal(t, c.want, FormatDateTime(timeFmtLocale(c.locale), &instant))
+			assert.Equal(t, c.want, formatDateTime(localeCtx(c.locale), &instant))
 		})
 	}
 }
@@ -54,12 +45,12 @@ func TestFormatDateTime_LayoutCarriesNoEnglish(t *testing.T) {
 	}
 	for _, locale := range []string{"en", "pt-BR"} {
 		t.Run(locale, func(t *testing.T) {
-			ctx := timeFmtLocale(locale)
+			ctx := localeCtx(locale)
 			// Every month of the year, so a layout naming a month cannot slip
 			// through on the one month whose name this instant does not reach.
 			for month := time.January; month <= time.December; month++ {
 				instant := time.Date(2026, month, 14, 21, 3, 7, 0, time.UTC)
-				got := FormatDateTime(ctx, &instant)
+				got := formatDateTime(ctx, &instant)
 				for _, name := range english {
 					assert.NotContainsf(t, got, name, "%s rendered %q, which carries the English %q", locale, got, name)
 				}
@@ -69,22 +60,26 @@ func TestFormatDateTime_LayoutCarriesNoEnglish(t *testing.T) {
 }
 
 func TestFormatDateTime_NilAndZeroRenderEmpty(t *testing.T) {
-	ctx := timeFmtLocale("en")
-	assert.Equal(t, "", FormatDateTime(ctx, nil))
+	ctx := localeCtx("en")
+	assert.Equal(t, "", formatDateTime(ctx, nil))
 	var zero time.Time
-	assert.Equal(t, "", FormatDateTime(ctx, &zero))
+	assert.Equal(t, "", formatDateTime(ctx, &zero))
 }
 
 // TestFormatDateTime_MissingLayoutFallsBackToANumericLayout drives the
-// formatter against a translator over an empty bundle, which is the one way
-// the layout key resolves to itself. Without the fallback, time.Format takes
-// the key as a layout, finds no reference token in it, and renders the key
-// verbatim into the table cell rather than failing.
+// formatter with the layout lookup answering the key itself, which is what
+// i18n.T does for a key no catalog carries. Without the fallback, time.Format
+// takes the key as a layout, finds no reference token in it, and renders the
+// key verbatim into the table cell rather than failing.
 func TestFormatDateTime_MissingLayoutFallsBackToANumericLayout(t *testing.T) {
-	empty := &translator{bundle: &bundle{}, tag: language.English}
-	ctx := context.WithValue(context.Background(), ctxKeyLocalizer, empty)
-	instant := timeFmtInstant
-	assert.Equal(t, "2026-09-14 21:03", FormatDateTime(ctx, &instant))
+	assert.Equal(t, "2026-09-14 21:03", formatDateTimeIn("common.datetime.layout", timeFmtInstant))
+}
+
+// TestFormatDateTime_FoundLayoutIsTheOneRendered is the other half of the
+// seam above: a layout the lookup found is rendered as found, not replaced by
+// the fallback.
+func TestFormatDateTime_FoundLayoutIsTheOneRendered(t *testing.T) {
+	assert.Equal(t, "14.09.2026", formatDateTimeIn("02.01.2006", timeFmtInstant))
 }
 
 func TestFormatSince_UnitsAndPlurals(t *testing.T) {
@@ -128,18 +123,18 @@ func TestFormatSince_UnitsAndPlurals(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			then := now.Add(-c.elapsed)
-			assert.Equal(t, c.en, FormatSince(timeFmtLocale("en"), &then, now), "en")
-			assert.Equal(t, c.ptBR, FormatSince(timeFmtLocale("pt-BR"), &then, now), "pt-BR")
+			assert.Equal(t, c.en, formatSince(localeCtx("en"), &then, now), "en")
+			assert.Equal(t, c.ptBR, formatSince(localeCtx("pt-BR"), &then, now), "pt-BR")
 		})
 	}
 }
 
 func TestFormatSince_NilAndZeroRenderEmpty(t *testing.T) {
-	ctx := timeFmtLocale("en")
+	ctx := localeCtx("en")
 	now := timeFmtInstant
-	assert.Equal(t, "", FormatSince(ctx, nil, now))
+	assert.Equal(t, "", formatSince(ctx, nil, now))
 	var zero time.Time
-	assert.Equal(t, "", FormatSince(ctx, &zero, now))
+	assert.Equal(t, "", formatSince(ctx, &zero, now))
 }
 
 // TestFormatSince_UnknownLocaleFallsBackToEnglish holds the phrase keys to the
@@ -148,5 +143,5 @@ func TestFormatSince_NilAndZeroRenderEmpty(t *testing.T) {
 func TestFormatSince_UnknownLocaleFallsBackToEnglish(t *testing.T) {
 	now := timeFmtInstant
 	then := now.Add(-3 * time.Hour)
-	assert.Equal(t, "3 hours ago", FormatSince(timeFmtLocale("xx"), &then, now))
+	assert.Equal(t, "3 hours ago", formatSince(localeCtx("xx"), &then, now))
 }

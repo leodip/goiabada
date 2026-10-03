@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/core/buildinfo"
-	"github.com/leodip/goiabada/core/i18n"
 )
 
 func TestArgsFuncMap(t *testing.T) {
@@ -61,9 +60,9 @@ func TestVersionCommentFuncMap(t *testing.T) {
 }
 
 // TestDateTimeAndSinceFuncMap holds the two date entries to being registered
-// under the names the templates call and to reaching the i18n formatters
-// rather than any local copy of them. The formatter's own exhaustive table
-// lives beside it, in core/i18n; these two wrappers own only the name and the
+// under the names the templates call and to reaching the formatters in
+// timefmt.go rather than any local copy of them. The formatters' own exhaustive
+// table is in timefmt_test.go; these two wrappers own only the name and the
 // clock (#373).
 func TestDateTimeAndSinceFuncMap(t *testing.T) {
 	ctx := context.Background()
@@ -73,7 +72,7 @@ func TestDateTimeAndSinceFuncMap(t *testing.T) {
 	if !ok {
 		t.Fatalf(`templateFuncMap["DateTime"] is not func(context.Context, any) string`)
 	}
-	if got, want := dateTime(ctx, &instant), i18n.FormatDateTime(ctx, &instant); got != want {
+	if got, want := dateTime(ctx, &instant), formatDateTime(ctx, &instant); got != want {
 		t.Errorf("DateTime() = %q, want %q", got, want)
 	}
 	if got := dateTime(ctx, nil); got != "" {
@@ -88,7 +87,7 @@ func TestDateTimeAndSinceFuncMap(t *testing.T) {
 	// the clock read Since performs for itself: the wrapper supplies
 	// time.Now().UTC(), which this test cannot pass in.
 	then := time.Now().UTC().Add(-73 * time.Hour)
-	if got, want := since(ctx, &then), i18n.FormatSince(ctx, &then, time.Now().UTC()); got != want {
+	if got, want := since(ctx, &then), formatSince(ctx, &then, time.Now().UTC()); got != want {
 		t.Errorf("Since() = %q, want %q", got, want)
 	}
 	if got := since(ctx, nil); got != "" {
