@@ -5,10 +5,8 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -22,16 +20,15 @@ type accountLogoutAPI interface {
 }
 
 func HandleAccountLogoutGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountLogoutAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		var jwtInfo oauthclient.JwtInfo
-		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-			jwtInfo = r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
-		}
+		// An absent token set is this page's unauthenticated arm, not a fault: the zero value has
+		// no ID token, and the visitor is sent home below.
+		jwtInfo, _ := reqctx.JwtInfoFrom(r.Context())
 
 		session, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
 		if err != nil {

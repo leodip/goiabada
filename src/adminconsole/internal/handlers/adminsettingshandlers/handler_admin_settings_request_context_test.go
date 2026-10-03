@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
@@ -138,7 +137,7 @@ func newSettingsTestStore() *sessionstore.ServerSideStore {
 func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(t *testing.T) {
 	// The cache is never reached: every row's client refuses, and the three handlers holding one
 	// invalidate it only after a successful save.
-	settingsCache := cache.NewSettingsCache("http://auth.example.invalid")
+	settingsCache := &invalidationRecorder{}
 
 	testCases := []struct {
 		name    string

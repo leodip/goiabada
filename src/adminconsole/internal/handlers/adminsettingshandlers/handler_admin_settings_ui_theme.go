@@ -7,14 +7,10 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/sessionstore"
 
-	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 )
@@ -26,7 +22,7 @@ type settingsUIThemeAPI interface {
 }
 
 func HandleAdminSettingsUIThemeGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsUIThemeAPI,
 ) http.HandlerFunc {
@@ -34,9 +30,9 @@ func HandleAdminSettingsUIThemeGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -81,10 +77,10 @@ func HandleAdminSettingsUIThemeGet(
 }
 
 func HandleAdminSettingsUIThemePost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsUIThemeAPI,
-	settingsCache *cache.SettingsCache,
+	settingsCache SettingsInvalidator,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -98,7 +94,7 @@ func HandleAdminSettingsUIThemePost(
 			// without them, but not past a 401: the administrator's session has ended, and a
 			// resubmission would meet the same refusal (#427 decision 17).
 			uiThemes := []string{}
-			if jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo); ok {
+			if jwtInfo, ok := reqctx.JwtInfoFrom(r.Context()); ok {
 				apiResp, err := apiClient.GetSettingsUITheme(r.Context(), jwtInfo.TokenResponse.AccessToken)
 				if err != nil {
 					if handlerhelpers.IsSessionEnded(err) {
@@ -124,9 +120,9 @@ func HandleAdminSettingsUIThemePost(
 		// No client-side validation; rely on API validation
 
 		// Get access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 

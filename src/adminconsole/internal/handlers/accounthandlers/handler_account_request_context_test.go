@@ -293,9 +293,9 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 			request: handlertest.Request(http.MethodGet, "/account/sessions", handlertest.WithAccessToken()),
 		},
 		{
-			name: "HandleAccountSessionsEndSesssionPost",
+			name: "HandleAccountSessionsEndSessionPost",
 			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
-				return HandleAccountSessionsEndSesssionPost(h, c)
+				return HandleAccountSessionsEndSessionPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/sessions",
 				handlertest.WithAccessToken(),
