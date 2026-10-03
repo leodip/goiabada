@@ -192,8 +192,8 @@ func WithLocale(ctx context.Context, explicit bool, tags ...string) context.Cont
 
 // attachLocale stores the localizer plus the primary resolved language tag
 // (the first preference used to build the localizer; "en" for the bundle's
-// English fallback). The tag is used by the CLDR-backed display helpers
-// (RefCountry/RefPhoneCountry/RefTimezone).
+// English fallback). The tag is what LocaleTag answers, which the admin
+// console's CLDR-backed reference labels read.
 func attachLocale(ctx context.Context, loc *translator, tag string, explicit bool) context.Context {
 	ctx = context.WithValue(ctx, ctxKeyLocalizer, loc)
 	ctx = context.WithValue(ctx, ctxKeyLocaleTag, primaryTag(tag))

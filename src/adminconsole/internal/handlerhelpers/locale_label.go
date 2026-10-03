@@ -1,11 +1,11 @@
-package i18n
+package handlerhelpers
 
 import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/language/display"
 )
 
-// LocaleLabel renders the label shown in the locale picker for a BCP 47
+// localeLabel renders the label shown in the locale picker for a BCP 47
 // locale id (e.g. "pt-BR"), given its English name
 // (locales.Locale.Name, e.g. "Portuguese (Brazil)").
 //
@@ -18,7 +18,11 @@ import (
 //
 // The label is viewer-independent: pt-BR always renders its native name in
 // Portuguese regardless of the active UI locale, so no context is needed.
-func LocaleLabel(id, englishName string) string {
+//
+// It was core/i18n.LocaleLabel until #442: the admin console's locale picker is
+// its one caller, and in core it put CLDR's display tables into the auth
+// server's binary, which renders no locale picker.
+func localeLabel(id, englishName string) string {
 	native := nativeLocaleName(id)
 	if native == "" || native == englishName {
 		return englishName
