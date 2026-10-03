@@ -8,12 +8,9 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/errs"
 )
 
 // userAttributesAddAPI is what the add user attribute page needs: the user it belongs to, and the
@@ -24,7 +21,7 @@ type userAttributesAddAPI interface {
 }
 
 func HandleAdminUserAttributesAddGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient userAttributesAddAPI,
 ) http.HandlerFunc {
 
@@ -43,9 +40,9 @@ func HandleAdminUserAttributesAddGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -76,7 +73,7 @@ func HandleAdminUserAttributesAddGet(
 }
 
 func HandleAdminUserAttributesAddPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient userAttributesAddAPI,
 ) http.HandlerFunc {
 
@@ -95,9 +92,9 @@ func HandleAdminUserAttributesAddPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
