@@ -12,12 +12,11 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// The new-user page is this package's only reader of constants.ContextKeySettings, and the value on
-// that key is api.PublicSettingsResponse rather than a models.Settings the settings-cache middleware
-// filled four fields of (#350). The key is a context key, so the type is an interface at every
-// reader and the match between what the middleware writes and what a handler asserts is checked
-// nowhere at compile time. This is what checks it: move either end alone and the handler panics on
-// a live request.
+// The new-user page is this package's only reader of the settings reqctx carries, and that value is
+// api.PublicSettingsResponse rather than a models.Settings the settings-cache middleware filled four
+// fields of (#350). The type is held at compile time by reqctx's typed accessors since #440; what
+// this case still holds is that the page reads the value the middleware wrote rather than one of
+// its own.
 //
 // Both values of the flag, because the page draws a different password control for each and a
 // handler that stopped reading the carrier would otherwise pass on one of them.

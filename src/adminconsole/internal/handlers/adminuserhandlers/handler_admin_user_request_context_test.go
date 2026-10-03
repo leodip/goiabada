@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -24,10 +23,6 @@ import (
 
 // Seam 4 for the user pages (#386). See accounthandlers' file of the same name for what this owns
 // and why the context is the assertion.
-//
-// getPhoneCountriesWithCache has a case of its own below, because it is the one call in this
-// package that is not made from a handler body: the 24-hour cache sits between, and a context that
-// stopped at the cache would be invisible to a handler test.
 
 type userCtxMarkerKey struct{}
 
@@ -397,10 +392,6 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 			httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything).Return(nil).Maybe()
 
-			// The 24-hour cache is a package variable, so a value left by another test would skip
-			// the fetch the phone page is about.
-			resetPhoneCountriesCache()
-
 			apiClient := &ctxRecordingApiClient{}
 
 			marked := testCase.request.WithContext(
@@ -423,10 +414,6 @@ func TestAdminUserHandlers_ThePhoneWriteCarriesTheRequestsContext(t *testing.T) 
 	httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 		mock.Anything, mock.Anything).Return(nil).Maybe()
-
-	// The 24-hour cache is a package variable, so a value left by another test would skip the
-	// fetch this case is about. Emptying it is what makes the call happen.
-	resetPhoneCountriesCache()
 
 	// The user read this page makes first refuses like everything else, so this case builds a
 	// client whose GetUserById succeeds and leaves the rest recording.
@@ -455,21 +442,6 @@ func (s *phoneWriteApiClient) GetUserById(_ context.Context, _ string, userId in
 	return &api.UserResponse{Id: userId, Username: "jdoe"}, nil
 }
 
-// The cache is the one hop between a handler and the auth server in this package, so it is the one
-// place a context could be dropped without a handler test noticing.
-func TestGetPhoneCountriesWithCache_CarriesTheCallersContextThroughAMiss(t *testing.T) {
-	resetPhoneCountriesCache()
-
-	apiClient := &ctxRecordingApiClient{}
-	ctx := context.WithValue(context.Background(), userCtxMarkerKey{}, "cache-miss")
-
-	_, err := getPhoneCountriesWithCache(ctx, apiClient, "an-access-token")
-	require.Error(t, err)
-
-	require.Len(t, apiClient.seen, 1)
-	assert.Equal(t, "cache-miss", apiClient.seen[0].Value(userCtxMarkerKey{}))
-}
-
 // pictureUpload is the one request here that is not form-encoded: the upload handler reads a
 // multipart "picture" part and refuses anything else before it reaches the API.
 func pictureUpload(userId string) *http.Request {
@@ -485,12 +457,4 @@ func pictureUpload(userId string) *http.Request {
 		handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
 		handlertest.WithContentType(writer.FormDataContentType()),
 		handlertest.WithBody(bytes.NewReader(buf.Bytes())))
-}
-
-func resetPhoneCountriesCache() {
-	phoneCountriesCache.mutex.Lock()
-	defer phoneCountriesCache.mutex.Unlock()
-
-	phoneCountriesCache.data = nil
-	phoneCountriesCache.timestamp = time.Time{}
 }

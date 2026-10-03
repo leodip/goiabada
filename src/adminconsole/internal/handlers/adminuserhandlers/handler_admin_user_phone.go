@@ -8,26 +8,23 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-// userPhoneAPI is what the user phone page needs: the user, the phone write, and the cached
-// country list it renders the form from.
+// userPhoneAPI is what the user phone page needs: the user, the phone write, and the country list
+// it renders the form from.
 type userPhoneAPI interface {
-	phoneCountriesAPI
+	GetPhoneCountries(ctx context.Context, accessToken string) ([]api.PhoneCountryResponse, error)
 	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
 	UpdateUserPhone(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPhoneRequest) (*api.UserResponse, error)
 }
 
 func HandleAdminUserPhoneGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userPhoneAPI,
 ) http.HandlerFunc {
@@ -47,9 +44,9 @@ func HandleAdminUserPhoneGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -65,8 +62,7 @@ func HandleAdminUserPhoneGet(
 			return
 		}
 
-		// Get phone countries via API (with caching)
-		phoneCountries, err := getPhoneCountriesWithCache(r.Context(), apiClient, jwtInfo.TokenResponse.AccessToken)
+		phoneCountries, err := apiClient.GetPhoneCountries(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -107,7 +103,7 @@ func HandleAdminUserPhoneGet(
 }
 
 func HandleAdminUserPhonePost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userPhoneAPI,
 ) http.HandlerFunc {
@@ -127,14 +123,14 @@ func HandleAdminUserPhonePost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
-		// Get phone countries for rendering errors (if needed) - with caching
-		phoneCountries, err := getPhoneCountriesWithCache(r.Context(), apiClient, jwtInfo.TokenResponse.AccessToken)
+		// Get phone countries for rendering errors (if needed)
+		phoneCountries, err := apiClient.GetPhoneCountries(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return

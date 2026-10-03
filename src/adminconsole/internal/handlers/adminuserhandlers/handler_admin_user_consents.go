@@ -7,13 +7,10 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -26,7 +23,7 @@ type userConsentsAPI interface {
 }
 
 func HandleAdminUserConsentsGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userConsentsAPI,
 ) http.HandlerFunc {
@@ -46,9 +43,9 @@ func HandleAdminUserConsentsGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -102,7 +99,7 @@ func HandleAdminUserConsentsGet(
 }
 
 func HandleAdminUserConsentsPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient userConsentsAPI,
 ) http.HandlerFunc {
 
@@ -121,9 +118,9 @@ func HandleAdminUserConsentsPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -164,8 +161,10 @@ func HandleAdminUserConsentsPost(
 			}
 		}
 
+		// A consent no longer this user's is a stale page: it was revoked after the page loaded,
+		// so the id names nothing here and is answered as one, with nothing logged (#440).
 		if !found {
-			httpHelper.JsonError(w, r, errs.Errorf("unable to revoke consent with id %v because it doesn't belong to user id %v", consentId, user.Id))
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		} else {
 
