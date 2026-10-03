@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
-	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -46,7 +45,7 @@ func serveResourcePermissionsSave(stub *resourcePermissionsSaveApiClient, body s
 	rec := httptest.NewRecorder()
 	router := chi.NewRouter()
 	router.Post("/admin/resources/{resourceId}/permissions",
-		HandleAdminResourcePermissionsPost(handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{}), nil, stub))
+		HandleAdminResourcePermissionsPost(handlerhelpers.NewHttpHelper(nil), nil, stub))
 	router.ServeHTTP(rec, req)
 	return rec
 }

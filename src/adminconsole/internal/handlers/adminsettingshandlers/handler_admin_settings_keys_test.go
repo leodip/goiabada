@@ -16,7 +16,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
-	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -101,7 +100,7 @@ func TestHandleAdminSettingsKeysRotatePost_APIErrorReachesTheBrowser(t *testing.
 			// templateFS is nil because JsonError renders no template. This is the real
 			// helper rather than a mock so the assertions below are on the bytes the
 			// browser receives.
-			httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
+			httpHelper := handlerhelpers.NewHttpHelper(nil)
 
 			req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate",
 				handlertest.WithAccessToken(),
@@ -134,7 +133,7 @@ func TestHandleAdminSettingsKeysRotatePost_APIErrorReachesTheBrowser(t *testing.
 // failure path through a different helper cannot alter what a successful rotation answers.
 func TestHandleAdminSettingsKeysRotatePost_SuccessIsUnchanged(t *testing.T) {
 
-	httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
+	httpHelper := handlerhelpers.NewHttpHelper(nil)
 
 	req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate", handlertest.WithAccessToken())
 

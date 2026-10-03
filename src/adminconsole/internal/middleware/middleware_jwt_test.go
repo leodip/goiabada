@@ -16,6 +16,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/boundedread"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
@@ -170,7 +171,7 @@ func TestRequiresScope_Authorized(t *testing.T) {
 		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
 	}
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
+	ctx = reqctx.WithJwtInfo(ctx, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(true)
@@ -203,7 +204,7 @@ func TestRequiresScope_Unauthorized(t *testing.T) {
 		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
 	}
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
+	ctx = reqctx.WithJwtInfo(ctx, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
@@ -239,7 +240,7 @@ func TestRequiresScope_Unauthenticated(t *testing.T) {
 
 	jwtInfo := oauthclient.JwtInfo{}
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
+	ctx = reqctx.WithJwtInfo(ctx, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
@@ -294,7 +295,7 @@ func TestRequiresScope_RedirectError(t *testing.T) {
 
 	jwtInfo := oauthclient.JwtInfo{}
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
+	ctx = reqctx.WithJwtInfo(ctx, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)

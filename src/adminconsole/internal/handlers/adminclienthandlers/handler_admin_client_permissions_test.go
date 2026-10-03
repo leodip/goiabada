@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
-	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -68,7 +67,7 @@ func TestHandleAdminClientPermissionsPost_SendsTheLoadedList(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
+			httpHelper := handlerhelpers.NewHttpHelper(nil)
 			req := handlertest.Request(http.MethodPost, "/admin/clients/5/permissions",
 				handlertest.WithAccessToken(),
 				handlertest.WithBody(bytes.NewBufferString(tc.body)),
@@ -93,7 +92,7 @@ func TestHandleAdminClientPermissionsPost_SendsTheLoadedList(t *testing.T) {
 // telling them to reload, rather than the generic error (#428).
 func TestHandleAdminClientPermissionsPost_AConflictReachesTheBrowser(t *testing.T) {
 	const sentence = "The list was changed by another save after it was loaded."
-	httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
+	httpHelper := handlerhelpers.NewHttpHelper(nil)
 	req := handlertest.Request(http.MethodPost, "/admin/clients/5/permissions",
 		handlertest.WithAccessToken(),
 		handlertest.WithBody(bytes.NewBufferString(`{"clientId":5,"assignedPermissionsIds":[6],"expectedPermissionIds":[3]}`)),

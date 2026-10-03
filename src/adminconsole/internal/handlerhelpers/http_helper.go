@@ -2,7 +2,6 @@ package handlerhelpers
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,8 +13,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
@@ -35,26 +33,12 @@ import (
 // exists to remove. Drift between the two copies is the accepted price; a change worth making in
 // one is worth reading the other for (#385).
 
-type LayoutSettings struct {
-	AppName     string
-	UITheme     string
-	SMTPEnabled bool
-}
-
-type SettingsReader interface {
-	LayoutSettings(ctx context.Context) LayoutSettings
-}
-
 type HttpHelper struct {
 	templateFS fs.FS
-	settings   SettingsReader
 }
 
-func NewHttpHelper(templateFS fs.FS, settings SettingsReader) *HttpHelper {
-	return &HttpHelper{
-		templateFS: templateFS,
-		settings:   settings,
-	}
+func NewHttpHelper(templateFS fs.FS) *HttpHelper {
+	return &HttpHelper{templateFS: templateFS}
 }
 
 // InternalServerError logs err once, with a stack and the request id the page shows, and renders
@@ -164,7 +148,14 @@ func (h *HttpHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, layo
 func (h *HttpHelper) renderToBuffer(r *http.Request, layoutName string, templateName string,
 	data map[string]interface{}) (*bytes.Buffer, error) {
 
-	settings := h.settings.LayoutSettings(r.Context())
+	// Every application route is mounted under the settings-cache middleware, so a render without
+	// settings is a wiring defect. It is refused rather than rendered under an invented blank app
+	// name and theme, and when the refused page is the error page itself, InternalServerError ends
+	// in its plain-text last resort (#440 decision 3).
+	settings, ok := reqctx.SettingsFrom(r.Context())
+	if !ok {
+		return nil, reqctx.ErrNoSettings
+	}
 	// The layout's values are written into the caller's map rather than a copy, and
 	// TestRenderTemplate_Binds reads isAdmin back out of it; a nil map is therefore allocated
 	// here rather than panicking on the first write below. No caller passes nil today, so this
@@ -183,13 +174,7 @@ func (h *HttpHelper) renderToBuffer(r *http.Request, layoutName string, template
 	// own, and the two are deliberately separate (#385).
 	data["ctx"] = r.Context()
 
-	var jwtInfo oauthclient.JwtInfo
-	if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-		var ok bool
-		jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
-		if !ok {
-			return nil, errs.New("unable to cast jwtInfo to oauthclient.JwtInfo")
-		}
+	if jwtInfo, ok := reqctx.JwtInfoFrom(r.Context()); ok {
 		if jwtInfo.IdToken != nil && jwtInfo.IdToken.Claims["sub"] != nil {
 			// Extract user info from ID token claims instead of database lookup
 			// The ID token contains: sub, name, email, email_verified, etc.

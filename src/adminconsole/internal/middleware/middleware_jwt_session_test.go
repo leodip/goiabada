@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient/oauthclienttest"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
@@ -154,7 +155,7 @@ func (h *sessionHarness) serve(parser tokenParser, cookies []*http.Cookie) serve
 	out.recorder = httptest.NewRecorder()
 	m.JwtSessionHandler()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		out.reached = true
-		if jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo); ok {
+		if jwtInfo, ok := reqctx.JwtInfoFrom(r.Context()); ok {
 			out.jwtInfo = &jwtInfo
 		}
 	})).ServeHTTP(out.recorder, req)

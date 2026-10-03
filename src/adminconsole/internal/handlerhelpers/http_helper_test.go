@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -13,8 +14,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
@@ -23,16 +25,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type stubSettingsReader struct {
-	settings LayoutSettings
-	panic    bool
-}
-
-func (s stubSettingsReader) LayoutSettings(context.Context) LayoutSettings {
-	if s.panic {
-		panic("settings are absent")
-	}
-	return s.settings
+// newRequest is httptest.NewRequest with settings on its context, as MiddlewareSettingsCache puts
+// them there for every application route. A row about a render without settings builds its request
+// with httptest.NewRequest instead.
+func newRequest(method, target string, body io.Reader) *http.Request {
+	req := httptest.NewRequest(method, target, body)
+	return req.WithContext(reqctx.WithSettings(req.Context(), &api.PublicSettingsResponse{}))
 }
 
 // assertNoStore requires the two cache header fields every rendered page carries. Read off
@@ -50,7 +48,7 @@ func TestInternalServerError(t *testing.T) {
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
 	}
-	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
+	httpHelper := NewHttpHelper(templateFS)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -58,7 +56,7 @@ func TestInternalServerError(t *testing.T) {
 		httpHelper.InternalServerError(w, r, errors.New("test error"))
 	})
 
-	req := httptest.NewRequest("GET", "/", nil)
+	req := newRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -94,7 +92,7 @@ func TestNotFound(t *testing.T) {
 	httpHelper := NewHttpHelper(fstest.MapFS{
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"not_found.html":              {Data: []byte("{{define \"content\"}}Not found{{end}}")},
-	}, stubSettingsReader{})
+	})
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -103,7 +101,7 @@ func TestNotFound(t *testing.T) {
 	})
 
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest("GET", "/admin/clients/not-a-number/settings", nil))
+	r.ServeHTTP(w, newRequest("GET", "/admin/clients/not-a-number/settings", nil))
 
 	// Read the snapshot the client receives rather than the recorder's live header map, for the
 	// reason TestInternalServerError states (#247).
@@ -127,7 +125,7 @@ func TestNotFound_RenderFailureAnswers500(t *testing.T) {
 	httpHelper := NewHttpHelper(fstest.MapFS{
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
-	}, stubSettingsReader{})
+	})
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -136,7 +134,7 @@ func TestNotFound_RenderFailureAnswers500(t *testing.T) {
 	})
 
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	r.ServeHTTP(w, newRequest("GET", "/", nil))
 
 	res := w.Result()
 	defer func() { _ = res.Body.Close() }()
@@ -150,10 +148,10 @@ func TestRenderTemplate(t *testing.T) {
 		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"page.html":           {Data: []byte("{{define \"content\"}}Hello, {{.Name}}! Status: {{._httpStatus}}{{end}}")},
 	}
-	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
+	httpHelper := NewHttpHelper(templateFS)
 
 	t.Run("Without _httpStatus", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
+		req := newRequest("GET", "/", nil)
 		w := httptest.NewRecorder()
 
 		data := map[string]interface{}{
@@ -174,7 +172,7 @@ func TestRenderTemplate(t *testing.T) {
 	})
 
 	t.Run("With _httpStatus", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
+		req := newRequest("GET", "/", nil)
 		w := httptest.NewRecorder()
 
 		data := map[string]interface{}{
@@ -202,9 +200,9 @@ func TestRenderTemplate(t *testing.T) {
 	// response this function never wrote a body for (#247).
 	t.Run("A failed render writes no headers at all", func(t *testing.T) {
 		emptyFS := fstest.MapFS{}
-		failing := NewHttpHelper(emptyFS, stubSettingsReader{})
+		failing := NewHttpHelper(emptyFS)
 
-		req := httptest.NewRequest("GET", "/", nil)
+		req := newRequest("GET", "/", nil)
 		w := httptest.NewRecorder()
 
 		err := failing.RenderTemplate(w, req, "layouts/layout.html", "page.html", map[string]interface{}{})
@@ -235,10 +233,10 @@ func TestRenderTemplate_Binds(t *testing.T) {
 		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"page.html":           {Data: []byte("{{define \"content\"}}Hello, {{if .loggedInUser}}{{.loggedInUser.Username}}{{else}}Guest{{end}}!{{end}}")},
 	}
-	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
+	httpHelper := NewHttpHelper(templateFS)
 
 	t.Run("Without ID Token", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
+		req := newRequest("GET", "/", nil)
 		data := map[string]interface{}{}
 
 		body, err := renderPage(httpHelper, req, "layouts/layout.html", "page.html", data)
@@ -248,7 +246,7 @@ func TestRenderTemplate_Binds(t *testing.T) {
 	})
 
 	t.Run("With ID Token", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
+		req := newRequest("GET", "/", nil)
 		ctx := req.Context()
 
 		jwtInfo := oauthclient.JwtInfo{
@@ -259,7 +257,7 @@ func TestRenderTemplate_Binds(t *testing.T) {
 				},
 			},
 		}
-		ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
+		ctx = reqctx.WithJwtInfo(ctx, jwtInfo)
 		req = req.WithContext(ctx)
 
 		data := map[string]interface{}{}
@@ -271,21 +269,6 @@ func TestRenderTemplate_Binds(t *testing.T) {
 		assert.Contains(t, body, "Hello, Alice!")
 	})
 
-	// The context value under the token set's key is read as an oauthclient.JwtInfo or the render is
-	// refused. The refusal names the type it expected, which once named dtos.JwtInfo, a package this
-	// tree no longer has (#440).
-	t.Run("A token set of another type refuses the render", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, "not a token set"))
-
-		body, err := renderPage(httpHelper, req, "layouts/layout.html", "page.html", map[string]interface{}{})
-
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "oauthclient.JwtInfo")
-		assert.NotContains(t, err.Error(), "dtos")
-		assert.Empty(t, body)
-	})
-
 	// The isAdmin bind is the other half of the enrichment #385 moved here out of core, and
 	// the console's layouts gate the admin menu on it. It is true only for a grant carrying the
 	// auth server's manage scope, which is why both arms are here: the scope string is assembled
@@ -294,12 +277,12 @@ func TestRenderTemplate_Binds(t *testing.T) {
 	// carries without decoding (#427).
 	t.Run("isAdmin follows the granted scope", func(t *testing.T) {
 		withAccessToken := func(scope string) *http.Request {
-			req := httptest.NewRequest("GET", "/", nil)
+			req := newRequest("GET", "/", nil)
 			jwtInfo := oauthclient.JwtInfo{
 				TokenResponse: oauth.TokenResponse{AccessToken: "opaque", Scope: "openid " + scope},
 				IdToken:       &oauth.JwtToken{TokenBase64: "i"},
 			}
-			return req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwtInfo))
+			return req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
 		}
 		manageScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier
 
@@ -322,26 +305,41 @@ func TestRenderTemplate_Binds(t *testing.T) {
 			"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 			"page.html":           {Data: []byte("{{define \"content\"}}{{.appName}}|{{.uiTheme}}|{{.smtpEnabled}}{{end}}")},
 		}
-		httpHelper := NewHttpHelper(layoutFS, stubSettingsReader{settings: LayoutSettings{
+		httpHelper := NewHttpHelper(layoutFS)
+		req := httptest.NewRequest("GET", "/", nil)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &api.PublicSettingsResponse{
 			AppName:     "sentinel app",
 			UITheme:     "sentinel theme",
 			SMTPEnabled: true,
-		}})
+		}))
 
-		body, err := renderPage(httpHelper,
-			httptest.NewRequest("GET", "/", nil), "layouts/layout.html", "page.html", map[string]interface{}{})
+		body, err := renderPage(httpHelper, req, "layouts/layout.html", "page.html", map[string]interface{}{})
 
 		require.NoError(t, err)
 		assert.Equal(t, "<html>sentinel app|sentinel theme|true</html>", body)
 	})
 
-	t.Run("A settings reader panic is propagated", func(t *testing.T) {
-		httpHelper := NewHttpHelper(templateFS, stubSettingsReader{panic: true})
+	// Every application route runs under MiddlewareSettingsCache, so a render without settings is
+	// a wiring defect. It is refused with the one sentinel, for the caller's 500 path to answer,
+	// writes nothing, and binds nothing into the page data. The page would otherwise render under
+	// an invented blank app name and theme (#440 decision 3).
+	t.Run("Without settings the render is refused", func(t *testing.T) {
+		for name, req := range map[string]*http.Request{
+			"nothing written":       httptest.NewRequest("GET", "/", nil),
+			"a nil pointer written": httptest.NewRequest("GET", "/", nil).WithContext(reqctx.WithSettings(context.Background(), nil)),
+		} {
+			t.Run(name, func(t *testing.T) {
+				data := map[string]interface{}{}
+				w := httptest.NewRecorder()
 
-		require.Panics(t, func() {
-			_, _ = renderPage(httpHelper,
-				httptest.NewRequest("GET", "/", nil), "layouts/layout.html", "page.html", map[string]interface{}{})
-		})
+				err := httpHelper.RenderTemplate(w, req, "layouts/layout.html", "page.html", data)
+
+				require.ErrorIs(t, err, reqctx.ErrNoSettings)
+				assert.Empty(t, data)
+				assert.Empty(t, w.Body.String())
+				assert.Empty(t, w.Result().Header.Get("Content-Type"))
+			})
+		}
 	})
 }
 
@@ -357,11 +355,11 @@ func TestRenderTemplate_RendersTheTemplateNamedWhateverTheLocale(t *testing.T) {
 		"account_profile.html":       {Data: []byte("{{define \"content\"}}the profile{{end}}")},
 		"account_profile.pt-BR.html": {Data: []byte("{{define \"content\"}}a locale variant{{end}}")},
 	}
-	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
+	httpHelper := NewHttpHelper(templateFS)
 
 	for _, templateName := range []string{"/emails/note.html", "emails/note.html"} {
 		t.Run(templateName, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/", nil)
+			req := newRequest("GET", "/", nil)
 			req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 			require.Equal(t, "pt-BR", i18n.LocaleTag(req.Context()), "the request is in the variant's locale")
 
@@ -373,7 +371,7 @@ func TestRenderTemplate_RendersTheTemplateNamedWhateverTheLocale(t *testing.T) {
 	}
 
 	t.Run("a page outside emails/", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
+		req := newRequest("GET", "/", nil)
 		req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 
 		body, err := renderPage(httpHelper, req, "/layouts/layout.html", "/account_profile.html", map[string]interface{}{})
@@ -390,10 +388,11 @@ func TestRenderTemplate_NilDataMap(t *testing.T) {
 		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"page.html":           {Data: []byte("{{define \"content\"}}{{.appName}}|{{.urlPath}}{{end}}")},
 	}
-	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{settings: LayoutSettings{AppName: "sentinel app"}})
+	httpHelper := NewHttpHelper(templateFS)
+	req := httptest.NewRequest("GET", "/some/page", nil)
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &api.PublicSettingsResponse{AppName: "sentinel app"}))
 
-	body, err := renderPage(httpHelper,
-		httptest.NewRequest("GET", "/some/page", nil), "layouts/layout.html", "page.html", nil)
+	body, err := renderPage(httpHelper, req, "layouts/layout.html", "page.html", nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, "<html>sentinel app|/some/page</html>", body)
@@ -406,8 +405,8 @@ func TestRenderTemplate_Partials(t *testing.T) {
 	layout := []byte(`<html>{{template "content" .}}</html>`)
 	page := []byte(`{{define "content"}}[{{template "badge" .}}]{{end}}`)
 	render := func(templateFS fstest.MapFS) (string, error) {
-		return renderPage(NewHttpHelper(templateFS, stubSettingsReader{}),
-			httptest.NewRequest("GET", "/", nil), "layouts/layout.html", "page.html", map[string]interface{}{})
+		return renderPage(NewHttpHelper(templateFS),
+			newRequest("GET", "/", nil), "layouts/layout.html", "page.html", map[string]interface{}{})
 	}
 
 	t.Run("A template defined under partials is parsed with the page", func(t *testing.T) {
@@ -445,9 +444,9 @@ func TestRenderTemplate_Partials(t *testing.T) {
 
 func TestJsonError(t *testing.T) {
 	templateFS := fstest.MapFS{}
-	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
+	httpHelper := NewHttpHelper(templateFS)
 
-	req := httptest.NewRequest("GET", "/", nil)
+	req := newRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
 
 	err := customerrors.NewErrorDetail("test_error", "Test error description")
@@ -470,9 +469,9 @@ func TestJsonError(t *testing.T) {
 
 func TestEncodeJson(t *testing.T) {
 	templateFS := fstest.MapFS{}
-	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
+	httpHelper := NewHttpHelper(templateFS)
 
-	req := httptest.NewRequest("GET", "/", nil)
+	req := newRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
 
 	data := map[string]string{"key": "value"}

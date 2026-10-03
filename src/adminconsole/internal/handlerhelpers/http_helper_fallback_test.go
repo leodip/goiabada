@@ -9,6 +9,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -29,7 +30,7 @@ func failingErrorPageHelper() *HttpHelper {
 	return NewHttpHelper(fstest.MapFS{
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}{{template \"never_defined\" .}}{{end}}")},
-	}, stubSettingsReader{})
+	})
 }
 
 func errorLevelRecords(logs *logtest.SlogCapture) []logtest.CapturedRecord {
@@ -62,7 +63,7 @@ func TestInternalServerError_RenderFailureWritesCatalogTextAndLogsTheRenderError
 	})
 
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	router.ServeHTTP(w, newRequest("GET", "/", nil))
 
 	res := w.Result()
 	defer func() { _ = res.Body.Close() }()
@@ -91,6 +92,43 @@ func TestInternalServerError_RenderFailureWritesCatalogTextAndLogsTheRenderError
 	assert.NotContains(t, body, failure.Error())
 }
 
+// A request reaching the error page without settings cannot render it either: the page's layout
+// reads them. It ends in the same last resort, 500 with the catalog text and the request id, and
+// the render record names the missing settings for the operator. Only a wiring defect gets here,
+// and it used to panic in the settings reader instead (#440 decision 3).
+func TestInternalServerError_WithoutSettingsAnswersThePlainTextFallback(t *testing.T) {
+	logs := logtest.CaptureSlog(t)
+	httpHelper := errorPageHelper()
+
+	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
+		httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+	})
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+	require.Equal(t, http.StatusInternalServerError, res.StatusCode)
+	assert.Equal(t, "text/plain; charset=utf-8", res.Header.Get("Content-Type"))
+
+	records := errorLevelRecords(logs)
+	require.Len(t, records, 2)
+	reported, isError := loggedErrorOf(t, records[0])
+	require.True(t, isError)
+	assert.ErrorIs(t, reported, reqctx.ErrNoSettings)
+	assert.Equal(t, "unable to render the error page", records[1].Message)
+	renderErr, isError := loggedErrorOf(t, records[1])
+	require.True(t, isError)
+	assert.ErrorIs(t, renderErr, reqctx.ErrNoSettings)
+
+	requestId, isString := records[1].Attrs["request_id"].(string)
+	require.True(t, isString, "request_id must be a string attribute")
+	require.NotEmpty(t, requestId)
+	assert.Equal(t, catalogText(t, "adminconsole.error.body")+" "+catalogText(t, "adminconsole.error.request_id_label")+" "+
+		requestId+"\n", w.Body.String())
+}
+
 // chi's RequestID adopts an inbound X-Request-Id verbatim, so the one variable in the body is the
 // caller's to choose. A megabyte of it, led by control bytes, comes back escaped and clipped.
 func TestInternalServerError_RenderFailureBoundsAClientChosenRequestId(t *testing.T) {
@@ -101,7 +139,7 @@ func TestInternalServerError_RenderFailureBoundsAClientChosenRequestId(t *testin
 		httpHelper.InternalServerError(w, r, errs.New("the database went away"))
 	})
 
-	req := httptest.NewRequest("GET", "/", nil)
+	req := newRequest("GET", "/", nil)
 	req.Header.Set("X-Request-Id", "\x01\r\n"+strings.Repeat("a", 1<<20))
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -126,7 +164,7 @@ func TestInternalServerError_RenderFailureSpeaksTheRequestsLocale(t *testing.T) 
 	})
 
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	router.ServeHTTP(w, newRequest("GET", "/", nil))
 
 	require.Equal(t, http.StatusInternalServerError, w.Code)
 	assert.True(t, strings.HasPrefix(w.Body.String(), "Pedimos desculpas"), "got %q", w.Body.String())

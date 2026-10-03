@@ -63,8 +63,8 @@ func loggedErrorOf(t *testing.T, record logtest.CapturedRecord) (error, bool) {
 	return logged, true
 }
 
-// errorRouter is the harness these rows share: a chi router carrying the request id middleware and
-// the settings the renderer reads, calling handle for GET /.
+// errorRouter is the harness these rows share: a chi router carrying the request id middleware,
+// calling handle for GET /. The settings the renderer reads ride on each request, from newRequest.
 func errorRouter(handle http.HandlerFunc) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -76,7 +76,7 @@ func errorPageHelper() *HttpHelper {
 	return NewHttpHelper(fstest.MapFS{
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
-	}, stubSettingsReader{})
+	})
 }
 
 func notFoundPageHelper() *HttpHelper {
@@ -84,7 +84,7 @@ func notFoundPageHelper() *HttpHelper {
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"not_found.html":              {Data: []byte("{{define \"content\"}}Not found{{end}}")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
-	}, stubSettingsReader{})
+	})
 }
 
 // Decision 11's other half, and the half no status assertion can see. The console reaches NotFound
@@ -101,7 +101,7 @@ func TestNotFound_LogsNothing(t *testing.T) {
 	})
 
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	router.ServeHTTP(w, newRequest("GET", "/", nil))
 
 	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
 	assert.Empty(t, logs.Records(), "a stale or malformed URL is not an event an operator has to read")
@@ -120,7 +120,7 @@ func TestNotFound_RenderFailureStillLogsOnce(t *testing.T) {
 	})
 
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	router.ServeHTTP(w, newRequest("GET", "/", nil))
 
 	require.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
 
@@ -151,7 +151,7 @@ func TestInternalServerError_LogsOnceWithErrorAndRequestId(t *testing.T) {
 	})
 
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	router.ServeHTTP(w, newRequest("GET", "/", nil))
 
 	record, ok := theOneErrorRecord(t, logs)
 	if !ok {
@@ -189,7 +189,7 @@ func TestInternalServerError_StacksAnUnstackedError(t *testing.T) {
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.InternalServerError(w, r, bare)
 	})
-	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
+	router.ServeHTTP(httptest.NewRecorder(), newRequest("GET", "/", nil))
 
 	record, ok := theOneErrorRecord(t, logs)
 	if !ok {
@@ -217,7 +217,7 @@ func TestInternalServerError_KeepsTheOriginsSingleStack(t *testing.T) {
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.InternalServerError(w, r, errs.Wrap(origin, "and a layer above it"))
 	})
-	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
+	router.ServeHTTP(httptest.NewRecorder(), newRequest("GET", "/", nil))
 
 	record, ok := theOneErrorRecord(t, logs)
 	if !ok {
@@ -232,14 +232,14 @@ func TestInternalServerError_KeepsTheOriginsSingleStack(t *testing.T) {
 
 func TestJsonError_LogsOnceOnTheGenericBranch(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
+	httpHelper := NewHttpHelper(fstest.MapFS{})
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.JsonError(w, r, errs.New("not a wire error"))
 	})
 
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	router.ServeHTTP(w, newRequest("GET", "/", nil))
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 
@@ -270,14 +270,14 @@ func TestJsonError_LogsOnceOnTheGenericBranch(t *testing.T) {
 // status and the code and never looked at the record (#279 decisions 9 and 12).
 func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
+	httpHelper := NewHttpHelper(fstest.MapFS{})
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.JsonError(w, r, customerrors.NewErrorDetail("server_error", "The operation failed."))
 	})
 
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	router.ServeHTTP(w, newRequest("GET", "/", nil))
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 
@@ -310,7 +310,7 @@ func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testin
 // and the id on the wire have to be the same string (#279 decision 9, #435).
 func TestJsonError_AnExplicit500DetailLogsAndCorrelates(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
+	httpHelper := NewHttpHelper(fstest.MapFS{})
 
 	detail := customerrors.NewErrorDetailWithHttpStatusCode("server_error", "The operation failed.",
 		http.StatusInternalServerError)
@@ -320,7 +320,7 @@ func TestJsonError_AnExplicit500DetailLogsAndCorrelates(t *testing.T) {
 	})
 
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	router.ServeHTTP(w, newRequest("GET", "/", nil))
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 
@@ -349,7 +349,7 @@ func TestJsonError_AnExplicit500DetailLogsAndCorrelates(t *testing.T) {
 // of to the client.
 func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
+	httpHelper := NewHttpHelper(fstest.MapFS{})
 
 	detail := customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 		"The redirect URI is not registered.", http.StatusBadRequest)
@@ -359,7 +359,7 @@ func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
 	})
 
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	router.ServeHTTP(w, newRequest("GET", "/", nil))
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 
@@ -379,7 +379,7 @@ func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
 // decides the answer through a wrapper, which is the half of this row decision 6 is about (#279,
 // #440).
 func TestJsonError_SendsNoWWWAuthenticateChallenge(t *testing.T) {
-	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
+	httpHelper := NewHttpHelper(fstest.MapFS{})
 
 	detail := customerrors.NewErrorDetailWithHttpStatusCode("invalid_token",
 		"The access token is invalid.", http.StatusUnauthorized).
@@ -390,7 +390,7 @@ func TestJsonError_SendsNoWWWAuthenticateChallenge(t *testing.T) {
 	})
 
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	router.ServeHTTP(w, newRequest("GET", "/", nil))
 
 	res := w.Result()
 	defer func() { _ = res.Body.Close() }()

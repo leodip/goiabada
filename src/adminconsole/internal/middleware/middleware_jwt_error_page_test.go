@@ -9,6 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -137,21 +138,6 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 			},
 		},
 		{
-			name:      "the context holds something that is not a JwtInfo",
-			wantCause: "unable to cast the context value to JwtInfo",
-			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
-				m := NewMiddlewareJwt(new(mock_sessionstore.Store), sessionName,
-					new(mock_middleware.TokenParser), new(mock_middleware.AuthHelper), rec, nil,
-					"http://localhost:9090", "http://localhost:9091", "", "")
-
-				req := httptest.NewRequest(http.MethodGet, "/", nil)
-				req = req.WithContext(context.WithValue(req.Context(),
-					constants.ContextKeyJwtInfo, "not a JwtInfo"))
-
-				return m.RequiresScope([]string{"required:scope"})(mustNotRun(t)), req
-			},
-		},
-		{
 			name:      "the redirect to the authorize endpoint fails",
 			wantCause: "unable to redirect to authorize",
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
@@ -170,8 +156,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 					coreconstants.AdminConsoleClientIdentifier, "")
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
-				req = req.WithContext(context.WithValue(req.Context(),
-					constants.ContextKeyJwtInfo, jwtInfo))
+				req = req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
 
 				return m.RequiresScope([]string{"required:scope"})(mustNotRun(t)), req
 			},

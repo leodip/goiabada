@@ -20,8 +20,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -32,7 +33,7 @@ const AccessToken = "an-access-token"
 
 // Option adjusts what Request builds. An option that is not given leaves its value off the request
 // entirely, which is the distinction the tables covering an unauthenticated visitor depend on:
-// without WithAccessToken there is no ContextKeyJwtInfo at all, not an empty one.
+// without WithAccessToken there is no token set at all, not an empty one.
 type Option func(*requestSpec)
 
 type requestSpec struct {
@@ -41,7 +42,7 @@ type requestSpec struct {
 	routeParams [][2]string
 	accessToken *string
 	jwtInfo     *oauthclient.JwtInfo
-	settings    any
+	settings    *api.PublicSettingsResponse
 	hasSettings bool
 }
 
@@ -66,19 +67,19 @@ func Request(method, target string, opts ...Option) *http.Request {
 		ctx = context.WithValue(ctx, chi.RouteCtxKey, routeCtx)
 	}
 	if spec.jwtInfo != nil {
-		ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, *spec.jwtInfo)
+		ctx = reqctx.WithJwtInfo(ctx, *spec.jwtInfo)
 	} else if spec.accessToken != nil {
-		ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo,
+		ctx = reqctx.WithJwtInfo(ctx,
 			oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: *spec.accessToken}})
 	}
 	if spec.hasSettings {
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, spec.settings)
+		ctx = reqctx.WithSettings(ctx, spec.settings)
 	}
 	return req.WithContext(ctx)
 }
 
-// WithAccessToken puts AccessToken on the context under ContextKeyJwtInfo, which is where every
-// admin console handler reads the bearer it forwards to the API. Without it a handler answers 500
+// WithAccessToken puts a token set carrying AccessToken on the context, which is where every admin
+// console handler reads the bearer it forwards to the API. Without it a handler answers 500
 // before reaching anything most cases are about.
 func WithAccessToken() Option {
 	return func(spec *requestSpec) {
@@ -108,14 +109,9 @@ func WithRouteParam(key, value string) Option {
 	}
 }
 
-// WithSettings puts a value on the context under ContextKeySettings, where the settings-cache
-// middleware puts one in production.
-//
-// The value is untyped here because context.WithValue erases it anyway, and because the type on
-// that key is itself moving from a persistence model to a wire DTO in this change (#350). A
-// handler's own type assertion is what decides whether the value was the right one, which is the
-// same thing that decides it in production.
-func WithSettings(settings any) Option {
+// WithSettings puts the settings on the context through reqctx, as the settings-cache middleware
+// does in production.
+func WithSettings(settings *api.PublicSettingsResponse) Option {
 	return func(spec *requestSpec) {
 		spec.settings = settings
 		spec.hasSettings = true

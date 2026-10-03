@@ -4,55 +4,36 @@ import (
 	"context"
 	"testing"
 
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestSettingsReader_LayoutSettings(t *testing.T) {
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &api.PublicSettingsResponse{
-		AppName:     "sentinel app",
-		UITheme:     "sentinel theme",
-		SMTPEnabled: true,
-	})
-
-	settings := SettingsReader{}.LayoutSettings(ctx)
-
-	assert.Equal(t, handlerhelpers.LayoutSettings{
-		AppName:     "sentinel app",
-		UITheme:     "sentinel theme",
-		SMTPEnabled: true,
-	}, settings)
-}
-
 func TestSettingsReader_Issuer(t *testing.T) {
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &api.PublicSettingsResponse{
+	ctx := reqctx.WithSettings(context.Background(), &api.PublicSettingsResponse{
 		Issuer: "https://sentinel.example",
 	})
 
 	assert.Equal(t, "https://sentinel.example", SettingsReader{}.Issuer(ctx))
 }
 
-func TestSettingsReader_PanicsWithoutSettings(t *testing.T) {
+// Without settings the reader answers "" rather than panicking. The ID-token parser refuses an
+// empty expected issuer outright, so a request that reached it without the settings middleware is
+// refused there, as a token it cannot verify, and not answered with a crash (#440 decision 3).
+func TestSettingsReader_IssuerWithoutSettingsIsEmpty(t *testing.T) {
 	tests := []struct {
 		name string
-		read func()
+		ctx  context.Context
 	}{
-		{
-			name: "issuer",
-			read: func() { SettingsReader{}.Issuer(context.Background()) },
-		},
-		{
-			name: "layout settings",
-			read: func() { SettingsReader{}.LayoutSettings(context.Background()) },
-		},
+		{name: "nothing written", ctx: context.Background()},
+		{name: "a nil pointer written", ctx: reqctx.WithSettings(context.Background(), nil)},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Panics(t, tt.read)
+			assert.NotPanics(t, func() {
+				assert.Equal(t, "", SettingsReader{}.Issuer(tt.ctx))
+			})
 		})
 	}
 }

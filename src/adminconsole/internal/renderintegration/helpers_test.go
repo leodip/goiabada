@@ -1,17 +1,15 @@
 package renderintegration
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
@@ -48,14 +46,14 @@ func renderWithLayoutAs(t *testing.T, layout, page string, bind map[string]inter
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	settings := &api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: true}
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), settings))
 	if idTokenClaims != nil {
 		jwtInfo := oauthclient.JwtInfo{IdToken: &oauth.JwtToken{Claims: idTokenClaims}}
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwtInfo))
+		req = req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
 	}
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 
-	h := handlerhelpers.NewHttpHelper(web.TemplateFS(), adminmiddleware.SettingsReader{})
+	h := handlerhelpers.NewHttpHelper(web.TemplateFS())
 	w := httptest.NewRecorder()
 	err := h.RenderTemplate(w, req, layout, page, bind)
 	require.NoErrorf(t, err, "render %s in pt-BR (template referenced data the bind lacks?)", page)

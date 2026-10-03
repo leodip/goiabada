@@ -5,8 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -36,11 +35,7 @@ func MiddlewareLocaleFromJWT() func(http.Handler) http.Handler {
 }
 
 func localeClaimFromJwt(ctx context.Context) string {
-	v := ctx.Value(constants.ContextKeyJwtInfo)
-	if v == nil {
-		return ""
-	}
-	jwtInfo, ok := v.(oauthclient.JwtInfo)
+	jwtInfo, ok := reqctx.JwtInfoFrom(ctx)
 	if !ok || jwtInfo.IdToken == nil {
 		return ""
 	}
