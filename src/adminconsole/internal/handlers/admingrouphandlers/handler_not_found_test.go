@@ -136,3 +136,42 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 		})
 	}
 }
+
+// The settings page kept its own 404 check in front of HandleAPIError, which answers an upstream
+// 404 with the same page, so the check was deleted (#440). These rows pin what the page answers
+// without it: a group the API says is gone is the 404 page and nothing else, and a server fault
+// stays the 500 page.
+func TestGroupSettings_AGoneGroupAnswers404AndAFaultAnswers500(t *testing.T) {
+	gone := &apiclient.APIError{Code: "NOT_FOUND", Message: "Group not found", StatusCode: http.StatusNotFound}
+	broken := &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError}
+
+	testCases := []struct {
+		name         string
+		apiErr       error
+		wantNotFound bool
+	}{
+		{name: "a group the API says is gone", apiErr: gone, wantNotFound: true},
+		{name: "a 500 from the API", apiErr: broken},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			httpHelper := mocks_handlers.NewHttpHelper(t)
+			if testCase.wantNotFound {
+				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
+			} else {
+				httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
+					Return().Once()
+			}
+
+			req := handlertest.Request(http.MethodGet, "/admin/groups/42/settings",
+				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "42"))
+			apiClient := &notFoundGroupApiClient{err: testCase.apiErr}
+
+			// The session store is nil: neither answer reaches it.
+			HandleAdminGroupSettingsGet(httpHelper, nil, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+
+			httpHelper.AssertExpectations(t)
+		})
+	}
+}

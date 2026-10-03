@@ -132,9 +132,9 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
 		},
 		{
-			name: "HandleAdminClientOAuth2Get",
+			name: "HandleAdminClientOAuth2FlowsGet",
 			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
-				return HandleAdminClientOAuth2Get(h, nil, c)
+				return HandleAdminClientOAuth2FlowsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/oauth2-flows",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),

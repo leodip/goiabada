@@ -7,12 +7,9 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/errs"
 )
 
 // groupMembersAddAPI is what the add member page needs: the group, the annotated user search, and
@@ -24,7 +21,7 @@ type groupMembersAddAPI interface {
 }
 
 func HandleAdminGroupMembersAddGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient groupMembersAddAPI,
 ) http.HandlerFunc {
 
@@ -43,9 +40,9 @@ func HandleAdminGroupMembersAddGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -74,7 +71,7 @@ func HandleAdminGroupMembersAddGet(
 }
 
 func HandleAdminGroupMembersSearchGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient groupMembersAddAPI,
 ) http.HandlerFunc {
 
@@ -94,9 +91,9 @@ func HandleAdminGroupMembersSearchGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -142,7 +139,7 @@ func HandleAdminGroupMembersSearchGet(
 }
 
 func HandleAdminGroupMembersAddPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient groupMembersAddAPI,
 ) http.HandlerFunc {
 
@@ -173,9 +170,9 @@ func HandleAdminGroupMembersAddPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 

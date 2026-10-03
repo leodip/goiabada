@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -54,7 +54,7 @@ func TestHandleAdminClientLogoGet_TheLogoRefusalIsOneWarnWithASnakeKeyAndTheRequ
 	router.Use(chimiddleware.RequestID)
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), constants.ContextKeyJwtInfo,
+			ctx := reqctx.WithJwtInfo(r.Context(),
 				oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

@@ -50,10 +50,3 @@ type SessionInfo struct {
 	UserAgent string
 	Clients   []string
 }
-
-type PageResult struct {
-	Page     int
-	PageSize int
-	Total    int
-	Sessions []SessionInfo
-}

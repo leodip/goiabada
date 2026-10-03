@@ -15,9 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -36,7 +34,7 @@ type clientLogoAPI interface {
 // invariant the other 100 sites answer 500 for, and rendered the HTML 500 page into a fetch() that
 // was about to call response.json(). The success bodies are unchanged.
 func HandleAdminClientLogoGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient clientLogoAPI,
 ) http.HandlerFunc {
 
@@ -54,9 +52,9 @@ func HandleAdminClientLogoGet(
 			return
 		}
 
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -98,13 +96,13 @@ func HandleAdminClientLogoGet(
 }
 
 func HandleAdminClientLogoPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient clientLogoAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -152,13 +150,13 @@ func HandleAdminClientLogoPost(
 }
 
 func HandleAdminClientLogoDelete(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient clientLogoAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 

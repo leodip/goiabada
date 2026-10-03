@@ -8,12 +8,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/errs"
 )
 
 // groupDeleteAPI is what the group delete page needs: the group it confirms, and the delete.
@@ -23,7 +20,7 @@ type groupDeleteAPI interface {
 }
 
 func HandleAdminGroupDeleteGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient groupDeleteAPI,
 ) http.HandlerFunc {
 
@@ -41,9 +38,9 @@ func HandleAdminGroupDeleteGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -73,7 +70,7 @@ func HandleAdminGroupDeleteGet(
 }
 
 func HandleAdminGroupDeletePost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient groupDeleteAPI,
 ) http.HandlerFunc {
 
@@ -92,9 +89,9 @@ func HandleAdminGroupDeletePost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
