@@ -467,7 +467,12 @@ fails the unit tier rather than reaching a release; the three mains are `shipped
 `TestReleaseBuilds_TheRealReleaseBuildsSetProduction` in core's tier holds them to it: every
 `go build` in the servers' cross-compile script, the two server Dockerfiles and the wizard's
 cross-compile script sets `production`, the mains they build are exactly `shippedMains`, and both
-scripts' `build_platform` calls equal `releaseTargets` as a set (#463).
+scripts' `build_platform` calls equal `releaseTargets` as a set (#463). Beside it,
+`TestReleaseBuilds_TheRealStampsNameVariables` holds every `-ldflags -X` target in the same four
+files, the servers' script's `$LDFLAGS` read from its one assignment, to naming a package-level string
+variable a production build declares, `main.` resolved against the main its `go build` compiles: the
+linker ignores an `-X` that names nothing, so a path a move leaves behind would build with exit 0 and
+ship binaries reporting `development` (#442).
 
 **Dead-interface guard**: the auth server and admin console unit tiers each run
 `TestHandlers_NoDeadInterfaces` over their own `internal/handlers` package, holding every interface

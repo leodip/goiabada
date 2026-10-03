@@ -4,7 +4,9 @@ package testutil
 // every other tag free, on each of releaseTargets. Both halves of that are a premise about files the
 // guard never opens, the scripts and Dockerfiles a release builds with, so this test opens them: every
 // go build in them sets production, and each cross-compile script builds for exactly the platforms
-// releaseTargets lists (#463).
+// releaseTargets lists (#463). It also reads every -X target their go builds pass the linker, and
+// holds each to naming a package-level string variable, because the linker ignores one that names
+// nothing and the binary ships reporting "development" (#442).
 //
 // It is a test rather than a finding inside AssertArchitecture, so core's tier is the one that runs
 // it; CI's Unit job runs that tier on every pull request. The reader is driven over fixture text in
@@ -13,7 +15,11 @@ package testutil
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -21,6 +27,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/internal/refgraph"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -405,44 +412,71 @@ func wordSet(words ...string) map[string]bool {
 	return set
 }
 
-// readBuildFlags reads a go build's flags, which end at its first argument that is not one, and
-// reports whether they set the production tag, or why they cannot be read. The go command keeps the
-// last -tags it is given, so the last one is the one read. A word beginning with an expansion, quoted
-// or not, can begin with a dash once expanded, "$FLAGS" or "${FLAGS[@]}" holding -tags=dev, so where
-// a flag could be it cannot be read; as a flag's value, the next word -o or -ldflags consumes, it can.
-func readBuildFlags(args []shellWord) (bool, string) {
-	tags := ""
+// buildFlag is one flag a go build is given: its name without dashes, its value, and whether the
+// word holding that value expands.
+type buildFlag struct {
+	name, value string
+	expands     bool
+}
+
+// readGoBuildArgs reads a go build's arguments into its flags, which end at its first argument that
+// is not one, and the arguments after them, or reports why they cannot be read. A word beginning
+// with an expansion, quoted or not, can begin with a dash once expanded, "$FLAGS" or "${FLAGS[@]}"
+// holding -tags=dev, so where a flag could be it cannot be read; as a flag's value, the next word -o
+// or -ldflags consumes, it can.
+func readGoBuildArgs(args []shellWord) ([]buildFlag, []shellWord, string) {
+	var flags []buildFlag
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if a.splits {
-			return false, a.raw + " is an unquoted expansion"
+			return nil, nil, a.raw + " is an unquoted expansion"
 		}
 		if a.expands && (strings.HasPrefix(a.value, "$") || strings.HasPrefix(a.value, "`")) {
-			return false, a.raw + " is an expansion that could supply a flag"
+			return nil, nil, a.raw + " is an expansion that could supply a flag"
 		}
-		if a.value == "--" || !strings.HasPrefix(a.value, "-") {
-			break
+		if a.value == "--" {
+			return flags, args[i+1:], ""
+		}
+		if !strings.HasPrefix(a.value, "-") {
+			return flags, args[i:], ""
 		}
 		name, value, hasValue := strings.Cut(strings.TrimPrefix(a.value[1:], "-"), "=")
+		expands := a.expands
 		switch {
 		case goBuildValueFlags[name] && !hasValue:
 			if i+1 == len(args) {
-				return false, a.raw + " has no value"
+				return nil, nil, a.raw + " has no value"
 			}
 			i++
 			if args[i].splits {
-				return false, args[i].raw + " is an unquoted expansion"
+				return nil, nil, args[i].raw + " is an unquoted expansion"
 			}
-			value = args[i].value
+			value, expands = args[i].value, args[i].expands
 		case !hasValue && !goBuildBoolFlags[name]:
-			return false, a.raw + " is a flag it does not know"
+			return nil, nil, a.raw + " is a flag it does not know"
 		}
-		if name == "tags" {
-			if strings.ContainsAny(value, "$`") {
-				return false, "-tags takes its value from an expansion"
-			}
-			tags = value
+		flags = append(flags, buildFlag{name: name, value: value, expands: expands})
+	}
+	return flags, nil, ""
+}
+
+// readBuildFlags reads a go build's flags and reports whether they set the production tag, or why
+// they cannot be read. The go command keeps the last -tags it is given, so the last one is the one
+// read.
+func readBuildFlags(args []shellWord) (bool, string) {
+	flags, _, unreadable := readGoBuildArgs(args)
+	if unreadable != "" {
+		return false, unreadable
+	}
+	tags := ""
+	for _, f := range flags {
+		if f.name != "tags" {
+			continue
 		}
+		if strings.ContainsAny(f.value, "$`") {
+			return false, "-tags takes its value from an expansion"
+		}
+		tags = f.value
 	}
 	for _, tag := range strings.FieldsFunc(tags, func(r rune) bool { return r == ',' || r == ' ' }) {
 		if tag == "production" {
@@ -459,6 +493,352 @@ func sortedKeys(set map[string]bool) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// The linker ignores an -X whose variable does not exist: go build exits 0, and the binary reports
+// whatever the declaration says, "development" for the build stamp. A path a package move leaves
+// behind therefore ships mislabelled releases with every tier green, so every -X target a release
+// build passes is held to naming a package-level string variable the tree declares (#442).
+
+// stampTarget is one -X target a go build in a release-build file passes the linker: the line the
+// go build starts on, the target as written, importpath.name, and the go build's first package
+// argument, which says which main a main. target means.
+type stampTarget struct {
+	line   int
+	target string
+	pkgArg string
+}
+
+var (
+	// shellVariableReference is an -ldflags value that is one variable's expansion and nothing else,
+	// "$LDFLAGS" or "${LDFLAGS}".
+	shellVariableReference = regexp.MustCompile(`^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))$`)
+
+	// linkerBoolFlags are the linker flags taking no value. -X is the one flag taking a value that
+	// is read; a flag in neither cannot be read, since whether it takes the next field decides what
+	// that field is.
+	linkerBoolFlags = wordSet("s", "w")
+)
+
+// readStampTargets reads every -X target the go build commands in a release-build file pass the
+// linker, and every -ldflags it cannot read. A file, or a go build, whose flags readReleaseText
+// cannot read yields nothing here, since that is already its finding. An -ldflags value that is one
+// variable's expansion, as in the servers' script, is read from that variable's assignment.
+func readStampTargets(text string) ([]stampTarget, []shellProblem) {
+	s := readShell(text)
+	if len(s.problems) > 0 {
+		return nil, nil
+	}
+	variables := plainShellVariables(s.commands)
+	var targets []stampTarget
+	var problems []shellProblem
+	for _, c := range s.commands {
+		if !isGoBuild(c) {
+			continue
+		}
+		flags, packages, unreadable := readGoBuildArgs(c.words[2:])
+		if unreadable != "" {
+			continue
+		}
+		pkgArg := ""
+		if len(packages) > 0 {
+			pkgArg = packages[0].value
+		}
+		for _, f := range flags {
+			if f.name != "ldflags" {
+				continue
+			}
+			value := f.value
+			if m := shellVariableReference.FindStringSubmatch(value); f.expands && m != nil {
+				name := m[1] + m[2]
+				assigned, ok := variables[name]
+				if !ok {
+					problems = append(problems, shellProblem{c.line, fmt.Sprintf("-ldflags takes its value from $%s, which is not assigned exactly once by a plain assignment", name)})
+					continue
+				}
+				value = assigned
+			}
+			stamps, why := readLinkerStamps(value)
+			if why != "" {
+				problems = append(problems, shellProblem{c.line, "passes -ldflags this reader cannot read: " + why})
+				continue
+			}
+			for _, target := range stamps {
+				targets = append(targets, stampTarget{line: c.line, target: target, pkgArg: pkgArg})
+			}
+		}
+	}
+	return targets, problems
+}
+
+// plainShellVariables returns the value of every variable a script assigns exactly once, by an
+// assignment that is a command of its own, and names in no word of any command. Anything else has
+// no one value the reader can stand behind: an assignment before a command sets the variable for
+// that command alone, a function call included, a += appends, and a word naming it, as local,
+// export, read or for do, may be setting it again.
+func plainShellVariables(commands []shellCommand) map[string]string {
+	type variable struct {
+		value       string
+		plain       bool
+		assignments int
+	}
+	seen := map[string]*variable{}
+	note := func(name string) *variable {
+		if seen[name] == nil {
+			seen[name] = &variable{}
+		}
+		return seen[name]
+	}
+	for _, c := range commands {
+		for _, a := range c.assigns {
+			name, value, _ := strings.Cut(a.value, "=")
+			v := note(strings.TrimSuffix(name, "+"))
+			v.assignments++
+			v.value, v.plain = value, len(c.words) == 0 && !strings.HasSuffix(name, "+")
+		}
+		for _, w := range c.words {
+			name, _, _ := strings.Cut(w.value, "=")
+			note(strings.TrimSuffix(name, "+")).assignments++
+		}
+	}
+	values := map[string]string{}
+	for name, v := range seen {
+		if v.assignments == 1 && v.plain {
+			values[name] = v.value
+		}
+	}
+	return values
+}
+
+// readLinkerStamps reads an -ldflags value the way the go command and the linker do, and returns
+// its -X targets, or why it cannot be read. A value not beginning with a dash is pattern=flags, the
+// flags applying to the packages the pattern matches. The linker reads -X's value as
+// importpath.name=value, the target ending at the first equals sign and its package at the last dot
+// before that.
+func readLinkerStamps(value string) ([]string, string) {
+	flags := strings.TrimSpace(value)
+	if flags != "" && flags[0] != '-' {
+		_, after, ok := strings.Cut(flags, "=")
+		if !ok {
+			return nil, flags + " is neither linker flags nor pattern=flags"
+		}
+		flags = after
+	}
+	fields, why := splitGoFlags(flags)
+	if why != "" {
+		return nil, why
+	}
+	var targets []string
+	for i := 0; i < len(fields); i++ {
+		f := fields[i]
+		if !strings.HasPrefix(f, "-") || f == "-" || f == "--" {
+			if strings.HasPrefix(f, "$") || strings.HasPrefix(f, "`") {
+				return nil, f + " is an expansion that could supply a linker flag"
+			}
+			return nil, f + " is not a linker flag"
+		}
+		name, x, hasValue := strings.Cut(strings.TrimPrefix(f[1:], "-"), "=")
+		switch {
+		case name == "X":
+			if !hasValue {
+				if i+1 == len(fields) {
+					return nil, f + " has no value"
+				}
+				i++
+				x = fields[i]
+			}
+			target, _, ok := strings.Cut(x, "=")
+			if !ok || !strings.Contains(target, ".") {
+				return nil, "-X " + x + " is not importpath.name=value"
+			}
+			if strings.ContainsAny(target, "$`") {
+				return nil, "-X " + x + " takes its path from an expansion"
+			}
+			targets = append(targets, target)
+		case !linkerBoolFlags[name]:
+			return nil, f + " is a linker flag it does not know"
+		}
+	}
+	return targets, ""
+}
+
+// splitGoFlags splits a flag string into fields the way the go command does, which is not the way
+// the shell does: fields end at spaces, a field beginning with a quote runs to the next same quote
+// with nothing escaped inside, and a quote anywhere else is an ordinary character.
+func splitGoFlags(s string) ([]string, string) {
+	var fields []string
+	for {
+		s = strings.TrimLeft(s, " \t\n\r")
+		if s == "" {
+			return fields, ""
+		}
+		if q := s[0]; q == '\'' || q == '"' {
+			end := strings.IndexByte(s[1:], q)
+			if end < 0 {
+				return nil, "it opens a " + string(q) + " that never closes"
+			}
+			fields = append(fields, s[1:1+end])
+			s = s[2+end:]
+			continue
+		}
+		end := strings.IndexAny(s, " \t\n\r")
+		if end < 0 {
+			end = len(s)
+		}
+		fields = append(fields, s[:end])
+		s = s[end:]
+	}
+}
+
+// stampVariable is what a package declares under the name an -X target gives.
+type stampVariable int
+
+const (
+	stampable stampVariable = iota
+	noStringVariable
+	computedVariable
+)
+
+// readStampVariable reads what the package in dir, as a production build compiles it, declares
+// under name: a package-level variable -X can set, declared string or with no type and a value of
+// string literals, and with no value or such a value; one whose initializer is anything else, which
+// the linker leaves to compute what it computes; or no package-level string variable at all.
+func readStampVariable(root, dir, name string) stampVariable {
+	full := filepath.Join(root, filepath.FromSlash(dir))
+	entries, err := os.ReadDir(full)
+	if err != nil {
+		return noStringVariable
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		fset := token.NewFileSet()
+		file, err := parser.ParseFile(fset, filepath.Join(full, e.Name()), nil, parser.ParseComments)
+		if err != nil || refgraph.ExemptByBuildConstraint(file, fset) {
+			continue
+		}
+		for _, decl := range file.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok || gen.Tok != token.VAR {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				v := spec.(*ast.ValueSpec)
+				for i, n := range v.Names {
+					if n.Name == name {
+						return readStampSpec(v, i)
+					}
+				}
+			}
+		}
+	}
+	return noStringVariable
+}
+
+// readStampSpec reads the i-th variable a var spec declares.
+func readStampSpec(v *ast.ValueSpec, i int) stampVariable {
+	if v.Type != nil {
+		if ident, ok := v.Type.(*ast.Ident); !ok || ident.Name != "string" {
+			return noStringVariable
+		}
+	}
+	switch {
+	case len(v.Values) == 0:
+		return stampable
+	case len(v.Values) != len(v.Names):
+		return computedVariable
+	case isStringLiterals(v.Values[i]):
+		return stampable
+	}
+	if lit, ok := v.Values[i].(*ast.BasicLit); ok && v.Type == nil && lit.Kind != token.STRING {
+		return noStringVariable
+	}
+	return computedVariable
+}
+
+// isStringLiterals reports whether an expression is string literals joined by +, which the compiler
+// lays down as data the linker can replace.
+func isStringLiterals(e ast.Expr) bool {
+	switch e := e.(type) {
+	case *ast.BasicLit:
+		return e.Kind == token.STRING
+	case *ast.ParenExpr:
+		return isStringLiterals(e.X)
+	case *ast.BinaryExpr:
+		return e.Op == token.ADD && isStringLiterals(e.X) && isStringLiterals(e.Y)
+	}
+	return false
+}
+
+// compiledMain returns the main a go build compiles, given the mains its file is listed as building
+// and the go build's package argument: the file's one main, or else the one whose path ends with the
+// argument.
+func compiledMain(mains []string, pkgArg string) (string, bool) {
+	if len(mains) == 1 {
+		return mains[0], true
+	}
+	arg := path.Clean(pkgArg)
+	var found []string
+	for _, m := range mains {
+		if m == arg || strings.HasSuffix(m, "/"+arg) {
+			found = append(found, m)
+		}
+	}
+	if len(found) != 1 {
+		return "", false
+	}
+	return found[0], true
+}
+
+// checkReleaseStamps holds every -X target the release-build files under root pass to naming a
+// package-level string variable a production build of the tree declares, a main. target resolved
+// against the main its go build compiles and any other through the module paths graph holds, and
+// returns what does not hold, sorted. A file from which no -X is read fails too, since a release
+// built from it is not stamped, and a check that read nothing would pass on any path. A file that
+// cannot be read is checkReleaseBuilds' finding.
+func checkReleaseStamps(root string, builds []releaseBuild, graph *refgraph.ImportGraph) []string {
+	var findings []string
+	for _, b := range builds {
+		src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(b.file)))
+		if err != nil {
+			continue
+		}
+		targets, problems := readStampTargets(string(src))
+		for _, p := range problems {
+			findings = append(findings, fmt.Sprintf("release builds: %s:%d %s", b.file, p.line, p.what))
+		}
+		if len(targets) == 0 && len(problems) == 0 {
+			findings = append(findings, fmt.Sprintf("release builds: %s passes no -X this reader can read, so nothing it builds is stamped", b.file))
+		}
+		for _, t := range targets {
+			at := fmt.Sprintf("release builds: %s:%d stamps %s with -X", b.file, t.line, t.target)
+			dot := strings.LastIndex(t.target, ".")
+			pkg, name := t.target[:dot], t.target[dot+1:]
+			var dir string
+			switch {
+			case pkg == "main":
+				var ok bool
+				if dir, ok = compiledMain(b.mains, t.pkgArg); !ok {
+					findings = append(findings, fmt.Sprintf("%s, but which of %s its go build compiles cannot be told from %q", at, strings.Join(b.mains, ", "), t.pkgArg))
+					continue
+				}
+			case graph.ModuleDir(pkg) == "":
+				findings = append(findings, at+", which names no package in the four modules")
+				continue
+			default:
+				dir = graph.RelPath(pkg)
+			}
+			switch readStampVariable(root, dir, name) {
+			case noStringVariable:
+				findings = append(findings, fmt.Sprintf("%s, which names no package-level string variable in %s", at, dir))
+			case computedVariable:
+				findings = append(findings, fmt.Sprintf("%s, which %s initializes with something other than string literals, so -X does not replace it", at, dir))
+			}
+		}
+	}
+	sort.Strings(findings)
+	return findings
 }
 
 // checkReleaseBuilds holds the release-build files under root to the shipped mains and release
@@ -664,6 +1044,151 @@ build_platform "windows" "amd64" ".exe"&&build_platform "openbsd" "amd64" ""
 	})
 }
 
+func TestReleaseBuilds_StampTargets(t *testing.T) {
+	const assignedTwice = "-ldflags takes its value from $LDFLAGS, which is not assigned exactly once by a plain assignment"
+	cases := []struct {
+		name     string
+		text     string
+		want     []stampTarget
+		problems []shellProblem
+	}{
+		{
+			"a Dockerfile's -X inside single quotes is read",
+			"FROM golang AS build\nRUN go build -tags=production -ldflags=\"-w -X 'a.test/p.V=${v}'\" -o out ./cmd/a\n",
+			[]stampTarget{{2, "a.test/p.V", "./cmd/a"}}, nil,
+		},
+		{
+			"flags carried in a shell variable are read from its assignment",
+			"LDFLAGS='-w -X \"a.test/p.V='${V}'\" -X \"a.test/p.D='${D}'\"'\ngo build -ldflags \"$LDFLAGS\" ./cmd/a\n",
+			[]stampTarget{{2, "a.test/p.V", "./cmd/a"}, {2, "a.test/p.D", "./cmd/a"}}, nil,
+		},
+		{
+			"the variable may be named in braces",
+			"LDFLAGS='-X a.test/p.V=1'\ngo build -ldflags=\"${LDFLAGS}\" .\n",
+			[]stampTarget{{2, "a.test/p.V", "."}}, nil,
+		},
+		{
+			"unquoted targets in a double-quoted value are read",
+			`go build -ldflags "-w -X main.version=${V} -X main.imageTag=${V}" .` + "\n",
+			[]stampTarget{{1, "main.version", "."}, {1, "main.imageTag", "."}}, nil,
+		},
+		{
+			"every spelling of -X the linker accepts is read",
+			"go build -ldflags '-X=a.test/p.V=1 --X a.test/p.W=2 --X=a.test/p.Z=3' .\n",
+			[]stampTarget{{1, "a.test/p.V", "."}, {1, "a.test/p.W", "."}, {1, "a.test/p.Z", "."}}, nil,
+		},
+		{
+			"-ldflags spelled with two dashes is read",
+			`go build --ldflags "-X a.test/p.V=1" ./cmd/a` + "\n",
+			[]stampTarget{{1, "a.test/p.V", "./cmd/a"}}, nil,
+		},
+		{
+			"flags behind a package pattern are read",
+			"go build -ldflags 'all=-X a.test/p.V=1' .\n",
+			[]stampTarget{{1, "a.test/p.V", "."}}, nil,
+		},
+		{
+			"every -ldflags is read",
+			"go build -ldflags '-X a.test/p.V=1' -ldflags '-X a.test/q.V=1' .\n",
+			[]stampTarget{{1, "a.test/p.V", "."}, {1, "a.test/q.V", "."}}, nil,
+		},
+		{
+			"the target ends at the first equals sign",
+			`go build -ldflags "-X 'a.test/p.V=x=$V'" .` + "\n",
+			[]stampTarget{{1, "a.test/p.V", "."}}, nil,
+		},
+		{
+			"each go build is read on its own",
+			"( cd a && go build -ldflags '-X a.test/p.V=1' ./cmd/a ) && go build -ldflags '-X main.v=1' ./cmd/b\n",
+			[]stampTarget{{1, "a.test/p.V", "./cmd/a"}, {1, "main.v", "./cmd/b"}}, nil,
+		},
+		{"a go build without -ldflags stamps nothing", "go build -tags=production -o out .\n", nil, nil},
+		{"an -X given to another command is not read", "echo go build -ldflags '-X a.test/p.V=1' .\n", nil, nil},
+		{
+			"a go build whose flags cannot be read is the other reading's finding",
+			"go build $FLAGS -ldflags '-X a.test/p.V=1' .\n",
+			nil, nil,
+		},
+		{
+			"a variable assigned twice cannot be read",
+			"LDFLAGS='-X a.test/p.V=1'\nLDFLAGS='-X a.test/q.V=1'\ngo build -ldflags \"$LDFLAGS\" .\n",
+			nil, []shellProblem{{3, assignedTwice}},
+		},
+		{
+			"a variable assigned and appended to cannot be read",
+			"LDFLAGS='-X a.test/p.V=1'\nLDFLAGS+=' -X a.test/q.V=1'\ngo build -ldflags \"$LDFLAGS\" .\n",
+			nil, []shellProblem{{3, assignedTwice}},
+		},
+		{
+			"a variable also set by a builtin cannot be read",
+			"LDFLAGS='-X a.test/p.V=1'\nf() { local LDFLAGS='-X a.test/q.V=1'; go build -ldflags \"$LDFLAGS\" .; }\n",
+			nil, []shellProblem{{2, assignedTwice}},
+		},
+		{
+			"a variable never assigned cannot be read",
+			"go build -ldflags \"$LDFLAGS\" .\n",
+			nil, []shellProblem{{1, assignedTwice}},
+		},
+		{
+			"an assignment before a command sets no variable the command's own words read",
+			"LDFLAGS='-X a.test/p.V=1' go build -ldflags \"$LDFLAGS\" .\n",
+			nil, []shellProblem{{1, assignedTwice}},
+		},
+		{
+			"an expansion where a linker flag could be cannot be read",
+			`go build -ldflags "-w $EXTRA -X a.test/p.V=1" .` + "\n",
+			nil, []shellProblem{{1, "passes -ldflags this reader cannot read: $EXTRA is an expansion that could supply a linker flag"}},
+		},
+		{
+			"a target whose path is an expansion cannot be read",
+			`go build -ldflags "-X $PKG.V=1" .` + "\n",
+			nil, []shellProblem{{1, "passes -ldflags this reader cannot read: -X $PKG.V=1 takes its path from an expansion"}},
+		},
+		{
+			"a target without a value cannot be read",
+			"go build -ldflags '-X a.test/p.V' .\n",
+			nil, []shellProblem{{1, "passes -ldflags this reader cannot read: -X a.test/p.V is not importpath.name=value"}},
+		},
+		{
+			"a target without a package cannot be read",
+			"go build -ldflags '-X version=1' .\n",
+			nil, []shellProblem{{1, "passes -ldflags this reader cannot read: -X version=1 is not importpath.name=value"}},
+		},
+		{
+			"an -X with nothing after it cannot be read",
+			"go build -ldflags '-w -X' .\n",
+			nil, []shellProblem{{1, "passes -ldflags this reader cannot read: -X has no value"}},
+		},
+		{
+			"a linker flag the reader does not know cannot be read",
+			"go build -ldflags '-extldflags -X -X a.test/p.V=1' .\n",
+			nil, []shellProblem{{1, "passes -ldflags this reader cannot read: -extldflags is a linker flag it does not know"}},
+		},
+		{
+			"a quote inside a field is no quote to the go command",
+			`go build -ldflags '-X a.test/p.V="1 2"' .` + "\n",
+			nil, []shellProblem{{1, `passes -ldflags this reader cannot read: 2" is not a linker flag`}},
+		},
+		{
+			"a quote the go command finds unclosed cannot be read",
+			`go build -ldflags "-X 'a.test/p.V=1" .` + "\n",
+			nil, []shellProblem{{1, "passes -ldflags this reader cannot read: it opens a ' that never closes"}},
+		},
+		{
+			"a value that is neither flags nor pattern=flags cannot be read",
+			"go build -ldflags 'all' .\n",
+			nil, []shellProblem{{1, "passes -ldflags this reader cannot read: all is neither linker flags nor pattern=flags"}},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			targets, problems := readStampTargets(c.text)
+			assert.Equal(t, c.want, targets)
+			assert.Equal(t, c.problems, problems)
+		})
+	}
+}
+
 // ---- the check, over fixture trees ----------------------------------------------------------
 
 // releaseFixtureTargets is the release-target list the fixture scripts are held to.
@@ -843,6 +1368,191 @@ func TestReleaseBuilds_Check(t *testing.T) {
 	})
 }
 
+// stampFixtureBuilds lists a servers-shaped script building both fixture mains with its flags in a
+// shell variable, a Dockerfile building the first, and a wizard-shaped script building it too.
+var stampFixtureBuilds = []releaseBuild{
+	{file: "build/build.sh", mains: []string{"one/cmd/one", "two/cmd/two"}, platforms: true},
+	{file: "build/Dockerfile-one", mains: []string{"one/cmd/one"}},
+	{file: "build/wizard.sh", mains: []string{"one/cmd/one"}, platforms: true},
+}
+
+const (
+	stampReleaseScript = `#!/bin/bash
+LDFLAGS='-w -X "example.test/core/stamp.Version='${VERSION}'" -X "example.test/core/stamp.BuildDate='${BUILD_DATE}'"'
+build_platform() {
+    ( cd one && GOOS=$1 GOARCH=$2 go build -v -tags=production \
+        -ldflags "$LDFLAGS" \
+        -o out ./cmd/one )
+    ( cd two && GOOS=$1 GOARCH=$2 go build -tags=production -ldflags "${LDFLAGS}" -o out ./cmd/two )
+}
+build_platform "linux" "amd64" ""
+`
+	stampDockerfile = "FROM golang AS build\nARG version\n" +
+		`RUN go build -tags=production -ldflags="-w -X 'example.test/core/stamp.Version=${version}' -X 'main.imageTag=${version}'" -o bin/one ./cmd/one` + "\n"
+	stampWizardScript = `#!/bin/bash
+GOOS=linux go build -v -tags=production \
+    -ldflags "-w -X main.version=${VERSION} -X main.imageTag=${VERSION}" \
+    -o "build/one-linux" \
+    .
+`
+	stampPackage = "package stamp\n\nvar Version = \"development\"\n\nvar BuildDate string\n"
+	stampMainOne = "package main\n\nvar (\n\tversion  = \"dev\"\n\timageTag = \"latest\"\n)\n\nfunc main() {}\n"
+)
+
+// checkStampFixture writes the stamp fixture with the given files replaced, a file given as "" left
+// out, and checks it.
+func checkStampFixture(t *testing.T, files map[string]string) []string {
+	t.Helper()
+
+	all := map[string]string{
+		"build/build.sh":       stampReleaseScript,
+		"build/Dockerfile-one": stampDockerfile,
+		"build/wizard.sh":      stampWizardScript,
+		"core/stamp/stamp.go":  stampPackage,
+		"core/other/other.go":  "package other\n",
+		"one/cmd/one/main.go":  stampMainOne,
+		"two/cmd/two/main.go":  "package main\n\nfunc main() {}\n",
+	}
+	for rel, src := range files {
+		all[rel] = src
+	}
+	for rel, src := range all {
+		if src == "" {
+			delete(all, rel)
+		}
+	}
+	root := writeTree(t, all)
+	graph, err := refgraph.BuildImportGraph(root)
+	require.NoError(t, err)
+	return checkReleaseStamps(root, stampFixtureBuilds, graph)
+}
+
+func TestReleaseBuilds_Stamps(t *testing.T) {
+	t.Run("targets naming string variables pass, main. resolved against the main each go build compiles", func(t *testing.T) {
+		assert.Empty(t, checkStampFixture(t, nil))
+	})
+
+	t.Run("a stale path in the servers' shell variable fails at every go build reading it", func(t *testing.T) {
+		findings := checkStampFixture(t, map[string]string{
+			"build/build.sh": strings.Replace(stampReleaseScript, "core/stamp.Version", "core/constants.Version", 1),
+		})
+		assertFindings(t, findings,
+			"release builds: build/build.sh:4 stamps example.test/core/constants.Version with -X, which names no package-level string variable in core/constants",
+			"release builds: build/build.sh:7 stamps example.test/core/constants.Version with -X, which names no package-level string variable in core/constants")
+	})
+
+	t.Run("a stale path in a Dockerfile fails", func(t *testing.T) {
+		findings := checkStampFixture(t, map[string]string{
+			"build/Dockerfile-one": strings.Replace(stampDockerfile, "core/stamp.Version", "core/other.Version", 1),
+		})
+		assertFindings(t, findings,
+			"release builds: build/Dockerfile-one:3 stamps example.test/core/other.Version with -X, which names no package-level string variable in core/other")
+	})
+
+	t.Run("a variable missing from a package that exists fails", func(t *testing.T) {
+		findings := checkStampFixture(t, map[string]string{
+			"build/Dockerfile-one": strings.Replace(stampDockerfile, "stamp.Version", "stamp.GitCommit", 1),
+		})
+		assertFindings(t, findings,
+			"release builds: build/Dockerfile-one:3 stamps example.test/core/stamp.GitCommit with -X, which names no package-level string variable in core/stamp")
+	})
+
+	t.Run("a package outside the four modules fails", func(t *testing.T) {
+		findings := checkStampFixture(t, map[string]string{
+			"build/Dockerfile-one": strings.Replace(stampDockerfile, "example.test/core/stamp.Version", "example.test/elsewhere/stamp.Version", 1),
+		})
+		assertFindings(t, findings,
+			"release builds: build/Dockerfile-one:3 stamps example.test/elsewhere/stamp.Version with -X, which names no package in the four modules")
+	})
+
+	t.Run("main. is the main the go build compiles, not any main the file builds", func(t *testing.T) {
+		script := strings.Replace(stampReleaseScript, `-ldflags "$LDFLAGS"`, `-ldflags "-X main.version=${VERSION}"`, 1)
+		script = strings.Replace(script, `-ldflags "${LDFLAGS}"`, `-ldflags "-X main.version=${VERSION}"`, 1)
+		findings := checkStampFixture(t, map[string]string{"build/build.sh": script})
+		assertFindings(t, findings,
+			"release builds: build/build.sh:7 stamps main.version with -X, which names no package-level string variable in two/cmd/two")
+	})
+
+	t.Run("a main. target the file's one main lacks fails", func(t *testing.T) {
+		findings := checkStampFixture(t, map[string]string{
+			"build/wizard.sh": strings.Replace(stampWizardScript, "main.imageTag", "main.tag", 1),
+		})
+		assertFindings(t, findings,
+			"release builds: build/wizard.sh:2 stamps main.tag with -X, which names no package-level string variable in one/cmd/one")
+	})
+
+	t.Run("a main. target whose main cannot be told from the package argument fails", func(t *testing.T) {
+		findings := checkStampFixture(t, map[string]string{
+			"build/build.sh": strings.Replace(stampReleaseScript, `-ldflags "${LDFLAGS}" -o out ./cmd/two`, `-ldflags "-X main.version=1" -o out .`, 1),
+		})
+		assertFindings(t, findings,
+			`release builds: build/build.sh:7 stamps main.version with -X, but which of one/cmd/one, two/cmd/two its go build compiles cannot be told from "."`)
+	})
+
+	t.Run("a variable initialized by a call fails, since -X does not replace it", func(t *testing.T) {
+		findings := checkStampFixture(t, map[string]string{
+			"core/stamp/stamp.go": "package stamp\n\nimport \"strings\"\n\nvar Version = strings.ToLower(\"DEV\")\n\nvar BuildDate string\n",
+		})
+		assertFindings(t, findings,
+			"release builds: build/Dockerfile-one:3 stamps example.test/core/stamp.Version with -X, which core/stamp initializes with something other than string literals, so -X does not replace it",
+			"release builds: build/build.sh:4 stamps example.test/core/stamp.Version with -X, which core/stamp initializes with something other than string literals, so -X does not replace it",
+			"release builds: build/build.sh:7 stamps example.test/core/stamp.Version with -X, which core/stamp initializes with something other than string literals, so -X does not replace it")
+	})
+
+	t.Run("a constant, a function and a variable that is not a string are no string variable", func(t *testing.T) {
+		for _, decl := range []string{`const Version = "development"`, "func Version() {}", "var Version = 1", "var Version []byte"} {
+			findings := checkStampFixture(t, map[string]string{
+				"core/stamp/stamp.go": "package stamp\n\n" + decl + "\n\nvar BuildDate string\n",
+				"build/build.sh":      strings.Replace(stampReleaseScript, "core/stamp.Version", "core/stamp.BuildDate", 1),
+			})
+			assertFindings(t, findings,
+				"release builds: build/Dockerfile-one:3 stamps example.test/core/stamp.Version with -X, which names no package-level string variable in core/stamp")
+		}
+	})
+
+	t.Run("a variable a production build does not compile fails", func(t *testing.T) {
+		findings := checkStampFixture(t, map[string]string{
+			"core/stamp/stamp.go":      "package stamp\n\nvar BuildDate string\n",
+			"core/stamp/dev.go":        "//go:build !production\n\npackage stamp\n\nvar Version = \"development\"\n",
+			"core/stamp/stamp_test.go": "package stamp\n\nvar Version = \"development\"\n",
+			"build/build.sh":           strings.Replace(stampReleaseScript, "core/stamp.Version", "core/stamp.BuildDate", 1),
+		})
+		assertFindings(t, findings,
+			"release builds: build/Dockerfile-one:3 stamps example.test/core/stamp.Version with -X, which names no package-level string variable in core/stamp")
+	})
+
+	t.Run("a variable local to a function is no package-level variable", func(t *testing.T) {
+		findings := checkStampFixture(t, map[string]string{
+			"core/stamp/stamp.go": "package stamp\n\nvar BuildDate string\n\nfunc f() string {\n\tvar Version = \"development\"\n\treturn Version\n}\n",
+			"build/build.sh":      strings.Replace(stampReleaseScript, "core/stamp.Version", "core/stamp.BuildDate", 1),
+		})
+		assertFindings(t, findings,
+			"release builds: build/Dockerfile-one:3 stamps example.test/core/stamp.Version with -X, which names no package-level string variable in core/stamp")
+	})
+
+	t.Run("every declaration -X can replace passes", func(t *testing.T) {
+		assert.Empty(t, checkStampFixture(t, map[string]string{
+			"core/stamp/stamp.go": "package stamp\n\nvar (\n\tOther, Version string = \"o\", \"de\" + (\"velopment\")\n\tBuildDate = `development`\n)\n",
+		}))
+	})
+
+	t.Run("a release build stamping nothing fails", func(t *testing.T) {
+		findings := checkStampFixture(t, map[string]string{
+			"build/Dockerfile-one": "FROM golang AS build\nRUN go build -tags=production -o bin/one ./cmd/one\n",
+		})
+		assertFindings(t, findings,
+			"release builds: build/Dockerfile-one passes no -X this reader can read, so nothing it builds is stamped")
+	})
+
+	t.Run("-ldflags the reader cannot read fails", func(t *testing.T) {
+		findings := checkStampFixture(t, map[string]string{
+			"build/wizard.sh": strings.Replace(stampWizardScript, "-w -X", "-w $EXTRA -X", 1),
+		})
+		assertFindings(t, findings,
+			"release builds: build/wizard.sh:2 passes -ldflags this reader cannot read: $EXTRA is an expansion that could supply a linker flag")
+	})
+}
+
 // ---- the real tree --------------------------------------------------------------------------
 
 // TestReleaseBuilds_TheRealReleaseBuildsSetProduction holds this repository's release builds to the
@@ -851,6 +1561,16 @@ func TestReleaseBuilds_Check(t *testing.T) {
 // releaseTargets.
 func TestReleaseBuilds_TheRealReleaseBuildsSetProduction(t *testing.T) {
 	assert.Empty(t, checkReleaseBuilds(SourceRoot(t), releaseBuilds, shippedMains, releaseTargets))
+}
+
+// TestReleaseBuilds_TheRealStampsNameVariables holds every -X a release build passes to naming a
+// package-level string variable a production build of the tree declares, so a path left behind by a
+// move fails here rather than shipping a binary that reports "development".
+func TestReleaseBuilds_TheRealStampsNameVariables(t *testing.T) {
+	root := SourceRoot(t)
+	graph, err := refgraph.BuildImportGraph(root)
+	require.NoError(t, err)
+	assert.Empty(t, checkReleaseStamps(root, releaseBuilds, graph))
 }
 
 // ---- the wizard's Makefile ------------------------------------------------------------------
