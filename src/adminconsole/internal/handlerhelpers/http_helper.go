@@ -24,7 +24,7 @@ import (
 )
 
 // This renderer is one of two. The auth server has its own copy in
-// authserver/internal/handlerhelpers, and about 238 of the lines below are the same in both.
+// authserver/internal/handlerhelpers, and about 210 of the lines below are the same in both.
 //
 // The duplication is deliberate and is what owning a renderer costs. The single copy this
 // replaced lived in core and hid two things only one binary ever reached: the loggedInUser and
@@ -119,7 +119,7 @@ func (h *HttpHelper) NotFound(w http.ResponseWriter, r *http.Request) {
 func (h *HttpHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
 	data map[string]interface{}) error {
 
-	buf, err := h.RenderTemplateToBuffer(r, layoutName, templateName, data)
+	buf, err := h.renderToBuffer(r, layoutName, templateName, data)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (h *HttpHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, layo
 	// construction, and structurally cannot reach static assets, images, JWKS or discovery, which
 	// must stay cacheable.
 	//
-	// The position matters as much as the values. It is after RenderTemplateToBuffer has returned
+	// The position matters as much as the values. It is after renderToBuffer has returned
 	// successfully, so a render that fails leaves the response completely untouched and the
 	// caller's InternalServerError still owns every header as well as the status (#247).
 	w.Header().Set("Cache-Control", "no-store")
@@ -157,12 +157,16 @@ func (h *HttpHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, layo
 	return nil
 }
 
-func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
+// renderToBuffer renders a page without touching the response, which is what lets RenderTemplate
+// leave a failed render's response untouched. It is unexported because a page is the only thing
+// this binary renders: the auth server's twin exports its own for email bodies, and the console
+// sends no email (#440).
+func (h *HttpHelper) renderToBuffer(r *http.Request, layoutName string, templateName string,
 	data map[string]interface{}) (*bytes.Buffer, error) {
 
 	settings := h.settings.LayoutSettings(r.Context())
 	// The layout's values are written into the caller's map rather than a copy, and
-	// TestRenderTemplateToBuffer reads isAdmin back out of it; a nil map is therefore allocated
+	// TestRenderTemplate_Binds reads isAdmin back out of it; a nil map is therefore allocated
 	// here rather than panicking on the first write below. No caller passes nil today, so this
 	// closes a latent panic, and the auth server's twin carries the same guard (#435).
 	if data == nil {
@@ -184,7 +188,7 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 		var ok bool
 		jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
 		if !ok {
-			return nil, errs.New("unable to cast jwtInfo to dtos.JwtInfo")
+			return nil, errs.New("unable to cast jwtInfo to oauthclient.JwtInfo")
 		}
 		if jwtInfo.IdToken != nil && jwtInfo.IdToken.Claims["sub"] != nil {
 			// Extract user info from ID token claims instead of database lookup
@@ -253,23 +257,6 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 	templateName = strings.TrimPrefix(templateName, "/")
 	layoutName = strings.TrimPrefix(layoutName, "/")
 
-	// Per-locale email template lookup. For emails (templateName under
-	// "emails/"), try <name>.<locale>.html before <name>.html so a translated
-	// copy of the whole email body wins over the English baseline. Falls
-	// through to the base template when no locale-specific copy exists.
-	// The default locale "en" is always served by the base file.
-	if strings.HasPrefix(templateName, "emails/") {
-		locale := i18n.LocaleTag(r.Context())
-		if locale != "" && locale != "en" {
-			ext := filepath.Ext(templateName)
-			base := strings.TrimSuffix(templateName, ext)
-			candidate := base + "." + locale + ext
-			if _, err := fs.Stat(h.templateFS, candidate); err == nil {
-				templateName = candidate
-			}
-		}
-	}
-
 	templateFiles := []string{
 		layoutName,
 		templateName,
@@ -320,14 +307,6 @@ func (h *HttpHelper) JsonError(w http.ResponseWriter, r *http.Request, err error
 		statusCode := errorDetail.GetHttpStatusCode()
 		if statusCode == 0 {
 			statusCode = http.StatusInternalServerError
-		}
-
-		// RFC 6749 Section 5.2: If the client attempted to authenticate via the
-		// "Authorization" request header field, the authorization server MUST
-		// respond with HTTP 401 and include the "WWW-Authenticate" response header.
-		wwwAuthenticate := errorDetail.GetWWWAuthenticate()
-		if wwwAuthenticate != "" {
-			w.Header().Set("WWW-Authenticate", wwwAuthenticate)
 		}
 
 		w.WriteHeader(statusCode)

@@ -22,9 +22,9 @@ import (
 )
 
 // The 404 page, end to end: the real HttpHelper.NotFound over the real embedded template FS, at the
-// HTTP seam. Everything else in this package renders a bind through RenderTemplateToBuffer, which
-// cannot see a status; this one has to, because the status is half of what decision 11 changed and
-// the console is invisible to the integration tier, which drives the auth server and only ever
+// HTTP seam. Everything else in this package renders a bind through RenderTemplate and reads only
+// the body; this one reads the status too, because the status is half of what decision 11 changed
+// and the console is invisible to the integration tier, which drives the auth server and only ever
 // mentions the console's base URL as a string to assert against (#279).
 func TestRender_NotFoundPage(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/admin/clients/not-a-number/settings", nil)
@@ -106,7 +106,7 @@ func menuLabelText(t *testing.T, out string) string {
 // TestRender_MenuLabelShowsTheLoggedInUser is the case the rest of this package could not see.
 // Every other render here is an anonymous request, so `loggedInUser` is never bound and the dropdown
 // label comes back empty — which reads as "no handler binds it" if the harness is mistaken for the
-// product. The bind is real and it is central: HttpHelper.RenderTemplateToBuffer builds it from the
+// product. The bind is real and it is central: HttpHelper.RenderTemplate builds it from the
 // ID token's claims, and JwtSessionHandler puts that token on the context ahead of every route in
 // routes.go that renders a menu page. Rendering with a token is what distinguishes the two.
 func TestRender_MenuLabelShowsTheLoggedInUser(t *testing.T) {
