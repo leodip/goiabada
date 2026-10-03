@@ -5,12 +5,13 @@
 // the address claim is not on record.User, which is a persistence record with no business
 // constructing an OIDC claim (#387 decision 5).
 //
-// The two places where the two callers legitimately differ are inputs here, not merges. Each is
-// observable on the wire, so collapsing one would change what a client receives, and tests pin
-// both (#387 decision 6):
+// The two things each caller chooses are inputs here, not merges. Each is observable on the wire,
+// so the mapper reads neither from anywhere else, and tests pin both (#387 decision 6):
 //
-//   - the base URL the profile and picture claims are built from. /userinfo reads the global
-//     configuration, issuance the one injected into TokenIssuer. That is Mapper.BaseURL.
+//   - the base URL the profile and picture claims are built from, which the caller supplies:
+//     /userinfo the one its handler is constructed with, issuance the one injected into
+//     TokenIssuer, both from the loaded configuration. The mapper reads no configuration of its
+//     own. That is Mapper.BaseURL.
 //   - which of a group's or an attribute's two include flags decides. /userinfo reads
 //     IncludeInIdToken at all three of its filter sites; issuance reads IncludeInAccessToken in
 //     the access token and IncludeInIdToken in the ID token. That is Mapper.Inclusion.
