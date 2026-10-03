@@ -132,7 +132,7 @@ const activateTestEmail = "user+tag@example.com"
 // The first hop: the emailed link, carrying the code and nothing else.
 // =============================================================================
 
-func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
+func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 	const code = "the-emitted-code"
 
 	t.Run("a valid code marks the session and redirects to a clean URL", func(t *testing.T) {
@@ -145,7 +145,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC().Add(-time.Minute))
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 
-		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		sent := activationLinkFollowedRequest(code)
 		handler.ServeHTTP(rr, sent)
@@ -190,7 +190,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		expectRenderedLinkExpired(pageRenderer)
 		expectAuditFailedActivationCode(auditLogger, "unknown_code", 0)
 
-		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, activationLinkFollowedRequest(code))
 
@@ -219,7 +219,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		// nothing about it is established as the subject of the request.
 		expectAuditFailedActivationCode(auditLogger, "unknown_code", 0)
 
-		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		sent := activationLinkFollowedRequest(code)
 		handler.ServeHTTP(rr, sent)
@@ -256,7 +256,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 			return strings.Contains(err.Error(), "unable to decrypt verification code")
 		})).Once()
 
-		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		handler.ServeHTTP(httptest.NewRecorder(), activationLinkFollowedRequest(code))
 
 		assert.Empty(t, logs.Records(), "a server fault must not be logged as a refused link")
@@ -287,7 +287,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 			emaillinks.LinkMarkerFlowAccountActivate, 7, "the-first-hash")
 		logs := logtest.CaptureSlog(t)
 
-		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, sent)
 
@@ -331,7 +331,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 			emaillinks.LinkMarkerFlowResetPassword, 42, "the-reset-hash")
 		logs := logtest.CaptureSlog(t)
 
-		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, sent)
 
@@ -366,7 +366,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		expectAuditFailedActivationCode(auditLogger, "code_expired", 7)
 		logs := logtest.CaptureSlog(t)
 
-		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, activationLinkFollowedRequest(code))
 
@@ -403,7 +403,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 					expectAuditFailedActivationCode(auditLogger, "code_expired", 7)
 				}
 
-				handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+				handler := HandleActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 				rr := httptest.NewRecorder()
 				handler.ServeHTTP(rr, activationLinkFollowedRequest(code))
 
@@ -424,7 +424,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 // The clean hop: no query at all, the marker alone.
 // =============================================================================
 
-func TestHandleAccountActivateGet_Clean(t *testing.T) {
+func TestHandleActivateGet_Clean(t *testing.T) {
 	const code = "the-emitted-code"
 
 	t.Run("the marker completes the activation", func(t *testing.T) {
@@ -457,7 +457,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 				return !expired
 			})).Return(nil).Once()
 
-		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		sent := withMarker(t, store, activationCleanGetRequest(), emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash)
 		handler.ServeHTTP(rr, sent)
@@ -537,7 +537,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 				sent := tc.request(t, store)
 				logs := logtest.CaptureSlog(t)
 
-				handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+				handler := HandleActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 				rr := httptest.NewRecorder()
 				handler.ServeHTTP(rr, sent)
 
@@ -559,7 +559,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 // A link mailed while registration was on must not create an account after an administrator has
 // turned it off. Each hop is given everything it would need to succeed, so the setting is the
 // only thing that can refuse it (#425 decision 6).
-func TestHandleAccountActivateGet_SelfRegistrationDisabled(t *testing.T) {
+func TestHandleActivateGet_SelfRegistrationDisabled(t *testing.T) {
 	const code = "the-emitted-code"
 
 	for _, tc := range []struct {
@@ -591,7 +591,7 @@ func TestHandleAccountActivateGet_SelfRegistrationDisabled(t *testing.T) {
 			pageRenderer.On("NotFound", mock.Anything, mock.Anything).Once()
 			logs := logtest.CaptureSlog(t)
 
-			handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+			handler := HandleActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, sent)
 

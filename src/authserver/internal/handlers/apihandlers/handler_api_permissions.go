@@ -33,7 +33,7 @@ type permissionsDatabase interface {
 	UpdatePermission(ctx context.Context, tx *sql.Tx, permission *models.Permission) error
 }
 
-func HandleAPIPermissionsByResourceGet(
+func HandlePermissionsByResourceGet(
 	database permissionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -77,9 +77,9 @@ func HandleAPIPermissionsByResourceGet(
 	}
 }
 
-// HandleAPIResourcePermissionsPut - PUT /api/v1/admin/resources/{resourceId}/permissions
+// HandleResourcePermissionsPut - PUT /api/v1/admin/resources/{resourceId}/permissions
 // Replaces the full set of permission definitions for a resource.
-func HandleAPIResourcePermissionsPut(
+func HandleResourcePermissionsPut(
 	database permissionsDatabase,
 	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,

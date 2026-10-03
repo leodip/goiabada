@@ -116,8 +116,8 @@ func updateClientNotOwningAuthenticationMode(ctx context.Context, database clien
 	})
 }
 
-// HandleAPIClientsGet - GET /api/v1/admin/clients
-func HandleAPIClientsGet(
+// HandleClientsGet - GET /api/v1/admin/clients
+func HandleClientsGet(
 	database clientsDatabase,
 ) http.HandlerFunc {
 
@@ -154,8 +154,8 @@ func HandleAPIClientsGet(
 	}
 }
 
-// HandleAPIClientGet - GET /api/v1/admin/clients/{id}
-func HandleAPIClientGet(
+// HandleClientGet - GET /api/v1/admin/clients/{id}
+func HandleClientGet(
 	database clientsDatabase,
 	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
@@ -220,8 +220,8 @@ func HandleAPIClientGet(
 	}
 }
 
-// HandleAPIClientDelete - DELETE /api/v1/admin/clients/{id}
-func HandleAPIClientDelete(
+// HandleClientDelete - DELETE /api/v1/admin/clients/{id}
+func HandleClientDelete(
 	database clientsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
@@ -271,8 +271,8 @@ func HandleAPIClientDelete(
 	}
 }
 
-// HandleAPIClientCreatePost - POST /api/v1/admin/clients
-func HandleAPIClientCreatePost(
+// HandleClientCreatePost - POST /api/v1/admin/clients
+func HandleClientCreatePost(
 	database clientsDatabase,
 	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
@@ -389,8 +389,8 @@ func HandleAPIClientCreatePost(
 	}
 }
 
-// HandleAPIClientUpdatePut - PUT /api/v1/admin/clients/{id}
-func HandleAPIClientUpdatePut(
+// HandleClientUpdatePut - PUT /api/v1/admin/clients/{id}
+func HandleClientUpdatePut(
 	database clientsDatabase,
 	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
@@ -593,9 +593,9 @@ func HandleAPIClientUpdatePut(
 	}
 }
 
-// HandleAPIClientAuthenticationPut - PUT /api/v1/admin/clients/{id}/authentication
+// HandleClientAuthenticationPut - PUT /api/v1/admin/clients/{id}/authentication
 // Changes client's public/confidential mode and client secret.
-func HandleAPIClientAuthenticationPut(
+func HandleClientAuthenticationPut(
 	database clientsDatabase,
 	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,
@@ -738,9 +738,9 @@ func validateClientSecret(secret string) error {
 	return nil
 }
 
-// HandleAPIClientOAuth2FlowsPut - PUT /api/v1/admin/clients/{id}/oauth2-flows
+// HandleClientOAuth2FlowsPut - PUT /api/v1/admin/clients/{id}/oauth2-flows
 // Updates which OAuth2 flows are enabled for the client.
-func HandleAPIClientOAuth2FlowsPut(
+func HandleClientOAuth2FlowsPut(
 	database clientsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
@@ -812,10 +812,10 @@ func HandleAPIClientOAuth2FlowsPut(
 	}
 }
 
-// HandleAPIClientRedirectURIsPut - PUT /api/v1/admin/clients/{id}/redirect-uris
+// HandleClientRedirectURIsPut - PUT /api/v1/admin/clients/{id}/redirect-uris
 // Replaces the full set of redirect URIs for the client, in one transaction, from a request
 // validated and bounded before anything is written, and returns the updated client.
-func HandleAPIClientRedirectURIsPut(
+func HandleClientRedirectURIsPut(
 	database clientsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
@@ -1001,11 +1001,11 @@ func HandleAPIClientRedirectURIsPut(
 	}
 }
 
-// HandleAPIClientWebOriginsPut - PUT /api/v1/admin/clients/{id}/web-origins
+// HandleClientWebOriginsPut - PUT /api/v1/admin/clients/{id}/web-origins
 // Replaces the full set of web origins for the client, in one transaction. Each value is
 // canonicalized to the exact string a browser sends in an Origin header, or refused, so a stored
 // origin is always one CORS can match.
-func HandleAPIClientWebOriginsPut(
+func HandleClientWebOriginsPut(
 	database clientsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
@@ -1169,9 +1169,9 @@ func HandleAPIClientWebOriginsPut(
 	}
 }
 
-// HandleAPIClientTokensPut - PUT /api/v1/admin/clients/{id}/tokens
+// HandleClientTokensPut - PUT /api/v1/admin/clients/{id}/tokens
 // Updates token-related settings for a client.
-func HandleAPIClientTokensPut(
+func HandleClientTokensPut(
 	database clientsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

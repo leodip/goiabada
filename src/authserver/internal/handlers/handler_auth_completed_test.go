@@ -678,8 +678,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// ceremony dead: the previous user's grants are still live, so minting a replacement session
 	// and an authorization code on top of them would hand the browser to the new user while
 	// leaving the old user's refresh tokens working. Both other callers of revocation.TerminateUserSessionTx
-	// pin exactly this, in TestHandleAPIUserSessionDelete_TerminationFailureIsA500 and
-	// TestHandleAPIAccountSessionDelete_TerminationFailureIsA500, and it is the audit suppression
+	// pin exactly this, in TestHandleUserSessionDelete_TerminationFailureIsA500 and
+	// TestHandleAccountSessionDelete_TerminationFailureIsA500, and it is the audit suppression
 	// that matters as much as the 500: an event written on a rolled-back termination is a false
 	// security record.
 	t.Run("Termination failure is a 500 with nothing audited and no replacement", func(t *testing.T) {

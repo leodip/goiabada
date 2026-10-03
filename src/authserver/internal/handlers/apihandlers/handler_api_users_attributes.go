@@ -30,8 +30,8 @@ type usersAttributesDatabase interface {
 	UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *models.UserAttribute) error
 }
 
-// HandleAPIUserAttributesGet - GET /api/v1/admin/users/{id}/attributes
-func HandleAPIUserAttributesGet(
+// HandleUserAttributesGet - GET /api/v1/admin/users/{id}/attributes
+func HandleUserAttributesGet(
 	database usersAttributesDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -78,8 +78,8 @@ func HandleAPIUserAttributesGet(
 	}
 }
 
-// HandleAPIUserAttributeGet - GET /api/v1/admin/user-attributes/{id}
-func HandleAPIUserAttributeGet(
+// HandleUserAttributeGet - GET /api/v1/admin/user-attributes/{id}
+func HandleUserAttributeGet(
 	database usersAttributesDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -119,8 +119,8 @@ func HandleAPIUserAttributeGet(
 	}
 }
 
-// HandleAPIUserAttributeCreatePost - POST /api/v1/admin/user-attributes
-func HandleAPIUserAttributeCreatePost(
+// HandleUserAttributeCreatePost - POST /api/v1/admin/user-attributes
+func HandleUserAttributeCreatePost(
 	database usersAttributesDatabase,
 	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
@@ -210,8 +210,8 @@ func HandleAPIUserAttributeCreatePost(
 	}
 }
 
-// HandleAPIUserAttributeUpdatePut - PUT /api/v1/admin/user-attributes/{id}
-func HandleAPIUserAttributeUpdatePut(
+// HandleUserAttributeUpdatePut - PUT /api/v1/admin/user-attributes/{id}
+func HandleUserAttributeUpdatePut(
 	database usersAttributesDatabase,
 	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
@@ -312,8 +312,8 @@ func HandleAPIUserAttributeUpdatePut(
 	}
 }
 
-// HandleAPIUserAttributeDelete - DELETE /api/v1/admin/user-attributes/{id}
-func HandleAPIUserAttributeDelete(
+// HandleUserAttributeDelete - DELETE /api/v1/admin/user-attributes/{id}
+func HandleUserAttributeDelete(
 	database usersAttributesDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

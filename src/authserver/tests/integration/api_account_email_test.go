@@ -340,7 +340,7 @@ func TestAPIAccountEmailPut_TellsThePreviousAddress(t *testing.T) {
 // The first change's notice, to the verified address the account started with, shows only that
 // mail was on; it is no barrier for the second change's job, which runs on its own goroutine. The
 // absence check below therefore catches a notice that has already arrived and nothing slower. The
-// proof ordered on completion is TestHandleAPIAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress,
+// proof ordered on completion is TestHandleAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress,
 // whose runner holds every job the request hands off.
 func TestAPIAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress(t *testing.T) {
 	useMailpitSMTP(t)

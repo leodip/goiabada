@@ -16,11 +16,11 @@ import (
 // settings is a wiring defect. It answers the one JSON 500 envelope this surface uses, with
 // reqctx.ErrNoSettings in the record, and this row stands for every settings read in the package:
 // they share this writer (#433 decision 6).
-func TestHandleAPISettingsGeneralGet_WithoutSettingsAnswersTheJSON500Envelope(t *testing.T) {
+func TestHandleSettingsGeneralGet_WithoutSettingsAnswersTheJSON500Envelope(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 
-	HandleAPISettingsGeneralGet().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/admin/settings/general", nil))
+	HandleSettingsGeneralGet().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/admin/settings/general", nil))
 
 	require.Equal(t, http.StatusInternalServerError, rr.Code)
 	code, description := decodeErrorEnvelope(t, rr)

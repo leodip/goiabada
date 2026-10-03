@@ -67,13 +67,13 @@ func stubAdminEmailUpdate(database *mocks_data.Database, updateErr error) {
 	database.On("UpdateUser", mock.Anything, mock.Anything, mock.Anything).Return(updateErr).Once()
 }
 
-func TestHandleAPIUserEmailPut_ALostRaceForTheAddressAnswers409(t *testing.T) {
+func TestHandleUserEmailPut_ALostRaceForTheAddressAnswers409(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	stubAdminEmailUpdate(database, uniqueViolationOnUpdate)
 
 	rr := httptest.NewRecorder()
-	HandleAPIUserEmailPut(database, accountvalidation.NewEmailValidator(database), auditLogger).
+	HandleUserEmailPut(database, accountvalidation.NewEmailValidator(database), auditLogger).
 		ServeHTTP(rr, adminEmailPutRequest(t))
 
 	requireEmailTaken(t, rr)
@@ -84,13 +84,13 @@ func TestHandleAPIUserEmailPut_ALostRaceForTheAddressAnswers409(t *testing.T) {
 // The reject arm: only the unique-key refusal is a conflict. Any other write failure is the
 // server's, and a 409 for it would send the caller to change an address that was never the
 // problem.
-func TestHandleAPIUserEmailPut_AnyOtherWriteFailureAnswers500(t *testing.T) {
+func TestHandleUserEmailPut_AnyOtherWriteFailureAnswers500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	stubAdminEmailUpdate(database, errs.New("the connection was reset"))
 
 	rr := httptest.NewRecorder()
-	HandleAPIUserEmailPut(database, accountvalidation.NewEmailValidator(database), auditLogger).
+	HandleUserEmailPut(database, accountvalidation.NewEmailValidator(database), auditLogger).
 		ServeHTTP(rr, adminEmailPutRequest(t))
 
 	require.Equal(t, http.StatusInternalServerError, rr.Code)

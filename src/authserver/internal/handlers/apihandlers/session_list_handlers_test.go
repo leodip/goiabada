@@ -68,7 +68,7 @@ func expectSessionListReads(database *mocks_data.Database, sessions []models.Use
 		Return([]models.Client{{Id: 5, ClientIdentifier: "portal"}}, nil).Once()
 }
 
-func TestHandleAPIUserSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
+func TestHandleUserSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	now := liveSession(1, "sid-other", 5)
@@ -85,7 +85,7 @@ func TestHandleAPIUserSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
 	req = setChiURLParam(req, "id", "42")
 
 	rr := httptest.NewRecorder()
-	HandleAPIUserSessionsGet(database).ServeHTTP(rr, req)
+	HandleUserSessionsGet(database).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	got := decodeSessionList(t, rr)
@@ -98,7 +98,7 @@ func TestHandleAPIUserSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
 
 // An admin token minted through client_credentials carries no sid, and the handler must read that
 // as "none of these is mine" rather than matching the empty string against an empty identifier.
-func TestHandleAPIUserSessionsGet_NoSidOnTheTokenMarksNothingCurrent(t *testing.T) {
+func TestHandleUserSessionsGet_NoSidOnTheTokenMarksNothingCurrent(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	sessions := []models.UserSession{liveSession(1, "sid-one", 5), liveSession(2, "", 5)}
@@ -111,7 +111,7 @@ func TestHandleAPIUserSessionsGet_NoSidOnTheTokenMarksNothingCurrent(t *testing.
 	req = setChiURLParam(req, "id", "42")
 
 	rr := httptest.NewRecorder()
-	HandleAPIUserSessionsGet(database).ServeHTTP(rr, req)
+	HandleUserSessionsGet(database).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	for _, session := range decodeSessionList(t, rr) {
@@ -119,7 +119,7 @@ func TestHandleAPIUserSessionsGet_NoSidOnTheTokenMarksNothingCurrent(t *testing.
 	}
 }
 
-func TestHandleAPIClientSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
+func TestHandleClientSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	mine := liveSession(2, "sid-mine", 5)
@@ -137,7 +137,7 @@ func TestHandleAPIClientSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
 	req = setChiURLParam(req, "id", "7")
 
 	rr := httptest.NewRecorder()
-	HandleAPIClientSessionsGet(database).ServeHTTP(rr, req)
+	HandleClientSessionsGet(database).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	got := decodeSessionList(t, rr)
@@ -147,7 +147,7 @@ func TestHandleAPIClientSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
-func TestHandleAPIAccountSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
+func TestHandleAccountSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	mine := liveSession(2, "sid-mine", 5)
@@ -163,7 +163,7 @@ func TestHandleAPIAccountSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) 
 		map[string]interface{}{"sub": "the-user"})
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountSessionsGet(database).ServeHTTP(rr, req)
+	HandleAccountSessionsGet(database).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	got := decodeSessionList(t, rr)

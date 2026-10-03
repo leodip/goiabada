@@ -79,8 +79,8 @@ type accountOTPDatabase interface {
 		issuedAt time.Time, staleBefore time.Time) (bool, error)
 }
 
-// HandleAPIAccountOTPEnrollmentGet - GET /api/v1/account/otp/enrollment
-func HandleAPIAccountOTPEnrollmentGet(
+// HandleAccountOTPEnrollmentGet - GET /api/v1/account/otp/enrollment
+func HandleAccountOTPEnrollmentGet(
 	database accountOTPDatabase,
 	otpSecretGenerator OtpSecretGenerator,
 	dataCipher *encryption.DataCipher,
@@ -219,8 +219,8 @@ func HandleAPIAccountOTPEnrollmentGet(
 	}
 }
 
-// HandleAPIAccountOTPPut - PUT /api/v1/account/otp
-func HandleAPIAccountOTPPut(
+// HandleAccountOTPPut - PUT /api/v1/account/otp
+func HandleAccountOTPPut(
 	database accountOTPDatabase,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,

@@ -22,8 +22,8 @@ type accountPhoneDatabase interface {
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
 }
 
-// HandleAPIAccountPhonePut - PUT /api/v1/account/phone
-func HandleAPIAccountPhonePut(
+// HandleAccountPhonePut - PUT /api/v1/account/phone
+func HandleAccountPhonePut(
 	database accountPhoneDatabase,
 	phoneValidator *accountvalidation.PhoneValidator,
 	auditLogger AuditLogger,

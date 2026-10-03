@@ -314,7 +314,7 @@ func (e *Sender) buildMessage(from, to *mail.Address, input *SendEmailInput) ([]
 
 // newMessageID returns `<32 hex characters@domain>`, per RFC 5322 section 3.6.4's SHOULD. The
 // domain is the part of the from address after its last '@'; the address is validated as an email
-// on the way into the settings (apihandlers.HandleAPISettingsEmailPut), which is what keeps this
+// on the way into the settings (apihandlers.HandleSettingsEmailPut), which is what keeps this
 // from being a header injection point (#274).
 func (e *Sender) newMessageID(fromAddress string) (string, error) {
 	reader := e.randReader

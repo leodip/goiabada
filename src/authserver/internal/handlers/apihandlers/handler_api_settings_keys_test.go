@@ -69,10 +69,10 @@ func rotateRequest() *http.Request {
 	return setTokenContextWithClaims(r, map[string]interface{}{"sub": adminSubject})
 }
 
-// TestHandleAPISettingsKeysRotatePost_Success is the wiring test: the whole transition runs and the
+// TestHandleSettingsKeysRotatePost_Success is the wiring test: the whole transition runs and the
 // audit entry is written once. It also pins that the audit happens only after a commit, which is the
 // property the three refusal cases below assert the other half of.
-func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
+func TestHandleSettingsKeysRotatePost_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -97,7 +97,7 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPISettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
+	HandleSettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.JSONEq(t, `{"success":true}`, rr.Body.String())
@@ -108,10 +108,10 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 	auditLogger.AssertExpectations(t)
 }
 
-// TestHandleAPISettingsKeysRotatePost_RotationInProgress covers the loser of a race. 409 rather than
+// TestHandleSettingsKeysRotatePost_RotationInProgress covers the loser of a race. 409 rather than
 // 200 because this call rotated nothing, and no audit entry because the log must carry exactly one
 // entry per rotation that happened.
-func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
+func TestHandleSettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -124,7 +124,7 @@ func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).Return(false, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPISettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
+	HandleSettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
 
 	assert.Equal(t, http.StatusConflict, rr.Code)
 	body := decodeErrorBody(t, rr)
@@ -139,11 +139,11 @@ func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 	auditLogger.AssertExpectations(t)
 }
 
-// TestHandleAPISettingsKeysRotatePost_KeySetIncomplete is the defect the issue opens with: a
+// TestHandleSettingsKeysRotatePost_KeySetIncomplete is the defect the issue opens with: a
 // deployment with no next key. No DeleteKeyPair expectation is registered, so the mock fails the
 // test if the handler destroys the previous key on its way to refusing, which is exactly what the
 // old handler did.
-func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
+func TestHandleSettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -155,7 +155,7 @@ func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	rr := httptest.NewRecorder()
 	capture := logtest.CaptureSlog(t)
 
-	HandleAPISettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
+	HandleSettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
 
 	logged := capture.Text()
 
@@ -180,10 +180,10 @@ func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	auditLogger.AssertExpectations(t)
 }
 
-// TestHandleAPISettingsKeysRotatePost_InternalError covers everything that is neither sentinel: an
+// TestHandleSettingsKeysRotatePost_InternalError covers everything that is neither sentinel: an
 // engine failure keeps the generic code, so a caller cannot mistake a broken database for a lost
 // race and retry into it.
-func TestHandleAPISettingsKeysRotatePost_InternalError(t *testing.T) {
+func TestHandleSettingsKeysRotatePost_InternalError(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -192,7 +192,7 @@ func TestHandleAPISettingsKeysRotatePost_InternalError(t *testing.T) {
 		Return([]models.KeyPair(nil), assert.AnError).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPISettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
+	HandleSettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", decodeErrorBody(t, rr).ErrorCode)
@@ -200,7 +200,7 @@ func TestHandleAPISettingsKeysRotatePost_InternalError(t *testing.T) {
 	auditLogger.AssertExpectations(t)
 }
 
-// TestHandleAPISettingsKeysGet_OrdersNextCurrentPrevious owns the guarantee the admin console now
+// TestHandleSettingsKeysGet_OrdersNextCurrentPrevious owns the guarantee the admin console now
 // relies on. Its page used to re-impose this order with a structurally identical copy of the loop
 // below, which is the only reason the console named a signing-key state at all; #385 deleted the
 // copy, so the order is this endpoint's claim and has to be tested where it is made. The console's
@@ -208,7 +208,7 @@ func TestHandleAPISettingsKeysRotatePost_InternalError(t *testing.T) {
 //
 // Every row is fed deliberately unsorted, because a fixture already in the answer's order passes
 // with the loop deleted.
-func TestHandleAPISettingsKeysGet_OrdersNextCurrentPrevious(t *testing.T) {
+func TestHandleSettingsKeysGet_OrdersNextCurrentPrevious(t *testing.T) {
 
 	testCases := []struct {
 		name  string
@@ -268,7 +268,7 @@ func TestHandleAPISettingsKeysGet_OrdersNextCurrentPrevious(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/settings/keys", nil)
-			HandleAPISettingsKeysGet(database).ServeHTTP(rr, req)
+			HandleSettingsKeysGet(database).ServeHTTP(rr, req)
 
 			require.Equal(t, http.StatusOK, rr.Code)
 

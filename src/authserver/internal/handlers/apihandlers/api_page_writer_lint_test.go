@@ -19,7 +19,7 @@ import (
 // some handlers receive used to carry InternalServerError and NotFound, which render error.html and
 // not_found.html, and six branches still called the first of those after decision 7 landed: the
 // five database failures in handler_api_user_consents.go and the GetUserBySubject failure in
-// HandleAPIAccountProfilePictureDelete. A database outage on those routes handed the console's
+// HandleAccountProfilePictureDelete. A database outage on those routes handed the console's
 // fetch an HTML page to JSON.parse, and logged nothing under the request id the envelope would have
 // carried. The pull request review for #279 found them; this is the guard that keeps the count at
 // zero, because the mistake is one a handler written from an older one makes.

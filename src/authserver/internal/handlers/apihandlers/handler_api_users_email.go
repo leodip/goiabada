@@ -29,8 +29,8 @@ type usersEmailValidator interface {
 	ValidateEmailChange(ctx context.Context, email string, subject string) error
 }
 
-// HandleAPIUserEmailPut - PUT /api/v1/admin/users/{id}/email
-func HandleAPIUserEmailPut(
+// HandleUserEmailPut - PUT /api/v1/admin/users/{id}/email
+func HandleUserEmailPut(
 	database usersEmailDatabase,
 	emailValidator usersEmailValidator,
 	auditLogger AuditLogger,

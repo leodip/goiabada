@@ -77,7 +77,7 @@ func TestNoStore(t *testing.T) {
 // NOT the sweep in the authserver's internal/server/routes_no_store_test.go, and an earlier version
 // of this comment said it was. That sweep calls every registered route WITHOUT credentials, so it
 // stops in a guard and never reaches a handler: setting Cache-Control: public, max-age=300 on
-// HandleAPIClientGet leaves all 105 of its cases green, and leaves this case green too.
+// HandleClientGet leaves all 105 of its cases green, and leaves this case green too.
 //
 // Only an authenticated success response can observe it, so the two API responses that carry a
 // credential each assert the pair on their own success in the authserver's integration tier:

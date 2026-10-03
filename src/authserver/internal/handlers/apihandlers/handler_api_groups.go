@@ -31,7 +31,7 @@ type groupsDatabase interface {
 	UpdateGroup(ctx context.Context, tx *sql.Tx, group *models.Group) error
 }
 
-func HandleAPIGroupsGet(
+func HandleGroupsGet(
 	database groupsDatabase,
 ) http.HandlerFunc {
 
@@ -64,7 +64,7 @@ func HandleAPIGroupsGet(
 	}
 }
 
-func HandleAPIGroupCreatePost(
+func HandleGroupCreatePost(
 	database groupsDatabase,
 	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
@@ -145,7 +145,7 @@ func HandleAPIGroupCreatePost(
 	}
 }
 
-func HandleAPIGroupGet(
+func HandleGroupGet(
 	database groupsDatabase,
 ) http.HandlerFunc {
 
@@ -187,7 +187,7 @@ func HandleAPIGroupGet(
 	}
 }
 
-func HandleAPIGroupUpdatePut(
+func HandleGroupUpdatePut(
 	database groupsDatabase,
 	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
@@ -294,7 +294,7 @@ func HandleAPIGroupUpdatePut(
 	}
 }
 
-func HandleAPIGroupDelete(
+func HandleGroupDelete(
 	database groupsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

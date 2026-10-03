@@ -23,7 +23,7 @@ type usersSearchDatabase interface {
 	UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []models.User) error
 }
 
-func HandleAPIUsersSearchGet(
+func HandleUsersSearchGet(
 	database usersSearchDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

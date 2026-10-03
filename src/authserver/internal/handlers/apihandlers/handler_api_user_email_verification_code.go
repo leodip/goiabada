@@ -23,8 +23,8 @@ type userEmailVerificationCodeDatabase interface {
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
 }
 
-// HandleAPIUserEmailVerificationCodePost - POST /api/v1/admin/users/{id}/email/verification-code
-func HandleAPIUserEmailVerificationCodePost(
+// HandleUserEmailVerificationCodePost - POST /api/v1/admin/users/{id}/email/verification-code
+func HandleUserEmailVerificationCodePost(
 	database userEmailVerificationCodeDatabase,
 	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,

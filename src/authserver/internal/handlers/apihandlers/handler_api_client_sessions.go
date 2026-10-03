@@ -28,7 +28,7 @@ type clientSessionsDatabase interface {
 	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error
 }
 
-// HandleAPIClientSessionsGet - GET /api/v1/admin/clients/{id}/sessions
+// HandleClientSessionsGet - GET /api/v1/admin/clients/{id}/sessions
 // Returns a paginated list of user sessions associated with a client, and the people they
 // belong to. Defaults: page=1, size=50. Caps size to 100. Lists only sessions still active
 // under the current settings; an expired one is omitted rather than reported (#373 decision 2).
@@ -36,7 +36,7 @@ type clientSessionsDatabase interface {
 // This is the one session list spanning users, so the console could not name a session's owner
 // without reading each one back: it fetched a user per row, up to 50 HTTP round trips to render
 // one page. The owners ride along in a normalized users array instead (#373 decision 9).
-func HandleAPIClientSessionsGet(
+func HandleClientSessionsGet(
 	database clientSessionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

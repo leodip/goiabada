@@ -24,8 +24,8 @@ type accountProfileDatabase interface {
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
 }
 
-// HandleAPIAccountProfileGet - GET /api/v1/account/profile
-func HandleAPIAccountProfileGet(
+// HandleAccountProfileGet - GET /api/v1/account/profile
+func HandleAccountProfileGet(
 	database accountProfileDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -57,8 +57,8 @@ func HandleAPIAccountProfileGet(
 	}
 }
 
-// HandleAPIAccountProfilePut - PUT /api/v1/account/profile
-func HandleAPIAccountProfilePut(
+// HandleAccountProfilePut - PUT /api/v1/account/profile
+func HandleAccountProfilePut(
 	database accountProfileDatabase,
 	profileValidator *accountvalidation.ProfileValidator,
 	auditLogger AuditLogger,

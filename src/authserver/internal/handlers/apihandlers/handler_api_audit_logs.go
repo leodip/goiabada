@@ -17,7 +17,7 @@ type auditLogsDatabase interface {
 	GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string, requestId string) ([]models.AuditLog, int, error)
 }
 
-func HandleAPIAuditLogsGet(
+func HandleAuditLogsGet(
 	database auditLogsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

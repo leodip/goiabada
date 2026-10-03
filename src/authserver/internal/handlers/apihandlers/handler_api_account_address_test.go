@@ -44,7 +44,7 @@ func addressPutRequest(t *testing.T, subject string, body api.UpdateUserAddressR
 }
 
 // The `api/unlogged-500` anchor: this exact line answered 500 and threw the error away.
-func TestHandleAPIAccountAddressPut_ADatabaseFailureIsOneLoggedFiveHundred(t *testing.T) {
+func TestHandleAccountAddressPut_ADatabaseFailureIsOneLoggedFiveHundred(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -52,7 +52,7 @@ func TestHandleAPIAccountAddressPut_ADatabaseFailureIsOneLoggedFiveHundred(t *te
 		Return(nil, errors.New("the database is down")).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountAddressPut(database, accountvalidation.NewAddressValidator(), auditLogger)
+	handler := HandleAccountAddressPut(database, accountvalidation.NewAddressValidator(), auditLogger)
 
 	capture := logtest.CaptureSlog(t)
 
@@ -78,7 +78,7 @@ func TestHandleAPIAccountAddressPut_ADatabaseFailureIsOneLoggedFiveHundred(t *te
 
 // The `api/encode-after-header` anchor: the success body is buffered and written whole, under the
 // status and Content-Type, and nothing is logged.
-func TestHandleAPIAccountAddressPut_ASuccessWritesTheWholeBody(t *testing.T) {
+func TestHandleAccountAddressPut_ASuccessWritesTheWholeBody(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -88,7 +88,7 @@ func TestHandleAPIAccountAddressPut_ASuccessWritesTheWholeBody(t *testing.T) {
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnAddress, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountAddressPut(database, accountvalidation.NewAddressValidator(), auditLogger)
+	handler := HandleAccountAddressPut(database, accountvalidation.NewAddressValidator(), auditLogger)
 
 	capture := logtest.CaptureSlog(t)
 

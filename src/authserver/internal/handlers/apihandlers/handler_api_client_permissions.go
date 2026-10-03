@@ -28,8 +28,8 @@ type clientPermissionsDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
-// HandleAPIClientPermissionsGet - GET /api/v1/admin/clients/{id}/permissions
-func HandleAPIClientPermissionsGet(
+// HandleClientPermissionsGet - GET /api/v1/admin/clients/{id}/permissions
+func HandleClientPermissionsGet(
 	database clientPermissionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -76,10 +76,10 @@ func HandleAPIClientPermissionsGet(
 	}
 }
 
-// HandleAPIClientPermissionsPut - PUT /api/v1/admin/clients/{id}/permissions
+// HandleClientPermissionsPut - PUT /api/v1/admin/clients/{id}/permissions
 // Replaces the full set of permissions assigned to a client. Validation,
 // security, and audit logging are done here to support non-admin-console clients.
-func HandleAPIClientPermissionsPut(
+func HandleClientPermissionsPut(
 	database clientPermissionsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

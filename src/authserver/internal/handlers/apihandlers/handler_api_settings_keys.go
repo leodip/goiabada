@@ -30,8 +30,8 @@ type settingsKeysDatabase interface {
 	GetKeyPairById(ctx context.Context, tx *sql.Tx, keyPairId int64) (*models.KeyPair, error)
 }
 
-// HandleAPISettingsKeysGet - GET /api/v1/admin/settings/keys
-func HandleAPISettingsKeysGet(
+// HandleSettingsKeysGet - GET /api/v1/admin/settings/keys
+func HandleSettingsKeysGet(
 	database settingsKeysDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -87,13 +87,13 @@ func HandleAPISettingsKeysGet(
 	}
 }
 
-// HandleAPISettingsKeysRotatePost - POST /api/v1/admin/settings/keys/rotate
+// HandleSettingsKeysRotatePost - POST /api/v1/admin/settings/keys/rotate
 //
 // The transition itself lives in signingkeys.Rotator, which takes it as one transaction.
 // This used to be five unsynchronised writes here, and the delete of the previous key ran
 // before the check that a next key even existed, so a rotation that was about to be refused
 // had already destroyed the key still signing live tokens (#251).
-func HandleAPISettingsKeysRotatePost(
+func HandleSettingsKeysRotatePost(
 	database settingsKeysDatabase,
 	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,
@@ -138,8 +138,8 @@ func HandleAPISettingsKeysRotatePost(
 	}
 }
 
-// HandleAPISettingsKeyDelete - DELETE /api/v1/admin/settings/keys/{id}
-func HandleAPISettingsKeyDelete(
+// HandleSettingsKeyDelete - DELETE /api/v1/admin/settings/keys/{id}
+func HandleSettingsKeyDelete(
 	database settingsKeysDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

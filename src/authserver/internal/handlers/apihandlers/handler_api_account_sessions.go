@@ -29,10 +29,10 @@ type accountSessionsDatabase interface {
 	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error
 }
 
-// HandleAPIAccountSessionsGet - GET /api/v1/account/sessions
+// HandleAccountSessionsGet - GET /api/v1/account/sessions
 // Returns the caller's own active sessions, each with the clients it authorized and
 // whether it is the session the caller's own token was issued through.
-func HandleAPIAccountSessionsGet(
+func HandleAccountSessionsGet(
 	database accountSessionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -94,10 +94,10 @@ func HandleAPIAccountSessionsGet(
 	}
 }
 
-// HandleAPIAccountSessionDelete - DELETE /api/v1/account/sessions/{id}
+// HandleAccountSessionDelete - DELETE /api/v1/account/sessions/{id}
 // Deletes a user session that belongs to the authenticated user. Deleting the
 // current session is allowed.
-func HandleAPIAccountSessionDelete(
+func HandleAccountSessionDelete(
 	database accountSessionsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

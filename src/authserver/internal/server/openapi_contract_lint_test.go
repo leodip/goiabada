@@ -80,7 +80,7 @@ type routeRegistration struct {
 	method      string // lower case, as the spec spells it
 	path        string // as written, with routes.go's own parameter names
 	key         string // method + path with parameter names erased, the join key with the spec
-	handler     string
+	handler     string // package-qualified, apihandlers.HandleUserGet
 	rateLimited bool
 	// scopeGuarded is true when a scope-checking middleware stands in front of the route, so
 	// the route can answer 403 without its handler containing the word. It is read from both
@@ -412,8 +412,10 @@ func stringLiteral(e ast.Expr) (string, bool) {
 	return s, true
 }
 
-// handlerConstructor pulls HandleX out of apihandlers.HandleX(deps...). Every API route is
-// registered that way; anything else (a file server, a bare http.HandlerFunc) is not an
+// handlerConstructor pulls apihandlers.HandleX out of apihandlers.HandleX(deps...), package
+// and all, because two handler packages can declare the same name: apihandlers.HandleClientLogoGet
+// answers the admin API and handlers.HandleClientLogoGet the public logo URL. Every API route
+// is registered that way; anything else (a file server, a bare http.HandlerFunc) is not an
 // operation the spec describes and is left alone.
 func handlerConstructor(e ast.Expr) (string, bool) {
 	call, ok := e.(*ast.CallExpr)
@@ -422,7 +424,11 @@ func handlerConstructor(e ast.Expr) (string, bool) {
 	}
 	switch fn := call.Fun.(type) {
 	case *ast.SelectorExpr:
-		return fn.Sel.Name, strings.HasPrefix(fn.Sel.Name, "Handle")
+		pkg, ok := fn.X.(*ast.Ident)
+		if !ok {
+			return "", false
+		}
+		return pkg.Name + "." + fn.Sel.Name, strings.HasPrefix(fn.Sel.Name, "Handle")
 	case *ast.Ident:
 		return fn.Name, strings.HasPrefix(fn.Name, "Handle")
 	}
@@ -491,8 +497,9 @@ func mentionsRateLimiter(e ast.Expr) bool {
 	return found
 }
 
-// parseHandlerStatuses maps every Handle* constructor under internal/handlers to the
-// statuses its body can write.
+// parseHandlerStatuses maps every Handle* constructor under internal/handlers, keyed by its
+// package-qualified name as handlerConstructor reads it from routes.go, to the statuses its
+// body can write.
 func parseHandlerStatuses(t *testing.T) map[string]map[int]bool {
 	t.Helper()
 
@@ -504,14 +511,15 @@ func parseHandlerStatuses(t *testing.T) map[string]map[int]bool {
 			if !ok || fn.Recv != nil || fn.Body == nil || !strings.HasPrefix(fn.Name.Name, "Handle") {
 				continue
 			}
-			// Two handlers of the same name in different packages would make the lookup by
-			// name ambiguous and the result arbitrary. There are none; this says so.
-			if prev, dup := seenIn[fn.Name.Name]; dup {
+			// Two handler packages of the same name would make the lookup ambiguous and the
+			// result arbitrary. There are none; this says so.
+			name := file.Name.Name + "." + fn.Name.Name
+			if prev, dup := seenIn[name]; dup {
 				t.Fatalf("%s is declared in both %s and %s; the status scan looks handlers "+
-					"up by name and cannot tell them apart", fn.Name.Name, prev, path)
+					"up by package and name and cannot tell them apart", name, prev, path)
 			}
-			seenIn[fn.Name.Name] = path
-			out[fn.Name.Name] = statusesWrittenIn(t, path, fset, fn)
+			seenIn[name] = path
+			out[name] = statusesWrittenIn(t, path, fset, fn)
 		}
 	})
 
@@ -1649,7 +1657,7 @@ var publishedRequestEnums = map[string]string{
 	"CreateUserRequest.setPasswordType": "enforced: handler_api_users_crud.go refuses a present " +
 		"value outside [now, email] with 400 before either arm is chosen, and treats absent as " +
 		"\"now\" per the schema's default. Covered by " +
-		"TestHandleAPIUserCreatePost_SetPasswordTypeMatrix. Was the one known gap on this list " +
+		"TestHandleUserCreatePost_SetPasswordTypeMatrix. Was the one known gap on this list " +
 		"until #350: the handler compared against the two values and refused nothing else, so a " +
 		"third value created an account with no password and no setup email",
 }

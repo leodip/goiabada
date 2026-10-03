@@ -18,8 +18,8 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// HandleAPISettingsGeneralGet - GET /api/v1/admin/settings/general
-func HandleAPISettingsGeneralGet() http.HandlerFunc {
+// HandleSettingsGeneralGet - GET /api/v1/admin/settings/general
+func HandleSettingsGeneralGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
@@ -48,8 +48,8 @@ type settingsGeneralDatabase interface {
 	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
 }
 
-// HandleAPISettingsGeneralPut - PUT /api/v1/admin/settings/general
-func HandleAPISettingsGeneralPut(
+// HandleSettingsGeneralPut - PUT /api/v1/admin/settings/general
+func HandleSettingsGeneralPut(
 	database settingsGeneralDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

@@ -66,10 +66,10 @@ func adminSessionDeleteRequest(sessionId string, subject string) *http.Request {
 	return setTokenContextWithClaims(req, map[string]interface{}{"sub": subject})
 }
 
-// TestHandleAPIUserSessionDelete_TerminatesAndAuditsBothEvents is the wiring test for the
+// TestHandleUserSessionDelete_TerminatesAndAuditsBothEvents is the wiring test for the
 // administrative half of decision 5, and it doubles as the field-by-field assertion on decision 9's
 // payload, because this is where the new event is emitted from.
-func TestHandleAPIUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
+func TestHandleUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -95,7 +95,7 @@ func TestHandleAPIUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) 
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIUserSessionDelete(database, auditLogger)
+	handler := HandleUserSessionDelete(database, auditLogger)
 	handler.ServeHTTP(rr, adminSessionDeleteRequest("100", adminSubject))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -125,7 +125,7 @@ func TestHandleAPIUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) 
 	assert.Len(t, terminatedPayload, 6)
 }
 
-// TestHandleAPIUserSessionDelete_NoTokenAuditsAnEmptySubject is the other half of callerSubject.
+// TestHandleUserSessionDelete_NoTokenAuditsAnEmptySubject is the other half of callerSubject.
 // A request that reached the handler with no validated token on its context records the actor as
 // the empty string, present rather than absent.
 //
@@ -135,7 +135,7 @@ func TestHandleAPIUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) 
 // one a later edit can turn into a panic or a dropped key without anything going red. Present
 // matters as much as empty: AuditLogResponse.Details is the marshalled map returned verbatim by
 // GET /api/v1/admin/audit-logs, so an absent key is a change a consumer can see (#385).
-func TestHandleAPIUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
+func TestHandleUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -152,7 +152,7 @@ func TestHandleAPIUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/user-sessions/100", nil)
 	rr := httptest.NewRecorder()
-	handler := HandleAPIUserSessionDelete(database, auditLogger)
+	handler := HandleUserSessionDelete(database, auditLogger)
 	handler.ServeHTTP(rr, setChiURLParam(req, "id", "100"))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -166,10 +166,10 @@ func TestHandleAPIUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
 	auditLogger.AssertExpectations(t)
 }
 
-// TestHandleAPIUserSessionDelete_TerminationFailureIsA500 is the case that decided this file had to
+// TestHandleUserSessionDelete_TerminationFailureIsA500 is the case that decided this file had to
 // exist. KEEP IT. The integration tier can read audit rows but cannot make the termination
 // transaction fail, so this is the only seam that can show neither event is emitted when it does.
-func TestHandleAPIUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
+func TestHandleUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -182,7 +182,7 @@ func TestHandleAPIUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 		Return(errors.New("the session delete failed")).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIUserSessionDelete(database, auditLogger)
+	handler := HandleUserSessionDelete(database, auditLogger)
 	handler.ServeHTTP(rr, adminSessionDeleteRequest("100", adminSubject))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -194,17 +194,17 @@ func TestHandleAPIUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
-// TestHandleAPIUserSessionDelete_NotFoundDoesNotTerminate pins that the pre-existing 404 still
+// TestHandleUserSessionDelete_NotFoundDoesNotTerminate pins that the pre-existing 404 still
 // answers first. Without it, a handler that terminated before looking the session up would pass
 // every other case here.
-func TestHandleAPIUserSessionDelete_NotFoundDoesNotTerminate(t *testing.T) {
+func TestHandleUserSessionDelete_NotFoundDoesNotTerminate(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(999)).Return(nil, nil).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIUserSessionDelete(database, auditLogger)
+	handler := HandleUserSessionDelete(database, auditLogger)
 	handler.ServeHTTP(rr, adminSessionDeleteRequest("999", adminSubject))
 
 	assert.Equal(t, http.StatusNotFound, rr.Code)

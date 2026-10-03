@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHandleAPIGroupCreatePost_Success(t *testing.T) {
+func TestHandleGroupCreatePost_Success(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -54,7 +54,7 @@ func TestHandleAPIGroupCreatePost_Success(t *testing.T) {
 	}()
 }
 
-func TestHandleAPIGroupCreatePost_ValidationErrors(t *testing.T) {
+func TestHandleGroupCreatePost_ValidationErrors(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
@@ -137,7 +137,7 @@ func TestHandleAPIGroupCreatePost_ValidationErrors(t *testing.T) {
 	}
 }
 
-func TestHandleAPIGroupCreatePost_DuplicateGroupIdentifier(t *testing.T) {
+func TestHandleGroupCreatePost_DuplicateGroupIdentifier(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -175,10 +175,10 @@ func TestHandleAPIGroupCreatePost_DuplicateGroupIdentifier(t *testing.T) {
 	assert.Contains(t, response["error_description"].(string), "The group identifier is already in use")
 }
 
-// TestHandleAPIGroupCreatePost_AngleBracketsRejected pins the reject that replaced the strip: this
+// TestHandleGroupCreatePost_AngleBracketsRejected pins the reject that replaced the strip: this
 // description used to be stored as "Test Description" with a 201, the script tag silently dropped
 // (#275).
-func TestHandleAPIGroupCreatePost_AngleBracketsRejected(t *testing.T) {
+func TestHandleGroupCreatePost_AngleBracketsRejected(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -207,9 +207,9 @@ func TestHandleAPIGroupCreatePost_AngleBracketsRejected(t *testing.T) {
 	assert.Nil(t, stored)
 }
 
-// TestHandleAPIGroupCreatePost_AmpersandsAndQuotesStoredVerbatim is the accepted twin: a
+// TestHandleGroupCreatePost_AmpersandsAndQuotesStoredVerbatim is the accepted twin: a
 // description the validator does not refuse is trimmed and otherwise stored byte for byte.
-func TestHandleAPIGroupCreatePost_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
+func TestHandleGroupCreatePost_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	identifier := "test-group-" + fake.LetterN(6)
@@ -243,7 +243,7 @@ func TestHandleAPIGroupCreatePost_AmpersandsAndQuotesStoredVerbatim(t *testing.T
 	assert.Equal(t, `Tom & Jerry said "hi"`, stored.Description)
 }
 
-func TestHandleAPIGroupCreatePost_Unauthorized(t *testing.T) {
+func TestHandleGroupCreatePost_Unauthorized(t *testing.T) {
 	reqData := map[string]interface{}{
 		"groupIdentifier":      "test-group",
 		"description":          "Test Description",
@@ -259,7 +259,7 @@ func TestHandleAPIGroupCreatePost_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
-func TestHandleAPIGroupCreatePost_InvalidJSON(t *testing.T) {
+func TestHandleGroupCreatePost_InvalidJSON(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 

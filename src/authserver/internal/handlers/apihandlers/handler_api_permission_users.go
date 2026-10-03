@@ -20,10 +20,10 @@ type permissionUsersDatabase interface {
 	GetUsersByPermissionIdPaginated(ctx context.Context, tx *sql.Tx, permissionId int64, page int, pageSize int) ([]models.User, int, error)
 }
 
-// HandleAPIPermissionUsersGet
+// HandlePermissionUsersGet
 // GET /api/v1/admin/permissions/{permissionId}/users?page={page}&size={size}
 // Returns paginated users who have the specified permission.
-func HandleAPIPermissionUsersGet(
+func HandlePermissionUsersGet(
 	database permissionUsersDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -26,7 +26,7 @@ type groupMembersDatabase interface {
 	GetUserGroupByUserIdAndGroupId(ctx context.Context, tx *sql.Tx, userId, groupId int64) (*models.UserGroup, error)
 }
 
-func HandleAPIGroupMembersGet(
+func HandleGroupMembersGet(
 	database groupMembersDatabase,
 ) http.HandlerFunc {
 
@@ -90,7 +90,7 @@ func HandleAPIGroupMembersGet(
 	}
 }
 
-func HandleAPIGroupMemberAddPost(
+func HandleGroupMemberAddPost(
 	database groupMembersDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
@@ -175,7 +175,7 @@ func HandleAPIGroupMemberAddPost(
 	}
 }
 
-func HandleAPIGroupMemberDelete(
+func HandleGroupMemberDelete(
 	database groupMembersDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

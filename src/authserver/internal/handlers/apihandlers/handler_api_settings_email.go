@@ -21,8 +21,8 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// HandleAPISettingsEmailGet - GET /api/v1/admin/settings/email
-func HandleAPISettingsEmailGet() http.HandlerFunc {
+// HandleSettingsEmailGet - GET /api/v1/admin/settings/email
+func HandleSettingsEmailGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
@@ -50,8 +50,8 @@ type settingsEmailDatabase interface {
 	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
 }
 
-// HandleAPISettingsEmailPut - PUT /api/v1/admin/settings/email
-func HandleAPISettingsEmailPut(
+// HandleSettingsEmailPut - PUT /api/v1/admin/settings/email
+func HandleSettingsEmailPut(
 	database settingsEmailDatabase,
 	emailValidator EmailValidator,
 	auditLogger AuditLogger,
@@ -227,8 +227,8 @@ func HandleAPISettingsEmailPut(
 	}
 }
 
-// HandleAPISettingsEmailSendTestPost - POST /api/v1/admin/settings/email/send-test
-func HandleAPISettingsEmailSendTestPost(
+// HandleSettingsEmailSendTestPost - POST /api/v1/admin/settings/email/send-test
+func HandleSettingsEmailSendTestPost(
 	emailValidator EmailValidator,
 	emailSender EmailSender,
 	auditLogger AuditLogger,

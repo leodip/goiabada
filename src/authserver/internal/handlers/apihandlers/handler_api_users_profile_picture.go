@@ -26,8 +26,8 @@ type usersProfilePictureDatabase interface {
 	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
 }
 
-// HandleAPIUserProfilePicturePost - POST /api/v1/admin/users/{id}/profile-picture
-func HandleAPIUserProfilePicturePost(
+// HandleUserProfilePicturePost - POST /api/v1/admin/users/{id}/profile-picture
+func HandleUserProfilePicturePost(
 	database usersProfilePictureDatabase,
 	auditLogger AuditLogger,
 	baseURL string,
@@ -119,8 +119,8 @@ func HandleAPIUserProfilePicturePost(
 	}
 }
 
-// HandleAPIUserProfilePictureDelete - DELETE /api/v1/admin/users/{id}/profile-picture
-func HandleAPIUserProfilePictureDelete(
+// HandleUserProfilePictureDelete - DELETE /api/v1/admin/users/{id}/profile-picture
+func HandleUserProfilePictureDelete(
 	database usersProfilePictureDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
@@ -176,8 +176,8 @@ func HandleAPIUserProfilePictureDelete(
 	}
 }
 
-// HandleAPIUserProfilePictureGet - GET /api/v1/admin/users/{id}/profile-picture (check if exists)
-func HandleAPIUserProfilePictureGet(
+// HandleUserProfilePictureGet - GET /api/v1/admin/users/{id}/profile-picture (check if exists)
+func HandleUserProfilePictureGet(
 	database usersProfilePictureDatabase,
 	baseURL string,
 ) http.HandlerFunc {

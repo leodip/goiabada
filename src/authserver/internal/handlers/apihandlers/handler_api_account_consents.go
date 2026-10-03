@@ -27,7 +27,7 @@ type accountConsentsDatabase interface {
 }
 
 // GET /api/v1/account/consents
-func HandleAPIAccountConsentsGet(
+func HandleAccountConsentsGet(
 	database accountConsentsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +70,7 @@ func HandleAPIAccountConsentsGet(
 }
 
 // DELETE /api/v1/account/consents/{id}
-func HandleAPIAccountConsentDelete(
+func HandleAccountConsentDelete(
 	database accountConsentsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

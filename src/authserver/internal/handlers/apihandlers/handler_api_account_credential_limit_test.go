@@ -76,11 +76,11 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 
 	return &credentialEnv{
 		password: rateLimiter.LimitAccountPassword(
-			HandleAPIAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger, rateLimiter)),
+			HandleAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger, rateLimiter)),
 		otp: rateLimiter.LimitAccountPassword(
-			HandleAPIAccountOTPPut(database, auditLogger, rateLimiter, testDataCipher)),
+			HandleAccountOTPPut(database, auditLogger, rateLimiter, testDataCipher)),
 		email: rateLimiter.LimitAccountPassword(
-			HandleAPIAccountEmailPut(mocks_handlers.NewPageRenderer(t), database, accountvalidation.NewEmailValidator(database),
+			HandleAccountEmailPut(mocks_handlers.NewPageRenderer(t), database, accountvalidation.NewEmailValidator(database),
 				mocks_accounthandlers.NewEmailSender(t), auditLogger, rateLimiter, &heldJobs{})),
 		database: database,
 	}

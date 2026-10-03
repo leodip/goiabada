@@ -47,7 +47,7 @@ func TestCutBody_TheAccountPhonePut(t *testing.T) {
 	const body = `{"phoneCountryUniqueId":"US_0","phoneNumber":"5551234567"}`
 
 	serve := func(t *testing.T, limit int, database *mocks_data.Database) *httptest.ResponseRecorder {
-		handler := HandleAPIAccountPhonePut(database, accountvalidation.NewPhoneValidator(), mocks_handlers.NewAuditLogger(t))
+		handler := HandleAccountPhonePut(database, accountvalidation.NewPhoneValidator(), mocks_handlers.NewAuditLogger(t))
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/account/phone", nil)
 		req.Body = cutBody(rr, body, limit)
@@ -93,7 +93,7 @@ func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 				database.On("GetClientById", mock.Anything, mock.Anything, int64(1)).Return(&models.Client{Id: 1}, nil).Once()
 			},
 			handler: func(database *mocks_data.Database, t *testing.T) http.HandlerFunc {
-				return HandleAPIClientPermissionsPut(database, mocks_handlers.NewAuditLogger(t))
+				return HandleClientPermissionsPut(database, mocks_handlers.NewAuditLogger(t))
 			},
 		},
 		{
@@ -103,7 +103,7 @@ func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 				database.On("GetGroupById", mock.Anything, mock.Anything, int64(1)).Return(&models.Group{Id: 1}, nil).Once()
 			},
 			handler: func(database *mocks_data.Database, t *testing.T) http.HandlerFunc {
-				return HandleAPIGroupPermissionsPut(database, mocks_handlers.NewAuditLogger(t))
+				return HandleGroupPermissionsPut(database, mocks_handlers.NewAuditLogger(t))
 			},
 		},
 		{
@@ -113,7 +113,7 @@ func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil).Once()
 			},
 			handler: func(database *mocks_data.Database, t *testing.T) http.HandlerFunc {
-				return HandleAPIUserPermissionsPut(database, mocks_handlers.NewAuditLogger(t))
+				return HandleUserPermissionsPut(database, mocks_handlers.NewAuditLogger(t))
 			},
 		},
 		{
@@ -123,7 +123,7 @@ func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 				database.On("GetResourceById", mock.Anything, mock.Anything, int64(1)).Return(&models.Resource{Id: 1}, nil).Once()
 			},
 			handler: func(database *mocks_data.Database, t *testing.T) http.HandlerFunc {
-				return HandleAPIResourcePermissionsPut(database, inputvalidation.NewIdentifierValidator(), mocks_handlers.NewAuditLogger(t))
+				return HandleResourcePermissionsPut(database, inputvalidation.NewIdentifierValidator(), mocks_handlers.NewAuditLogger(t))
 			},
 		},
 	}

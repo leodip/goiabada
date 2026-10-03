@@ -14,8 +14,8 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// HandleAPISettingsUIThemeGet - GET /api/v1/admin/settings/ui-theme
-func HandleAPISettingsUIThemeGet() http.HandlerFunc {
+// HandleSettingsUIThemeGet - GET /api/v1/admin/settings/ui-theme
+func HandleSettingsUIThemeGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
@@ -37,8 +37,8 @@ type settingsUIThemeDatabase interface {
 	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
 }
 
-// HandleAPISettingsUIThemePut - PUT /api/v1/admin/settings/ui-theme
-func HandleAPISettingsUIThemePut(
+// HandleSettingsUIThemePut - PUT /api/v1/admin/settings/ui-theme
+func HandleSettingsUIThemePut(
 	database settingsUIThemeDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

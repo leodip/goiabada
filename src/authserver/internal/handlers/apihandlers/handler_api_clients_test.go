@@ -214,10 +214,10 @@ func TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite(
 }
 
 // =============================================================================
-// HandleAPIClientAuthenticationPut
+// HandleClientAuthenticationPut
 // =============================================================================
 
-// TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow is the finding itself.
+// TestHandleClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow is the finding itself.
 //
 // The handler loads the client, and by the time it writes, the row says something else: here the
 // snapshot says public while the write turns out to perform the transition, which is what a
@@ -226,7 +226,7 @@ func TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite(
 // public client still holding grants that were issued while a secret was required. So the answer
 // comes from SetClientPublic, the write itself, and this asserts that the handler acts on that
 // answer rather than on the copy in its hand.
-func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *testing.T) {
+func TestHandleClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -252,7 +252,7 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientAuthenticationPut(database, auditLogger, testDataCipher)
+	handler := HandleClientAuthenticationPut(database, auditLogger, testDataCipher)
 	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -269,12 +269,12 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 	assert.Less(t, callIndex(t, database, "SetClientPublic"), callIndex(t, database, "UpdateClient"))
 }
 
-// TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAndSavesNothing covers
+// TestHandleClientAuthenticationPut_AFailedClassificationRevokesNothingAndSavesNothing covers
 // the direction the two tests above cannot: what happens when the write cannot establish which
 // transition this is. There is no safe guess. Revoking anyway would sign out the users of a
 // client nobody flipped, and saving anyway would produce the very state the classification
 // exists to catch, so the whole transaction is abandoned and the caller is told it failed.
-func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAndSavesNothing(t *testing.T) {
+func TestHandleClientAuthenticationPut_AFailedClassificationRevokesNothingAndSavesNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -285,7 +285,7 @@ func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAnd
 		Return(false, errors.New("no client with that id")).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientAuthenticationPut(database, auditLogger, testDataCipher)
+	handler := HandleClientAuthenticationPut(database, auditLogger, testDataCipher)
 	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -298,12 +298,12 @@ func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAnd
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything)
 }
 
-// TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothing is the other
+// TestHandleClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothing is the other
 // side of the same decision, and the one that stops the fix above becoming "revoke on every
 // save". Both the snapshot and the row say public, so this write removes no requirement and must
 // leave the client's grants alone: revoking here would sign every user of the application out
 // because an administrator re-saved a form.
-func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothing(t *testing.T) {
+func TestHandleClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -317,7 +317,7 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientAuthenticationPut(database, auditLogger, testDataCipher)
+	handler := HandleClientAuthenticationPut(database, auditLogger, testDataCipher)
 	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -327,12 +327,12 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything)
 }
 
-// TestHandleAPIClientAuthenticationPut_AClientMadePublicIsWrittenWithThePublicInvariants pins the
+// TestHandleClientAuthenticationPut_AClientMadePublicIsWrittenWithThePublicInvariants pins the
 // endpoint's own call to Client.ApplyPublicClientInvariants. The client arrives confidential with
 // client credentials on and PKCE explicitly optional, and is made public: the row written must
 // already carry client credentials off and PKCE an explicit true, since the endpoint answers with
 // that row and the console renders it (#245, #428).
-func TestHandleAPIClientAuthenticationPut_AClientMadePublicIsWrittenWithThePublicInvariants(t *testing.T) {
+func TestHandleClientAuthenticationPut_AClientMadePublicIsWrittenWithThePublicInvariants(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -354,7 +354,7 @@ func TestHandleAPIClientAuthenticationPut_AClientMadePublicIsWrittenWithThePubli
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientAuthenticationPut(database, auditLogger, testDataCipher)
+	handler := HandleClientAuthenticationPut(database, auditLogger, testDataCipher)
 	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
@@ -399,7 +399,7 @@ func callIndex(t *testing.T, database *mocks_data.Database, method string) int {
 }
 
 // =============================================================================
-// HandleAPIClientWebOriginsPut
+// HandleClientWebOriginsPut
 // =============================================================================
 
 // webOriginsBody is the save's JSON body. A nil expected list is sent as null, which the save
@@ -440,7 +440,7 @@ func expectStoredWebOrigins(database *mocks_data.Database, rows ...models.WebOri
 // on that transaction, with no row acquisition before the read (#428). A wanted value is stored in
 // its canonical form, the exact string a browser sends in an Origin header (#250). The audit event
 // follows the commit.
-func TestHandleAPIClientWebOriginsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
+func TestHandleClientWebOriginsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -471,7 +471,7 @@ func TestHandleAPIClientWebOriginsPut_SavesTheExactPlanInOneTransaction(t *testi
 		Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
+	HandleClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
 		webOriginsBody(t,
 			[]string{"https://keep.example.com", "  HTTPS://New.Example.com/  "},
 			[]string{"https://old.example.com", "https://keep.example.com"})))
@@ -493,7 +493,7 @@ func TestHandleAPIClientWebOriginsPut_SavesTheExactPlanInOneTransaction(t *testi
 // the driver's error to the helper, which is when the real one rolls back, and it stays reachable
 // in the chain, so a real deadlock would be recognised and rerun rather than answered. The wrap
 // names the origin being written, for the operator reading the one log record (#428).
-func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
+func TestHandleClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -505,7 +505,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(diskFull).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
+	HandleClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
 		webOriginsBody(t, []string{"https://a.example.com"}, []string{"https://old.example.com"})))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -520,7 +520,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 // write and no audit, in both of the shapes where ignoring the error would pass for something else:
 // a loaded list naming a stored row would then read as outdated and answer 409, and an empty loaded
 // list with nothing wanted would answer 200 over a read that never happened (#428).
-func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
+func TestHandleClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
 	tests := []struct {
 		name     string
 		wanted   []string
@@ -541,7 +541,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 			database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).Return(loadErr).Once()
 
 			rr := httptest.NewRecorder()
-			HandleAPIClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
+			HandleClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
 				webOriginsBody(t, test.wanted, test.expected)))
 
 			assert.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
@@ -565,7 +565,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 // The helper's loop is scripted here: the stub runs the body, checks the driver's error is still
 // reachable through what the body returned, which is what the real classifier needs, and runs it
 // again. The real loop, with a real deadlock, is the data tier's.
-func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
+func TestHandleClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -596,7 +596,7 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedWebOrigins, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
+	handler := HandleClientWebOriginsPut(database, auditLogger)
 	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", webOriginsBody(t, []string{"https://a.example.com"}, []string{})))
 
 	assert.Equal(t, 2, attempts)
@@ -610,7 +610,7 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 
 // The helper giving up, a deadlock on every attempt, is one 500 under the update message and no
 // audit event: the exhausted error carries no step of its own and is reported as the helper's.
-func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
+func TestHandleClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -619,7 +619,7 @@ func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testin
 	mocks_data.ExpectRunInTransactionRefused(database, exhausted)
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
+	handler := HandleClientWebOriginsPut(database, auditLogger)
 	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", webOriginsBody(t, []string{"https://a.example.com"}, []string{})))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -659,7 +659,7 @@ func canonicalOriginOfLength(t *testing.T, n int) string {
 //
 // The strict mock carries GetClientById and nothing else: reaching RunInTransaction fails the test,
 // so the refusal is proved to happen before any write is attempted.
-func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *testing.T) {
+func TestHandleClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -670,7 +670,7 @@ func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *test
 	origin := canonicalOriginOfLength(t, 268)
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
+	handler := HandleClientWebOriginsPut(database, auditLogger)
 	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", webOriginsBody(t, []string{origin}, []string{})))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -682,7 +682,7 @@ func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *test
 // The other side of the bound: a canonical origin of exactly 267 bytes, models.WebOriginMaxBytes and
 // the longest standards-valid origin, is written. It reaches CreateWebOrigin on the save's
 // transaction, which is what separates an admitted value from one refused before the write (#428).
-func TestHandleAPIClientWebOriginsPut_AnOriginAtTheBoundIsStored(t *testing.T) {
+func TestHandleClientWebOriginsPut_AnOriginAtTheBoundIsStored(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -698,7 +698,7 @@ func TestHandleAPIClientWebOriginsPut_AnOriginAtTheBoundIsStored(t *testing.T) {
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedWebOrigins, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
+	handler := HandleClientWebOriginsPut(database, auditLogger)
 	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", webOriginsBody(t, []string{origin}, []string{})))
 
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
@@ -711,7 +711,7 @@ func TestHandleAPIClientWebOriginsPut_AnOriginAtTheBoundIsStored(t *testing.T) {
 // refuses the second insert. That whole save rolls back and answers 409 CONCURRENT_UPDATE, the
 // conflict an administrator resolves by reloading, rather than a 500 that says nothing; nothing is
 // audited (#428).
-func TestHandleAPIClientWebOriginsPut_AUniqueKeyRaceIsAConflict(t *testing.T) {
+func TestHandleClientWebOriginsPut_AUniqueKeyRaceIsAConflict(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -722,7 +722,7 @@ func TestHandleAPIClientWebOriginsPut_AUniqueKeyRaceIsAConflict(t *testing.T) {
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(refused).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
+	HandleClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
 		webOriginsBody(t, []string{"https://a.example.com"}, []string{})))
 
 	assert.Equal(t, http.StatusConflict, rr.Code, rr.Body.String())
@@ -736,7 +736,7 @@ func TestHandleAPIClientWebOriginsPut_AUniqueKeyRaceIsAConflict(t *testing.T) {
 // A loaded list that differs from the stored rows read on the transaction is a save from an
 // outdated page: 409 CONCURRENT_UPDATE, nothing written and nothing audited, where applying the
 // whole list would silently undo the change the caller never saw (#428).
-func TestHandleAPIClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
+func TestHandleClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -748,7 +748,7 @@ func TestHandleAPIClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T
 	)
 
 	rr := httptest.NewRecorder()
-	HandleAPIClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
+	HandleClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
 		webOriginsBody(t, []string{"https://a.example.com", "https://b.example.com"}, []string{"https://a.example.com"})))
 
 	assert.Equal(t, http.StatusConflict, rr.Code)
@@ -764,7 +764,7 @@ func TestHandleAPIClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T
 // a form that canonicalizes to the stored value, since the comparison is on the canonical origin
 // the rows are stored in; and [] against an empty stored list, which is a page that loaded no
 // origins and not a missing field (#428).
-func TestHandleAPIClientWebOriginsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
+func TestHandleClientWebOriginsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
 	tests := []struct {
 		name     string
 		stored   []models.WebOrigin
@@ -797,7 +797,7 @@ func TestHandleAPIClientWebOriginsPut_ALoadedListEqualAsASetProceeds(t *testing.
 			auditLogger.On("Log", mock.Anything, audit.EventUpdatedWebOrigins, mock.Anything).Return().Once()
 
 			rr := httptest.NewRecorder()
-			HandleAPIClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
+			HandleClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
 				webOriginsBody(t, []string{"https://c.example.com"}, test.expected)))
 
 			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
@@ -810,7 +810,7 @@ func TestHandleAPIClientWebOriginsPut_ALoadedListEqualAsASetProceeds(t *testing.
 // strict mock carries the client read and nothing else, and reaching RunInTransaction fails the
 // case. The loaded list is required, and each of its values must canonicalize, since one that does
 // not can match no stored row (#428); the wanted list's rules are #250's.
-func TestHandleAPIClientWebOriginsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
+func TestHandleClientWebOriginsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
 	tests := []struct {
 		name            string
 		body            string
@@ -855,7 +855,7 @@ func TestHandleAPIClientWebOriginsPut_ARefusedSaveNeverOpensTheTransaction(t *te
 			expectWebOriginsClient(database)
 
 			rr := httptest.NewRecorder()
-			HandleAPIClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7", test.body))
+			HandleClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7", test.body))
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			code, description := decodeErrorEnvelope(t, rr)
@@ -868,7 +868,7 @@ func TestHandleAPIClientWebOriginsPut_ARefusedSaveNeverOpensTheTransaction(t *te
 }
 
 // =============================================================================
-// HandleAPIClientRedirectURIsPut
+// HandleClientRedirectURIsPut
 // =============================================================================
 
 // redirectURIsBody is the save's JSON body. A nil expected list is sent as null, which the save
@@ -923,7 +923,7 @@ func uriOfBytes(t *testing.T, n int, unit string) string {
 // used to store: keeping it deletes the extra copy, where the save keyed by value left it alone and a
 // later removal of the URI deleted one copy and left the other live at sign-in (#428). The audit
 // event follows the commit.
-func TestHandleAPIClientRedirectURIsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
+func TestHandleClientRedirectURIsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -955,7 +955,7 @@ func TestHandleAPIClientRedirectURIsPut_SavesTheExactPlanInOneTransaction(t *tes
 		Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
+	HandleClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
 		redirectURIsBody(t,
 			[]string{"https://keep.example.com/cb", "  https://new.example.com/cb  "},
 			[]string{"https://old.example.com/cb", "https://keep.example.com/cb"})))
@@ -972,7 +972,7 @@ func TestHandleAPIClientRedirectURIsPut_SavesTheExactPlanInOneTransaction(t *tes
 // A failed write hands its error to the helper, which is when the real one rolls back, so nothing
 // the save wrote before it commits; the answer is one 500 and nothing is audited, since an audit row
 // for a save that did not happen is a false record of an administrator's action (#264, #428).
-func TestHandleAPIClientRedirectURIsPut_AFailedWriteCommitsNothing(t *testing.T) {
+func TestHandleClientRedirectURIsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -984,7 +984,7 @@ func TestHandleAPIClientRedirectURIsPut_AFailedWriteCommitsNothing(t *testing.T)
 	database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).Return(diskFull).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
+	HandleClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
 		redirectURIsBody(t, []string{"https://new.example.com/cb"}, []string{"https://old.example.com/cb"})))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -998,7 +998,7 @@ func TestHandleAPIClientRedirectURIsPut_AFailedWriteCommitsNothing(t *testing.T)
 // both of the shapes where ignoring the error would pass for something else: a loaded list naming a
 // stored row would then read as outdated and answer 409, and an empty loaded list with nothing wanted
 // would answer 200 over a read that never happened. Every list save carries this case (#428).
-func TestHandleAPIClientRedirectURIsPut_AFailedStoredReadIsOneFiveHundred(t *testing.T) {
+func TestHandleClientRedirectURIsPut_AFailedStoredReadIsOneFiveHundred(t *testing.T) {
 	tests := []struct {
 		name     string
 		wanted   []string
@@ -1019,7 +1019,7 @@ func TestHandleAPIClientRedirectURIsPut_AFailedStoredReadIsOneFiveHundred(t *tes
 			database.On("ClientLoadRedirectURIs", mock.Anything, clientUpdateTx, mock.Anything).Return(readErr).Once()
 
 			rr := httptest.NewRecorder()
-			HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
+			HandleClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
 				redirectURIsBody(t, test.wanted, test.expected)))
 
 			assert.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
@@ -1035,7 +1035,7 @@ func TestHandleAPIClientRedirectURIsPut_AFailedStoredReadIsOneFiveHundred(t *tes
 // A body aborted as a deadlock victim and rerun by the helper answers once and audits once: each
 // attempt reads the stored list afresh and plans from it, and nothing is written to the response
 // from inside an attempt that might be thrown away (#301, #428).
-func TestHandleAPIClientRedirectURIsPut_ARerunAttemptAnswersOnce(t *testing.T) {
+func TestHandleClientRedirectURIsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -1061,7 +1061,7 @@ func TestHandleAPIClientRedirectURIsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedRedirectURIs, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
+	HandleClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
 		redirectURIsBody(t, []string{"https://a.example.com/cb"}, []string{})))
 
 	assert.Equal(t, 2, attempts)
@@ -1074,7 +1074,7 @@ func TestHandleAPIClientRedirectURIsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 // A loaded list that differs from the stored rows read on the transaction is a save from an
 // outdated page: 409 CONCURRENT_UPDATE, nothing written and nothing audited, where applying the
 // whole list would silently undo the change the caller never saw (#428).
-func TestHandleAPIClientRedirectURIsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
+func TestHandleClientRedirectURIsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -1086,7 +1086,7 @@ func TestHandleAPIClientRedirectURIsPut_AnOutdatedLoadedListIsRefused(t *testing
 	)
 
 	rr := httptest.NewRecorder()
-	HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
+	HandleClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
 		redirectURIsBody(t, []string{"https://a.example.com/cb", "https://b.example.com/cb"}, []string{"https://a.example.com/cb"})))
 
 	assert.Equal(t, http.StatusConflict, rr.Code)
@@ -1101,7 +1101,7 @@ func TestHandleAPIClientRedirectURIsPut_AnOutdatedLoadedListIsRefused(t *testing
 // A loaded list equal to the stored one as a set proceeds: in another order, with a repeat, with
 // surrounding spaces, and [] against an empty stored list, which is a page that loaded no URIs and
 // not a missing field (#428).
-func TestHandleAPIClientRedirectURIsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
+func TestHandleClientRedirectURIsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
 	tests := []struct {
 		name     string
 		stored   []models.RedirectURI
@@ -1134,7 +1134,7 @@ func TestHandleAPIClientRedirectURIsPut_ALoadedListEqualAsASetProceeds(t *testin
 			auditLogger.On("Log", mock.Anything, audit.EventUpdatedRedirectURIs, mock.Anything).Return().Once()
 
 			rr := httptest.NewRecorder()
-			HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
+			HandleClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
 				redirectURIsBody(t, []string{"https://c.example.com/cb"}, test.expected)))
 
 			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
@@ -1149,7 +1149,7 @@ func TestHandleAPIClientRedirectURIsPut_ALoadedListEqualAsASetProceeds(t *testin
 // URIs, each at most 2048 bytes by Go len, which every engine's column holds, checked before the
 // parse. A stored value over a bound, one a client could hold from before the bound existed, is
 // refused like any other when the save carries it, which is #122's precedent for legacy rows.
-func TestHandleAPIClientRedirectURIsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
+func TestHandleClientRedirectURIsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
 	sixtyOne := make([]string, 61)
 	for i := range sixtyOne {
 		sixtyOne[i] = fmt.Sprintf("https://app%d.example.com/cb", i)
@@ -1217,7 +1217,7 @@ func TestHandleAPIClientRedirectURIsPut_ARefusedSaveNeverOpensTheTransaction(t *
 			expectRedirectURIsClient(database)
 
 			rr := httptest.NewRecorder()
-			HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7", test.body))
+			HandleClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7", test.body))
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			code, description := decodeErrorEnvelope(t, rr)
@@ -1234,7 +1234,7 @@ func TestHandleAPIClientRedirectURIsPut_ARefusedSaveNeverOpensTheTransaction(t *
 // two-byte and in four-byte characters too, each reaching CreateRedirectURI on the save's
 // transaction. Literals rather than the model's constants, so a bound moved past its column is
 // caught (#428).
-func TestHandleAPIClientRedirectURIsPut_TheBoundsAreAdmitted(t *testing.T) {
+func TestHandleClientRedirectURIsPut_TheBoundsAreAdmitted(t *testing.T) {
 	sixty := make([]string, 60)
 	for i := range sixty {
 		sixty[i] = uriOfBytes(t, 2048, fmt.Sprintf("%02d", i%100))
@@ -1256,7 +1256,7 @@ func TestHandleAPIClientRedirectURIsPut_TheBoundsAreAdmitted(t *testing.T) {
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedRedirectURIs, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
+	HandleClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
 		redirectURIsBody(t, sixty, []string{})))
 
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())

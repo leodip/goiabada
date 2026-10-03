@@ -55,7 +55,7 @@ func registrationCeremonyId(r *http.Request) string {
 	return id
 }
 
-func HandleAccountRegisterGet(
+func HandleRegisterGet(
 	pageRenderer PageRenderer,
 ) http.HandlerFunc {
 
@@ -91,7 +91,7 @@ type accountRegisterDatabase interface {
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
 }
 
-func HandleAccountRegisterPost(
+func HandleRegisterPost(
 	pageRenderer PageRenderer,
 	database accountRegisterDatabase,
 	userCreator UserCreator,

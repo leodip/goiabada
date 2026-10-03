@@ -73,7 +73,7 @@ func assertNothingAfterTheClient(t *testing.T, database *mocks_data.Database) {
 
 // logout/nil-err: resolving the client by its redirect URI, one client's URIs fail to load. The
 // record used to carry a nil error, so the 500 named no cause at all.
-func TestHandleAPIAccountLogoutRequestPost_ARedirectURILoadFailureIsOnTheRecord(t *testing.T) {
+func TestHandleAccountLogoutRequestPost_ARedirectURILoadFailureIsOnTheRecord(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetAllClients", mock.Anything, mock.Anything).
 		Return([]models.Client{{Id: 7, ClientIdentifier: logoutClientIdent}}, nil).Once()
@@ -82,7 +82,7 @@ func TestHandleAPIAccountLogoutRequestPost_ARedirectURILoadFailureIsOnTheRecord(
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleAPIAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, ""))
+	HandleAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, ""))
 
 	requireErrorOnTheRecord(t, rr, capture, errLogoutLookupFailed)
 	assert.Equal(t, int64(7), capture.Records()[0].Attrs["client_id"])
@@ -90,14 +90,14 @@ func TestHandleAPIAccountLogoutRequestPost_ARedirectURILoadFailureIsOnTheRecord(
 }
 
 // logout/client-400, failure arm: a database error is not a bad client identifier.
-func TestHandleAPIAccountLogoutRequestPost_AClientLookupFailureAnswers500(t *testing.T) {
+func TestHandleAccountLogoutRequestPost_AClientLookupFailureAnswers500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
 		Return(nil, errLogoutLookupFailed).Once()
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleAPIAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
+	HandleAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
 
 	requireErrorOnTheRecord(t, rr, capture, errLogoutLookupFailed)
 	assert.Equal(t, logoutClientIdent, capture.Records()[0].Attrs["client_identifier"])
@@ -105,14 +105,14 @@ func TestHandleAPIAccountLogoutRequestPost_AClientLookupFailureAnswers500(t *tes
 }
 
 // logout/client-400, missing arm: an identifier naming no client stays the caller's 400.
-func TestHandleAPIAccountLogoutRequestPost_AnUnknownClientIsStill400(t *testing.T) {
+func TestHandleAccountLogoutRequestPost_AnUnknownClientIsStill400(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
 		Return(nil, nil).Once()
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleAPIAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
+	HandleAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
 
 	requireRefused(t, rr, capture, http.StatusBadRequest, "VALIDATION_ERROR")
 	assertNothingAfterTheClient(t, database)
@@ -131,7 +131,7 @@ func stubResolvedClient(database *mocks_data.Database) {
 
 // logout/session-401, failure arm: 401 would send the caller to re-authenticate over a fault of
 // the server's.
-func TestHandleAPIAccountLogoutRequestPost_ASessionLookupFailureAnswers500(t *testing.T) {
+func TestHandleAccountLogoutRequestPost_ASessionLookupFailureAnswers500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	stubResolvedClient(database)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, logoutSid).
@@ -139,14 +139,14 @@ func TestHandleAPIAccountLogoutRequestPost_ASessionLookupFailureAnswers500(t *te
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleAPIAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
+	HandleAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
 
 	requireErrorOnTheRecord(t, rr, capture, errLogoutLookupFailed)
 	database.AssertNotCalled(t, "UserSessionLoadClients", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // logout/session-401, missing arm: a sid naming no live session stays 401.
-func TestHandleAPIAccountLogoutRequestPost_AMissingSessionIsStill401(t *testing.T) {
+func TestHandleAccountLogoutRequestPost_AMissingSessionIsStill401(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	stubResolvedClient(database)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, logoutSid).
@@ -154,7 +154,7 @@ func TestHandleAPIAccountLogoutRequestPost_AMissingSessionIsStill401(t *testing.
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleAPIAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
+	HandleAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
 
 	requireRefused(t, rr, capture, http.StatusUnauthorized, "INVALID_SESSION")
 	database.AssertNotCalled(t, "UserSessionLoadClients", mock.Anything, mock.Anything, mock.Anything)

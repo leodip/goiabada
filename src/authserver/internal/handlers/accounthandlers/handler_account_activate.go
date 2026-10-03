@@ -20,7 +20,7 @@ import (
 )
 
 // verificationCodeLifetime bounds how long an activation code stays usable after
-// HandleAccountRegisterPost issues it.
+// HandleRegisterPost issues it.
 //
 // Consulted on the FIRST hop only, where the emailed code arrives. The clean hop after the
 // redirect is bounded by the marker's own window instead, which starts when the code was
@@ -104,7 +104,7 @@ type accountActivateDatabase interface {
 	GetPreRegistrationByVerificationCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*models.PreRegistration, error)
 }
 
-// HandleAccountActivateGet serves both halves of the activation link's journey.
+// HandleActivateGet serves both halves of the activation link's journey.
 //
 // A request carrying ?code= is the emailed link being followed: it validates the code, marks
 // the session and answers 303 to the same path with no query, so the credential does not
@@ -126,7 +126,7 @@ type accountActivateDatabase interface {
 // Both hops refuse while self-registration is off, the way the register pages do: a link mailed
 // while registration was on must not create an account after an administrator has turned it off
 // (#425 decision 6).
-func HandleAccountActivateGet(
+func HandleActivateGet(
 	pageRenderer PageRenderer,
 	httpSession sessionstore.Store,
 	database accountActivateDatabase,

@@ -37,8 +37,8 @@ type accountEmailVerificationDatabase interface {
 // two are one value rather than two that could drift apart (#404).
 const emailVerificationCodeLifetime = 5 * time.Minute
 
-// HandleAPIAccountEmailVerificationSendPost - POST /api/v1/account/email/verification/send
-func HandleAPIAccountEmailVerificationSendPost(
+// HandleAccountEmailVerificationSendPost - POST /api/v1/account/email/verification/send
+func HandleAccountEmailVerificationSendPost(
 	pageRenderer PageRenderer,
 	database accountEmailVerificationDatabase,
 	emailSender EmailSender,
@@ -184,8 +184,8 @@ func writeSendNotNeeded(w http.ResponseWriter, r *http.Request, user *models.Use
 	return false
 }
 
-// HandleAPIAccountEmailVerificationPost - POST /api/v1/account/email/verification
-func HandleAPIAccountEmailVerificationPost(
+// HandleAccountEmailVerificationPost - POST /api/v1/account/email/verification
+func HandleAccountEmailVerificationPost(
 	database accountEmailVerificationDatabase,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,

@@ -84,7 +84,7 @@ var grantSaves = []grantSave{
 		deletedEvent: audit.EventDeletedUserPermission,
 		ownerKey:     "userId",
 		handler: func(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) http.HandlerFunc {
-			return HandleAPIUserPermissionsPut(database, auditLogger)
+			return HandleUserPermissionsPut(database, auditLogger)
 		},
 		body: func(t *testing.T, wanted, expected []int64) string {
 			t.Helper()
@@ -116,7 +116,7 @@ var grantSaves = []grantSave{
 		deletedEvent: audit.EventDeletedGroupPermission,
 		ownerKey:     "groupId",
 		handler: func(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) http.HandlerFunc {
-			return HandleAPIGroupPermissionsPut(database, auditLogger)
+			return HandleGroupPermissionsPut(database, auditLogger)
 		},
 		body: func(t *testing.T, wanted, expected []int64) string {
 			t.Helper()
@@ -149,7 +149,7 @@ var grantSaves = []grantSave{
 		consolidatedEvent: audit.EventUpdatedClientPermissions,
 		ownerKey:          "clientId",
 		handler: func(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) http.HandlerFunc {
-			return HandleAPIClientPermissionsPut(database, auditLogger)
+			return HandleClientPermissionsPut(database, auditLogger)
 		},
 		body: func(t *testing.T, wanted, expected []int64) string {
 			t.Helper()

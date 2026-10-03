@@ -45,11 +45,11 @@ var registrationEchoCases = []struct {
 	{"a repeated parameter reads the first copy", "?ceremony=" + aCeremonyId + "&ceremony=other", aCeremonyId},
 }
 
-func TestHandleAccountRegisterGet_EchoesOnlyAWellFormedCeremony(t *testing.T) {
+func TestHandleRegisterGet_EchoesOnlyAWellFormedCeremony(t *testing.T) {
 	for _, tc := range registrationEchoCases {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			handler := HandleAccountRegisterGet(pageRenderer)
+			handler := HandleRegisterGet(pageRenderer)
 
 			req := httptest.NewRequest(http.MethodGet, "/account/register"+tc.query, nil)
 			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SelfRegistrationEnabled: true}))
@@ -70,11 +70,11 @@ func TestHandleAccountRegisterGet_EchoesOnlyAWellFormedCeremony(t *testing.T) {
 // The form posts to action="", so the URL the page was loaded at, parameter included, is the one the
 // submission has, and a refusal that redraws the form has to carry the id on or the second attempt
 // would lose it. Driven through the refusal every mistyped submission takes first: no email.
-func TestHandleAccountRegisterPost_TheRedrawnFormKeepsOnlyAWellFormedCeremony(t *testing.T) {
+func TestHandleRegisterPost_TheRedrawnFormKeepsOnlyAWellFormedCeremony(t *testing.T) {
 	for _, tc := range registrationEchoCases {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			handler := HandleAccountRegisterPost(pageRenderer, mocks_data.NewDatabase(t),
+			handler := HandleRegisterPost(pageRenderer, mocks_data.NewDatabase(t),
 				mocks_accounthandlers.NewUserCreator(t), mocks_accounthandlers.NewEmailValidator(t),
 				mocks_accounthandlers.NewPasswordValidator(t), mocks_accounthandlers.NewEmailSender(t),
 				mocks_handlers.NewAuditLogger(t), testDataCipher, testBaseURL, testAdminConsoleBaseURL)

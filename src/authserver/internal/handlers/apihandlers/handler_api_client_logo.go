@@ -26,8 +26,8 @@ type clientLogoDatabase interface {
 	UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *models.ClientLogo) error
 }
 
-// HandleAPIClientLogoPost - POST /api/v1/admin/clients/{id}/logo
-func HandleAPIClientLogoPost(
+// HandleClientLogoPost - POST /api/v1/admin/clients/{id}/logo
+func HandleClientLogoPost(
 	database clientLogoDatabase,
 	auditLogger AuditLogger,
 	baseURL string,
@@ -119,8 +119,8 @@ func HandleAPIClientLogoPost(
 	}
 }
 
-// HandleAPIClientLogoDelete - DELETE /api/v1/admin/clients/{id}/logo
-func HandleAPIClientLogoDelete(
+// HandleClientLogoDelete - DELETE /api/v1/admin/clients/{id}/logo
+func HandleClientLogoDelete(
 	database clientLogoDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
@@ -176,8 +176,8 @@ func HandleAPIClientLogoDelete(
 	}
 }
 
-// HandleAPIClientLogoGet - GET /api/v1/admin/clients/{id}/logo
-func HandleAPIClientLogoGet(
+// HandleClientLogoGet - GET /api/v1/admin/clients/{id}/logo
+func HandleClientLogoGet(
 	database clientLogoDatabase,
 	baseURL string,
 ) http.HandlerFunc {

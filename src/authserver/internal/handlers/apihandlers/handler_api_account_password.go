@@ -28,8 +28,8 @@ type accountPasswordDatabase interface {
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
 }
 
-// HandleAPIAccountPasswordPut - PUT /api/v1/account/password
-func HandleAPIAccountPasswordPut(
+// HandleAccountPasswordPut - PUT /api/v1/account/password
+func HandleAccountPasswordPut(
 	database accountPasswordDatabase,
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,

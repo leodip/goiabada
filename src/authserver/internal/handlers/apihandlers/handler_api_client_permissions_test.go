@@ -17,7 +17,7 @@ import (
 // client credentials flow enabled, since they are what a client_credentials token is granted from.
 // It is decided before the transaction opens, so the refusal reads nothing more and writes nothing
 // (#428).
-func TestHandleAPIClientPermissionsPut_ClientCredentialsOffIsRefusedBeforeTheTransaction(t *testing.T) {
+func TestHandleClientPermissionsPut_ClientCredentialsOffIsRefusedBeforeTheTransaction(t *testing.T) {
 	save := grantSaves[2]
 	if save.name != "client permissions" {
 		t.Fatalf("grantSaves[2] is %q, not the client permission save", save.name)

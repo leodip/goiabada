@@ -30,8 +30,8 @@ type usersSessionsDatabase interface {
 	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error
 }
 
-// HandleAPIUserSessionsGet - GET /api/v1/admin/users/{id}/sessions
-func HandleAPIUserSessionsGet(
+// HandleUserSessionsGet - GET /api/v1/admin/users/{id}/sessions
+func HandleUserSessionsGet(
 	database usersSessionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -105,8 +105,8 @@ func HandleAPIUserSessionsGet(
 	}
 }
 
-// HandleAPIUserSessionDelete - DELETE /api/v1/admin/user-sessions/{id}
-func HandleAPIUserSessionDelete(
+// HandleUserSessionDelete - DELETE /api/v1/admin/user-sessions/{id}
+func HandleUserSessionDelete(
 	database usersSessionsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
