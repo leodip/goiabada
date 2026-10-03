@@ -21,7 +21,7 @@ import (
 //
 // The middleware tables in internal/middleware pass with the chain in either order,
 // because they mount the locale middleware themselves. This drives the real
-// initMiddleware, so moving i18n.MiddlewareLocale back below middleware.SettingsCache
+// initMiddleware, so moving i18n.Locale back below middleware.SettingsCache
 // fails the settings rows here and nothing else in the repository.
 //
 // The settings cache points at an address nothing listens on, which is what keeps

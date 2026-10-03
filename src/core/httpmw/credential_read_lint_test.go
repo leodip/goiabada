@@ -32,11 +32,9 @@ import (
 // r.FormValue accepts exactly that request, because ParseForm merges the URL query behind the body,
 // so the accessor is the whole of the difference between honouring those sentences and not.
 //
-// The list is one name. The other form read under core is deliberately absent for its own reason:
-//
-//   - render/http_helper.go reads a key its caller supplies, for the query-or-body lookup
-//     RP-initiated logout needs (#109). It owns no credential policy, so a name listed here would
-//     be enforced there by accident rather than by decision.
+// The list is one name, and no package under core reads a request form today. The query-or-body
+// lookup RP-initiated logout needs (#109) is the auth server's own, in its internal/render, outside
+// the tree this test walks.
 //
 // core is named as the tree to walk and core/httpmw beneath it as a coverage floor, so the read
 // moving to another kernel package stays covered while a rename that empties core/httpmw fails

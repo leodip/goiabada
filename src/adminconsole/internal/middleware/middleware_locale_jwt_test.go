@@ -29,7 +29,7 @@ func localeSeenBy(t *testing.T, req *http.Request) string {
 	t.Helper()
 
 	var base *http.Request
-	i18n.MiddlewareLocale(nil)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+	i18n.Locale(nil)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		base = r
 	})).ServeHTTP(httptest.NewRecorder(), req)
 

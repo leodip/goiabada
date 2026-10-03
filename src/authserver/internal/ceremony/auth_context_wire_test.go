@@ -11,8 +11,8 @@ import (
 
 // The two literals below are what AuthContext serialized to while this type lived in
 // core/oauthprovider, captured from that tree before #339 moved it. They are the wire format of an
-// in-flight ceremony: handlerhelpers.SaveAuthContext marshals this struct to JSON and puts the
-// string in the session, so a ceremony that began on the old binary is decoded by the new one, and
+// in-flight ceremony: Store.SaveAuthContext marshals this struct to JSON and puts the string in
+// the session, so a ceremony that began on the old binary is decoded by the new one, and
 // the field names below are the whole of the contract between them. AuthContext carries no json
 // tags, so every field serializes under its Go name and renaming one is a silent break.
 //

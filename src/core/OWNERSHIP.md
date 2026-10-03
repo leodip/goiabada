@@ -374,9 +374,9 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeSettingsSmtpFromNameAngleBrackets` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeUserGroupsNotFound` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `LoadBundle` | both-apps | — |
+| `core/i18n` | `Locale` | both-apps | — |
 | `core/i18n` | `LocaleTag` | both-apps | — |
 | `core/i18n` | `LocalizedError` | both-apps | — |
-| `core/i18n` | `MiddlewareLocale` | both-apps | — |
 | `core/i18n` | `NewLocalizedError` | kernel | — |
 | `core/i18n` | `Raw` | contract | The un-templated half of the message catalog both processes compile. Only the admin console's `JSBootstrap` template function calls it today, the auth server's pages serving no client-side string table; it stays because it reads the localizer and the bundle this package keeps private, so moving it would export the state #385 decision 11 exists to keep unexported, and would put one catalog behind two renderers. The six template helpers that shared this argument read nothing of that state but `T` and `LocaleTag`, and moved into the admin console's `internal/render` in #442. |
 | `core/i18n` | `ResolveRequestLocale` | kernel | — |

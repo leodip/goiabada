@@ -70,7 +70,7 @@ func TestRevokeClientGrants_AFailedRecordSweepsNothing(t *testing.T) {
 	result, err := RevokeClientGrants(context.Background(), db, revokeTx, revokeClientId)
 
 	require.ErrorIs(t, err, boom)
-	assert.Equal(t, ClientGrantRevocationResult{}, result)
+	assert.Equal(t, ClientGrantResult{}, result)
 	assertNotAttempted(t, db, "UpdateRefreshToken")
 }
 
@@ -124,6 +124,6 @@ func TestRevokeClientGrantsTx_ALostKeyRunsTheRevocationOnceMore(t *testing.T) {
 		})
 
 		require.ErrorIs(t, err, data.ErrUniqueViolation)
-		assert.Equal(t, ClientGrantRevocationResult{}, result)
+		assert.Equal(t, ClientGrantResult{}, result)
 	})
 }

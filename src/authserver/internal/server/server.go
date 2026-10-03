@@ -458,7 +458,7 @@ func (s *Server) applicationBranch(faults middleware.ServerFaults, i18nCeremonyS
 		// Adds the session identifier (if available) to the request context
 		middleware.SessionIdentifier(s.sessionStore, s.database, faults),
 
-		i18n.MiddlewareLocale(i18nCeremonyStore),
+		i18n.Locale(i18nCeremonyStore),
 	)
 }
 
