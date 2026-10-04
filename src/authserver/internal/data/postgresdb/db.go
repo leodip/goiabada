@@ -50,6 +50,11 @@ type DatabaseConfig struct {
 	// Create decides whether the constructor may create the database when it is absent. It is
 	// positive-sense, so the zero value does not create: every literal has to set it (#293).
 	Create bool
+	// Pool is the application database's connection pool; the maintenance connection a creating
+	// start opens is not under it. nil leaves database/sql's own pool, unlimited, which only the
+	// tools and the data tier's fixtures that call this constructor directly open with: the
+	// server's comes through datafactory, which always passes one (#394).
+	Pool *data.PoolConfig
 }
 
 // New opens the PostgreSQL database dbConfig names, creating it first when dbConfig.Create says
@@ -97,6 +102,9 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 	db, err := sql.Open("pgx", DSN(dbConfig))
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to open database")
+	}
+	if dbConfig.Pool != nil {
+		dbConfig.Pool.ApplyTo(db)
 	}
 
 	if !dbConfig.Create {

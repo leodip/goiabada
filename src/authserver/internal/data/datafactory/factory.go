@@ -74,38 +74,59 @@ func OpenDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, logSQL b
 	// Migratable over it, so an `if database == nil` at a caller would read false (#353).
 	switch dialect {
 	case data.MySQL:
-		database, err := mysqldb.New(ctx, mysqlConfig(dbConfig), logSQL)
+		engineConfig := mysqlConfig(dbConfig)
+		database, err := mysqldb.New(ctx, engineConfig, logSQL)
 		if err != nil {
 			return nil, err
 		}
+		recordPool(ctx, *engineConfig.Pool)
 		return database, nil
 	case data.SQLite:
 		// The DSN is all SQLite reads. GOIABADA_DB_CREATE has nowhere to go here: SQLite has no
 		// create statement and no maintenance connection to issue one over, so `mode=rw` in the
 		// operator's DSN is the equivalent (#293, #438 decision 4). A chosen leniency rather than
 		// an oversight, so TestOpenDatabase_Dispatch has a row for it.
+		//
+		// The four pool settings have nowhere to go either: SQLite's pool is one connection, and
+		// the record says so rather than repeating what was configured (#394).
 		database, err := sqlitedb.New(ctx, dbConfig.DSN, logSQL)
 		if err != nil {
 			return nil, err
 		}
+		recordPool(ctx, sqlitedb.Pool())
 		return database, nil
 	case data.Postgres:
-		database, err := postgresdb.New(ctx, postgresConfig(dbConfig), logSQL)
+		engineConfig := postgresConfig(dbConfig)
+		database, err := postgresdb.New(ctx, engineConfig, logSQL)
 		if err != nil {
 			return nil, err
 		}
+		recordPool(ctx, *engineConfig.Pool)
 		return database, nil
 	case data.MSSQL:
-		database, err := mssqldb.New(ctx, mssqlConfig(dbConfig), logSQL)
+		engineConfig := mssqlConfig(dbConfig)
+		database, err := mssqldb.New(ctx, engineConfig, logSQL)
 		if err != nil {
 			return nil, err
 		}
+		recordPool(ctx, *engineConfig.Pool)
 		return database, nil
 	default:
 		// Unreachable: ParseDialect answers one of the four or refuses. It names the dialect rather
 		// than falling through, so a fifth constant added there without an arm here fails loudly.
 		return nil, errs.Errorf("no engine for database dialect %q", dialect)
 	}
+}
+
+// recordPool writes the one record of the pool a start opened, once the engine has opened it. It is
+// the one place all four values are visible, since database/sql reads back only the open cap, so
+// an operator sizing max_connections reads it off here, SQLite's fixed values included (#394).
+func recordPool(ctx context.Context, pool data.PoolConfig) {
+	slog.InfoContext(ctx, "database connection pool",
+		"max_open_conns", pool.MaxOpenConns,
+		"max_idle_conns", pool.MaxIdleConns,
+		"conn_max_lifetime", pool.ConnMaxLifetime,
+		"conn_max_idle_time", pool.ConnMaxIdleTime)
 }
 
 // mysqlConfig is the switch arm's struct literal and nothing else, extracted so that field
@@ -122,6 +143,18 @@ func mysqlConfig(c *config.DatabaseConfig) *mysqldb.DatabaseConfig {
 		Port:     c.Port,
 		Name:     c.Name,
 		Create:   c.Create,
+		Pool:     serverPool(c),
+	}
+}
+
+// serverPool is the pool the three server engines open with, as configured: the idle cap the one
+// set or, unset, the open cap (#394 decision 6). Each mapper takes its own copy.
+func serverPool(c *config.DatabaseConfig) *data.PoolConfig {
+	return &data.PoolConfig{
+		MaxOpenConns:    c.MaxOpenConns,
+		MaxIdleConns:    c.EffectiveMaxIdleConns(),
+		ConnMaxLifetime: c.ConnMaxLifetime,
+		ConnMaxIdleTime: c.ConnMaxIdleTime,
 	}
 }
 
@@ -135,6 +168,7 @@ func postgresConfig(c *config.DatabaseConfig) *postgresdb.DatabaseConfig {
 		Port:     c.Port,
 		Name:     c.Name,
 		Create:   c.Create,
+		Pool:     serverPool(c),
 	}
 }
 
@@ -148,6 +182,7 @@ func mssqlConfig(c *config.DatabaseConfig) *mssqldb.DatabaseConfig {
 		Port:     c.Port,
 		Name:     c.Name,
 		Create:   c.Create,
+		Pool:     serverPool(c),
 	}
 }
 

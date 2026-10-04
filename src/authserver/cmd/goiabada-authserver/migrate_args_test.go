@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,6 +24,10 @@ func migrateArgsBase() config.DatabaseConfig {
 		Name:     "goiabada",
 		DSN:      "file::memory:?cache=shared",
 		Create:   true,
+
+		MaxOpenConns:    20,
+		ConnMaxLifetime: 30 * time.Minute,
+		ConnMaxIdleTime: 5 * time.Minute,
 	}
 }
 
@@ -79,9 +84,15 @@ func TestParseMigrateArgs(t *testing.T) {
 			[]string{"-"}, migrateArgsBase()},
 		{"every database flag", migrateArgsBase(),
 			[]string{"-db-type=mssql", "-db-username=u", "-db-password=p@ss", "version", "-db-host=h2",
-				"-db-port=11433", "-db-name=n", "-db-dsn=d", "-db-create=false"},
+				"-db-port=11433", "-db-name=n", "-db-dsn=d", "-db-create=false",
+				"-db-max-open-conns=6", "-db-max-idle-conns=2", "-db-conn-max-lifetime=1h", "-db-conn-max-idle-time=0"},
 			[]string{"version"}, config.DatabaseConfig{Type: "mssql", Username: "u", Password: "p@ss",
-				Host: "h2", Port: 11433, Name: "n", DSN: "d", Create: false}},
+				Host: "h2", Port: 11433, Name: "n", DSN: "d", Create: false,
+				MaxOpenConns: 6, MaxIdleConns: intPtr(2), ConnMaxLifetime: time.Hour, ConnMaxIdleTime: 0}},
+		// The pool flags are read after `migrate` too (#394 decision 5), and an unset idle cap
+		// still follows the open cap once a flag there moves it.
+		{"the open cap after migrate", migrateArgsBase(), []string{"version", "--db-max-open-conns=3"},
+			[]string{"version"}, with(func(c *config.DatabaseConfig) { c.MaxOpenConns = 3 })},
 		{"no arguments", migrateArgsBase(), nil, nil, migrateArgsBase()},
 	}
 	for _, tc := range cases {
@@ -123,6 +134,13 @@ func TestParseMigrateArgs_Refusals(t *testing.T) {
 			`invalid value "maybe" for --db-create: parse error`},
 		{"a value missing at the end", []string{"version", "-db-port"},
 			"--db-port needs a value: give it as --db-port=<value>"},
+		// The pool's ranges hold after `migrate` as they hold before it, in Load's line (#394).
+		{"an open cap of 0", []string{"version", "--db-max-open-conns=0"},
+			`malformed configuration: --db-max-open-conns is "0", not at least 1`},
+		{"an idle cap above the open cap", []string{"version", "--db-max-idle-conns=21"},
+			`malformed configuration: GOIABADA_DB_MAX_IDLE_CONNS (--db-max-idle-conns) is "21", not at most GOIABADA_DB_MAX_OPEN_CONNS (--db-max-open-conns), which is 20`},
+		{"a lifetime in bare seconds", []string{"version", "--db-conn-max-lifetime=1800"},
+			`invalid value "1800" for --db-conn-max-lifetime: parse error`},
 		// flag reads -1 as a flag, so a negative version never reaches parseTargetVersion.
 		{"a negative operand", []string{"to", "-1"},
 			"-1 is not a flag migrate accepts: only the --db-* flags can follow migrate, so give any other flag before it"},
@@ -144,6 +162,8 @@ func TestParseMigrateArgs_Help(t *testing.T) {
 		assert.True(t, inv.help, "%#v", args)
 	}
 }
+
+func intPtr(n int) *int { return &n }
 
 // sqliteBase is a base configuration naming the SQLite file path.
 func sqliteBase(path string) config.DatabaseConfig {

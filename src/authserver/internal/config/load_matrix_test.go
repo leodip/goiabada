@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/core/logging/logtest"
 )
@@ -91,6 +92,17 @@ func boolVar(name, flagName string, def, fromEnv, fromFlag bool, read func(*Conf
 		env: name, flag: flagName, def: def,
 		envValue: strconv.FormatBool(fromEnv), envWant: fromEnv,
 		flagValue: strconv.FormatBool(fromFlag), flagWant: fromFlag,
+		read: read,
+	}
+}
+
+// durationVar is a row in Go's duration syntax, which is what the standard flag package reads and
+// what the environment variable is held to as well (#394 decision 5).
+func durationVar(name, flagName string, def time.Duration, fromEnv string, wantEnv time.Duration, fromFlag string, wantFlag time.Duration, read func(*Config) any) configVar {
+	return configVar{
+		env: name, flag: flagName, def: def,
+		envValue: fromEnv, envWant: wantEnv,
+		flagValue: fromFlag, flagWant: wantFlag,
 		read: read,
 	}
 }
@@ -224,6 +236,22 @@ var configVariables = []configVar{
 	boolVar("GOIABADA_DB_CREATE", "db-create", true,
 		false, true,
 		func(c *Config) any { return c.Database.Create }),
+	// The pool of the three server engines (#394 decisions 5 and 6). The idle row reads the value
+	// the engines are given, which follows the open cap while neither the variable nor the flag
+	// sets it: its default is the open cap's default, 20.
+	intVar("GOIABADA_DB_MAX_OPEN_CONNS", "db-max-open-conns", 20,
+		35, 45,
+		func(c *Config) any { return c.Database.MaxOpenConns }),
+	intVar("GOIABADA_DB_MAX_IDLE_CONNS", "db-max-idle-conns", 20,
+		7, 3,
+		func(c *Config) any { return c.Database.EffectiveMaxIdleConns() }),
+	durationVar("GOIABADA_DB_CONN_MAX_LIFETIME", "db-conn-max-lifetime", 30*time.Minute,
+		"1h", time.Hour, "90s", 90*time.Second,
+		func(c *Config) any { return c.Database.ConnMaxLifetime }),
+	// The flag writes 0, no limit, which is a legitimate choice behind a pooler such as PgBouncer.
+	durationVar("GOIABADA_DB_CONN_MAX_IDLE_TIME", "db-conn-max-idle-time", 5*time.Minute,
+		"10m", 10*time.Minute, "0", 0,
+		func(c *Config) any { return c.Database.ConnMaxIdleTime }),
 
 	// Initial setup and the data-encryption keys
 	strVar("GOIABADA_ADMIN_EMAIL", "admin-email", "admin",
@@ -323,6 +351,16 @@ var malformedVariableRows = []struct {
 		`GOIABADA_AUTHSERVER_RATELIMITER_ENABLED is "no", not a boolean (true or false)`},
 	{"GOIABADA_DB_CREATE", "yes", "-db-create=true",
 		`GOIABADA_DB_CREATE is "yes", not a boolean (true or false)`},
+	{"GOIABADA_DB_MAX_OPEN_CONNS", "twenty", "-db-max-open-conns=20",
+		`GOIABADA_DB_MAX_OPEN_CONNS is "twenty", not an integer`},
+	{"GOIABADA_DB_MAX_IDLE_CONNS", "5.5", "-db-max-idle-conns=5",
+		`GOIABADA_DB_MAX_IDLE_CONNS is "5.5", not an integer`},
+	// A bare number is seconds to an operator and nothing to Go's duration syntax, which needs a
+	// unit, so it is refused rather than guessed at (#394 decision 5).
+	{"GOIABADA_DB_CONN_MAX_LIFETIME", "1800", "-db-conn-max-lifetime=30m",
+		`GOIABADA_DB_CONN_MAX_LIFETIME is "1800", not a duration such as 30m, 1h or 90s`},
+	{"GOIABADA_DB_CONN_MAX_IDLE_TIME", "5 minutes", "-db-conn-max-idle-time=5m",
+		`GOIABADA_DB_CONN_MAX_IDLE_TIME is "5 minutes", not a duration such as 30m, 1h or 90s`},
 }
 
 // TestLoad_RefusesAMalformedVariable is decisions 6 and 10 of #434 over the ten numeric and
@@ -361,7 +399,7 @@ func TestLoad_EveryNumericAndBooleanVariableHasARefusalRow(t *testing.T) {
 	}
 	for _, v := range configVariables {
 		switch v.def.(type) {
-		case int, int64, bool:
+		case int, int64, bool, time.Duration:
 			if !refused[v.env] {
 				t.Errorf("%s is numeric or boolean and TestLoad_RefusesAMalformedVariable has no row for it", v.env)
 			}
@@ -417,6 +455,119 @@ func TestLoad_TheUploadSizeMustBePositive(t *testing.T) {
 			}
 			if c.AuthServer.ProfilePictureMaxSizeBytes != tt.want {
 				t.Errorf("ProfilePictureMaxSizeBytes = %d, want %d", c.AuthServer.ProfilePictureMaxSizeBytes, tt.want)
+			}
+		})
+	}
+}
+
+// TestLoad_ThePoolSettingsAreHeldToTheirRanges is #394 decision 5's refusals and decision 6's
+// defaults, through Load: the open cap is at least 1, since 0 is database/sql's unlimited; the idle
+// cap is 0 or more and never above the open cap, which follows the open cap unless it is set; the
+// two durations are 0 or more, 0 meaning no limit. A refusal names the variable or the flag that
+// supplied the value, a flag given for a refused variable does not rescue it, and every value is
+// checked on SQLite too, which is the default engine every row here loads under: the value the
+// operator wrote is wrong whichever engine reads it (#434).
+func TestLoad_ThePoolSettingsAreHeldToTheirRanges(t *testing.T) {
+	type pool struct {
+		open, idle         int
+		lifetime, idleTime time.Duration
+	}
+	tests := []struct {
+		name    string
+		env     map[string]string
+		args    []string
+		want    pool
+		refusal string
+	}{
+		{name: "nothing set is 20, 20, 30m and 5m",
+			want: pool{20, 20, 30 * time.Minute, 5 * time.Minute}},
+		{name: "the smallest open cap, with idle following it", env: map[string]string{"GOIABADA_DB_MAX_OPEN_CONNS": "1"},
+			want: pool{1, 1, 30 * time.Minute, 5 * time.Minute}},
+		{name: "idle follows a lowered open cap rather than being refused above it",
+			env:  map[string]string{"GOIABADA_DB_MAX_OPEN_CONNS": "10"},
+			want: pool{10, 10, 30 * time.Minute, 5 * time.Minute}},
+		{name: "idle follows the open cap's flag, which beat its variable",
+			env:  map[string]string{"GOIABADA_DB_MAX_OPEN_CONNS": "5"},
+			args: []string{"-db-max-open-conns=30"},
+			want: pool{30, 30, 30 * time.Minute, 5 * time.Minute}},
+		{name: "idle set to 0 keeps none idle", env: map[string]string{"GOIABADA_DB_MAX_IDLE_CONNS": "0"},
+			want: pool{20, 0, 30 * time.Minute, 5 * time.Minute}},
+		{name: "idle equal to the open cap", env: map[string]string{"GOIABADA_DB_MAX_OPEN_CONNS": "8", "GOIABADA_DB_MAX_IDLE_CONNS": "8"},
+			want: pool{8, 8, 30 * time.Minute, 5 * time.Minute}},
+		{name: "a set idle cap stays when the open cap is raised", args: []string{"-db-max-idle-conns=4", "-db-max-open-conns=50"},
+			want: pool{50, 4, 30 * time.Minute, 5 * time.Minute}},
+		{name: "both durations 0, no limit", env: map[string]string{"GOIABADA_DB_CONN_MAX_LIFETIME": "0", "GOIABADA_DB_CONN_MAX_IDLE_TIME": "0s"},
+			want: pool{20, 20, 0, 0}},
+
+		{name: "an open cap of 0, which database/sql reads as unlimited",
+			env:     map[string]string{"GOIABADA_DB_MAX_OPEN_CONNS": "0"},
+			refusal: `GOIABADA_DB_MAX_OPEN_CONNS is "0", not at least 1`},
+		{name: "a negative open cap", env: map[string]string{"GOIABADA_DB_MAX_OPEN_CONNS": " -3 "},
+			refusal: `GOIABADA_DB_MAX_OPEN_CONNS is "-3", not at least 1`},
+		{name: "a refused open cap is not rescued by its flag",
+			env:     map[string]string{"GOIABADA_DB_MAX_OPEN_CONNS": "0"},
+			args:    []string{"-db-max-open-conns=10"},
+			refusal: `GOIABADA_DB_MAX_OPEN_CONNS is "0", not at least 1`},
+		{name: "an open cap of 0 from the flag", args: []string{"-db-max-open-conns=0"},
+			refusal: `--db-max-open-conns is "0", not at least 1`},
+		{name: "a negative idle cap", env: map[string]string{"GOIABADA_DB_MAX_IDLE_CONNS": "-1"},
+			refusal: `GOIABADA_DB_MAX_IDLE_CONNS is "-1", not at least 0`},
+		{name: "a negative idle cap from the flag", args: []string{"-db-max-idle-conns=-1"},
+			refusal: `--db-max-idle-conns is "-1", not at least 0`},
+		{name: "an idle cap above the default open cap is refused, not lowered",
+			env:     map[string]string{"GOIABADA_DB_MAX_IDLE_CONNS": "21"},
+			refusal: `GOIABADA_DB_MAX_IDLE_CONNS (--db-max-idle-conns) is "21", not at most GOIABADA_DB_MAX_OPEN_CONNS (--db-max-open-conns), which is 20`},
+		{name: "an idle cap above an open cap the flags set",
+			args:    []string{"-db-max-open-conns=25", "-db-max-idle-conns=30"},
+			refusal: `GOIABADA_DB_MAX_IDLE_CONNS (--db-max-idle-conns) is "30", not at most GOIABADA_DB_MAX_OPEN_CONNS (--db-max-open-conns), which is 25`},
+		{name: "a negative lifetime", env: map[string]string{"GOIABADA_DB_CONN_MAX_LIFETIME": "-1m"},
+			refusal: `GOIABADA_DB_CONN_MAX_LIFETIME is "-1m", not at least 0`},
+		{name: "a negative lifetime from the flag", args: []string{"-db-conn-max-lifetime=-1s"},
+			refusal: `--db-conn-max-lifetime is "-1s", not at least 0`},
+		{name: "a bare number of seconds from the flag", args: []string{"-db-conn-max-lifetime=1800"},
+			refusal: `invalid value "1800" for flag -db-conn-max-lifetime: parse error`},
+		{name: "a negative idle time", env: map[string]string{"GOIABADA_DB_CONN_MAX_IDLE_TIME": "-5s"},
+			refusal: `GOIABADA_DB_CONN_MAX_IDLE_TIME is "-5s", not at least 0`},
+		{name: "a negative idle time from the flag", args: []string{"-db-conn-max-idle-time=-2h"},
+			refusal: `--db-conn-max-idle-time is "-2h0m0s", not at least 0`},
+		{name: "every bad value at once, from the variables and the flags",
+			env: map[string]string{
+				"GOIABADA_DB_MAX_OPEN_CONNS":    "0",
+				"GOIABADA_DB_CONN_MAX_LIFETIME": "1800",
+			},
+			args: []string{"-db-max-idle-conns=-2", "-db-conn-max-idle-time=-1s"},
+			refusal: `GOIABADA_DB_MAX_OPEN_CONNS is "0", not at least 1; ` +
+				`GOIABADA_DB_CONN_MAX_LIFETIME is "1800", not a duration such as 30m, 1h or 90s; ` +
+				`--db-max-idle-conns is "-2", not at least 0; ` +
+				`--db-conn-max-idle-time is "-1s", not at least 0`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, c, err := loadMatrixRefusing(t, tt.env, tt.args)
+
+			if tt.refusal != "" {
+				want := tt.refusal
+				if !strings.HasPrefix(want, "invalid value") {
+					want = "malformed configuration: " + want
+				}
+				if err == nil || err.Error() != want {
+					t.Errorf("Load() = %v, want %q", err, want)
+				}
+				if c != nil {
+					t.Errorf("Load() refused and still answered a configuration: %#v", c)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load() = %v", err)
+			}
+			if c.Database.Type != "sqlite" {
+				t.Fatalf("the row loaded under %q, want the default sqlite this test is about", c.Database.Type)
+			}
+			got := pool{c.Database.MaxOpenConns, c.Database.EffectiveMaxIdleConns(), c.Database.ConnMaxLifetime, c.Database.ConnMaxIdleTime}
+			if got.open != tt.want.open || got.idle != tt.want.idle ||
+				got.lifetime != tt.want.lifetime || got.idleTime != tt.want.idleTime {
+				t.Errorf("pool = %+v, want %+v", got, tt.want)
 			}
 		})
 	}
@@ -506,8 +657,9 @@ func TestLoad_FlagBeatsTheEnvironment(t *testing.T) {
 // Seam 2: the registered flag set of this binary
 // -----------------------------------------------------------------------------
 
-// authServerFlags is the 32 flags the auth server registers after the split (#351): its own 19,
-// the 8 database flags, the 3 initial-setup flags, and the two admin console values it reads.
+// authServerFlags is the 36 flags the auth server registers: its own 19, the 12 database flags,
+// the 3 initial-setup flags, and the two admin console values it reads. 32 were what the split
+// left (#351); the four pool flags came after it (#394).
 //
 // It is written out rather than derived from configVariables, and that is the whole point. A
 // derived expectation cannot fail when a flag is dropped from the table and from config.go
@@ -539,14 +691,27 @@ var authServerFlags = []string{
 	"authserver-templatedir",
 	"authserver-trust-proxy-headers",
 	"authserver-trusted-proxies",
+	"db-conn-max-idle-time",
+	"db-conn-max-lifetime",
 	"db-create",
 	"db-dsn",
 	"db-host",
+	"db-max-idle-conns",
+	"db-max-open-conns",
 	"db-name",
 	"db-password",
 	"db-port",
 	"db-type",
 	"db-username",
+}
+
+// flagsAddedAfterTheSplit are the auth server's flags that no binary registered before #351, so
+// they are outside the partition TestFlagLists_AgreeWithTheTable counts.
+var flagsAddedAfterTheSplit = []string{
+	"db-conn-max-idle-time",
+	"db-conn-max-lifetime",
+	"db-max-idle-conns",
+	"db-max-open-conns",
 }
 
 // refusedFlags is the other half of the narrowing, named rather than merely absent: the 13 admin
@@ -654,9 +819,14 @@ func TestFlagLists_AgreeWithTheTable(t *testing.T) {
 
 	// 45 flags were registered by both binaries before the split, and the auth server keeps 32
 	// of them. The two lists partition that surface, so a flag that quietly left both is a
-	// flag nobody decided about.
-	if got := len(authServerFlags) + len(refusedFlags); got != 45 {
-		t.Errorf("the two lists cover %d flags, want the 45 both binaries registered before the split", got)
+	// flag nobody decided about. The flags added since are named, not merely counted.
+	for _, name := range flagsAddedAfterTheSplit {
+		if !expected[name] {
+			t.Errorf("flagsAddedAfterTheSplit names %q, which authServerFlags does not list", name)
+		}
+	}
+	if got := len(authServerFlags) - len(flagsAddedAfterTheSplit) + len(refusedFlags); got != 45 {
+		t.Errorf("the two lists cover %d of the flags both binaries registered before the split, want 45", got)
 	}
 }
 
@@ -705,6 +875,11 @@ func TestRegisterDatabaseFlags_RegistersTheDatabaseFlagsOnTheConfigGiven(t *test
 		Name:     "n1",
 		DSN:      "d1",
 		Create:   false,
+
+		MaxOpenConns:    11,
+		MaxIdleConns:    intPtr(6),
+		ConnMaxLifetime: 2 * time.Hour,
+		ConnMaxIdleTime: 3 * time.Minute,
 	}
 	fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -716,8 +891,8 @@ func TestRegisterDatabaseFlags_RegistersTheDatabaseFlagsOnTheConfigGiven(t *test
 			want[name] = true
 		}
 	}
-	if len(want) != 8 {
-		t.Fatalf("authServerFlags names %d db- flags, want 8, so this case would check the wrong set", len(want))
+	if len(want) != 12 {
+		t.Fatalf("authServerFlags names %d db- flags, want 12, so this case would check the wrong set", len(want))
 	}
 
 	registered := map[string]string{}
@@ -742,6 +917,11 @@ func TestRegisterDatabaseFlags_RegistersTheDatabaseFlagsOnTheConfigGiven(t *test
 		"db-name":     "n1",
 		"db-dsn":      "d1",
 		"db-create":   "false",
+
+		"db-max-open-conns":     "11",
+		"db-max-idle-conns":     "6",
+		"db-conn-max-lifetime":  "2h0m0s",
+		"db-conn-max-idle-time": "3m0s",
 	}
 	for name, def := range wantDefaults {
 		if got := registered[name]; got != def {
@@ -755,7 +935,83 @@ func TestRegisterDatabaseFlags_RegistersTheDatabaseFlagsOnTheConfigGiven(t *test
 	if local.Port != 1433 {
 		t.Errorf("db-port set to 1433 left the struct at %d", local.Port)
 	}
+	if err := fs.Set("db-max-idle-conns", "9"); err != nil {
+		t.Fatalf("setting db-max-idle-conns: %v", err)
+	}
+	if local.MaxIdleConns == nil || *local.MaxIdleConns != 9 {
+		t.Errorf("db-max-idle-conns set to 9 left the struct at %v", local.MaxIdleConns)
+	}
 }
+
+// TestRegisterDatabaseFlags_AnUnsetIdleCapFollowsTheOpenCap: the idle cap follows the open cap
+// until something sets it, so its flag defaults to nothing rather than to a number, and setting
+// the open cap alone moves the idle cap the engines are given with it (#394 decision 6).
+func TestRegisterDatabaseFlags_AnUnsetIdleCapFollowsTheOpenCap(t *testing.T) {
+	local := DatabaseConfig{MaxOpenConns: 20}
+	fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	RegisterDatabaseFlags(fs, &local)
+
+	if got := fs.Lookup("db-max-idle-conns").DefValue; got != "" {
+		t.Errorf("db-max-idle-conns defaults to %q, want nothing: it follows the open cap", got)
+	}
+	if err := fs.Parse([]string{"-db-max-open-conns=7"}); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if local.MaxIdleConns != nil {
+		t.Errorf("the idle cap was set to %d by a flag for the open cap", *local.MaxIdleConns)
+	}
+	if got := local.EffectiveMaxIdleConns(); got != 7 {
+		t.Errorf("EffectiveMaxIdleConns() = %d, want the open cap, 7", got)
+	}
+}
+
+// TestCheckDatabaseFlags_RefusesWhatTheFlagsGivenLeaveOutOfRange is the check the `migrate`
+// subcommand runs after its own parse of the --db-* flags, so a pool flag given after `migrate` is
+// held to decision 5 as one given before it is: a flag not given is not checked, since what it
+// would report came from Load, which checked it already (#394).
+func TestCheckDatabaseFlags_RefusesWhatTheFlagsGivenLeaveOutOfRange(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "no flags", want: ""},
+		{name: "every flag in range", args: []string{"-db-max-open-conns=3", "-db-max-idle-conns=3", "-db-conn-max-lifetime=0", "-db-conn-max-idle-time=1s"}},
+		{name: "every flag out of range",
+			args: []string{"-db-max-open-conns=0", "-db-max-idle-conns=-1", "-db-conn-max-lifetime=-1s", "-db-conn-max-idle-time=-1s"},
+			want: `malformed configuration: --db-max-open-conns is "0", not at least 1; ` +
+				`--db-max-idle-conns is "-1", not at least 0; ` +
+				`--db-conn-max-lifetime is "-1s", not at least 0; ` +
+				`--db-conn-max-idle-time is "-1s", not at least 0`},
+		{name: "an idle cap above the open cap the configuration holds", args: []string{"-db-max-idle-conns=21"},
+			want: `malformed configuration: GOIABADA_DB_MAX_IDLE_CONNS (--db-max-idle-conns) is "21", not at most GOIABADA_DB_MAX_OPEN_CONNS (--db-max-open-conns), which is 20`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			local := DatabaseConfig{MaxOpenConns: 20}
+			fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
+			fs.SetOutput(io.Discard)
+			RegisterDatabaseFlags(fs, &local)
+			if err := fs.Parse(tt.args); err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+
+			err := CheckDatabaseFlags(fs, &local)
+			if tt.want == "" {
+				if err != nil {
+					t.Errorf("CheckDatabaseFlags() = %v, want nothing refused", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != tt.want {
+				t.Errorf("CheckDatabaseFlags() = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func intPtr(n int) *int { return &n }
 
 // TestRegisterDatabaseFlags_DbTypeHelpNamesEveryEngine: the help text named two of the four
 // engines this binary supports.
@@ -815,7 +1071,7 @@ func TestConfigVariables_EveryRowCanFail(t *testing.T) {
 
 var (
 	envNameInSource  = regexp.MustCompile(`GOIABADA_[A-Z0-9_]+`)
-	flagNameInSource = regexp.MustCompile(`fs\.[A-Za-z0-9]+Var\([^,]+, *"([^"]+)"`)
+	flagNameInSource = regexp.MustCompile(`fs\.[A-Za-z0-9]*Var\([^,]+, *"([^"]+)"`)
 )
 
 // TestConfigSource_EveryVariableAndFlagHasARow reads config.go and compares what Load

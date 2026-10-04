@@ -41,8 +41,9 @@ const migrateUsage = `usage:
   goiabada-authserver migrate to <version> step the schema to <version>, up or down (for example: to 44, or to 000044)
 
 Connection details come from the GOIABADA_DB_* environment variables or the --db-* flags
-(--db-type, --db-username, --db-password, --db-host, --db-port, --db-name, --db-dsn, --db-create),
-given before or after migrate. A flag after migrate overrides the same flag before it. Every other
+(--db-type, --db-username, --db-password, --db-host, --db-port, --db-name, --db-dsn, --db-create,
+and the pool's --db-max-open-conns, --db-max-idle-conns, --db-conn-max-lifetime and
+--db-conn-max-idle-time), given before or after migrate. A flag after migrate overrides the same flag before it. Every other
 flag goes before migrate.`
 
 // Exit codes. They are kept apart so a deployment script can tell a mistake in the invocation from
@@ -189,6 +190,12 @@ func parseMigrateArgs(args []string, db config.DatabaseConfig) (migrateInvocatio
 		if err := fs.Set(name, value); err != nil {
 			return migrateInvocation{}, errs.Wrapf(err, "invalid value %q for --%s", value, name)
 		}
+	}
+
+	// The flag package parsed each value; the pool's ranges are held here as Load holds them for
+	// the flags given before `migrate` (#394 decision 5).
+	if err := config.CheckDatabaseFlags(fs, &db); err != nil {
+		return migrateInvocation{}, err
 	}
 
 	inv.database = db
