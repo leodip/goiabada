@@ -81,6 +81,8 @@ type TransactionalUserCreator interface {
 // is given the context passed in, detached from its cancellation but keeping its values, so what it
 // records carries the request's id (#404 decision 8). The server's afterresponse.Jobs is the one
 // implementation, and shutdown waits for the jobs it holds.
+// Past 64 jobs in flight it drops the job with a warning rather than run it, so a flood costs
+// some genuine requests their mail and never changes a response (#485).
 type AfterResponse interface {
 	Go(ctx context.Context, job func(ctx context.Context))
 }

@@ -96,6 +96,8 @@ type OtpSecretGenerator interface {
 // logs carries the request's id. The server's afterresponse.Jobs is the one implementation, and
 // shutdown waits for the jobs it holds. The email change hands it the notice to the previous
 // address, which must never fail or hold up the change it reports (#404 decision 11).
+// Past 64 jobs in flight it drops the job with a warning rather than run it, so a flood costs
+// some genuine requests their mail and never changes a response (#485).
 type AfterResponse interface {
 	Go(ctx context.Context, job func(ctx context.Context))
 }
