@@ -15,22 +15,37 @@ import (
 var errReadFault = errors.New("read fault")
 
 // scriptedStep is one read a scripted prompter expects: the prompt it must be asked with, by its
-// start, and what the read returns.
+// start, whether it is a password read, and what the read returns.
 type scriptedStep struct {
 	prompt string
+	// hidden is a read that must not echo or be kept in the line history: a password's.
+	hidden bool
 	answer string
 	err    error
 }
 
 // scriptedPrompter answers the reads of a test in order and fails the test on a read it was not
-// scripted for or one asked with another prompt.
+// scripted for, one asked with another prompt, or a password read as a line or a line as a password.
+// It keeps every prompt it was asked with, which the operator reads as they read the console.
 type scriptedPrompter struct {
-	t     *testing.T
-	steps []scriptedStep
+	t       *testing.T
+	steps   []scriptedStep
+	prompts []string
 }
 
 func (p *scriptedPrompter) readLine(prompt string) (string, error) {
 	p.t.Helper()
+	return p.read(prompt, false)
+}
+
+func (p *scriptedPrompter) readPassword(prompt string) (string, error) {
+	p.t.Helper()
+	return p.read(prompt, true)
+}
+
+func (p *scriptedPrompter) read(prompt string, hidden bool) (string, error) {
+	p.t.Helper()
+	p.prompts = append(p.prompts, prompt)
 	if len(p.steps) == 0 {
 		p.t.Errorf("read %q with nothing scripted", prompt)
 		return "", errReadFault
@@ -39,6 +54,9 @@ func (p *scriptedPrompter) readLine(prompt string) (string, error) {
 	p.steps = p.steps[1:]
 	if !strings.HasPrefix(prompt, step.prompt) {
 		p.t.Errorf("read %q, scripted for %q", prompt, step.prompt)
+	}
+	if hidden != step.hidden {
+		p.t.Errorf("read %q with hidden %v, scripted with hidden %v", prompt, hidden, step.hidden)
 	}
 	return step.answer, step.err
 }
@@ -94,7 +112,7 @@ func TestAsker_AReadFaultIsNeverTheDefault(t *testing.T) {
 	})
 	t.Run("the weak-password confirmation", func(t *testing.T) {
 		a, in, _ := testAsker(t,
-			scriptedStep{prompt: "Password [changeme]: ", answer: ""},
+			scriptedStep{prompt: "Password [changeme]: ", hidden: true, answer: ""},
 			scriptedStep{prompt: "Use this password anyway? [y/N]: ", err: errReadFault},
 		)
 		got, err := a.password("Password", "changeme")
@@ -228,11 +246,11 @@ func TestAsker_AnInvalidAnswerIsAskedAgain(t *testing.T) {
 
 func TestAsker_AWeakPasswordIsKeptOnlyWhenConfirmed(t *testing.T) {
 	a, in, out := testAsker(t,
-		scriptedStep{prompt: "Password [changeme]: ", answer: ""},
+		scriptedStep{prompt: "Password [changeme]: ", hidden: true, answer: ""},
 		scriptedStep{prompt: "Use this password anyway? [y/N]: ", answer: ""},
-		scriptedStep{prompt: "Password [changeme]: ", answer: "weak"},
+		scriptedStep{prompt: "Password [changeme]: ", hidden: true, answer: "weak"},
 		scriptedStep{prompt: "Use this password anyway? [y/N]: ", answer: "y"},
-		scriptedStep{prompt: "Password [changeme]: ", answer: "Str0ng-Passw0rd!"},
+		scriptedStep{prompt: "Password [changeme]: ", hidden: true, answer: "Str0ng-Passw0rd!"},
 	)
 	if got, err := a.password("Password", "changeme"); err != nil || got != "weak" {
 		t.Errorf("password = %q, %v; want the confirmed \"weak\"", got, err)
@@ -388,5 +406,73 @@ func TestLinePrompter_AReadFaultIsNotTheAbort(t *testing.T) {
 	_, err := p.readLine("Name: ")
 	if !errors.Is(err, errReadFault) || errors.Is(err, errAborted) {
 		t.Errorf("readLine: %v, want the read fault", err)
+	}
+}
+
+// A password is read without echo and kept out of the line history, so it reaches neither the
+// screen, its scrollback and recordings, nor the up arrow at a later prompt; a line read before it
+// is still recalled, so the history the password is missing from is one that works (#396 decision
+// 17).
+func TestTerminalPrompter_APasswordIsReadWithoutEchoOrHistory(t *testing.T) {
+	p, terminal, raw := testTerminalPrompter("visible\rZq7HiddenValue\r\x1b[A\r")
+	if got, err := p.readLine("Name: "); err != nil || got != "visible" {
+		t.Fatalf("readLine = %q, %v; want \"visible\"", got, err)
+	}
+	if got, err := p.readPassword("Admin password: "); err != nil || got != "Zq7HiddenValue" {
+		t.Fatalf("readPassword = %q, %v; want \"Zq7HiddenValue\"", got, err)
+	}
+	if got, err := p.readLine("Name: "); err != nil || got != "visible" {
+		t.Errorf("the up arrow recalled %q, %v; want \"visible\", the last line read with echo", got, err)
+	}
+	written := terminal.output.String()
+	if strings.Contains(written, "Zq7HiddenValue") {
+		t.Errorf("the password was echoed: %q", written)
+	}
+	if !strings.Contains(written, "Admin password: ") {
+		t.Errorf("the password prompt was not written: %q", written)
+	}
+	if raw.entered != 3 || raw.restored != 3 {
+		t.Errorf("raw mode entered %d and restored %d times, want 3 and 3", raw.entered, raw.restored)
+	}
+}
+
+func TestTerminalPrompter_CtrlCAtAPasswordIsTheAbort(t *testing.T) {
+	p, _, raw := testTerminalPrompter("abc\x03")
+	if _, err := p.readPassword("Admin password: "); !errors.Is(err, errAborted) {
+		t.Errorf("readPassword: %v, want errAborted", err)
+	}
+	if raw.entered != 1 || raw.restored != 1 {
+		t.Errorf("raw mode entered %d and restored %d times, want 1 and 1", raw.entered, raw.restored)
+	}
+}
+
+// Input that is not a terminal never echoed, so a password is read from it as any line is.
+func TestLinePrompter_ReadsAPasswordAsALine(t *testing.T) {
+	var out bytes.Buffer
+	p := &linePrompter{r: bufio.NewReader(strings.NewReader("piped-Passw0rd\n")), w: &out}
+	if got, err := p.readPassword("Admin password: "); err != nil || got != "piped-Passw0rd" {
+		t.Errorf("readPassword = %q, %v; want \"piped-Passw0rd\"", got, err)
+	}
+	if out.String() != "Admin password: " {
+		t.Errorf("wrote %q, want the prompt alone", out.String())
+	}
+}
+
+// A generated default is offered as [generated], never as its value, and taken by an empty answer;
+// a typed password is read hidden too (#396 decision 17).
+func TestAsker_AGeneratedPasswordIsOfferedWithoutItsValue(t *testing.T) {
+	a, in, out := testAsker(t,
+		scriptedStep{prompt: "Database password [generated]: ", hidden: true, answer: ""},
+		scriptedStep{prompt: "Database password [generated]: ", hidden: true, answer: " typed-Passw0rd "},
+	)
+	if got, err := a.generatedPassword("Database password", "Zq7GeneratedValue"); err != nil || got != "Zq7GeneratedValue" {
+		t.Errorf("generatedPassword = %q, %v; want the generated value for an empty answer", got, err)
+	}
+	if got, err := a.generatedPassword("Database password", "Zq7GeneratedValue"); err != nil || got != "typed-Passw0rd" {
+		t.Errorf("generatedPassword = %q, %v; want the typed one", got, err)
+	}
+	in.assertConsumed()
+	if shown := strings.Join(in.prompts, "") + out.String(); strings.Contains(shown, "Zq7GeneratedValue") {
+		t.Errorf("the generated value was shown: %q", shown)
 	}
 }

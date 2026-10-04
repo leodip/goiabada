@@ -20,6 +20,10 @@ type Config struct {
 	AESEncryptionKey    string
 	OAuthClientSecret   string
 	K8sNamespace        string
+	// AdminPasswordGenerated and DBPasswordGenerated say the wizard generated the password rather
+	// than the operator setting it, which is all the wizard reports of either (#396 decision 17).
+	AdminPasswordGenerated bool
+	DBPasswordGenerated    bool
 	// LocalProxy says a reverse proxy on the same machine forwards to the native binaries: they
 	// then listen on loopback alone and trust its forwarded headers. Only native binaries ask.
 	LocalProxy bool

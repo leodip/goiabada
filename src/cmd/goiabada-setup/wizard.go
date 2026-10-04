@@ -160,6 +160,8 @@ func (w *wizard) chooseDeployment() error {
 		w.out.info("Deployment type: %s", target.displayName)
 	}
 	w.config.Deployment = target
+	// The files are placed here, before any step reports a secret, so each can say where it will be.
+	w.paths = resolveOutputPaths(target, w.flags.Output)
 	if !target.asksURLs {
 		w.config.AuthServerURL = "http://localhost:9090"
 		w.config.AdminConsoleURL = "http://localhost:9091"
@@ -508,15 +510,17 @@ func (w *wizard) askAdmin() error {
 	// Only a password the operator chose is judged: a generated one holds the classes SQL Server
 	// asks for and no symbol, and was warned about as weak (#430).
 	adminPassword := w.flags.AdminPassword
-	if adminPassword == "" {
+	generated := adminPassword == ""
+	if generated {
 		adminPassword = generatePassword()
-		w.out.info("Generated admin password: %s", adminPassword)
 	} else if issues := checkPasswordStrength(adminPassword); len(issues) > 0 {
 		w.out.warning("Weak password: %s", strings.Join(issues, ", "))
 	}
+	w.reportPassword("Admin password", generated)
 	w.out.info("Admin email: %s", adminEmail)
 	w.config.AdminEmail = adminEmail
 	w.config.AdminPassword = adminPassword
+	w.config.AdminPasswordGenerated = generated
 	return nil
 }
 
@@ -602,8 +606,7 @@ func (w *wizard) databaseConnectionFromPrompts(defaultHost string) error {
 	if c.DBUsername, err = w.nonEmpty("Database username", c.Engine.defaultUser); err != nil {
 		return err
 	}
-	c.DBPassword, err = w.nonEmpty("Database password", generatePassword())
-	return err
+	return w.databasePasswordFromPrompt()
 }
 
 func (w *wizard) databaseConnectionFromFlags() error {
@@ -632,11 +635,7 @@ func (w *wizard) databaseConnectionFromFlags() error {
 	if c.DBUsername == "" {
 		c.DBUsername = c.Engine.defaultUser
 	}
-	c.DBPassword = w.flags.DBPassword
-	if c.DBPassword == "" {
-		c.DBPassword = generatePassword()
-		w.out.info("Generated database password: %s", c.DBPassword)
-	}
+	w.databasePasswordFromFlags()
 	w.out.info("Database host: %s:%s", c.DBHost, c.DBPort)
 	w.out.info("Database name: %s", c.DBName)
 	w.out.info("Database user: %s", c.DBUsername)
@@ -646,23 +645,55 @@ func (w *wizard) databaseConnectionFromFlags() error {
 // askDatabasePassword is a database the generated compose file runs, which needs only a password.
 func (w *wizard) askDatabasePassword() error {
 	if w.interactive {
-		password, err := w.nonEmpty("Database password", generatePassword())
-		w.config.DBPassword = password
-		return err
+		return w.databasePasswordFromPrompt()
 	}
-	w.config.DBPassword = w.flags.DBPassword
-	if w.config.DBPassword == "" {
-		w.config.DBPassword = generatePassword()
-	}
-	w.out.info("Database password: %s", w.config.DBPassword)
+	w.databasePasswordFromFlags()
 	return nil
+}
+
+// databasePasswordFromPrompt reads the database password hidden, offering a generated one, which is
+// taken when the answer is empty and is never shown.
+func (w *wizard) databasePasswordFromPrompt() error {
+	generated := generatePassword()
+	password, err := w.generatedPassword("Database password", generated)
+	w.config.DBPassword = password
+	w.config.DBPasswordGenerated = password == generated
+	return err
+}
+
+// databasePasswordFromFlags takes --db-password, or generates one, and reports which.
+func (w *wizard) databasePasswordFromFlags() {
+	c := w.config
+	c.DBPassword = w.flags.DBPassword
+	c.DBPasswordGenerated = c.DBPassword == ""
+	if c.DBPasswordGenerated {
+		c.DBPassword = generatePassword()
+	}
+	w.reportPassword("Database password", c.DBPasswordGenerated)
+}
+
+// reportPassword says whether a password was generated or set, and where it is stored, and never
+// what it is: the terminal's output reaches scrollback, recordings and the log of every CI job that
+// runs the wizard, and every secret is in a file written 0600 (#396 decision 17).
+func (w *wizard) reportPassword(what string, generated bool) {
+	how := "set"
+	if generated {
+		how = "generated"
+	}
+	w.out.info("%s: %s, stored in %s", what, how, w.storedIn(goiabadaSecrets))
+}
+
+// storedIn is where a secret is stored: for Kubernetes the Secret named in the secrets file, and for
+// the other types the secrets file itself.
+func (w *wizard) storedIn(secret string) string {
+	if w.config.Deployment.kind == deploymentKubernetes {
+		return fmt.Sprintf("the %s Secret in %s", secret, w.paths.secrets)
+	}
+	return w.paths.secrets
 }
 
 func (w *wizard) generateCredentials() error {
 	c := w.config
-	// The files are placed here, before anything is written, so the AES key's warning can say
-	// where it will be.
-	w.paths = resolveOutputPaths(c.Deployment, w.flags.Output)
 	c.AuthSessionAuthKey = generateHexKey(64)
 	c.AuthSessionEncKey = generateHexKey(32)
 	c.AdminSessionAuthKey = generateHexKey(64)
@@ -682,10 +713,7 @@ func (w *wizard) generateCredentials() error {
 // database, and where it is stored, without printing it: it is the one secret whose loss loses
 // data, and this is the moment at which a backup can still be made (#396 decision 16).
 func (w *wizard) warnAboutTheAESKey() {
-	stored := w.paths.secrets
-	if w.config.Deployment.kind == deploymentKubernetes {
-		stored = fmt.Sprintf("the %s Secret in %s", encryptionKeySecret, w.paths.secrets)
-	}
+	stored := w.storedIn(encryptionKeySecret)
 	w.out.warning("Back up the AES encryption key separately from the database: without it, the client")
 	w.out.println("   secrets, SMTP credentials, OTP seeds and signing keys the database holds cannot be")
 	w.out.printf("   recovered. It is stored in %s.\n", stored)
