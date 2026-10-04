@@ -53,10 +53,11 @@ const (
 )
 
 // backgroundWorkerDatabase is what the cleanup worker needs: the claim that makes one instance
-// the sweeper, and the nine deletes it sweeps with.
+// the sweeper, and the ten deletes it sweeps with.
 type backgroundWorkerDatabase interface {
 	DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error
 	DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error
+	DeleteExpiredRateLimitCounters(ctx context.Context, tx *sql.Tx, now time.Time) error
 	DeleteExpiredRefreshTokens(ctx context.Context, tx *sql.Tx) error
 	DeleteExpiredSessions(ctx context.Context, tx *sql.Tx, maxLifetime time.Duration) error
 	DeleteOrphanedRefreshTokenFamilyRevocations(ctx context.Context, tx *sql.Tx) error
@@ -139,14 +140,35 @@ func (w *Worker) run(ctx context.Context) {
 
 // poll is what one tick of the worker does, and the two halves are deliberately unequal.
 //
-// The browser session reap and the parked authorization request reap run on every instance every
-// time, outside the claim. The rest of the cleanup runs on at most one instance every
-// cleanupInterval, behind the claim. The calls live here rather than inline in run so the pairing
-// is one thing a test can exercise without waiting out the startup delay (#266 decision 19, #437).
+// The browser session reap, the parked authorization request reap and the rate-limit counter reap
+// run on every instance every time, outside the claim. The rest of the cleanup runs on at most one
+// instance every cleanupInterval, behind the claim. The calls live here rather than inline in run
+// so the pairing is one thing a test can exercise without waiting out the startup delay (#266
+// decision 19, #437, #394).
 func (w *Worker) poll(ctx context.Context) {
 	w.reapBrowserSessions(ctx)
 	w.reapAuthorizeRequests(ctx)
+	w.reapRateLimitCounters(ctx)
 	w.runIfClaimed(ctx)
+}
+
+// reapRateLimitCounters deletes the shared credential counters whose two windows have both passed.
+//
+// The third sweep outside the claim, for the reason the other two are. On PostgreSQL, MySQL and SQL
+// Server every credential check charges a row before it runs, for any address, real or not, so an
+// unauthenticated caller produces rows as fast as the per-IP tier in front lets it try, on every
+// pod at once. A
+// row is no use once its windows have passed, an hour at most, and on the twelve hour claim it
+// would go on existing for up to twelve. It runs whether or not the limiter is on: a delete on an
+// empty table costs nothing, and a limiter switched off leaves no rows behind. On SQLite the table
+// stays empty, since the tiers count in memory there.
+//
+// Single-flight is given up on the same terms: the delete is idempotent and keyed on an indexed
+// column. Do not move this call into performTask (#394 decision 3).
+func (w *Worker) reapRateLimitCounters(ctx context.Context) {
+	if err := w.database.DeleteExpiredRateLimitCounters(ctx, nil, time.Now().UTC()); err != nil {
+		slog.ErrorContext(ctx, "unable to delete expired rate limit counters", "error", err)
+	}
 }
 
 // reapAuthorizeRequests deletes parked authorization requests whose expires_at has passed.

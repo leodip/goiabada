@@ -726,3 +726,35 @@ func TestInitRoutes_TokenFormThatDoesNotParse(t *testing.T) {
 		})
 	}
 }
+
+// TestInitRoutes_TheCredentialTiersCountInTheDatabaseOnTheServerEngines is #394 decision 2's engine
+// choice, made by initRoutes with no setting: on PostgreSQL, MySQL and SQL Server a wrong account
+// password is counted in the database every replica shares, and on SQLite, which cannot have a
+// second replica, in this process. The database mock is strict, so on SQLite a reservation reaching
+// it is an unexpected call that fails the case by itself.
+func TestInitRoutes_TheCredentialTiersCountInTheDatabaseOnTheServerEngines(t *testing.T) {
+	passwordBody := `{"currentPassword":"` + routesTestWrongPassword + `","newPassword":"a new password"}`
+
+	for _, engine := range []string{"postgres", "mysql", "mssql"} {
+		t.Run(engine+" counts in the database", func(t *testing.T) {
+			server := newRoutesTestServerWith(t, func(cfg *config.Config) { cfg.Database.Type = engine })
+			database := server.database.(*datamocks.Database)
+			database.On("ReserveRateLimitHit", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+				mock.Anything, mock.Anything).Return(true, nil).Once()
+
+			assert.NotEqual(t, http.StatusTooManyRequests,
+				serve(server, apiRequest(http.MethodPut, "/api/v1/account/password", passwordBody)).Code)
+
+			database.AssertNumberOfCalls(t, "ReserveRateLimitHit", 1)
+		})
+	}
+
+	t.Run("sqlite counts in memory", func(t *testing.T) {
+		server := newRoutesTestServerWith(t, func(cfg *config.Config) { cfg.Database.Type = "sqlite" })
+
+		// The whole budget spent and refused, with the database never asked.
+		assertRefused(t, exhaust(t, server, accountPasswordBudget, func(int) *http.Request {
+			return apiRequest(http.MethodPut, "/api/v1/account/password", passwordBody)
+		}), accountPasswordWindow, shapeAPI)
+	})
+}

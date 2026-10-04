@@ -72,7 +72,7 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), credentialSubject).Return(user, nil).Maybe()
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
-	rateLimiter := middleware.NewRateLimiter(nil, unusedRenderer{t}, nil, nil, true)
+	rateLimiter := middleware.NewRateLimiter(nil, unusedRenderer{t}, nil, nil, true, nil)
 
 	return &credentialEnv{
 		password: rateLimiter.LimitAccountPassword(
