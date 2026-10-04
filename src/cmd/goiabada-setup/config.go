@@ -23,4 +23,18 @@ type Config struct {
 	// LocalProxy says a reverse proxy on the same machine forwards to the native binaries: they
 	// then listen on loopback alone and trust its forwarded headers. Only native binaries ask.
 	LocalProxy bool
+	// GatewayTrafficPolicy is the externalTrafficPolicy of Envoy Gateway's load balancer Service,
+	// which decides the address the servers see for a client. Only Kubernetes asks (#396 decision 4).
+	GatewayTrafficPolicy trafficPolicy
+	// NetworkPolicy says the manifest admits the servers' ports from Envoy's namespace, and the auth
+	// server's from the admin console, and from nothing else. Only Kubernetes asks (#396 decision 5).
+	NetworkPolicy bool
 }
+
+// trafficPolicy is an externalTrafficPolicy, spelled as Kubernetes spells it.
+type trafficPolicy string
+
+const (
+	trafficPolicyCluster trafficPolicy = "Cluster"
+	trafficPolicyLocal   trafficPolicy = "Local"
+)

@@ -98,6 +98,12 @@ func interactiveScript(d *deployment, e *engine) []scriptedStep {
 	if d.asksNamespace {
 		steps = append(steps, scriptedStep{prompt: "Namespace [goiabada]: ", answer: ""})
 	}
+	if d.servedByEnvoyGateway {
+		steps = append(steps,
+			scriptedStep{prompt: trafficPolicyPrompt, answer: ""},
+			scriptedStep{prompt: networkPolicyPrompt, answer: ""},
+		)
+	}
 	if d.kind == deploymentNative {
 		steps = append(steps, scriptedStep{prompt: localProxyPrompt, answer: ""})
 	}
@@ -138,8 +144,8 @@ func TestWizard_EveryDeploymentTypeRunsToItsFile(t *testing.T) {
 		{deploymentLocal, "mysql", []string{"Deployment type", "Database type", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
 		{deploymentProduction, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Admin credentials", "Generating credentials", "Generating configuration"}},
 		{deploymentProduction, "postgres", []string{"Deployment type", "Database type", "Domain names", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
-		{deploymentKubernetes, "postgres", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
-		{deploymentKubernetes, "mssql", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentKubernetes, "postgres", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Gateway traffic policy", "Network policy", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentKubernetes, "mssql", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Gateway traffic policy", "Network policy", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
 		{deploymentNative, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Admin credentials", "Generating credentials", "Generating configuration"}},
 		{deploymentNative, "mysql", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
 	}
@@ -369,7 +375,7 @@ func TestWizard_NonInteractiveRunsFromTheFlags(t *testing.T) {
 				DeploymentType: "k8s", DBType: "postgres", AuthServerURL: "https://auth.example.org",
 				Namespace: "identity", DBHost: "pg.internal", DBPort: "6543", DBName: "gb", DBUsername: "gbuser", DBPassword: "db-secret",
 			},
-			numbers:  []int{7, 8},
+			numbers:  []int{9, 10},
 			database: connectionCall{"postgres", "pg.internal", "6543", "gb", "gbuser", "db-secret"},
 			checked:  true,
 		},
@@ -850,6 +856,48 @@ func TestParseFlags(t *testing.T) {
 			t.Errorf("--local-proxy is not listed under the native binaries options:\n%s", usage)
 		}
 	})
+	// --gateway-traffic-policy reads cluster or local in any case, and anything else is refused by
+	// the flag's name; --network-policy is a plain boolean (#396 decisions 4, 5 and 19).
+	t.Run("--gateway-traffic-policy and --network-policy", func(t *testing.T) {
+		for args, want := range map[string]struct {
+			policy        trafficPolicy
+			networkPolicy bool
+		}{
+			"":                                 {},
+			"--gateway-traffic-policy=cluster": {trafficPolicyCluster, false},
+			"--gateway-traffic-policy=local":   {trafficPolicyLocal, false},
+			"--gateway-traffic-policy=Local":   {trafficPolicyLocal, false},
+			"--gateway-traffic-policy cluster --network-policy": {trafficPolicyCluster, true},
+			"--network-policy=false":                            {"", false},
+		} {
+			flags, err := parseFlags(strings.Fields(args), io.Discard)
+			if err != nil {
+				t.Fatalf("parseFlags(%q): %v", args, err)
+			}
+			if flags.GatewayTrafficPolicy != want.policy || flags.NetworkPolicy != want.networkPolicy {
+				t.Errorf("parseFlags(%q) reads %q and %v, want %q and %v", args, flags.GatewayTrafficPolicy, flags.NetworkPolicy, want.policy, want.networkPolicy)
+			}
+		}
+		for _, value := range []string{"nodes", "", "Cluster,Local"} {
+			_, err := parseFlags([]string{"--gateway-traffic-policy=" + value}, io.Discard)
+			if err == nil || !strings.Contains(err.Error(), "for flag -gateway-traffic-policy: use cluster or local") {
+				t.Errorf("parseFlags(--gateway-traffic-policy=%s): %v, want the value refused by the flag's name", value, err)
+			}
+		}
+	})
+	t.Run("the usage lists the Kubernetes flags under Kubernetes", func(t *testing.T) {
+		var stderr bytes.Buffer
+		_, _ = parseFlags([]string{"-h"}, &stderr)
+		usage := stderr.String()
+		section := strings.Index(usage, "Kubernetes Options:")
+		next := strings.Index(usage, "Native Binaries Options:")
+		for _, name := range []string{"--gateway-traffic-policy", "--network-policy"} {
+			at := strings.Index(usage, name)
+			if section < 0 || at < section || at > next {
+				t.Errorf("%s is not listed under the Kubernetes options:\n%s", name, usage)
+			}
+		}
+	})
 	t.Run("values", func(t *testing.T) {
 		flags, err := parseFlags([]string{"--type=native", "--db", "mysql", "-o", "out.env", "--skip-db-test", "--no-color"}, io.Discard)
 		if err != nil {
@@ -941,6 +989,165 @@ func TestWizard_LocalProxyIsIgnoredOutsideNative(t *testing.T) {
 			}
 			if strings.Contains(out.String(), "reverse proxy on this machine") {
 				t.Errorf("%s reports the native answer:\n%s", flags.DeploymentType, out)
+			}
+		})
+	}
+}
+
+// trafficPolicyPrompt and networkPolicyPrompt are the two Kubernetes questions, the first Cluster
+// by default and the second no (#396 decisions 4 and 5).
+const (
+	trafficPolicyPrompt = "Select traffic policy [1-2] [1]: "
+	networkPolicyPrompt = "Restrict who can reach Goiabada with NetworkPolicies? [y/N]: "
+)
+
+// kubernetesFlags is a non-interactive Kubernetes run, its answers to the two questions left out.
+func kubernetesFlags() *CLIFlags {
+	return &CLIFlags{DeploymentType: "kubernetes", DBType: "postgres", AuthServerURL: "https://auth.example.org",
+		DBHost: "pg.internal", SkipDBTest: true}
+}
+
+// withKubernetesAnswer is the interactive Kubernetes script with prompt answered by answer.
+func withKubernetesAnswer(t *testing.T, prompt, answer string) []scriptedStep {
+	t.Helper()
+	steps := interactiveScript(deployments[deploymentKubernetes], testEngine("postgres"))
+	for i := range steps {
+		if steps[i].prompt == prompt {
+			steps[i].answer = answer
+			return steps
+		}
+	}
+	t.Fatalf("the script never asks %q", prompt)
+	return nil
+}
+
+// Kubernetes asks which traffic policy the gateway uses, Cluster by default, and
+// --gateway-traffic-policy answers without a prompt, Cluster when left out. The question says what
+// each costs and that the EnvoyProxy is cluster-wide; the answer is the EnvoyProxy the completion
+// message prints and what the manifest says the servers see (#396 decisions 4 and 19).
+func TestWizard_KubernetesAsksTheGatewayTrafficPolicy(t *testing.T) {
+	cases := map[string]struct {
+		flags *CLIFlags
+		steps []scriptedStep
+		want  trafficPolicy
+	}{
+		"prompted, the default": {&CLIFlags{}, withKubernetesAnswer(t, trafficPolicyPrompt, ""), trafficPolicyCluster},
+		"prompted, 1":           {&CLIFlags{}, withKubernetesAnswer(t, trafficPolicyPrompt, "1"), trafficPolicyCluster},
+		"prompted, 2":           {&CLIFlags{}, withKubernetesAnswer(t, trafficPolicyPrompt, "2"), trafficPolicyLocal},
+		"by flag, left out":     {kubernetesFlags(), nil, trafficPolicyCluster},
+		"by flag, cluster": {func() *CLIFlags {
+			f := kubernetesFlags()
+			f.GatewayTrafficPolicy = trafficPolicyCluster
+			return f
+		}(), nil, trafficPolicyCluster},
+		"by flag, local": {func() *CLIFlags {
+			f := kubernetesFlags()
+			f.GatewayTrafficPolicy = trafficPolicyLocal
+			return f
+		}(), nil, trafficPolicyLocal},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			w, in, out, _ := testWizard(t, tc.flags, tc.steps)
+			if err := w.setup(); err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			in.assertConsumed()
+			if w.config.GatewayTrafficPolicy != tc.want {
+				t.Errorf("GatewayTrafficPolicy is %q, want %q", w.config.GatewayTrafficPolicy, tc.want)
+			}
+			if !strings.Contains(out.String(), "externalTrafficPolicy: "+string(tc.want)) {
+				t.Errorf("the completion message's EnvoyProxy does not set externalTrafficPolicy: %s:\n%s", tc.want, out)
+			}
+			written, err := os.ReadFile(w.outputPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			seen := map[trafficPolicy]string{trafficPolicyCluster: "a node's address", trafficPolicyLocal: "the client's address"}[tc.want]
+			if !strings.Contains(strings.Join(strings.Fields(string(written)), " "), seen) {
+				t.Errorf("the manifest does not say the servers see %s", seen)
+			}
+			if tc.steps != nil {
+				for _, said := range []string{"Cluster", "node's address", "Local", "DaemonSet", "client's address", "cluster-wide"} {
+					if !strings.Contains(out.String(), said) {
+						t.Errorf("the question does not say %q:\n%s", said, out)
+					}
+				}
+			}
+		})
+	}
+}
+
+// Kubernetes asks whether to restrict who can reach Goiabada, no by default, and --network-policy
+// answers without a prompt, no when left out. The question says what stays open on no; the answer
+// is whether the manifest carries the NetworkPolicies (#396 decisions 5 and 19).
+func TestWizard_KubernetesAsksWhetherToRestrictWhoReachesIt(t *testing.T) {
+	cases := map[string]struct {
+		flags *CLIFlags
+		steps []scriptedStep
+		want  bool
+	}{
+		"prompted, the default": {&CLIFlags{}, withKubernetesAnswer(t, networkPolicyPrompt, ""), false},
+		"prompted, yes":         {&CLIFlags{}, withKubernetesAnswer(t, networkPolicyPrompt, "y"), true},
+		"prompted, no":          {&CLIFlags{}, withKubernetesAnswer(t, networkPolicyPrompt, "n"), false},
+		"by flag, left out":     {kubernetesFlags(), nil, false},
+		"by flag, --network-policy": {func() *CLIFlags {
+			f := kubernetesFlags()
+			f.NetworkPolicy = true
+			return f
+		}(), nil, true},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			w, in, out, _ := testWizard(t, tc.flags, tc.steps)
+			if err := w.setup(); err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			in.assertConsumed()
+			if w.config.NetworkPolicy != tc.want {
+				t.Errorf("NetworkPolicy is %v, want %v", w.config.NetworkPolicy, tc.want)
+			}
+			written, err := os.ReadFile(w.outputPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			policies := 0
+			for _, doc := range yamlDocuments(t, string(written)) {
+				if doc["kind"] == "NetworkPolicy" {
+					policies++
+				}
+			}
+			if want := map[bool]int{true: 2, false: 0}[tc.want]; policies != want {
+				t.Errorf("the manifest carries %d NetworkPolicies, want %d", policies, want)
+			}
+			if tc.steps != nil && !strings.Contains(strings.Join(strings.Fields(out.String()), " "), "any pod in the cluster can reach both servers") {
+				t.Errorf("the question does not say what stays open on no:\n%s", out)
+			}
+		})
+	}
+}
+
+// --gateway-traffic-policy and --network-policy are ignored by every type that does not deploy to
+// Kubernetes, as --namespace and --db-host are (#396 decision 19).
+func TestWizard_KubernetesFlagsAreIgnoredElsewhere(t *testing.T) {
+	for _, flags := range []CLIFlags{
+		{DeploymentType: "production", DBType: "postgres", AuthServerURL: "https://auth.example.org"},
+		{DeploymentType: "native", DBType: "postgres", AuthServerURL: "https://auth.example.org", DBHost: "pg.internal", SkipDBTest: true},
+		{DeploymentType: "local", DBType: "sqlite"},
+	} {
+		t.Run(flags.DeploymentType, func(t *testing.T) {
+			flags.GatewayTrafficPolicy, flags.NetworkPolicy = trafficPolicyLocal, true
+			w, _, out, _ := testWizard(t, &flags, nil)
+			if err := w.setup(); err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			if w.config.GatewayTrafficPolicy != "" || w.config.NetworkPolicy {
+				t.Errorf("%s holds traffic policy %q and NetworkPolicy %v", flags.DeploymentType, w.config.GatewayTrafficPolicy, w.config.NetworkPolicy)
+			}
+			for _, said := range []string{"traffic policy", "NetworkPolic"} {
+				if strings.Contains(out.String(), said) {
+					t.Errorf("%s reports %q:\n%s", flags.DeploymentType, said, out)
+				}
 			}
 		})
 	}

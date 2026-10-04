@@ -54,6 +54,8 @@ The setup wizard generates:
   checks, resource limits, a rolling update strategy and a spread over nodes
 - **PodDisruptionBudgets**: One per Deployment (see [Disruptions](#disruptions-and-spread))
 - **Services**: ClusterIP services for internal routing
+- **NetworkPolicies**, if you ask for them: one per Deployment, admitting only Envoy and the admin
+  console (see [Who can reach Goiabada](#who-can-reach-goiabada))
 - **Gateway and HTTPRoutes**: External access with TLS termination
 
 ## Prerequisites
@@ -97,7 +99,15 @@ kubectl wait --timeout=5m -n envoy-gateway-system \
   deployment/envoy-gateway --for=condition=Available
 ```
 
-Then create the `eg` GatewayClass the generated manifest names. Its EnvoyProxy changes `externalTrafficPolicy` from `Local`, the default, to `Cluster` for better compatibility with cloud LoadBalancers. Save as `gatewayclass.yaml`:
+Then create the `eg` GatewayClass the generated manifest names, backed by an EnvoyProxy that sets
+the traffic policy of the load balancer Service in front of Envoy. The wizard asks which policy you
+want and prints the matching file; both are below. The policy decides which address Goiabada sees
+for a client, and so what its rate limits, audit records and session records count.
+
+**`Cluster`, the wizard's default**, works behind every load balancer: the load balancer may send a
+connection to any node, and kube-proxy forwards it to an Envoy pod wherever one runs. The cost is
+that the forwarding node replaces the client's address with its own, so Envoy, and Goiabada behind
+it, see a node's address for every client. Save as `gatewayclass.yaml`:
 
 ```yaml
 apiVersion: gateway.envoyproxy.io/v1alpha1
@@ -125,12 +135,58 @@ spec:
     namespace: envoy-gateway-system
 ```
 
-<Aside type="note" title="Why Cluster mode?">
-The default `Local` policy can cause connection timeouts on some cloud providers due to traffic being dropped on nodes without Envoy pods. `Cluster` mode routes traffic through kube-proxy, which works reliably everywhere.
+**`Local`, with Envoy on every node** (`--gateway-traffic-policy=local`), keeps the client's
+address: a node delivers a connection only to an Envoy pod on that same node, so nothing rewrites
+its source. Under `Local` a node with no Envoy pod drops the traffic the load balancer sends it,
+which is why Envoy Gateway's own default, `Local` with a one-pod Deployment, can time out on some
+clouds. Running Envoy as a DaemonSet puts a pod on every node, at the cost of one Envoy pod, with
+its CPU and memory, per node.
+Save this as `gatewayclass.yaml` instead:
 
-**Trade-off:** With `Cluster`, Envoy sees a node IP instead of the client IP, and that node IP is what Goiabada reads from the `X-Forwarded-For` header Envoy sets (`TRUST_PROXY_HEADERS=true`), so its rate limiting and session records see it too.
+```yaml
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: goiabada-proxy
+  namespace: envoy-gateway-system
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDaemonSet: {}
+      envoyService:
+        externalTrafficPolicy: Local
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: goiabada-proxy
+    namespace: envoy-gateway-system
+```
 
-If you need the client IP preserved (e.g., for per-client rate limiting, or IP allowlisting at the LoadBalancer), consider running Envoy as a DaemonSet (`envoyDaemonSet` in the EnvoyProxy) with `Local` policy, or enable Proxy Protocol if your cloud supports it.
+An empty `envoyDaemonSet` is a DaemonSet with every default; an EnvoyProxy takes either it or
+`envoyDeployment`, not both. This variant follows Envoy Gateway v1.9.1's API and has not been tried
+on a load-balanced cluster by the project, so check that a pod runs on every node after applying it:
+`kubectl get daemonset -n envoy-gateway-system`.
+
+A third route keeps the client's address without an Envoy pod per node: Proxy Protocol, where the
+load balancer prepends the client's address to each connection and Envoy reads it. It needs
+annotations on the load balancer Service that differ from cloud to cloud, which the wizard cannot
+know, so it does not offer it; Envoy Gateway's
+[client traffic policy](https://gateway.envoyproxy.io/docs/tasks/traffic/client-traffic-policy/)
+documentation covers the Envoy side.
+
+<Aside type="caution" title="The EnvoyProxy and GatewayClass are cluster-wide">
+Every Gateway of class `eg` shares them. On a cluster that already runs Envoy Gateway, the traffic
+policy belongs to whoever runs it: agree it with them rather than apply either file over theirs, and
+answer the wizard's question with the policy the cluster actually uses, since the manifest's
+comments follow it.
 </Aside>
 
 ```bash
@@ -222,8 +278,10 @@ Use the [setup wizard](/getting-started/setup-wizard/):
 2. Choose your database type
 3. Enter your domain names (e.g., `https://auth.example.com`)
 4. Enter your Kubernetes namespace (default: `goiabada`)
-5. Configure admin credentials
-6. Enter your database connection details
+5. Choose the gateway's traffic policy, `Cluster` (default) or `Local` (see [Step 1](#step-1-install-envoy-gateway))
+6. Choose whether NetworkPolicies restrict who can reach Goiabada (default: no; see [Who can reach Goiabada](#who-can-reach-goiabada))
+7. Configure admin credentials
+8. Enter your database connection details
 </Steps>
 
 The wizard will:
@@ -297,9 +355,18 @@ kubectl describe challenges -n goiabada
 
 ### Connectivity issues (port 80 not responding)
 
-Some cloud providers have issues with `externalTrafficPolicy: Local` on LoadBalancer services. The EnvoyProxy in Step 1 changes this to `Cluster` to avoid the issue.
+Under `externalTrafficPolicy: Local`, a node with no Envoy pod drops what the load balancer sends
+it, so a single Envoy pod leaves most nodes answering nothing. Under the `Cluster` EnvoyProxy of Step
+1 that cannot happen. Under the `Local` one, check that the DaemonSet runs a pod on every node:
 
-If your `eg` GatewayClass has no `parametersRef` to that EnvoyProxy, apply Step 1's file:
+```bash
+kubectl get daemonset -n envoy-gateway-system
+```
+
+If your load balancer still cannot reach Envoy under `Local`, switch to the `Cluster` file of Step 1,
+which has no `envoyDaemonSet`; Goiabada then sees a node's address for every client.
+
+If your `eg` GatewayClass has no `parametersRef` to the EnvoyProxy, apply Step 1's file:
 
 ```bash
 kubectl apply -f gatewayclass.yaml
@@ -430,9 +497,9 @@ turn it on, not every limit holds across replicas:
   Service, three replicas give a client up to three times each budget, and a rollout resets them.
   For a request limit across the whole deployment, use the gateway's own rate limiting.
 - **The per-IP limits depend on the client IP.** The generated manifests trust one proxy hop with
-  `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` empty, and with the `Cluster` traffic policy of Step 1 the
+  `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` empty. Under the `Cluster` traffic policy of Step 1 the
   address Goiabada sees is a node's, so a per-IP limit counts everyone arriving through one node
-  together. See [client IP and proxy trust](#client-ip-and-proxy-trust) before relying on one.
+  together; under `Local` it is the client's. See [client IP and proxy trust](#client-ip-and-proxy-trust) before relying on one.
 
 The budgets are in the [rate limiting table](/reference/environment-variables/#security-settings).
 
@@ -527,7 +594,8 @@ rightmost `X-Forwarded-For` entry. Envoy appends the address it received each co
 that header, so the rightmost entry is Envoy's own observation: whatever a client sends in
 `X-Forwarded-For` ends up to its left and is never read. Which address Envoy observes depends on the
 traffic policy of Step 1: under `Cluster`, a node's; under `Local` with Envoy on every node, the
-client's.
+client's. The comment above each pair in the manifest says which, following your answer to the
+wizard.
 
 **Why the list is empty.** A trusted-proxy list makes Goiabada walk `X-Forwarded-For` from the right
 past every address in it. The lists that come to mind for a cluster both go wrong here. The private
@@ -545,11 +613,70 @@ Goiabada reads the forwarded headers only from a connection whose address is in 
 `goiabada-adminconsole` Service directly, around Envoy, connects from its own address and can send
 any `X-Forwarded-For` it likes, choosing the address it is rate limited and audited under. No
 trusted-proxy list prevents that, since Envoy's pods are pods too; a NetworkPolicy admitting only
-Envoy's namespace does.
+Envoy's namespace does (see [Who can reach Goiabada](#who-can-reach-goiabada)).
 
 See [client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection)
 for how the resolution works, and the startup warning the auth server logs about it when the rate
 limiter is on.
+
+## Who can reach Goiabada
+
+Without a NetworkPolicy, any pod in the cluster can call the `goiabada-authserver` and
+`goiabada-adminconsole` Services directly, around Envoy. Besides reaching the admin console from
+inside the cluster, such a pod chooses the address it is rate limited and audited under, by sending
+its own `X-Forwarded-For` (see [client IP and proxy trust](#client-ip-and-proxy-trust)). The wizard
+asks whether to close that; the answer is no unless you say yes, or pass `--network-policy`.
+
+On yes, the manifest carries one ingress-only NetworkPolicy per Deployment:
+
+| Pods | Admitted on | From |
+|------|-------------|------|
+| `goiabada-authserver` | TCP 9090 | Envoy's namespace, `envoy-gateway-system`; the admin console's pods |
+| `goiabada-adminconsole` | TCP 9091 | Envoy's namespace, `envoy-gateway-system` |
+
+Envoy's namespace is selected by its `kubernetes.io/metadata.name` label, which Kubernetes sets on
+every namespace. `envoy-gateway-system` is where Envoy Gateway runs its proxies by default; if yours
+runs them elsewhere, change the name in both policies. The kubelet's health probes come from the
+pod's own node, which a NetworkPolicy cannot block, and cert-manager's HTTP-01 solver pods carry
+other labels, so neither is affected.
+
+Before you answer yes, check two things:
+
+- **Your CNI enforces NetworkPolicy.** Calico and Cilium do. Some clusters' default network plugin
+  does not, or does only once enforcement is turned on in the cluster's settings; there the policies
+  are accepted and do nothing.
+- **Nothing else in the cluster calls the auth server through its Service.** A resource server that
+  fetches `/certs` or calls `/userinfo` at `http://goiabada-authserver.goiabada:9090` is refused once
+  the policy applies, and the connection times out rather than being refused. Admit its namespace
+  by adding a peer to the auth server's policy, as its comment shows:
+
+  ```yaml
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: envoy-gateway-system
+    - podSelector:
+        matchLabels:
+          app: goiabada-adminconsole
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: my-resource-server
+  ```
+
+  A workload that calls the auth server's public URL goes through Envoy and needs nothing.
+
+The policies state no egress rules, so they restrict nothing the servers connect to. An egress rule
+would have to name every destination, and two cannot be named: the SMTP host and port are settings
+in the database, changed in the admin console, and the database host is often a DNS name, while a
+NetworkPolicy selects only pods, namespaces and IP blocks. A rule written for today's addresses
+would cut email or the database when either moved.
+
+To see what the policies admit:
+
+```bash
+kubectl describe networkpolicy -n goiabada
+```
 
 ## Health endpoints
 

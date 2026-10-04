@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -199,67 +200,265 @@ func completionYAML(t *testing.T, message string) []map[string]any {
 }
 
 // The completion message's prerequisites set up exactly what the manifest names: the GatewayClass
-// its Gateway asks for, backed by an EnvoyProxy with externalTrafficPolicy Cluster, and the
+// its Gateway asks for, backed by an EnvoyProxy with the traffic policy the operator chose, and the
 // ClusterIssuer its annotation asks for, solving HTTP-01 through that Gateway in the manifest's
-// namespace. Nothing is left of ingress-nginx, which is retired (#430).
+// namespace. Nothing is left of ingress-nginx, which is retired (#430). Under Local, Envoy runs on
+// every node as a DaemonSet, so no node the load balancer sends to drops the traffic; under Cluster
+// it stays a Deployment (#396 decision 4, checked against Envoy Gateway v1.9.1's API types).
 func TestKubernetesInstructions_SetUpWhatTheManifestNames(t *testing.T) {
-	config := kubernetesConfig()
-	gateway := kubernetesDocuments(t, config)["Gateway"]["goiabada"]
-	var buf bytes.Buffer
-	printKubernetesInstructions(&console{w: &buf}, config, "goiabada-k8s.yaml")
-	message := buf.String()
+	for _, policy := range []trafficPolicy{trafficPolicyCluster, trafficPolicyLocal} {
+		t.Run(string(policy), func(t *testing.T) {
+			config := kubernetesConfig()
+			config.GatewayTrafficPolicy = policy
+			gateway := kubernetesDocuments(t, config)["Gateway"]["goiabada"]
+			var buf bytes.Buffer
+			printKubernetesInstructions(&console{w: &buf}, config, "goiabada-k8s.yaml")
+			message := buf.String()
 
-	for _, gone := range []string{"ingress-nginx", "Ingress", "ingress:", "LoadBalancer"} {
-		if strings.Contains(message, gone) {
-			t.Errorf("the message still mentions %q", gone)
-		}
-	}
+			for _, gone := range []string{"ingress-nginx", "Ingress", "ingress:", "LoadBalancer"} {
+				if strings.Contains(message, gone) {
+					t.Errorf("the message still mentions %q", gone)
+				}
+			}
 
-	byKind := map[string]map[string]any{}
-	for _, doc := range completionYAML(t, message) {
-		byKind[at[string](t, doc, "kind")] = doc
-	}
-	if len(byKind) != 3 {
-		t.Fatalf("the message's YAML is %d kinds, want EnvoyProxy, GatewayClass and ClusterIssuer", len(byKind))
-	}
+			byKind := map[string]map[string]any{}
+			for _, doc := range completionYAML(t, message) {
+				byKind[at[string](t, doc, "kind")] = doc
+			}
+			if len(byKind) != 3 {
+				t.Fatalf("the message's YAML is %d kinds, want EnvoyProxy, GatewayClass and ClusterIssuer", len(byKind))
+			}
 
-	class := byKind["GatewayClass"]
-	if got, want := at[string](t, class, "metadata", "name"), at[string](t, gateway, "spec", "gatewayClassName"); got != want {
-		t.Errorf("the GatewayClass is %q, and the Gateway asks for %q", got, want)
-	}
-	if got := at[string](t, class, "spec", "controllerName"); got != "gateway.envoyproxy.io/gatewayclass-controller" {
-		t.Errorf("the GatewayClass is for controller %q, want Envoy Gateway's", got)
-	}
-	proxy := byKind["EnvoyProxy"]
-	ref := at[map[string]any](t, class, "spec", "parametersRef")
-	if at[string](t, ref, "kind") != "EnvoyProxy" || at[string](t, ref, "group") != "gateway.envoyproxy.io" ||
-		at[string](t, ref, "name") != at[string](t, proxy, "metadata", "name") ||
-		at[string](t, ref, "namespace") != at[string](t, proxy, "metadata", "namespace") {
-		t.Errorf("the GatewayClass takes parameters from %v, which is not the EnvoyProxy %v", ref, proxy["metadata"])
-	}
-	if got := at[string](t, proxy, "spec", "provider", "kubernetes", "envoyService", "externalTrafficPolicy"); got != "Cluster" {
-		t.Errorf("the EnvoyProxy sets externalTrafficPolicy %q, want Cluster", got)
-	}
+			class := byKind["GatewayClass"]
+			if got, want := at[string](t, class, "metadata", "name"), at[string](t, gateway, "spec", "gatewayClassName"); got != want {
+				t.Errorf("the GatewayClass is %q, and the Gateway asks for %q", got, want)
+			}
+			if got := at[string](t, class, "spec", "controllerName"); got != "gateway.envoyproxy.io/gatewayclass-controller" {
+				t.Errorf("the GatewayClass is for controller %q, want Envoy Gateway's", got)
+			}
+			proxy := byKind["EnvoyProxy"]
+			ref := at[map[string]any](t, class, "spec", "parametersRef")
+			if at[string](t, ref, "kind") != "EnvoyProxy" || at[string](t, ref, "group") != "gateway.envoyproxy.io" ||
+				at[string](t, ref, "name") != at[string](t, proxy, "metadata", "name") ||
+				at[string](t, ref, "namespace") != at[string](t, proxy, "metadata", "namespace") {
+				t.Errorf("the GatewayClass takes parameters from %v, which is not the EnvoyProxy %v", ref, proxy["metadata"])
+			}
+			provider := at[map[string]any](t, proxy, "spec", "provider", "kubernetes")
+			if got := at[string](t, provider, "envoyService", "externalTrafficPolicy"); got != string(policy) {
+				t.Errorf("the EnvoyProxy sets externalTrafficPolicy %q, want %s", got, policy)
+			}
+			// Envoy Gateway v1.9.1 admits one of envoyDeployment and envoyDaemonSet, and an empty
+			// envoyDaemonSet is a DaemonSet with every default.
+			if _, ok := provider["envoyDeployment"]; ok {
+				t.Errorf("the EnvoyProxy sets envoyDeployment: %v", provider["envoyDeployment"])
+			}
+			daemonSet, isDaemonSet := provider["envoyDaemonSet"]
+			if want := policy == trafficPolicyLocal; isDaemonSet != want {
+				t.Errorf("the EnvoyProxy runs Envoy as a DaemonSet: %v, want %v", isDaemonSet, want)
+			}
+			if isDaemonSet {
+				if spec, ok := daemonSet.(map[string]any); !ok || len(spec) != 0 {
+					t.Errorf("envoyDaemonSet is %v, want an empty mapping", daemonSet)
+				}
+			}
 
-	issuer := byKind["ClusterIssuer"]
-	if got, want := at[string](t, issuer, "metadata", "name"), at[string](t, gateway, "metadata", "annotations", "cert-manager.io/cluster-issuer"); got != want {
-		t.Errorf("the ClusterIssuer is %q, and the Gateway asks for %q", got, want)
-	}
-	solver := only[map[string]any](t, at[[]any](t, issuer, "spec", "acme", "solvers"), "the issuer's solvers")
-	parent := only[map[string]any](t, at[[]any](t, solver, "http01", "gatewayHTTPRoute", "parentRefs"), "the solver's parentRefs")
-	if at[string](t, parent, "kind") != "Gateway" || at[string](t, parent, "name") != at[string](t, gateway, "metadata", "name") ||
-		at[string](t, parent, "namespace") != config.K8sNamespace {
-		t.Errorf("the solver attaches to %v, want the Gateway %s in %s", parent, gateway["metadata"], config.K8sNamespace)
-	}
+			issuer := byKind["ClusterIssuer"]
+			if got, want := at[string](t, issuer, "metadata", "name"), at[string](t, gateway, "metadata", "annotations", "cert-manager.io/cluster-issuer"); got != want {
+				t.Errorf("the ClusterIssuer is %q, and the Gateway asks for %q", got, want)
+			}
+			solver := only[map[string]any](t, at[[]any](t, issuer, "spec", "acme", "solvers"), "the issuer's solvers")
+			parent := only[map[string]any](t, at[[]any](t, solver, "http01", "gatewayHTTPRoute", "parentRefs"), "the solver's parentRefs")
+			if at[string](t, parent, "kind") != "Gateway" || at[string](t, parent, "name") != at[string](t, gateway, "metadata", "name") ||
+				at[string](t, parent, "namespace") != config.K8sNamespace {
+				t.Errorf("the solver attaches to %v, want the Gateway %s in %s", parent, gateway["metadata"], config.K8sNamespace)
+			}
 
-	for _, command := range []string{
-		"kubectl get gateway goiabada -n identity -o jsonpath='{.status.addresses[0].value}'",
-		"kubectl get gateway,httproute -n identity",
+			for _, command := range []string{
+				"kubectl get gateway goiabada -n identity -o jsonpath='{.status.addresses[0].value}'",
+				"kubectl get gateway,httproute -n identity",
+			} {
+				if !strings.Contains(message, command) {
+					t.Errorf("the message has no %q", command)
+				}
+			}
+		})
+	}
+}
+
+// The EnvoyProxy and the GatewayClass are cluster-wide, so the message says the traffic policy is
+// the choice of whoever runs Envoy Gateway; and its troubleshooting tips follow the policy chosen:
+// under Cluster, the EnvoyProxy that sets it, and under Local, the DaemonSet that must run an Envoy
+// pod on every node the load balancer sends to (#396 decision 4).
+func TestKubernetesInstructions_FollowTheTrafficPolicy(t *testing.T) {
+	for _, testCase := range []struct {
+		policy          trafficPolicy
+		wanted, refused []string
+	}{
+		{trafficPolicyCluster,
+			[]string{"If the GatewayClass has no EnvoyProxy with externalTrafficPolicy: Cluster"},
+			[]string{"kubectl get daemonset -n envoy-gateway-system"}},
+		{trafficPolicyLocal,
+			[]string{"kubectl get daemonset -n envoy-gateway-system", "--gateway-traffic-policy=cluster"},
+			[]string{"If the GatewayClass has no EnvoyProxy with externalTrafficPolicy: Cluster"}},
 	} {
-		if !strings.Contains(message, command) {
-			t.Errorf("the message has no %q", command)
-		}
+		t.Run(string(testCase.policy), func(t *testing.T) {
+			config := kubernetesConfig()
+			config.GatewayTrafficPolicy = testCase.policy
+			var buf bytes.Buffer
+			printKubernetesInstructions(&console{w: &buf}, config, "goiabada-k8s.yaml")
+			message := buf.String()
+			if !strings.Contains(message, "cluster-wide") || !strings.Contains(message, "whoever runs") {
+				t.Errorf("the message does not say the EnvoyProxy and GatewayClass are cluster-wide, so the choice is whoever runs Envoy Gateway's:\n%s", message)
+			}
+			tips := message[strings.Index(message, "TROUBLESHOOTING TIPS"):]
+			for _, want := range testCase.wanted {
+				if !strings.Contains(tips, want) {
+					t.Errorf("the troubleshooting tips lack %q:\n%s", want, tips)
+				}
+			}
+			for _, refused := range testCase.refused {
+				if strings.Contains(message, refused) {
+					t.Errorf("the message says %q under %s", refused, testCase.policy)
+				}
+			}
+		})
 	}
+}
+
+// Both ConfigMaps say, beside the trust they set, which address the servers see under the traffic
+// policy chosen: a node's under Cluster, where Envoy receives each connection from a node, and the
+// client's under Local, where it receives it from the client itself (#396 decision 4).
+func TestKubernetesManifest_SaysWhichAddressTheServersSee(t *testing.T) {
+	for _, testCase := range []struct {
+		policy       trafficPolicy
+		said, unsaid string
+	}{
+		{trafficPolicyCluster, "a node's address", "the client's address"},
+		{trafficPolicyLocal, "the client's address", "a node's address"},
+	} {
+		t.Run(string(testCase.policy), func(t *testing.T) {
+			config := kubernetesConfig()
+			config.GatewayTrafficPolicy = testCase.policy
+			_, content := generatedConfiguration(config)
+			lines := strings.Split(content, "\n")
+			checked := 0
+			for i, line := range lines {
+				if !strings.Contains(line, "_TRUST_PROXY_HEADERS:") {
+					continue
+				}
+				comment := commentAbove(lines, i)
+				if !strings.Contains(comment, testCase.said) || !strings.Contains(comment, string(testCase.policy)) {
+					t.Errorf("line %d's comment does not say the servers see %s under %s: %q", i+1, testCase.said, testCase.policy, comment)
+				}
+				if strings.Contains(comment, testCase.unsaid) {
+					t.Errorf("line %d's comment says the servers see %s under %s: %q", i+1, testCase.unsaid, testCase.policy, comment)
+				}
+				checked++
+			}
+			if checked != 2 {
+				t.Fatalf("%d lines set TRUST_PROXY_HEADERS, want one per ConfigMap", checked)
+			}
+		})
+	}
+}
+
+// networkPolicyComment is the block of comment lines directly above the NetworkPolicy's document,
+// between its `---` and its apiVersion.
+func networkPolicyComment(t *testing.T, content, name string) string {
+	t.Helper()
+	for _, doc := range strings.Split(content, "\n---\n") {
+		if !strings.Contains(doc, "\nkind: NetworkPolicy\n") || !strings.Contains(doc, "\n  name: "+name+"\n") {
+			continue
+		}
+		var comment []string
+		for _, line := range strings.Split(doc, "\n") {
+			if !strings.HasPrefix(line, "#") {
+				break
+			}
+			comment = append(comment, strings.TrimSpace(strings.TrimPrefix(line, "#")))
+		}
+		return strings.Join(comment, " ")
+	}
+	t.Fatalf("no NetworkPolicy document named %s", name)
+	return ""
+}
+
+// On yes, each Deployment gets an ingress-only NetworkPolicy: the auth server's pods admit 9090 from
+// the Envoy proxies' namespace and from the admin console's pods, the admin console's admit 9091
+// from the Envoy proxies' namespace alone, and neither states an egress rule, since the SMTP server
+// and the database host are nothing a NetworkPolicy can select. Each comment says why there is no
+// egress rule, that only a CNI that implements NetworkPolicy enforces it, and how to admit another
+// namespace. On no, nothing is emitted (#396 decision 5).
+func TestKubernetesManifest_AdmitsOnlyEnvoyWhenAsked(t *testing.T) {
+	envoy := map[string]any{"namespaceSelector": map[string]any{"matchLabels": map[string]any{"kubernetes.io/metadata.name": "envoy-gateway-system"}}}
+	adminConsole := map[string]any{"podSelector": map[string]any{"matchLabels": map[string]any{"app": "goiabada-adminconsole"}}}
+	// The auth server's comment carries the reasons and the recipe; the admin console's, whose
+	// pods nothing in the cluster calls, says it is ingress-only and where it is enforced.
+	want := map[string]struct {
+		port    int
+		from    []any
+		comment []string
+	}{
+		"goiabada-authserver":   {9090, []any{envoy, adminConsole}, []string{"egress", "SMTP", "database", "CNI", "kubernetes.io/metadata.name: <"}},
+		"goiabada-adminconsole": {9091, []any{envoy}, []string{"egress", "CNI"}},
+	}
+
+	t.Run("no", func(t *testing.T) {
+		config := kubernetesConfig()
+		if policies := kubernetesDocuments(t, config)["NetworkPolicy"]; len(policies) != 0 {
+			t.Errorf("the manifest carries NetworkPolicies %v when none was asked for", slices.Sorted(maps.Keys(policies)))
+		}
+	})
+	t.Run("yes", func(t *testing.T) {
+		config := kubernetesConfig()
+		config.NetworkPolicy = true
+		docs := kubernetesDocuments(t, config)
+		_, content := generatedConfiguration(config)
+		if len(docs["NetworkPolicy"]) != len(workloads) {
+			t.Errorf("the manifest has NetworkPolicies %v, want one per Deployment", slices.Sorted(maps.Keys(docs["NetworkPolicy"])))
+		}
+		for _, w := range workloads {
+			t.Run(w.deployment, func(t *testing.T) {
+				policy := docs["NetworkPolicy"][w.deployment]
+				if policy == nil {
+					t.Fatalf("no NetworkPolicy named %s", w.deployment)
+				}
+				if got := at[string](t, policy, "apiVersion"); got != "networking.k8s.io/v1" {
+					t.Errorf("apiVersion is %q, want networking.k8s.io/v1", got)
+				}
+				if got := at[string](t, policy, "metadata", "namespace"); got != config.K8sNamespace {
+					t.Errorf("the policy is in namespace %q, want %q", got, config.K8sNamespace)
+				}
+				spec := at[map[string]any](t, policy, "spec")
+				selector := at[map[string]any](t, spec, "podSelector", "matchLabels")
+				pods := at[map[string]any](t, deploymentNamed(t, docs, w.deployment), "spec", "template", "metadata", "labels")
+				if len(selector) != 1 || selector["app"] != w.deployment || pods["app"] != w.deployment {
+					t.Errorf("the policy selects %v, and the Deployment's pods are %v", selector, pods)
+				}
+				if got := only[string](t, at[[]any](t, spec, "policyTypes"), "policyTypes"); got != "Ingress" {
+					t.Errorf("policyTypes is %q, want Ingress alone", got)
+				}
+				if egress, ok := spec["egress"]; ok {
+					t.Errorf("the policy states egress rules %v", egress)
+				}
+				rule := only[map[string]any](t, at[[]any](t, spec, "ingress"), "the ingress rules")
+				port := only[map[string]any](t, at[[]any](t, rule, "ports"), "the rule's ports")
+				if at[string](t, port, "protocol") != "TCP" || at[int](t, port, "port") != want[w.deployment].port {
+					t.Errorf("the rule admits %v, want TCP %d", port, want[w.deployment].port)
+				}
+				if got := at[[]any](t, rule, "from"); !reflect.DeepEqual(got, want[w.deployment].from) {
+					t.Errorf("the rule admits %v, want %v", got, want[w.deployment].from)
+				}
+
+				comment := networkPolicyComment(t, content, w.deployment)
+				for _, said := range want[w.deployment].comment {
+					if !strings.Contains(comment, said) {
+						t.Errorf("the policy's comment does not mention %q: %q", said, comment)
+					}
+				}
+			})
+		}
+	})
 }
 
 // Each container is held for five seconds before it is signalled, through Kubernetes' own sleep

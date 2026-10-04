@@ -25,6 +25,14 @@ func printSummary(out *console, config *Config) {
 	if config.K8sNamespace != "" {
 		out.printf("  K8s Namespace:    %s\n", config.K8sNamespace)
 	}
+	if config.Deployment.servedByEnvoyGateway {
+		out.printf("  Traffic policy:   %s\n", config.GatewayTrafficPolicy)
+		if config.NetworkPolicy {
+			out.println("  NetworkPolicies:  admit only Envoy and the admin console")
+		} else {
+			out.println("  NetworkPolicies:  none")
+		}
+	}
 	if config.Deployment.asksLocalProxy {
 		if config.LocalProxy {
 			out.println("  Reverse proxy:    on this machine (listen on 127.0.0.1)")
@@ -90,20 +98,7 @@ func printKubernetesInstructions(out *console, config *Config, outputPath string
 	out.println("     Wait for it to be ready:")
 	out.printf("     %skubectl wait --timeout=5m -n envoy-gateway-system deployment/envoy-gateway --for=condition=Available%s\n", out.cyan, out.reset)
 	out.println()
-	out.println("  2. The GatewayClass the manifest names, with externalTrafficPolicy: Cluster")
-	out.println("     for better compatibility (save as gatewayclass.yaml):")
-	out.println("     ---")
-	out.println("     apiVersion: gateway.envoyproxy.io/v1alpha1")
-	out.println("     kind: EnvoyProxy")
-	out.println("     metadata:")
-	out.println("       name: goiabada-proxy")
-	out.println("       namespace: envoy-gateway-system")
-	out.println("     spec:")
-	out.println("       provider:")
-	out.println("         type: Kubernetes")
-	out.println("         kubernetes:")
-	out.println("           envoyService:")
-	out.println("             externalTrafficPolicy: Cluster")
+	printEnvoyProxyPrerequisite(out, config.GatewayTrafficPolicy)
 	out.println("     ---")
 	out.println("     apiVersion: gateway.networking.k8s.io/v1")
 	out.println("     kind: GatewayClass")
@@ -118,6 +113,10 @@ func printKubernetesInstructions(out *console, config *Config, outputPath string
 	out.println("         namespace: envoy-gateway-system")
 	out.println()
 	out.printf("     %skubectl apply -f gatewayclass.yaml%s\n", out.cyan, out.reset)
+	out.println()
+	out.println("     The EnvoyProxy and the GatewayClass are cluster-wide: on a cluster that already runs")
+	out.println("     Envoy Gateway, the traffic policy belongs to whoever runs it, so agree it with them")
+	out.println("     rather than apply these over theirs.")
 	out.println()
 	out.println("  3. cert-manager for automatic TLS certificates, with Gateway API support on:")
 	out.printf("     %skubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.21.2/cert-manager.yaml%s\n", out.cyan, out.reset)
@@ -177,9 +176,24 @@ func printKubernetesInstructions(out *console, config *Config, outputPath string
 	out.println("  • If cert-manager HTTP-01 challenges fail or timeout:")
 	out.println("    - Verify DNS records point to the Gateway's address")
 	out.println("    - Ensure port 80 is accessible from the internet")
-	out.println("    - If the GatewayClass has no EnvoyProxy with externalTrafficPolicy: Cluster,")
-	out.println("      apply the one in step 2 above")
+	if config.GatewayTrafficPolicy == trafficPolicyLocal {
+		out.println("    - Under Local, a node with no Envoy pod drops the load balancer's traffic: check")
+		out.println("      the EnvoyProxy in step 2 is applied and runs an Envoy pod on every node:")
+		out.printf("      %skubectl get daemonset -n envoy-gateway-system%s\n", out.cyan, out.reset)
+		out.println("    - If your load balancer still cannot reach Envoy, use the Cluster policy instead:")
+		out.println("      the EnvoyProxy the wizard prints with --gateway-traffic-policy=cluster, which has")
+		out.println("      no envoyDaemonSet. Goiabada then sees a node's address for every client.")
+	} else {
+		out.println("    - If the GatewayClass has no EnvoyProxy with externalTrafficPolicy: Cluster,")
+		out.println("      apply the one in step 2 above")
+	}
 	out.println()
+	if config.NetworkPolicy {
+		out.println("  • A connection a NetworkPolicy refuses times out rather than being refused. If a")
+		out.println("    workload cannot reach a server, check what the policies admit:")
+		out.printf("      %skubectl describe networkpolicy -n %s%s\n", out.cyan, config.K8sNamespace, out.reset)
+		out.println()
+	}
 	out.println("  • Check Gateway and route status:")
 	out.printf("      %skubectl get gateway,httproute -n %s%s\n", out.cyan, config.K8sNamespace, out.reset)
 	out.printf("      %skubectl describe gateway goiabada -n %s%s\n", out.cyan, config.K8sNamespace, out.reset)
@@ -193,6 +207,38 @@ func printKubernetesInstructions(out *console, config *Config, outputPath string
 	out.println("  • Check pod logs for errors:")
 	out.printf("      %skubectl logs -n %s deployment/goiabada-authserver%s\n", out.cyan, config.K8sNamespace, out.reset)
 	out.println()
+}
+
+// printEnvoyProxyPrerequisite prints the opening of the completion message's second prerequisite,
+// the EnvoyProxy setting the traffic policy chosen, down to the GatewayClass that follows it: under
+// Cluster, Envoy stays a Deployment; under Local it runs on every node as a DaemonSet, so no node
+// the load balancer sends to drops the traffic (#396 decision 4). envoyDaemonSet, envoyService and
+// externalTrafficPolicy are Envoy Gateway v1.9.1's (api/v1alpha1), which admits one of
+// envoyDeployment and envoyDaemonSet, and reads an empty envoyDaemonSet as every default.
+func printEnvoyProxyPrerequisite(out *console, policy trafficPolicy) {
+	if policy == trafficPolicyLocal {
+		out.println("  2. The GatewayClass the manifest names, with externalTrafficPolicy: Local and Envoy")
+		out.println("     on every node as a DaemonSet, so Goiabada sees each client's address and no node")
+		out.println("     drops the load balancer's traffic (save as gatewayclass.yaml):")
+	} else {
+		out.println("  2. The GatewayClass the manifest names, with externalTrafficPolicy: Cluster")
+		out.println("     for better compatibility (save as gatewayclass.yaml):")
+	}
+	out.println("     ---")
+	out.println("     apiVersion: gateway.envoyproxy.io/v1alpha1")
+	out.println("     kind: EnvoyProxy")
+	out.println("     metadata:")
+	out.println("       name: goiabada-proxy")
+	out.printf("       namespace: %s\n", envoyProxyNamespace)
+	out.println("     spec:")
+	out.println("       provider:")
+	out.println("         type: Kubernetes")
+	out.println("         kubernetes:")
+	if policy == trafficPolicyLocal {
+		out.println("           envoyDaemonSet: {}")
+	}
+	out.println("           envoyService:")
+	out.printf("             externalTrafficPolicy: %s\n", policy)
 }
 
 func printNativeInstructions(out *console, config *Config, outputPath string) {
