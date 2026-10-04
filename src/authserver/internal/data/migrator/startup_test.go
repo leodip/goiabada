@@ -22,7 +22,7 @@ func TestUpToHead(t *testing.T) {
 		db := openTestDB(t)
 		m := newTestMigrator(t, db, threeVersions())
 
-		migrated, err := m.UpToHead(context.Background(), release)
+		migrated, err := m.UpToHead(context.Background(), release, nil)
 
 		require.NoError(t, err)
 		assert.True(t, migrated, "migrations ran, so the caller must not write that nothing needed to")
@@ -33,10 +33,10 @@ func TestUpToHead(t *testing.T) {
 	t.Run("at head nothing runs and that is not a failure", func(t *testing.T) {
 		db := openTestDB(t)
 		m := newTestMigrator(t, db, threeVersions())
-		_, err := m.UpToHead(context.Background(), release)
+		_, err := m.UpToHead(context.Background(), release, nil)
 		require.NoError(t, err)
 
-		migrated, err := m.UpToHead(context.Background(), release)
+		migrated, err := m.UpToHead(context.Background(), release, nil)
 
 		require.NoError(t, err, "ErrNoChange is the ordinary restart, and must never stop one")
 		assert.False(t, migrated, "nothing ran, which is what the caller's startup record reports")
@@ -49,7 +49,7 @@ func TestUpToHead(t *testing.T) {
 		require.NoError(t, err)
 		m := newTestMigrator(t, db, threeVersions())
 
-		migrated, err := m.UpToHead(context.Background(), release)
+		migrated, err := m.UpToHead(context.Background(), release, nil)
 
 		require.Error(t, err)
 		assert.False(t, migrated)
@@ -70,7 +70,7 @@ func TestUpToHead(t *testing.T) {
 		require.NoError(t, err)
 		m := newTestMigrator(t, db, threeVersions())
 
-		migrated, err := m.UpToHead(context.Background(), release)
+		migrated, err := m.UpToHead(context.Background(), release, nil)
 
 		require.Error(t, err)
 		assert.False(t, migrated)
@@ -91,10 +91,10 @@ func TestUpToHead(t *testing.T) {
 		db := openTestDB(t)
 		m, err := New(db, threeVersions(), "migrations", eng)
 		require.NoError(t, err)
-		_, err = m.UpToHead(context.Background(), release)
+		_, err = m.UpToHead(context.Background(), release, nil)
 		require.ErrorIs(t, err, unlockErr, "the chain runs and the unlock fails")
 
-		migrated, err := m.UpToHead(context.Background(), release)
+		migrated, err := m.UpToHead(context.Background(), release, nil)
 
 		require.Error(t, err, "a lock that did not come back must stop the start, not be read as nothing to do")
 		assert.ErrorIs(t, err, unlockErr, "the failure that blocks every other migrator is what is reported")

@@ -791,7 +791,11 @@ func TestEngines_CarryTheRightPlaceholdersAndTransactionBehaviour(t *testing.T) 
 
 	// SQLite has no cross-process lock statement, so it takes the in-process mutex instead.
 	assert.Nil(t, SQLite().lock)
+	assert.Nil(t, SQLite().tryLock)
 	assert.NotNil(t, MySQL("goiabada").lock)
+	assert.NotNil(t, MySQL("goiabada").tryLock)
+	assert.NotNil(t, Postgres("goiabada").tryLock)
+	assert.NotNil(t, SQLServer("goiabada").tryLock)
 	assert.NotNil(t, Postgres("goiabada").unlock)
 	assert.NotNil(t, SQLServer("goiabada").unlock)
 }
@@ -845,9 +849,14 @@ func TestRun_AFailedUnlockIsReportedAndTheSessionIsDiscarded(t *testing.T) {
 	assertPoolReturned(t, db)
 }
 
-func TestRun_ALockedDatabaseIsRefusedAndNothingRuns(t *testing.T) {
+// TestRun_ALockThatFailsIsRefusedAndNothingRuns is the lock statement failing outright: the
+// session died, or the engine refused it. No engine gives up waiting any more, so this is the one
+// way left for the lock not to be taken, and nothing may run without it (#390 decision 6).
+func TestRun_ALockThatFailsIsRefusedAndNothingRuns(t *testing.T) {
+	lockErr := errors.New("the lock statement failed")
 	eng := SQLite()
-	eng.lock = func(context.Context, *sql.Conn) error { return ErrLocked }
+	eng.tryLock = func(context.Context, *sql.Conn) (bool, error) { return false, nil }
+	eng.lock = func(context.Context, *sql.Conn) error { return lockErr }
 	eng.unlock = func(context.Context, *sql.Conn) error {
 		return fmt.Errorf("unlock must not run when the lock was never taken")
 	}
@@ -856,8 +865,31 @@ func TestRun_ALockedDatabaseIsRefusedAndNothingRuns(t *testing.T) {
 	m, err := New(db, threeVersions(), "migrations", eng)
 	require.NoError(t, err)
 
-	assert.ErrorIs(t, m.Up(context.Background()), ErrLocked)
+	assert.ErrorIs(t, m.Up(context.Background()), lockErr)
 	assert.Empty(t, recorded(t, db))
 	assert.False(t, tableExists(t, db, "t1"))
+	assertPoolReturned(t, db)
+}
+
+// TestRun_ATryThatFailsIsRefusedAndNothingRuns is the same refusal one statement earlier: the
+// try that decides whether there is a wait to report fails, so there is no lock and no wait.
+func TestRun_ATryThatFailsIsRefusedAndNothingRuns(t *testing.T) {
+	tryErr := errors.New("the try statement failed")
+	eng := SQLite()
+	eng.tryLock = func(context.Context, *sql.Conn) (bool, error) { return false, tryErr }
+	eng.lock = func(context.Context, *sql.Conn) error {
+		return fmt.Errorf("the runner must not wait after a try that failed")
+	}
+	eng.unlock = func(context.Context, *sql.Conn) error {
+		return fmt.Errorf("unlock must not run when the lock was never taken")
+	}
+
+	db := openTestDB(t)
+	m, err := New(db, threeVersions(), "migrations", eng)
+	require.NoError(t, err)
+
+	err = m.Up(context.Background())
+	assert.ErrorIs(t, err, tryErr)
+	assert.Empty(t, recorded(t, db))
 	assertPoolReturned(t, db)
 }

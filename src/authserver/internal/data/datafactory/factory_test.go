@@ -6,8 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -339,6 +341,111 @@ func TestNewDatabase_WritesTheNoMigrationRecordOnlyWhenNothingRan(t *testing.T) 
 	second := start(t)
 	require.Len(t, second, 1, "a restart at head says so exactly once")
 	assert.Equal(t, slog.LevelInfo, second[0].Level, "a start finding nothing to migrate is lifecycle, which is Info")
+}
+
+// TestNewDatabase_SaysWhenItMigratesAndWhenItHasMigrated is #390 decision 7's two records around
+// the migrations: a start that runs files says so before the first, with where the schema goes
+// from and to and how many files that is, and again after the last, with how many ran and how
+// long they took. A restart at head writes neither. Without them a start running a long
+// migration writes nothing between opening the database and listening, and cannot be told from
+// a hung one.
+//
+// The expected numbers come from the SQLite migration directory, read here by filename rather
+// than through the runner, so a runner that miscounted its own chain would not agree with itself
+// by construction. A never-migrated database reads from_version 0: no Goiabada migration is
+// numbered 0, and the runner's own marker for it is an implementation detail no record carries.
+func TestNewDatabase_SaysWhenItMigratesAndWhenItHasMigrated(t *testing.T) {
+	head, carried := sqliteMigrationSet(t)
+	cfg := &config.DatabaseConfig{Type: "sqlite", DSN: filepath.Join(t.TempDir(), "records.db")}
+	aesKey := []byte("0123456789abcdef0123456789abcdef")
+
+	start := func(t *testing.T) *logtest.SlogCapture {
+		t.Helper()
+		capture := logtest.CaptureSlog(t)
+		database, err := NewDatabase(context.Background(), cfg, aesKey, nil, false)
+		require.NoError(t, err)
+		concrete, ok := database.(*sqlitedb.Database)
+		require.True(t, ok, "a sqlite type opens the sqlite engine")
+		require.NoError(t, concrete.DB.Close(), "released so the next start is a fresh open")
+		return capture
+	}
+
+	first := start(t)
+	migrating := recordsNamed(first, "migrating the database")
+	require.Len(t, migrating, 1, "a first start says once that it is migrating")
+	assert.Equal(t, slog.LevelInfo, migrating[0].Level, "migrating is lifecycle, which is Info")
+	assert.Equal(t, map[string]any{
+		"from_version": int64(0),
+		"to_version":   int64(head),
+		"pending":      int64(carried),
+	}, migrating[0].Attrs)
+
+	migrated := recordsNamed(first, "database migrated")
+	require.Len(t, migrated, 1, "and once that it has migrated")
+	assert.Equal(t, slog.LevelInfo, migrated[0].Level, "migrated is lifecycle, which is Info")
+	assert.Equal(t, int64(0), migrated[0].Attrs["from_version"])
+	assert.Equal(t, int64(head), migrated[0].Attrs["to_version"])
+	assert.Equal(t, int64(carried), migrated[0].Attrs["applied"])
+	took, ok := migrated[0].Attrs["duration"].(time.Duration)
+	require.Truef(t, ok, "duration is a time.Duration, as the request logger's is: got %T", migrated[0].Attrs["duration"])
+	assert.Positive(t, took, "a chain of %d files took some time", carried)
+	assert.Len(t, migrated[0].Attrs, 4, "and nothing else")
+
+	order := messageOrder(first, "opening the database", "migrating the database", "database migrated")
+	assert.Equal(t, []string{"opening the database", "migrating the database", "database migrated"}, order,
+		"the records read in the order the start does the work")
+	assert.Empty(t, recordsNamed(first, "no need to migrate the database"), "a start that migrated did need to")
+	assert.Empty(t, recordsNamed(first, "waiting for the migration lock"),
+		"SQLite's lock is a mutex in this process, which another process can never hold")
+
+	second := start(t)
+	assert.Empty(t, recordsNamed(second, "migrating the database"), "a restart at head runs nothing")
+	assert.Empty(t, recordsNamed(second, "database migrated"), "so it has migrated nothing")
+	assert.Len(t, recordsNamed(second, "no need to migrate the database"), 1, "and says that instead")
+}
+
+// sqliteMigrationSet reads the SQLite migration directory by filename: the highest version, and
+// how many versions it carries, which is how many steps a never-migrated database takes to head.
+func sqliteMigrationSet(t *testing.T) (head, carried int) {
+	t.Helper()
+	entries, err := os.ReadDir(filepath.Join("..", "sqlitedb", "migrations"))
+	require.NoError(t, err)
+	versions := map[int]bool{}
+	for _, e := range entries {
+		digits, _, found := strings.Cut(e.Name(), "_")
+		require.Truef(t, found, "a migration file is named <version>_<name>: %s", e.Name())
+		v, err := strconv.Atoi(digits)
+		require.NoErrorf(t, err, "a migration file starts with its version: %s", e.Name())
+		versions[v] = true
+		head = max(head, v)
+	}
+	require.NotEmpty(t, versions, "the directory carries migrations")
+	return head, len(versions)
+}
+
+func recordsNamed(capture *logtest.SlogCapture, message string) []logtest.CapturedRecord {
+	var found []logtest.CapturedRecord
+	for _, r := range capture.Records() {
+		if r.Message == message {
+			found = append(found, r)
+		}
+	}
+	return found
+}
+
+// messageOrder is the captured messages among wanted, in the order they were written.
+func messageOrder(capture *logtest.SlogCapture, wanted ...string) []string {
+	keep := map[string]bool{}
+	for _, w := range wanted {
+		keep[w] = true
+	}
+	var order []string
+	for _, r := range capture.Records() {
+		if keep[r.Message] {
+			order = append(order, r.Message)
+		}
+	}
+	return order
 }
 
 // TestOpenDatabase_PassesLogSQLToTheEngine covers the factory's other parameter, which every

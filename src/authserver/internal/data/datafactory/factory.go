@@ -17,6 +17,7 @@ package datafactory
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -153,8 +154,10 @@ func mssqlConfig(c *config.DatabaseConfig) *mssqldb.DatabaseConfig {
 // survive migration 000047, brings the schema to head and then runs the startup data tasks.
 //
 // One migrator serves both the pre-flight's version read and the step to head, and the startup
-// record saying nothing needed migrating is written here, by the process starting, rather than by
-// the runner or by each engine (#438).
+// records are written here, by the process starting, rather than by the runner or by each engine:
+// the runner reports a wait for the migration lock and the migration around its files through
+// startupProgress, and the record saying nothing needed migrating is this function's own (#438,
+// #390 decision 7).
 //
 // The two data-encryption keys are parameters rather than reads of a configuration singleton, so
 // that the refusal below is one call away from a test rather than unreachable (#351). aesKey is
@@ -175,7 +178,7 @@ func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []
 		return nil, preflightEmailCaseErr
 	}
 
-	migrated, err := m.UpToHead(ctx, buildinfo.Version)
+	migrated, err := m.UpToHead(ctx, buildinfo.Version, startupProgress{ctx: ctx})
 	if err != nil {
 		return nil, err
 	}
@@ -196,4 +199,36 @@ func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []
 	}
 
 	return database, nil
+}
+
+// startupProgress writes the startup records the migration runner reports, so a start waiting
+// for the migration lock or running a long migration says so rather than looking hung (#390
+// decision 7). A queued start that finds another process has already migrated writes the wait
+// record and then "no need to migrate the database".
+type startupProgress struct {
+	ctx context.Context
+}
+
+func (p startupProgress) WaitingForLock() {
+	slog.InfoContext(p.ctx, "waiting for the migration lock")
+}
+
+func (p startupProgress) Migrating(from, to, pending int) {
+	slog.InfoContext(p.ctx, "migrating the database",
+		"from_version", recordedVersion(from), "to_version", to, "pending", pending)
+}
+
+func (p startupProgress) Migrated(from, to, applied int, took time.Duration) {
+	slog.InfoContext(p.ctx, "database migrated",
+		"from_version", recordedVersion(from), "to_version", to, "applied", applied, "duration", took)
+}
+
+// recordedVersion is a schema version as the startup records carry it: a database never migrated
+// is 0, since no Goiabada migration is numbered 0, rather than the runner's NilVersion, which is
+// its own marker and nothing an operator should have to recognise.
+func recordedVersion(v int) int {
+	if v == migrator.NilVersion {
+		return 0
+	}
+	return v
 }

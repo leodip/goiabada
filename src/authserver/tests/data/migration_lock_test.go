@@ -6,25 +6,41 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	mssql "github.com/microsoft/go-mssqldb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // migrationLockHoldBudget is how long a migration is required to stay blocked while another
-// session holds the migration lock. It has to sit well under MySQL's GET_LOCK timeout of ten
-// seconds, which is the one lock of the three that gives up rather than waiting, or the test
-// would be asserting a blocked operation against an operation that had already failed.
+// session holds the migration lock, in the tests asking only whether the runner takes it at all.
+// How long the runner then goes on waiting is TestMigrationLock_AStartQueuedBehindTheLock's
+// question, held past migrationLockPastTheOldGiveUp.
 const migrationLockHoldBudget = 2 * time.Second
+
+// migrationLockPastTheOldGiveUp is how long a start queued behind the migration lock is held
+// there by TestMigrationLock_AStartQueuedBehindTheLockWaitsPastTenSecondsAndSaysSo. MySQL's
+// GET_LOCK used to wait ten seconds and then give up, so the queued process wrote an Error
+// record, exited 1 and crash-looped; it waits indefinitely now, as PostgreSQL's and SQL Server's
+// locks always did (#390 decision 6). Two seconds past the old limit, so a runner that still gave
+// up would have done so with time to spare for the assertion to see it.
+const migrationLockPastTheOldGiveUp = 12 * time.Second
+
+// migrationLockRecordBudget is how long a start is allowed to take to reach the migration lock
+// and say it is waiting: the open, the connection and, on SQL Server, the schema_migrations
+// pre-create all come first.
+const migrationLockRecordBudget = time.Minute
 
 // migrationLockFinishBudget is how long the same migration is then allowed to take once the
 // lock comes back. Generous: the whole chain runs inside it, and on SQL Server that is the
@@ -126,6 +142,224 @@ func TestMigrationLock_AFailedMigrationStillGivesTheResourceBack(t *testing.T) {
 	requireMigrationLockIsFree(t, h, eng, "after a migration whose file failed")
 }
 
+// TestMigrationLock_AStartQueuedBehindTheLockWaitsPastTenSecondsAndSaysSo is #390 decisions 6
+// and 7 on the real engines, through the start itself: datafactory.NewDatabase, the call the
+// auth server's main makes, against a database whose migration lock another session holds.
+//
+// Two things a pod queued behind another pod's migration used to get wrong. On MySQL it gave up
+// after ten seconds and crash-looped, the one engine-specific route into CrashLoopBackOff; on
+// every engine it wrote nothing while it waited, so it could not be told from a hung one. So the
+// start must say it is waiting, once, before it waits; still be waiting well past the old ten
+// seconds; and then migrate, saying so, once the lock comes back.
+//
+// The hold is a second session out of the isolated database's own pool, as in the tests above,
+// on the resource the production engine names. Holding the wrong resource would let a start that
+// never reached for the lock pass the wait half, and fail only the record half, for the wrong
+// reason.
+//
+// Run via: ./run-tests.sh --type data --db <mysql|postgres|mssql> --run TestMigrationLock
+func TestMigrationLock_AStartQueuedBehindTheLockWaitsPastTenSecondsAndSaysSo(t *testing.T) {
+	if !hasSessionMigrationLock() {
+		t.Skipf("%s has no session-scoped migration lock: its exclusion is a process-wide mutex", dbType())
+	}
+
+	h := newIsolatedDB(t)
+	eng := migrationLockEngine(t, h.Name)
+
+	release := holdMigrationLock(t, h, eng)
+	capture := logtest.CaptureSlog(t)
+	done := startInBackground(t, h.Name)
+
+	awaitRecord(t, capture, done, "waiting for the migration lock")
+	select {
+	case res := <-done:
+		t.Fatalf("the start ended within %s of saying it was waiting, while the migration lock was still held (it answered %v). "+
+			"A queued start must wait for the lock rather than give up and be restarted (#390 decision 6)",
+			migrationLockPastTheOldGiveUp, res.err)
+	case <-time.After(migrationLockPastTheOldGiveUp):
+	}
+	assert.Empty(t, recordsNamed(capture, "migrating the database"),
+		"nothing may migrate while another session holds the lock")
+
+	release()
+	select {
+	case res := <-done:
+		require.NoErrorf(t, res.err, "the start must migrate once the lock is released on %s", dbType())
+	case <-time.After(migrationLockFinishBudget):
+		t.Fatalf("the start did not finish within %s after the migration lock was released on %s",
+			migrationLockFinishBudget, dbType())
+	}
+
+	waits := recordsNamed(capture, "waiting for the migration lock")
+	require.Len(t, waits, 1, "the wait is said once, however long it lasts")
+	assert.Equal(t, slog.LevelInfo, waits[0].Level, "waiting is lifecycle, which is Info")
+	assert.Empty(t, waits[0].Attrs, "the record names no resource: an operator has nothing to do with it")
+
+	assert.Equal(t,
+		[]string{"opening the database", "waiting for the migration lock", "migrating the database", "database migrated"},
+		messageOrder(capture, "opening the database", "waiting for the migration lock", "migrating the database",
+			"database migrated", "no need to migrate the database"),
+		"the start waited, then migrated the never-migrated database, and said each in that order")
+	migrating := recordsNamed(capture, "migrating the database")
+	require.Len(t, migrating, 1)
+	assert.Equal(t, int64(0), migrating[0].Attrs["from_version"], "the isolated database was never migrated")
+
+	requireMigrationLockIsFree(t, h, eng, "after a start that waited for it")
+}
+
+// TestMigrationLock_AStartQueuedBehindAnotherPodsMigrationSaysSoTwice is decision 7's own example:
+// the queued start waits, and when the lock comes back the other process has already migrated, so
+// it writes the wait record and then "no need to migrate the database".
+//
+// Run via: ./run-tests.sh --type data --db <mysql|postgres|mssql> --run TestMigrationLock
+func TestMigrationLock_AStartQueuedBehindAnotherPodsMigrationSaysSoTwice(t *testing.T) {
+	if !hasSessionMigrationLock() {
+		t.Skipf("%s has no session-scoped migration lock: its exclusion is a process-wide mutex", dbType())
+	}
+
+	h := newIsolatedDB(t)
+	eng := migrationLockEngine(t, h.Name)
+	require.NoErrorf(t, h.Migrator.Up(context.Background()), "the other pod's migration, already done, on %s", dbType())
+
+	release := holdMigrationLock(t, h, eng)
+	capture := logtest.CaptureSlog(t)
+	done := startInBackground(t, h.Name)
+
+	awaitRecord(t, capture, done, "waiting for the migration lock")
+	release()
+	select {
+	case res := <-done:
+		require.NoErrorf(t, res.err, "the start must carry on once the lock is released on %s", dbType())
+	case <-time.After(migrationLockFinishBudget):
+		t.Fatalf("the start did not finish within %s after the migration lock was released on %s",
+			migrationLockFinishBudget, dbType())
+	}
+
+	assert.Equal(t,
+		[]string{"waiting for the migration lock", "no need to migrate the database"},
+		messageOrder(capture, "waiting for the migration lock", "migrating the database",
+			"database migrated", "no need to migrate the database"))
+}
+
+// TestMigrationLock_AStartWithTheLockFreeSaysNothingAboutWaiting is the other half of the wait
+// record: the start tries the lock without waiting first, and only a held lock is a wait to
+// report. A start that wrote it every time would tell an operator nothing.
+//
+// Run via: ./run-tests.sh --type data --db <mysql|postgres|mssql> --run TestMigrationLock
+func TestMigrationLock_AStartWithTheLockFreeSaysNothingAboutWaiting(t *testing.T) {
+	if !hasSessionMigrationLock() {
+		t.Skipf("%s has no session-scoped migration lock: its exclusion is a process-wide mutex", dbType())
+	}
+
+	h := newIsolatedDB(t)
+	eng := migrationLockEngine(t, h.Name)
+
+	capture := logtest.CaptureSlog(t)
+	res := <-startInBackground(t, h.Name)
+	require.NoErrorf(t, res.err, "the start must migrate a database nobody else is migrating on %s", dbType())
+
+	assert.Equal(t,
+		[]string{"migrating the database", "database migrated"},
+		messageOrder(capture, "waiting for the migration lock", "migrating the database",
+			"database migrated", "no need to migrate the database"),
+		"a free lock is taken at once, so there was no wait to say")
+
+	requireMigrationLockIsFree(t, h, eng, "after a start that took it at once")
+}
+
+// startResult is what a start in the background answered.
+type startResult struct{ err error }
+
+// startInBackground runs datafactory.NewDatabase against the isolated database named, in a
+// goroutine, as the auth server's main would, with Create off since the database exists. The
+// opened pool is closed on t before the isolated database's own drop runs, which needs no session
+// left on it.
+func startInBackground(t *testing.T, name string) <-chan startResult {
+	t.Helper()
+	cfg := appConfig.Database
+	cfg.Name = name
+	cfg.Create = false
+
+	opened := make(chan data.Database, 1)
+	t.Cleanup(func() {
+		select {
+		case db := <-opened:
+			closeStarted(db)
+		default:
+		}
+	})
+
+	done := make(chan startResult, 1)
+	go func() {
+		db, err := datafactory.NewDatabase(context.Background(), &cfg, dataKey, nil, false)
+		if db != nil {
+			opened <- db
+		}
+		done <- startResult{err: err}
+	}()
+	return done
+}
+
+// closeStarted closes the pool a start opened.
+func closeStarted(db data.Database) {
+	switch concrete := db.(type) {
+	case *mysqldb.Database:
+		_ = concrete.DB.Close()
+	case *postgresdb.Database:
+		_ = concrete.DB.Close()
+	case *mssqldb.Database:
+		_ = concrete.DB.Close()
+	}
+}
+
+// awaitRecord waits until the start writes message, failing if the start ends first or does not
+// get there within migrationLockRecordBudget.
+func awaitRecord(t *testing.T, capture *logtest.SlogCapture, done <-chan startResult, message string) {
+	t.Helper()
+	deadline := time.After(migrationLockRecordBudget)
+	tick := time.NewTicker(20 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		if len(recordsNamed(capture, message)) > 0 {
+			return
+		}
+		select {
+		case res := <-done:
+			t.Fatalf("the start ended (answering %v) without writing %q while another session held the migration lock on %s",
+				res.err, message, dbType())
+		case <-deadline:
+			t.Fatalf("the start did not write %q within %s while another session held the migration lock on %s",
+				message, migrationLockRecordBudget, dbType())
+		case <-tick.C:
+		}
+	}
+}
+
+func recordsNamed(capture *logtest.SlogCapture, message string) []logtest.CapturedRecord {
+	var found []logtest.CapturedRecord
+	for _, r := range capture.Records() {
+		if r.Message == message {
+			found = append(found, r)
+		}
+	}
+	return found
+}
+
+// messageOrder is the captured messages among wanted, in the order they were written.
+func messageOrder(capture *logtest.SlogCapture, wanted ...string) []string {
+	keep := map[string]bool{}
+	for _, w := range wanted {
+		keep[w] = true
+	}
+	var order []string
+	for _, r := range capture.Records() {
+		if keep[r.Message] {
+			order = append(order, r.Message)
+		}
+	}
+	return order
+}
+
 // TestMigrationLock_ThePreCreateGivesTheResourceBack covers the one place outside the runner
 // that takes the migration lock: SQL Server's schema_migrations pre-create, which is a catalog
 // check followed by a CREATE and is safe only while the lock is held (#293).
@@ -133,8 +367,11 @@ func TestMigrationLock_AFailedMigrationStillGivesTheResourceBack(t *testing.T) {
 // It holds the same resource on the same instance, so it owes the same two things Migrator.run
 // owes and for the same reasons: the lock has to come back, and a session that failed to give it
 // back must not return to the pool. NewMigrator is where that happens, and newIsolatedDB already
-// called it, so this asks a SECOND construction against the same database and then takes the
-// resource from a pool of its own.
+// called it, so this drops the table that construction created, asks a SECOND construction
+// against the same database and then takes the resource from a pool of its own. The drop is what
+// puts the lock under test: a pre-create finding the table already there takes no lock at all,
+// since there is nothing to create and the lock may be held by another process's migration, which
+// the start then waits for in the runner, where it says so (#390 decision 7).
 //
 // SQL Server only. It is the only engine whose pre-create reaches for the lock at all: the other
 // three create the table with a plain IF NOT EXISTS, which their engines make atomic.
@@ -148,9 +385,12 @@ func TestMigrationLock_ThePreCreateGivesTheResourceBack(t *testing.T) {
 	h := newIsolatedDB(t)
 	eng := migrationLockEngine(t, h.Name)
 
+	_, err := h.SQL.Exec("DROP TABLE schema_migrations")
+	require.NoError(t, err, "clear the table the fixture's own construction created")
+
 	// The pre-create runs inside NewMigrator, so this is what puts the lock ceremony under test
 	// rather than the runner's own.
-	_, err := h.DB.NewMigrator(context.Background())
+	_, err = h.DB.NewMigrator(context.Background())
 	require.NoErrorf(t, err, "construct a second migrator, which pre-creates schema_migrations again on %s", dbType())
 
 	requireMigrationLockIsFree(t, h, eng, "after the schema_migrations pre-create")

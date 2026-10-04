@@ -3,14 +3,41 @@ package migrator
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/leodip/goiabada/core/errs"
 )
 
+// Progress is what a starting process is told while UpToHead works, so it can say so: a start
+// waiting for the migration lock, or running a long migration, otherwise writes nothing and
+// cannot be told from a hung one (#390 decision 7). The runner writes no record itself; the
+// process starting owns the startup records, as it owns "no need to migrate the database".
+//
+// Versions are the runner's own, so a database never migrated is NilVersion.
+type Progress interface {
+	// WaitingForLock is called once, before the wait, when another session holds the migration
+	// lock. Never on SQLite, whose lock is a mutex in this process.
+	WaitingForLock()
+	// Migrating is called before the first migration file runs: the version the schema is at,
+	// the version it is going to and how many files that takes.
+	Migrating(from, to, pending int)
+	// Migrated is called after the last file has run and the schema is at to: how many files ran
+	// and how long they took.
+	Migrated(from, to, applied int, took time.Duration)
+}
+
+// noProgress is the Progress of every operation nobody is reporting on: Up, Migrate and Force, and
+// an UpToHead passed nil.
+type noProgress struct{}
+
+func (noProgress) WaitingForLock()                       {}
+func (noProgress) Migrating(int, int, int)               {}
+func (noProgress) Migrated(int, int, int, time.Duration) {}
+
 // UpToHead is the one way a starting process brings its database to head: Up, with "nothing to
 // do" answered as (false, nil) and every failure explained by StartupRefusal. migrated reports
 // whether any migration ran, so the caller, which owns the startup record, can say so; nothing
-// here logs.
+// here logs. progress is told what happens on the way, and may be nil.
 //
 // Nothing to do is the bare ErrNoChange and nothing else, tested by identity. run joins a failed
 // unlock onto what the operation returned, so at head with a lock that did not come back Up
@@ -20,8 +47,11 @@ import (
 //
 // The wrap is the text each engine's own Migrate used before this replaced the four of them, so
 // what an operator reads when a start is refused did not move (#438).
-func (m *Migrator) UpToHead(ctx context.Context, goiabadaVersion string) (migrated bool, err error) {
-	err = m.Up(ctx)
+func (m *Migrator) UpToHead(ctx context.Context, goiabadaVersion string, progress Progress) (migrated bool, err error) {
+	if progress == nil {
+		progress = noProgress{}
+	}
+	err = m.up(ctx, progress)
 	if IsNoChange(err) {
 		return false, nil
 	}

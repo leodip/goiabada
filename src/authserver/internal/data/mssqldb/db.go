@@ -341,7 +341,21 @@ const schemaMigrationsTableDDL = `IF OBJECT_ID(N'schema_migrations', N'U') IS NU
 // taken, used and released on a single connection pinned out of the pool. Issued against
 // the pooled *sql.DB, the release could land on a different session and leave the lock held
 // for the life of the process, blocking every later migrator.
+//
+// A table already there is answered before the lock, because there is nothing to create and the
+// lock may be held by another process's migration for as long as that takes. Waiting for it here
+// would be a wait the start never says it is in; the runner waits for the same lock next, and
+// says so (#390 decision 7). Only a table that is absent, a first start, takes the lock, and the
+// DDL checks again under it.
 func (d *Database) ensureSchemaMigrationsTable(ctx context.Context) (err error) {
+	var existing sql.NullInt64
+	if checkErr := d.DB.QueryRowContext(ctx, `SELECT OBJECT_ID(N'schema_migrations', N'U')`).Scan(&existing); checkErr != nil {
+		return errs.Wrap(checkErr, "unable to check for the schema_migrations table")
+	}
+	if existing.Valid {
+		return nil
+	}
+
 	eng := migrator.SQLServer(d.dbConfig.Name)
 
 	conn, err := d.DB.Conn(ctx)
@@ -356,8 +370,9 @@ func (d *Database) ensureSchemaMigrationsTable(ctx context.Context) (err error) 
 		}
 	}()
 
-	// The lock waits indefinitely, which is what the library did too: the holder is another
-	// process's pre-create or migration, and both are short.
+	// The lock waits indefinitely, which is what the library did too. The table was absent a
+	// moment ago, so the holder is another process starting against the same empty database:
+	// its pre-create, which is short, and at worst the first migration it runs right after.
 	if lockErr := eng.Lock(ctx, conn); lockErr != nil {
 		return errs.Wrap(lockErr, "unable to take the migration lock")
 	}
