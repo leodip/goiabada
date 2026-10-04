@@ -53,7 +53,7 @@ Use the [setup wizard](/getting-started/setup-wizard/) to generate your `docker-
 
 1. Select **"2. Production with reverse proxy"** when prompted
 2. Enter your domain names (e.g., `https://auth.example.com` and `https://admin.example.com`)
-3. The wizard automatically sets `TRUST_PROXY_HEADERS=true` (and, because your base URLs are `https://`, cookies get the `Secure` flag automatically)
+3. The wizard automatically sets `TRUST_PROXY_HEADERS=true` with `TRUSTED_PROXIES` empty, trusting Nginx as the one proxy hop; step 6 below makes Nginx hand Goiabada the client's address rather than Cloudflare's (see [client IP behind Cloudflare](#client-ip-behind-cloudflare)). Because your base URLs are `https://`, cookies get the `Secure` flag automatically
 
 Then start the containers:
 
@@ -241,7 +241,51 @@ sudo nginx -t
 sudo nginx -s reload
 ```
 
-### 6. Configure firewall
+### 6. Have Nginx resolve Cloudflare
+
+Every request reaches Nginx from a Cloudflare address, so without this step
+Goiabada would see Cloudflare's edge as the client. Nginx's `real_ip` module
+replaces that address with the client's, taken from the `CF-Connecting-IP` header,
+but only on a connection that comes from one of Cloudflare's published ranges.
+Write those ranges into a file Nginx loads in its `http` context:
+
+```bash
+{
+  echo "# Cloudflare's ranges, from https://www.cloudflare.com/ips/ ($(date -I))"
+  for range in $(curl -fsS https://www.cloudflare.com/ips-v4) $(curl -fsS https://www.cloudflare.com/ips-v6); do
+    echo "set_real_ip_from $range;"
+  done
+  echo "real_ip_header CF-Connecting-IP;"
+} | sudo tee /etc/nginx/conf.d/cloudflare-real-ip.conf
+```
+
+The file looks like this, with every range Cloudflare lists:
+
+```nginx
+# Cloudflare's ranges, from https://www.cloudflare.com/ips/ (2026-10-04)
+set_real_ip_from 173.245.48.0/20;
+set_real_ip_from 103.21.244.0/22;
+# ...
+set_real_ip_from 2400:cb00::/32;
+# ...
+real_ip_header CF-Connecting-IP;
+```
+
+Test and reload:
+
+```bash
+sudo nginx -t
+sudo nginx -s reload
+```
+
+Debian's and Ubuntu's Nginx packages include `/etc/nginx/conf.d/*.conf` in the
+`http` context and are built with the `real_ip` module (`nginx -V 2>&1 | grep -o
+with-http_realip_module` shows it). Cloudflare changes its ranges rarely; run the
+command again when it does, or from a monthly cron job. See
+[client IP behind Cloudflare](#client-ip-behind-cloudflare) for why Goiabada
+needs no list of its own.
+
+### 7. Configure firewall
 
 ```bash
 sudo ufw allow 80/tcp
@@ -254,21 +298,32 @@ sudo ufw allow 443/tcp
 - Auth server: `https://auth.example.com`
 - Admin console: `https://admin.example.com`
 
-<Aside type="caution" title="Client IP behind two proxies">
-This setup has **two** proxy hops (Cloudflare, then Nginx), so `X-Forwarded-For`
-carries multiple entries. With only `TRUST_PROXY_HEADERS=true` and no
-`TRUSTED_PROXIES`, Goiabada trusts a single hop, which a client can defeat by
-injecting extra forwarded entries. Set `TRUSTED_PROXIES` to the addresses of the
-proxies you control so the client IP is resolved from the trusted end of the
-chain:
+## Client IP behind Cloudflare
 
-```bash
-# Nginx host (loopback) plus Cloudflare's published IP ranges
-GOIABADA_AUTHSERVER_TRUSTED_PROXIES=127.0.0.1,173.245.48.0/20,103.21.244.0/22,...
-GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES=127.0.0.1,173.245.48.0/20,103.21.244.0/22,...
-```
+Goiabada keys its rate limits and audit records on the client IP, which behind
+proxies it reads from `X-Forwarded-For`. The wizard sets `TRUST_PROXY_HEADERS=true`
+with `TRUSTED_PROXIES` empty, so Goiabada trusts one hop, the proxy that connects
+to it, and takes the client from the rightmost entry, which that proxy appended.
 
-Cloudflare publishes its ranges at [cloudflare.com/ips](https://www.cloudflare.com/ips/).
+Here that proxy is Nginx, and step 6 is what makes its entry the client's: with
+`real_ip`, Nginx's `$remote_addr` is the address in `CF-Connecting-IP` on a
+connection from Cloudflare, and the `X-Real-IP $remote_addr` and
+`$proxy_add_x_forwarded_for` lines of step 5 pass that address on. A value a client
+puts in `X-Forwarded-For` itself stays to the left and is never read. A request that
+reaches Nginx directly, from outside Cloudflare's ranges, keeps its own address, so
+a forged `CF-Connecting-IP` changes nothing. Without step 6, the rightmost entry is
+a Cloudflare edge address: not forgeable, but shared by everyone that edge serves,
+so many users would count against one rate-limit bucket.
+
+Do not list Cloudflare's ranges, or `127.0.0.1`, in `TRUSTED_PROXIES`. Nginx
+connects to `127.0.0.1:9090`, but a Compose service sees the connection come from
+the Compose network's gateway, an address such as `172.21.0.1`; Goiabada reads
+forwarded headers only from a connection whose address is in the list, so that list
+makes it ignore them and resolve every request to the gateway, one bucket for
+everyone.
+
+To check, open the sign-in page and read the auth server's request log (`docker
+compose logs goiabada-authserver`): the `ip` of your request should be your own
+address, not Cloudflare's.
 See [Reverse proxy: client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection)
-for how the walk works.
-</Aside>
+for how the resolution works.

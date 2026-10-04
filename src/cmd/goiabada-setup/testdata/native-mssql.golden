@@ -31,12 +31,19 @@ GOIABADA_DB_PASSWORD="db-password"
 # Auth server settings
 # =============================================================================
 GOIABADA_AUTHSERVER_BASEURL="https://auth.example.com"
-GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP="0.0.0.0"
+# A reverse proxy on this machine forwards to this server, so it listens on 127.0.0.1
+# alone, and trusts the forwarded headers of a connection from 127.0.0.1 alone. For a
+# proxy on another host, set the listen host to an address that host reaches, and the
+# trusted proxies to that host's address.
+GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP="127.0.0.1"
 GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP="9090"
+# The client is the rightmost X-Forwarded-For entry the proxy appends, read only from a
+# connection that comes from 127.0.0.1.
+GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS="true"
+GOIABADA_AUTHSERVER_TRUSTED_PROXIES="127.0.0.1"
 GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY="auth-session-auth-key"
 GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY="auth-session-enc-key"
 GOIABADA_AES_ENCRYPTION_KEY="aes-encryption-key"
-GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS="true"
 GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS="true"
 GOIABADA_AUTHSERVER_LOG_LEVEL="info"
 GOIABADA_AUTHSERVER_LOG_FORMAT="text"
@@ -45,11 +52,18 @@ GOIABADA_AUTHSERVER_LOG_FORMAT="text"
 # Admin console settings
 # =============================================================================
 GOIABADA_ADMINCONSOLE_BASEURL="https://admin.example.com"
-GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP="0.0.0.0"
+# A reverse proxy on this machine forwards to this server, so it listens on 127.0.0.1
+# alone, and trusts the forwarded headers of a connection from 127.0.0.1 alone. For a
+# proxy on another host, set the listen host to an address that host reaches, and the
+# trusted proxies to that host's address.
+GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP="127.0.0.1"
 GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP="9091"
+# The client is the rightmost X-Forwarded-For entry the proxy appends, read only from a
+# connection that comes from 127.0.0.1.
+GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS="true"
+GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES="127.0.0.1"
 GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY="admin-session-auth-key"
 GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY="admin-session-enc-key"
-GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS="true"
 GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS="true"
 GOIABADA_ADMINCONSOLE_LOG_LEVEL="info"
 GOIABADA_ADMINCONSOLE_LOG_FORMAT="text"

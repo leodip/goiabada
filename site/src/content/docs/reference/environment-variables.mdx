@@ -220,7 +220,7 @@ A listen host is an address on this machine, not the public URL: browsers and cl
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_TRUSTED_PROXIES</code><br/><code>--authserver-trusted-proxies</code></td>
       <td><em>(empty)</em></td>
-      <td>Comma-separated reverse-proxy IPs/CIDRs, e.g. <code>10.0.0.0/8,192.168.1.5</code>. When set (with <code>TRUST_PROXY_HEADERS=true</code>), the real client IP is resolved by walking <code>X-Forwarded-For</code> from the right across these trusted hops, which prevents IP spoofing behind multiple proxies or a CDN. When empty, a single proxy hop is trusted. An entry that is neither an IP address nor a CIDR range stops the server at startup, whatever <code>TRUST_PROXY_HEADERS</code> says.</td>
+      <td>Comma-separated reverse-proxy IPs/CIDRs, e.g. <code>10.0.0.0/8,192.168.1.5</code>. When set (with <code>TRUST_PROXY_HEADERS=true</code>), the real client IP is resolved by walking <code>X-Forwarded-For</code> from the right across these trusted hops, which prevents IP spoofing behind multiple proxies or a CDN. When empty, a single proxy hop is trusted. When set, it must include the proxy that connects to Goiabada: forwarded headers on a connection from any other address are ignored. An entry that is neither an IP address nor a CIDR range stops the server at startup, whatever <code>TRUST_PROXY_HEADERS</code> says.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY</code></td>
@@ -293,7 +293,7 @@ Shared means one budget, not two of the same size: a wrong password counts the s
 
 **Per pod.** The limits that count every request are counted in each auth server process, on every database: a deployment running several replicas multiplies each of them by the replica count, and a rollout resets them. They bound floods and outbound mail rather than guessing. For a request limit that holds across the whole deployment, put one at your gateway, reverse proxy, CDN or cloud WAF, which also stops a flood before it reaches the auth server. The `rate_limit_exceeded` audit event is likewise recorded at most once per key and window by each replica.
 
-**Keyed on IP addresses.** A limit keyed on an IP address is only as good as the client IP Goiabada resolves. Behind a reverse proxy that takes `TRUST_PROXY_HEADERS`, and with more than one proxy layer, or a proxy that does not overwrite the inbound headers, it also takes `TRUSTED_PROXIES`: without it, a client can forge the address it is counted under. See [client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection).
+**Keyed on IP addresses.** A limit keyed on an IP address is only as good as the client IP Goiabada resolves. Behind a reverse proxy it takes `TRUST_PROXY_HEADERS`. One hop, with `TRUSTED_PROXIES` empty, is sound behind a proxy that sets or appends `X-Forwarded-For`; a second proxy hop in front also takes `TRUSTED_PROXIES`. Either way, a caller that reaches Goiabada without passing the proxy can forge the address it is counted under. See [client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection).
 </Aside>
 
 ### Customization
@@ -535,7 +535,7 @@ The admin console needs to know where the auth server is located. See [Network c
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES</code><br/><code>--adminconsole-trusted-proxies</code></td>
       <td><em>(empty)</em></td>
-      <td>Comma-separated reverse-proxy IPs/CIDRs, e.g. <code>10.0.0.0/8,192.168.1.5</code>. When set (with <code>TRUST_PROXY_HEADERS=true</code>), the real client IP is resolved by walking <code>X-Forwarded-For</code> from the right across these trusted hops, which prevents IP spoofing behind multiple proxies or a CDN. When empty, a single proxy hop is trusted. An entry that is neither an IP address nor a CIDR range stops the server at startup, whatever <code>TRUST_PROXY_HEADERS</code> says.</td>
+      <td>Comma-separated reverse-proxy IPs/CIDRs, e.g. <code>10.0.0.0/8,192.168.1.5</code>. When set (with <code>TRUST_PROXY_HEADERS=true</code>), the real client IP is resolved by walking <code>X-Forwarded-For</code> from the right across these trusted hops, which prevents IP spoofing behind multiple proxies or a CDN. When empty, a single proxy hop is trusted. When set, it must include the proxy that connects to Goiabada: forwarded headers on a connection from any other address are ignored. An entry that is neither an IP address nor a CIDR range stops the server at startup, whatever <code>TRUST_PROXY_HEADERS</code> says.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY</code></td>

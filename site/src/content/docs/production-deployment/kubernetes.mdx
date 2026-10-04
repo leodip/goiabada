@@ -23,7 +23,7 @@ Regardless of your Kubernetes setup, Goiabada requires:
 | **Two hostnames** | Separate domains/subdomains for auth server and admin console |
 | **Shared database** | MySQL, PostgreSQL, or SQL Server (SQLite not supported - pods need a shared database) |
 | **Empty database** | For fresh deployments, the database must be empty - Goiabada seeds it with OAuth clients configured for your specific URLs |
-| **Proxy headers** | The generated manifests set `TRUST_PROXY_HEADERS=true` for proper client IP detection behind a gateway |
+| **Proxy headers** | The generated manifests trust one proxy hop, the gateway, to resolve the client IP (see [client IP and proxy trust](#client-ip-and-proxy-trust)) |
 
 <Aside type="caution" title="Database must be empty">
 Goiabada automatically seeds the database on first startup with an admin user and OAuth clients configured for your URLs. If you redeploy with different URLs against an existing database, authentication will fail because the OAuth client redirect URIs won't match.
@@ -429,11 +429,10 @@ turn it on, not every limit holds across replicas:
 - **Per pod:** every other limit, the per-IP limits and the limits on outbound mail. Behind the
   Service, three replicas give a client up to three times each budget, and a rollout resets them.
   For a request limit across the whole deployment, use the gateway's own rate limiting.
-- **The per-IP limits depend on the client IP.** The generated manifests trust one proxy hop and
-  set no `GOIABADA_AUTHSERVER_TRUSTED_PROXIES`, and with the `Cluster` traffic policy of Step 1 the
+- **The per-IP limits depend on the client IP.** The generated manifests trust one proxy hop with
+  `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` empty, and with the `Cluster` traffic policy of Step 1 the
   address Goiabada sees is a node's, so a per-IP limit counts everyone arriving through one node
-  together. See [client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection)
-  before relying on one.
+  together. See [client IP and proxy trust](#client-ip-and-proxy-trust) before relying on one.
 
 The budgets are in the [rate limiting table](/reference/environment-variables/#security-settings).
 
@@ -511,6 +510,46 @@ issued:
 ```bash
 kubectl label namespace goiabada pod-security.kubernetes.io/enforce=restricted
 ```
+
+## Client IP and proxy trust
+
+Goiabada keys its rate limits, audit records and session records on the client IP, which behind
+the gateway it reads from `X-Forwarded-For`. Each generated ConfigMap sets its server's pair side by
+side, under a comment saying why:
+
+```yaml
+GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS: "true"
+GOIABADA_AUTHSERVER_TRUSTED_PROXIES: ""
+```
+
+With the headers trusted and the list empty, Goiabada trusts one hop and takes the client from the
+rightmost `X-Forwarded-For` entry. Envoy appends the address it received each connection from to
+that header, so the rightmost entry is Envoy's own observation: whatever a client sends in
+`X-Forwarded-For` ends up to its left and is never read. Which address Envoy observes depends on the
+traffic policy of Step 1: under `Cluster`, a node's; under `Local` with Envoy on every node, the
+client's.
+
+**Why the list is empty.** A trusted-proxy list makes Goiabada walk `X-Forwarded-For` from the right
+past every address in it. The lists that come to mind for a cluster both go wrong here. The private
+ranges hold the node addresses Envoy records under `Cluster`, so Goiabada would walk past Envoy's
+entry and adopt whatever the client put to its left. The pod CIDR does the same on clusters where
+pods and nodes share a subnet, as on EKS with the VPC CNI and with Azure CNI. One gateway needs no
+list.
+
+**When to set it.** Set `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` and
+`GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES` only when a CDN or a second load balancer that appends
+`X-Forwarded-For` sits in front of Envoy. Name every hop you control, the Envoy pods included:
+Goiabada reads the forwarded headers only from a connection whose address is in the list.
+
+**What no list stops.** A pod in the cluster that calls the `goiabada-authserver` or
+`goiabada-adminconsole` Service directly, around Envoy, connects from its own address and can send
+any `X-Forwarded-For` it likes, choosing the address it is rate limited and audited under. No
+trusted-proxy list prevents that, since Envoy's pods are pods too; a NetworkPolicy admitting only
+Envoy's namespace does.
+
+See [client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection)
+for how the resolution works, and the startup warning the auth server logs about it when the rate
+limiter is on.
 
 ## Health endpoints
 

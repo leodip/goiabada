@@ -43,7 +43,7 @@ Use the [setup wizard](/getting-started/setup-wizard/) to generate your `docker-
 
 1. Select **"2. Production with reverse proxy"** when prompted
 2. Enter your domain names (e.g., `https://auth.example.com` and `https://admin.example.com`)
-3. The wizard automatically sets `TRUST_PROXY_HEADERS=true` (and, because your base URLs are `https://`, cookies get the `Secure` flag automatically)
+3. The wizard automatically sets `TRUST_PROXY_HEADERS=true` with `TRUSTED_PROXIES` empty: the tunnel appends the client's address to `X-Forwarded-For`, so Goiabada trusts it as the one proxy hop (see [client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection)). Because your base URLs are `https://`, cookies get the `Secure` flag automatically
 
 Then start the containers:
 

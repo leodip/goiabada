@@ -72,10 +72,6 @@ func generateAuthServerService(config *Config) string {
 	var sb strings.Builder
 
 	behindProxy := config.Deployment.behindProxy
-	trustProxyHeaders := "false"
-	if behindProxy {
-		trustProxyHeaders = "true"
-	}
 
 	authInternalURL := "http://goiabada-authserver:9090"
 
@@ -133,7 +129,7 @@ func generateAuthServerService(config *Config) string {
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_CERTFILE=\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_KEYFILE=\n")
-	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS", trustProxyHeaders)
+	writeComposeTrust(&sb, behindProxy, "AUTHSERVER")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_LEVEL=info\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_FORMAT=text\n")
@@ -167,10 +163,6 @@ func generateAdminConsoleService(config *Config) string {
 	var sb strings.Builder
 
 	behindProxy := config.Deployment.behindProxy
-	trustProxyHeaders := "false"
-	if behindProxy {
-		trustProxyHeaders = "true"
-	}
 
 	authInternalURL := "http://goiabada-authserver:9090"
 
@@ -208,7 +200,7 @@ func generateAdminConsoleService(config *Config) string {
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS=\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_CERTFILE=\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_KEYFILE=\n")
-	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS", trustProxyHeaders)
+	writeComposeTrust(&sb, behindProxy, "ADMINCONSOLE")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LOG_LEVEL=info\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LOG_FORMAT=text\n")
@@ -219,6 +211,28 @@ func generateAdminConsoleService(config *Config) string {
 	sb.WriteString("\n")
 
 	return sb.String()
+}
+
+// writeComposeTrust writes one service's proxy trust. Behind the reverse proxy on the host it
+// trusts one hop with an explicit empty list, under the comment saying why that is sound: nginx on
+// the host and a Cloudflare Tunnel each append the address they received the connection from. A
+// list naming 127.0.0.1 would not do, since a Compose service's peer is the Compose network's
+// gateway, so the headers would be ignored and every request resolved to it (#396 decision 6).
+// server is the variables' infix, AUTHSERVER or ADMINCONSOLE.
+func writeComposeTrust(sb *strings.Builder, behindProxy bool, server string) {
+	prefix := "GOIABADA_" + server + "_"
+	if !behindProxy {
+		writeComposeVariable(sb, prefix+"TRUST_PROXY_HEADERS", "false")
+		return
+	}
+	sb.WriteString("      # The reverse proxy on this host, nginx or a Cloudflare Tunnel, appends the address it\n")
+	sb.WriteString("      # received each connection from to X-Forwarded-For, so trusting one hop, the rightmost\n")
+	sb.WriteString("      # entry, resolves the client with no list. Set the list only for a second proxy hop in\n")
+	sb.WriteString("      # front of that one, naming every hop, this service's peer included: the Compose\n")
+	sb.WriteString("      # network's gateway, not 127.0.0.1. For Cloudflare's proxy in front of nginx, have nginx\n")
+	sb.WriteString("      # resolve Cloudflare instead: https://goiabada.dev/production-deployment/cloudflare-nginx/\n")
+	writeComposeVariable(sb, prefix+"TRUST_PROXY_HEADERS", "true")
+	writeComposeVariable(sb, prefix+"TRUSTED_PROXIES", "")
 }
 
 // writeStopGracePeriod writes a service's stop_grace_period under the comment lines saying what it

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -27,6 +28,43 @@ type CLIFlags struct {
 	DBPassword      string
 	SkipDBTest      bool
 	NoColor         bool
+	// LocalProxy is --local-proxy, read by native binaries alone.
+	LocalProxy optionalBool
+}
+
+// optionalBool is a boolean flag that knows whether it was given, so one left out takes the
+// default of the deployment it applies to.
+type optionalBool struct {
+	set, value bool
+}
+
+func (b *optionalBool) String() string {
+	if b == nil || !b.set {
+		return ""
+	}
+	return strconv.FormatBool(b.value)
+}
+
+// Set reads the value as the flag package reads a boolean flag's, so a value that is none is
+// refused naming the flag.
+func (b *optionalBool) Set(value string) error {
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return err
+	}
+	b.set, b.value = true, parsed
+	return nil
+}
+
+// IsBoolFlag lets the flag be given alone, meaning true, as a boolean flag can.
+func (b *optionalBool) IsBoolFlag() bool { return true }
+
+// or is the value given, or defaultValue when the flag was left out.
+func (b optionalBool) or(defaultValue bool) bool {
+	if b.set {
+		return b.value
+	}
+	return defaultValue
 }
 
 // parseFlags reads the command line. It returns flag.ErrHelp for -h and --help and the parse error
@@ -55,6 +93,7 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 	fs.StringVar(&flags.DBPassword, "db-password", "", "Database password")
 	fs.BoolVar(&flags.SkipDBTest, "skip-db-test", false, "Skip database connection test")
 	fs.BoolVar(&flags.NoColor, "no-color", false, "Disable colored output")
+	fs.Var(&flags.LocalProxy, "local-proxy", "A reverse proxy on this machine forwards to the native binaries (default: true)")
 
 	fs.Usage = func() {
 		name := fs.Name()
@@ -85,6 +124,11 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 		p("  --db-user USER         Database username (default: auto-detected)\n")
 		p("  --db-password PASS     Database password (generated if not provided)\n")
 		p("  --skip-db-test         Skip database connection test\n\n")
+		p("Native Binaries Options:\n")
+		p("  --local-proxy=BOOL     A reverse proxy on this machine forwards to Goiabada (default: true):\n")
+		p("                         both servers listen on 127.0.0.1 and trust its forwarded headers.\n")
+		p("                         false listens on every interface and trusts no forwarded header,\n")
+		p("                         for HTTPS served by Goiabada itself\n\n")
 		p("Examples:\n")
 		p("  Interactive mode (recommended for first-time setup):\n")
 		p("    %s\n\n", name)

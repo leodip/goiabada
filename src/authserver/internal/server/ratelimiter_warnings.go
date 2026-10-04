@@ -13,11 +13,18 @@ const (
 		"every request resolves to the proxy's address and the whole deployment shares one per-IP bucket. " +
 		"Set GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS, and GOIABADA_AUTHSERVER_TRUSTED_PROXIES with it"
 
+	// One hop is sound behind any proxy that sets or appends X-Forwarded-For, Envoy, nginx and
+	// Cloudflare among them, since the rightmost entry is then the address that proxy received the
+	// connection from. The server cannot tell that from a proxy passing the header through untouched
+	// or a caller reaching it around the proxy, which is why this stays a warning (#396 decision 8).
 	warnRateLimiterSingleHopTrust = "config: GOIABADA_AUTHSERVER_RATELIMITER_ENABLED is true and " +
-		"GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS is true with no GOIABADA_AUTHSERVER_TRUSTED_PROXIES; " +
-		"single-hop trust adopts the rightmost X-Forwarded-For entry, which is sound only if the proxy " +
-		"overwrites the inbound header, and otherwise lets a client choose its own per-IP bucket. " +
-		"Set GOIABADA_AUTHSERVER_TRUSTED_PROXIES to the proxy addresses or CIDRs"
+		"GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS is true with no GOIABADA_AUTHSERVER_TRUSTED_PROXIES, " +
+		"so the client is the rightmost X-Forwarded-For entry. That is sound behind one reverse proxy " +
+		"that sets or appends X-Forwarded-For, as Envoy, nginx and Cloudflare do; what defeats it is a " +
+		"caller that reaches this server without passing the proxy, which then chooses the address it " +
+		"is rate-limited and audited under. Set GOIABADA_AUTHSERVER_TRUSTED_PROXIES only when a second " +
+		"proxy hop, such as a CDN or a load balancer, sits in front of the one that connects here. " +
+		"See https://goiabada.dev/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection"
 )
 
 // rateLimiterConfigWarnings reports the proxy misconfigurations that change what a rate
@@ -28,7 +35,8 @@ const (
 // who opted in and for whom the per-IP buckets now decide who gets served. The two
 // conditions fail in opposite directions, which is why both are worth a line: untrusted
 // headers behind a proxy fail closed and throttle everybody at once, while single-hop trust
-// with no allowlist fails open and hands the bucket choice to the caller.
+// with no allowlist fails open, handing the bucket choice to any caller that reaches the
+// server without passing its proxy.
 func rateLimiterConfigWarnings(enabled, trustProxyHeaders bool, trustedProxies []string) []string {
 	if !enabled {
 		return nil

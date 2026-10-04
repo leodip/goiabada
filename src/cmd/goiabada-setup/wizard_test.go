@@ -98,6 +98,9 @@ func interactiveScript(d *deployment, e *engine) []scriptedStep {
 	if d.asksNamespace {
 		steps = append(steps, scriptedStep{prompt: "Namespace [goiabada]: ", answer: ""})
 	}
+	if d.kind == deploymentNative {
+		steps = append(steps, scriptedStep{prompt: localProxyPrompt, answer: ""})
+	}
 	defaultEmail := "admin@example.com"
 	if d.asksURLs {
 		defaultEmail = "admin@example.org"
@@ -137,8 +140,8 @@ func TestWizard_EveryDeploymentTypeRunsToItsFile(t *testing.T) {
 		{deploymentProduction, "postgres", []string{"Deployment type", "Database type", "Domain names", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
 		{deploymentKubernetes, "postgres", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
 		{deploymentKubernetes, "mssql", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
-		{deploymentNative, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Admin credentials", "Generating credentials", "Generating configuration"}},
-		{deploymentNative, "mysql", []string{"Deployment type", "Database type", "Domain names", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentNative, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Admin credentials", "Generating credentials", "Generating configuration"}},
+		{deploymentNative, "mysql", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
 	}
 	for _, tc := range cases {
 		d := deployments[tc.deployment]
@@ -372,7 +375,7 @@ func TestWizard_NonInteractiveRunsFromTheFlags(t *testing.T) {
 		},
 		{
 			flags:    CLIFlags{DeploymentType: "4", DBType: "mssql", AuthServerURL: "https://auth.example.org", DBHost: "sql.internal", DBPassword: "db-secret", SkipDBTest: true},
-			numbers:  []int{6, 7},
+			numbers:  []int{7, 8},
 			database: connectionCall{"mssql", "sql.internal", "1433", "goiabada", "sa", "db-secret"},
 		},
 	}
@@ -814,6 +817,39 @@ func TestParseFlags(t *testing.T) {
 			t.Errorf("parseFlags(--bogus): %v, want a parse error", err)
 		}
 	})
+	// --local-proxy knows whether it was given, so left out it takes the default, and a value that
+	// is not a boolean is refused by the flag's name (#396 decision 19).
+	t.Run("--local-proxy", func(t *testing.T) {
+		for args, want := range map[string]optionalBool{
+			"":                    {},
+			"--local-proxy":       {set: true, value: true},
+			"--local-proxy=true":  {set: true, value: true},
+			"--local-proxy=false": {set: true, value: false},
+		} {
+			flags, err := parseFlags(strings.Fields(args), io.Discard)
+			if err != nil {
+				t.Fatalf("parseFlags(%q): %v", args, err)
+			}
+			if flags.LocalProxy != want {
+				t.Errorf("parseFlags(%q) reads %+v, want %+v", args, flags.LocalProxy, want)
+			}
+		}
+		var stderr bytes.Buffer
+		_, err := parseFlags([]string{"--local-proxy=maybe"}, &stderr)
+		if err == nil || !strings.Contains(err.Error(), `invalid boolean value "maybe" for -local-proxy`) {
+			t.Errorf("parseFlags(--local-proxy=maybe): %v, want the value refused by the flag's name", err)
+		}
+	})
+	t.Run("the usage lists --local-proxy under native binaries", func(t *testing.T) {
+		var stderr bytes.Buffer
+		_, _ = parseFlags([]string{"-h"}, &stderr)
+		usage := stderr.String()
+		section := strings.Index(usage, "Native Binaries Options:")
+		flag := strings.Index(usage, "--local-proxy")
+		if section < 0 || flag < section {
+			t.Errorf("--local-proxy is not listed under the native binaries options:\n%s", usage)
+		}
+	})
 	t.Run("values", func(t *testing.T) {
 		flags, err := parseFlags([]string{"--type=native", "--db", "mysql", "-o", "out.env", "--skip-db-test", "--no-color"}, io.Discard)
 		if err != nil {
@@ -823,6 +859,91 @@ func TestParseFlags(t *testing.T) {
 			t.Errorf("parsed %+v", flags)
 		}
 	})
+}
+
+// localProxyPrompt is the native question, asked with yes as its default (#396 decision 7).
+const localProxyPrompt = "Does a reverse proxy on this machine forward to Goiabada? [Y/n]: "
+
+// Native binaries ask whether a reverse proxy on the same machine forwards to them, yes by default,
+// and --local-proxy answers without a prompt, true when left out. The answer is what the env file
+// is written from (#396 decisions 7 and 19).
+func TestWizard_NativeAsksWhetherALocalProxyForwardsToIt(t *testing.T) {
+	d, e := deployments[deploymentNative], testEngine("postgres")
+	withAnswer := func(answer string) []scriptedStep {
+		steps := interactiveScript(d, e)
+		for i := range steps {
+			if steps[i].prompt == localProxyPrompt {
+				steps[i].answer = answer
+				return steps
+			}
+		}
+		t.Fatal("the script asks no local proxy question")
+		return nil
+	}
+	nonInteractive := func(localProxy optionalBool) *CLIFlags {
+		return &CLIFlags{DeploymentType: "native", DBType: "postgres", AuthServerURL: "https://auth.example.org",
+			DBHost: "pg.internal", SkipDBTest: true, LocalProxy: localProxy}
+	}
+	cases := map[string]struct {
+		flags *CLIFlags
+		steps []scriptedStep
+		want  bool
+	}{
+		"prompted, the default":        {&CLIFlags{}, withAnswer(""), true},
+		"prompted, yes":                {&CLIFlags{}, withAnswer("y"), true},
+		"prompted, no":                 {&CLIFlags{}, withAnswer("n"), false},
+		"by flag, left out":            {nonInteractive(optionalBool{}), nil, true},
+		"by flag, --local-proxy=true":  {nonInteractive(optionalBool{set: true, value: true}), nil, true},
+		"by flag, --local-proxy=false": {nonInteractive(optionalBool{set: true, value: false}), nil, false},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			w, in, out, _ := testWizard(t, tc.flags, tc.steps)
+			if err := w.setup(); err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			in.assertConsumed()
+			if w.config.LocalProxy != tc.want {
+				t.Errorf("LocalProxy is %v, want %v", w.config.LocalProxy, tc.want)
+			}
+			written, err := os.ReadFile(w.outputPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			env, _, err := systemdEnvironmentFile(string(written))
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantTrust := map[bool]string{true: "true", false: "false"}[tc.want]
+			if got := env["GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS"]; got != wantTrust {
+				t.Errorf("the file trusts forwarded headers: %q, want %q", got, wantTrust)
+			}
+		})
+	}
+}
+
+// --local-proxy is ignored by every type that does not run native binaries, as --namespace and
+// --db-host are: the file is the one the type writes without it (#396 decision 19).
+func TestWizard_LocalProxyIsIgnoredOutsideNative(t *testing.T) {
+	for _, flags := range []CLIFlags{
+		{DeploymentType: "production", DBType: "postgres", AuthServerURL: "https://auth.example.org"},
+		{DeploymentType: "kubernetes", DBType: "postgres", AuthServerURL: "https://auth.example.org", DBHost: "pg.internal", SkipDBTest: true},
+		{DeploymentType: "local", DBType: "sqlite"},
+	} {
+		t.Run(flags.DeploymentType, func(t *testing.T) {
+			flags.LocalProxy = optionalBool{set: true, value: false}
+			w, _, out, _ := testWizard(t, &flags, nil)
+			if err := w.setup(); err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			if w.config.LocalProxy {
+				t.Errorf("LocalProxy is set for %s", flags.DeploymentType)
+			}
+			if strings.Contains(out.String(), "reverse proxy on this machine") {
+				t.Errorf("%s reports the native answer:\n%s", flags.DeploymentType, out)
+			}
+		})
+	}
 }
 
 // The palette colours what prints, and its zero value colours nothing.
