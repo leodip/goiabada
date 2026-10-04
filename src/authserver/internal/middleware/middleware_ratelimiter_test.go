@@ -762,15 +762,16 @@ func TestLimitResetPwd_PerIP(t *testing.T) {
 // request and one deployment-wide bucket of 5 per 5 minutes would stop everyone activating an
 // account.
 //
-// The budget is exact because it is published policy: 20 requests per 5 minutes, which is 10
-// activation operations at the two requests an activation now costs, the same operation rate
-// as reset over a chain one request shorter (decision 11).
+// The budget is exact because it is published policy: 30 requests per 5 minutes, which is 10
+// activation operations at the three requests an activation now costs (the link's GET, the clean
+// GET that renders the password form, and its POST), the reset tier's budget for the same chain
+// (#207 decision 9).
 //
 // The handler stub writes 418 rather than 200 on purpose: a middleware that writes nothing
 // produces exactly 200 with an empty body, so 418 is what tells "the handler ran" apart from
 // "nothing was written", and from 429.
 func TestLimitActivate_PerIP(t *testing.T) {
-	const budget = 20
+	const budget = 30
 
 	run := func(m *RateLimiter, target, ip string) (int, bool) {
 		req := limiterRequest(http.MethodGet, target, nil)
@@ -784,7 +785,7 @@ func TestLimitActivate_PerIP(t *testing.T) {
 		return rr.Code, reached
 	}
 
-	t.Run("the budget is exactly 20 per IP", func(t *testing.T) {
+	t.Run("the budget is exactly 30 per IP", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
 		for i := 0; i < budget; i++ {
 			if code, reached := run(m, "/account/activate", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
@@ -839,9 +840,8 @@ func TestLimitActivate_PerIP(t *testing.T) {
 	})
 }
 
-// TestLimitRegister_PerIP verifies self-registration is bounded per client block, at the same
-// budget as the activation step that follows it, and that a distinct address per request buys
-// nothing (#219).
+// TestLimitRegister_PerIP verifies self-registration is bounded per client block, and that a
+// distinct address per request buys nothing (#219).
 //
 // That last case is the one the limiter exists for. The endpoint answers whether an address
 // already has an account, sends mail to whichever do not, and writes a pre_registrations row for
@@ -849,8 +849,7 @@ func TestLimitActivate_PerIP(t *testing.T) {
 // address would bucket the attacker's own choice of victim and bound none of it, which is why
 // decision 8 has no per-email tier.
 //
-// The budget is exact because it is published policy: 20 requests per 5 minutes, matching
-// activate so registration and its activation trip at the same rate.
+// The budget is exact because it is published policy: 20 requests per 5 minutes.
 //
 // The handler stub writes 418 rather than 200 on purpose: a middleware that writes nothing
 // produces exactly 200 with an empty body, so 418 is what tells "the handler ran" apart from
@@ -1843,7 +1842,7 @@ func builtLimiters() []builtLimiter {
 	return []builtLimiter{
 		{
 			name: "LimitActivate", limit: func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitActivate },
-			request: ipRequest(http.MethodGet, "/activate"), budget: 20,
+			request: ipRequest(http.MethodGet, "/activate"), budget: 30,
 			contentType: "text/html; charset=UTF-8", retryAfter: "300",
 			audited: map[string]interface{}{"limiter": "activate", "ip": ip}, warned: ipWarned("activate"),
 		},

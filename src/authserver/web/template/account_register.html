@@ -18,19 +18,25 @@
                     class="w-full input input-bordered" autocomplete="off" autofocus />
             </div>
 
-            <div class="w-full mt-4 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">{{ T $.ctx "common.field.password" }}</span>
-                </label>
-                <input type="password" name="password" value="" placeholder="" class="w-full input input-bordered" />
-            </div>
+            {{/* With email verification the password is chosen on the form the emailed link
+                 leads to, so this form asks for the address alone (#207). */}}
+            {{if .requiresEmailVerification}}
+                <p class="mt-4">{{ T $.ctx "account.register.verification_hint" }}</p>
+            {{else}}
+                <div class="w-full mt-4 form-control">
+                    <label class="label">
+                        <span class="label-text text-base-content">{{ T $.ctx "common.field.password" }}</span>
+                    </label>
+                    <input type="password" name="password" value="" placeholder="" class="w-full input input-bordered" />
+                </div>
 
-            <div class="w-full mt-4 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">{{ T $.ctx "common.field.password_confirmation" }}</span>
-                </label>
-                <input type="password" name="passwordConfirmation" value="" placeholder="" class="w-full input input-bordered" />
-            </div>
+                <div class="w-full mt-4 form-control">
+                    <label class="label">
+                        <span class="label-text text-base-content">{{ T $.ctx "common.field.password_confirmation" }}</span>
+                    </label>
+                    <input type="password" name="passwordConfirmation" value="" placeholder="" class="w-full input input-bordered" />
+                </div>
+            {{end}}
 
         </div>
 

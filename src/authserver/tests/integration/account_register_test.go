@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"html"
 	"io"
 	"net/http"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/stretchr/testify/assert"
@@ -58,6 +60,21 @@ func postRegister(t *testing.T, client *http.Client, email, password, confirm st
 	return resp
 }
 
+// postRegisterAddress submits the form registration with verification shows, which has the
+// address alone: the password is chosen from the emailed link (#207 decision 1).
+func postRegisterAddress(t *testing.T, client *http.Client, email string) *http.Response {
+	t.Helper()
+	destUrl := appConfig.AuthServer.BaseURL + "/account/register"
+	req, err := http.NewRequest("POST", destUrl, strings.NewReader(url.Values{"email": {email}}.Encode()))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Referer", destUrl)
+	req.Header.Set("Origin", appConfig.AuthServer.BaseURL)
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	return resp
+}
+
 func bodyString(t *testing.T, resp *http.Response) string {
 	b, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
@@ -90,6 +107,35 @@ func TestSelfRegister_GetPage_Enabled(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+// 1c. With verification required the form asks for the address alone, and says the password is
+// chosen from the emailed link; without it the form still asks for the password (#207 decisions
+// 1 and 13).
+func TestSelfRegister_GetPage_WithVerification_AsksForTheAddressAlone(t *testing.T) {
+	useMailpitSMTP(t)
+
+	setRegSettings(t, true, true, true)
+	httpClient := createHttpClient(t)
+	resp := loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/account/register")
+	body := bodyString(t, resp)
+	_ = resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, body, `name="email"`)
+	assert.NotContains(t, body, `name="password"`)
+	assert.NotContains(t, body, `name="passwordConfirmation"`)
+	assert.Contains(t, body, "We&#39;ll email you a link to choose your password.")
+
+	setRegSettings(t, true, false, true)
+	resp = loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/account/register")
+	body = bodyString(t, resp)
+	_ = resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, body, `name="password"`)
+	assert.Contains(t, body, `name="passwordConfirmation"`)
+	assert.NotContains(t, body, "choose your password")
 }
 
 // Scenario 2: POST /account/register with SMTP off
@@ -208,13 +254,71 @@ func followActivationLink(t *testing.T, client *http.Client, link string) string
 
 const activationSucceededText = "Congratulations! Your account has been activated."
 const activationExpiredText = "Unable to activate the account. The verification code appears to be expired."
+const activationFormTitle = "Choose your password"
+
+// loadActivationForm fetches the clean URL the first hop redirected to, which renders the
+// "choose your password" form and creates nothing, and returns the continuation id the form
+// carries, read out of the page the way a browser gets it.
+func loadActivationForm(t *testing.T, client *http.Client, cleanURL string, email string) string {
+	t.Helper()
+
+	resp := loadPage(t, client, cleanURL)
+	body := bodyString(t, resp)
+	_ = resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Contains(t, body, activationFormTitle)
+	// Unescaped, because html/template writes the '+' of these addresses as &#43;.
+	assert.Contains(t, html.UnescapeString(body), "Choose a password for "+email+" to finish creating your account.")
+	assert.Contains(t, body, `name="password"`)
+	assert.Contains(t, body, `name="passwordConfirmation"`)
+	assert.Contains(t, body, "Create account")
+	return continuationIdIn(t, body)
+}
+
+// postActivation submits the form to the clean URL, which is where the template's empty action
+// sends it.
+func postActivation(t *testing.T, client *http.Client, cleanURL, password, confirmation,
+	continuationId string) *http.Response {
+	t.Helper()
+
+	form := url.Values{
+		"password":             {password},
+		"passwordConfirmation": {confirmation},
+		"continuationId":       {continuationId},
+	}
+	req, err := http.NewRequest("POST", cleanURL, strings.NewReader(form.Encode()))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Referer", cleanURL)
+	req.Header.Set("Origin", appConfig.AuthServer.BaseURL)
+
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	return resp
+}
+
+// registerAndFollowLink registers an address with verification, follows the link read out of the
+// mail actually sent, and returns the clean URL with the browser that followed it.
+func registerAndFollowLink(t *testing.T, email string) (*http.Client, string) {
+	t.Helper()
+
+	browser := createHttpClient(t)
+	loadRegisterPage(t, browser)
+
+	resp := postRegisterAddress(t, browser, email)
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	return browser, followActivationLink(t, browser, latestActivationLink(t, email))
+}
 
 // Scenario 3: POST with SMTP on and verification required.
 //
-// Pre-registration row is created (no user yet); follow the link the handler actually emailed
-// and verify the user is materialized with EmailVerified=true. The address contains a '+', so
-// this is also the end-to-end guard for #112 itself: before the change this registration could
-// never be completed.
+// The form takes the address alone and the pending registration stores no password. The link the
+// handler actually emailed leads to a form where the password is chosen, and only that form's POST
+// creates the account, verified, with that password (#207 decision 1). The address contains a
+// '+', so this is also the end-to-end guard for #112 itself.
 func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.T) {
 	useMailpitSMTP(t)
 	setRegSettings(t, true, true, true)
@@ -223,7 +327,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	loadRegisterPage(t, httpClient)
 
 	email := registerPlusAddress()
-	resp := postRegister(t, httpClient, email, "Password123!", "Password123!")
+	resp := postRegisterAddress(t, httpClient, email)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -237,6 +341,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	if !assert.NotNil(t, preReg, "pre-registration should exist after POST") {
 		return
 	}
+	assert.Empty(t, preReg.PasswordHash, "the pending registration stores no password")
 
 	// The hash is what the link resolves to, and it must be the hash of the code that was
 	// issued or the registration is unactivatable.
@@ -247,9 +352,14 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	assert.Equal(t, expectedHash, preReg.VerificationCodeHash)
 
 	cleanURL := followActivationLink(t, httpClient, latestActivationLink(t, email))
+	continuationId := loadActivationForm(t, httpClient, cleanURL, email)
 
-	// The account is created from the clean URL, on the marker alone.
-	activateResp := loadPage(t, httpClient, cleanURL)
+	user, err = database.GetUserByEmail(context.Background(), nil, email)
+	require.NoError(t, err)
+	assert.Nil(t, user, "rendering the password form must create nothing")
+
+	const chosenPassword = "Chosen-At-Activation-1!"
+	activateResp := postActivation(t, httpClient, cleanURL, chosenPassword, chosenPassword, continuationId)
 	defer func() { _ = activateResp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, activateResp.StatusCode)
@@ -261,6 +371,8 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	assert.NoError(t, err)
 	if assert.NotNil(t, user, "the '+' address must complete registration end to end") {
 		assert.True(t, user.EmailVerified)
+		assert.True(t, passwordhash.Verify(user.PasswordHash, chosenPassword),
+			"the account's password must be the one chosen at activation")
 	}
 
 	preReg, err = database.GetPreRegistrationByEmail(context.Background(), nil, email)
@@ -268,28 +380,111 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	assert.Nil(t, preReg, "pre-registration should be deleted after activation")
 }
 
-// The replay case only a real cookie jar can see. The marker lives in a client-side encrypted
-// cookie, so the server clearing it replaces the browser's copy and cannot invalidate one an
-// attacker kept. What refuses the copy is the code hash it names no longer resolving, because
-// activating deleted the pre-registration.
+// The activation mail carries decision 13's text: the link leads to choosing a password, and no
+// account exists unless it is used.
+func TestSelfRegister_TheActivationMailSaysThePasswordIsChosenFromTheLink(t *testing.T) {
+	useMailpitSMTP(t)
+	setRegSettings(t, true, true, true)
+
+	email := registerPlusAddress()
+	browser := createHttpClient(t)
+	loadRegisterPage(t, browser)
+	resp := postRegisterAddress(t, browser, email)
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	messages := awaitMailTo(t, email)
+	require.Len(t, messages, 1)
+	message := messages[0]
+
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	require.NoError(t, err)
+
+	assert.Equal(t, "Activate your account", message.Subject)
+	assert.Contains(t, message.HTML, "To finish creating your "+settings.AppName+" account, click the link below and choose a password:")
+	assert.Contains(t, message.HTML, "The link expires in 5 minutes. If you have trouble clicking it, copy and paste it into your web browser.")
+	assert.Contains(t, message.HTML, "If you didn't ask to create an account, ignore this message: no account is created unless the link is used.")
+}
+
+// What decision 1 exists for, at the only level that sees a real redirect: fetching the link and
+// following its redirect, as a mail scanner or a link previewer does, creates no account. The
+// pending registration survives, so the recipient's own click still works.
+func TestSelfRegister_FetchingTheLinkCreatesNoAccount(t *testing.T) {
+	useMailpitSMTP(t)
+	setRegSettings(t, true, true, true)
+
+	email := registerPlusAddress()
+	scanner, cleanURL := registerAndFollowLink(t, email)
+	_ = loadActivationForm(t, scanner, cleanURL, email)
+
+	user, err := database.GetUserByEmail(context.Background(), nil, email)
+	require.NoError(t, err)
+	assert.Nil(t, user, "fetching the link must not create the account")
+
+	preReg, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
+	require.NoError(t, err)
+	assert.NotNil(t, preReg, "the pending registration must survive a fetch")
+
+	// The recipient, in a browser of their own, still completes it.
+	recipient := createHttpClient(t)
+	recipientCleanURL := followActivationLink(t, recipient, latestActivationLink(t, email))
+	continuationId := loadActivationForm(t, recipient, recipientCleanURL, email)
+	activateResp := postActivation(t, recipient, recipientCleanURL, "Recipient-Chose-1!", "Recipient-Chose-1!", continuationId)
+	body := bodyString(t, activateResp)
+	_ = activateResp.Body.Close()
+	require.Contains(t, body, activationSucceededText)
+
+	user, err = database.GetUserByEmail(context.Background(), nil, email)
+	require.NoError(t, err)
+	require.NotNil(t, user)
+	assert.True(t, passwordhash.Verify(user.PasswordHash, "Recipient-Chose-1!"))
+}
+
+// A refused password redraws the form with the reason and creates nothing; the continuation it
+// carries back still completes the activation.
+func TestSelfRegister_ActivationRedrawsTheFormForAMismatchedConfirmation(t *testing.T) {
+	useMailpitSMTP(t)
+	setRegSettings(t, true, true, true)
+
+	email := registerPlusAddress()
+	browser, cleanURL := registerAndFollowLink(t, email)
+	continuationId := loadActivationForm(t, browser, cleanURL, email)
+
+	resp := postActivation(t, browser, cleanURL, "Chosen-At-Activation-1!", "Something-Else-1!", continuationId)
+	body := bodyString(t, resp)
+	_ = resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, body, activationFormTitle)
+	assert.Contains(t, body, "password confirmation does not match")
+	assert.Equal(t, continuationId, continuationIdIn(t, body), "the redraw must carry the continuation back")
+
+	user, err := database.GetUserByEmail(context.Background(), nil, email)
+	require.NoError(t, err)
+	assert.Nil(t, user, "a refused password must create nothing")
+
+	resp = postActivation(t, browser, cleanURL, "Chosen-At-Activation-1!", "Chosen-At-Activation-1!", continuationId)
+	body = bodyString(t, resp)
+	_ = resp.Body.Close()
+	assert.Contains(t, body, activationSucceededText)
+}
+
+// The replay case only a real cookie jar can see. A copy of the browser's cookies, taken while the
+// marker is still live, replays the submission after the activation completed. What refuses it
+// is the code hash the marker names no longer resolving, because activating deleted the
+// pre-registration.
 func TestSelfRegister_ReplayedMarkerAfterActivationIsRefused(t *testing.T) {
 	useMailpitSMTP(t)
 	setRegSettings(t, true, true, true)
 
-	httpClient := createHttpClient(t)
-	loadRegisterPage(t, httpClient)
-
 	email := registerPlusAddress()
-	resp := postRegister(t, httpClient, email, "Password123!", "Password123!")
-	_ = resp.Body.Close()
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-
-	cleanURL := followActivationLink(t, httpClient, latestActivationLink(t, email))
+	httpClient, cleanURL := registerAndFollowLink(t, email)
+	continuationId := loadActivationForm(t, httpClient, cleanURL, email)
 
 	// Taken while the marker is still live and usable.
 	captured := capturedSessionCookies(t, httpClient)
 
-	activateResp := loadPage(t, httpClient, cleanURL)
+	activateResp := postActivation(t, httpClient, cleanURL, "Password123!", "Password123!", continuationId)
 	activationBody := bodyString(t, activateResp)
 	_ = activateResp.Body.Close()
 	require.Contains(t, activationBody, activationSucceededText)
@@ -298,26 +493,27 @@ func TestSelfRegister_ReplayedMarkerAfterActivationIsRefused(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, activated)
 
-	replayResp := loadPage(t, clientCarrying(t, captured), cleanURL)
+	replayResp := postActivation(t, clientCarrying(t, captured), cleanURL, "Attacker123!", "Attacker123!", continuationId)
 	replayBody := bodyString(t, replayResp)
 	_ = replayResp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, replayResp.StatusCode)
+	assert.Equal(t, http.StatusBadRequest, replayResp.StatusCode)
 	assert.Contains(t, replayBody, activationExpiredText,
-		"a replayed marker must land on the register-again page")
+		"a replayed submission must land on the register-again page")
 	assert.NotContains(t, replayBody, activationSucceededText)
 
 	after, err := database.GetUserByEmail(context.Background(), nil, email)
 	require.NoError(t, err)
 	require.NotNil(t, after)
 	assert.Equal(t, activated.Id, after.Id,
-		"a replayed marker must not create a second account")
+		"a replayed submission must not create a second account")
+	assert.Equal(t, activated.PasswordHash, after.PasswordHash,
+		"a replayed submission must not change the password")
 }
 
 // The activation half of the same defect (#112 decision 13). Two pending registrations and
-// one cookie jar: the clean hop reads the marker alone, so before the first-writer-wins rule
-// the redirect already in flight activated whichever link had been followed last, creating an
-// account nobody in that browser had asked for and leaving the intended one pending.
+// one cookie jar: a second link followed while the first continuation is live must not take the
+// session over, so the form already on its way activates the registration that produced it.
 func TestSelfRegister_ASecondLinkDoesNotRetargetTheRedirectInFlight(t *testing.T) {
 	useMailpitSMTP(t)
 	setRegSettings(t, true, true, true)
@@ -326,7 +522,7 @@ func TestSelfRegister_ASecondLinkDoesNotRetargetTheRedirectInFlight(t *testing.T
 	loadRegisterPage(t, browser)
 
 	firstEmail := registerPlusAddress()
-	firstResp := postRegister(t, browser, firstEmail, "Password123!", "Password123!")
+	firstResp := postRegisterAddress(t, browser, firstEmail)
 	_ = firstResp.Body.Close()
 	require.Equal(t, http.StatusOK, firstResp.StatusCode)
 
@@ -335,7 +531,7 @@ func TestSelfRegister_ASecondLinkDoesNotRetargetTheRedirectInFlight(t *testing.T
 	loadRegisterPage(t, elsewhere)
 
 	secondEmail := registerPlusAddress()
-	secondResp := postRegister(t, elsewhere, secondEmail, "Password123!", "Password123!")
+	secondResp := postRegisterAddress(t, elsewhere, secondEmail)
 	_ = secondResp.Body.Close()
 	require.Equal(t, http.StatusOK, secondResp.StatusCode)
 
@@ -351,8 +547,9 @@ func TestSelfRegister_ASecondLinkDoesNotRetargetTheRedirectInFlight(t *testing.T
 		"a second link followed while one is live must not take over the session")
 	assert.Contains(t, steeredBody, activationExpiredText)
 
-	// The redirect in flight completes, and activates the registration that produced it.
-	activateResp := loadPage(t, browser, cleanURL)
+	// The redirect in flight renders the form for, and activates, the registration that produced it.
+	continuationId := loadActivationForm(t, browser, cleanURL, firstEmail)
+	activateResp := postActivation(t, browser, cleanURL, "Password123!", "Password123!", continuationId)
 	activationBody := bodyString(t, activateResp)
 	_ = activateResp.Body.Close()
 	require.Contains(t, activationBody, activationSucceededText)
@@ -368,6 +565,78 @@ func TestSelfRegister_ASecondLinkDoesNotRetargetTheRedirectInFlight(t *testing.T
 	stillPending, err := database.GetPreRegistrationByEmail(context.Background(), nil, secondEmail)
 	require.NoError(t, err)
 	assert.NotNil(t, stillPending, "the second registration must still be pending, so its own link still works")
+}
+
+// createAccountAt gives an address an account behind the pending registration's back, as an
+// administrator creating the user would.
+func createAccountAt(t *testing.T, email string) *record.User {
+	t.Helper()
+	existing := &record.User{
+		Subject:      fake.UUID(),
+		Enabled:      true,
+		Email:        email,
+		PasswordHash: "irrelevant",
+	}
+	require.NoError(t, database.CreateUser(context.Background(), nil, existing))
+	return existing
+}
+
+// An address that gained an account between registration and activation is refused with the
+// flow's one page, at 200 on the clean GET and 400 on the POST, and its pending registration is
+// deleted; no second account appears and the existing one is untouched. It used to answer the
+// 500 page (#207 decision 10).
+func TestSelfRegister_ActivationIsRefusedForAnAddressThatHasAnAccount(t *testing.T) {
+	useMailpitSMTP(t)
+	setRegSettings(t, true, true, true)
+
+	t.Run("at the clean GET", func(t *testing.T) {
+		email := registerPlusAddress()
+		browser, cleanURL := registerAndFollowLink(t, email)
+		existing := createAccountAt(t, email)
+
+		resp := loadPage(t, browser, cleanURL)
+		body := bodyString(t, resp)
+		_ = resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Contains(t, body, activationExpiredText)
+		assert.NotContains(t, body, activationFormTitle)
+
+		preReg, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
+		require.NoError(t, err)
+		assert.Nil(t, preReg, "a pending registration that can never complete is deleted")
+
+		after, err := database.GetUserByEmail(context.Background(), nil, email)
+		require.NoError(t, err)
+		require.NotNil(t, after)
+		assert.Equal(t, existing.Id, after.Id)
+		assert.Equal(t, "irrelevant", after.PasswordHash, "the existing account is untouched")
+	})
+
+	t.Run("at the POST", func(t *testing.T) {
+		email := registerPlusAddress()
+		browser, cleanURL := registerAndFollowLink(t, email)
+		continuationId := loadActivationForm(t, browser, cleanURL, email)
+		existing := createAccountAt(t, email)
+
+		resp := postActivation(t, browser, cleanURL, "Password123!", "Password123!", continuationId)
+		body := bodyString(t, resp)
+		_ = resp.Body.Close()
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		assert.Contains(t, body, activationExpiredText)
+		assert.NotContains(t, body, activationSucceededText)
+
+		preReg, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
+		require.NoError(t, err)
+		assert.Nil(t, preReg, "a pending registration that can never complete is deleted")
+
+		after, err := database.GetUserByEmail(context.Background(), nil, email)
+		require.NoError(t, err)
+		require.NotNil(t, after)
+		assert.Equal(t, existing.Id, after.Id)
+		assert.Equal(t, "irrelevant", after.PasswordHash, "the existing account is untouched")
+	})
 }
 
 // Scenario 5a: POST while self-registration is disabled returns the not-found

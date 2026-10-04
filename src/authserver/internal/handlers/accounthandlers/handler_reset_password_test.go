@@ -1790,11 +1790,12 @@ func TestAuditFailedResetPasswordCode(t *testing.T) {
 	})
 }
 
-// forgotPasswordCodeMatches is the comparison that decides whether an index hit is really
-// the code that was issued, so it is pinned directly as well as through the handler. The
-// point of the constant-time comparison is not observable from the outside, so what these
-// cases guard is that the matching semantics stayed correct when it was introduced.
-func TestForgotPasswordCodeMatches(t *testing.T) {
+// emailedCodeMatches is the comparison that decides, in both emailed-link flows, whether an
+// index hit is really the code that was issued, so it is pinned directly as well as through the
+// handlers. The point of the constant-time comparison is not observable from the outside, so
+// what these cases guard is that the matching semantics stayed correct when it was introduced,
+// and again when activation took it over from its plain comparison (#207 decision 12).
+func TestEmailedCodeMatches(t *testing.T) {
 	testCases := []struct {
 		name     string
 		stored   string
@@ -1816,7 +1817,7 @@ func TestForgotPasswordCodeMatches(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, forgotPasswordCodeMatches(tc.stored, tc.supplied))
+			assert.Equal(t, tc.want, emailedCodeMatches(tc.stored, tc.supplied))
 		})
 	}
 }

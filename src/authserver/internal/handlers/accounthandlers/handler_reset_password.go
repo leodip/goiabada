@@ -101,19 +101,20 @@ func isForgotPasswordCodeExpired(user *record.User) bool {
 	return user.ForgotPasswordCodeIssuedAt.Time.Add(forgotPasswordCodeLifetime).Before(time.Now().UTC())
 }
 
-// forgotPasswordCodeMatches compares a supplied reset code against the stored one
-// in constant time, the same way client secrets are compared in
+// emailedCodeMatches compares a supplied emailed-link code, a reset code or an activation
+// code, against the stored one in constant time, the same way client secrets are compared in
 // protocolvalidation.ValidateTokenRequest. A plain string comparison stops at the first
-// differing byte, which in principle leaks how much of a guessed code was right.
+// differing byte, which in principle leaks how much of a guessed code was right. Activation
+// compared its code with a plain != until #207 decision 12, the one outlier.
 //
 // Still the authority even though the row is now found by an unsalted SHA-256 of the same
 // code: the index locates a candidate row, and this decides whether the code presented is
 // really the one stored. An index match that this rejects is answered as an unknown code.
 //
 // This is not constant time with respect to length: inputs of differing lengths
-// are rejected immediately. Reset codes are fixed length, so that difference
+// are rejected immediately. Both flows' codes are fixed length, so that difference
 // carries nothing useful.
-func forgotPasswordCodeMatches(storedCode string, suppliedCode string) bool {
+func emailedCodeMatches(storedCode string, suppliedCode string) bool {
 	return subtle.ConstantTimeCompare([]byte(storedCode), []byte(suppliedCode)) == 1
 }
 
@@ -342,7 +343,7 @@ func handleResetPasswordLinkFollowed(pageRenderer PageRenderer, httpSession sess
 	// The index found a candidate; this decides. No userId is audited on this branch: the
 	// row matched a hash the supplied code does not reproduce, so nothing about it is
 	// established as the subject of the request.
-	if !forgotPasswordCodeMatches(storedCode, code) {
+	if !emailedCodeMatches(storedCode, code) {
 		rejectResetPassword(pageRenderer, auditLogger, w, r, 0, auditReasonUnknownCode, 0)
 		return
 	}
