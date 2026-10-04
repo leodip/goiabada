@@ -167,13 +167,14 @@ func TestMigrationLock_MigrateToInterruptedAtThePreCreateLeavesTheDatabaseUnchan
 }
 
 // buildAuthServer builds the auth server's binary from this tree into the test's temporary
-// directory.
+// directory. VCS stamping is off, as in build.sh: git in CI's container exits 128 on the checkout,
+// which fails a stamped build, and nothing here reads the stamp.
 func buildAuthServer(t *testing.T) string {
 	t.Helper()
 	binary := filepath.Join(t.TempDir(), "goiabada-authserver")
 	ctx, cancel := context.WithTimeout(context.Background(), migrationLockFinishBudget)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "go", "build", "-o", binary,
+	out, err := exec.CommandContext(ctx, "go", "build", "-buildvcs=false", "-o", binary,
 		"github.com/leodip/goiabada/authserver/cmd/goiabada-authserver").CombinedOutput()
 	require.NoErrorf(t, err, "build the auth server: %s", out)
 	return binary
