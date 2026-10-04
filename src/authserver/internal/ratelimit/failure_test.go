@@ -1,6 +1,7 @@
 package ratelimit
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"testing"
@@ -16,13 +17,34 @@ func newFailureAt(c *clock, limit int, window time.Duration) *FailureLimiter {
 	return f
 }
 
+// reserve is Reserve for a test that expects the count to be readable: a store error fails
+// the test, and the answer is whether a slot was granted.
+func reserve(t *testing.T, f *FailureLimiter, key string) *Reservation {
+	t.Helper()
+	r, err := f.Reserve(context.Background(), key)
+	if err != nil {
+		t.Fatalf("Reserve(%q) returned an error: %v", key, err)
+	}
+	return r
+}
+
+// release is Release for a test that expects the store to answer.
+func release(t *testing.T, r *Reservation, failed bool) {
+	t.Helper()
+	if err := r.Release(context.Background(), failed); err != nil {
+		t.Fatalf("Release(failed=%v) returned an error: %v", failed, err)
+	}
+}
+
 // fail runs one credential check that is found wrong: reserve, then charge on release. It
 // reports whether the check was admitted at all.
-func fail(f *FailureLimiter, key string) bool {
-	if !f.Reserve(key) {
+func fail(t *testing.T, f *FailureLimiter, key string) bool {
+	t.Helper()
+	r := reserve(t, f, key)
+	if r == nil {
 		return false
 	}
-	f.Release(key, true)
+	release(t, r, true)
 	return true
 }
 
@@ -33,21 +55,22 @@ func TestFailureLimiter_OnlyAFailureSpendsTheBudget(t *testing.T) {
 	// Well past the budget, every one of them a credential found right. A limiter that
 	// charged on Reserve, or on any Release, would refuse the sixth.
 	for i := 1; i <= 20; i++ {
-		if !f.Reserve("k") {
+		r := reserve(t, f, "k")
+		if r == nil {
 			t.Fatalf("Reserve #%d refused after %d successful checks, want admitted: a success spends nothing", i, i-1)
 		}
-		f.Release("k", false)
+		release(t, r, false)
 	}
 
 	for i := 1; i <= 5; i++ {
-		if !fail(f, "k") {
+		if !fail(t, f, "k") {
 			t.Fatalf("failure #%d refused, want admitted: the budget is 5 failures", i)
 		}
 	}
-	if f.Reserve("k") {
+	if reserve(t, f, "k") != nil {
 		t.Error("Reserve after 5 failures admitted, want refused: the budget is 5")
 	}
-	if !f.Reserve("other") {
+	if reserve(t, f, "other") == nil {
 		t.Error("Reserve on another key refused, want admitted: one key's failures are not another's")
 	}
 }
@@ -57,15 +80,15 @@ func TestFailureLimiter_FailuresAgeOutWithTheWindow(t *testing.T) {
 	f := newFailureAt(c, 5, testWindow)
 
 	for i := 0; i < 5; i++ {
-		fail(f, "k")
+		fail(t, f, "k")
 	}
-	if f.Reserve("k") {
+	if reserve(t, f, "k") != nil {
 		t.Fatal("setup: 5 failures did not exhaust a budget of 5")
 	}
 
 	// Two whole windows on, nothing recorded is recent enough to count.
 	c.advance(2 * testWindow)
-	if !f.Reserve("k") {
+	if reserve(t, f, "k") == nil {
 		t.Error("Reserve refused two windows after the last failure, want admitted")
 	}
 }
@@ -77,20 +100,23 @@ func TestFailureLimiter_AHeldReservationCountsAgainstTheBudget(t *testing.T) {
 	c := newClock()
 	f := newFailureAt(c, 5, testWindow)
 
+	held := make([]*Reservation, 0, 5)
 	for i := 1; i <= 5; i++ {
-		if !f.Reserve("k") {
+		r := reserve(t, f, "k")
+		if r == nil {
 			t.Fatalf("Reserve #%d refused with %d held, want admitted: the budget is 5", i, i-1)
 		}
+		held = append(held, r)
 	}
-	if f.Reserve("k") {
+	if reserve(t, f, "k") != nil {
 		t.Fatal("Reserve #6 admitted with 5 held, want refused: a held reservation counts")
 	}
 
-	f.Release("k", false)
-	if !f.Reserve("k") {
+	release(t, held[0], false)
+	if reserve(t, f, "k") == nil {
 		t.Error("Reserve refused after a slot was handed back uncharged, want admitted")
 	}
-	if f.Reserve("k") {
+	if reserve(t, f, "k") != nil {
 		t.Error("Reserve admitted with 5 held again, want refused")
 	}
 }
@@ -104,8 +130,12 @@ func TestFailureLimiter_FailsClosedOnAStoreError(t *testing.T) {
 	f := newFailureAt(c, 5, testWindow)
 	f.rl.store = erroringStore{getErr: errors.New("counter unavailable")}
 
-	if f.Reserve("anyone@example.com") {
+	r, err := f.Reserve(context.Background(), "anyone@example.com")
+	if r != nil {
 		t.Error("Reserve admitted while the store could not be read, want refused: the limiter must fail closed")
+	}
+	if err == nil {
+		t.Error("Reserve answered a store failure with no error, want one: a fault is not a refusal")
 	}
 }
 
@@ -128,7 +158,8 @@ func TestFailureLimiter_ConcurrentReservationsAdmitExactlyTheBudget(t *testing.T
 		go func(i int) {
 			defer wg.Done()
 			<-start
-			admitted[i] = f.Reserve("k")
+			r, err := f.Reserve(context.Background(), "k")
+			admitted[i] = r != nil && err == nil
 		}(i)
 	}
 	close(start)

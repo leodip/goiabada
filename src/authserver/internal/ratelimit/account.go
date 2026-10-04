@@ -1,9 +1,12 @@
 package ratelimit
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"strings"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // AccountLimiter is the two-tier budget a password check passes through: a tight budget per
@@ -22,7 +25,8 @@ import (
 // backstop's budget over the tight one still exhausts the backstop and denies the owner for
 // the rest of its window. That is the price of having an account-wide ceiling at all (#219).
 //
-// The budgets and windows are the caller's: this type only composes the two tiers.
+// The budgets and windows are the caller's, and so is where each tier counts: this type only
+// composes the two tiers.
 type AccountLimiter struct {
 	tight    *FailureLimiter
 	backstop *FailureLimiter
@@ -47,26 +51,45 @@ const (
 	RefusedBackstop
 )
 
+// AccountReservation is the slot an AccountLimiter holds on both tiers for one password check.
+// Release it exactly once.
+type AccountReservation struct {
+	tight    *Reservation
+	backstop *Reservation
+}
+
 // Reserve claims a slot on both tiers, or on neither. The tight slot is handed back when the
 // backstop refuses, so a refusal never strands one: in-flight slots do not decay, and a slot
 // kept here would lock that network out of the account until the process restarted, long
 // after the backstop's window had passed (#439).
-func (a *AccountLimiter) Reserve(networkKey, accountKey string) Refusal {
-	if !a.tight.Reserve(networkKey) {
-		return RefusedTight
+//
+// An error means a tier's count could not be read, and the Refusal then names that tier; no
+// slot is held. The tight slot is handed back uncharged when the backstop fails, and a failure
+// to hand it back is joined to the error.
+func (a *AccountLimiter) Reserve(ctx context.Context, networkKey, accountKey string) (*AccountReservation, Refusal, error) {
+	tight, err := a.tight.Reserve(ctx, networkKey)
+	if err != nil {
+		return nil, RefusedTight, err
 	}
-	if !a.backstop.Reserve(accountKey) {
-		a.tight.Release(networkKey, false)
-		return RefusedBackstop
+	if tight == nil {
+		return nil, RefusedTight, nil
 	}
-	return Admitted
+	backstop, err := a.backstop.Reserve(ctx, accountKey)
+	if err != nil || backstop == nil {
+		if releaseErr := tight.Release(ctx, false); releaseErr != nil {
+			return nil, RefusedBackstop, errs.Join(err, releaseErr)
+		}
+		return nil, RefusedBackstop, err
+	}
+	return &AccountReservation{tight: tight, backstop: backstop}, Admitted, nil
 }
 
 // Release charges or drops both tiers together, which is what keeps them counting the same
-// events. It matches one Reserve that answered Admitted.
-func (a *AccountLimiter) Release(networkKey, accountKey string, failed bool) {
-	a.backstop.Release(accountKey, failed)
-	a.tight.Release(networkKey, failed)
+// events. Both are released whatever the first answers, and the errors are joined.
+func (r *AccountReservation) Release(ctx context.Context, failed bool) error {
+	backstopErr := r.backstop.Release(ctx, failed)
+	tightErr := r.tight.Release(ctx, failed)
+	return errs.Join(backstopErr, tightErr)
 }
 
 // AccountKey buckets by the account an identifier names rather than by the

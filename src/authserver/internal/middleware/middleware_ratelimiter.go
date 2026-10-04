@@ -170,21 +170,35 @@ func newAccountTiers(tight, backstop *failureTier) *accountTiers {
 
 // reserve claims a slot on both tiers, or on neither. It returns the tier that refused and
 // the key it refused, so the caller can report the trip and answer with that tier's window;
-// nil means the request may proceed and release is owed.
-func (a *accountTiers) reserve(networkKey, accountKey string) (*tier, string) {
-	switch a.limiter.Reserve(networkKey, accountKey) {
+// a nil tier means the request may proceed and the reservation is owed a release. A tier
+// whose count could not be read refuses, so the limiter fails closed.
+func (a *accountTiers) reserve(ctx context.Context, networkKey, accountKey string) (*ratelimit.AccountReservation, *tier, string) {
+	reservation, refusal, err := a.limiter.Reserve(ctx, networkKey, accountKey)
+	if err != nil {
+		slog.ErrorContext(ctx, "unable to read a credential rate limit", "error", err)
+	}
+	switch refusal {
 	case ratelimit.RefusedTight:
-		return &a.tight.tier, networkKey
+		return nil, &a.tight.tier, networkKey
 	case ratelimit.RefusedBackstop:
-		return &a.backstop.tier, accountKey
+		return nil, &a.backstop.tier, accountKey
 	default:
-		return nil, ""
+		return reservation, nil, ""
 	}
 }
 
-// release charges or drops both tiers together.
-func (a *accountTiers) release(networkKey, accountKey string, failed bool) {
-	a.limiter.Release(networkKey, accountKey, failed)
+// heldReservation is a credential check's slot on either limiter shape: one failures-only
+// tier's, or the account limiter's two.
+type heldReservation interface {
+	Release(ctx context.Context, failed bool) error
+}
+
+// releaseCredentialReservation charges or drops what a credential check reserved, once the
+// handler has said whether the credential was wrong.
+func releaseCredentialReservation(ctx context.Context, reservation heldReservation, failed bool) {
+	if err := reservation.Release(ctx, failed); err != nil {
+		slog.ErrorContext(ctx, "unable to release a credential rate limit reservation", "error", err)
+	}
 }
 
 // withCredentialReservation puts a failures-only tier's reservation on the request, through
@@ -475,7 +489,8 @@ func (m *RateLimiter) LimitPwd(next http.Handler) http.Handler {
 		// user signing in normally is never refused by it however often they do.
 		accountKey := ratelimit.AccountKey(r.FormValue("email"))
 		networkKey := accountNetworkRateLimitKey(r, accountKey)
-		if t, key := m.pwdAccount.reserve(networkKey, accountKey); t != nil {
+		held, t, key := m.pwdAccount.reserve(r.Context(), networkKey, accountKey)
+		if t != nil {
 			m.refuse(w, r, t, key, rejectBrowser, map[string]interface{}{"email": accountKey, "ip": ipKey})
 			return
 		}
@@ -486,7 +501,7 @@ func (m *RateLimiter) LimitPwd(next http.Handler) http.Handler {
 		reservation := &reqctx.CredentialReservation{}
 		r = withCredentialReservation(r, reservation)
 		defer func() {
-			m.pwdAccount.release(networkKey, accountKey, reservation.Failed())
+			releaseCredentialReservation(r.Context(), held, reservation.Failed())
 		}()
 
 		next.ServeHTTP(w, r)
@@ -534,7 +549,11 @@ func (m *RateLimiter) limitFailuresPerSubject(next http.Handler, t *failureTier,
 			return
 		}
 
-		if !t.limiter.Reserve(key) {
+		held, err := t.limiter.Reserve(r.Context(), key)
+		if err != nil {
+			slog.ErrorContext(r.Context(), "unable to read a credential rate limit", "error", err)
+		}
+		if held == nil {
 			m.refuse(w, r, &t.tier, key, class, audited)
 			return
 		}
@@ -542,7 +561,7 @@ func (m *RateLimiter) limitFailuresPerSubject(next http.Handler, t *failureTier,
 		reservation := &reqctx.CredentialReservation{}
 		r = withCredentialReservation(r, reservation)
 		defer func() {
-			t.limiter.Release(key, reservation.Failed())
+			releaseCredentialReservation(r.Context(), held, reservation.Failed())
 		}()
 
 		next.ServeHTTP(w, r)
@@ -895,7 +914,8 @@ func (m *RateLimiter) LimitROPC(next http.Handler) http.Handler {
 		// key: a ceiling an attacker escapes by registering a second client is not a ceiling.
 		accountKey := ratelimit.AccountKey(r.PostFormValue("username"))
 		networkKey := accountNetworkRateLimitKey(r, accountKey)
-		if t, key := m.pwdAccount.reserve(networkKey, accountKey); t != nil {
+		held, t, key := m.pwdAccount.reserve(r.Context(), networkKey, accountKey)
+		if t != nil {
 			m.refuse(w, r, t, key, rejectOAuth,
 				map[string]interface{}{"email": accountKey, "ip": ipKey})
 			return
@@ -907,7 +927,7 @@ func (m *RateLimiter) LimitROPC(next http.Handler) http.Handler {
 		reservation := &reqctx.CredentialReservation{}
 		r = withCredentialReservation(r, reservation)
 		defer func() {
-			m.pwdAccount.release(networkKey, accountKey, reservation.Failed())
+			releaseCredentialReservation(r.Context(), held, reservation.Failed())
 		}()
 
 		next.ServeHTTP(w, r)

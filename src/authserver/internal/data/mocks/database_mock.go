@@ -3296,6 +3296,69 @@ func (_c *Database_DeleteExpiredBrowserSessions_Call) RunAndReturn(run func(ctx 
 	return _c
 }
 
+// DeleteExpiredRateLimitCounters provides a mock function for the type Database
+func (_mock *Database) DeleteExpiredRateLimitCounters(ctx context.Context, tx *sql.Tx, now time.Time) error {
+	ret := _mock.Called(ctx, tx, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteExpiredRateLimitCounters")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, time.Time) error); ok {
+		r0 = returnFunc(ctx, tx, now)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteExpiredRateLimitCounters_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteExpiredRateLimitCounters'
+type Database_DeleteExpiredRateLimitCounters_Call struct {
+	*mock.Call
+}
+
+// DeleteExpiredRateLimitCounters is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - now time.Time
+func (_e *Database_Expecter) DeleteExpiredRateLimitCounters(ctx any, tx any, now any) *Database_DeleteExpiredRateLimitCounters_Call {
+	return &Database_DeleteExpiredRateLimitCounters_Call{Call: _e.mock.On("DeleteExpiredRateLimitCounters", ctx, tx, now)}
+}
+
+func (_c *Database_DeleteExpiredRateLimitCounters_Call) Run(run func(ctx context.Context, tx *sql.Tx, now time.Time)) *Database_DeleteExpiredRateLimitCounters_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteExpiredRateLimitCounters_Call) Return(err error) *Database_DeleteExpiredRateLimitCounters_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteExpiredRateLimitCounters_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, now time.Time) error) *Database_DeleteExpiredRateLimitCounters_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteExpiredRefreshTokens provides a mock function for the type Database
 func (_mock *Database) DeleteExpiredRefreshTokens(ctx context.Context, tx *sql.Tx) error {
 	ret := _mock.Called(ctx, tx)
@@ -7772,6 +7835,96 @@ func (_c *Database_GetPreRegistrationByVerificationCodeHash_Call) RunAndReturn(r
 	return _c
 }
 
+// GetRateLimitCounts provides a mock function for the type Database
+func (_mock *Database) GetRateLimitCounts(ctx context.Context, tx *sql.Tx, keyHash string, current time.Time, previous time.Time) (int, int, error) {
+	ret := _mock.Called(ctx, tx, keyHash, current, previous)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRateLimitCounts")
+	}
+
+	var r0 int
+	var r1 int
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, time.Time, time.Time) (int, int, error)); ok {
+		return returnFunc(ctx, tx, keyHash, current, previous)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, time.Time, time.Time) int); ok {
+		r0 = returnFunc(ctx, tx, keyHash, current, previous)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string, time.Time, time.Time) int); ok {
+		r1 = returnFunc(ctx, tx, keyHash, current, previous)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+	if returnFunc, ok := ret.Get(2).(func(context.Context, *sql.Tx, string, time.Time, time.Time) error); ok {
+		r2 = returnFunc(ctx, tx, keyHash, current, previous)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
+}
+
+// Database_GetRateLimitCounts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRateLimitCounts'
+type Database_GetRateLimitCounts_Call struct {
+	*mock.Call
+}
+
+// GetRateLimitCounts is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - keyHash string
+//   - current time.Time
+//   - previous time.Time
+func (_e *Database_Expecter) GetRateLimitCounts(ctx any, tx any, keyHash any, current any, previous any) *Database_GetRateLimitCounts_Call {
+	return &Database_GetRateLimitCounts_Call{Call: _e.mock.On("GetRateLimitCounts", ctx, tx, keyHash, current, previous)}
+}
+
+func (_c *Database_GetRateLimitCounts_Call) Run(run func(ctx context.Context, tx *sql.Tx, keyHash string, current time.Time, previous time.Time)) *Database_GetRateLimitCounts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		var arg4 time.Time
+		if args[4] != nil {
+			arg4 = args[4].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetRateLimitCounts_Call) Return(curr int, prev int, err error) *Database_GetRateLimitCounts_Call {
+	_c.Call.Return(curr, prev, err)
+	return _c
+}
+
+func (_c *Database_GetRateLimitCounts_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, keyHash string, current time.Time, previous time.Time) (int, int, error)) *Database_GetRateLimitCounts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetRedirectURIById provides a mock function for the type Database
 func (_mock *Database) GetRedirectURIById(ctx context.Context, tx *sql.Tx, redirectURIId int64) (*record.RedirectURI, error) {
 	ret := _mock.Called(ctx, tx, redirectURIId)
@@ -12059,6 +12212,165 @@ func (_c *Database_RefreshTokenLoadUser_Call) Return(err error) *Database_Refres
 }
 
 func (_c *Database_RefreshTokenLoadUser_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error) *Database_RefreshTokenLoadUser_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RefundRateLimitHit provides a mock function for the type Database
+func (_mock *Database) RefundRateLimitHit(ctx context.Context, tx *sql.Tx, keyHash string, windowStart time.Time) error {
+	ret := _mock.Called(ctx, tx, keyHash, windowStart)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RefundRateLimitHit")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, time.Time) error); ok {
+		r0 = returnFunc(ctx, tx, keyHash, windowStart)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_RefundRateLimitHit_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RefundRateLimitHit'
+type Database_RefundRateLimitHit_Call struct {
+	*mock.Call
+}
+
+// RefundRateLimitHit is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - keyHash string
+//   - windowStart time.Time
+func (_e *Database_Expecter) RefundRateLimitHit(ctx any, tx any, keyHash any, windowStart any) *Database_RefundRateLimitHit_Call {
+	return &Database_RefundRateLimitHit_Call{Call: _e.mock.On("RefundRateLimitHit", ctx, tx, keyHash, windowStart)}
+}
+
+func (_c *Database_RefundRateLimitHit_Call) Run(run func(ctx context.Context, tx *sql.Tx, keyHash string, windowStart time.Time)) *Database_RefundRateLimitHit_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_RefundRateLimitHit_Call) Return(err error) *Database_RefundRateLimitHit_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_RefundRateLimitHit_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, keyHash string, windowStart time.Time) error) *Database_RefundRateLimitHit_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReserveRateLimitHit provides a mock function for the type Database
+func (_mock *Database) ReserveRateLimitHit(ctx context.Context, keyHash string, current time.Time, previous time.Time, expiresAt time.Time, admit func(curr int, prev int) bool) (bool, error) {
+	ret := _mock.Called(ctx, keyHash, current, previous, expiresAt, admit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReserveRateLimitHit")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Time, time.Time, time.Time, func(curr int, prev int) bool) (bool, error)); ok {
+		return returnFunc(ctx, keyHash, current, previous, expiresAt, admit)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Time, time.Time, time.Time, func(curr int, prev int) bool) bool); ok {
+		r0 = returnFunc(ctx, keyHash, current, previous, expiresAt, admit)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, time.Time, time.Time, time.Time, func(curr int, prev int) bool) error); ok {
+		r1 = returnFunc(ctx, keyHash, current, previous, expiresAt, admit)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_ReserveRateLimitHit_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReserveRateLimitHit'
+type Database_ReserveRateLimitHit_Call struct {
+	*mock.Call
+}
+
+// ReserveRateLimitHit is a helper method to define mock.On call
+//   - ctx context.Context
+//   - keyHash string
+//   - current time.Time
+//   - previous time.Time
+//   - expiresAt time.Time
+//   - admit func(curr int, prev int) bool
+func (_e *Database_Expecter) ReserveRateLimitHit(ctx any, keyHash any, current any, previous any, expiresAt any, admit any) *Database_ReserveRateLimitHit_Call {
+	return &Database_ReserveRateLimitHit_Call{Call: _e.mock.On("ReserveRateLimitHit", ctx, keyHash, current, previous, expiresAt, admit)}
+}
+
+func (_c *Database_ReserveRateLimitHit_Call) Run(run func(ctx context.Context, keyHash string, current time.Time, previous time.Time, expiresAt time.Time, admit func(curr int, prev int) bool)) *Database_ReserveRateLimitHit_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		var arg4 time.Time
+		if args[4] != nil {
+			arg4 = args[4].(time.Time)
+		}
+		var arg5 func(curr int, prev int) bool
+		if args[5] != nil {
+			arg5 = args[5].(func(curr int, prev int) bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_ReserveRateLimitHit_Call) Return(b bool, err error) *Database_ReserveRateLimitHit_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_ReserveRateLimitHit_Call) RunAndReturn(run func(ctx context.Context, keyHash string, current time.Time, previous time.Time, expiresAt time.Time, admit func(curr int, prev int) bool) (bool, error)) *Database_ReserveRateLimitHit_Call {
 	_c.Call.Return(run)
 	return _c
 }
