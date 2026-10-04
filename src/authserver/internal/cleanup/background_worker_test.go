@@ -3,11 +3,13 @@ package cleanup
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -592,6 +594,7 @@ func TestWorker_Poll_ReapsBrowserSessionsEvenWhenTheClaimIsLost(t *testing.T) {
 
 	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
+	mockDB.On("DeleteExpiredRateLimitCounters", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
@@ -615,6 +618,7 @@ func TestWorker_Poll_ReapsAuthorizeRequestsEvenWhenTheClaimIsLost(t *testing.T) 
 	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
+	mockDB.On("DeleteExpiredRateLimitCounters", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	worker.poll(context.Background())
 
@@ -633,6 +637,7 @@ func TestWorker_Poll_AuthorizeRequestReapFailureStopsNothingElse(t *testing.T) {
 		Return(errors.New("database is down")).Once()
 	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
+	mockDB.On("DeleteExpiredRateLimitCounters", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	worker.poll(context.Background())
 
@@ -649,6 +654,7 @@ func TestWorker_Poll_BrowserSessionReapFailureStillReapsAuthorizeRequests(t *tes
 	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
+	mockDB.On("DeleteExpiredRateLimitCounters", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	worker.poll(context.Background())
 
@@ -667,6 +673,7 @@ func TestWorker_Poll_ReapsAuthorizeRequestsWithACurrentTimestamp(t *testing.T) {
 		Run(func(args mock.Arguments) { gotNow = args.Get(2).(time.Time) }).Return(nil).Once()
 	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
+	mockDB.On("DeleteExpiredRateLimitCounters", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	before := time.Now().UTC()
 	worker.poll(context.Background())
@@ -688,6 +695,7 @@ func TestWorker_Poll_ReapFailureDoesNotStopTheClaim(t *testing.T) {
 	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
+	mockDB.On("DeleteExpiredRateLimitCounters", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	worker.poll(context.Background())
 
@@ -704,6 +712,77 @@ func TestWorker_Poll_ReapsWithACurrentTimestamp(t *testing.T) {
 	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) { gotNow = args.Get(2).(time.Time) }).Return(nil).Once()
 	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(false, nil).Once()
+	mockDB.On("DeleteExpiredRateLimitCounters", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+	before := time.Now().UTC()
+	worker.poll(context.Background())
+	after := time.Now().UTC()
+
+	assert.False(t, gotNow.Before(before))
+	assert.False(t, gotNow.After(after))
+}
+
+// TestWorker_Poll_ReapsRateLimitCountersEvenWhenTheClaimIsLost is the same pin for the shared
+// credential counters (#394 decision 3). A wrong password for any address writes a row, and an
+// unauthenticated caller can send as many as the per-IP tier lets through, so the sweep runs on every
+// instance at every poll, as the browser session and parked request sweeps do, rather than on the
+// twelve hour claim.
+func TestWorker_Poll_ReapsRateLimitCountersEvenWhenTheClaimIsLost(t *testing.T) {
+	mockDB := datamocks.NewDatabase(t)
+	worker := New(mockDB)
+
+	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteExpiredRateLimitCounters", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(false, nil).Once()
+
+	worker.poll(context.Background())
+
+	mockDB.AssertExpectations(t)
+	mockDB.AssertNumberOfCalls(t, "DeleteExpiredRateLimitCounters", 1)
+}
+
+// TestWorker_Poll_RateLimitCounterReapFailureStopsNothingElse: the counter sweep is housekeeping
+// like the others, so its failure is logged and the other sweeps and the claim still run.
+func TestWorker_Poll_RateLimitCounterReapFailureStopsNothingElse(t *testing.T) {
+	logs := logtest.CaptureSlog(t)
+	mockDB := datamocks.NewDatabase(t)
+	worker := New(mockDB)
+
+	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteExpiredRateLimitCounters", mock.Anything, mock.Anything, mock.Anything).
+		Return(errors.New("database is down")).Once()
+	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(false, nil).Once()
+
+	worker.poll(context.Background())
+
+	mockDB.AssertExpectations(t)
+	errorRecords := 0
+	for _, record := range logs.Records() {
+		if record.Level == slog.LevelError {
+			errorRecords++
+			assert.Equal(t, "unable to delete expired rate limit counters", record.Message)
+		}
+	}
+	assert.Equal(t, 1, errorRecords)
+}
+
+// TestWorker_Poll_ReapsRateLimitCountersWithACurrentTimestamp: a counter row expires against the
+// instant of the poll.
+func TestWorker_Poll_ReapsRateLimitCountersWithACurrentTimestamp(t *testing.T) {
+	mockDB := datamocks.NewDatabase(t)
+	worker := New(mockDB)
+
+	var gotNow time.Time
+	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteExpiredRateLimitCounters", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) { gotNow = args.Get(2).(time.Time) }).Return(nil).Once()
 	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
 

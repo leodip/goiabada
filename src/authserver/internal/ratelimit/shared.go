@@ -21,16 +21,26 @@ import (
 // rollout refills it. They are also the cheap tiers to share: a credential check already depends
 // on the database, and a couple of short statements sit beside a bcrypt. The per-IP tiers exist
 // to refuse a flood for free and the mail tiers bound a nuisance, so both stay in memory, per
-// pod, where a database write would turn a flood into database load.
+// pod, where a database write would turn a flood into database load; a deployment wanting those
+// shared puts a request limit at its gateway. Rejected: a database store for every tier, which puts
+// a write on every request of a flood; dividing budgets by a replica count, which breaks under
+// autoscaling and rollouts and cannot divide a budget of 5; Redis, a new runtime dependency on the
+// login path.
 //
-// WHERE. On PostgreSQL, MySQL and SQL Server, with no setting; SQLite cannot have a second
-// replica and counts in memory.
+// WHERE. On PostgreSQL, MySQL and SQL Server, with no setting (the server's sharedCredentialCounts
+// chooses); SQLite cannot have a second replica and counts in memory. A memory default behind a
+// switch was rejected, because every multi-replica operator who never found the switch would keep
+// the defect, and the database adds no requirement a deployment does not already meet.
 //
 // HOW A ROW IS KEYED. By the SHA-256 of the tier name, a NUL and the key, never the key: the
 // table only has to count an email address or an IP block, not hold one. A window starts at a
 // multiple of its length since the Unix epoch, so every pod places a request in the same window;
 // pods' wall clocks decide it, and NTP skew moves a boundary by a fraction of a second against
-// windows of minutes. The warning line and the audit event keep the readable key.
+// windows of minutes. The warning line and the audit event keep the readable key; the audit gate
+// stays in each process, so a trip is audited at most once per key, per window, per replica. Raw
+// keys were rejected: the table would hold addresses and IP blocks only to count them. Every
+// instance sweeps rows whose two windows have passed at every poll, outside the cleanup claim,
+// because an unauthenticated caller can create them.
 //
 // HOW A SLOT IS HELD. A reservation is a charge: Reserve increments the current window when the
 // decayed rate, the in-memory limiter's arithmetic, admits one more, atomically across every pod
@@ -38,14 +48,18 @@ import (
 // one is refunded from the window it was charged in. So a successful check spends nothing once
 // it completes, and the in-flight protection #219 measured holds across pods rather than per
 // pod. A pod that dies between the two leaves one charge behind, which decays with its window:
-// the refusing direction.
+// the refusing direction. A separate table of leased reservations was rejected: twice the table and
+// the statements, and a lease length to tune, for nothing the charge and its refund lack.
 //
 // WHEN THE STORE CANNOT ANSWER. Each call is bounded at storeCallBound, the wait for a pool
 // connection included, and reaching it is a failure. Reserve then returns an error and no
 // slot, so the credential is never checked without the count's answer, and the caller answers
-// a fault rather than a trip. The refund runs detached from the request's cancellation, so a
-// client hanging up after a right password does not leave the charge behind; when it fails
-// anyway the charge stays, which is the refusing direction again.
+// a fault rather than a trip: the 500 its route gives any fault, in the shape its caller parses,
+// with the one Error record that 500 owes, and no Retry-After, rate-limit warning or audit event.
+// A 429 would send a client into a backoff loop and report an outage as an attack. The refund
+// runs detached from the request's cancellation, so a client hanging up after a right password
+// does not leave the charge behind; when it fails anyway the charge stays, which is the refusing
+// direction again.
 
 // sharedStore is what a shared limiter asks of the database.
 type sharedStore interface {

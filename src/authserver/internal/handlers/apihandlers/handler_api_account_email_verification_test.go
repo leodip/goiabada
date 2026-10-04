@@ -36,6 +36,10 @@ func (u unusedRenderer) RenderTemplate(w http.ResponseWriter, r *http.Request, l
 	return nil
 }
 
+func (u unusedRenderer) InternalServerError(w http.ResponseWriter, r *http.Request, err error) {
+	u.t.Errorf("the API reject class rendered the error page instead of writing JSON: %v", err)
+}
+
 // verificationEnv is one handler wired to its limiter the way routes.go wires them, plus the
 // user row the database hands back. The row is shared rather than rebuilt per request
 // because the handler mutates it on success, exactly as the real row is mutated: a case
@@ -80,7 +84,7 @@ func newVerificationEnv(t *testing.T) *verificationEnv {
 		Return(true, nil).Maybe()
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
-	rateLimiter := middleware.NewRateLimiter(nil, unusedRenderer{t}, nil, nil, true)
+	rateLimiter := middleware.NewRateLimiter(nil, unusedRenderer{t}, nil, nil, true, nil)
 	handler := HandleAccountEmailVerificationPost(database, auditLogger, rateLimiter, testDataCipher)
 
 	return &verificationEnv{

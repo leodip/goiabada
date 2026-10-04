@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -29,11 +30,13 @@ type authContextGetter interface {
 	GetAuthContext(r *http.Request) (*ceremony.AuthContext, error)
 }
 
-// errorRenderer renders an HTML error page. The middleware declares only the shape it
-// needs rather than depending on the handler helper that satisfies it.
+// errorRenderer renders an HTML error page: the refusal page a trip answers with, and the 500 page
+// a credential tier whose shared count could not be read answers with (#394). The middleware
+// declares only the shape it needs rather than depending on the handler helper that satisfies it.
 type errorRenderer interface {
 	RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
 		data map[string]interface{}) error
+	InternalServerError(w http.ResponseWriter, r *http.Request, err error)
 }
 
 // auditEventLogger records a security event. The middleware declares only the shape it needs
@@ -43,6 +46,15 @@ type errorRenderer interface {
 // logger satisfies (#328).
 type auditEventLogger interface {
 	Log(ctx context.Context, auditEvent string, details map[string]interface{})
+}
+
+// credentialCounter is the database the five credential tiers count in on PostgreSQL, MySQL and SQL
+// Server, which every replica shares; ratelimit.NewSharedFailureLimiter records why those tiers and
+// no others. The server hands nil on SQLite, and the tiers then count in this process (#394).
+type credentialCounter interface {
+	ReserveRateLimitHit(ctx context.Context, keyHash string, current, previous, expiresAt time.Time,
+		admit func(curr, prev int) bool) (bool, error)
+	RefundRateLimitHit(ctx context.Context, tx *sql.Tx, keyHash string, windowStart time.Time) error
 }
 
 // rejectClass is the shape a rejected caller can parse. A browser gets the error page it
@@ -138,8 +150,16 @@ type failureTier struct {
 // must be empty for, so the empty value is passed here rather than at each call site,
 // which makes the invariant structural instead of something every caller has to remember
 // (#219). The gate is taken from the limiter for newTier's reason.
-func newFailureTier(name string, limit int, window time.Duration) *failureTier {
+//
+// The tier counts in store under its own name when there is one, which is every server engine,
+// and in this process when store is nil, which is SQLite (#394 decision 2). The shared limiter's
+// gate follows its epoch-aligned windows, and stays per process: at most one audit event per key,
+// per window, per replica.
+func newFailureTier(name string, limit int, window time.Duration, store credentialCounter) *failureTier {
 	limiter := ratelimit.NewFailureLimiter(limit, window)
+	if store != nil {
+		limiter = ratelimit.NewSharedFailureLimiter(store, name, limit, window)
+	}
 	return &failureTier{
 		tier: tier{
 			name:      name,
@@ -170,20 +190,21 @@ func newAccountTiers(tight, backstop *failureTier) *accountTiers {
 
 // reserve claims a slot on both tiers, or on neither. It returns the tier that refused and
 // the key it refused, so the caller can report the trip and answer with that tier's window;
-// a nil tier means the request may proceed and the reservation is owed a release. A tier
-// whose count could not be read refuses, so the limiter fails closed.
-func (a *accountTiers) reserve(ctx context.Context, networkKey, accountKey string) (*ratelimit.AccountReservation, *tier, string) {
+// a nil tier and a nil error mean the request may proceed and the reservation is owed a
+// release. An error is a count that could not be read, which holds nothing and which the
+// caller answers as a fault, never as a trip: the limiter fails closed (#276, #394 decision 4).
+func (a *accountTiers) reserve(ctx context.Context, networkKey, accountKey string) (*ratelimit.AccountReservation, *tier, string, error) {
 	reservation, refusal, err := a.limiter.Reserve(ctx, networkKey, accountKey)
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to read a credential rate limit", "error", err)
+		return nil, nil, "", err
 	}
 	switch refusal {
 	case ratelimit.RefusedTight:
-		return nil, &a.tight.tier, networkKey
+		return nil, &a.tight.tier, networkKey, nil
 	case ratelimit.RefusedBackstop:
-		return nil, &a.backstop.tier, accountKey
+		return nil, &a.backstop.tier, accountKey, nil
 	default:
-		return reservation, nil, ""
+		return reservation, nil, "", nil
 	}
 }
 
@@ -252,7 +273,7 @@ type RateLimiter struct {
 }
 
 func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jsonWriter jsonErrorWriter,
-	auditLogger auditEventLogger, enabled bool) *RateLimiter {
+	auditLogger auditEventLogger, enabled bool, credentialCounts credentialCounter) *RateLimiter {
 
 	return &RateLimiter{
 		ceremonyStore: ceremonyStore,
@@ -268,8 +289,8 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// 800-63B §3.2.2 names. Both count failures only, so a user who signs in spends
 		// nothing (#219).
 		pwdAccount: newAccountTiers(
-			newFailureTier("pwd_account_net", 10, 15*time.Minute),
-			newFailureTier("pwd_account", 100, 60*time.Minute),
+			newFailureTier("pwd_account_net", 10, 15*time.Minute, credentialCounts),
+			newFailureTier("pwd_account", 100, 60*time.Minute, credentialCounts),
 		),
 		// per-IP: stops one host hammering many accounts
 		pwdIp: newTier("pwd_ip", "ip", 30, 1*time.Minute),
@@ -279,7 +300,7 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// Five rather than three because the same limiter covers enrollment, where
 		// pointing the wrong entry in an authenticator app at the form burns codes, and a
 		// resubmitted code is refused as a replay and so counts as a failure too (#219).
-		otp: newFailureTier("otp", 5, 15*time.Minute),
+		otp: newFailureTier("otp", 5, 15*time.Minute, credentialCounts),
 		// per-subject email verification failures. The code is four letters plus four
 		// digits, 26^4 x 10^4, so 5 failures per 15 minutes puts a hit on the far side of a
 		// human lifetime. It needs a bound at all because the chain in front of it is short:
@@ -288,7 +309,7 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// address the attacker does not control. That change now needs the account password
 		// too (#404), which shortens the chain without removing it. Failures only, so a user reading the code
 		// out of their inbox spends nothing (#219).
-		emailVerification: newFailureTier("email_verification", 5, 15*time.Minute),
+		emailVerification: newFailureTier("email_verification", 5, 15*time.Minute, credentialCounts),
 		// per-subject: verification mails sent, every request counted. The send mails a code to
 		// whatever address the account holds, and the account sets that address itself, so
 		// what this bounds is one account mailing addresses it does not own. The handler's own
@@ -307,7 +328,7 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// higher: the password is the only credential guarding the removal of the account's
 		// second factor, since the disable branch takes no OTP code at all. Failures only, so
 		// a user changing their password successfully spends nothing (#113, #219).
-		accountPassword: newFailureTier("account_password", 5, 15*time.Minute),
+		accountPassword: newFailureTier("account_password", 5, 15*time.Minute, credentialCounts),
 		// per-IP: 10 activation operations per 5 minutes, at the three requests an activation
 		// now costs (the link's GET, the clean GET that renders the password form, and its
 		// POST), shared by both methods. resetPwd's budget for the same chain (#112, #207
@@ -422,6 +443,27 @@ func (m *RateLimiter) reportTrip(ctx context.Context, t *tier, key string,
 	m.auditLogger.Log(ctx, audit.EventRateLimitExceeded, details)
 }
 
+// fault answers a credential check whose count could not be read: the 500 the route already gives
+// a fault, in the shape its caller parses, through the writer every other 500 there goes through,
+// which writes the one Error record and puts the request id in the body. err names the shared tier
+// that failed and why.
+//
+// Not a trip, so none of what refuse writes: no Retry-After, no "rate limit reached" warning and no
+// audit event. A 429 would send a client into a backoff loop and fill the audit log with false
+// trips through a database outage, and the audit write would fail with the database anyway. The
+// credential is never checked, since the request stops here (#276, #394 decision 4).
+func (m *RateLimiter) fault(w http.ResponseWriter, r *http.Request, class rejectClass, err error) {
+	switch class {
+	case rejectOAuth:
+		// RFC 6749 section 5.2's server_error, as the token endpoint answers every other fault.
+		m.jsonWriter.JSONError(w, r, err)
+	case rejectAPI:
+		apiresponse.WriteInternalServerError(w, r, err)
+	default:
+		m.renderer.InternalServerError(w, r, err)
+	}
+}
+
 // reject writes the 429 in the shape the route's caller parses.
 func (m *RateLimiter) reject(w http.ResponseWriter, r *http.Request, class rejectClass) {
 	// RFC 6585 Section 4's "Responses with the 429 status code MUST NOT be stored by a
@@ -489,7 +531,11 @@ func (m *RateLimiter) LimitPwd(next http.Handler) http.Handler {
 		// user signing in normally is never refused by it however often they do.
 		accountKey := ratelimit.AccountKey(r.FormValue("email"))
 		networkKey := accountNetworkRateLimitKey(r, accountKey)
-		held, t, key := m.pwdAccount.reserve(r.Context(), networkKey, accountKey)
+		held, t, key, err := m.pwdAccount.reserve(r.Context(), networkKey, accountKey)
+		if err != nil {
+			m.fault(w, r, rejectBrowser, err)
+			return
+		}
 		if t != nil {
 			m.refuse(w, r, t, key, rejectBrowser, map[string]interface{}{"email": accountKey, "ip": ipKey})
 			return
@@ -551,7 +597,8 @@ func (m *RateLimiter) limitFailuresPerSubject(next http.Handler, t *failureTier,
 
 		held, err := t.limiter.Reserve(r.Context(), key)
 		if err != nil {
-			slog.ErrorContext(r.Context(), "unable to read a credential rate limit", "error", err)
+			m.fault(w, r, class, err)
+			return
 		}
 		if held == nil {
 			m.refuse(w, r, &t.tier, key, class, audited)
@@ -914,7 +961,11 @@ func (m *RateLimiter) LimitROPC(next http.Handler) http.Handler {
 		// key: a ceiling an attacker escapes by registering a second client is not a ceiling.
 		accountKey := ratelimit.AccountKey(r.PostFormValue("username"))
 		networkKey := accountNetworkRateLimitKey(r, accountKey)
-		held, t, key := m.pwdAccount.reserve(r.Context(), networkKey, accountKey)
+		held, t, key, err := m.pwdAccount.reserve(r.Context(), networkKey, accountKey)
+		if err != nil {
+			m.fault(w, r, rejectOAuth, err)
+			return
+		}
 		if t != nil {
 			m.refuse(w, r, t, key, rejectOAuth,
 				map[string]interface{}{"email": accountKey, "ip": ipKey})

@@ -31,7 +31,8 @@ import (
 )
 
 // testTemplateFS is the smallest tree RenderTemplate needs: a layout that includes the
-// three blocks the real one includes, and the error page the browser rejection renders.
+// three blocks the real one includes, the error page the browser rejection renders, and the
+// 500 page a credential tier whose store faulted answers with (#394).
 //
 // This focused fixture avoids coupling middleware behaviour to unrelated markup changes.
 // What stands in here is only the templates' shape. What is genuinely under test is the
@@ -45,6 +46,9 @@ var testTemplateFS = fstest.MapFS{
 	"auth_error.html": &fstest.MapFile{Data: []byte(
 		`{{define "title"}}{{.appName}}{{end}}{{define "head"}}{{end}}` +
 			`{{define "body"}}<h1>{{.title}}</h1><p id="errorMsg">{{.error}}</p>{{end}}`)},
+	"error.html": &fstest.MapFile{Data: []byte(
+		`{{define "title"}}{{.appName}}{{end}}{{define "head"}}{{end}}` +
+			`{{define "body"}}<p id="requestId">{{.requestId}}</p>{{end}}`)},
 }
 
 // auditEvent is one call the middleware made to its audit logger.
@@ -97,7 +101,7 @@ func newTestMiddleware(ceremonyStore authContextGetter, enabled bool) *RateLimit
 func newAuditedTestMiddleware(ceremonyStore authContextGetter, enabled bool) (*RateLimiter, *stubAuditLogger) {
 	auditLog := &stubAuditLogger{}
 	httpHelper := render.New(testTemplateFS)
-	return NewRateLimiter(ceremonyStore, httpHelper, httpHelper, auditLog, enabled), auditLog
+	return NewRateLimiter(ceremonyStore, httpHelper, httpHelper, auditLog, enabled, nil), auditLog
 }
 
 // limiterRequest builds the request a limited route actually receives. Settings are on the

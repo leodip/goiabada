@@ -48,6 +48,7 @@ func TestWorker_Poll_ReapsUnderTheWorkersContext(t *testing.T) {
 		Return(nil).Once()
 	mockDB.On("TryClaimCleanupRun", theWorkersContext(), mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
+	mockDB.On("DeleteExpiredRateLimitCounters", theWorkersContext(), mock.Anything, mock.Anything).Return(nil).Once()
 
 	worker.poll(lifecycleContext())
 
@@ -67,6 +68,7 @@ func TestWorker_Poll_LostClaimReachesNoSweepPort(t *testing.T) {
 		Return(nil).Once()
 	mockDB.On("TryClaimCleanupRun", theWorkersContext(), mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
+	mockDB.On("DeleteExpiredRateLimitCounters", theWorkersContext(), mock.Anything, mock.Anything).Return(nil).Once()
 
 	worker.poll(lifecycleContext())
 

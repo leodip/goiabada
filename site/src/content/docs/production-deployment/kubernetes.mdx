@@ -376,6 +376,28 @@ than the database refusing a new connection to every pod at once. Raising replic
 queues to the database's refusals. The pool settings are in the
 [environment variable reference](/reference/environment-variables/#database-configuration).
 
+### Rate limiting across replicas
+
+The built-in rate limiter is off by default (`GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`). If you
+turn it on, not every limit holds across replicas:
+
+- **Shared:** the limits on credential guessing, which count failed passwords (at sign-in and
+  through the password grant), failed OTP codes, failed account password checks and failed email
+  verification codes. On PostgreSQL, MySQL and SQL Server they are counted in the database every
+  pod shares, so three replicas still allow one budget, and a rollout does not reset it. If the
+  database cannot answer such a check within 5 seconds, the request is answered with a server error
+  rather than let through.
+- **Per pod:** every other limit, the per-IP limits and the limits on outbound mail. Behind the
+  Service, three replicas give a client up to three times each budget, and a rollout resets them.
+  For a request limit across the whole deployment, use the gateway's own rate limiting.
+- **The per-IP limits depend on the client IP.** The generated manifests trust one proxy hop and
+  set no `GOIABADA_AUTHSERVER_TRUSTED_PROXIES`, and with the `Cluster` traffic policy of Step 1 the
+  address Goiabada sees is a node's, so a per-IP limit counts everyone arriving through one node
+  together. See [client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection)
+  before relying on one.
+
+The budgets are in the [rate limiting table](/reference/environment-variables/#security-settings).
+
 ### Resource limits
 
 The generated manifests include default limits. Adjust based on your load:

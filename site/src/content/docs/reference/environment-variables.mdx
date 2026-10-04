@@ -289,9 +289,11 @@ A limit that counts failures is not spent by a successful sign-in, so signing in
 
 Shared means one budget, not two of the same size: a wrong password counts the same whether it arrives at the login form or at the password grant, and the same whether it arrives at the password, OTP or email change.
 
-Counters are held in the process, so a deployment running several replicas multiplies every budget by the replica count and resets them on deploy.
+**Shared across replicas.** On PostgreSQL, MySQL and SQL Server, the limits that count failures (failed sign-ins, failed codes and failed passwords in the table) are counted in the database, so every replica of the auth server spends one budget and a rollout does not refill it. On SQLite, which runs as a single replica, they are counted in the process. If the database cannot answer one of these checks within 5 seconds, the request is refused with a server error (500, in the endpoint's usual error format) rather than allowed through, and no rate-limit event is recorded.
 
-You can also implement rate limiting at the infrastructure level (reverse proxy, CDN, cloud WAF) for more flexibility.
+**Per pod.** The limits that count every request are counted in each auth server process, on every database: a deployment running several replicas multiplies each of them by the replica count, and a rollout resets them. They bound floods and outbound mail rather than guessing. For a request limit that holds across the whole deployment, put one at your gateway, reverse proxy, CDN or cloud WAF, which also stops a flood before it reaches the auth server. The `rate_limit_exceeded` audit event is likewise recorded at most once per key and window by each replica.
+
+**Keyed on IP addresses.** A limit keyed on an IP address is only as good as the client IP Goiabada resolves. Behind a reverse proxy that takes `TRUST_PROXY_HEADERS`, and with more than one proxy layer, or a proxy that does not overwrite the inbound headers, it also takes `TRUSTED_PROXIES`: without it, a client can forge the address it is counted under. See [client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection).
 </Aside>
 
 ### Customization

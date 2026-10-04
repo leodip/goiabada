@@ -30,10 +30,16 @@ func (rateLimitTestRenderer) RenderTemplate(w http.ResponseWriter, r *http.Reque
 	return nil
 }
 
+// InternalServerError writes the 500 a credential tier whose shared count could not be read answers
+// with. The limiter here counts in memory, which cannot fail, so no case reaches it.
+func (rateLimitTestRenderer) InternalServerError(w http.ResponseWriter, r *http.Request, err error) {
+	w.WriteHeader(http.StatusInternalServerError)
+}
+
 // newTestRateLimiter builds a live, enabled limiter for the cases that exercise a handler
 // through it. A nil audit logger is the supported shape: the limiter skips the audit write
 // and still emits its warning line and its rejection. It has no JSON writer, which LimitROPC
 // writes through only for a form that does not parse, and no case here sends one.
 func newTestRateLimiter(ceremonyStore CeremonyStore) *middleware.RateLimiter {
-	return middleware.NewRateLimiter(ceremonyStore, rateLimitTestRenderer{}, nil, nil, true)
+	return middleware.NewRateLimiter(ceremonyStore, rateLimitTestRenderer{}, nil, nil, true, nil)
 }

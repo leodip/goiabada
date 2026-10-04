@@ -74,6 +74,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		httpHelper,
 		auditLogger,
 		authServerConfig.RateLimiterEnabled,
+		sharedCredentialCounts(s.cfg.Database.Type, s.database),
 	)
 	emitRateLimiterConfigWarnings(
 		authServerConfig.RateLimiterEnabled,
