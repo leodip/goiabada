@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -17,7 +16,7 @@ func generateEnvFile(config *Config, paths outputPaths) string {
 	fmt.Fprintf(&sb, "#   %s\n", nativeStartCommand(paths, "goiabada-authserver"))
 	fmt.Fprintf(&sb, "#   %s\n", nativeStartCommand(paths, "goiabada-adminconsole"))
 	sb.WriteString("#\n")
-	fmt.Fprintf(&sb, "# Or with systemd, add EnvironmentFile=/path/to/%s\n", filepath.Base(paths.description))
+	fmt.Fprintf(&sb, "# %s\n", systemdEnvironmentFileHint(paths))
 	sb.WriteString("#\n")
 	sb.WriteString("# IMPORTANT: The database must be empty for initial deployment.\n")
 	sb.WriteString("# Goiabada will seed it with OAuth clients configured for the URLs below.\n")
