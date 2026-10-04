@@ -216,12 +216,15 @@ func TestMain_MigrateStopsCleanlyOnSIGINT(t *testing.T) {
 	require.Truef(t, errors.As(err, &exitErr), "a stop short of the target is not success: %v\n%s", err, printed.String())
 	require.Equalf(t, 1, exitErr.ExitCode(), "a signal handled, not one that killed the process\n%s", printed.String())
 
-	match := regexp.MustCompile(`stopped by a signal: the database is at schema version (\d{6}|none \(never migrated\)), clean`).
+	// The plan is printed before the runner takes the lock, so on a slow run (-race) the signal can
+	// end that wait instead, which reportStop answers with its own line.
+	match := regexp.MustCompile(`stopped by a signal(?: before any migration ran: the database is unchanged|` +
+		`: the database is at schema version (\d{6}|none \(never migrated\)), clean)`).
 		FindStringSubmatch(printed.String())
 	require.NotNilf(t, match, "it says where it stopped\n%s", printed.String())
 
 	version, dirty, err := schemaVersion(t, path)
-	if match[1] == "none (never migrated)" {
+	if match[1] == "" || match[1] == "none (never migrated)" {
 		// The signal reached the runner before its first file: nothing ran.
 		assert.Truef(t, migrator.IsNilVersion(err), "nothing was applied: %v", err)
 		return
