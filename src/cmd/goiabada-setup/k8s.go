@@ -23,6 +23,13 @@ const (
 	terminationGracePeriodSeconds = preStopPauseSeconds + 60
 )
 
+// The startup probe's budget, five minutes, is its period times the failures it allows; Compose's
+// start_period for the auth server is the same five minutes (#390 decision 5).
+const (
+	startupProbePeriodSeconds    = 5
+	startupProbeFailureThreshold = 60
+)
+
 func generateKubernetesManifests(config *Config) string {
 	var sb strings.Builder
 
@@ -144,18 +151,12 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("            secretKeyRef:\n")
 	sb.WriteString("              name: goiabada-secrets\n")
 	sb.WriteString("              key: oauth-client-secret\n")
-	sb.WriteString("        livenessProbe:\n")
-	sb.WriteString("          httpGet:\n")
-	sb.WriteString("            path: /health\n")
-	sb.WriteString("            port: 9090\n")
-	sb.WriteString("          initialDelaySeconds: 10\n")
-	sb.WriteString("          periodSeconds: 10\n")
-	sb.WriteString("        readinessProbe:\n")
-	sb.WriteString("          httpGet:\n")
-	sb.WriteString("            path: /health\n")
-	sb.WriteString("            port: 9090\n")
-	sb.WriteString("          initialDelaySeconds: 5\n")
-	sb.WriteString("          periodSeconds: 5\n")
+	writeProbes(&sb, 9090,
+		"The auth server opens the database, runs any outstanding migrations and seeds an",
+		"empty one before it listens; with several replicas, the first pod migrates and the",
+		"others wait for its lock. If an upgrade's migrations take longer, raise",
+		"failureThreshold until it times periodSeconds covers them, or the container is",
+		"restarted mid-migration.")
 	writePreStopPause(&sb)
 	sb.WriteString("        resources:\n")
 	sb.WriteString("          requests:\n")
@@ -210,18 +211,8 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("            secretKeyRef:\n")
 	sb.WriteString("              name: goiabada-secrets\n")
 	sb.WriteString("              key: admin-session-enc-key\n")
-	sb.WriteString("        livenessProbe:\n")
-	sb.WriteString("          httpGet:\n")
-	sb.WriteString("            path: /health\n")
-	sb.WriteString("            port: 9091\n")
-	sb.WriteString("          initialDelaySeconds: 10\n")
-	sb.WriteString("          periodSeconds: 10\n")
-	sb.WriteString("        readinessProbe:\n")
-	sb.WriteString("          httpGet:\n")
-	sb.WriteString("            path: /health\n")
-	sb.WriteString("            port: 9091\n")
-	sb.WriteString("          initialDelaySeconds: 5\n")
-	sb.WriteString("          periodSeconds: 5\n")
+	writeProbes(&sb, 9091,
+		"The auth server's budget: this server starts in seconds.")
 	writePreStopPause(&sb)
 	sb.WriteString("        resources:\n")
 	sb.WriteString("          requests:\n")
@@ -335,6 +326,37 @@ func writeTerminationGracePeriod(sb *strings.Builder, consequence ...string) {
 		fmt.Fprintf(sb, "      # %s\n", line)
 	}
 	fmt.Fprintf(sb, "      terminationGracePeriodSeconds: %d\n", terminationGracePeriodSeconds)
+}
+
+// writeProbes writes a container's startup, liveness and readiness probes, all on its static
+// /health, each stating its period, timeout and failure threshold, then the lines saying what the
+// startup budget means for this container. Liveness and readiness keep the values Kubernetes applied
+// before; the startup probe, rather than an initial delay, holds them off.
+func writeProbes(sb *strings.Builder, port int, startupComment ...string) {
+	fmt.Fprintf(sb, "        # Allows the container up to %d minutes (%d failures, %ds apart) to start listening;\n",
+		startupProbePeriodSeconds*startupProbeFailureThreshold/60, startupProbeFailureThreshold, startupProbePeriodSeconds)
+	sb.WriteString("        # liveness and readiness wait for it, and its first success ends it.\n")
+	for _, line := range startupComment {
+		fmt.Fprintf(sb, "        # %s\n", line)
+	}
+	writeProbe(sb, "startupProbe", port, startupProbePeriodSeconds, startupProbeFailureThreshold)
+	sb.WriteString("        # /health answers 200 whenever the process is up and touches neither the database nor\n")
+	sb.WriteString("        # the auth server. Keep liveness on it: a check that follows a dependency would restart\n")
+	sb.WriteString("        # every pod at once when that dependency has a short outage.\n")
+	writeProbe(sb, "livenessProbe", port, 10, 3)
+	writeProbe(sb, "readinessProbe", port, 5, 3)
+}
+
+// writeProbe writes one probe asking for /health on port, with a one-second timeout, Kubernetes'
+// default, stated so that every threshold a probe acts on is in the manifest.
+func writeProbe(sb *strings.Builder, name string, port, periodSeconds, failureThreshold int) {
+	fmt.Fprintf(sb, "        %s:\n", name)
+	sb.WriteString("          httpGet:\n")
+	sb.WriteString("            path: /health\n")
+	fmt.Fprintf(sb, "            port: %d\n", port)
+	fmt.Fprintf(sb, "          periodSeconds: %d\n", periodSeconds)
+	sb.WriteString("          timeoutSeconds: 1\n")
+	fmt.Fprintf(sb, "          failureThreshold: %d\n", failureThreshold)
 }
 
 // writePreStopPause writes a container's preStop sleep, through Kubernetes' native sleep action

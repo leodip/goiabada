@@ -38,7 +38,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      # Up to 5 minutes for a first start to seed the database, or an upgrade to migrate it;
+      # failures in that window do not count, and the first success ends it.
+      start_period: 300s
     volumes:
       # Bootstrap credentials directory - auth server writes OAuth and session keys here
       - ./bootstrap:/bootstrap

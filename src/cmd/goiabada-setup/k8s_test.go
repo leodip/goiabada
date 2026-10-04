@@ -287,3 +287,58 @@ func TestKubernetesManifest_GivesEachContainerTimeToStop(t *testing.T) {
 		})
 	}
 }
+
+// Each container is given five minutes to start, through a startup probe on /health every five
+// seconds with sixty failures allowed, and liveness and readiness are held off until it succeeds
+// rather than by an initial delay, so a first start that seeds or an upgrade that migrates is not
+// killed at about 40 seconds. Every probe states its period, timeout and failure threshold, liveness
+// and readiness at the values Kubernetes applied before (#390, the probe assumptions).
+func TestKubernetesManifest_GatesEachContainerOnAStartupProbe(t *testing.T) {
+	deployments := kubernetesDocuments(t, kubernetesConfig())["Deployment"]
+	for _, want := range []struct {
+		deployment string
+		port       int
+	}{
+		{"goiabada-authserver", 9090},
+		{"goiabada-adminconsole", 9091},
+	} {
+		t.Run(want.deployment, func(t *testing.T) {
+			deployment := deployments[want.deployment]
+			if deployment == nil {
+				t.Fatalf("no Deployment named %s", want.deployment)
+			}
+			podSpec := at[map[string]any](t, deployment, "spec", "template", "spec")
+			container := only[map[string]any](t, at[[]any](t, podSpec, "containers"), want.deployment+"'s containers")
+			for _, probe := range []struct {
+				name                              string
+				period, timeout, failureThreshold int
+			}{
+				{"startupProbe", 5, 1, 60},
+				{"livenessProbe", 10, 1, 3},
+				{"readinessProbe", 5, 1, 3},
+			} {
+				t.Run(probe.name, func(t *testing.T) {
+					spec := at[map[string]any](t, container, probe.name)
+					if got := at[string](t, spec, "httpGet", "path"); got != "/health" {
+						t.Errorf("%s asks for %q, want /health", probe.name, got)
+					}
+					if got := at[int](t, spec, "httpGet", "port"); got != want.port {
+						t.Errorf("%s asks port %d, want %d", probe.name, got, want.port)
+					}
+					if _, ok := spec["initialDelaySeconds"]; ok {
+						t.Errorf("%s waits initialDelaySeconds %v, and the startup probe is what holds it off", probe.name, spec["initialDelaySeconds"])
+					}
+					if got := at[int](t, spec, "periodSeconds"); got != probe.period {
+						t.Errorf("%s has periodSeconds %d, want %d", probe.name, got, probe.period)
+					}
+					if got := at[int](t, spec, "timeoutSeconds"); got != probe.timeout {
+						t.Errorf("%s has timeoutSeconds %d, want %d", probe.name, got, probe.timeout)
+					}
+					if got := at[int](t, spec, "failureThreshold"); got != probe.failureThreshold {
+						t.Errorf("%s has failureThreshold %d, want %d", probe.name, got, probe.failureThreshold)
+					}
+				})
+			}
+		})
+	}
+}
