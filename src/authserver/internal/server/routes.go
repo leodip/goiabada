@@ -102,7 +102,6 @@ func (s *Server) initRoutes(branches appBranches) {
 	// them leaves the other reachable.
 	protocol.With(userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL))
 	protocol.With(userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL))
-	pages.Get("/health", handlers.HandleHealthCheckGet())
 	pages.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	pages.Get("/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
 	pages.Get("/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))

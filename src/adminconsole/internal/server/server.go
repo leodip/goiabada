@@ -21,6 +21,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
@@ -131,19 +132,7 @@ func (s *Server) Start(ctx context.Context) error {
 		return errs.New("no listener is enabled, so the admin console cannot start: configure at least one of the http and https listeners")
 	}
 
-	// The static branch and the application branch, in that order. Both are registered
-	// on s.router; only the second carries the middleware initMiddleware returns, which
-	// is what keeps a stylesheet from costing a session load, and here that load is an
-	// HTTP call to the auth server (see initMiddleware).
-	app := s.initMiddleware()
-
-	s.serveStaticFiles("/static", http.FS(s.staticFS))
-
-	// Browsers auto-probe /favicon.ico at the site root regardless of the
-	// <link rel="icon"> tags; point it at the real asset under /static.
-	s.router.Get("/favicon.ico", http.RedirectHandler("/static/favicon/favicon.ico", http.StatusMovedPermanently).ServeHTTP)
-
-	s.initRoutes(app)
+	s.registerRoutes()
 
 	// The servers are kept rather than left local to the goroutine serving each, which is what lets
 	// a cancellation drain them. Before #426 nothing could, and SIGTERM cut off every request in
@@ -176,6 +165,28 @@ func (s *Server) Start(ctx context.Context) error {
 type listener struct {
 	server *http.Server
 	serve  func() error
+}
+
+// registerRoutes mounts everything this server answers on s.router: the root chain, the static
+// branch and the application branch, in that order. Both branches are registered on s.router;
+// only the second carries the middleware initMiddleware returns, which is what keeps a stylesheet
+// from costing a session load, and here that load is an HTTP call to the auth server (see
+// initMiddleware).
+func (s *Server) registerRoutes() {
+	app := s.initMiddleware()
+
+	s.serveStaticFiles("/static", http.FS(s.staticFS))
+
+	// Browsers auto-probe /favicon.ico at the site root regardless of the
+	// <link rel="icon"> tags; point it at the real asset under /static.
+	s.router.Get("/favicon.ico", http.RedirectHandler("/static/favicon/favicon.ico", http.StatusMovedPermanently).ServeHTTP)
+
+	// Beside the static branch rather than on the application branch, so the probes' endpoint
+	// passes through none of the settings cache and the session load, each a call to the auth server, and answers whenever the process is up
+	// (see handlers.HandleHealthCheckGet, #390).
+	s.router.Get("/health", handlers.HandleHealthCheckGet())
+
+	s.initRoutes(app)
 }
 
 // serveAndDrain is the auth server's, copied rather than shared because each binary owns its
