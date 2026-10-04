@@ -93,7 +93,6 @@ func (s *Server) initRoutes(root chi.Router) {
 	// cases — the whole point of this page is that the user is
 	// authenticated but not authorized.
 	root.With(baseAuth...).Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
-	root.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
 
 	// Auth routes
 	root.With(baseAuth...).Route("/auth", func(r chi.Router) {

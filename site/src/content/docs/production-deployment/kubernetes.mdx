@@ -364,10 +364,24 @@ resources:
 
 ## Health endpoints
 
-Both services expose health checks used by Kubernetes probes:
+Both services expose a health endpoint, and the generated manifest points every probe at it:
 
 - Auth server: `http://goiabada-authserver:9090/health`
 - Admin console: `http://goiabada-adminconsole:9091/health`
+
+`/health` answers `200` with the body `healthy` whenever the process is up and listening. That is
+all it tells you. It does not read the database, the settings or the session, and the admin
+console's does not call the auth server, so it keeps answering `200` while the database or the auth
+server is down. Watch the applications' own error records, or your database's monitoring, for
+those.
+
+That is deliberate. Every auth server pod shares one database and every admin console pod shares
+one auth server, so a probe that checked either would fail on every pod at the same moment: a
+liveness probe would restart them all at once, and a readiness probe would take every pod out of
+the Service together, so clients would get the gateway's "no healthy upstream" in place of the
+application's own error and recovery would wait a probe period longer. A pod that cannot reach the
+database at start never answers `/health` at all, because the auth server opens and migrates the
+database before it listens.
 
 ## Updating Goiabada
 

@@ -25,6 +25,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
@@ -139,19 +140,7 @@ func (s *Server) Start(ctx context.Context) error {
 		return errs.New("no listener is enabled, so the auth server cannot start: configure at least one of the http and https listeners")
 	}
 
-	// The static branch and the application branches, in that order. All are registered
-	// on s.router; only the application branches carry the middleware initMiddleware
-	// returns, which is what keeps a stylesheet from costing a settings read and a session
-	// load (see initMiddleware).
-	branches := s.initMiddleware()
-
-	s.serveStaticFiles("/static", http.FS(s.staticFS))
-
-	// Browsers auto-probe /favicon.ico at the site root regardless of the
-	// <link rel="icon"> tags; point it at the real asset under /static.
-	s.router.Get("/favicon.ico", http.RedirectHandler("/static/favicon/favicon.ico", http.StatusMovedPermanently).ServeHTTP)
-
-	s.initRoutes(branches)
+	s.registerRoutes()
 
 	var listeners []listener
 
@@ -176,6 +165,27 @@ func (s *Server) Start(ctx context.Context) error {
 	s.worker.Start()
 
 	return serveAndDrain(ctx, listeners, s.stopBackgroundWork)
+}
+
+// registerRoutes mounts everything this server answers on s.router: the root chain, the static
+// branch and the application branches, in that order. All are registered on s.router; only the
+// application branches carry the middleware initMiddleware returns, which is what keeps a
+// stylesheet from costing a settings read and a session load (see initMiddleware).
+func (s *Server) registerRoutes() {
+	branches := s.initMiddleware()
+
+	s.serveStaticFiles("/static", http.FS(s.staticFS))
+
+	// Browsers auto-probe /favicon.ico at the site root regardless of the
+	// <link rel="icon"> tags; point it at the real asset under /static.
+	s.router.Get("/favicon.ico", http.RedirectHandler("/static/favicon/favicon.ico", http.StatusMovedPermanently).ServeHTTP)
+
+	// Beside the static branch rather than on the application branch, so the probes' endpoint
+	// passes through none of the settings read and the session load, and answers whenever the process is up
+	// (see handlers.HandleHealthCheckGet, #390).
+	s.router.Get("/health", handlers.HandleHealthCheckGet())
+
+	s.initRoutes(branches)
 }
 
 // stopBackgroundWork is what Start does once every listener has drained: it waits for the jobs the
