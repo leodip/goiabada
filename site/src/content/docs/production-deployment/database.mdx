@@ -127,6 +127,13 @@ it. A mistyped command, such as `migrat`, is refused rather than starting the se
 | `goiabada-authserver migrate version` | Prints the schema version this binary expects and the one the database records |
 | `goiabada-authserver migrate to <version>` | Steps the schema to that version, up or down |
 
+Ctrl-C (SIGINT) or SIGTERM stops `migrate to` the way it stops a starting auth server: a wait for
+the database connection or for the migration lock ends at once, a migration file already running
+runs to its end, and the next one does not start, so the schema is left clean. The command then
+prints the schema version the database is at and how many migrations it applied and how many
+remain, and exits 1, because the version asked for was not reached. Running the same command again
+carries on from there. `migrate version` only reads, so Ctrl-C simply ends it.
+
 To roll a deployment back to an earlier release, back the database up first, then run
 `goiabada-authserver migrate to <version>` on the **current** binary, naming the schema version the
 target release expects, which its release notes state. Install the target release afterwards. The
