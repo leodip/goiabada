@@ -35,6 +35,8 @@ type CLIFlags struct {
 	// Kubernetes alone. The policy is empty when the flag was left out.
 	GatewayTrafficPolicy trafficPolicy
 	NetworkPolicy        bool
+	// RateLimiter is --rate-limiter, read by production Compose, native binaries and Kubernetes.
+	RateLimiter optionalBool
 }
 
 // optionalBool is a boolean flag that knows whether it was given, so one left out takes the
@@ -120,6 +122,7 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 	fs.BoolVar(&flags.NoColor, "no-color", false, "Disable colored output")
 	fs.Var(&flags.GatewayTrafficPolicy, "gateway-traffic-policy", "Kubernetes: the traffic policy of Envoy Gateway's load balancer Service: cluster or local (default: cluster)")
 	fs.BoolVar(&flags.NetworkPolicy, "network-policy", false, "Kubernetes: admit only Envoy and the admin console to the servers with NetworkPolicies")
+	fs.Var(&flags.RateLimiter, "rate-limiter", "Production, Kubernetes and native: turn on the auth server's rate limiter (default: true, but false for Kubernetes under the cluster traffic policy)")
 	fs.Var(&flags.LocalProxy, "local-proxy", "A reverse proxy on this machine forwards to the native binaries (default: true)")
 
 	fs.Usage = func() {
@@ -151,6 +154,10 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 		p("  --db-user USER         Database username (default: auto-detected)\n")
 		p("  --db-password PASS     Database password (generated if not provided)\n")
 		p("  --skip-db-test         Skip database connection test\n\n")
+		p("Rate Limiter Options (for production/kubernetes/native):\n")
+		p("  --rate-limiter=BOOL    Turn on the auth server's built-in rate limiter (default: true, but\n")
+		p("                         false for kubernetes under the cluster traffic policy, where its\n")
+		p("                         per-IP limits count every client arriving through one node together)\n\n")
 		p("Kubernetes Options:\n")
 		p("  --gateway-traffic-policy=POLICY\n")
 		p("                         The externalTrafficPolicy of Envoy Gateway's load balancer Service\n")

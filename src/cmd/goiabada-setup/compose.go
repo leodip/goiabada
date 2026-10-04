@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -130,6 +131,12 @@ func generateAuthServerService(config *Config) string {
 	sb.WriteString("      - GOIABADA_AUTHSERVER_CERTFILE=\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_KEYFILE=\n")
 	writeComposeTrust(&sb, behindProxy, "AUTHSERVER")
+	if config.Deployment.asksRateLimiter {
+		for _, line := range config.rateLimiterComment() {
+			fmt.Fprintf(&sb, "      # %s\n", line)
+		}
+		writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_RATELIMITER_ENABLED", strconv.FormatBool(config.RateLimiter))
+	}
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_LEVEL=info\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_FORMAT=text\n")

@@ -239,6 +239,8 @@ Nothing outside the machine reaches the plain HTTP listeners, and Goiabada takes
 
 On no (`--local-proxy=false`), both servers listen on every interface and trust no forwarded header, so each client is the address it connects from. They serve plain HTTP until you configure direct HTTPS, below.
 
+The wizard also asks whether to turn on the auth server's [rate limiter](/reference/environment-variables/#security-settings), yes by default, and writes `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` either way (`--rate-limiter=false` answers no). Behind a reverse proxy on the same machine, the `127.0.0.1` list keeps the auth server's startup warnings about proxy trust silent. With no proxy, the auth server logs a warning at every start that it trusts no forwarded header and that, behind a proxy, everyone would share one per-IP bucket; with nothing in front of it, that is expected.
+
 ## Direct HTTPS (optional)
 
 If you prefer not to use a reverse proxy, configure direct HTTPS. Setting the certificate and key turns on the HTTPS listener; set `LISTEN_HOST_HTTP` empty as well to stop serving plain HTTP:

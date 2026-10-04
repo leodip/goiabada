@@ -107,6 +107,14 @@ func interactiveScript(d *deployment, e *engine) []scriptedStep {
 	if d.kind == deploymentNative {
 		steps = append(steps, scriptedStep{prompt: localProxyPrompt, answer: ""})
 	}
+	// The rate limiter is on by default but for Kubernetes, whose default traffic policy, Cluster,
+	// turns it off.
+	switch d.kind {
+	case deploymentProduction, deploymentNative:
+		steps = append(steps, scriptedStep{prompt: rateLimiterOnPrompt, answer: ""})
+	case deploymentKubernetes:
+		steps = append(steps, scriptedStep{prompt: rateLimiterOffPrompt, answer: ""})
+	}
 	defaultEmail := "admin@example.com"
 	if d.asksURLs {
 		defaultEmail = "admin@example.org"
@@ -142,12 +150,12 @@ func TestWizard_EveryDeploymentTypeRunsToItsFile(t *testing.T) {
 	}{
 		{deploymentLocal, "sqlite", []string{"Deployment type", "Database type", "Admin credentials", "Generating credentials", "Generating configuration"}},
 		{deploymentLocal, "mysql", []string{"Deployment type", "Database type", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
-		{deploymentProduction, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Admin credentials", "Generating credentials", "Generating configuration"}},
-		{deploymentProduction, "postgres", []string{"Deployment type", "Database type", "Domain names", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
-		{deploymentKubernetes, "postgres", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Gateway traffic policy", "Network policy", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
-		{deploymentKubernetes, "mssql", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Gateway traffic policy", "Network policy", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
-		{deploymentNative, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Admin credentials", "Generating credentials", "Generating configuration"}},
-		{deploymentNative, "mysql", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentProduction, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Rate limiter", "Admin credentials", "Generating credentials", "Generating configuration"}},
+		{deploymentProduction, "postgres", []string{"Deployment type", "Database type", "Domain names", "Rate limiter", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
+		{deploymentKubernetes, "postgres", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Gateway traffic policy", "Network policy", "Rate limiter", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentKubernetes, "mssql", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Gateway traffic policy", "Network policy", "Rate limiter", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentNative, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Rate limiter", "Admin credentials", "Generating credentials", "Generating configuration"}},
+		{deploymentNative, "mysql", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Rate limiter", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
 	}
 	for _, tc := range cases {
 		d := deployments[tc.deployment]
@@ -367,7 +375,7 @@ func TestWizard_NonInteractiveRunsFromTheFlags(t *testing.T) {
 		},
 		{
 			flags:    CLIFlags{DeploymentType: "production", DBType: "mysql", AuthServerURL: "https://auth.example.org", DBPassword: "db-secret"},
-			numbers:  []int{6, 7},
+			numbers:  []int{7, 8},
 			database: connectionCall{engine: "mysql", port: "3306", password: "db-secret"},
 		},
 		{
@@ -375,13 +383,13 @@ func TestWizard_NonInteractiveRunsFromTheFlags(t *testing.T) {
 				DeploymentType: "k8s", DBType: "postgres", AuthServerURL: "https://auth.example.org",
 				Namespace: "identity", DBHost: "pg.internal", DBPort: "6543", DBName: "gb", DBUsername: "gbuser", DBPassword: "db-secret",
 			},
-			numbers:  []int{9, 10},
+			numbers:  []int{10, 11},
 			database: connectionCall{"postgres", "pg.internal", "6543", "gb", "gbuser", "db-secret"},
 			checked:  true,
 		},
 		{
 			flags:    CLIFlags{DeploymentType: "4", DBType: "mssql", AuthServerURL: "https://auth.example.org", DBHost: "sql.internal", DBPassword: "db-secret", SkipDBTest: true},
-			numbers:  []int{7, 8},
+			numbers:  []int{8, 9},
 			database: connectionCall{"mssql", "sql.internal", "1433", "goiabada", "sa", "db-secret"},
 		},
 	}
@@ -898,6 +906,43 @@ func TestParseFlags(t *testing.T) {
 			}
 		}
 	})
+	// --rate-limiter knows whether it was given, so left out it takes the deployment's default, and
+	// a value that is not a boolean is refused by the flag's name (#396 decisions 9 and 19).
+	t.Run("--rate-limiter", func(t *testing.T) {
+		for args, want := range map[string]optionalBool{
+			"":                     {},
+			"--rate-limiter":       {set: true, value: true},
+			"--rate-limiter=true":  {set: true, value: true},
+			"--rate-limiter=false": {set: true, value: false},
+		} {
+			flags, err := parseFlags(strings.Fields(args), io.Discard)
+			if err != nil {
+				t.Fatalf("parseFlags(%q): %v", args, err)
+			}
+			if flags.RateLimiter != want {
+				t.Errorf("parseFlags(%q) reads %+v, want %+v", args, flags.RateLimiter, want)
+			}
+		}
+		_, err := parseFlags([]string{"--rate-limiter=often"}, io.Discard)
+		if err == nil || !strings.Contains(err.Error(), `invalid boolean value "often" for -rate-limiter`) {
+			t.Errorf("parseFlags(--rate-limiter=often): %v, want the value refused by the flag's name", err)
+		}
+	})
+	t.Run("the usage lists --rate-limiter under the types it applies to", func(t *testing.T) {
+		var stderr bytes.Buffer
+		_, _ = parseFlags([]string{"-h"}, &stderr)
+		usage := stderr.String()
+		at := strings.Index(usage, "--rate-limiter")
+		if at < 0 {
+			t.Fatalf("the usage does not list --rate-limiter:\n%s", usage)
+		}
+		heading := usage[strings.LastIndex(usage[:at], "\n\n")+2 : at]
+		for _, name := range []string{"production", "kubernetes", "native"} {
+			if !strings.Contains(heading, name) {
+				t.Errorf("--rate-limiter is listed under %q, which does not name %s", heading, name)
+			}
+		}
+	})
 	t.Run("values", func(t *testing.T) {
 		flags, err := parseFlags([]string{"--type=native", "--db", "mysql", "-o", "out.env", "--skip-db-test", "--no-color"}, io.Discard)
 		if err != nil {
@@ -1007,18 +1052,19 @@ func kubernetesFlags() *CLIFlags {
 		DBHost: "pg.internal", SkipDBTest: true}
 }
 
-// withKubernetesAnswer is the interactive Kubernetes script with prompt answered by answer.
+// withKubernetesAnswer is the interactive Kubernetes script with prompt answered by answer. The
+// Local traffic policy, answer 2, turns the rate limiter question's default on.
 func withKubernetesAnswer(t *testing.T, prompt, answer string) []scriptedStep {
 	t.Helper()
-	steps := interactiveScript(deployments[deploymentKubernetes], testEngine("postgres"))
-	for i := range steps {
-		if steps[i].prompt == prompt {
-			steps[i].answer = answer
-			return steps
+	steps := withAnswers(t, deploymentKubernetes, map[string]string{prompt: answer})
+	if prompt == trafficPolicyPrompt && answer == "2" {
+		for i := range steps {
+			if steps[i].prompt == rateLimiterOffPrompt {
+				steps[i].prompt = rateLimiterOnPrompt
+			}
 		}
 	}
-	t.Fatalf("the script never asks %q", prompt)
-	return nil
+	return steps
 }
 
 // Kubernetes asks which traffic policy the gateway uses, Cluster by default, and
@@ -1150,6 +1196,134 @@ func TestWizard_KubernetesFlagsAreIgnoredElsewhere(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// rateLimiterOnPrompt and rateLimiterOffPrompt are the rate limiter question with each default: on
+// for production Compose, native binaries and Kubernetes under Local, off for Kubernetes under
+// Cluster (#396 decision 9).
+const (
+	rateLimiterOnPrompt  = "Turn on the rate limiter? [Y/n]: "
+	rateLimiterOffPrompt = "Turn on the rate limiter? [y/N]: "
+)
+
+// withAnswers is the interactive script of a deployment on PostgreSQL with each prompt named
+// answered as given.
+func withAnswers(t *testing.T, kind deploymentType, answers map[string]string) []scriptedStep {
+	t.Helper()
+	steps := interactiveScript(deployments[kind], testEngine("postgres"))
+	for prompt, answer := range answers {
+		found := false
+		for i := range steps {
+			if steps[i].prompt == prompt {
+				steps[i].answer, found = answer, true
+			}
+		}
+		if !found {
+			t.Fatalf("the %s script never asks %q", deployments[kind].name, prompt)
+		}
+	}
+	return steps
+}
+
+// Production Compose, native binaries and Kubernetes ask whether to turn the rate limiter on: yes
+// by default, but for Kubernetes under the Cluster traffic policy, where the per-IP limits would
+// count everyone arriving through one node together. --rate-limiter answers without a prompt, the
+// deployment's default when left out, and an explicit value wins. The answer is the switch the
+// generated configuration hands the auth server (#396 decisions 9 and 19).
+func TestWizard_AsksWhetherToTurnTheRateLimiterOn(t *testing.T) {
+	nonInteractive := func(kind deploymentType, policy trafficPolicy, rateLimiter optionalBool) *CLIFlags {
+		flags := &CLIFlags{DeploymentType: deployments[kind].name, DBType: "postgres", AuthServerURL: "https://auth.example.org",
+			DBHost: "pg.internal", SkipDBTest: true, GatewayTrafficPolicy: policy, RateLimiter: rateLimiter}
+		return flags
+	}
+	cases := map[string]struct {
+		flags *CLIFlags
+		steps []scriptedStep
+		want  bool
+	}{
+		"production, prompted, the default":                      {&CLIFlags{}, withAnswers(t, deploymentProduction, nil), true},
+		"production, prompted, no":                               {&CLIFlags{}, withAnswers(t, deploymentProduction, map[string]string{rateLimiterOnPrompt: "n"}), false},
+		"native, prompted, the default":                          {&CLIFlags{}, withAnswers(t, deploymentNative, nil), true},
+		"native, prompted, no":                                   {&CLIFlags{}, withAnswers(t, deploymentNative, map[string]string{rateLimiterOnPrompt: "n"}), false},
+		"kubernetes under Cluster, prompted, the default":        {&CLIFlags{}, withAnswers(t, deploymentKubernetes, nil), false},
+		"kubernetes under Cluster, prompted, yes":                {&CLIFlags{}, withAnswers(t, deploymentKubernetes, map[string]string{rateLimiterOffPrompt: "y"}), true},
+		"kubernetes under Local, prompted, the default":          {&CLIFlags{}, withKubernetesAnswer(t, trafficPolicyPrompt, "2"), true},
+		"production, by flag, left out":                          {nonInteractive(deploymentProduction, "", optionalBool{}), nil, true},
+		"production, by flag, --rate-limiter=false":              {nonInteractive(deploymentProduction, "", optionalBool{set: true, value: false}), nil, false},
+		"native, by flag, left out":                              {nonInteractive(deploymentNative, "", optionalBool{}), nil, true},
+		"native, by flag, --rate-limiter=false":                  {nonInteractive(deploymentNative, "", optionalBool{set: true, value: false}), nil, false},
+		"kubernetes, by flag, left out":                          {nonInteractive(deploymentKubernetes, "", optionalBool{}), nil, false},
+		"kubernetes under cluster, by flag, left out":            {nonInteractive(deploymentKubernetes, trafficPolicyCluster, optionalBool{}), nil, false},
+		"kubernetes under cluster, by flag, --rate-limiter=true": {nonInteractive(deploymentKubernetes, trafficPolicyCluster, optionalBool{set: true, value: true}), nil, true},
+		"kubernetes under local, by flag, left out":              {nonInteractive(deploymentKubernetes, trafficPolicyLocal, optionalBool{}), nil, true},
+		"kubernetes under local, by flag, --rate-limiter=false":  {nonInteractive(deploymentKubernetes, trafficPolicyLocal, optionalBool{set: true, value: false}), nil, false},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			w, in, out, _ := testWizard(t, tc.flags, tc.steps)
+			if err := w.setup(); err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			in.assertConsumed()
+			if w.config.RateLimiter != tc.want {
+				t.Errorf("RateLimiter is %v, want %v", w.config.RateLimiter, tc.want)
+			}
+			written, err := os.ReadFile(w.outputPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := map[bool]string{true: "true", false: "false"}[tc.want]
+			if got := serverEnvironments(t, w.config, string(written))["AUTHSERVER"][rateLimiterVariable]; got != want {
+				t.Errorf("the file sets %s to %q, want %q", rateLimiterVariable, got, want)
+			}
+		})
+	}
+}
+
+// Under the Cluster traffic policy the question says why it is off by default: the per-IP limits,
+// with two of their budgets, would count every user arriving through one node together, while the
+// limits on failed credentials hold under either policy (#396 decision 9).
+func TestWizard_TheRateLimiterQuestionSaysWhyItIsOffUnderCluster(t *testing.T) {
+	w, in, out, _ := testWizard(t, &CLIFlags{}, withAnswers(t, deploymentKubernetes, nil))
+	if err := w.setup(); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	in.assertConsumed()
+	said := strings.Join(strings.Fields(out.String()), " ")
+	for _, want := range []string{
+		"through one node together",
+		"30 password posts a minute",
+		"20 forgot-password requests per 5 minutes",
+		"hold under either traffic policy",
+		rateLimitsDocs,
+	} {
+		if !strings.Contains(said, want) {
+			t.Errorf("the question does not say %q:\n%s", want, out)
+		}
+	}
+}
+
+// --rate-limiter is ignored by local testing, which never asks and leaves the limiter off, as
+// --namespace is by every type but Kubernetes (#396 decisions 9 and 19).
+func TestWizard_RateLimiterFlagIsIgnoredByLocalTesting(t *testing.T) {
+	flags := &CLIFlags{DeploymentType: "local", DBType: "sqlite", RateLimiter: optionalBool{set: true, value: true}}
+	w, _, out, _ := testWizard(t, flags, nil)
+	if err := w.setup(); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if w.config.RateLimiter {
+		t.Error("local testing turned the rate limiter on")
+	}
+	if strings.Contains(strings.ToLower(out.String()), "rate limiter") {
+		t.Errorf("local testing reports the rate limiter:\n%s", out)
+	}
+	written, err := os.ReadFile(w.outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(written), rateLimiterVariable) {
+		t.Errorf("local testing's file names %s", rateLimiterVariable)
 	}
 }
 

@@ -82,7 +82,7 @@ services:
       # https://goiabada.dev/reference/environment-variables/#security-settings
       # With it on, the auth server logs a warning at every start that it trusts one proxy hop
       # with no list; behind the one reverse proxy on this host, that is expected.
-      - "GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=true"
+      - "GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=false"
       - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true
       - GOIABADA_AUTHSERVER_LOG_LEVEL=info
       - GOIABADA_AUTHSERVER_LOG_FORMAT=text

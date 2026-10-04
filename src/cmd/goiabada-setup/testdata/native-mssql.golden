@@ -41,6 +41,11 @@ GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP="9090"
 # connection that comes from 127.0.0.1.
 GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS="true"
 GOIABADA_AUTHSERVER_TRUSTED_PROXIES="127.0.0.1"
+# The auth server's built-in rate limiter: per-IP limits on sign-in, password reset,
+# self-registration and client registration, and limits on failed passwords and codes per
+# account. The server's own default is off. The limits are listed at
+# https://goiabada.dev/reference/environment-variables/#security-settings
+GOIABADA_AUTHSERVER_RATELIMITER_ENABLED="true"
 GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY="auth-session-auth-key"
 GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY="auth-session-enc-key"
 GOIABADA_AES_ENCRYPTION_KEY="aes-encryption-key"

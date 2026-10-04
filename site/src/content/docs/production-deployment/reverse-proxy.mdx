@@ -295,7 +295,10 @@ writes `TRUSTED_PROXIES=127.0.0.1`.
 </Aside>
 
 If you turn the rate limiter on while trusting one hop with no list, the auth
-server logs a warning at every start saying so. It cannot tell a proxy that
+server logs a warning at every start saying so. The setup wizard's production
+Compose file turns the limiter on unless you answer no (`--rate-limiter=false`),
+so with it, expect this warning at every start: one hop is what that file trusts,
+and is correct behind the one proxy on the host. The server cannot tell a proxy that
 appends from one that passes the header through untouched, nor see whether
 anything reaches it around the proxy. Once you have checked both against your
 setup, the warning is expected and can be left as it is.

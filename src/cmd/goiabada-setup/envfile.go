@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -49,6 +50,10 @@ func generateEnvFile(config *Config) string {
 	sb.WriteString("# =============================================================================\n")
 	writeEnvVariable(&sb, "GOIABADA_AUTHSERVER_BASEURL", config.AuthServerURL)
 	writeEnvListenerAndTrust(&sb, config, "AUTHSERVER", "9090", "9443")
+	for _, line := range config.rateLimiterComment() {
+		fmt.Fprintf(&sb, "# %s\n", line)
+	}
+	writeEnvVariable(&sb, "GOIABADA_AUTHSERVER_RATELIMITER_ENABLED", strconv.FormatBool(config.RateLimiter))
 	writeEnvVariable(&sb, "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY", config.AuthSessionAuthKey)
 	writeEnvVariable(&sb, "GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY", config.AuthSessionEncKey)
 	writeEnvVariable(&sb, "GOIABADA_AES_ENCRYPTION_KEY", config.AESEncryptionKey)

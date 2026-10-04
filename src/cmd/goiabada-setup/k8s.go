@@ -87,6 +87,10 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("  GOIABADA_APPNAME: \"Goiabada\"\n")
 	fmt.Fprintf(&sb, "  GOIABADA_ADMIN_EMAIL: %s\n", yamlQuote(config.AdminEmail))
 	writeKubernetesTrust(&sb, "AUTHSERVER", config.GatewayTrafficPolicy)
+	for _, line := range config.rateLimiterComment() {
+		fmt.Fprintf(&sb, "  # %s\n", line)
+	}
+	fmt.Fprintf(&sb, "  GOIABADA_AUTHSERVER_RATELIMITER_ENABLED: \"%t\"\n", config.RateLimiter)
 	fmt.Fprintf(&sb, "  GOIABADA_DB_TYPE: %s\n", yamlQuote(config.Engine.name))
 	fmt.Fprintf(&sb, "  GOIABADA_DB_HOST: %s\n", yamlQuote(config.DBHost))
 	fmt.Fprintf(&sb, "  GOIABADA_DB_PORT: %s\n", yamlQuote(config.DBPort))
