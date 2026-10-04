@@ -3,6 +3,8 @@ package afterresponse
 import (
 	"context"
 	"log/slog"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -163,4 +165,172 @@ func TestGo_APanickingJobIsAnErrorRecordAndNotTheEndOfTheProcess(t *testing.T) {
 	assert.Equal(t, slog.LevelError, records[0].Level)
 	assert.Equal(t, "req-panic", records[0].Attrs["request_id"])
 	assert.Equal(t, "boom", records[0].Attrs["panic"])
+}
+
+// fillToTheCap starts 64 jobs, the cap #394 decision 8 sets, each blocked until release is closed,
+// and returns once every one of them is running.
+func fillToTheCap(t *testing.T, jobs *Jobs, release <-chan struct{}) {
+	t.Helper()
+	running := make(chan struct{}, 64)
+	for range 64 {
+		jobs.Go(context.Background(), func(context.Context) {
+			running <- struct{}{}
+			<-release
+		})
+	}
+	for i := range 64 {
+		select {
+		case <-running:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("only %d of the 64 jobs under the cap ran", i)
+		}
+	}
+}
+
+// warnings returns the Warn records captured so far.
+func warnings(capture *logtest.SlogCapture) []logtest.CapturedRecord {
+	var found []logtest.CapturedRecord
+	for _, record := range capture.Records() {
+		if record.Level == slog.LevelWarn {
+			found = append(found, record)
+		}
+	}
+	return found
+}
+
+// With 64 jobs in flight the next one is dropped: Go returns at once without running it, inline or
+// later, and records one Warn on the request's id. Running it inline would make the response depend
+// on whether the work ran, which is what running it after the response exists to prevent (#485,
+// #404 decisions 7 and 8).
+func TestGo_AJobPastTheCapIsDroppedWithOneWarnRecord(t *testing.T) {
+	capture := logtest.CaptureSlog(t)
+	jobs := New()
+	release := make(chan struct{})
+	fillToTheCap(t, jobs, release)
+	require.Empty(t, warnings(capture), "the 64 jobs under the cap are all admitted")
+
+	ctx, cancel := requestContext("req-dropped")
+	defer cancel()
+	var ran atomic.Bool
+	returned := make(chan struct{})
+	go func() {
+		jobs.Go(ctx, func(context.Context) {
+			ran.Store(true)
+			<-release
+		})
+		close(returned)
+	}()
+	select {
+	case <-returned:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Go ran the dropped job inline")
+	}
+
+	close(release)
+	require.True(t, jobs.Wait(5*time.Second))
+	assert.False(t, ran.Load(), "a dropped job never runs")
+
+	dropped := warnings(capture)
+	require.Len(t, dropped, 1)
+	assert.Equal(t, "req-dropped", dropped[0].Attrs["request_id"])
+}
+
+// A dropped job is never counted in flight: Wait answers for the 64 admitted jobs alone, at once
+// when they have finished, though the dropped one never will.
+func TestWait_WaitsForAdmittedJobsOnly(t *testing.T) {
+	logtest.CaptureSlog(t)
+	jobs := New()
+	release := make(chan struct{})
+	fillToTheCap(t, jobs, release)
+
+	never := make(chan struct{})
+	defer close(never)
+	returned := make(chan struct{})
+	go func() {
+		jobs.Go(context.Background(), func(context.Context) { <-never })
+		close(returned)
+	}()
+	select {
+	case <-returned:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Go ran the dropped job inline")
+	}
+
+	assert.False(t, jobs.Wait(0), "the 64 admitted jobs are still running")
+	close(release)
+	require.True(t, jobs.Wait(5*time.Second), "the admitted jobs finished, and the dropped one is not waited for")
+	assert.True(t, jobs.Wait(0), "nothing is left in flight")
+}
+
+// A job that finishes gives its slot back: once 64 have finished, 64 more are admitted and only the
+// next is dropped.
+func TestGo_AFinishedJobReleasesItsSlot(t *testing.T) {
+	capture := logtest.CaptureSlog(t)
+	jobs := New()
+	first := make(chan struct{})
+	fillToTheCap(t, jobs, first)
+	close(first)
+	require.True(t, jobs.Wait(5*time.Second))
+
+	second := make(chan struct{})
+	fillToTheCap(t, jobs, second)
+	assert.Empty(t, warnings(capture), "every slot the first 64 held was given back")
+
+	jobs.Go(context.Background(), func(context.Context) {})
+	assert.Len(t, warnings(capture), 1, "the cap still holds once the slots are taken again")
+	close(second)
+	assert.True(t, jobs.Wait(5*time.Second))
+}
+
+// A job that panics gives its slot back too, so a run of panics cannot shrink the cap until every
+// later job is dropped.
+func TestGo_APanickingJobReleasesItsSlot(t *testing.T) {
+	capture := logtest.CaptureSlog(t)
+	jobs := New()
+	for range 64 {
+		jobs.Go(context.Background(), func(context.Context) { panic("boom") })
+	}
+	require.True(t, jobs.Wait(5*time.Second))
+
+	release := make(chan struct{})
+	fillToTheCap(t, jobs, release)
+	assert.Empty(t, warnings(capture), "every slot a panicking job held was given back")
+	close(release)
+	assert.True(t, jobs.Wait(5*time.Second))
+}
+
+// The cap holds under concurrent calls: of 200 jobs handed over at once while none finishes,
+// exactly 64 run and the other 136 are dropped, one Warn record each.
+func TestGo_ConcurrentCallsAdmitExactlyTheCap(t *testing.T) {
+	capture := logtest.CaptureSlog(t)
+	jobs := New()
+	release := make(chan struct{})
+	var ran atomic.Int32
+
+	var callers sync.WaitGroup
+	for range 200 {
+		callers.Add(1)
+		go func() {
+			defer callers.Done()
+			jobs.Go(context.Background(), func(context.Context) {
+				ran.Add(1)
+				<-release
+			})
+		}()
+	}
+	allReturned := make(chan struct{})
+	go func() {
+		callers.Wait()
+		close(allReturned)
+	}()
+	select {
+	case <-allReturned:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Go ran a dropped job inline")
+	}
+	close(release)
+	require.True(t, jobs.Wait(5*time.Second))
+
+	assert.Equal(t, int32(64), ran.Load())
+	assert.Len(t, warnings(capture), 136)
 }
