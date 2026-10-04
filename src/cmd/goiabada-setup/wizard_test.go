@@ -229,14 +229,14 @@ func TestWizard_EveryDeploymentTypeRunsToItsFile(t *testing.T) {
 			}
 
 			wantPath := filepath.Join(w.flags.Output, d.outputFile)
-			if w.outputPath != wantPath {
-				t.Errorf("output path %q, want %q", w.outputPath, wantPath)
+			if w.paths.description != wantPath {
+				t.Errorf("output path %q, want %q", w.paths.description, wantPath)
 			}
 			written, err := os.ReadFile(wantPath)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, content := generatedConfiguration(c); string(written) != content {
+			if string(written) != descriptionOf(c) {
 				t.Errorf("%s is not the generator's output for the Config", d.outputFile)
 			}
 			if !strings.Contains(out.String(), "SETUP COMPLETE!") {
@@ -332,7 +332,7 @@ func TestWizard_TheConnectionFailureMenu(t *testing.T) {
 		if !strings.Contains(out.String(), "Continuing without successful database connection test.") {
 			t.Errorf("no warning:\n%s", out)
 		}
-		if _, err := os.Stat(w.outputPath); err != nil {
+		if _, err := os.Stat(w.paths.description); err != nil {
 			t.Errorf("the file was not written: %v", err)
 		}
 	})
@@ -422,7 +422,7 @@ func TestWizard_NonInteractiveRunsFromTheFlags(t *testing.T) {
 			if tc.flags.Namespace != "" && c.K8sNamespace != tc.flags.Namespace {
 				t.Errorf("namespace %q, want %q", c.K8sNamespace, tc.flags.Namespace)
 			}
-			if _, err := os.Stat(w.outputPath); err != nil {
+			if _, err := os.Stat(w.paths.description); err != nil {
 				t.Errorf("the file was not written: %v", err)
 			}
 		})
@@ -682,7 +682,7 @@ func TestWizard_NonInteractiveWritesDespiteAFailedCheck(t *testing.T) {
 	if len(*calls) != 1 || !strings.Contains(out.String(), "Database connection test failed. Configuration will still be generated.") {
 		t.Errorf("checks %+v, output:\n%s", *calls, out)
 	}
-	if _, err := os.Stat(w.outputPath); err != nil {
+	if _, err := os.Stat(w.paths.description); err != nil {
 		t.Errorf("the file was not written: %v", err)
 	}
 }
@@ -999,7 +999,7 @@ func TestWizard_NativeAsksWhetherALocalProxyForwardsToIt(t *testing.T) {
 			if w.config.LocalProxy != tc.want {
 				t.Errorf("LocalProxy is %v, want %v", w.config.LocalProxy, tc.want)
 			}
-			written, err := os.ReadFile(w.outputPath)
+			written, err := os.ReadFile(w.paths.description)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1105,7 +1105,7 @@ func TestWizard_KubernetesAsksTheGatewayTrafficPolicy(t *testing.T) {
 			if !strings.Contains(out.String(), "externalTrafficPolicy: "+string(tc.want)) {
 				t.Errorf("the completion message's EnvoyProxy does not set externalTrafficPolicy: %s:\n%s", tc.want, out)
 			}
-			written, err := os.ReadFile(w.outputPath)
+			written, err := os.ReadFile(w.paths.description)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1153,7 +1153,7 @@ func TestWizard_KubernetesAsksWhetherToRestrictWhoReachesIt(t *testing.T) {
 			if w.config.NetworkPolicy != tc.want {
 				t.Errorf("NetworkPolicy is %v, want %v", w.config.NetworkPolicy, tc.want)
 			}
-			written, err := os.ReadFile(w.outputPath)
+			written, err := os.ReadFile(w.paths.description)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1269,7 +1269,7 @@ func TestWizard_AsksWhetherToTurnTheRateLimiterOn(t *testing.T) {
 			if w.config.RateLimiter != tc.want {
 				t.Errorf("RateLimiter is %v, want %v", w.config.RateLimiter, tc.want)
 			}
-			written, err := os.ReadFile(w.outputPath)
+			written, err := os.ReadFile(w.paths.description)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1318,7 +1318,7 @@ func TestWizard_RateLimiterFlagIsIgnoredByLocalTesting(t *testing.T) {
 	if strings.Contains(strings.ToLower(out.String()), "rate limiter") {
 		t.Errorf("local testing reports the rate limiter:\n%s", out)
 	}
-	written, err := os.ReadFile(w.outputPath)
+	written, err := os.ReadFile(w.paths.description)
 	if err != nil {
 		t.Fatal(err)
 	}

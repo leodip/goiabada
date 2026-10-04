@@ -48,6 +48,9 @@ GOIABADA_AUTHSERVER_TRUSTED_PROXIES="127.0.0.1"
 GOIABADA_AUTHSERVER_RATELIMITER_ENABLED="false"
 GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY="auth-session-auth-key"
 GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY="auth-session-enc-key"
+# GOIABADA_AES_ENCRYPTION_KEY encrypts the client secrets, SMTP credentials, OTP seeds and
+# signing keys the database holds. Back it up separately from the database: without it they
+# cannot be recovered, and a backup holding both gives them to whoever reads it.
 GOIABADA_AES_ENCRYPTION_KEY="aes-encryption-key"
 GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS="true"
 GOIABADA_AUTHSERVER_LOG_LEVEL="info"

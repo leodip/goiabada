@@ -287,13 +287,19 @@ Use the [setup wizard](/getting-started/setup-wizard/):
 The wizard will:
 - Test database connectivity
 - **Check if the database is empty** (warns you if it contains existing Goiabada data)
-- Generate all Kubernetes manifests in a single file
+- Generate the Kubernetes manifests in `goiabada-k8s.yaml`, which holds no secret, and the Secrets they
+  read in `goiabada-secrets.yaml` beside it, the AES key in a Secret of its own, `goiabada-encryption-key`
 
-Deploy:
+Deploy both, the manifest first, since it creates the namespace the Secrets are in:
 
 ```bash
-kubectl apply -f goiabada-k8s.yaml
+kubectl apply -f goiabada-k8s.yaml -f goiabada-secrets.yaml
 ```
+
+Keep `goiabada-secrets.yaml` out of version control; the manifest can be committed. The wizard warns
+when it writes into a git working tree, and gives the line to add to its `.gitignore`. Back up the AES
+key separately from the database: without it, the client secrets, SMTP credentials, OTP seeds and
+signing keys the database holds cannot be recovered.
 
 ### Step 6: Configure DNS
 
@@ -789,7 +795,7 @@ when it finishes: `latest` moves, so pods started at different times can run dif
 Replace it with a [release version](https://github.com/leodip/goiabada/releases) before production.
 
 1. Update image tags in your manifest or regenerate with the setup wizard
-2. Apply changes:
+2. Apply changes. The manifest alone carries the image tags, so the Secrets need not be applied again:
    ```bash
    kubectl apply -f goiabada-k8s.yaml
    ```

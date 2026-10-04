@@ -38,11 +38,13 @@ type engine struct {
 	// server's for an engine with no server.
 	volume string
 	mount  string
-	// composeEnvironment is the database service's environment lines, in order, each value
-	// written through composeQuote.
-	composeEnvironment func(password string) []string
+	// composeEnvironment is the database service's environment lines but its password, in order,
+	// each a mapping entry. composePasswordVariable is the variable its password is set in, which
+	// the override file writes, since the Compose file holds no secret (#396 decision 14).
+	composeEnvironment      []string
+	composePasswordVariable string
 	// healthcheck is the shell command the database service's CMD-SHELL healthcheck runs. It
-	// carries no password: one that needs it reads the variable composeEnvironment sets, from the
+	// carries no password: one that needs it reads composePasswordVariable, from the
 	// container's own environment, so the secret is neither written twice nor shell-quoted inside
 	// YAML, where a `"`, `\` or `'` in it broke the file or the shell (#430). The generator writes
 	// it through composeQuote, which turns its `${NAME}` into the `$${NAME}` Compose hands over.
@@ -64,7 +66,7 @@ type engine struct {
 // engines is the database menu, in its order. SQLite is last, so the three engines Kubernetes
 // accepts keep their numbers when it is left out.
 var engines = []*engine{
-	{
+	{ //nolint:gosec // G101: composePasswordVariable names the variable the password is set in, and holds no password
 		number:     "1",
 		name:       "mysql",
 		label:      "MySQL",
@@ -76,25 +78,23 @@ var engines = []*engine{
 			"is a dump and restore, not a tag edit: MySQL upgrades a data directory in place only",
 			"along its documented paths, and does not start on one it cannot.",
 		},
-		defaultPort:    "3306",
-		defaultUser:    "root",
-		kubernetesHost: "mysql-service",
-		composeService: "mysql-server",
-		volume:         "mysql-data",
-		mount:          "/var/lib/mysql",
-		composeEnvironment: func(password string) []string {
-			return []string{"MYSQL_ROOT_PASSWORD: " + composeQuote(password)}
-		},
-		healthcheck:    `mysqladmin ping -uroot -p"${MYSQL_ROOT_PASSWORD}" --protocol tcp`,
-		healthInterval: "1s",
-		healthTimeout:  "2s",
-		driver:         "mysql",
-		dsn:            mysqlDSN,
-		maintenanceDSN: mysqlMaintenanceDSN,
-		existenceQuery: "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
-		emptinessQuery: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'users'",
+		defaultPort:             "3306",
+		defaultUser:             "root",
+		kubernetesHost:          "mysql-service",
+		composeService:          "mysql-server",
+		volume:                  "mysql-data",
+		mount:                   "/var/lib/mysql",
+		composePasswordVariable: "MYSQL_ROOT_PASSWORD",
+		healthcheck:             `mysqladmin ping -uroot -p"${MYSQL_ROOT_PASSWORD}" --protocol tcp`,
+		healthInterval:          "1s",
+		healthTimeout:           "2s",
+		driver:                  "mysql",
+		dsn:                     mysqlDSN,
+		maintenanceDSN:          mysqlMaintenanceDSN,
+		existenceQuery:          "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
+		emptinessQuery:          "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'users'",
 	},
-	{
+	{ //nolint:gosec // G101: composePasswordVariable names the variable the password is set in, and holds no password
 		number:     "2",
 		name:       "postgres",
 		aliases:    []string{"postgresql"},
@@ -107,49 +107,47 @@ var engines = []*engine{
 			"is a dump and restore or pg_upgrade, not a tag edit: PostgreSQL does not start on a",
 			"data directory another major wrote.",
 		},
-		defaultPort:    "5432",
-		defaultUser:    "postgres",
-		kubernetesHost: "postgres-service",
-		composeService: "postgres-server",
-		volume:         "postgres-data",
-		mount:          "/var/lib/postgresql",
-		composeEnvironment: func(password string) []string {
-			return []string{"POSTGRES_PASSWORD: " + composeQuote(password), "POSTGRES_DB: goiabada"}
-		},
-		healthcheck:    "pg_isready -U postgres",
-		healthInterval: "1s",
-		healthTimeout:  "2s",
-		driver:         "pgx",
-		dsn:            postgresDSN,
-		maintenanceDSN: postgresMaintenanceDSN,
-		existenceQuery: "SELECT COUNT(*) FROM pg_database WHERE datname = $1",
-		emptinessQuery: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'",
+		defaultPort:             "5432",
+		defaultUser:             "postgres",
+		kubernetesHost:          "postgres-service",
+		composeService:          "postgres-server",
+		volume:                  "postgres-data",
+		mount:                   "/var/lib/postgresql",
+		composeEnvironment:      []string{"POSTGRES_DB: goiabada"},
+		composePasswordVariable: "POSTGRES_PASSWORD",
+		healthcheck:             "pg_isready -U postgres",
+		healthInterval:          "1s",
+		healthTimeout:           "2s",
+		driver:                  "pgx",
+		dsn:                     postgresDSN,
+		maintenanceDSN:          postgresMaintenanceDSN,
+		existenceQuery:          "SELECT COUNT(*) FROM pg_database WHERE datname = $1",
+		emptinessQuery:          "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'",
 	},
-	{
-		number:         "3",
-		name:           "mssql",
-		aliases:        []string{"sqlserver"},
-		label:          "SQL Server",
-		hasServer:      true,
-		kubernetes:     true,
-		image:          "mcr.microsoft.com/mssql/server:2022-latest",
-		defaultPort:    "1433",
-		defaultUser:    "sa",
-		kubernetesHost: "mssql-service",
-		composeService: "mssql-server",
-		volume:         "mssql-data",
-		mount:          "/var/opt/mssql",
-		composeEnvironment: func(password string) []string {
-			return []string{"ACCEPT_EULA: Y", "MSSQL_SA_PASSWORD: " + composeQuote(password)}
-		},
-		healthcheck:    `/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "${MSSQL_SA_PASSWORD}" -C -Q 'SELECT 1' || exit 1`,
-		healthInterval: "10s",
-		healthTimeout:  "5s",
-		driver:         "sqlserver",
-		dsn:            mssqlDSN,
-		maintenanceDSN: mssqlMaintenanceDSN,
-		existenceQuery: "SELECT COUNT(*) FROM sys.databases WHERE name = @p1",
-		emptinessQuery: "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'users'",
+	{ //nolint:gosec // G101: composePasswordVariable names the variable the password is set in, and holds no password
+		number:                  "3",
+		name:                    "mssql",
+		aliases:                 []string{"sqlserver"},
+		label:                   "SQL Server",
+		hasServer:               true,
+		kubernetes:              true,
+		image:                   "mcr.microsoft.com/mssql/server:2022-latest",
+		defaultPort:             "1433",
+		defaultUser:             "sa",
+		kubernetesHost:          "mssql-service",
+		composeService:          "mssql-server",
+		volume:                  "mssql-data",
+		mount:                   "/var/opt/mssql",
+		composeEnvironment:      []string{"ACCEPT_EULA: Y"},
+		composePasswordVariable: "MSSQL_SA_PASSWORD",
+		healthcheck:             `/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "${MSSQL_SA_PASSWORD}" -C -Q 'SELECT 1' || exit 1`,
+		healthInterval:          "10s",
+		healthTimeout:           "5s",
+		driver:                  "sqlserver",
+		dsn:                     mssqlDSN,
+		maintenanceDSN:          mssqlMaintenanceDSN,
+		existenceQuery:          "SELECT COUNT(*) FROM sys.databases WHERE name = @p1",
+		emptinessQuery:          "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'users'",
 	},
 	{
 		number: "4",

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"slices"
 	"strings"
 )
@@ -52,24 +53,35 @@ type deployment struct {
 	// a lowercase domain name (validateListenerHostname) and not the other URL's host.
 	routesByHost bool
 
-	outputFile        string
-	generate          func(config *Config) string
-	printInstructions func(out *console, config *Config, outputPath string)
+	// outputFile is the default name of the file describing the deployment, and secretsFile the
+	// default name of the file beside it holding every secret, empty for a type whose one file is
+	// both. When --output names a file, the secrets file's name is that name with secretsSuffix
+	// before its extension (#396 decision 14).
+	outputFile    string
+	secretsFile   string
+	secretsSuffix string
+	generate      func(config *Config) string
+	// generateSecrets writes the secrets file, for a type that has one.
+	generateSecrets   func(config *Config) string
+	printInstructions func(out *console, config *Config, paths outputPaths)
 }
 
 // deployments is the deployment menu, in its order, indexed by deploymentType.
 var deployments = []*deployment{
-	{
+	{ //nolint:gosec // G101: secretsFile and secretsSuffix name a file, and hold no credential
 		kind:              deploymentLocal,
 		number:            "1",
 		name:              "local",
 		menuLabel:         "Local testing (HTTP only) - for development/testing",
 		displayName:       "Local testing (Docker)",
 		outputFile:        "docker-compose.yml",
+		secretsFile:       "docker-compose.override.yml",
+		secretsSuffix:     ".override",
 		generate:          generateDockerCompose,
+		generateSecrets:   generateComposeOverride,
 		printInstructions: printComposeInstructions,
 	},
-	{
+	{ //nolint:gosec // G101: secretsFile and secretsSuffix name a file, and hold no credential
 		kind:              deploymentProduction,
 		number:            "2",
 		name:              "production",
@@ -79,7 +91,10 @@ var deployments = []*deployment{
 		behindProxy:       true,
 		asksRateLimiter:   true,
 		outputFile:        "docker-compose.yml",
+		secretsFile:       "docker-compose.override.yml",
+		secretsSuffix:     ".override",
 		generate:          generateDockerCompose,
+		generateSecrets:   generateComposeOverride,
 		printInstructions: printComposeInstructions,
 	},
 	{
@@ -96,7 +111,10 @@ var deployments = []*deployment{
 		servedByEnvoyGateway: true,
 		asksRateLimiter:      true,
 		outputFile:           "goiabada-k8s.yaml",
+		secretsFile:          "goiabada-secrets.yaml",
+		secretsSuffix:        "-secrets",
 		generate:             generateKubernetesManifests,
+		generateSecrets:      generateKubernetesSecrets,
 		printInstructions:    printKubernetesInstructions,
 	},
 	{
@@ -134,6 +152,18 @@ func deploymentNames() []string {
 		names = append(names, d.name)
 	}
 	return names
+}
+
+// secretsFileBeside is the name of the file holding the secrets beside a description --output names
+// name: name itself for a type whose one file is both, and otherwise name with the type's suffix
+// before its extension, -secrets for Kubernetes and .override for Compose, which names an override
+// that way, so a compose.yaml's is the compose.override.yaml Compose merges by itself.
+func (d *deployment) secretsFileBeside(name string) string {
+	if d.secretsFile == "" {
+		return name
+	}
+	extension := filepath.Ext(name)
+	return strings.TrimSuffix(name, extension) + d.secretsSuffix + extension
 }
 
 // accepts says whether the deployment can run on the engine: Kubernetes only on one its manifests

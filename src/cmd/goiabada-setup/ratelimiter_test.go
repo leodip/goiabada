@@ -21,7 +21,7 @@ func TestEveryAskingOutput_WritesTheRateLimiterExplicitly(t *testing.T) {
 	for _, testCase := range goldenCases() {
 		config := testCase.config()
 		t.Run(testCase.name, func(t *testing.T) {
-			_, content := generatedConfiguration(config)
+			content := descriptionOf(config)
 			env := serverEnvironments(t, config, content)
 			kind := config.Deployment.kind
 
