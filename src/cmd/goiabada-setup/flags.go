@@ -201,7 +201,7 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 
 // checkWritable refuses, by its name, a flag whose value no generated file could carry, before a
 // step reads any of them. The type and database flags are resolved against the tables and refused
-// there, and the output path is never written into a file.
+// there, and the output path by checkOutput, in either mode.
 func (f *CLIFlags) checkWritable() error {
 	for _, entry := range []struct{ name, value string }{
 		{"--auth-url", f.AuthServerURL},
@@ -218,6 +218,23 @@ func (f *CLIFlags) checkWritable() error {
 		if err := checkWritable(entry.value); err != nil {
 			return errs.Wrapf(err, "%s cannot be written to the configuration", entry.name)
 		}
+	}
+	return nil
+}
+
+// checkOutput refuses an --output a generated file's header could not name. Each header names the
+// files beside it by the names they are written under, in a comment that ends at a line break, so
+// a control character or a line separator in the name would end the comment and write the rest as
+// configuration; a name that is not UTF-8 has no spelling in YAML. It applies in both modes, since
+// the interactive wizard writes where --output says too.
+func checkOutput(output string) error {
+	if err := checkWritable(output); err != nil {
+		return errs.Wrap(err, "--output cannot be written to the configuration")
+	}
+	if strings.ContainsFunc(output, func(r rune) bool {
+		return r < 0x20 || (r >= 0x7f && r < 0xa0) || r == 0x2028 || r == 0x2029
+	}) {
+		return errs.New("--output cannot be written to the configuration: it contains a control character")
 	}
 	return nil
 }

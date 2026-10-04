@@ -416,7 +416,7 @@ func TestWizard_WritesTheSecretsFileBesideTheDescription(t *testing.T) {
 			if got := entryNames(entries); !slices.Equal(got, want) {
 				t.Fatalf("the directory holds %v, want %v", got, want)
 			}
-			description, secrets := generatedConfiguration(w.config)
+			description, secrets := writtenConfiguration(w.config, w.paths)
 			for name, want := range map[string]string{tc.description: description.content, tc.secrets: secrets.content} {
 				path := filepath.Join(dir, name)
 				info, err := os.Stat(path)

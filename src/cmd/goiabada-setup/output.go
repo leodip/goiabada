@@ -13,17 +13,24 @@ type generatedFile struct {
 }
 
 // generatedConfiguration returns the files the configured deployment type is configured by, under
-// their default names, from the type's generators: the description of the deployment, and the file
-// holding its secrets. The manifest and the Compose file hold none, so they can be committed; the
-// native env file is both, being the secret material itself, and is returned twice (#396 decision
-// 14).
+// their default names, as writtenConfiguration writes them there.
 func generatedConfiguration(config *Config) (description, secrets generatedFile) {
+	return writtenConfiguration(config, config.Deployment.defaultPaths())
+}
+
+// writtenConfiguration returns the files the configured deployment type is configured by, written
+// at paths, from the type's generators: the description of the deployment, and the file holding its
+// secrets. The manifest and the Compose file hold none, so they can be committed; the native env
+// file is both, being the secret material itself, and is returned twice (#396 decision 14). Each
+// file's header names the files beside it by the names they are written under, and the commands it
+// gives name them so.
+func writtenConfiguration(config *Config, paths outputPaths) (description, secrets generatedFile) {
 	d := config.Deployment
-	description = generatedFile{name: d.outputFile, content: d.generate(config)}
+	description = generatedFile{name: filepath.Base(paths.description), content: d.generate(config, paths)}
 	if d.secretsFile == "" {
 		return description, description
 	}
-	return description, generatedFile{name: d.secretsFile, content: d.generateSecrets(config)}
+	return description, generatedFile{name: filepath.Base(paths.secrets), content: d.generateSecrets(config, paths)}
 }
 
 // outputPaths are where a configuration's description and its secrets file are written, the same
@@ -38,15 +45,21 @@ func (p outputPaths) separate() bool {
 	return p.description != p.secrets
 }
 
+// defaultPaths are the deployment's files under their default names, in no directory.
+func (d *deployment) defaultPaths() outputPaths {
+	if d.secretsFile == "" {
+		return outputPaths{description: d.outputFile, secrets: d.outputFile}
+	}
+	return outputPaths{description: d.outputFile, secrets: d.secretsFile}
+}
+
 // resolveOutputPaths places the deployment's files: under their default names in the current
 // directory, or in the directory output names, or, when output names a file, the description under
 // that name and the secrets file beside it under the name derived from it.
 func resolveOutputPaths(d *deployment, output string) outputPaths {
 	dir, _ := os.Getwd()
-	description, secrets := d.outputFile, d.secretsFile
-	if secrets == "" {
-		secrets = description
-	}
+	defaults := d.defaultPaths()
+	description, secrets := defaults.description, defaults.secrets
 	if output != "" {
 		if isDirectory(output) {
 			dir = output

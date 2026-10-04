@@ -79,3 +79,16 @@ func envQuote(s string) string {
 	b.WriteByte('"')
 	return b.String()
 }
+
+// shellQuote writes s as one word of a POSIX shell command: as it is when every character is one
+// the shell reads literally in a word, and otherwise between single quotes, inside which a shell
+// keeps every character literal, each `'` in s closing the quotes, escaped, and reopening them
+// (POSIX XCU 2.2.2). The printed commands name the files the wizard wrote, whose names the
+// operator chose with --output: concatenated unquoted, a space split a file into two arguments and
+// a `*` was expanded.
+func shellQuote(s string) string {
+	if s != "" && strings.Trim(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@%+=:,./_-") == "" {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
