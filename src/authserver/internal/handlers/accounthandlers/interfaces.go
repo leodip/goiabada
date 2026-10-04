@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
@@ -81,8 +82,10 @@ type TransactionalUserCreator interface {
 // is given the context passed in, detached from its cancellation but keeping its values, so what it
 // records carries the request's id (#404 decision 8). The server's afterresponse.Jobs is the one
 // implementation, and shutdown waits for the jobs it holds.
-// Past 64 jobs in flight it drops the job with a warning rather than run it, so a flood costs
-// some genuine requests their mail and never changes a response (#485).
+// Past 64 jobs of the same class in flight it drops the job with a warning rather than run it, so
+// a flood costs some genuine requests of that class their mail and never changes a response (#485).
+// Forgot-password hands over ClassRecovery and registration ClassRegistration, each public, so
+// neither can fill the budget of the authenticated account notice (#394 review).
 type AfterResponse interface {
-	Go(ctx context.Context, job func(ctx context.Context))
+	Go(ctx context.Context, class afterresponse.Class, job func(ctx context.Context))
 }

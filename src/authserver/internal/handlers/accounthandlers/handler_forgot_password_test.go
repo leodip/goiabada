@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -93,21 +94,26 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 // runs the jobs to completion and asserts what they did (#404 decision 8). Each job runs under the
 // context the handler handed over, which is the request's.
 type heldJobs struct {
-	ctxs []context.Context
-	jobs []func(ctx context.Context)
+	ctxs    []context.Context
+	classes []afterresponse.Class
+	jobs    []func(ctx context.Context)
 }
 
-func (h *heldJobs) Go(ctx context.Context, job func(ctx context.Context)) {
+func (h *heldJobs) Go(ctx context.Context, class afterresponse.Class, job func(ctx context.Context)) {
 	h.ctxs = append(h.ctxs, ctx)
+	h.classes = append(h.classes, class)
 	h.jobs = append(h.jobs, job)
 }
 
-// runAll runs every job held, in the order handed over, and requires exactly one: a forgot-password
-// request hands off one job or none.
-func (h *heldJobs) runAll(t *testing.T) {
+// runAll runs every job held, in the order handed over, and requires exactly one, admitted against
+// class: a forgot-password request or a registration hands off one job or none, forgot-password's
+// against ClassRecovery and registration's against ClassRegistration, each a budget of its own
+// (#394 review).
+func (h *heldJobs) runAll(t *testing.T, class afterresponse.Class) {
 	t.Helper()
 	require.Len(t, h.jobs, 1, "a well-formed request hands exactly one job to run after its response")
 	for i, job := range h.jobs {
+		assert.Equal(t, class, h.classes[i], "the job is admitted against the budget of its own kind of work")
 		job(h.ctxs[i])
 	}
 }
@@ -210,7 +216,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["outcome"] == "unknown_address"
 		})).Return().Once()
-		jobs.runAll(t)
+		jobs.runAll(t, afterresponse.ClassRecovery)
 
 		pageRenderer.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -277,7 +283,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 			return details["outcome"] == "code_issued" && details["userId"] == int64(1)
 		})).Return().Once()
 
-		jobs.runAll(t)
+		jobs.runAll(t, afterresponse.ClassRecovery)
 
 		// The hash stored beside the encrypted code is the only thing that will find this
 		// row when the link comes back, since the link carries the code and no address
@@ -357,7 +363,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 		assert.Equal(t, http.StatusOK, rr.Code, "the response has gone before the code is encrypted")
-		jobs.runAll(t)
+		jobs.runAll(t, afterresponse.ClassRecovery)
 
 		assert.Equal(t, map[string]interface{}{
 			"ip":          testClientIP,
@@ -393,7 +399,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		database.On("TryStoreForgotPasswordCode", mock.Anything, (*sql.Tx)(nil), int64(1), "existing@example.com",
 			mock.Anything, mock.Anything, mock.Anything).Return(false, assert.AnError).Once()
 		details := captureRequestedPasswordReset(auditLogger)
-		jobs.runAll(t)
+		jobs.runAll(t, afterresponse.ClassRecovery)
 
 		pageRenderer.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -490,7 +496,7 @@ func TestHandleForgotPasswordPost_SendsNothingUnlessTheAccountIsVerifiedAndEnabl
 			details := captureRequestedPasswordReset(auditLogger)
 
 			handler.ServeHTTP(rr, req)
-			jobs.runAll(t)
+			jobs.runAll(t, afterresponse.ClassRecovery)
 
 			assert.Equal(t, http.StatusOK, rr.Code)
 			assert.Equal(t, map[string]interface{}{"linkSent": true}, *bound,
@@ -654,7 +660,7 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 			}).Return().Once()
 
 		handler.ServeHTTP(rr, req)
-		jobs.runAll(t)
+		jobs.runAll(t, afterresponse.ClassRecovery)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		assert.Equal(t, map[string]interface{}{
@@ -695,7 +701,7 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 		details := captureRequestedPasswordReset(auditLogger)
 
 		handler.ServeHTTP(rr, req)
-		jobs.runAll(t)
+		jobs.runAll(t, afterresponse.ClassRecovery)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		assert.Equal(t, map[string]interface{}{"linkSent": true}, *bound, "the requester is told a link was sent")

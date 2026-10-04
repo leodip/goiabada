@@ -29,7 +29,7 @@ func TestGo_TheJobRunsDetachedFromTheRequestsCancellationButKeepsItsValues(t *te
 
 	release := make(chan struct{})
 	seen := make(chan context.Context, 1)
-	jobs.Go(ctx, func(jobCtx context.Context) {
+	jobs.Go(ctx, ClassRecovery, func(jobCtx context.Context) {
 		<-release
 		seen <- jobCtx
 	})
@@ -59,7 +59,7 @@ func TestGo_ReturnsBeforeTheJobFinishes(t *testing.T) {
 
 	returned := make(chan struct{})
 	go func() {
-		jobs.Go(context.Background(), func(context.Context) {
+		jobs.Go(context.Background(), ClassRecovery, func(context.Context) {
 			<-release
 			close(finished)
 		})
@@ -85,7 +85,7 @@ func TestWait_WaitsForTheJobsInFlight(t *testing.T) {
 	jobs := New()
 	release := make(chan struct{})
 	finished := make(chan struct{})
-	jobs.Go(context.Background(), func(context.Context) {
+	jobs.Go(context.Background(), ClassRecovery, func(context.Context) {
 		<-release
 		close(finished)
 	})
@@ -122,7 +122,7 @@ func TestWait_WithNothingInFlightReturnsAtOnce(t *testing.T) {
 	assert.True(t, jobs.Wait(0), "no job has run")
 
 	done := make(chan struct{})
-	jobs.Go(context.Background(), func(context.Context) { close(done) })
+	jobs.Go(context.Background(), ClassRecovery, func(context.Context) { close(done) })
 	<-done
 	require.True(t, jobs.Wait(5*time.Second), "the job must finish")
 	assert.True(t, jobs.Wait(0), "every job has finished")
@@ -134,7 +134,7 @@ func TestWait_WithNothingInFlightReturnsAtOnce(t *testing.T) {
 func TestWait_AJobStillRunningAtTheTimeoutIsReported(t *testing.T) {
 	jobs := New()
 	release := make(chan struct{})
-	jobs.Go(context.Background(), func(context.Context) { <-release })
+	jobs.Go(context.Background(), ClassRecovery, func(context.Context) { <-release })
 
 	assert.False(t, jobs.Wait(0), "the job is still running")
 	assert.False(t, jobs.Wait(10*time.Millisecond), "the job is still running")
@@ -143,7 +143,7 @@ func TestWait_AJobStillRunningAtTheTimeoutIsReported(t *testing.T) {
 	require.True(t, jobs.Wait(5*time.Second), "the job finished")
 
 	again := make(chan struct{})
-	jobs.Go(context.Background(), func(context.Context) { <-again })
+	jobs.Go(context.Background(), ClassRecovery, func(context.Context) { <-again })
 	assert.False(t, jobs.Wait(0), "a job started after the last one finished is in flight")
 	close(again)
 	assert.True(t, jobs.Wait(5*time.Second))
@@ -157,7 +157,7 @@ func TestGo_APanickingJobIsAnErrorRecordAndNotTheEndOfTheProcess(t *testing.T) {
 	ctx, cancel := requestContext("req-panic")
 	defer cancel()
 
-	jobs.Go(ctx, func(context.Context) { panic("boom") })
+	jobs.Go(ctx, ClassRecovery, func(context.Context) { panic("boom") })
 
 	require.True(t, jobs.Wait(5*time.Second), "a panicking job still counts as finished")
 	records := capture.Records()
@@ -167,13 +167,13 @@ func TestGo_APanickingJobIsAnErrorRecordAndNotTheEndOfTheProcess(t *testing.T) {
 	assert.Equal(t, "boom", records[0].Attrs["panic"])
 }
 
-// fillToTheCap starts 64 jobs, the cap #394 decision 8 sets, each blocked until release is closed,
-// and returns once every one of them is running.
-func fillToTheCap(t *testing.T, jobs *Jobs, release <-chan struct{}) {
+// fillToTheCap starts 64 jobs of class, the cap per class #394 decision 8 sets, each blocked until
+// release is closed, and returns once every one of them is running.
+func fillToTheCap(t *testing.T, jobs *Jobs, class Class, release <-chan struct{}) {
 	t.Helper()
 	running := make(chan struct{}, 64)
 	for range 64 {
-		jobs.Go(context.Background(), func(context.Context) {
+		jobs.Go(context.Background(), class, func(context.Context) {
 			running <- struct{}{}
 			<-release
 		})
@@ -206,7 +206,7 @@ func TestGo_AJobPastTheCapIsDroppedWithOneWarnRecord(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
 	jobs := New()
 	release := make(chan struct{})
-	fillToTheCap(t, jobs, release)
+	fillToTheCap(t, jobs, ClassRecovery, release)
 	require.Empty(t, warnings(capture), "the 64 jobs under the cap are all admitted")
 
 	ctx, cancel := requestContext("req-dropped")
@@ -214,7 +214,7 @@ func TestGo_AJobPastTheCapIsDroppedWithOneWarnRecord(t *testing.T) {
 	var ran atomic.Bool
 	returned := make(chan struct{})
 	go func() {
-		jobs.Go(ctx, func(context.Context) {
+		jobs.Go(ctx, ClassRecovery, func(context.Context) {
 			ran.Store(true)
 			<-release
 		})
@@ -233,6 +233,53 @@ func TestGo_AJobPastTheCapIsDroppedWithOneWarnRecord(t *testing.T) {
 	dropped := warnings(capture)
 	require.Len(t, dropped, 1)
 	assert.Equal(t, "req-dropped", dropped[0].Attrs["request_id"])
+	assert.Equal(t, "recovery", dropped[0].Attrs["class"], "the record names the budget that was full")
+}
+
+// Each class has a budget of its own: with recovery's 64 slots full, a registration job and an
+// account notice are admitted and run, and only the next recovery job is dropped. The notice is the
+// one that matters: without this, whoever held a stolen session could fill the budget through the
+// public forgot-password form, then change the address, and the mail warning the victim was the
+// one dropped (#394 review).
+func TestGo_AFullClassTakesNoSlotFromAnotherClass(t *testing.T) {
+	capture := logtest.CaptureSlog(t)
+	jobs := New()
+	release := make(chan struct{})
+	fillToTheCap(t, jobs, ClassRecovery, release)
+
+	ran := make(chan Class, 2)
+	for _, class := range []Class{ClassRegistration, ClassAccountNotice} {
+		jobs.Go(context.Background(), class, func(context.Context) { ran <- class })
+	}
+	var seen []Class
+	for range 2 {
+		select {
+		case class := <-ran:
+			seen = append(seen, class)
+		case <-time.After(5 * time.Second):
+			t.Fatal("a job of another class was not run while recovery's budget was full")
+		}
+	}
+	assert.ElementsMatch(t, []Class{ClassRegistration, ClassAccountNotice}, seen)
+	assert.Empty(t, warnings(capture), "the other classes' budgets are untouched")
+
+	jobs.Go(context.Background(), ClassRecovery, func(context.Context) {})
+	dropped := warnings(capture)
+	require.Len(t, dropped, 1, "recovery's own budget still holds")
+	assert.Equal(t, "recovery", dropped[0].Attrs["class"])
+
+	close(release)
+	assert.True(t, jobs.Wait(5*time.Second))
+}
+
+// Wait waits for every class: with nothing of recovery's in flight, a notice still running holds it.
+func TestWait_WaitsForEveryClass(t *testing.T) {
+	jobs := New()
+	release := make(chan struct{})
+	jobs.Go(context.Background(), ClassAccountNotice, func(context.Context) { <-release })
+	assert.False(t, jobs.Wait(0), "the notice is still running")
+	close(release)
+	assert.True(t, jobs.Wait(5*time.Second))
 }
 
 // A dropped job is never counted in flight: Wait answers for the 64 admitted jobs alone, at once
@@ -241,13 +288,13 @@ func TestWait_WaitsForAdmittedJobsOnly(t *testing.T) {
 	logtest.CaptureSlog(t)
 	jobs := New()
 	release := make(chan struct{})
-	fillToTheCap(t, jobs, release)
+	fillToTheCap(t, jobs, ClassRecovery, release)
 
 	never := make(chan struct{})
 	defer close(never)
 	returned := make(chan struct{})
 	go func() {
-		jobs.Go(context.Background(), func(context.Context) { <-never })
+		jobs.Go(context.Background(), ClassRecovery, func(context.Context) { <-never })
 		close(returned)
 	}()
 	select {
@@ -268,15 +315,15 @@ func TestGo_AFinishedJobReleasesItsSlot(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
 	jobs := New()
 	first := make(chan struct{})
-	fillToTheCap(t, jobs, first)
+	fillToTheCap(t, jobs, ClassRecovery, first)
 	close(first)
 	require.True(t, jobs.Wait(5*time.Second))
 
 	second := make(chan struct{})
-	fillToTheCap(t, jobs, second)
+	fillToTheCap(t, jobs, ClassRecovery, second)
 	assert.Empty(t, warnings(capture), "every slot the first 64 held was given back")
 
-	jobs.Go(context.Background(), func(context.Context) {})
+	jobs.Go(context.Background(), ClassRecovery, func(context.Context) {})
 	assert.Len(t, warnings(capture), 1, "the cap still holds once the slots are taken again")
 	close(second)
 	assert.True(t, jobs.Wait(5*time.Second))
@@ -288,12 +335,12 @@ func TestGo_APanickingJobReleasesItsSlot(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
 	jobs := New()
 	for range 64 {
-		jobs.Go(context.Background(), func(context.Context) { panic("boom") })
+		jobs.Go(context.Background(), ClassRecovery, func(context.Context) { panic("boom") })
 	}
 	require.True(t, jobs.Wait(5*time.Second))
 
 	release := make(chan struct{})
-	fillToTheCap(t, jobs, release)
+	fillToTheCap(t, jobs, ClassRecovery, release)
 	assert.Empty(t, warnings(capture), "every slot a panicking job held was given back")
 	close(release)
 	assert.True(t, jobs.Wait(5*time.Second))
@@ -312,7 +359,7 @@ func TestGo_ConcurrentCallsAdmitExactlyTheCap(t *testing.T) {
 		callers.Add(1)
 		go func() {
 			defer callers.Done()
-			jobs.Go(context.Background(), func(context.Context) {
+			jobs.Go(context.Background(), ClassRecovery, func(context.Context) {
 				ran.Add(1)
 				<-release
 			})

@@ -3,6 +3,7 @@ package apihandlers
 import (
 	"bytes"
 	"context"
+	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
@@ -96,8 +97,11 @@ type OtpSecretGenerator interface {
 // logs carries the request's id. The server's afterresponse.Jobs is the one implementation, and
 // shutdown waits for the jobs it holds. The email change hands it the notice to the previous
 // address, which must never fail or hold up the change it reports (#404 decision 11).
-// Past 64 jobs in flight it drops the job with a warning rather than run it, so a flood costs
-// some genuine requests their mail and never changes a response (#485).
+// Past 64 jobs of the same class in flight it drops the job with a warning rather than run it, so
+// a flood costs some genuine requests of that class their mail and never changes a response (#485).
+// The notice is ClassAccountNotice, a budget of its own that no public form can fill: with one
+// shared budget, whoever held a stolen session could fill it through forgot-password, then change
+// the address, and the mail warning the victim was the one dropped (#394 review).
 type AfterResponse interface {
-	Go(ctx context.Context, job func(ctx context.Context))
+	Go(ctx context.Context, class afterresponse.Class, job func(ctx context.Context))
 }

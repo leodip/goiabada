@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -179,7 +180,7 @@ func notifyPreviousAddress(r *http.Request, pageRenderer PageRenderer, emailSend
 	locale := user.Locale
 	smtpConfig := emaildelivery.SMTPConfigFromSettings(settings)
 
-	afterResponse.Go(r.Context(), func(ctx context.Context) {
+	afterResponse.Go(r.Context(), afterresponse.ClassAccountNotice, func(ctx context.Context) {
 		// The request is read for nothing but the renderer's inputs, under the job's context:
 		// the request's own is cancelled once the response has gone.
 		emailReq := r.WithContext(i18n.WithLocale(ctx, true, locale, "en"))

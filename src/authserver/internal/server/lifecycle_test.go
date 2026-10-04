@@ -249,7 +249,7 @@ func TestStopBackgroundWork_WaitsForTheJobsInFlight(t *testing.T) {
 
 	release := make(chan struct{})
 	var finished atomic.Bool
-	s.jobs.Go(context.Background(), func(context.Context) {
+	s.jobs.Go(context.Background(), afterresponse.ClassRecovery, func(context.Context) {
 		<-release
 		finished.Store(true)
 	})

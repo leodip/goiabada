@@ -3,6 +3,7 @@ package accounthandlers
 import (
 	"bytes"
 	"database/sql"
+	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -69,7 +70,7 @@ func TestHandleRegisterPost_WithVerificationARowThatCanStillCompleteIsLeftAlone(
 			details, _ := captureRequestedRegistration(h.auditLogger, nil)
 
 			h.handler.ServeHTTP(rr, req)
-			h.jobs.runAll(t)
+			h.jobs.runAll(t, afterresponse.ClassRegistration)
 
 			assert.Equal(t, map[string]interface{}{
 				"ip":                testClientIP,
@@ -125,7 +126,7 @@ func TestHandleRegisterPost_WithVerificationADeadRowIsReplacedWithAFreshLink(t *
 
 	h.handler.ServeHTTP(rr, req)
 	assert.Empty(t, order, "the row is replaced after the response")
-	h.jobs.runAll(t)
+	h.jobs.runAll(t, afterresponse.ClassRegistration)
 
 	code, err := testDataCipher.Decrypt(codeEncrypted)
 	require.NoError(t, err)
@@ -165,7 +166,7 @@ func TestHandleRegisterPost_WithVerificationALostReplacementSendsNothing(t *test
 	details, _ := captureRequestedRegistration(h.auditLogger, nil)
 
 	h.handler.ServeHTTP(rr, req)
-	h.jobs.runAll(t)
+	h.jobs.runAll(t, afterresponse.ClassRegistration)
 
 	assert.Equal(t, map[string]interface{}{
 		"ip":                testClientIP,
@@ -192,7 +193,7 @@ func TestHandleRegisterPost_WithVerificationAFailedReplacementIsAServerError(t *
 	details, _ := captureRequestedRegistration(h.auditLogger, nil)
 
 	h.handler.ServeHTTP(rr, req)
-	h.jobs.runAll(t)
+	h.jobs.runAll(t, afterresponse.ClassRegistration)
 
 	assert.Equal(t, http.StatusOK, rr.Code, "the response has gone before the row is replaced")
 	assert.Equal(t, map[string]interface{}{
