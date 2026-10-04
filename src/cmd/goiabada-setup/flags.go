@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -30,6 +31,10 @@ type CLIFlags struct {
 	NoColor         bool
 	// LocalProxy is --local-proxy, read by native binaries alone.
 	LocalProxy optionalBool
+	// GatewayTrafficPolicy is --gateway-traffic-policy and NetworkPolicy --network-policy, read by
+	// Kubernetes alone. The policy is empty when the flag was left out.
+	GatewayTrafficPolicy trafficPolicy
+	NetworkPolicy        bool
 }
 
 // optionalBool is a boolean flag that knows whether it was given, so one left out takes the
@@ -67,6 +72,26 @@ func (b optionalBool) or(defaultValue bool) bool {
 	return defaultValue
 }
 
+// String is the policy as --gateway-traffic-policy spells it, empty when the flag was left out.
+func (p *trafficPolicy) String() string {
+	if p == nil {
+		return ""
+	}
+	return strings.ToLower(string(*p))
+}
+
+// Set reads cluster or local in any case, and refuses anything else, which the flag package
+// reports naming the flag.
+func (p *trafficPolicy) Set(value string) error {
+	for _, policy := range []trafficPolicy{trafficPolicyCluster, trafficPolicyLocal} {
+		if strings.EqualFold(value, string(policy)) {
+			*p = policy
+			return nil
+		}
+	}
+	return errs.New("use cluster or local")
+}
+
 // parseFlags reads the command line. It returns flag.ErrHelp for -h and --help and the parse error
 // for anything else it cannot read, each already reported to stderr with the usage, and leaves the
 // exit to main: the flag package's own ExitOnError would have been a second exit (#430).
@@ -93,6 +118,8 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 	fs.StringVar(&flags.DBPassword, "db-password", "", "Database password")
 	fs.BoolVar(&flags.SkipDBTest, "skip-db-test", false, "Skip database connection test")
 	fs.BoolVar(&flags.NoColor, "no-color", false, "Disable colored output")
+	fs.Var(&flags.GatewayTrafficPolicy, "gateway-traffic-policy", "Kubernetes: the traffic policy of Envoy Gateway's load balancer Service: cluster or local (default: cluster)")
+	fs.BoolVar(&flags.NetworkPolicy, "network-policy", false, "Kubernetes: admit only Envoy and the admin console to the servers with NetworkPolicies")
 	fs.Var(&flags.LocalProxy, "local-proxy", "A reverse proxy on this machine forwards to the native binaries (default: true)")
 
 	fs.Usage = func() {
@@ -124,6 +151,14 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 		p("  --db-user USER         Database username (default: auto-detected)\n")
 		p("  --db-password PASS     Database password (generated if not provided)\n")
 		p("  --skip-db-test         Skip database connection test\n\n")
+		p("Kubernetes Options:\n")
+		p("  --gateway-traffic-policy=POLICY\n")
+		p("                         The externalTrafficPolicy of Envoy Gateway's load balancer Service\n")
+		p("                         (default: cluster). cluster works behind every load balancer, and\n")
+		p("                         Goiabada sees a node's address for every client; local runs Envoy on\n")
+		p("                         every node as a DaemonSet, and Goiabada sees the client's address\n")
+		p("  --network-policy       Admit only Envoy's namespace, and the admin console to the auth\n")
+		p("                         server, with NetworkPolicies (default: off, any pod can reach them)\n\n")
 		p("Native Binaries Options:\n")
 		p("  --local-proxy=BOOL     A reverse proxy on this machine forwards to Goiabada (default: true):\n")
 		p("                         both servers listen on 127.0.0.1 and trust its forwarded headers.\n")

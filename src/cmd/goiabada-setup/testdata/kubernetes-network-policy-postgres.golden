@@ -60,9 +60,9 @@ data:
   # Envoy stops that, and no list does.
   GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS: "true"
   GOIABADA_AUTHSERVER_TRUSTED_PROXIES: ""
-  GOIABADA_DB_TYPE: "mssql"
+  GOIABADA_DB_TYPE: "postgres"
   GOIABADA_DB_HOST: "goiabada-db"
-  GOIABADA_DB_PORT: "1433"
+  GOIABADA_DB_PORT: "5432"
   GOIABADA_DB_NAME: "goiabada"
   GOIABADA_DB_USERNAME: "goiabada-user"
 
@@ -429,6 +429,68 @@ spec:
   ports:
   - port: 9091
     targetPort: 9091
+
+---
+# Admits the auth server's port from Envoy's proxies and from the admin console's pods,
+# and from nothing else. Enforced only by a CNI that implements NetworkPolicy (Calico and
+# Cilium do; some clusters' default CNI does not, and accepts the policy and ignores it).
+# The kubelet's probes come from the pod's own node, which no NetworkPolicy blocks.
+# There are no egress rules: the SMTP host and port are settings in the database, and the
+# database host is often a DNS name, neither of which a NetworkPolicy can select, so an
+# egress rule would cut email or the database.
+# A workload in another namespace that calls the auth server through its Service, for
+# /certs or /userinfo, is refused until you admit its namespace by adding to from:
+#   - namespaceSelector:
+#       matchLabels:
+#         kubernetes.io/metadata.name: <its namespace>
+# If Envoy Gateway runs its proxies in a namespace other than envoy-gateway-system, its
+# default, name that one below instead.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: goiabada-authserver
+  namespace: "goiabada"
+spec:
+  podSelector:
+    matchLabels:
+      app: goiabada-authserver
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: envoy-gateway-system
+    - podSelector:
+        matchLabels:
+          app: goiabada-adminconsole
+    ports:
+    - protocol: TCP
+      port: 9090
+
+---
+# Admits the admin console's port from Envoy's proxies alone: nothing in the cluster calls
+# it. Ingress only, with no egress rules, as the auth server's is, and enforced only by a
+# CNI that implements NetworkPolicy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: goiabada-adminconsole
+  namespace: "goiabada"
+spec:
+  podSelector:
+    matchLabels:
+      app: goiabada-adminconsole
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: envoy-gateway-system
+    ports:
+    - protocol: TCP
+      port: 9091
 
 ---
 apiVersion: gateway.networking.k8s.io/v1

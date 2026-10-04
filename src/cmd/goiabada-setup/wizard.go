@@ -65,6 +65,16 @@ var wizardSteps = []wizardStep{
 		run:     (*wizard).askNamespace,
 	},
 	{
+		title:   "Gateway traffic policy",
+		applies: func(c *Config) bool { return c.Deployment.servedByEnvoyGateway },
+		run:     (*wizard).askTrafficPolicy,
+	},
+	{
+		title:   "Network policy",
+		applies: func(c *Config) bool { return c.Deployment.servedByEnvoyGateway },
+		run:     (*wizard).askNetworkPolicy,
+	},
+	{
 		title:   "Reverse proxy",
 		applies: func(c *Config) bool { return c.Deployment.asksLocalProxy },
 		run:     (*wizard).askLocalProxy,
@@ -132,7 +142,7 @@ func (w *wizard) chooseDeployment() error {
 			choices = append(choices, d.number)
 		}
 		w.out.println()
-		choice, err := w.choice(fmt.Sprintf("Select deployment type [1-%d]", len(choices)), choices, "1")
+		choice, err := w.choice(fmt.Sprintf("Select deployment type [1-%d]", len(choices)), choices)
 		if err != nil {
 			return err
 		}
@@ -169,7 +179,7 @@ func (w *wizard) chooseEngine() error {
 			w.out.println("      SQLite is not recommended for Kubernetes deployments.")
 			w.out.println()
 		}
-		choice, err := w.choice(fmt.Sprintf("Select database [1-%d]", len(choices)), choices, "1")
+		choice, err := w.choice(fmt.Sprintf("Select database [1-%d]", len(choices)), choices)
 		if err != nil {
 			return err
 		}
@@ -346,6 +356,60 @@ func (w *wizard) askNamespace() error {
 	return nil
 }
 
+// askTrafficPolicy asks which externalTrafficPolicy Envoy Gateway's load balancer Service uses,
+// Cluster by default, which decides the EnvoyProxy the completion message prints and the address the
+// servers see (#396 decision 4).
+func (w *wizard) askTrafficPolicy() error {
+	if !w.interactive {
+		w.config.GatewayTrafficPolicy = w.flags.GatewayTrafficPolicy
+		if w.config.GatewayTrafficPolicy == "" {
+			w.config.GatewayTrafficPolicy = trafficPolicyCluster
+		}
+		w.out.info("Gateway traffic policy: %s", w.config.GatewayTrafficPolicy)
+		return nil
+	}
+	w.out.println("Envoy Gateway's load balancer Service has a traffic policy, which decides the address")
+	w.out.println("Goiabada sees for each client, and so what it rate limits and audits:")
+	w.out.println("  1. Cluster: works behind every load balancer. Goiabada sees a node's address for")
+	w.out.println("     every client, not the client's own.")
+	w.out.println("  2. Local, with Envoy on every node as a DaemonSet: Goiabada sees the client's address,")
+	w.out.println("     at the cost of an Envoy pod on every node.")
+	w.out.println("The EnvoyProxy and GatewayClass that set it are cluster-wide: on a cluster that already")
+	w.out.println("runs Envoy Gateway, the choice belongs to whoever runs it.")
+	w.out.println()
+	choice, err := w.choice("Select traffic policy [1-2]", []string{"1", "2"})
+	w.config.GatewayTrafficPolicy = trafficPolicyCluster
+	if choice == "2" {
+		w.config.GatewayTrafficPolicy = trafficPolicyLocal
+	}
+	return err
+}
+
+// askNetworkPolicy asks whether NetworkPolicies admit only Envoy's namespace to both servers, and
+// the admin console to the auth server, no by default (#396 decision 5).
+func (w *wizard) askNetworkPolicy() error {
+	if !w.interactive {
+		w.config.NetworkPolicy = w.flags.NetworkPolicy
+		answer := "no"
+		if w.config.NetworkPolicy {
+			answer = "yes, admitting only Envoy and the admin console"
+		}
+		w.out.info("NetworkPolicies: %s", answer)
+		return nil
+	}
+	w.out.println("NetworkPolicies can admit only Envoy's namespace (envoy-gateway-system) to both servers,")
+	w.out.println("and the admin console to the auth server.")
+	w.out.println("  Yes: on a CNI that enforces NetworkPolicy, every other pod is refused, including a")
+	w.out.println("       workload in another namespace that calls the auth server's Service, for /certs")
+	w.out.println("       or /userinfo, until you admit its namespace as the policy's comment shows.")
+	w.out.println("  No:  any pod in the cluster can reach both servers, and can choose the address it is")
+	w.out.println("       rate limited and audited under by sending its own X-Forwarded-For.")
+	w.out.println()
+	restrict, err := w.yesNo("Restrict who can reach Goiabada with NetworkPolicies?", false)
+	w.config.NetworkPolicy = restrict
+	return err
+}
+
 // askLocalProxy asks whether a reverse proxy on the same machine forwards to the native binaries,
 // yes by default: they then listen on 127.0.0.1 alone and trust forwarded headers from 127.0.0.1
 // alone, and otherwise listen on every interface and trust none (#396 decision 7).
@@ -460,7 +524,7 @@ func (w *wizard) askDatabaseConnection() error {
 		w.out.println("2. Continue anyway (configuration will be generated)")
 		w.out.println("3. Abort setup")
 		w.out.println()
-		choice, err := w.choice("Select option [1-3]", []string{"1", "2", "3"}, "1")
+		choice, err := w.choice("Select option [1-3]", []string{"1", "2", "3"})
 		if err != nil {
 			return err
 		}

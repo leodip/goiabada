@@ -70,7 +70,7 @@ func TestAsker_AReadFaultIsNeverTheDefault(t *testing.T) {
 	})
 	t.Run("choice", func(t *testing.T) {
 		a, in, _ := testAsker(t, scriptedStep{prompt: "Pick [1]: ", err: errReadFault})
-		got, err := a.choice("Pick", []string{"1", "2"}, "1")
+		got, err := a.choice("Pick", []string{"1", "2"})
 		if !errors.Is(err, errReadFault) || got != "" {
 			t.Errorf("choice = %q, %v; want \"\" and the read fault", got, err)
 		}
@@ -115,7 +115,7 @@ func TestAsker_AnEmptyAnswerIsTheDefault(t *testing.T) {
 	if got, err := a.text("Name", "fallback"); err != nil || got != "fallback" {
 		t.Errorf("text = %q, %v; want the default", got, err)
 	}
-	if got, err := a.choice("Pick", []string{"1", "2"}, "2"); err != nil || got != "2" {
+	if got, err := a.choice("Pick", []string{"2", "1"}); err != nil || got != "2" {
 		t.Errorf("choice = %q, %v; want the default", got, err)
 	}
 	if got, err := a.yesNo("Go?", true); err != nil || !got {
@@ -154,7 +154,7 @@ func TestAsker_TheAbortIsReturnedAsItIs(t *testing.T) {
 	if _, err := a.text("Name", "x"); !errors.Is(err, errAborted) {
 		t.Errorf("text: %v, want errAborted", err)
 	}
-	if _, err := a.choice("Pick", []string{"1"}, "1"); !errors.Is(err, errAborted) {
+	if _, err := a.choice("Pick", []string{"1"}); !errors.Is(err, errAborted) {
 		t.Errorf("choice: %v, want errAborted", err)
 	}
 	if _, err := a.yesNo("Go?", true); !errors.Is(err, errAborted) {
@@ -201,7 +201,7 @@ func TestAsker_AnInvalidAnswerIsAskedAgain(t *testing.T) {
 		scriptedStep{prompt: "User: ", answer: ""},
 		scriptedStep{prompt: "User: ", answer: "someone"},
 	)
-	if got, err := a.choice("Pick", []string{"1", "2"}, "1"); err != nil || got != "2" {
+	if got, err := a.choice("Pick", []string{"1", "2"}); err != nil || got != "2" {
 		t.Errorf("choice = %q, %v; want \"2\"", got, err)
 	}
 	if got, err := a.yesNo("Go?", true); err != nil || !got {

@@ -70,11 +70,15 @@ The wizard will ask you a few questions:
 
 3. **Domain names** - Your auth and admin console URLs (production/Kubernetes/native)
 
-4. **Reverse proxy** (native binaries only) - Whether a reverse proxy on the same machine, such as Nginx, forwards to Goiabada. Yes, the default, has both servers listen on `127.0.0.1` and trust its forwarded headers alone; no has them listen on every interface, trust no forwarded header, and wait for you to configure HTTPS. `--local-proxy=false` answers no without the prompt
+4. **Gateway traffic policy** (Kubernetes only) - The `externalTrafficPolicy` of Envoy Gateway's load balancer Service. `Cluster`, the default, works behind every load balancer, and Goiabada sees a node's address for every client; `Local`, with Envoy on every node as a DaemonSet, keeps the client's address at the cost of an Envoy pod per node. The answer decides the EnvoyProxy the wizard prints and the manifest's comments on which address the servers see (see [Kubernetes: Step 1](/production-deployment/kubernetes/#step-1-install-envoy-gateway)). `--gateway-traffic-policy=cluster` or `=local` answers without the prompt
 
-5. **Admin credentials** - Email and password for the first admin user
+5. **Network policy** (Kubernetes only) - Whether NetworkPolicies admit only Envoy's namespace to both servers, and the admin console to the auth server. No, the default, emits none, and any pod in the cluster can then reach both servers; yes needs a CNI that enforces NetworkPolicy, and refuses in-cluster callers of the auth server's Service until you admit their namespace (see [Kubernetes: who can reach Goiabada](/production-deployment/kubernetes/#who-can-reach-goiabada)). `--network-policy` answers yes without the prompt
 
-6. **Database password** - A strong password (auto-generated if you press Enter)
+6. **Reverse proxy** (native binaries only) - Whether a reverse proxy on the same machine, such as Nginx, forwards to Goiabada. Yes, the default, has both servers listen on `127.0.0.1` and trust its forwarded headers alone; no has them listen on every interface, trust no forwarded header, and wait for you to configure HTTPS. `--local-proxy=false` answers no without the prompt
+
+7. **Admin credentials** - Email and password for the first admin user
+
+8. **Database password** - A strong password (auto-generated if you press Enter)
 
 ## What gets generated
 
@@ -103,6 +107,7 @@ The wizard creates a `goiabada-k8s.yaml` file with:
 - Deployments (auth server and admin console), each with a PodDisruptionBudget
 - Services
 - Gateway and HTTPRoutes (TLS by cert-manager)
+- NetworkPolicies, one per Deployment, if you asked for them
 
 Deploy with:
 

@@ -138,9 +138,10 @@ func (a asker) text(prompt, defaultValue string) (string, error) {
 	}
 }
 
-func (a asker) choice(prompt string, validChoices []string, defaultValue string) (string, error) {
+// choice asks until the answer is one of validChoices, offering the first as the default.
+func (a asker) choice(prompt string, validChoices []string) (string, error) {
 	for {
-		input, err := a.text(prompt, defaultValue)
+		input, err := a.text(prompt, validChoices[0])
 		if err != nil {
 			return "", err
 		}

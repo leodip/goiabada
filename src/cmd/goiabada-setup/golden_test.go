@@ -51,6 +51,14 @@ func goldenCases() []goldenCase {
 var answerCases = []goldenCase{
 	// Native binaries with no reverse proxy on the same machine (#396 decision 7).
 	{name: "native-direct-postgres", deployment: deploymentNative, engine: "postgres", answers: func(c *Config) { c.LocalProxy = false }},
+	// Kubernetes behind Envoy with the Local traffic policy (#396 decision 4).
+	{name: "kubernetes-local-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.GatewayTrafficPolicy = trafficPolicyLocal
+	}},
+	// Kubernetes with the NetworkPolicies admitting only Envoy and the admin console (#396 decision 5).
+	{name: "kubernetes-network-policy-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.NetworkPolicy = true
+	}},
 }
 
 // hostileCases are one configuration per format, Compose, Kubernetes and the env file, whose
@@ -131,6 +139,13 @@ func goldenConfig(kind deploymentType, engineName string) *Config {
 	// Only native binaries ask whether a reverse proxy on the same machine forwards to them, and
 	// the default answer is yes.
 	config.LocalProxy = kind == deploymentNative
+	// Only Kubernetes asks which traffic policy the gateway uses, Cluster by default, and whether to
+	// restrict who reaches the servers, no by default.
+	config.GatewayTrafficPolicy = ""
+	if kind == deploymentKubernetes {
+		config.GatewayTrafficPolicy = trafficPolicyCluster
+	}
+	config.NetworkPolicy = false
 	return config
 }
 

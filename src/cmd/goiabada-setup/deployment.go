@@ -42,6 +42,9 @@ type deployment struct {
 	// asksLocalProxy says the type asks whether a reverse proxy on the same machine forwards to it,
 	// which decides the env file's listen hosts and proxy trust (#396 decision 7).
 	asksLocalProxy bool
+	// servedByEnvoyGateway says the manifest is served through Envoy Gateway, so the type asks its
+	// traffic policy and whether a NetworkPolicy admits only Envoy (#396 decisions 4 and 5).
+	servedByEnvoyGateway bool
 	// routesByHost says the manifest routes and certifies each URL by its host, which must then be
 	// a lowercase domain name (validateListenerHostname) and not the other URL's host.
 	routesByHost bool
@@ -76,19 +79,20 @@ var deployments = []*deployment{
 		printInstructions: printComposeInstructions,
 	},
 	{
-		kind:              deploymentKubernetes,
-		number:            "3",
-		name:              "kubernetes",
-		aliases:           []string{"k8s"},
-		menuLabel:         "Kubernetes cluster",
-		displayName:       "Kubernetes",
-		asksURLs:          true,
-		asksNamespace:     true,
-		externalDatabase:  true,
-		routesByHost:      true,
-		outputFile:        "goiabada-k8s.yaml",
-		generate:          generateKubernetesManifests,
-		printInstructions: printKubernetesInstructions,
+		kind:                 deploymentKubernetes,
+		number:               "3",
+		name:                 "kubernetes",
+		aliases:              []string{"k8s"},
+		menuLabel:            "Kubernetes cluster",
+		displayName:          "Kubernetes",
+		asksURLs:             true,
+		asksNamespace:        true,
+		externalDatabase:     true,
+		routesByHost:         true,
+		servedByEnvoyGateway: true,
+		outputFile:           "goiabada-k8s.yaml",
+		generate:             generateKubernetesManifests,
+		printInstructions:    printKubernetesInstructions,
 	},
 	{
 		kind:              deploymentNative,
