@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
@@ -75,8 +79,22 @@ func migrateCommand(args []string, base config.DatabaseConfig, stdout, stderr io
 	// below takes a context rather than opening one where it lands (#386).
 	ctx := context.Background()
 
+	// `migrate to` owns SIGINT and SIGTERM, so Ctrl-C stops it the way a shutdown signal stops a
+	// starting server rather than ending it mid-file: a wait (connecting, or for the migration
+	// lock) is cancelled, a running file finishes, and no new one starts (#390 decision 10).
+	// `migrate version` only reads, so a signal simply ends it, as it always has.
+	if len(inv.positional) > 0 && inv.positional[0] == "to" {
+		var stopListeningForSignals context.CancelFunc
+		ctx, stopListeningForSignals = signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+		defer stopListeningForSignals()
+	}
+
 	database, err := datafactory.OpenDatabase(ctx, &inv.database, false)
 	if err != nil {
+		if stoppedBySignal(ctx, err) {
+			reportStop(stdout, err)
+			return migrateExitError
+		}
 		outf(stderr, "unable to open the database: %+v\n", err)
 		return migrateExitError
 	}
@@ -297,6 +315,10 @@ func migrateTo(ctx context.Context, database emailCaseReader, m *migrator.Migrat
 		outf(out, "the database is already at schema version %06d; nothing to do\n", target)
 		return migrateExitOK
 	}
+	if stoppedBySignal(ctx, err) {
+		reportStop(out, err)
+		return migrateExitError
+	}
 	if err != nil {
 		outf(out, "%s\n", err)
 		return migrateExitError
@@ -323,6 +345,10 @@ func migrateTo(ctx context.Context, database emailCaseReader, m *migrator.Migrat
 	// as a fresh one and skip the check on exactly the database least worth guessing about. Plan
 	// above makes this all but unreachable, since it reads the version too; unreachable is not the
 	// same as safe when the consequence is a dirty schema.
+	if stoppedBySignal(ctx, versionErr) {
+		reportStop(out, versionErr)
+		return migrateExitError
+	}
 	if versionErr != nil && !migrator.IsNilVersion(versionErr) {
 		outf(out, "unable to read the database's schema version before checking stored email "+
 			"addresses: %s\n", versionErr)
@@ -330,6 +356,10 @@ func migrateTo(ctx context.Context, database emailCaseReader, m *migrator.Migrat
 	}
 
 	if err := datafactory.CheckEmailCaseBeforeMigrating(ctx, database, current, target); err != nil {
+		if stoppedBySignal(ctx, err) {
+			reportStop(out, err)
+			return migrateExitError
+		}
 		outf(out, "%+v\n", err)
 		return migrateExitError
 	}
@@ -339,12 +369,48 @@ func migrateTo(ctx context.Context, database emailCaseReader, m *migrator.Migrat
 			outf(out, "the database is already at schema version %06d; nothing to do\n", target)
 			return migrateExitOK
 		}
+		if stoppedBySignal(ctx, err) {
+			reportStop(out, err)
+			return migrateExitError
+		}
 		outf(out, "migration failed: %s\n", err)
 		return migrateExitError
 	}
 
 	outf(out, "done: the database is now at schema version %06d\n", target)
 	return migrateExitOK
+}
+
+// stoppedBySignal reports whether err is the command's answer to the signal that ended ctx rather
+// than a failure: the signal arrived, and the step answered with the cancellation it caused.
+func stoppedBySignal(ctx context.Context, err error) bool {
+	return ctx.Err() != nil && errors.Is(err, context.Canceled)
+}
+
+// reportStop prints where a signal stopped `migrate to`. Its exit code is migrateExitError: the
+// target the operator asked for was not reached, and a script must not read the stop as success
+// (#390 decision 10).
+//
+// The runner answers StoppedError once it holds the database, with the schema clean at the version
+// it reached and the files it applied and had left; anything else matching the cancellation is a
+// wait the signal ended, before any file ran. A failed unlock the runner joined onto the stop is
+// printed as well, since every other migrator on this database waits on that lock.
+func reportStop(out io.Writer, err error) {
+	var stopped migrator.StoppedError
+	if !errors.As(err, &stopped) {
+		outf(out, "stopped by a signal before any migration ran: the database is unchanged\n")
+		return
+	}
+	reached := "none (never migrated)"
+	if stopped.Reached != migrator.NilVersion {
+		reached = fmt.Sprintf("%06d", stopped.Reached)
+	}
+	outf(out, "stopped by a signal: the database is at schema version %s, clean, with %d migrations "+
+		"applied and %d remaining; run the same command again to carry on\n",
+		reached, stopped.Applied, stopped.Remaining)
+	if err != error(stopped) {
+		outf(out, "%s\n", err)
+	}
 }
 
 // outf writes one line of the command's own output, discarding the error the write returns.
