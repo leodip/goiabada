@@ -3,6 +3,7 @@ package accounthandlers
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
@@ -67,6 +68,13 @@ type PasswordValidator interface {
 // UserCreator creates the user row and its default permissions in one transaction.
 type UserCreator interface {
 	CreateUser(ctx context.Context, input *usercreation.Input) (*record.User, error)
+}
+
+// TransactionalUserCreator creates the user row and its default permissions on the caller's
+// transaction, so activation commits the account and the consumption of its pending registration
+// together or neither (#207).
+type TransactionalUserCreator interface {
+	CreateUserInTransaction(ctx context.Context, tx *sql.Tx, input *usercreation.Input) (*record.User, error)
 }
 
 // AfterResponse runs work a handler hands off so that its response does not wait for it. The job

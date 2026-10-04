@@ -86,6 +86,7 @@ packages:
   # PasswordValidator followed when the forgot and reset password handlers, their last callers
   # in internal/handlers, moved here (#435). apihandlers declares the identical UserCreator,
   # EmailSender and PasswordValidator, and its tests use these mocks structurally.
+  # TransactionalUserCreator is activation's alone (#207).
   github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers:
     interfaces:
       EmailSender:
@@ -97,6 +98,10 @@ packages:
           dir: "./internal/handlers/accounthandlers/mocks"
           pkgname: "accounthandlersmocks"
       PasswordValidator:
+        config:
+          dir: "./internal/handlers/accounthandlers/mocks"
+          pkgname: "accounthandlersmocks"
+      TransactionalUserCreator:
         config:
           dir: "./internal/handlers/accounthandlers/mocks"
           pkgname: "accounthandlersmocks"

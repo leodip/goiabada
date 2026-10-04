@@ -115,9 +115,17 @@ func renderActivationLinkExpired(pageRenderer PageRenderer, w http.ResponseWrite
 // registration they consume, and the account its address may have gained meanwhile.
 type accountActivateDatabase interface {
 	DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationId int64) error
+	DeletePreRegistrationHoldingCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64, codeHash string) (bool, error)
 	GetPreRegistrationByVerificationCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*record.PreRegistration, error)
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
+
+// errActivationNoLongerOutstanding is the activation transaction's own refusal: the pending
+// registration no longer holds the code the marker resolved it by, because it was swept or
+// deleted between the lookup and the transaction. Returned from the body so the account
+// it inserted rolls back with it.
+var errActivationNoLongerOutstanding = errors.New("the pending registration no longer holds the activation code")
 
 // HandleActivateGet serves both halves of the activation link's journey that a GET reaches.
 //
@@ -231,7 +239,12 @@ func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession session
 
 	if isVerificationCodeExpired(preRegistration) {
 		// The code has expired: delete the pre-registration and ask the user to register again.
-		if deletePreRegistrationErr := database.DeletePreRegistration(r.Context(), nil, preRegistration.Id); deletePreRegistrationErr != nil {
+		// Only while the row still holds this code: a registration for the address may have
+		// replaced it with a fresh one since the lookup, keeping the row's id, and a delete by id
+		// alone would take the fresh link with it (#207 decision 6). Either way this link is
+		// refused alike, so whether the delete took effect is not looked at.
+		if _, deletePreRegistrationErr := database.DeletePreRegistrationHoldingCode(r.Context(), nil,
+			preRegistration.Id, codeHash); deletePreRegistrationErr != nil {
 			pageRenderer.InternalServerError(w, r, deletePreRegistrationErr)
 			return
 		}
@@ -277,11 +290,11 @@ func isVerificationCodeExpired(preRegistration *record.PreRegistration) bool {
 // the session marker, re-resolve the code hash it names, and check the address has no account.
 //
 // Re-resolving the marker's code hash is what refuses a replayed marker, for the reason
-// resolveResetPasswordMarker gives on the reset side: DeletePreRegistration removes the row the
-// hash names in the same request that creates the account, so a second attempt resolves to
-// nothing. Clearing the session now reaches every copy of the marker, since the session is a
-// database row rather than a browser cookie, so this is defence in depth rather than the whole
-// boundary it was written as (#112, #266).
+// resolveResetPasswordMarker gives on the reset side: the POST deletes the row the hash names in
+// the transaction that creates the account, so a second attempt resolves to nothing. Clearing the
+// session now reaches every copy of the marker, since the session is a database row rather than a
+// browser cookie, so this is defence in depth rather than the whole boundary it was written as
+// (#112, #266).
 //
 // The address check comes before the password is looked at, so an address that has meanwhile
 // gained an account is refused whatever was typed into the form rather than answered with another
@@ -355,15 +368,23 @@ func refuseActivationAddressTaken(pageRenderer PageRenderer, database accountAct
 // reason; a form naming a continuation other than the one the session holds is refused as
 // continuation_mismatch, so a page rendered for one pending registration cannot activate another.
 //
+// The account, its default permission and the consumption of the pending registration are written
+// in one transaction, and created_user and activated_account recorded after it commits, so a
+// failure anywhere leaves the pending registration and no account (AGENTS.md pattern 9). The
+// account used to commit on its own first, so a failed consumption answered the 500 page over a
+// verified, enabled account.
+//
 // Of two concurrent submissions of one activation, or of two pending registrations for one
 // address, exactly one creates the account: the other loses on the unique index on users.email,
 // which the data layer reports as data.ErrUniqueViolation, and is refused as address_taken like
-// an address the lookup found taken. It used to answer the 500 page with an error-level stack.
+// an address the lookup found taken. It used to answer the 500 page with an error-level stack. A
+// pending registration deleted between the lookup and the transaction, swept or refused
+// elsewhere, is found there by the fenced consumption and refused as code_no_longer_outstanding.
 func HandleActivatePost(
 	pageRenderer PageRenderer,
 	httpSession sessionstore.Store,
 	database accountActivateDatabase,
-	userCreator UserCreator,
+	userCreator TransactionalUserCreator,
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
 	adminConsoleBaseURL string,
@@ -451,11 +472,40 @@ func HandleActivatePost(
 			return
 		}
 
-		createdUser, err := userCreator.CreateUser(r.Context(), &usercreation.Input{
-			Email:         preRegistration.Email,
-			EmailVerified: true,
-			PasswordHash:  passwordHash,
+		// The body is safe to rerun after a deadlock: the inserts and the delete are rolled back
+		// with the attempt, and createdUser is assigned only once the body has done everything.
+		var createdUser *record.User
+		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			user, createUserErr := userCreator.CreateUserInTransaction(r.Context(), tx, &usercreation.Input{
+				Email:         preRegistration.Email,
+				EmailVerified: true,
+				PasswordHash:  passwordHash,
+			})
+			if createUserErr != nil {
+				return createUserErr
+			}
+
+			// What makes the marker one-shot: after this the hash it names resolves to nothing,
+			// so a replayed copy lands on the refusal page. Fenced by the code the marker
+			// resolved, so a row deleted or replaced since the lookup declines, and the account
+			// inserted above rolls back with the refusal.
+			consumed, consumeErr := database.DeletePreRegistrationHoldingCode(r.Context(), tx, preRegistration.Id,
+				preRegistration.VerificationCodeHash)
+			if consumeErr != nil {
+				return consumeErr
+			}
+			if !consumed {
+				return errs.WithStack(errActivationNoLongerOutstanding)
+			}
+
+			createdUser = user
+			return nil
 		})
+		if errors.Is(err, errActivationNoLongerOutstanding) {
+			refuseActivationLink(pageRenderer, auditLogger, w, r, 0, activationReasonCodeNoLongerOutstanding,
+				http.StatusBadRequest)
+			return
+		}
 		if errors.Is(err, data.ErrUniqueViolation) {
 			refuseActivationAddressTaken(pageRenderer, database, auditLogger, w, r, preRegistration.Id, http.StatusBadRequest)
 			return
@@ -468,17 +518,6 @@ func HandleActivatePost(
 		auditLogger.Log(r.Context(), audit.EventCreatedUser, map[string]interface{}{
 			"email": createdUser.Email,
 		})
-
-		// What makes the marker one-shot: after this the hash it names resolves to nothing, so a
-		// replayed copy lands on the refusal page. Two copies racing before either gets here are
-		// bounded instead by the UNIQUE index on users.email, which refuses the second insert, so
-		// exactly one account exists either way.
-		err = database.DeletePreRegistration(r.Context(), nil, preRegistration.Id)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
-
 		auditLogger.Log(r.Context(), audit.EventActivatedAccount, map[string]interface{}{
 			"email": createdUser.Email,
 		})

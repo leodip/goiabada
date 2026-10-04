@@ -522,6 +522,11 @@ type Database interface {
 	TryReplacePreRegistrationCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64, deadCodeHash string,
 		codeEncrypted []byte, codeHash string, issuedAt time.Time) (bool, error)
 	DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationId int64) error
+	// DeletePreRegistrationHoldingCode deletes a pending registration only while it still holds
+	// the code the caller read, and reports whether this call did. A replacement keeps the row's
+	// id, so a delete by id alone from a caller that read the row before it would take the fresh
+	// link with it (#207 decision 6).
+	DeletePreRegistrationHoldingCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64, codeHash string) (bool, error)
 	// DeleteDeadPreRegistrations sweeps every pending registration whose code was issued before
 	// deadBefore, or never issued, and leaves every other. The caller passes
 	// emaillinks.PreRegistrationDeadBefore, the one definition of a pending registration that can
