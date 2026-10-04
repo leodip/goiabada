@@ -45,6 +45,53 @@ type Input struct {
 
 func (uc *Creator) CreateUser(ctx context.Context, input *Input) (*record.User, error) {
 
+	user, err := uc.newUser(ctx, nil, input)
+	if err != nil {
+		return nil, err
+	}
+
+	// The user row and its account permission land in one transaction, opened through
+	// RunInTransaction so a deadlock reruns the body (#301). The body is safe to rerun: the id
+	// CreateUser assigns onto user is reassigned by the next attempt before the permission
+	// insert reads it.
+	err = uc.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		return uc.insertUser(ctx, tx, user)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+// CreateUserInTransaction is CreateUser on the caller's transaction, for a caller whose request
+// writes other rows beside the account and must commit or roll back all of them together:
+// activation, which consumes the pending registration with the account it creates (#207). Every
+// read and write runs on tx, which is required, since a nil one would commit the account on its
+// own. The caller's RunInTransaction body may rerun it after a deadlock: each call builds a fresh
+// user.
+func (uc *Creator) CreateUserInTransaction(ctx context.Context, tx *sql.Tx, input *Input) (*record.User, error) {
+
+	if tx == nil {
+		return nil, errs.New("creating a user in the caller's transaction requires a transaction")
+	}
+
+	user, err := uc.newUser(ctx, tx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := uc.insertUser(ctx, tx, user); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+// newUser builds the user the input describes, given the account-management permission every user
+// is given, read on tx.
+func (uc *Creator) newUser(ctx context.Context, tx *sql.Tx, input *Input) (*record.User, error) {
+
 	user := &record.User{
 		Subject:       uuid.New(),
 		Enabled:       true,
@@ -56,7 +103,7 @@ func (uc *Creator) CreateUser(ctx context.Context, input *Input) (*record.User, 
 		PasswordHash:  input.PasswordHash,
 	}
 
-	authServerResource, err := uc.database.GetResourceByResourceIdentifier(ctx, nil, builtin.AuthServerResourceIdentifier)
+	authServerResource, err := uc.database.GetResourceByResourceIdentifier(ctx, tx, builtin.AuthServerResourceIdentifier)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +113,7 @@ func (uc *Creator) CreateUser(ctx context.Context, input *Input) (*record.User, 
 		return nil, errs.Errorf("unable to find the %v resource", builtin.AuthServerResourceIdentifier)
 	}
 
-	permissions, err := uc.database.GetPermissionsByResourceId(ctx, nil, authServerResource.Id)
+	permissions, err := uc.database.GetPermissionsByResourceId(ctx, tx, authServerResource.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -85,29 +132,25 @@ func (uc *Creator) CreateUser(ctx context.Context, input *Input) (*record.User, 
 
 	user.Permissions = []record.Permission{*accountPermission}
 
-	// The user row and its account permission land in one transaction, opened through
-	// RunInTransaction so a deadlock reruns the body (#301). The body is safe to rerun: the id
-	// CreateUser assigns onto user is reassigned by the next attempt before the permission
-	// insert reads it.
-	err = uc.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		if createUserErr := uc.database.CreateUser(ctx, tx, user); createUserErr != nil {
-			return createUserErr
-		}
+	return user, nil
+}
 
-		for _, permission := range user.Permissions {
-			createUserPermissionErr := uc.database.CreateUserPermission(ctx, tx, &record.UserPermission{
-				UserId:       user.Id,
-				PermissionId: permission.Id,
-			})
-			if createUserPermissionErr != nil {
-				return createUserPermissionErr
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
+// insertUser writes the user row and then its permissions on tx, each permission naming the id the
+// user insert assigned.
+func (uc *Creator) insertUser(ctx context.Context, tx *sql.Tx, user *record.User) error {
+
+	if err := uc.database.CreateUser(ctx, tx, user); err != nil {
+		return err
 	}
 
-	return user, nil
+	for _, permission := range user.Permissions {
+		err := uc.database.CreateUserPermission(ctx, tx, &record.UserPermission{
+			UserId:       user.Id,
+			PermissionId: permission.Id,
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

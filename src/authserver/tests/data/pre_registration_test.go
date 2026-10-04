@@ -118,6 +118,120 @@ func TestDeletePreRegistration(t *testing.T) {
 	}
 }
 
+// TestDeletePreRegistrationHoldingCode is the expired activation link's delete, fenced by the code
+// the link carried: a replacement keeps the row's id, so a delete by id alone from a request that
+// read the row before the replacement took the fresh link with it (#207 decision 6).
+func TestDeletePreRegistrationHoldingCode(t *testing.T) {
+	t.Run("a row still holding the code is deleted", func(t *testing.T) {
+		preReg := createTestPreRegistration(t)
+
+		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), nil, preReg.Id, preReg.VerificationCodeHash)
+		if err != nil {
+			t.Fatalf("DeletePreRegistrationHoldingCode failed: %v", err)
+		}
+		if !deleted {
+			t.Error("the delete must report taking effect on a row still holding the code")
+		}
+		if preRegistrationExists(t, preReg.Id) {
+			t.Error("the row must be gone")
+		}
+	})
+
+	t.Run("a row whose code was replaced underneath is left as it is", func(t *testing.T) {
+		preReg := createTestPreRegistration(t)
+		freshHash := codeHashOf(t, fake.UUID())
+		freshEncrypted := []byte("ENCRYPTEDFRESHCODE")
+		issuedAt := time.Now().UTC().Truncate(time.Microsecond)
+
+		replaced, err := database.TryReplacePreRegistrationCode(context.Background(), nil, preReg.Id,
+			preReg.VerificationCodeHash, freshEncrypted, freshHash, issuedAt)
+		if err != nil || !replaced {
+			t.Fatalf("the replacement must take effect: replaced=%v err=%v", replaced, err)
+		}
+
+		// The expired link still names the code it carried, which the row no longer holds.
+		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), nil, preReg.Id, preReg.VerificationCodeHash)
+		if err != nil {
+			t.Fatalf("DeletePreRegistrationHoldingCode failed: %v", err)
+		}
+		if deleted {
+			t.Error("a delete naming a code the row no longer holds must not take effect")
+		}
+
+		fresh, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), nil, freshHash)
+		if err != nil || fresh == nil || fresh.Id != preReg.Id {
+			t.Errorf("the fresh link must still find its row: row=%v err=%v", fresh, err)
+		}
+	})
+
+	t.Run("a row already gone reports nothing deleted", func(t *testing.T) {
+		preReg := createTestPreRegistration(t)
+		if err := database.DeletePreRegistration(context.Background(), nil, preReg.Id); err != nil {
+			t.Fatalf("Failed to delete the pre-registration: %v", err)
+		}
+
+		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), nil, preReg.Id, preReg.VerificationCodeHash)
+		if err != nil {
+			t.Fatalf("DeletePreRegistrationHoldingCode failed: %v", err)
+		}
+		if deleted {
+			t.Error("a delete of a row that no longer exists must not report taking effect")
+		}
+	})
+
+	t.Run("another row's code deletes nothing", func(t *testing.T) {
+		preReg := createTestPreRegistration(t)
+		other := createTestPreRegistration(t)
+
+		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), nil, preReg.Id, other.VerificationCodeHash)
+		if err != nil {
+			t.Fatalf("DeletePreRegistrationHoldingCode failed: %v", err)
+		}
+		if deleted {
+			t.Error("the id and the code must both match")
+		}
+		if !preRegistrationExists(t, preReg.Id) || !preRegistrationExists(t, other.Id) {
+			t.Error("both rows must remain")
+		}
+	})
+
+	t.Run("an empty code hash is refused", func(t *testing.T) {
+		preReg := createTestPreRegistration(t)
+
+		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), nil, preReg.Id, "")
+		if err == nil {
+			t.Error("an empty code hash would match a row nobody issued a code for, and must be refused")
+		}
+		if deleted {
+			t.Error("a refused delete must not report taking effect")
+		}
+		if !preRegistrationExists(t, preReg.Id) {
+			t.Error("the row must remain")
+		}
+	})
+
+	t.Run("it runs on the caller's transaction", func(t *testing.T) {
+		preReg := createTestPreRegistration(t)
+
+		tx := beginTx(t)
+		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), tx, preReg.Id, preReg.VerificationCodeHash)
+		if err != nil || !deleted {
+			t.Fatalf("the delete inside the transaction must take effect: deleted=%v err=%v", deleted, err)
+		}
+		inTx, err := database.GetPreRegistrationById(context.Background(), tx, preReg.Id)
+		if err != nil || inTx != nil {
+			t.Fatalf("the delete must be visible through its transaction: row=%v err=%v", inTx, err)
+		}
+		if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
+			t.Fatalf("RollbackTransaction failed: %v", rollbackErr)
+		}
+
+		if !preRegistrationExists(t, preReg.Id) {
+			t.Error("a rolled-back delete must leave the row")
+		}
+	})
+}
+
 func createTestPreRegistration(t *testing.T) *record.PreRegistration {
 	// The code hash is unique per row and never empty, which is what the production
 	// caller does: verification_code_hash is UNIQUE, so two rows sharing the '' default

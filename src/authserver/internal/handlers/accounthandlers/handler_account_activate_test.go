@@ -173,6 +173,7 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 		// usable (#112 decision 7). No account can be created on this hop, or on the clean GET
 		// after it: HandleActivateGet takes no UserCreator (#207 decision 1).
 		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "DeletePreRegistrationHoldingCode", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 		marker, rejection, err := emaillinks.GetLinkMarker(store, nextBrowserRequest(t, sent, rr, activationCleanGetRequest),
 			emaillinks.LinkMarkerFlowAccountActivate)
@@ -298,6 +299,7 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 		assert.NotEqual(t, http.StatusSeeOther, rr.Code, "a refused second link must not redirect")
 		assertRefusalNotLogged(t, logs)
 		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "DeletePreRegistrationHoldingCode", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 		// The first continuation survives, so the redirect already in flight still activates
 		// the registration whose link produced it.
@@ -340,6 +342,7 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 		assert.NotEqual(t, http.StatusSeeOther, rr.Code, "a refused link must not redirect")
 		assertRefusalNotLogged(t, logs)
 		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "DeletePreRegistrationHoldingCode", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 		marker, rejection, err := emaillinks.GetLinkMarker(store, nextBrowserRequest(t, sent, rr, activationCleanGetRequest),
 			emaillinks.LinkMarkerFlowResetPassword)
@@ -361,7 +364,7 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC().Add(-6*time.Minute))
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
-		database.On("DeletePreRegistration", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil).Once()
+		database.On("DeletePreRegistrationHoldingCode", mock.Anything, (*sql.Tx)(nil), int64(7), codeHash).Return(true, nil).Once()
 		expectRenderedLinkExpired(pageRenderer)
 		expectAuditFailedActivationCode(auditLogger, "code_expired", 7)
 		logs := logtest.CaptureSlog(t)
@@ -374,6 +377,36 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 		assertRefusalNotLogged(t, logs)
 		database.AssertExpectations(t)
 		pageRenderer.AssertExpectations(t)
+		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	// A registration for the address replaced the dead row's code between this request's lookup
+	// and its delete, keeping the row's id. The delete names the code this link carried, so it
+	// declines and the fresh link survives; this link is refused exactly as an expired one is
+	// (#207 decision 6). A delete by id alone took the fresh link with it.
+	// handler_account_activate_sqlite_test.go runs the same interleaving on a real engine.
+	t.Run("an expired code whose row was replaced meanwhile leaves the fresh link", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		store := newMarkerTestStore()
+
+		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC().Add(-11*time.Minute))
+		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
+		database.On("DeletePreRegistrationHoldingCode", mock.Anything, (*sql.Tx)(nil), int64(7), codeHash).Return(false, nil).Once()
+		expectRenderedLinkExpired(pageRenderer)
+		expectAuditFailedActivationCode(auditLogger, "code_expired", 7)
+		logs := logtest.CaptureSlog(t)
+
+		handler := HandleActivateGet(pageRenderer, store, database, auditLogger, testDataCipher)
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, activationLinkFollowedRequest(code))
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assertRefusalNotLogged(t, logs)
+		database.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
+		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("the code's lifetime boundary", func(t *testing.T) {
@@ -396,7 +429,7 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 				preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, tc.issuedAt)
 				database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 				if tc.expired {
-					database.On("DeletePreRegistration", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil).Once()
+					database.On("DeletePreRegistrationHoldingCode", mock.Anything, (*sql.Tx)(nil), int64(7), codeHash).Return(true, nil).Once()
 					expectRenderedLinkExpired(pageRenderer)
 					expectAuditFailedActivationCode(auditLogger, "code_expired", 7)
 				}
@@ -461,6 +494,7 @@ func TestHandleActivateGet_Clean(t *testing.T) {
 		assert.NotContains(t, rendered, "error")
 
 		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "DeletePreRegistrationHoldingCode", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 
 		_, rejection, err = emaillinks.GetLinkMarker(store, nextBrowserRequest(t, sent, rr, activationCleanGetRequest),
@@ -572,6 +606,7 @@ func TestHandleActivateGet_Clean(t *testing.T) {
 				assert.Equal(t, http.StatusOK, rr.Code)
 				assertRefusalNotLogged(t, logs)
 				database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
+				database.AssertNotCalled(t, "DeletePreRegistrationHoldingCode", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 				database.AssertExpectations(t)
 				pageRenderer.AssertExpectations(t)
 			})
@@ -625,6 +660,7 @@ func TestHandleActivateGet_SelfRegistrationDisabled(t *testing.T) {
 			assertSelfRegistrationDisabledLogged(t, logs)
 			database.AssertNotCalled(t, "GetPreRegistrationByVerificationCodeHash", mock.Anything, mock.Anything, mock.Anything)
 			database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "DeletePreRegistrationHoldingCode", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			pageRenderer.AssertExpectations(t)
 		})
 	}
@@ -748,13 +784,18 @@ func expectRenderedActivationFormError(pageRenderer *handlersmocks.PageRenderer,
 	).Return(nil).Once()
 }
 
+// activationTx is the transaction the shared stub hands the activation's body. Expectations
+// written against it match only calls the body made, never one made outside the transaction with
+// nil, which is what tells the consumption and the account apart from writes that commit alone.
+var activationTx = &sql.Tx{}
+
 func TestHandleActivatePost_HappyPath(t *testing.T) {
 	const code = "the-emitted-code"
 	const chosenPassword = "Str0ngP4ss!"
 
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	database := datamocks.NewDatabase(t)
-	userCreator := accounthandlersmocks.NewUserCreator(t)
+	userCreator := accounthandlersmocks.NewTransactionalUserCreator(t)
 	passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	store := newMarkerTestStore()
@@ -764,18 +805,26 @@ func TestHandleActivatePost_HappyPath(t *testing.T) {
 	database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
 	passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword).Return(nil).Once()
 
+	// The account and the consumption are written on the one transaction, and both success
+	// entries are recorded after it commits (AGENTS.md pattern 9).
+	var steps []string
+	datamocks.ExpectRunInTransaction(database, activationTx, func(step string) { steps = append(steps, step) })
+	database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).
+		Run(func(mock.Arguments) { steps = append(steps, "consume") }).Return(true, nil).Once()
 	var created *usercreation.Input
-	userCreator.On("CreateUser", mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) { created = args.Get(1).(*usercreation.Input) }).
+	userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
+		Run(func(args mock.Arguments) {
+			created = args.Get(2).(*usercreation.Input)
+			steps = append(steps, "create account")
+		}).
 		Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
 
-	database.On("DeletePreRegistration", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["email"] == activateTestEmail
-	})).Return().Once()
+	})).Run(func(mock.Arguments) { steps = append(steps, audit.EventCreatedUser) }).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventActivatedAccount, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["email"] == activateTestEmail
-	})).Return().Once()
+	})).Run(func(mock.Arguments) { steps = append(steps, audit.EventActivatedAccount) }).Return().Once()
 	pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
 		"/account_register_activation_result.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			_, expired := data["linkHasExpired"]
@@ -788,6 +837,9 @@ func TestHandleActivatePost_HappyPath(t *testing.T) {
 	handler.ServeHTTP(rr, sent)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, []string{"begin", "create account", "consume", "commit",
+		audit.EventCreatedUser, audit.EventActivatedAccount}, steps)
+	database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 
 	// The account gets the password typed into this form, whoever registered the address: the
 	// person who proved control of the mailbox chooses it (#207 decision 1).
@@ -846,7 +898,7 @@ func TestHandleActivatePost_PasswordFieldRejections(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			database := datamocks.NewDatabase(t)
-			userCreator := accounthandlersmocks.NewUserCreator(t)
+			userCreator := accounthandlersmocks.NewTransactionalUserCreator(t)
 			passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			store := newMarkerTestStore()
@@ -865,8 +917,9 @@ func TestHandleActivatePost_PasswordFieldRejections(t *testing.T) {
 			assert.Equal(t, http.StatusOK, rr.Code)
 			pageRenderer.AssertExpectations(t)
 			database.AssertExpectations(t)
-			userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
+			userCreator.AssertNotCalled(t, "CreateUserInTransaction", mock.Anything, mock.Anything, mock.Anything)
 			database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "DeletePreRegistrationHoldingCode", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
@@ -945,7 +998,7 @@ func TestHandleActivatePost_RefusalsCreateNothing(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			database := datamocks.NewDatabase(t)
-			userCreator := accounthandlersmocks.NewUserCreator(t)
+			userCreator := accounthandlersmocks.NewTransactionalUserCreator(t)
 			passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			store := newMarkerTestStore()
@@ -961,8 +1014,9 @@ func TestHandleActivatePost_RefusalsCreateNothing(t *testing.T) {
 			handler.ServeHTTP(httptest.NewRecorder(), sent)
 
 			assertRefusalNotLogged(t, logs)
-			userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
+			userCreator.AssertNotCalled(t, "CreateUserInTransaction", mock.Anything, mock.Anything, mock.Anything)
 			database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "DeletePreRegistrationHoldingCode", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			database.AssertExpectations(t)
 			passwordValidator.AssertExpectations(t)
 			pageRenderer.AssertExpectations(t)
@@ -983,7 +1037,7 @@ func TestHandleActivatePost_AddressTaken(t *testing.T) {
 	t.Run("the lookup finds an account, before the password is looked at", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		database := datamocks.NewDatabase(t)
-		userCreator := accounthandlersmocks.NewUserCreator(t)
+		userCreator := accounthandlersmocks.NewTransactionalUserCreator(t)
 		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		store := newMarkerTestStore()
@@ -999,7 +1053,7 @@ func TestHandleActivatePost_AddressTaken(t *testing.T) {
 		handler := HandleActivatePost(pageRenderer, store, database, userCreator, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 		handler.ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash))
 
-		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
+		userCreator.AssertNotCalled(t, "CreateUserInTransaction", mock.Anything, mock.Anything, mock.Anything)
 		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything)
 		database.AssertExpectations(t)
 		pageRenderer.AssertExpectations(t)
@@ -1009,7 +1063,7 @@ func TestHandleActivatePost_AddressTaken(t *testing.T) {
 	t.Run("the insert loses the race on the unique email index", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		database := datamocks.NewDatabase(t)
-		userCreator := accounthandlersmocks.NewUserCreator(t)
+		userCreator := accounthandlersmocks.NewTransactionalUserCreator(t)
 		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		store := newMarkerTestStore()
@@ -1019,8 +1073,11 @@ func TestHandleActivatePost_AddressTaken(t *testing.T) {
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 		database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
 		passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword).Return(nil).Once()
-		userCreator.On("CreateUser", mock.Anything, mock.Anything).
+		stub := datamocks.ExpectRunInTransaction(database, activationTx)
+		userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
 			Return(nil, errs.Wrap(data.ErrUniqueViolation, "unable to insert user")).Once()
+		// The transaction rolled back with the refused insert, so the pending registration, which
+		// can never complete, is deleted by the refusal outside it.
 		database.On("DeletePreRegistration", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil).Once()
 		expectRenderedLinkExpiredAt(pageRenderer, http.StatusBadRequest)
 		expectAuditFailedActivationCode(auditLogger, "address_taken", 7)
@@ -1028,6 +1085,7 @@ func TestHandleActivatePost_AddressTaken(t *testing.T) {
 		handler := HandleActivatePost(pageRenderer, store, database, userCreator, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 		handler.ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash))
 
+		assert.ErrorIs(t, stub.BodyErr, data.ErrUniqueViolation, "the body handed the refused insert to the helper, which rolls back")
 		assertRefusalNotLogged(t, logs)
 		database.AssertExpectations(t)
 		userCreator.AssertExpectations(t)
@@ -1035,31 +1093,139 @@ func TestHandleActivatePost_AddressTaken(t *testing.T) {
 		// The strict mock holds the entries to the one refusal: no created_user, no activated_account.
 		auditLogger.AssertExpectations(t)
 	})
+}
 
-	// Any other insert failure is a server fault, not a refusal: the 500 page, the pending
-	// registration left alone, and no entry filing it under the link.
-	t.Run("another insert failure stays a server error", func(t *testing.T) {
-		pageRenderer := handlersmocks.NewPageRenderer(t)
-		database := datamocks.NewDatabase(t)
-		userCreator := accounthandlersmocks.NewUserCreator(t)
-		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
-		auditLogger := handlersmocks.NewAuditLogger(t)
-		store := newMarkerTestStore()
+// The account, its permission and the consumption of the pending registration commit together or
+// not at all, and created_user and activated_account are recorded only after they commit
+// (AGENTS.md pattern 9). Each failure answers the 500 page, records no entry, and leaves the
+// pending registration to the rollback rather than deleting it outside the transaction. The
+// account used to commit in its own transaction before the consumption, so a failed consumption
+// answered the 500 page over a verified, enabled account. handler_account_activate_sqlite_test.go
+// shows the rollback on a real engine.
+func TestHandleActivatePost_AFailureCommitsNothing(t *testing.T) {
+	const code = "the-emitted-code"
+	const chosenPassword = "Str0ngP4ss!"
 
-		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
-		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
-		database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
-		passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword).Return(nil).Once()
-		userCreator.On("CreateUser", mock.Anything, mock.Anything).Return(nil, errs.New("connection reset")).Once()
-		pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Once()
+	for _, tc := range []struct {
+		name string
+		// arrange registers the transaction and what its body is told, and returns the stub so
+		// the case can check what the body handed the helper; nil when the transaction never
+		// opens.
+		arrange func(database *datamocks.Database, userCreator *accounthandlersmocks.TransactionalUserCreator,
+			codeHash string) *datamocks.RunInTransactionStub
+		wantBodyErr bool
+	}{
+		{
+			name: "the account insert fails",
+			arrange: func(database *datamocks.Database, userCreator *accounthandlersmocks.TransactionalUserCreator,
+				codeHash string) *datamocks.RunInTransactionStub {
+				stub := datamocks.ExpectRunInTransaction(database, activationTx)
+				userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
+					Return(nil, errs.New("connection reset")).Once()
+				return stub
+			},
+			wantBodyErr: true,
+		},
+		{
+			name: "the consumption fails after the account insert",
+			arrange: func(database *datamocks.Database, userCreator *accounthandlersmocks.TransactionalUserCreator,
+				codeHash string) *datamocks.RunInTransactionStub {
+				stub := datamocks.ExpectRunInTransaction(database, activationTx)
+				userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
+					Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+				database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).
+					Return(false, errs.New("connection reset")).Once()
+				return stub
+			},
+			wantBodyErr: true,
+		},
+		{
+			name: "the engine refuses the commit",
+			arrange: func(database *datamocks.Database, userCreator *accounthandlersmocks.TransactionalUserCreator,
+				codeHash string) *datamocks.RunInTransactionStub {
+				stub := datamocks.ExpectRunInTransactionThenFail(database, activationTx, errs.New("commit refused"))
+				userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
+					Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+				database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).Return(true, nil).Once()
+				return stub
+			},
+		},
+		{
+			name: "the transaction never opens",
+			arrange: func(database *datamocks.Database, userCreator *accounthandlersmocks.TransactionalUserCreator,
+				codeHash string) *datamocks.RunInTransactionStub {
+				datamocks.ExpectRunInTransactionRefused(database, errs.New("cannot begin"))
+				return nil
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			database := datamocks.NewDatabase(t)
+			userCreator := accounthandlersmocks.NewTransactionalUserCreator(t)
+			passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			store := newMarkerTestStore()
 
-		handler := HandleActivatePost(pageRenderer, store, database, userCreator, passwordValidator, auditLogger, testAdminConsoleBaseURL)
-		handler.ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash))
+			preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
+			database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
+			database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
+			passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword).Return(nil).Once()
+			stub := tc.arrange(database, userCreator, codeHash)
+			pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Once()
 
-		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-		pageRenderer.AssertExpectations(t)
-	})
+			handler := HandleActivatePost(pageRenderer, store, database, userCreator, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+			handler.ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash))
+
+			if tc.wantBodyErr {
+				assert.Error(t, stub.BodyErr, "the body handed the failure to the helper, which rolls back")
+			}
+			database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertExpectations(t)
+			userCreator.AssertExpectations(t)
+			pageRenderer.AssertExpectations(t)
+		})
+	}
+}
+
+// A pending registration deleted between the lookup and the transaction, swept or refused
+// elsewhere, is found no longer holding the marker's code by the fenced consumption. It is refused
+// as a replayed marker is, at 400, and the body hands the refusal to the helper, so the account it
+// had inserted rolls back rather than committing over a registration that no longer exists.
+func TestHandleActivatePost_DeletedMeanwhile(t *testing.T) {
+	const code = "the-emitted-code"
+	const chosenPassword = "Str0ngP4ss!"
+
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
+	userCreator := accounthandlersmocks.NewTransactionalUserCreator(t)
+	passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	store := newMarkerTestStore()
+	logs := logtest.CaptureSlog(t)
+
+	preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
+	database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
+	database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
+	passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword).Return(nil).Once()
+	stub := datamocks.ExpectRunInTransaction(database, activationTx)
+	userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
+		Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+	database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).Return(false, nil).Once()
+	expectRenderedLinkExpiredAt(pageRenderer, http.StatusBadRequest)
+	expectAuditFailedActivationCode(auditLogger, "code_no_longer_outstanding", 0)
+
+	handler := HandleActivatePost(pageRenderer, store, database, userCreator, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+	handler.ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash))
+
+	assert.Error(t, stub.BodyErr, "the refusal leaves the transaction through the helper's rollback, account included")
+	assertRefusalNotLogged(t, logs)
+	database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
+	// The strict mock holds the entries to the one refusal: no created_user, no activated_account.
+	auditLogger.AssertExpectations(t)
 }
 
 // The POST refuses while self-registration is off, like both GET hops, given everything it would
@@ -1067,7 +1233,7 @@ func TestHandleActivatePost_AddressTaken(t *testing.T) {
 func TestHandleActivatePost_SelfRegistrationDisabled(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	database := datamocks.NewDatabase(t)
-	userCreator := accounthandlersmocks.NewUserCreator(t)
+	userCreator := accounthandlersmocks.NewTransactionalUserCreator(t)
 	passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	store := newMarkerTestStore()
@@ -1081,6 +1247,6 @@ func TestHandleActivatePost_SelfRegistrationDisabled(t *testing.T) {
 
 	assertSelfRegistrationDisabledLogged(t, logs)
 	database.AssertNotCalled(t, "GetPreRegistrationByVerificationCodeHash", mock.Anything, mock.Anything, mock.Anything)
-	userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
+	userCreator.AssertNotCalled(t, "CreateUserInTransaction", mock.Anything, mock.Anything, mock.Anything)
 	pageRenderer.AssertExpectations(t)
 }

@@ -119,6 +119,45 @@ func (d *Database) DeletePreRegistration(ctx context.Context, tx *sql.Tx, preReg
 	return nil
 }
 
+// DeletePreRegistrationHoldingCode deletes a pending registration only while it still holds
+// codeHash, the code the caller read and decided on, and reports whether this call deleted it.
+//
+// It is DeletePreRegistration fenced the way TryReplacePreRegistrationCode is: a replacement keeps
+// the row's id and gives it a fresh code, so a caller that read the row before the replacement
+// and deletes by id alone would delete the fresh link with it. Naming the code the caller read
+// makes that caller's delete decline instead, as it does for a row consumed or swept meanwhile
+// (#207 decision 6).
+func (d *Database) DeletePreRegistrationHoldingCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64,
+	codeHash string) (bool, error) {
+
+	// '' is the dormant value, which would match a row nobody issued a code for.
+	if codeHash == "" {
+		return false, errs.New("can't delete a preRegistration by an empty code hash")
+	}
+
+	preRegistrationStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
+		For(d.Flavor)
+
+	deleteBuilder := preRegistrationStruct.DeleteFrom("pre_registrations")
+	deleteBuilder.Where(
+		deleteBuilder.Equal("id", preRegistrationId),
+		deleteBuilder.Equal("verification_code_hash", codeHash),
+	)
+
+	sql, args := deleteBuilder.Build()
+	result, err := d.ExecSQL(ctx, tx, sql, args...)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to delete preRegistration")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errs.Wrap(err, "unable to get rows affected when deleting preRegistration")
+	}
+
+	return rowsAffected == 1, nil
+}
+
 // DeleteDeadPreRegistrations sweeps the pending registrations that can no longer complete: every
 // row whose code was issued before deadBefore, and every row with no issued-at, which no link can
 // activate. A row issued exactly at deadBefore is kept, as emaillinks.IsPreRegistrationDead keeps

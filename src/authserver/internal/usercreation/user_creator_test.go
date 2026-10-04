@@ -184,3 +184,72 @@ func TestCreator_CreateUser_TheBodyIsSafeToRerun(t *testing.T) {
 		"each attempt's permission row names the id that attempt's user insert assigned")
 	assert.Equal(t, int64(78), user.Id, "the caller sees the id of the attempt that committed")
 }
+
+// CreateUserInTransaction is for a caller that writes other rows beside the account and must
+// commit them together (activation, #207): every read and both inserts run on the caller's
+// transaction, and it opens none of its own, which would commit the account alone.
+func TestCreator_CreateUserInTransaction_RunsEverythingOnTheCallersTransaction(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+	db.On("GetResourceByResourceIdentifier", mock.Anything, txSentinel, builtin.AuthServerResourceIdentifier).
+		Return(&record.Resource{Id: 3}, nil).Once()
+	db.On("GetPermissionsByResourceId", mock.Anything, txSentinel, int64(3)).Return(accountPermissions(), nil).Once()
+
+	var calls []string
+	db.On("CreateUser", mock.Anything, txSentinel, mock.Anything).Run(func(args mock.Arguments) {
+		args.Get(2).(*record.User).Id = 77
+		calls = append(calls, "user row")
+	}).Return(nil).Once()
+	db.On("CreateUserPermission", mock.Anything, txSentinel, mock.MatchedBy(func(up *record.UserPermission) bool {
+		return up.UserId == 77 && up.PermissionId == accountPermissionId
+	})).Run(func(mock.Arguments) { calls = append(calls, "permission row") }).Return(nil).Once()
+
+	user, err := New(db).CreateUserInTransaction(context.Background(), txSentinel, &Input{
+		Email:         "ada@example.com",
+		EmailVerified: true,
+		PasswordHash:  "hash",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, user)
+
+	assert.Equal(t, []string{"user row", "permission row"}, calls)
+	assert.Equal(t, int64(77), user.Id)
+	assert.True(t, user.Enabled)
+	assert.True(t, user.EmailVerified)
+	assert.Equal(t, "hash", user.PasswordHash)
+	require.Len(t, user.Permissions, 1)
+	assert.Equal(t, accountPermissionId, user.Permissions[0].Id)
+	db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+}
+
+// A failed insert is the caller's to roll back, so it is returned as it is and nothing after it
+// is written.
+func TestCreator_CreateUserInTransaction_AFailedUserInsertIsReturnedAndWritesNoPermission(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+	db.On("GetResourceByResourceIdentifier", mock.Anything, txSentinel, builtin.AuthServerResourceIdentifier).
+		Return(&record.Resource{Id: 3}, nil).Once()
+	db.On("GetPermissionsByResourceId", mock.Anything, txSentinel, int64(3)).Return(accountPermissions(), nil).Once()
+
+	boom := errors.New("the engine refused the insert")
+	db.On("CreateUser", mock.Anything, txSentinel, mock.Anything).Return(boom).Once()
+
+	user, err := New(db).CreateUserInTransaction(context.Background(), txSentinel, &Input{Email: "ada@example.com"})
+
+	require.ErrorIs(t, err, boom)
+	assert.Nil(t, user)
+	db.AssertNotCalled(t, "CreateUserPermission", mock.Anything, mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+}
+
+// A nil transaction would make every write commit on its own, which is the one thing a caller
+// choosing this method is avoiding, so it is refused before anything is read or written.
+func TestCreator_CreateUserInTransaction_RefusesANilTransaction(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+
+	user, err := New(db).CreateUserInTransaction(context.Background(), nil, &Input{Email: "ada@example.com"})
+
+	require.Error(t, err)
+	assert.Nil(t, user)
+	db.AssertNotCalled(t, "GetResourceByResourceIdentifier", mock.Anything, mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+}

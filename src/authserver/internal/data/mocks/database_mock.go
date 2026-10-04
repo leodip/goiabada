@@ -3992,6 +3992,84 @@ func (_c *Database_DeletePreRegistration_Call) RunAndReturn(run func(ctx context
 	return _c
 }
 
+// DeletePreRegistrationHoldingCode provides a mock function for the type Database
+func (_mock *Database) DeletePreRegistrationHoldingCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64, codeHash string) (bool, error) {
+	ret := _mock.Called(ctx, tx, preRegistrationId, codeHash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeletePreRegistrationHoldingCode")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string) (bool, error)); ok {
+		return returnFunc(ctx, tx, preRegistrationId, codeHash)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string) bool); ok {
+		r0 = returnFunc(ctx, tx, preRegistrationId, codeHash)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, string) error); ok {
+		r1 = returnFunc(ctx, tx, preRegistrationId, codeHash)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_DeletePreRegistrationHoldingCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeletePreRegistrationHoldingCode'
+type Database_DeletePreRegistrationHoldingCode_Call struct {
+	*mock.Call
+}
+
+// DeletePreRegistrationHoldingCode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - preRegistrationId int64
+//   - codeHash string
+func (_e *Database_Expecter) DeletePreRegistrationHoldingCode(ctx any, tx any, preRegistrationId any, codeHash any) *Database_DeletePreRegistrationHoldingCode_Call {
+	return &Database_DeletePreRegistrationHoldingCode_Call{Call: _e.mock.On("DeletePreRegistrationHoldingCode", ctx, tx, preRegistrationId, codeHash)}
+}
+
+func (_c *Database_DeletePreRegistrationHoldingCode_Call) Run(run func(ctx context.Context, tx *sql.Tx, preRegistrationId int64, codeHash string)) *Database_DeletePreRegistrationHoldingCode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeletePreRegistrationHoldingCode_Call) Return(b bool, err error) *Database_DeletePreRegistrationHoldingCode_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_DeletePreRegistrationHoldingCode_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, preRegistrationId int64, codeHash string) (bool, error)) *Database_DeletePreRegistrationHoldingCode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteRedirectURI provides a mock function for the type Database
 func (_mock *Database) DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIId int64) error {
 	ret := _mock.Called(ctx, tx, redirectURIId)
