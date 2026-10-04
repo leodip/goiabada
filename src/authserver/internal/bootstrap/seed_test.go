@@ -526,3 +526,52 @@ func TestRun_WritesOneSeededRecord(t *testing.T) {
 	assert.Contains(t, messages, "app name is not set, defaulting it")
 	assert.Contains(t, messages, "using pre-generated OAuth client secret from environment")
 }
+
+// TestRun_AStopDuringTheSeedLetsItFinish and the case after it are #390 decision 9 for the seed: a
+// shutdown signal arriving while the seed writes lets it commit, since it is one transaction and
+// stopping it would only leave the next start to seed again, and one arriving before it begins
+// keeps it from beginning.
+func TestRun_AStopDuringTheSeedLetsItFinish(t *testing.T) {
+	db := newSeedDB(t)
+	cfg := singleStepConfig()
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	faults := &faultDB{runDatabase: db, onWrite: stop}
+
+	outcome, err := testRunner(faults, cfg).run(ctx)
+
+	require.NoError(t, err, "the seed under way when the stop arrived committed")
+	assert.Equal(t, Continue, outcome)
+	assert.Equal(t, seedWrites, faults.writes)
+	assertSeeded(t, db, cfg)
+}
+
+func TestRun_AStopBeforeTheSeedLeavesTheDatabaseEmpty(t *testing.T) {
+	db := newSeedDB(t)
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	stopping := &stopAfterTheEmptinessCheck{runDatabase: db, stop: stop}
+	faults := &faultDB{runDatabase: stopping}
+
+	outcome, err := testRunner(faults, singleStepConfig()).run(ctx)
+
+	require.ErrorIs(t, err, context.Canceled, "the start was asked to stop, and answers in a way main can match")
+	assert.Equal(t, Refused, outcome)
+	assert.Zero(t, faults.writes, "the seed did not begin")
+	isEmpty, err := db.IsEmpty(context.Background())
+	require.NoError(t, err)
+	assert.True(t, isEmpty, "the next start seeds")
+}
+
+// stopAfterTheEmptinessCheck answers the emptiness check and then stops the start, which is the
+// last moment before the seed begins.
+type stopAfterTheEmptinessCheck struct {
+	runDatabase
+	stop func()
+}
+
+func (s *stopAfterTheEmptinessCheck) IsEmpty(ctx context.Context) (bool, error) {
+	isEmpty, err := s.runDatabase.IsEmpty(ctx)
+	s.stop()
+	return isEmpty, err
+}

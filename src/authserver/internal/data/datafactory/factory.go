@@ -16,6 +16,7 @@ package datafactory
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -159,6 +160,12 @@ func mssqlConfig(c *config.DatabaseConfig) *mssqldb.DatabaseConfig {
 // startupProgress, and the record saying nothing needed migrating is this function's own (#438,
 // #390 decision 7).
 //
+// ctx is the start's, and its end is a shutdown signal (#390 decision 9): it cancels a wait, for
+// the engine, its creation or the migration lock, at once; a migration file already running runs
+// to its end and no further one starts, and the start says where the schema stopped; the
+// data-key rotation finishes if it is under way and does not start otherwise. What NewDatabase
+// answers after a stop then matches context.Canceled, which is how main tells it from a failure.
+//
 // The two data-encryption keys are parameters rather than reads of a configuration singleton, so
 // that the refusal below is one call away from a test rather than unreachable (#351). aesKey is
 // required and must be 32 bytes; previousAESKey is optional and is acted on only at that length,
@@ -180,6 +187,14 @@ func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []
 
 	migrated, err := m.UpToHead(ctx, buildinfo.Version, startupProgress{ctx: ctx})
 	if err != nil {
+		var stopped migrator.StoppedError
+		if errors.As(err, &stopped) {
+			slog.InfoContext(ctx, "database migration stopped",
+				"from_version", recordedVersion(stopped.From),
+				"reached_version", recordedVersion(stopped.Reached),
+				"applied", stopped.Applied,
+				"remaining", stopped.Remaining)
+		}
 		return nil, err
 	}
 	if !migrated {

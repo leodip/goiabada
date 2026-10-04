@@ -267,6 +267,98 @@ func TestMigrationLock_AStartWithTheLockFreeSaysNothingAboutWaiting(t *testing.T
 	requireMigrationLockIsFree(t, h, eng, "after a start that took it at once")
 }
 
+// TestMigrationLock_AStopWhileQueuedEndsTheWait is #390 decision 9 for the one wait decision 6
+// made indefinite: a start queued behind another session's migration lock, asked to stop, stops
+// waiting at once rather than when the lock comes back, migrates nothing, and leaves nothing behind
+// that keeps the lock from the others once its holder releases it.
+//
+// Run via: ./run-tests.sh --type data --db <mysql|postgres|mssql> --run TestMigrationLock
+func TestMigrationLock_AStopWhileQueuedEndsTheWait(t *testing.T) {
+	if !hasSessionMigrationLock() {
+		t.Skipf("%s has no session-scoped migration lock: its exclusion is a process-wide mutex", dbType())
+	}
+
+	h := newIsolatedDB(t)
+	eng := migrationLockEngine(t, h.Name)
+
+	release := holdMigrationLock(t, h, eng)
+	capture := logtest.CaptureSlog(t)
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	done := startInBackgroundWith(t, ctx, h.Name)
+
+	awaitRecord(t, capture, done, "waiting for the migration lock")
+	stop()
+	select {
+	case res := <-done:
+		require.ErrorIsf(t, res.err, context.Canceled,
+			"the stop is answered as the cancellation it was, so the process can tell it from a failure, on %s", dbType())
+	case <-time.After(migrationLockHoldBudget):
+		t.Fatalf("the start went on waiting for the migration lock for %s after it was asked to stop on %s",
+			migrationLockHoldBudget, dbType())
+	}
+	assert.Empty(t, recordsNamed(capture, "migrating the database"), "a stopped start migrates nothing")
+	assert.Empty(t, recordsNamed(capture, "database migration stopped"), "no migration was under way")
+
+	release()
+	requireMigrationLockIsFree(t, h, eng, "after a start queued behind it was stopped")
+}
+
+// TestMigrationLock_AStopDuringTheMigrationsGivesTheLockBack: a start stopped while it migrates
+// releases the migration lock itself, as a finished one does, whatever became of its context. The
+// stop arrives as the start says it is migrating, after the lock and before the first file, so it
+// lands between files on every engine; the runner's own tests hold a stop landing inside a file.
+//
+// Run via: ./run-tests.sh --type data --db <mysql|postgres|mssql> --run TestMigrationLock
+func TestMigrationLock_AStopDuringTheMigrationsGivesTheLockBack(t *testing.T) {
+	if !hasSessionMigrationLock() {
+		t.Skipf("%s has no session-scoped migration lock: its exclusion is a process-wide mutex", dbType())
+	}
+
+	h := newIsolatedDB(t)
+	eng := migrationLockEngine(t, h.Name)
+
+	capture := logtest.CaptureSlog(t)
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	previous := slog.Default()
+	slog.SetDefault(slog.New(stoppingHandler{Handler: previous.Handler(), message: "migrating the database", stop: stop}))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
+	var res startResult
+	select {
+	case res = <-startInBackgroundWith(t, ctx, h.Name):
+	case <-time.After(migrationLockRecordBudget):
+		t.Fatalf("the start did not stop within %s of being asked to on %s", migrationLockRecordBudget, dbType())
+	}
+
+	var stopped migrator.StoppedError
+	require.Truef(t, errors.As(res.err, &stopped), "a stop is answered as one on %s: %v", dbType(), res.err)
+	assert.NotContainsf(t, res.err.Error(), "migration lock",
+		"the release ran whatever became of the start's context, so nothing about the lock joins the stop on %s", dbType())
+	require.Len(t, recordsNamed(capture, "database migration stopped"), 1)
+
+	_, dirty, err := h.Migrator.Version(context.Background())
+	assert.Truef(t, migrator.IsNilVersion(err), "nothing ran, so nothing is recorded on %s: %v", dbType(), err)
+	assert.False(t, dirty)
+	requireMigrationLockIsFree(t, h, eng, "after a start stopped while it migrated")
+}
+
+// stoppingHandler calls stop as soon as a record carrying message is written.
+type stoppingHandler struct {
+	slog.Handler
+	message string
+	stop    func()
+}
+
+func (h stoppingHandler) Handle(ctx context.Context, r slog.Record) error {
+	err := h.Handler.Handle(ctx, r)
+	if r.Message == h.message {
+		h.stop()
+	}
+	return err
+}
+
 // startResult is what a start in the background answered.
 type startResult struct{ err error }
 
@@ -275,6 +367,12 @@ type startResult struct{ err error }
 // opened pool is closed on t before the isolated database's own drop runs, which needs no session
 // left on it.
 func startInBackground(t *testing.T, name string) <-chan startResult {
+	t.Helper()
+	return startInBackgroundWith(t, context.Background(), name)
+}
+
+// startInBackgroundWith is startInBackground under ctx, which is how a case stops the start.
+func startInBackgroundWith(t *testing.T, ctx context.Context, name string) <-chan startResult {
 	t.Helper()
 	cfg := appConfig.Database
 	cfg.Name = name
@@ -291,7 +389,7 @@ func startInBackground(t *testing.T, name string) <-chan startResult {
 
 	done := make(chan startResult, 1)
 	go func() {
-		db, err := datafactory.NewDatabase(context.Background(), &cfg, dataKey, nil, false)
+		db, err := datafactory.NewDatabase(ctx, &cfg, dataKey, nil, false)
 		if db != nil {
 			opened <- db
 		}

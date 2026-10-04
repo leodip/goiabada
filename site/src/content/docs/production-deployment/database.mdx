@@ -85,12 +85,38 @@ and the listeners starting:
 | `migrating the database` | Before the first migration runs | `from_version`, `to_version`, `pending` |
 | `database migrated` | After the last migration has run | `from_version`, `to_version`, `applied`, `duration` |
 | `no need to migrate the database` | The schema is already current | none |
+| `database migration stopped` | A shutdown signal stopped the migrations between two files | `from_version`, `reached_version`, `applied`, `remaining` |
 
 `from_version` is the schema version the database recorded, 0 for one that was never migrated, and
 `to_version` the one this release expects. `pending` and `applied` count migration files. A replica
 that waited behind another one's migration writes `waiting for the migration lock` and then `no
 need to migrate the database`. A start that writes `waiting for the migration lock` and nothing more
 is waiting for a process that is still migrating, not hung.
+
+A shutdown signal (SIGTERM, which Kubernetes and Compose send, or SIGINT) that reaches the auth
+server while it is still starting stops it cleanly, whatever it is doing:
+
+- A wait ends at once: for the database connection, for the database to be created, or for the
+  migration lock.
+- A migration file already running runs to its end, and the next one does not start. The lock is
+  released and the schema is left clean at the version it reached, which the next start carries on
+  from, so a start stopped repeatedly still advances file by file.
+- The data-key rotation and a first start's seed each commit whole: one under way completes, and one
+  not yet begun does not begin.
+
+The auth server then writes `shutdown signal received`, `database migration stopped` if migrations
+were under way (`reached_version` is where the schema now is, `remaining` how many files the next
+start will run), and `auth server stopped`, and exits 0. This happens whenever a pod is deleted while
+it starts (a second rollout, a scale-down, a node drain), when its startup budget runs out, and on
+`docker compose stop` during a first start.
+
+The one thing the auth server cannot finish is a migration file that runs longer than the grace
+period the platform allows a stop (`terminationGracePeriodSeconds` in Kubernetes, `stop_grace_period`
+in Compose): the platform then ends it with SIGKILL, which no process can intercept. That file is
+left marked dirty, and on MySQL and SQL Server, which run each file without an enclosing transaction,
+partly applied, and the next start refuses until the schema is repaired by hand, as its error
+explains. Before an upgrade carrying such a migration, raise the startup budget so the platform does
+not stop the start mid-file, and do not stop it yourself.
 
 The commands below run against the database in `GOIABADA_DB_*` and do not start the server. The
 `--db-*` flags override those variables, given before or after `migrate`; any other flag goes before

@@ -22,7 +22,7 @@ type Progress interface {
 	// the version it is going to and how many files that takes.
 	Migrating(from, to, pending int)
 	// Migrated is called after the last file has run and the schema is at to: how many files ran
-	// and how long they took.
+	// and how long they took. Never after a stop, which UpToHead answers as StoppedError.
 	Migrated(from, to, applied int, took time.Duration)
 }
 
@@ -39,6 +39,10 @@ func (noProgress) Migrated(int, int, int, time.Duration) {}
 // whether any migration ran, so the caller, which owns the startup record, can say so; nothing
 // here logs. progress is told what happens on the way, and may be nil.
 //
+// ctx is the start's: its end cancels a wait, for a connection or for the migration lock, and
+// stops the chain between two files, answered as StoppedError and not wrapped as a refusal, since
+// the start was asked to stop and did (#390 decision 9).
+//
 // Nothing to do is the bare ErrNoChange and nothing else, tested by identity. run joins a failed
 // unlock onto what the operation returned, so at head with a lock that did not come back Up
 // answers errors.Join(ErrNoChange, unlockErr); errors.Is would read that as a clean start and
@@ -54,6 +58,11 @@ func (m *Migrator) UpToHead(ctx context.Context, goiabadaVersion string, progres
 	err = m.up(ctx, progress)
 	if IsNoChange(err) {
 		return false, nil
+	}
+	var stopped StoppedError
+	if errors.As(err, &stopped) {
+		// Not a refusal: the start was asked to stop, and it did so with the schema clean.
+		return false, err
 	}
 	if err != nil {
 		return false, errs.Wrap(StartupRefusal(err, goiabadaVersion), "unable to migrate the database")

@@ -188,3 +188,39 @@ func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 		assert.Empty(t, rotatedRecords(capture), "a rotation that failed must not be reported as one that happened")
 	})
 }
+
+// TestRunStartupDataTasks_AStopBeforeTheRotationStartsNothing and the case after it are #390
+// decision 9 for the data-key rotation: a shutdown signal during startup does not start the
+// rotation, and a rotation under way when it arrives runs to its end, since the re-key is one
+// transaction and the next start would only have to begin it again.
+func TestRunStartupDataTasks_AStopBeforeTheRotationStartsNothing(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+	ctx, stop := context.WithCancel(context.Background())
+	stop()
+
+	err := runStartupDataTasks(ctx, db, currentKey, previousKey)
+
+	require.ErrorIs(t, err, context.Canceled, "the start was asked to stop, and says so in a way it can match")
+	db.AssertNotCalled(t, "GetAllSigningKeys", mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "ReencryptToKey", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestRunStartupDataTasks_AStopDuringTheRotationLetsItFinish(t *testing.T) {
+	capture := logtest.CaptureSlog(t)
+	db := datamocks.NewDatabase(t)
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	// The stop arrives once the rotation has begun, with its read of the canary.
+	db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).
+		Run(func(context.Context, *sql.Tx) { stop() }).
+		Return([]record.KeyPair{canaryUnder(t, previousKey)}, nil).Once()
+	var reencryptCtxErr error
+	db.EXPECT().ReencryptToKey(mock.Anything, previousKey, currentKey).
+		Run(func(ctx context.Context, _, _ []byte) { reencryptCtxErr = ctx.Err() }).
+		Return(nil).Once()
+
+	require.NoError(t, runStartupDataTasks(ctx, db, currentKey, previousKey))
+
+	assert.NoError(t, reencryptCtxErr, "the re-key ran under a context the stop could not end")
+	assert.Len(t, rotatedRecords(capture), 1, "and it finished, and said so")
+}

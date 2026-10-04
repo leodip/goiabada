@@ -149,6 +149,33 @@ func (e DirtyError) Error() string {
 	return b.String()
 }
 
+// StoppedError says the operation's context ended while the schema was being stepped, and the
+// runner stopped between two files: the file running when it ended ran to its end and was recorded
+// clean, and no further file started (#390 decision 9). The schema is clean at Reached, which the
+// next operation carries on from. Cutting the running file short instead would leave it dirty, and
+// on MySQL and SQL Server partly applied, which no start can carry on from without an operator.
+//
+// It unwraps to the context's error, so a caller that stopped the operation can tell the stop from
+// a failure with errors.Is.
+type StoppedError struct {
+	// From is the version the operation started at.
+	From int
+	// Reached is the version the schema is recorded at, clean: From when no file ran.
+	Reached int
+	// Applied is how many files ran, and Remaining how many the operation still had to run.
+	Applied   int
+	Remaining int
+	// Cause is the context's error.
+	Cause error
+}
+
+func (e StoppedError) Error() string {
+	return fmt.Sprintf("the migration stopped at version %s, clean, with %d of %d migrations applied: %v",
+		formatVersion(e.Reached), e.Applied, e.Applied+e.Remaining, e.Cause)
+}
+
+func (e StoppedError) Unwrap() error { return e.Cause }
+
 // UnknownVersionError says a version is not among the migration files this binary carries for this
 // engine. It arises two ways, and they need different sentences: the DATABASE records a version
 // the binary does not know, which means a newer release migrated it, or an operator asked to step

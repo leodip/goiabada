@@ -13,6 +13,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
@@ -402,6 +403,105 @@ func TestNewDatabase_SaysWhenItMigratesAndWhenItHasMigrated(t *testing.T) {
 	assert.Empty(t, recordsNamed(second, "migrating the database"), "a restart at head runs nothing")
 	assert.Empty(t, recordsNamed(second, "database migrated"), "so it has migrated nothing")
 	assert.Len(t, recordsNamed(second, "no need to migrate the database"), 1, "and says that instead")
+}
+
+// TestNewDatabase_AStopDuringTheMigrationsSaysWhereItLeftTheSchema is #390 decision 9's record: a
+// start stopped while it migrates says where the schema stopped, from where, and how many files
+// ran and remained, so an operator reading the last start knows the next one carries on from
+// there. The stop arrives as the start says it is migrating, which is after the lock and before
+// the first file, so it lands between files whatever the machine's speed; the runner's own tests
+// hold a stop landing inside a file.
+func TestNewDatabase_AStopDuringTheMigrationsSaysWhereItLeftTheSchema(t *testing.T) {
+	_, carried := sqliteMigrationSet(t)
+	dsn := filepath.Join(t.TempDir(), "stopped.db")
+	cfg := &config.DatabaseConfig{Type: "sqlite", DSN: dsn}
+	aesKey := []byte("0123456789abcdef0123456789abcdef")
+
+	capture := logtest.CaptureSlog(t)
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	stopOnRecord(t, "migrating the database", stop)
+
+	database, err := NewDatabase(ctx, cfg, aesKey, nil, false)
+
+	require.ErrorIs(t, err, context.Canceled, "the start was asked to stop, and answers in a way main can match")
+	assert.Nil(t, database)
+	stopped := recordsNamed(capture, "database migration stopped")
+	require.Len(t, stopped, 1, "a stop during the migrations says so once")
+	assert.Equal(t, slog.LevelInfo, stopped[0].Level, "a stop the platform asked for is lifecycle, which is Info")
+	assert.Equal(t, map[string]any{
+		"from_version":    int64(0),
+		"reached_version": int64(0),
+		"applied":         int64(0),
+		"remaining":       int64(carried),
+	}, stopped[0].Attrs)
+	assert.Equal(t, []string{"migrating the database", "database migration stopped"},
+		messageOrder(capture, "migrating the database", "database migrated", "database migration stopped"),
+		"the schema did not reach head, so nothing may say it was migrated")
+
+	_, dirty, versionErr := sqliteMigrator(t, dsn).Version(context.Background())
+	assert.Truef(t, migrator.IsNilVersion(versionErr), "the stop came before the first file, so nothing is recorded: %v", versionErr)
+	assert.False(t, dirty)
+}
+
+// TestNewDatabase_AStopAfterTheMigrationsStartsNoFurtherStep: the migrations are done and the
+// stop is answered before the next step, so the start ends there, with nothing to say about a
+// migration that finished.
+func TestNewDatabase_AStopAfterTheMigrationsStartsNoFurtherStep(t *testing.T) {
+	head, _ := sqliteMigrationSet(t)
+	dsn := filepath.Join(t.TempDir(), "migrated.db")
+	cfg := &config.DatabaseConfig{Type: "sqlite", DSN: dsn}
+	aesKey := []byte("0123456789abcdef0123456789abcdef")
+
+	capture := logtest.CaptureSlog(t)
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	stopOnRecord(t, "database migrated", stop)
+
+	database, err := NewDatabase(ctx, cfg, aesKey, nil, false)
+
+	require.ErrorIs(t, err, context.Canceled, "a start asked to stop goes no further than the step it was in")
+	assert.Nil(t, database)
+	assert.Empty(t, recordsNamed(capture, "database migration stopped"), "the migrations were not under way")
+
+	version, dirty, versionErr := sqliteMigrator(t, dsn).Version(context.Background())
+	require.NoError(t, versionErr)
+	assert.Equal(t, head, version)
+	assert.False(t, dirty)
+}
+
+// stopOnRecord calls stop as soon as a record carrying message is written, over whatever handler
+// is installed, which is the capture.
+func stopOnRecord(t *testing.T, message string, stop func()) {
+	t.Helper()
+	previous := slog.Default()
+	slog.SetDefault(slog.New(stoppingHandler{Handler: previous.Handler(), message: message, stop: stop}))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+}
+
+type stoppingHandler struct {
+	slog.Handler
+	message string
+	stop    func()
+}
+
+func (h stoppingHandler) Handle(ctx context.Context, r slog.Record) error {
+	err := h.Handler.Handle(ctx, r)
+	if r.Message == h.message {
+		h.stop()
+	}
+	return err
+}
+
+// sqliteMigrator opens the SQLite file at dsn for a look at its schema version, closing it on t.
+func sqliteMigrator(t *testing.T, dsn string) *migrator.Migrator {
+	t.Helper()
+	db, err := sqlitedb.New(context.Background(), dsn, false)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DB.Close() })
+	m, err := db.NewMigrator(context.Background())
+	require.NoError(t, err)
+	return m
 }
 
 // sqliteMigrationSet reads the SQLite migration directory by filename: the highest version, and
