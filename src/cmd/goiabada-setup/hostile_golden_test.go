@@ -160,6 +160,7 @@ func TestHostileGolden_KubernetesReadsBackEveryAnswer(t *testing.T) {
 	docs := yamlDocuments(t, content)
 
 	byKind := map[string]map[string]any{}
+	configMaps := map[string]map[string]any{}
 	for _, doc := range docs {
 		kind := at[string](t, doc, "kind")
 		if kind == "Namespace" {
@@ -170,20 +171,31 @@ func TestHostileGolden_KubernetesReadsBackEveryAnswer(t *testing.T) {
 			t.Errorf("%s is in namespace %q, want %q", kind, namespace, config.K8sNamespace)
 		}
 		byKind[kind] = doc
+		if kind == "ConfigMap" {
+			configMaps[at[string](t, doc, "metadata", "name")] = doc
+		}
 	}
 
-	data := at[map[string]any](t, byKind["ConfigMap"], "data")
-	for name, want := range map[string]string{
-		"GOIABADA_ADMIN_EMAIL":          config.AdminEmail,
-		"GOIABADA_AUTHSERVER_BASEURL":   config.AuthServerURL,
-		"GOIABADA_ADMINCONSOLE_BASEURL": config.AdminConsoleURL,
-		"GOIABADA_DB_HOST":              config.DBHost,
-		"GOIABADA_DB_PORT":              config.DBPort,
-		"GOIABADA_DB_NAME":              config.DBName,
-		"GOIABADA_DB_USERNAME":          config.DBUsername,
+	for configMap, wants := range map[string]map[string]string{
+		"goiabada-authserver-config": {
+			"GOIABADA_ADMIN_EMAIL":          config.AdminEmail,
+			"GOIABADA_AUTHSERVER_BASEURL":   config.AuthServerURL,
+			"GOIABADA_ADMINCONSOLE_BASEURL": config.AdminConsoleURL,
+			"GOIABADA_DB_HOST":              config.DBHost,
+			"GOIABADA_DB_PORT":              config.DBPort,
+			"GOIABADA_DB_NAME":              config.DBName,
+			"GOIABADA_DB_USERNAME":          config.DBUsername,
+		},
+		"goiabada-adminconsole-config": {
+			"GOIABADA_AUTHSERVER_BASEURL":   config.AuthServerURL,
+			"GOIABADA_ADMINCONSOLE_BASEURL": config.AdminConsoleURL,
+		},
 	} {
-		if got := at[string](t, data, name); got != want {
-			t.Errorf("ConfigMap %s reads back as %q, want %q", name, got, want)
+		data := at[map[string]any](t, configMaps[configMap], "data")
+		for name, want := range wants {
+			if got := at[string](t, data, name); got != want {
+				t.Errorf("ConfigMap %s's %s reads back as %q, want %q", configMap, name, got, want)
+			}
 		}
 	}
 

@@ -10,6 +10,14 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: "goiabada"
+  # Pod Security admission warns on apply, and writes to the audit log, for any pod in this
+  # namespace that breaks the restricted standard, and refuses none. If you own the namespace
+  # outright, add pod-security.kubernetes.io/enforce: restricted to refuse such pods; check
+  # first that everything else running here meets it, cert-manager's HTTP-01 solver pods
+  # included, which run here while a certificate is issued.
+  labels:
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
 
 ---
 apiVersion: v1
@@ -29,24 +37,39 @@ data:
   oauth-client-secret: b2F1dGgtY2xpZW50LXNlY3JldA==
 
 ---
+# What the auth server reads.
+# The three URLs are in both ConfigMaps, written from the same answers; change them in both.
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: goiabada-config
+  name: goiabada-authserver-config
   namespace: "goiabada"
 data:
-  GOIABADA_APPNAME: "Goiabada"
-  GOIABADA_ADMIN_EMAIL: "a\"b$c`d\\e #f'g@example.com"
   GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com/p\"a$HOME #x: y"
   GOIABADA_AUTHSERVER_INTERNALBASEURL: "http://goiabada-authserver:9090"
   GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com/`id`\\q'r ${PATH}"
+  GOIABADA_APPNAME: "Goiabada"
+  GOIABADA_ADMIN_EMAIL: "a\"b$c`d\\e #f'g@example.com"
   GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS: "true"
-  GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS: "true"
   GOIABADA_DB_TYPE: "postgres"
   GOIABADA_DB_HOST: "goiabada-db"
   GOIABADA_DB_PORT: "5432"
   GOIABADA_DB_NAME: "goiabada"
   GOIABADA_DB_USERNAME: "us\"er\\na$me #x: '"
+
+---
+# What the admin console reads.
+# The three URLs are in both ConfigMaps, written from the same answers; change them in both.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: goiabada-adminconsole-config
+  namespace: "goiabada"
+data:
+  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com/p\"a$HOME #x: y"
+  GOIABADA_AUTHSERVER_INTERNALBASEURL: "http://goiabada-authserver:9090"
+  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com/`id`\\q'r ${PATH}"
+  GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS: "true"
 
 ---
 apiVersion: apps/v1
@@ -56,6 +79,14 @@ metadata:
   namespace: "goiabada"
 spec:
   replicas: 1
+  # A rollout starts one new pod and waits for it to be ready before it stops an old one, so
+  # it never runs fewer pods than replicas.
+  # The surge pod opens its own database connections: the docs' connection arithmetic counts it.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: goiabada-authserver
@@ -64,20 +95,53 @@ spec:
       labels:
         app: goiabada-authserver
     spec:
+      # Neither server calls the Kubernetes API, so the pod mounts no service account token.
+      automountServiceAccountToken: false
+      # Kubernetes would otherwise give the container variables for every Service in the
+      # namespace, GOIABADA_AUTHSERVER_PORT and GOIABADA_ADMINCONSOLE_SERVICE_HOST among them,
+      # none of which either server reads.
+      enableServiceLinks: false
       # The most Kubernetes waits after deleting the pod before it kills the container: the
       # 5s preStop pause, plus up to 50s for the auth server to stop cleanly (15s to drain
       # requests, 15s for work handed off after responses, 20s for the cleanup worker),
       # plus 10s of headroom.
       # Set lower, it cuts the cleanup worker short first.
       terminationGracePeriodSeconds: 65
+      # Spread the pods over nodes, so losing or draining one takes as few as it can. Inert at
+      # one replica; with more, a pod is still scheduled when the nodes cannot be balanced.
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: goiabada-authserver
       containers:
       - name: authserver
         image: leodip/goiabada:authserver-latest
+        # latest is a moving tag: each start pulls whatever release it names then, so pods can
+        # run different releases. Replace it with a release version to pin the image.
+        imagePullPolicy: Always
+        # Everything the restricted Pod Security Standard requires, and a read-only root besides.
+        # Neither server writes to its filesystem here: the legacy bootstrap file is unused under
+        # Kubernetes, and the auth server's one other write, Go spilling an upload over the size
+        # limit to /tmp, is refused as FILE_TOO_LARGE rather than by the image check, a 400 either
+        # way. No writable mount is needed.
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          runAsGroup: 10001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+          seccompProfile:
+            type: RuntimeDefault
         ports:
         - containerPort: 9090
         envFrom:
         - configMapRef:
-            name: goiabada-config
+            name: goiabada-authserver-config
         env:
         - name: GOIABADA_ADMIN_PASSWORD
           valueFrom:
@@ -147,6 +211,12 @@ spec:
           preStop:
             sleep:
               seconds: 5
+        # A sign-in costs one bcrypt check at cost 10, about 35ms of CPU on a modern core, which no
+        # limit slows on its own. At the 500m limit a pod verifies about 14 a second, and a burst
+        # queues behind that: 16 at once take about 1.2s, and every other request on the pod waits
+        # with them. Cloud cores are often slower than the one measured, and the 100m request is all
+        # the scheduler guarantees on a busy node. For a higher sign-in peak, raise the limit or add
+        # replicas.
         resources:
           requests:
             memory: "128Mi"
@@ -156,6 +226,21 @@ spec:
             cpu: "500m"
 
 ---
+# A voluntary disruption, such as a node drain or a cluster upgrade, evicts one pod at a
+# time. At one replica that pod is still evicted, and the server is down until its
+# replacement is ready; at n replicas, n-1 keep serving.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: goiabada-authserver
+  namespace: "goiabada"
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: goiabada-authserver
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -163,6 +248,14 @@ metadata:
   namespace: "goiabada"
 spec:
   replicas: 1
+  # A rollout starts one new pod and waits for it to be ready before it stops an old one, so
+  # it never runs fewer pods than replicas.
+  # This server opens no database connections, so its surge pod costs the database nothing.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: goiabada-adminconsole
@@ -171,6 +264,12 @@ spec:
       labels:
         app: goiabada-adminconsole
     spec:
+      # Neither server calls the Kubernetes API, so the pod mounts no service account token.
+      automountServiceAccountToken: false
+      # Kubernetes would otherwise give the container variables for every Service in the
+      # namespace, GOIABADA_AUTHSERVER_PORT and GOIABADA_ADMINCONSOLE_SERVICE_HOST among them,
+      # none of which either server reads.
+      enableServiceLinks: false
       # The most Kubernetes waits after deleting the pod before it kills the container: the
       # 5s preStop pause, plus up to 50s for the auth server to stop cleanly (15s to drain
       # requests, 15s for work handed off after responses, 20s for the cleanup worker),
@@ -178,14 +277,41 @@ spec:
       # The auth server's value: this server stops within its 15s drain, and a grace period
       # is a ceiling, not a wait.
       terminationGracePeriodSeconds: 65
+      # Spread the pods over nodes, so losing or draining one takes as few as it can. Inert at
+      # one replica; with more, a pod is still scheduled when the nodes cannot be balanced.
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: goiabada-adminconsole
       containers:
       - name: adminconsole
         image: leodip/goiabada:adminconsole-latest
+        # latest is a moving tag: each start pulls whatever release it names then, so pods can
+        # run different releases. Replace it with a release version to pin the image.
+        imagePullPolicy: Always
+        # Everything the restricted Pod Security Standard requires, and a read-only root besides.
+        # Neither server writes to its filesystem here: the legacy bootstrap file is unused under
+        # Kubernetes, and the auth server's one other write, Go spilling an upload over the size
+        # limit to /tmp, is refused as FILE_TOO_LARGE rather than by the image check, a 400 either
+        # way. No writable mount is needed.
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          runAsGroup: 10001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+          seccompProfile:
+            type: RuntimeDefault
         ports:
         - containerPort: 9091
         envFrom:
         - configMapRef:
-            name: goiabada-config
+            name: goiabada-adminconsole-config
         env:
         - name: GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET
           valueFrom:
@@ -236,6 +362,7 @@ spec:
           preStop:
             sleep:
               seconds: 5
+        # The auth server's numbers. This server verifies no passwords and needs less.
         resources:
           requests:
             memory: "128Mi"
@@ -243,6 +370,21 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+
+---
+# A voluntary disruption, such as a node drain or a cluster upgrade, evicts one pod at a
+# time. At one replica that pod is still evicted, and the server is down until its
+# replacement is ready; at n replicas, n-1 keep serving.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: goiabada-adminconsole
+  namespace: "goiabada"
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: goiabada-adminconsole
 
 ---
 apiVersion: v1

@@ -63,6 +63,14 @@ func printKubernetesInstructions(out *console, config *Config, outputPath string
 	out.println()
 	out.printf("    %skubectl apply -f %s%s\n", out.cyan, filepath.Base(outputPath), out.reset)
 	out.println()
+	// A release build stamps its version as the tag; only a source build reaches here with latest
+	// (#396 decision 10).
+	if imageTag == "latest" {
+		out.warning("The manifest follows the moving image tag \"latest\", so pods can run different releases")
+		out.println("   and each start pulls whatever release it names then. Replace latest with a release")
+		out.println("   version in both image lines to pin them.")
+		out.println()
+	}
 
 	out.printf("%s%sPREREQUISITES%s\n", out.bold, out.yellow, out.reset)
 	out.println()

@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"maps"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -338,6 +340,304 @@ func TestKubernetesManifest_GatesEachContainerOnAStartupProbe(t *testing.T) {
 						t.Errorf("%s has failureThreshold %d, want %d", probe.name, got, probe.failureThreshold)
 					}
 				})
+			}
+		})
+	}
+}
+
+// workloads are the manifest's two Deployments, the container each runs, and the ConfigMap each
+// reads, by Deployment name.
+var workloads = []struct{ deployment, container, configMap string }{
+	{"goiabada-authserver", "authserver", "goiabada-authserver-config"},
+	{"goiabada-adminconsole", "adminconsole", "goiabada-adminconsole-config"},
+}
+
+// deploymentNamed is the manifest's Deployment of that name, failing the test when there is none.
+func deploymentNamed(t *testing.T, docs map[string]map[string]map[string]any, name string) map[string]any {
+	t.Helper()
+	deployment := docs["Deployment"][name]
+	if deployment == nil {
+		t.Fatalf("no Deployment named %s", name)
+	}
+	return deployment
+}
+
+// Each container states every field the restricted Pod Security Standard requires, and a read-only
+// root besides, on its own securityContext with no pod-level one beside it; each pod mounts no
+// service account token and is handed no service links, since neither binary calls the Kubernetes
+// API or reads the variables Kubernetes would inject (#396 decision 2, the service-link assumption).
+func TestKubernetesManifest_HardensEveryContainerToTheRestrictedStandard(t *testing.T) {
+	docs := kubernetesDocuments(t, kubernetesConfig())
+	for _, w := range workloads {
+		t.Run(w.deployment, func(t *testing.T) {
+			podSpec := at[map[string]any](t, deploymentNamed(t, docs, w.deployment), "spec", "template", "spec")
+			if got := at[bool](t, podSpec, "automountServiceAccountToken"); got {
+				t.Errorf("automountServiceAccountToken is %v, want false", got)
+			}
+			if got := at[bool](t, podSpec, "enableServiceLinks"); got {
+				t.Errorf("enableServiceLinks is %v, want false", got)
+			}
+			if context, ok := podSpec["securityContext"]; ok {
+				t.Errorf("the pod carries a securityContext %v, and each container states its own", context)
+			}
+
+			container := only[map[string]any](t, at[[]any](t, podSpec, "containers"), w.deployment+"'s containers")
+			if got := at[string](t, container, "name"); got != w.container {
+				t.Fatalf("the container is %q, want %q", got, w.container)
+			}
+			context := at[map[string]any](t, container, "securityContext")
+			for _, field := range []struct {
+				path []string
+				want any
+			}{
+				{[]string{"runAsNonRoot"}, true},
+				{[]string{"runAsUser"}, 10001},
+				{[]string{"runAsGroup"}, 10001},
+				{[]string{"allowPrivilegeEscalation"}, false},
+				{[]string{"readOnlyRootFilesystem"}, true},
+				{[]string{"seccompProfile", "type"}, "RuntimeDefault"},
+			} {
+				if got := at[any](t, context, field.path...); got != field.want {
+					t.Errorf("securityContext.%s is %v, want %v", strings.Join(field.path, "."), got, field.want)
+				}
+			}
+			if got := only[string](t, at[[]any](t, context, "capabilities", "drop"), "the dropped capabilities"); got != "ALL" {
+				t.Errorf("the container drops %q, want ALL", got)
+			}
+			if add, ok := at[map[string]any](t, context, "capabilities")["add"]; ok {
+				t.Errorf("the container adds capabilities %v", add)
+			}
+			if mounts, ok := container["volumeMounts"]; ok {
+				t.Errorf("the container mounts %v, and neither binary writes to its filesystem", mounts)
+			}
+		})
+	}
+}
+
+// The Namespace warns and audits at restricted, so every apply reports a pod that breaks the
+// standard, and enforces nothing, since the wizard accepts a namespace someone else's workloads may
+// already run in (#396 decision 20).
+func TestKubernetesManifest_LabelsTheNamespaceToWarnAndAuditAtRestricted(t *testing.T) {
+	config := kubernetesConfig()
+	namespace := kubernetesDocuments(t, config)["Namespace"][config.K8sNamespace]
+	if namespace == nil {
+		t.Fatalf("no Namespace named %s", config.K8sNamespace)
+	}
+	labels := at[map[string]any](t, namespace, "metadata", "labels")
+	for _, mode := range []string{"warn", "audit"} {
+		if got := at[string](t, labels, "pod-security.kubernetes.io/"+mode); got != "restricted" {
+			t.Errorf("pod-security.kubernetes.io/%s is %q, want restricted", mode, got)
+		}
+	}
+	if enforce, ok := labels["pod-security.kubernetes.io/enforce"]; ok {
+		t.Errorf("the Namespace enforces %v, and it may hold workloads that are not Goiabada's", enforce)
+	}
+}
+
+// Each Deployment rolls out by starting one new pod before it stops an old one, never running
+// fewer than its replicas, the surge pod the docs' connection arithmetic counts (#396 assumptions).
+func TestKubernetesManifest_RollsOutOnePodAtATimeWithNoneUnavailable(t *testing.T) {
+	docs := kubernetesDocuments(t, kubernetesConfig())
+	for _, w := range workloads {
+		t.Run(w.deployment, func(t *testing.T) {
+			strategy := at[map[string]any](t, deploymentNamed(t, docs, w.deployment), "spec", "strategy")
+			if got := at[string](t, strategy, "type"); got != "RollingUpdate" {
+				t.Errorf("the strategy is %q, want RollingUpdate", got)
+			}
+			if got := at[int](t, strategy, "rollingUpdate", "maxUnavailable"); got != 0 {
+				t.Errorf("maxUnavailable is %d, want 0", got)
+			}
+			if got := at[int](t, strategy, "rollingUpdate", "maxSurge"); got != 1 {
+				t.Errorf("maxSurge is %d, want 1", got)
+			}
+		})
+	}
+}
+
+// Each Deployment has a PodDisruptionBudget allowing one of its pods to be evicted at a time,
+// selecting exactly the pods the Deployment runs, in the manifest's namespace (#396 assumptions).
+func TestKubernetesManifest_GivesEachDeploymentADisruptionBudget(t *testing.T) {
+	config := kubernetesConfig()
+	docs := kubernetesDocuments(t, config)
+	if len(docs["PodDisruptionBudget"]) != len(workloads) {
+		t.Errorf("the manifest has %d PodDisruptionBudgets, want one per Deployment", len(docs["PodDisruptionBudget"]))
+	}
+	for _, w := range workloads {
+		t.Run(w.deployment, func(t *testing.T) {
+			deployment := deploymentNamed(t, docs, w.deployment)
+			budget := docs["PodDisruptionBudget"][w.deployment]
+			if budget == nil {
+				t.Fatalf("no PodDisruptionBudget named %s", w.deployment)
+			}
+			if got := at[string](t, budget, "apiVersion"); got != "policy/v1" {
+				t.Errorf("the budget's apiVersion is %q, want policy/v1", got)
+			}
+			if got := at[string](t, budget, "metadata", "namespace"); got != config.K8sNamespace {
+				t.Errorf("the budget is in namespace %q, want %q", got, config.K8sNamespace)
+			}
+			if got := at[int](t, budget, "spec", "maxUnavailable"); got != 1 {
+				t.Errorf("the budget's maxUnavailable is %d, want 1", got)
+			}
+			if minAvailable, ok := at[map[string]any](t, budget, "spec")["minAvailable"]; ok {
+				t.Errorf("the budget also sets minAvailable %v", minAvailable)
+			}
+			selector := at[map[string]any](t, budget, "spec", "selector", "matchLabels")
+			want := at[map[string]any](t, deployment, "spec", "selector", "matchLabels")
+			if len(selector) != 1 || selector["app"] != w.deployment || selector["app"] != want["app"] || len(want) != 1 {
+				t.Errorf("the budget selects %v, and the Deployment's pods are %v", selector, want)
+			}
+		})
+	}
+}
+
+// Each Deployment spreads its pods over nodes, one apart at most, preferring the spread rather than
+// refusing to schedule: inert at one replica, and at three it keeps a drain from taking them all
+// (#396 assumptions).
+func TestKubernetesManifest_SpreadsEachDeploymentOverNodes(t *testing.T) {
+	docs := kubernetesDocuments(t, kubernetesConfig())
+	for _, w := range workloads {
+		t.Run(w.deployment, func(t *testing.T) {
+			template := at[map[string]any](t, deploymentNamed(t, docs, w.deployment), "spec", "template")
+			constraint := only[map[string]any](t, at[[]any](t, template, "spec", "topologySpreadConstraints"), "the spread constraints")
+			if got := at[int](t, constraint, "maxSkew"); got != 1 {
+				t.Errorf("maxSkew is %d, want 1", got)
+			}
+			if got := at[string](t, constraint, "topologyKey"); got != "kubernetes.io/hostname" {
+				t.Errorf("topologyKey is %q, want kubernetes.io/hostname", got)
+			}
+			if got := at[string](t, constraint, "whenUnsatisfiable"); got != "ScheduleAnyway" {
+				t.Errorf("whenUnsatisfiable is %q, want ScheduleAnyway", got)
+			}
+			selector := at[map[string]any](t, constraint, "labelSelector", "matchLabels")
+			labels := at[map[string]any](t, template, "metadata", "labels")
+			if len(selector) != 1 || selector["app"] != w.deployment || labels["app"] != w.deployment {
+				t.Errorf("the spread counts pods %v, and the Deployment's pods are %v", selector, labels)
+			}
+		})
+	}
+}
+
+// withImageTag runs the test with the image tag a release build stamps, putting the source build's
+// back afterwards.
+func withImageTag(t *testing.T, tag string) {
+	t.Helper()
+	previous := imageTag
+	imageTag = tag
+	t.Cleanup(func() { imageTag = previous })
+}
+
+// A version tag names one build, so a node pulls it once; a source build's latest moves, so a node
+// pulls it at every start, or it would run whichever latest it happened to cache (#396 decision 10).
+func TestKubernetesManifest_PullPolicyFollowsTheTag(t *testing.T) {
+	for _, testCase := range []struct{ tag, policy string }{
+		{"latest", "Always"},
+		{"1.5.0", "IfNotPresent"},
+		{"2.0.0-rc.1", "IfNotPresent"},
+	} {
+		t.Run(testCase.tag, func(t *testing.T) {
+			withImageTag(t, testCase.tag)
+			docs := kubernetesDocuments(t, kubernetesConfig())
+			for _, w := range workloads {
+				podSpec := at[map[string]any](t, deploymentNamed(t, docs, w.deployment), "spec", "template", "spec")
+				container := only[map[string]any](t, at[[]any](t, podSpec, "containers"), w.deployment+"'s containers")
+				if got, want := at[string](t, container, "image"), "leodip/goiabada:"+w.container+"-"+testCase.tag; got != want {
+					t.Errorf("%s runs %q, want %q", w.deployment, got, want)
+				}
+				if got := at[string](t, container, "imagePullPolicy"); got != testCase.policy {
+					t.Errorf("%s pulls %s, want %s", w.deployment, got, testCase.policy)
+				}
+			}
+		})
+	}
+}
+
+// A source build's manifest follows a moving tag, and the completion message says so; a release
+// build's names its version, and the message has nothing to warn about (#396 decision 10).
+func TestKubernetesInstructions_WarnWhenTheManifestFollowsAMovingTag(t *testing.T) {
+	const warning = "follows the moving image tag"
+	for _, testCase := range []struct {
+		tag  string
+		warn bool
+	}{
+		{"latest", true},
+		{"1.5.0", false},
+		{"2.0.0-rc.1", false},
+	} {
+		t.Run(testCase.tag, func(t *testing.T) {
+			withImageTag(t, testCase.tag)
+			var buf bytes.Buffer
+			printKubernetesInstructions(&console{w: &buf}, kubernetesConfig(), "goiabada-k8s.yaml")
+			message := buf.String()
+			if got := strings.Contains(message, warning); got != testCase.warn {
+				t.Errorf("the message warns %q: %v, want %v\n%s", warning, got, testCase.warn, message)
+			}
+			if testCase.warn && !strings.Contains(message, "Warning:") {
+				t.Errorf("the moving tag is not reported as a warning:\n%s", message)
+			}
+		})
+	}
+}
+
+// Each process reads a ConfigMap of its own holding exactly the variables it reads, the three URLs
+// in both and the same in both; nothing reads the shared goiabada-config any more (#396 decision 13).
+// What each server reads is held from its own unit tier, against the goldens; this is the list.
+func TestKubernetesManifest_GivesEachProcessAConfigMapOfItsOwn(t *testing.T) {
+	config := kubernetesConfig()
+	docs := kubernetesDocuments(t, config)
+	if len(docs["ConfigMap"]) != 2 {
+		t.Errorf("the manifest has ConfigMaps %v, want the auth server's and the admin console's", slices.Sorted(maps.Keys(docs["ConfigMap"])))
+	}
+
+	urls := map[string]string{
+		"GOIABADA_AUTHSERVER_BASEURL":         config.AuthServerURL,
+		"GOIABADA_AUTHSERVER_INTERNALBASEURL": "http://goiabada-authserver:9090",
+		"GOIABADA_ADMINCONSOLE_BASEURL":       config.AdminConsoleURL,
+	}
+	wantKeys := map[string][]string{
+		"goiabada-authserver-config": {
+			"GOIABADA_ADMINCONSOLE_BASEURL",
+			"GOIABADA_ADMIN_EMAIL",
+			"GOIABADA_APPNAME",
+			"GOIABADA_AUTHSERVER_BASEURL",
+			"GOIABADA_AUTHSERVER_INTERNALBASEURL",
+			"GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS",
+			"GOIABADA_DB_HOST",
+			"GOIABADA_DB_NAME",
+			"GOIABADA_DB_PORT",
+			"GOIABADA_DB_TYPE",
+			"GOIABADA_DB_USERNAME",
+		},
+		"goiabada-adminconsole-config": {
+			"GOIABADA_ADMINCONSOLE_BASEURL",
+			"GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS",
+			"GOIABADA_AUTHSERVER_BASEURL",
+			"GOIABADA_AUTHSERVER_INTERNALBASEURL",
+		},
+	}
+	for _, w := range workloads {
+		t.Run(w.deployment, func(t *testing.T) {
+			configMap := docs["ConfigMap"][w.configMap]
+			if configMap == nil {
+				t.Fatalf("no ConfigMap named %s", w.configMap)
+			}
+			if got := at[string](t, configMap, "metadata", "namespace"); got != config.K8sNamespace {
+				t.Errorf("%s is in namespace %q, want %q", w.configMap, got, config.K8sNamespace)
+			}
+			data := at[map[string]any](t, configMap, "data")
+			if got := slices.Sorted(maps.Keys(data)); !slices.Equal(got, wantKeys[w.configMap]) {
+				t.Errorf("%s holds %v, want %v", w.configMap, got, wantKeys[w.configMap])
+			}
+			for name, want := range urls {
+				if got := at[string](t, data, name); got != want {
+					t.Errorf("%s sets %s to %q, want %q", w.configMap, name, got, want)
+				}
+			}
+
+			podSpec := at[map[string]any](t, deploymentNamed(t, docs, w.deployment), "spec", "template", "spec")
+			container := only[map[string]any](t, at[[]any](t, podSpec, "containers"), w.deployment+"'s containers")
+			source := only[map[string]any](t, at[[]any](t, container, "envFrom"), w.deployment+"'s envFrom")
+			if got := at[string](t, source, "configMapRef", "name"); got != w.configMap {
+				t.Errorf("%s reads the ConfigMap %q, want %q", w.deployment, got, w.configMap)
 			}
 		})
 	}
