@@ -47,7 +47,11 @@ RUN go build -buildvcs=false -tags=production -ldflags="-w -X 'github.com/leodip
 
 # ------------------------------------------------------------------------------
 
-FROM alpine:latest AS final
+FROM alpine:3.24 AS final
+
+# The minor is pinned in src/authserver/versions.yaml as tools.alpine and written
+# here by ./version-manager.sh update. A minor tag still receives Alpine's patch
+# releases, so only the six-monthly minor bump is a step of its own (#396).
 
 WORKDIR /app
 
@@ -55,6 +59,23 @@ WORKDIR /app
 # TZ against it before its first record, so the base image needs no tzdata. CI's
 # build validation starts this image with TZ set to prove it (#331).
 
+# The server runs as uid and gid 10001, named goiabada, and never as root (#396).
+# USER is numeric so a Kubernetes runAsNonRoot can verify it without reading
+# /etc/passwd, and the docs tell an operator to make a mounted file readable to
+# these ids. The binary is copied with no --chown, so it stays owned by root and
+# writable by root alone, as /app is, and the process cannot replace what the next
+# start runs. /data, where the generated Compose file mounts the
+# SQLite volume, and /bootstrap, where the legacy bootstrap file is written, are
+# created owned by 10001: Docker copies a mount point's ownership into an empty
+# named volume, and creates a mount point the image lacks owned by root, where the
+# server could write nothing.
+RUN addgroup -S -g 10001 goiabada \
+    && adduser -S -D -H -u 10001 -G goiabada goiabada \
+    && mkdir /data /bootstrap \
+    && chown 10001:10001 /data /bootstrap
+
 COPY --from=build /app/bin/goiabada-authserver ./
+
+USER 10001:10001
 
 ENTRYPOINT ["/app/goiabada-authserver"]

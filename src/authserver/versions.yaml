@@ -24,6 +24,8 @@
 # staticcheck:    Static analyzer (devcontainer, make check)
 # unparam:        Unused-parameter analyzer (devcontainer, make check)
 # govulncheck:    Vulnerability scanner (devcontainer)
+# alpine:         Base of the release images' final stage, as major.minor
+#                 (Dockerfile-authserver, Dockerfile-adminconsole)
 #
 # staticcheck, unparam and govulncheck are pinned because they gate CI. An
 # unpinned tool can turn every open PR red on an upstream release, with no
@@ -34,6 +36,12 @@
 # `./version-manager.sh check` queries. unparam publishes no tags at all, so it
 # is pinned to a pseudo-version and every upstream commit will show up as an
 # available update.
+#
+# alpine is pinned to a minor rather than a patch: the alpine:X.Y tag receives
+# Alpine's patch releases, security fixes included, at the next image build, so
+# only the six-monthly minor release is a bump made here. It replaced
+# alpine:latest, which moved the release images to a new minor with no change
+# on our side (#396).
 tools:
   go: "1.27.1"
   tailwind: "4.3.3"
@@ -42,6 +50,7 @@ tools:
   staticcheck: "0.8.1"
   unparam: "0.0.0-20260823230713-2fa3d841b0c8"
   govulncheck: "1.8.0"
+  alpine: "3.24"
 
 # -----------------------------------------------------------------------------
 # CDN Dependencies

@@ -70,3 +70,56 @@ You still need to set up SSL termination using one of the methods above (except 
 <Aside type="tip">
 Before going live, review the [production checklist](/production-deployment/production-checklist/) for security and configuration requirements.
 </Aside>
+
+## The user the images run as
+
+Both images run as uid 10001 and gid 10001, a user and group named `goiabada`, and never as root.
+The image names them by number, so a platform that refuses a root container, such as Kubernetes with
+`runAsNonRoot`, can verify the user without reading the image's `/etc/passwd`. The binary and the
+`/app` directory holding it belong to root, so the process cannot replace what its next start runs.
+
+A file you mount into a container must be readable by uid 10001 or gid 10001: the certificate and
+key named by `GOIABADA_AUTHSERVER_CERTFILE` and `GOIABADA_AUTHSERVER_KEYFILE` (and the admin
+console's pair), and the templates and static files of a [customization](/reference/customizations/).
+A key file left at mode `0600` and owned by root cannot be read; give it to the user, or to the group
+with mode `0640`:
+
+```bash
+sudo chown 10001:10001 key.pem
+# or
+sudo chgrp 10001 key.pem && sudo chmod 0640 key.pem
+```
+
+The auth server writes to two directories, and its image creates both owned by 10001:
+
+- `/data`, where the generated Compose file mounts the SQLite volume. Docker copies a mount point's
+  ownership into an empty named volume, so a new volume mounted here is writable from the first
+  start. A volume mounted at a path the image lacks gets a directory Docker creates owned by root,
+  where the server can write nothing.
+- `/bootstrap`, where the legacy bootstrap writes `bootstrap.env` when
+  `GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE` names a file in it. Mount a named volume there, and
+  read the file with `docker compose cp goiabada-authserver:/bootstrap/bootstrap.env .`. A bind mount
+  of a host directory that does not exist yet is created owned by root, and the write is refused.
+
+### Upgrading a Compose deployment that uses SQLite
+
+The images of earlier releases ran as root, so a SQLite volume they wrote belongs to root, and the
+auth server now stops at start with `unable to migrate the database: unable to clear
+schema_migrations: attempt to write a readonly database`. Give the volume to uid 10001 once, from
+the directory holding your `docker-compose.yml`, before starting the new image:
+
+```bash
+docker compose stop goiabada-authserver
+docker compose run --rm --no-deps --user 0:0 --cap-add CHOWN --entrypoint chown \
+  goiabada-authserver -R 10001:10001 /data
+docker compose up -d
+```
+
+This runs `chown` once as root, in a throwaway container of the auth server's service, so it reaches
+the volume wherever that service mounts it. `--cap-add CHOWN` is what lets root change the owner in
+a service that drops every capability; where the service drops none, it changes nothing. Use the
+path your file mounts the volume at: `/data` in the generated file, while the hand-written SQLite
+sample of earlier releases mounted it at `/app/data`.
+
+Nothing else needs this step. MySQL, PostgreSQL and SQL Server keep their data in their own
+containers, which run their own images, and the Kubernetes manifest mounts no volume.

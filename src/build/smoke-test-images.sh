@@ -18,6 +18,19 @@
 # each run ends without anything to connect to. The timeout is for a server that
 # does not stop: the run fails rather than hang the job.
 #
+# Each image is then read as the user it is configured to run as, with a shell in
+# place of its entrypoint, because which user that is no Go test can see (#396):
+#
+#   - It must be uid and gid 10001, the numeric ids a Kubernetes runAsNonRoot can
+#     verify without a passwd lookup and the ones the docs tell an operator to
+#     make a mounted file readable to.
+#   - It must not be able to write its own binary, or the directory holding it,
+#     so a process that is compromised cannot replace what the next start runs.
+#   - The auth server's image must give it /data and /bootstrap to write. Docker
+#     copies a mount point's ownership into an empty named volume, and creates a
+#     mount point the image lacks owned by root, so these two directories are what
+#     lets a fresh SQLite volume or bootstrap volume be written at all.
+#
 # Usage: ./smoke-test-images.sh --version <version> <image>...
 set -euo pipefail
 
@@ -35,6 +48,8 @@ done
 
 RUN_TIMEOUT=60
 UNKNOWN_TZ="Not/AZone"
+RUN_AS="10001:10001"
+AUTHSERVER_WRITABLE_DIRS=(/data /bootstrap)
 failed=0
 
 fail() {
@@ -53,7 +68,46 @@ run_image() {
     docker rm -f "$name" >/dev/null 2>&1 || true
 }
 
+# Prints, from inside the image and as the user it runs as, its uid:gid and
+# whether each path after the image is writable to it. A shell replaces the
+# entrypoint and nothing else, so the user is the one the image configures.
+read_user() {
+    local image="$1"
+    shift
+    docker run --rm --network none --entrypoint /bin/sh "$image" -c '
+        echo "id $(id -u):$(id -g)"
+        for path in "$@"; do
+            if [ -w "$path" ]; then echo "$path writable"; else echo "$path not writable"; fi
+        done
+    ' sh "$@"
+}
+
+# Fails unless the read_user output in USER_OUTPUT carries the line exactly.
+expect_line() {
+    local image="$1" line="$2"
+    if ! grep -q -x -F -e "$line" <<<"$USER_OUTPUT"; then
+        fail "$image: its user does not report \"$line\""
+    fi
+}
+
 for image in "${IMAGES[@]}"; do
+    echo "=== $image, its user"
+    # The entrypoint's first element is the binary.
+    binary=$(docker image inspect --format '{{index .Config.Entrypoint 0}}' "$image")
+    writable_dirs=()
+    if [[ "$binary" == */goiabada-authserver ]]; then
+        writable_dirs=("${AUTHSERVER_WRITABLE_DIRS[@]}")
+    fi
+    USER_OUTPUT=$(read_user "$image" "$binary" "$(dirname "$binary")" "${writable_dirs[@]}" 2>&1) ||
+        fail "$image: unable to read its user: $USER_OUTPUT"
+    echo "$USER_OUTPUT"
+    expect_line "$image" "id $RUN_AS"
+    expect_line "$image" "$binary not writable"
+    expect_line "$image" "$(dirname "$binary") not writable"
+    for dir in "${writable_dirs[@]}"; do
+        expect_line "$image" "$dir writable"
+    done
+
     echo "=== $image, TZ=Asia/Kolkata"
     run_image "$image" "Asia/Kolkata"
     echo "$OUTPUT"

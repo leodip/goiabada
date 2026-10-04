@@ -56,6 +56,10 @@ requests `SNAPSHOT` isolation, so `ALLOW_SNAPSHOT_ISOLATION` has no effect on it
 There is nothing to pre-create, and `GOIABADA_DB_CREATE` does not apply: the driver creates the file.
 To refuse an absent file instead of creating one, put `mode=rw` in `GOIABADA_DB_DSN`.
 
+The auth server runs as uid 10001, so the directory holding the file must be writable by it. In
+Docker, mount the volume at `/data`, which the image creates owned by that user; a volume written by
+the root images of earlier releases needs a [one-time `chown`](/production-deployment/#upgrading-a-compose-deployment-that-uses-sqlite).
+
 ## Schema migrations and rollback
 
 Goiabada migrates its own schema. The auth server applies whatever migrations its release carries
