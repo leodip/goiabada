@@ -96,7 +96,6 @@ func TestReencryptToKey(t *testing.T) {
 	require.NoError(t, db.CreateUser(ctx, nil, user))
 	preReg := &record.PreRegistration{
 		Email:                     fake.Email(),
-		PasswordHash:              "x",
 		VerificationCodeEncrypted: rekeyEncrypt(t, preRegCode, rekeyKeyA),
 		VerificationCodeHash:      codeHashOf(t, fake.UUID()),
 	}

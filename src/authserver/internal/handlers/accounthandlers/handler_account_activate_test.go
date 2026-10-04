@@ -68,7 +68,6 @@ func preRegistrationWithCode(t *testing.T, id int64, email, code string, issuedA
 	return &record.PreRegistration{
 		Id:                        id,
 		Email:                     email,
-		PasswordHash:              "password_hash",
 		VerificationCodeEncrypted: encrypted,
 		VerificationCodeHash:      codeHash,
 		VerificationCodeIssuedAt:  sql.NullTime{Time: issuedAt, Valid: true},
@@ -797,8 +796,6 @@ func TestHandleActivatePost_HappyPath(t *testing.T) {
 	assert.True(t, created.EmailVerified, "following the emailed link proved the address")
 	assert.True(t, passwordhash.Verify(created.PasswordHash, chosenPassword),
 		"the account's password must be the one chosen at activation")
-	assert.NotEqual(t, preReg.PasswordHash, created.PasswordHash,
-		"nothing the registration stored may become the account's password")
 
 	_, rejection, err := emaillinks.GetLinkMarker(store, nextBrowserRequest(t, sent, rr, activationCleanGetRequest),
 		emaillinks.LinkMarkerFlowAccountActivate)

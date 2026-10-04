@@ -341,7 +341,6 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	if !assert.NotNil(t, preReg, "pre-registration should exist after POST") {
 		return
 	}
-	assert.Empty(t, preReg.PasswordHash, "the pending registration stores no password")
 
 	// The hash is what the link resolves to, and it must be the hash of the code that was
 	// issued or the registration is unactivatable.

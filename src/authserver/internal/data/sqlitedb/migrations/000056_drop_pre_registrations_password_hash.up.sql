@@ -1,0 +1,15 @@
+-- Migration 000056: drop pre_registrations.password_hash (#207 decision 2).
+--
+-- Registration with email verification no longer asks for a password: the person who follows the
+-- emailed link chooses it on the activation form, and the account is created with that one. So
+-- nothing writes this column any more (the last writer stored an empty string) and nothing reads it.
+-- Keeping it would leave a NOT NULL column named password_hash that is always empty, and the hashes
+-- of registrations written before the upgrade would linger for no use.
+--
+-- A registration still pending at upgrade loses its stored hash and nothing else: its link resolves
+-- the row by verification_code_hash, and its activation asks for a password like any other.
+--
+-- The column is in no index and carries no default on any engine, so nothing has to be dropped
+-- before it. The Go field record.PreRegistration.PasswordHash goes in the same commit, because
+-- sqlbuilder derives every pre_registrations statement's column list from the struct tags.
+ALTER TABLE pre_registrations DROP COLUMN password_hash;
