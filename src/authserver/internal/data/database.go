@@ -502,10 +502,13 @@ type Database interface {
 	// ReserveRateLimitHit charges one hit to keyHash's current window when admit, handed the
 	// current and previous windows' counts before this hit, answers true, and reports whether it
 	// charged. The read, the decision and the charge are atomic across every handle on the
-	// database: the charge takes the row's lock first and admit is asked again under it, so two
-	// pods can never both take the last slot. A refusal writes nothing. It owns its transaction,
-	// as ReencryptToKey does, because creating a window's row can lose a race on the key, which
-	// on PostgreSQL aborts the transaction it ran in. expiresAt is when the row stops counting.
+	// database, across a window's roll too: the charge takes the previous window's row and then
+	// the current one's, and admit is asked again under both, so two pods can never both take the
+	// last slot, whichever of two adjacent windows each is charging. A key that already has a row
+	// for a later window is ErrRateLimitWindowMoved, with nothing charged. A refusal writes
+	// nothing. It owns its transaction, as ReencryptToKey does, because creating a window's row
+	// can lose a race on the key, which on PostgreSQL aborts the transaction it ran in. expiresAt
+	// is when the current window's row stops counting.
 	ReserveRateLimitHit(ctx context.Context, keyHash string, current, previous, expiresAt time.Time,
 		admit func(curr, prev int) bool) (bool, error)
 	// RefundRateLimitHit takes one hit back from the window it was charged in, never below zero.
@@ -666,3 +669,9 @@ type Database interface {
 // on one table has to look at the driver error itself, which is still reachable through errors.As
 // below this.
 var ErrUniqueViolation = errors.New("unique constraint violation")
+
+// ErrRateLimitWindowMoved is ReserveRateLimitHit finding a row for a window later than the one it
+// was asked to charge: another pod has opened that window for the key, and may have admitted
+// against a count this charge would change after the fact, so nothing is charged. The caller
+// places the reservation again, in the later window (#394).
+var ErrRateLimitWindowMoved = errors.New("the rate limit window has moved on")
