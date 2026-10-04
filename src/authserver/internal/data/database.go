@@ -522,6 +522,12 @@ type Database interface {
 	TryReplacePreRegistrationCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64, deadCodeHash string,
 		codeEncrypted []byte, codeHash string, issuedAt time.Time) (bool, error)
 	DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationId int64) error
+	// DeleteDeadPreRegistrations sweeps every pending registration whose code was issued before
+	// deadBefore, or never issued, and leaves every other. The caller passes
+	// emaillinks.PreRegistrationDeadBefore, the one definition of a pending registration that can
+	// no longer complete, so the sweep and the replacement never disagree about a row (#207
+	// decision 7).
+	DeleteDeadPreRegistrations(ctx context.Context, tx *sql.Tx, deadBefore time.Time) error
 
 	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *record.UserGroup) error
 	UpdateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *record.UserGroup) error

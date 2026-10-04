@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 )
@@ -458,4 +459,105 @@ func TestTryReplacePreRegistrationCode(t *testing.T) {
 		}
 		validatePreRegistration(t, dead, after)
 	})
+}
+
+// createPreRegistrationIssuedAt writes a pending registration whose code was issued at issuedAt,
+// or with no issued-at at all when issuedAt is the zero time.
+func createPreRegistrationIssuedAt(t *testing.T, issuedAt time.Time) *record.PreRegistration {
+	t.Helper()
+	preReg := &record.PreRegistration{
+		Email:                     fake.Email(),
+		VerificationCodeEncrypted: []byte(fake.UUID()),
+		VerificationCodeIssuedAt:  sql.NullTime{Time: issuedAt, Valid: !issuedAt.IsZero()},
+		VerificationCodeHash:      codeHashOf(t, fake.UUID()),
+	}
+	if err := database.CreatePreRegistration(context.Background(), nil, preReg); err != nil {
+		t.Fatalf("Failed to create test pre-registration: %v", err)
+	}
+	return preReg
+}
+
+func preRegistrationExists(t *testing.T, preRegistrationId int64) bool {
+	t.Helper()
+	found, err := database.GetPreRegistrationById(context.Background(), nil, preRegistrationId)
+	if err != nil {
+		t.Fatalf("Failed to reload pre-registration %d: %v", preRegistrationId, err)
+	}
+	return found != nil
+}
+
+// TestDeleteDeadPreRegistrations is the sweep of pending registrations that can no longer complete
+// (#207 decision 7). The worker hands it a cutoff ten minutes before the run; a row whose code was
+// issued before the cutoff is dead and goes, and every row that can still complete stays,
+// including one issued exactly at the cutoff. A row with no issued-at never had a usable code and
+// goes too, as the replacement already treats it as dead.
+func TestDeleteDeadPreRegistrations(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	deadBefore := now.Add(-10 * time.Minute)
+
+	longDead := createPreRegistrationIssuedAt(t, now.Add(-3*time.Hour))
+	justDead := createPreRegistrationIssuedAt(t, deadBefore.Add(-time.Second))
+	neverIssued := createPreRegistrationIssuedAt(t, time.Time{})
+	atTheCutoff := createPreRegistrationIssuedAt(t, deadBefore)
+	inThePasswordWindow := createPreRegistrationIssuedAt(t, now.Add(-9*time.Minute))
+	fresh := createPreRegistrationIssuedAt(t, now)
+
+	if err := database.DeleteDeadPreRegistrations(context.Background(), nil, deadBefore); err != nil {
+		t.Fatalf("DeleteDeadPreRegistrations failed: %v", err)
+	}
+
+	cases := []struct {
+		name    string
+		row     *record.PreRegistration
+		swept   bool
+		because string
+	}{
+		{"issued three hours ago", longDead, true, "its link and its password form are long expired"},
+		{"issued a second before the cutoff", justDead, true, "it can no longer complete"},
+		{"never issued a code", neverIssued, true, "no link can ever activate it"},
+		{"issued exactly at the cutoff", atTheCutoff, false, "its password form is still open, for this instant"},
+		{"issued nine minutes ago", inThePasswordWindow, false, "a link followed at 4:59 still has its form open"},
+		{"issued now", fresh, false, "its link has not even expired"},
+	}
+	for _, tc := range cases {
+		if exists := preRegistrationExists(t, tc.row.Id); exists == tc.swept {
+			t.Errorf("a row %s: exists=%v, want swept=%v, because %s", tc.name, exists, tc.swept, tc.because)
+		}
+		// The registration's replacement reads the same rows through the predicate; the sweep must
+		// never delete a row it would call live, nor keep one it would replace.
+		if dead := emaillinks.IsPreRegistrationDead(tc.row.VerificationCodeIssuedAt.Time, now); dead != tc.swept {
+			t.Errorf("a row %s: the replacement calls it dead=%v, the sweep swept=%v", tc.name, dead, tc.swept)
+		}
+	}
+
+	// Sweeping nothing is not an error, and leaves the live rows as they are.
+	if err := database.DeleteDeadPreRegistrations(context.Background(), nil, deadBefore); err != nil {
+		t.Fatalf("a sweep finding nothing must not fail: %v", err)
+	}
+	if !preRegistrationExists(t, atTheCutoff.Id) || !preRegistrationExists(t, fresh.Id) {
+		t.Error("a second sweep at the same cutoff must leave the live rows")
+	}
+}
+
+// TestDeleteDeadPreRegistrations_Transaction: the sweep runs on the transaction it is handed, so a
+// rollback leaves the dead row in place.
+func TestDeleteDeadPreRegistrations_Transaction(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	dead := createPreRegistrationIssuedAt(t, now.Add(-time.Hour))
+
+	tx := beginTx(t)
+	if err := database.DeleteDeadPreRegistrations(context.Background(), tx, now.Add(-10*time.Minute)); err != nil {
+		t.Fatalf("DeleteDeadPreRegistrations failed: %v", err)
+	}
+	inTx, err := database.GetPreRegistrationById(context.Background(), tx, dead.Id)
+	if err != nil || inTx != nil {
+		t.Fatalf("the sweep must be visible through its transaction: row=%v err=%v", inTx, err)
+	}
+	if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
+		t.Fatalf("RollbackTransaction failed: %v", rollbackErr)
+	}
+
+	if !preRegistrationExists(t, dead.Id) {
+		t.Error("a sweep rolled back must leave the row in place")
+	}
 }

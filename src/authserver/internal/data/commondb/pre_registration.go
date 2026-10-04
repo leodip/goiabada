@@ -119,6 +119,30 @@ func (d *Database) DeletePreRegistration(ctx context.Context, tx *sql.Tx, preReg
 	return nil
 }
 
+// DeleteDeadPreRegistrations sweeps the pending registrations that can no longer complete: every
+// row whose code was issued before deadBefore, and every row with no issued-at, which no link can
+// activate. A row issued exactly at deadBefore is kept, as emaillinks.IsPreRegistrationDead keeps
+// it; the next sweep has it (#207 decision 7).
+func (d *Database) DeleteDeadPreRegistrations(ctx context.Context, tx *sql.Tx, deadBefore time.Time) error {
+
+	preRegistrationStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
+		For(d.Flavor)
+
+	deleteBuilder := preRegistrationStruct.DeleteFrom("pre_registrations")
+	deleteBuilder.Where(deleteBuilder.Or(
+		deleteBuilder.LessThan("verification_code_issued_at", deadBefore),
+		deleteBuilder.IsNull("verification_code_issued_at"),
+	))
+
+	sql, args := deleteBuilder.Build()
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	if err != nil {
+		return errs.Wrap(err, "unable to delete dead preRegistrations")
+	}
+
+	return nil
+}
+
 // GetPreRegistrationByVerificationCodeHash finds the pre-registration an activation code
 // belongs to, by an unsalted SHA-256 of that code. It is what lets the activation link
 // carry the code and nothing else, so no email address travels in it and no part of the

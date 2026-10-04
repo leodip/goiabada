@@ -72,13 +72,14 @@ func TestWorker_Poll_LostClaimReachesNoSweepPort(t *testing.T) {
 
 	mockDB.AssertNotCalled(t, "DeleteExpiredRefreshTokens", mock.Anything, mock.Anything)
 	mockDB.AssertNotCalled(t, "DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything)
+	mockDB.AssertNotCalled(t, "DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything)
 	mockDB.AssertNotCalled(t, "DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything)
 	mockDB.AssertNotCalled(t, "DeleteExpiredSessions", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // performTask's own sweeps run on the context runIfClaimed was given, which is the same lifecycle
 // context: the claim does not mint a new one. Asserted here rather than left to the poll cases,
-// because these four are the sweeps that run inside the twelve-hour claim and a shutdown that
+// because these five are the sweeps that run inside the twelve-hour claim and a shutdown that
 // cannot interrupt them waits for the slowest DELETE in the schema.
 func TestWorker_PerformTask_SweepsUnderTheWorkersContext(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
@@ -87,6 +88,8 @@ func TestWorker_PerformTask_SweepsUnderTheWorkersContext(t *testing.T) {
 	mockDB.On("DeleteExpiredRefreshTokens", theWorkersContext(), mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", theWorkersContext(), mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", theWorkersContext(), mock.Anything, mock.Anything).
+		Return(nil).Once()
+	mockDB.On("DeleteDeadPreRegistrations", theWorkersContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 	// The settings row is absent, which stops the task before the two session sweeps. That keeps
 	// this case about the context and not about the sweep order, which its own tests own.
