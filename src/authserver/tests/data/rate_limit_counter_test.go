@@ -143,9 +143,10 @@ func TestSharedFailureLimiter_ASuccessSpendsNothingOnceReleasedOnEitherHandle(t 
 	}
 }
 
-// TestSharedAccountLimiter_TheBackstopIsOneCeilingAcrossHandles is NIST SP 800-63B's
-// account-wide ceiling held across pods: failures from fresh networks, alternating handles,
-// meet one backstop.
+// TestSharedAccountLimiter_TheBackstopIsOneCeilingAcrossHandles is the account-wide backstop
+// held across pods: failures from fresh networks, alternating handles, meet one budget. The
+// budget is a rate per window, not NIST SP 800-63B Section 3.2.2's consecutive-failure limit;
+// ratelimit/shared.go records the deviation.
 func TestSharedAccountLimiter_TheBackstopIsOneCeilingAcrossHandles(t *testing.T) {
 	second := secondDatabase(t)
 	ctx := context.Background()
