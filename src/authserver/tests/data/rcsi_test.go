@@ -218,7 +218,7 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 // The pool is closed on the failure path too, so a fixture that cannot migrate still does not
 // leave a connection behind for the drop to evict.
 func migrateRCSIDatabase(db *mssqldb.Database) error {
-	m, err := db.NewMigrator(context.Background())
+	m, err := db.NewMigrator(context.Background(), nil)
 	if err != nil {
 		_ = db.DB.Close()
 		return fmt.Errorf("creating the RCSI fixture's migrator: %w", err)

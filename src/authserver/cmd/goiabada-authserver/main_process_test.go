@@ -87,7 +87,7 @@ func migratedToHead(t *testing.T, path string) {
 	require.NoError(t, err)
 	defer func() { _ = db.DB.Close() }()
 
-	m, err := db.NewMigrator(context.Background())
+	m, err := db.NewMigrator(context.Background(), nil)
 	require.NoError(t, err)
 	require.NoError(t, m.Up(context.Background()))
 }
@@ -100,7 +100,7 @@ func recordedVersion(t *testing.T, path string) int {
 	require.NoError(t, err)
 	defer func() { _ = db.DB.Close() }()
 
-	m, err := db.NewMigrator(context.Background())
+	m, err := db.NewMigrator(context.Background(), nil)
 	require.NoError(t, err)
 	version, dirty, err := m.Version(context.Background())
 	require.NoError(t, err)

@@ -35,7 +35,7 @@ func TestNewMigrator_PinsTheSchemaMigrationsShape(t *testing.T) {
 
 	// Constructed and then dropped: NewMigrator is what runs the pre-create, and there is
 	// nothing to close (#268 decision 8).
-	_, err = db.NewMigrator(context.Background())
+	_, err = db.NewMigrator(context.Background(), nil)
 	require.NoError(t, err, "NewMigrator")
 
 	shape, err := schemadump.DumpTable(context.Background(), db.DB, data.SQLite, "schema_migrations")

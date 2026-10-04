@@ -488,7 +488,7 @@ func TestMigrationLock_ThePreCreateGivesTheResourceBack(t *testing.T) {
 
 	// The pre-create runs inside NewMigrator, so this is what puts the lock ceremony under test
 	// rather than the runner's own.
-	_, err = h.DB.NewMigrator(context.Background())
+	_, err = h.DB.NewMigrator(context.Background(), nil)
 	require.NoErrorf(t, err, "construct a second migrator, which pre-creates schema_migrations again on %s", dbType())
 
 	requireMigrationLockIsFree(t, h, eng, "after the schema_migrations pre-create")
@@ -560,7 +560,7 @@ func TestMigrationLock_ThePreCreateGivesTheResourceBackWhenTheReleaseFails(t *te
 			db.DB = faultPool
 			t.Cleanup(func() { db.DB = original })
 
-			_, err = db.NewMigrator(context.Background())
+			_, err = db.NewMigrator(context.Background(), nil)
 			require.ErrorIs(t, err, errPrecreateUnlockFault,
 				"a release that failed must reach the caller: it is the only notice that this database now carries a lock held against every later migrator")
 			if failDDL {

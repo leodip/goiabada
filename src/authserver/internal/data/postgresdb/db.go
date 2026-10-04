@@ -356,7 +356,10 @@ func (d *Database) ensureSchemaMigrationsTable(ctx context.Context) error {
 //
 // There is nothing to close. The runner takes a connection out of the pool for the duration
 // of one operation and gives it back before returning (#268 decision 8).
-func (d *Database) NewMigrator(ctx context.Context) (*migrator.Migrator, error) {
+//
+// The Progress SQL Server's pre-create reports a lock wait to goes unused: the version table here is
+// created by one idempotent statement, which waits for no migration lock.
+func (d *Database) NewMigrator(ctx context.Context, _ migrator.Progress) (*migrator.Migrator, error) {
 	if err := d.ensureSchemaMigrationsTable(ctx); err != nil {
 		return nil, err
 	}

@@ -213,6 +213,11 @@ func main() {
 	}
 	switch outcome {
 	case bootstrap.Exit:
+		// The legacy two-step seed ends the process whatever happens next, but a signal that
+		// arrived while it ran is still a stop during startup, said as every other one is.
+		if finishStartup() {
+			exitStopped()
+		}
 		os.Exit(0)
 	case bootstrap.Refused:
 		os.Exit(1)

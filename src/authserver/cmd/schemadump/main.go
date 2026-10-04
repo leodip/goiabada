@@ -172,7 +172,7 @@ func dumpOne(t target) ([]byte, error) {
 	}
 	defer cleanup()
 
-	m, err := db.NewMigrator(ctx)
+	m, err := db.NewMigrator(ctx, nil)
 	if err != nil {
 		return nil, errs.Errorf("prepare the scratch database's migration runner: %w", err)
 	}
@@ -197,7 +197,7 @@ func dumpOne(t target) ([]byte, error) {
 // one method this command calls on them rather than over data.Database, whose two hundred-odd
 // methods none of this needs.
 type migratable interface {
-	NewMigrator(ctx context.Context) (*migrator.Migrator, error)
+	NewMigrator(ctx context.Context, progress migrator.Progress) (*migrator.Migrator, error)
 }
 
 // open creates the scratch database and returns a handle to it plus the cleanup that closes

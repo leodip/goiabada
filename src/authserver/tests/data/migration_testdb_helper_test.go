@@ -180,7 +180,7 @@ func readDatabaseDefaultCollation(t *testing.T, sqlDB *sql.DB) string {
 // still registered by the caller, and they are now the whole of it.
 func newIsolated(t *testing.T, db datafactory.Migratable, sqlDB *sql.DB, name string) *isolatedDB {
 	t.Helper()
-	m, err := db.NewMigrator(context.Background())
+	m, err := db.NewMigrator(context.Background(), nil)
 	require.NoError(t, err, "NewMigrator")
 	return &isolatedDB{DB: db, SQL: sqlDB, Migrator: m, Name: name}
 }

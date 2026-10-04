@@ -212,7 +212,7 @@ func (m *Migrator) withConn(ctx context.Context, fn func(ctx context.Context, co
 // exactly the leak this package exists to end, in the one case where it is invisible.
 //
 // progress is told when the lock is held by another session and the operation is about to wait
-// for it; see takeLock.
+// for it; see Engine.LockReporting.
 func (m *Migrator) run(ctx context.Context, progress Progress, fn func(ctx context.Context, conn *sql.Conn) error) error {
 	return m.withConn(ctx, func(ctx context.Context, conn *sql.Conn) (err error) {
 		if m.eng.lock == nil {
@@ -220,7 +220,7 @@ func (m *Migrator) run(ctx context.Context, progress Progress, fn func(ctx conte
 			sqliteMigrationMu.Lock()
 			defer sqliteMigrationMu.Unlock()
 		} else {
-			if lockErr := m.takeLock(ctx, conn, progress); lockErr != nil {
+			if lockErr := m.eng.LockReporting(ctx, conn, progress); lockErr != nil {
 				return lockErr
 			}
 			defer func() {
@@ -234,24 +234,6 @@ func (m *Migrator) run(ctx context.Context, progress Progress, fn func(ctx conte
 		}
 		return fn(ctx, conn)
 	})
-}
-
-// takeLock tries the lock without waiting first, and only when another session holds it tells
-// progress, once, and then waits for it. A wait is what makes a starting process look hung, so it
-// is said before it begins, and a lock taken at once is no wait to say (#390 decision 7). An
-// engine with no try statement waits without telling.
-func (m *Migrator) takeLock(ctx context.Context, conn *sql.Conn, progress Progress) error {
-	if m.eng.tryLock != nil {
-		acquired, err := m.eng.tryLock(ctx, conn)
-		if err != nil {
-			return err
-		}
-		if acquired {
-			return nil
-		}
-		progress.WaitingForLock()
-	}
-	return m.eng.lock(ctx, conn)
 }
 
 // ---------------------------------------------------------------------------

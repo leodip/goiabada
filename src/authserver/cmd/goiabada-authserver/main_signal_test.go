@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -89,30 +90,75 @@ func TestMain_AShutdownSignalDuringStartupStopsCleanly(t *testing.T) {
 	}
 }
 
+// TestMain_ASignalDuringALegacyBootstrapStillSaysTheServerStopped is the same stop in the legacy
+// two-step mode, whose seed ends the process rather than handing it to the server. A signal landing
+// as the seed begins lets the seed commit and its bootstrap file be published, and the process
+// exits 0 either way; what the stop adds is the last record, "auth server stopped", which a stopped
+// start writes in every phase (#390 decision 9). The legacy exit used to come before it.
+func TestMain_ASignalDuringALegacyBootstrapStillSaysTheServerStopped(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "s.db")
+	outFile := filepath.Join(dir, "bootstrap.env")
+	at := "database is empty, performing initial bootstrap"
+
+	code, records := runMainSignalledAtWith(t, path, at, []string{
+		"GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE=" + outFile,
+	})
+
+	require.Equalf(t, 0, code, "the seed committed and the stop was carried out cleanly\n%s", dump(records))
+	messages := messagesOf(records)
+	require.Containsf(t, messages, "using legacy two-step bootstrap mode", "the case runs the legacy mode\n%s", dump(records))
+	assert.Contains(t, messages, "database seeded", "a seed under way when the signal arrived runs to its end")
+	assert.Truef(t, slices.ContainsFunc(messages, func(m string) bool { return strings.HasPrefix(m, "bootstrap complete") }),
+		"and its file is published\n%s", dump(records))
+	assert.Equal(t, 1, count(messages, "shutdown signal received"), "the signal is said once\n%s", dump(records))
+	assert.Equalf(t, 1, count(messages, "auth server stopped"), "the stop is said once\n%s", dump(records))
+	assert.Equalf(t, "auth server stopped", messages[len(messages)-1], "and it is the last thing said\n%s", dump(records))
+
+	_, statErr := os.Stat(outFile)
+	assert.NoError(t, statErr, "the bootstrap file holding the generated credentials is in place")
+	version, dirty, versionErr := schemaVersion(t, path)
+	require.NoError(t, versionErr)
+	assert.False(t, dirty, "the schema is left clean")
+	assert.Positive(t, version, "the database was migrated before it was seeded")
+}
+
+// singleStepEnv is the configuration that selects the single-step seed and lets the server start
+// after it: the admin console's client secret and the auth server's session keys.
+var singleStepEnv = []string{
+	"GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=" + strings.Repeat("ef", 32),
+	"GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=" + strings.Repeat("ab", 64),
+	"GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=" + strings.Repeat("cd", 32),
+}
+
 // runMainSignalledAt runs main over a fresh SQLite file at path, seeding it in single-step mode and
 // listening on a free loopback port, sends SIGTERM as it writes the record at, and answers its exit
 // code and every record it wrote, in order.
 func runMainSignalledAt(t *testing.T, path, at string) (int, []map[string]any) {
+	t.Helper()
+	return runMainSignalledAtWith(t, path, at, singleStepEnv)
+}
+
+// runMainSignalledAtWith is runMainSignalledAt with mode, the variables selecting how an empty
+// database is seeded, in place of the single-step ones.
+func runMainSignalledAtWith(t *testing.T, path, at string, mode []string) (int, []map[string]any) {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), mainProcessBound)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, os.Args[0])
-	cmd.Env = []string{
+	cmd.Env = append([]string{
 		runMainMarker + "=1",
 		"GOIABADA_DB_TYPE=sqlite",
 		"GOIABADA_DB_DSN=file:" + path,
 		"GOIABADA_AUTHSERVER_LOG_FORMAT=json",
 		"GOIABADA_AES_ENCRYPTION_KEY=" + strings.Repeat("ab", 32),
-		"GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=" + strings.Repeat("ef", 32),
 		"GOIABADA_ADMIN_EMAIL=admin@example.com",
 		"GOIABADA_ADMIN_PASSWORD=a-long-enough-password-for-the-seed",
-		"GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=" + strings.Repeat("ab", 64),
-		"GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=" + strings.Repeat("cd", 32),
 		"GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=127.0.0.1",
 		"GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=" + strconv.Itoa(freePort(t)),
-	}
+	}, mode...)
 	stderr, err := cmd.StderrPipe()
 	require.NoError(t, err)
 	require.NoError(t, cmd.Start())
@@ -167,7 +213,7 @@ func schemaVersion(t *testing.T, path string) (int, bool, error) {
 	db, err := sqlitedb.New(context.Background(), "file:"+path, false)
 	require.NoError(t, err)
 	defer func() { _ = db.DB.Close() }()
-	m, err := db.NewMigrator(context.Background())
+	m, err := db.NewMigrator(context.Background(), nil)
 	require.NoError(t, err)
 	return m.Version(context.Background())
 }

@@ -93,10 +93,11 @@ type Engine struct {
 func (e Engine) Name() string { return e.name }
 
 // Lock takes this engine's cross-process migration lock on conn, and Unlock releases it. They
-// are the same statements on the same resource the runner itself uses, exported for the one
-// caller outside this package that has to hold that exact resource: SQL Server's
-// schema_migrations pre-create, which is a check followed by a create and is safe only while the
-// migration lock is held (#293).
+// are the same statements on the same resource the runner itself uses, exported for the callers
+// outside this package that have to hold that exact resource: SQL Server's schema_migrations
+// pre-create, which is a check followed by a create and is safe only while the migration lock is
+// held (#293), takes it through LockReporting and releases it with Unlock, and the data tier's lock
+// tests hold it from a session of their own with this pair.
 //
 // Both are no-ops on SQLite, which has no session-scoped lock statement at all; the runner
 // excludes itself there with sqliteMigrationMu, which run takes and this pair cannot, since a
@@ -108,6 +109,32 @@ func (e Engine) Name() string { return e.name }
 func (e Engine) Lock(ctx context.Context, conn *sql.Conn) error {
 	if e.lock == nil {
 		return nil
+	}
+	return e.lock(ctx, conn)
+}
+
+// LockReporting is Lock, trying the lock without waiting first, and only when another session
+// holds it telling progress, once, and then waiting for it. A wait is what makes a starting process
+// look hung, so it is said before it begins, and a lock taken at once is no wait to say (#390
+// decision 7). The runner takes its lock through this, and so does SQL Server's schema_migrations
+// pre-create, which can queue behind another process's migration as the runner can. An engine with
+// no try statement waits without telling, and progress may be nil.
+func (e Engine) LockReporting(ctx context.Context, conn *sql.Conn, progress Progress) error {
+	if e.lock == nil {
+		return nil
+	}
+	if progress == nil {
+		progress = noProgress{}
+	}
+	if e.tryLock != nil {
+		acquired, err := e.tryLock(ctx, conn)
+		if err != nil {
+			return err
+		}
+		if acquired {
+			return nil
+		}
+		progress.WaitingForLock()
 	}
 	return e.lock(ctx, conn)
 }
