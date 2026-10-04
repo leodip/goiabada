@@ -306,6 +306,14 @@ func generateKubernetesManifests(config *Config) string {
 // resourceNames, and a secret manager can own it, apart from the other secrets (#396 decision 16).
 const encryptionKeySecret = "goiabada-encryption-key" //nolint:gosec // G101: the Secret's name, not its value
 
+// goiabadaSecrets is the Secret holding every secret but the AES key.
+const goiabadaSecrets = "goiabada-secrets"
+
+// kubernetesSecretReadCommand reads one key of a Secret back out of the cluster, decoded.
+func kubernetesSecretReadCommand(secret, key, ns string) string {
+	return fmt.Sprintf("kubectl get secret %s -n %s -o jsonpath='{.data.%s}' | base64 -d", secret, ns, key)
+}
+
 // kubernetesApplyCommand is the one kubectl apply that deploys the manifest and its secrets file on
 // an empty cluster: kubectl applies its files in the order given, and the Secrets are namespaced in
 // the Namespace the manifest creates, so the manifest goes first (#396 decision 14).
@@ -333,7 +341,7 @@ func generateKubernetesSecrets(config *Config) string {
 	// base64 spells any bytes in characters YAML reads as they are, so the Secrets' values are the
 	// one set of interpolated values not written through yamlQuote.
 	sb.WriteString("---\n")
-	writeSecretHead(&sb, ns, "goiabada-secrets")
+	writeSecretHead(&sb, ns, goiabadaSecrets)
 	fmt.Fprintf(&sb, "  db-password: %s\n", base64Encode(config.DBPassword))
 	fmt.Fprintf(&sb, "  admin-password: %s\n", base64Encode(config.AdminPassword))
 	fmt.Fprintf(&sb, "  auth-session-auth-key: %s\n", base64Encode(config.AuthSessionAuthKey))
@@ -349,7 +357,7 @@ func generateKubernetesSecrets(config *Config) string {
 	}
 	sb.WriteString("# It is a Secret of its own so that RBAC can restrict get on it by resourceNames, and a\n")
 	sb.WriteString("# secret manager can own it, apart from the other secrets. Read it back for the backup with:\n")
-	fmt.Fprintf(&sb, "#   kubectl get secret %s -n %s -o jsonpath='{.data.aes-encryption-key}' | base64 -d\n", encryptionKeySecret, ns)
+	fmt.Fprintf(&sb, "#   %s\n", kubernetesSecretReadCommand(encryptionKeySecret, "aes-encryption-key", ns))
 	writeSecretHead(&sb, ns, encryptionKeySecret)
 	fmt.Fprintf(&sb, "  aes-encryption-key: %s\n", base64Encode(config.AESEncryptionKey))
 

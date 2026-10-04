@@ -3,7 +3,6 @@ package main
 import (
 	"path/filepath"
 	"slices"
-	"strings"
 )
 
 func printBanner(out *console) {
@@ -49,11 +48,14 @@ func printSummary(out *console, config *Config) {
 		}
 	}
 	out.printf("  Admin Email:      %s\n", config.AdminEmail)
-	out.printf("  Admin Password:   %s\n", maskPassword(config.AdminPassword))
+	out.printf("  Admin Password:   %s\n", passwordOrigin(config.AdminPasswordGenerated))
 	if config.DBHost != "" {
 		out.printf("  DB Host:          %s:%s\n", config.DBHost, config.DBPort)
 		out.printf("  DB Name:          %s\n", config.DBName)
 		out.printf("  DB Username:      %s\n", config.DBUsername)
+	}
+	if config.DBPassword != "" {
+		out.printf("  DB Password:      %s\n", passwordOrigin(config.DBPasswordGenerated))
 	}
 	out.println()
 	out.printf("%s%s==========================================================%s\n", out.bold, out.cyan, out.reset)
@@ -73,7 +75,7 @@ func printCompletionMessage(out *console, config *Config, paths outputPaths) {
 	out.printf("    Auth Server:   %s%s%s\n", out.cyan, config.AuthServerURL, out.reset)
 	out.printf("    Admin Console: %s%s%s\n", out.cyan, config.AdminConsoleURL, out.reset)
 	out.println()
-	out.printf("Login with: %s%s%s / %s\n", out.bold, config.AdminEmail, out.reset, config.AdminPassword)
+	printWhereTheAdminPasswordIs(out, config, paths)
 	out.println()
 	printSecretsAdvice(out, paths)
 	if config.AdminPassword == "changeme" || len(config.AdminPassword) < 8 {
@@ -339,9 +341,24 @@ func printSecretsAdvice(out *console, paths outputPaths) {
 	out.println()
 }
 
-func maskPassword(password string) string {
-	if len(password) <= 4 {
-		return "****"
+// passwordOrigin is all the summary says of a password: whether it was generated or set. It showed
+// the first and last two characters of the admin password (#396 decision 17).
+func passwordOrigin(generated bool) string {
+	if generated {
+		return "(generated)"
 	}
-	return password[:2] + strings.Repeat("*", len(password)-4) + password[len(password)-2:]
+	return "(set)"
+}
+
+// printWhereTheAdminPasswordIs says whom to sign in as and where the admin password is, never what
+// it is: a generated one printed here would be in the log of every CI job that runs the wizard
+// (#396 decision 17). For Kubernetes it is the command that reads it back out of the cluster, since
+// the secrets file may be gone by the time anyone signs in.
+func printWhereTheAdminPasswordIs(out *console, config *Config, paths outputPaths) {
+	if config.Deployment.kind == deploymentKubernetes {
+		out.printf("Sign in as %s%s%s with the admin password, which this reads back out of the cluster:\n", out.bold, config.AdminEmail, out.reset)
+		out.printf("    %s%s%s\n", out.cyan, kubernetesSecretReadCommand(goiabadaSecrets, "admin-password", config.K8sNamespace), out.reset)
+		return
+	}
+	out.printf("Sign in as %s%s%s with the admin password, GOIABADA_ADMIN_PASSWORD in %s.\n", out.bold, config.AdminEmail, out.reset, filepath.Base(paths.secrets))
 }

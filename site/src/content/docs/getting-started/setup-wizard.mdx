@@ -78,9 +78,11 @@ The wizard will ask you a few questions:
 
 7. **Rate limiter** (production, Kubernetes and native binaries) - Whether to turn on the auth server's built-in [rate limiter](/reference/environment-variables/#security-settings), which the server leaves off by default. Yes is the default, except for Kubernetes under the `Cluster` traffic policy: there Goiabada sees a node's address for every client, so the per-IP limits would count every user arriving through one node together and throttle sign-ins on a busy site, while the limits on failed passwords and codes hold under either policy. The answer is written as `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`, `true` or `false`, under a comment. `--rate-limiter=true` or `=false` answers without the prompt; left out, the deployment's default applies. Local testing never asks and leaves it off. With the limiter on, the auth server logs a warning about its proxy trust at every start of a production Compose or Kubernetes deployment, which is expected behind one proxy (see [client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection))
 
-8. **Admin credentials** - Email and password for the first admin user
+8. **Admin credentials** - Email and password for the first admin user. The password is read without
+   echo (see [Passwords and the terminal](#passwords-and-the-terminal))
 
-9. **Database password** - A strong password (auto-generated if you press Enter)
+9. **Database password** - A strong password, generated if you press Enter. The prompt shows the
+   generated default as `[generated]`, never its value, and reads what you type without echo
 
 ## What gets generated
 
@@ -157,6 +159,33 @@ When it writes into a git working tree, it warns and gives the line to add to th
 `.gitignore`; it never edits one itself. It also warns when it generates the AES key: back it up
 separately from the database, since without it the client secrets, SMTP credentials, OTP seeds and
 signing keys the database holds cannot be recovered.
+
+## Passwords and the terminal
+
+The wizard prints no secret. Earlier versions printed the generated admin and database passwords, the
+database password even when you passed it with `--db-password`, and the admin password again at the
+end as `Login with: <email> / <password>`, and they echoed both password prompts. Whatever a terminal
+shows reaches its scrollback, screen recordings, and the log of every CI job that runs the wizard.
+
+Now each password step says only whether the password was set or generated, and where it is stored,
+and the summary shows `(set)` or `(generated)`. The completion message says where to find the admin
+password: `GOIABADA_ADMIN_PASSWORD` in `docker-compose.override.yml` or `goiabada.env`, or, for
+Kubernetes, the command that reads it back out of the cluster:
+
+```bash
+kubectl get secret goiabada-secrets -n goiabada -o jsonpath='{.data.admin-password}' | base64 -d
+```
+
+At a terminal, the password prompts read without echo and keep nothing in the line history, so the
+up arrow at a later prompt does not recall a password. Input piped to the wizard is read as before.
+There is no confirmation prompt: the file holds what you typed, and a mistyped database password fails
+the connection test.
+
+Every secret is in a file only its owner can read, so you never need to copy one from the terminal.
+Prefer the prompt, or a generated password, to `--admin-password` and `--db-password`: a password
+passed as a flag lands in your shell history and, while the wizard runs, in the process list, which
+other accounts on the machine can usually read. In non-interactive mode, leave both flags out and the
+wizard generates the passwords into the secrets file.
 
 ## Next steps
 

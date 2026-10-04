@@ -121,7 +121,7 @@ func interactiveScript(d *deployment, e *engine) []scriptedStep {
 	}
 	steps = append(steps,
 		scriptedStep{prompt: "Admin email [" + defaultEmail + "]: ", answer: ""},
-		scriptedStep{prompt: "Admin password [changeme]: ", answer: "Str0ng-Passw0rd!"},
+		scriptedStep{prompt: "Admin password [changeme]: ", hidden: true, answer: "Str0ng-Passw0rd!"},
 	)
 	switch {
 	case e.hasServer && d.externalDatabase:
@@ -130,11 +130,11 @@ func interactiveScript(d *deployment, e *engine) []scriptedStep {
 			scriptedStep{prompt: "Database port [" + e.defaultPort + "]: ", answer: ""},
 			scriptedStep{prompt: "Database name [goiabada]: ", answer: ""},
 			scriptedStep{prompt: "Database username [" + e.defaultUser + "]: ", answer: ""},
-			scriptedStep{prompt: "Database password [", answer: "db-secret"},
+			scriptedStep{prompt: "Database password [generated]: ", hidden: true, answer: "db-secret"},
 			scriptedStep{prompt: "Test database connection? [Y/n]: ", answer: ""},
 		)
 	case e.hasServer:
-		steps = append(steps, scriptedStep{prompt: "Database password [", answer: "db-secret"})
+		steps = append(steps, scriptedStep{prompt: "Database password [generated]: ", hidden: true, answer: "db-secret"})
 	}
 	return append(steps, scriptedStep{prompt: "Generate configuration files? [Y/n]: ", answer: ""})
 }
@@ -443,9 +443,16 @@ func TestWizard_NonInteractiveGeneratesWhatWasNotGiven(t *testing.T) {
 			t.Errorf("generated password %q, want 16 characters of three classes", password)
 		}
 	}
-	for _, line := range []string{"Generated admin password: " + c.AdminPassword, "Generated database password: " + c.DBPassword} {
+	// Each generated password is reported as generated, with where it is stored, and never printed
+	// (#396 decision 17).
+	for _, line := range []string{"Admin password: generated, stored in " + w.paths.secrets, "Database password: generated, stored in " + w.paths.secrets} {
 		if !strings.Contains(out.String(), line) {
 			t.Errorf("output lacks %q", line)
+		}
+	}
+	for _, password := range []string{c.AdminPassword, c.DBPassword} {
+		if strings.Contains(out.String(), password) {
+			t.Errorf("output prints the generated password %q", password)
 		}
 	}
 	// The wizard warned "Weak password: no special character" about the password it had just
@@ -464,7 +471,7 @@ func TestWizard_EveryGeneratedPasswordHoldsThreeClasses(t *testing.T) {
 	d, e := deployments[deploymentLocal], testEngine("mssql")
 	steps := interactiveScript(d, e)
 	for i := range steps {
-		if strings.HasPrefix(steps[i].prompt, "Database password [") {
+		if strings.HasPrefix(steps[i].prompt, "Database password [generated]") {
 			steps[i].answer = "" // take the generated default
 		}
 	}

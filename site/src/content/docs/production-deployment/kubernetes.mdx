@@ -301,6 +301,13 @@ when it writes into a git working tree, and gives the line to add to its `.gitig
 key separately from the database: without it, the client secrets, SMTP credentials, OTP seeds and
 signing keys the database holds cannot be recovered.
 
+The wizard prints no secret, a generated admin password included. Read the admin password back out of
+the cluster when you first sign in:
+
+```bash
+kubectl get secret goiabada-secrets -n goiabada -o jsonpath='{.data.admin-password}' | base64 -d
+```
+
 ### Step 6: Configure DNS
 
 After deploying, get the Gateway's address:

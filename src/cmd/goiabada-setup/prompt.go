@@ -18,9 +18,12 @@ var errAborted = errors.New("aborted")
 
 // prompter reads one answer. A read that fails for any reason but the operator ending the wizard
 // returns that failure, never an answer: the prompts built on it would otherwise take their default,
-// and a fault at "Generate configuration files?" would approve the write (#430).
+// and a fault at "Generate configuration files?" would approve the write (#430). readPassword reads
+// a password, which a terminal neither echoes nor keeps in its line history, so it reaches neither
+// the screen, its scrollback and recordings, nor the up arrow at a later prompt (#396 decision 17).
 type prompter interface {
 	readLine(prompt string) (string, error)
+	readPassword(prompt string) (string, error)
 }
 
 // newPrompter reads from a terminal through x/term, which edits the line and keeps its history,
@@ -37,9 +40,10 @@ func newPrompter(stdin *os.File, stdout io.Writer) prompter {
 }
 
 // terminalPrompter reads through term.Terminal, which echoes, edits and keeps a history of what it
-// reads. term.Terminal needs raw mode, and raw mode stops the terminal turning "\n" into "\r\n",
-// which everything else the wizard prints relies on, so raw mode is entered for each read and
-// restored before the read returns rather than held across the wizard (#430).
+// reads, but for a password, which it neither echoes nor keeps. term.Terminal needs raw mode, and
+// raw mode stops the terminal turning "\n" into "\r\n", which everything else the wizard prints
+// relies on, so raw mode is entered for each read and restored before the read returns rather than
+// held across the wizard (#430).
 type terminalPrompter struct {
 	t *term.Terminal
 	// enter puts the terminal into raw mode and returns what puts it back.
@@ -64,7 +68,19 @@ func newTerminalPrompter(fd int, rw io.ReadWriter) *terminalPrompter {
 
 // readLine answers errAborted for io.EOF, which term.Terminal returns for Ctrl-C, for Ctrl-D at an
 // empty line and for the end of the input alike.
-func (p *terminalPrompter) readLine(prompt string) (line string, err error) {
+func (p *terminalPrompter) readLine(prompt string) (string, error) {
+	return p.read(prompt, p.t.ReadLine)
+}
+
+// readPassword reads through term.Terminal's password read, which echoes nothing and adds nothing
+// to the history.
+func (p *terminalPrompter) readPassword(prompt string) (string, error) {
+	return p.read(prompt, func() (string, error) { return p.t.ReadPassword(prompt) })
+}
+
+// read runs one of term.Terminal's reads in raw mode, with prompt set for the line read, which takes
+// it from the terminal; the password read takes its own.
+func (p *terminalPrompter) read(prompt string, read func() (string, error)) (line string, err error) {
 	restore, err := p.enter()
 	if err != nil {
 		return "", errs.Wrap(err, "unable to put the terminal into raw mode")
@@ -78,7 +94,7 @@ func (p *terminalPrompter) readLine(prompt string) (line string, err error) {
 		_ = p.t.SetSize(width, height)
 	}
 	p.t.SetPrompt(prompt)
-	line, err = p.t.ReadLine()
+	line, err = read()
 	if errors.Is(err, io.EOF) {
 		return "", errAborted
 	}
@@ -107,6 +123,11 @@ func (p *linePrompter) readLine(prompt string) (string, error) {
 	return strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r"), nil
 }
 
+// readPassword reads a line: input that is not a terminal never echoed, and keeps no history.
+func (p *linePrompter) readPassword(prompt string) (string, error) {
+	return p.readLine(prompt)
+}
+
 // asker is the typed prompts, over a prompter and the console their complaints are written to.
 // Each returns its default only for an empty answer that was read, and a read's failure as it is.
 type asker struct {
@@ -117,12 +138,24 @@ type asker struct {
 // text asks again for an answer no generated file could carry (checkWritable), which only input
 // that is not a terminal can hold: term.Terminal drops control keys and decodes what it reads.
 func (a asker) text(prompt, defaultValue string) (string, error) {
+	return a.ask(a.in.readLine, prompt, defaultValue, defaultValue)
+}
+
+// hidden is text read as a password, offering the default under shown, which a generated default
+// is never shown as.
+func (a asker) hidden(prompt, defaultValue, shown string) (string, error) {
+	return a.ask(a.in.readPassword, prompt, defaultValue, shown)
+}
+
+// ask reads with read until the answer is one a generated file can carry, prompting with the
+// default shown as shown, and returns the default for an empty answer.
+func (a asker) ask(read func(prompt string) (string, error), prompt, defaultValue, shown string) (string, error) {
 	promptStr := prompt + ": "
-	if defaultValue != "" {
-		promptStr = prompt + " [" + defaultValue + "]: "
+	if shown != "" {
+		promptStr = prompt + " [" + shown + "]: "
 	}
 	for {
-		input, err := a.in.readLine(promptStr)
+		input, err := read(promptStr)
 		if err != nil {
 			return "", err
 		}
@@ -224,9 +257,17 @@ func (a asker) nonEmpty(prompt, defaultValue string) (string, error) {
 	}
 }
 
+// generatedPassword asks for a password read hidden, offering one generated as [generated] and never
+// as itself (#396 decision 17).
+func (a asker) generatedPassword(prompt, generated string) (string, error) {
+	return a.hidden(prompt, generated, "generated")
+}
+
+// password asks for a password read hidden, judging its strength. Its default is shown, being no
+// secret: the well-known one the completion message warns about.
 func (a asker) password(prompt, defaultValue string) (string, error) {
 	for {
-		value, err := a.text(prompt, defaultValue)
+		value, err := a.hidden(prompt, defaultValue, defaultValue)
 		if err != nil {
 			return "", err
 		}
