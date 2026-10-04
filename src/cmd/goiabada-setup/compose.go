@@ -46,6 +46,9 @@ func generateDBService(config *Config) string {
 	e := config.Engine
 
 	fmt.Fprintf(&sb, "  %s:\n", e.composeService)
+	for _, line := range e.imageComment {
+		fmt.Fprintf(&sb, "    # %s\n", line)
+	}
 	fmt.Fprintf(&sb, "    image: %s\n", e.image)
 	sb.WriteString("    restart: unless-stopped\n")
 	sb.WriteString("    volumes:\n")
@@ -82,6 +85,9 @@ func generateAuthServerService(config *Config) string {
 	writeStopGracePeriod(&sb,
 		"Up to 50s to stop cleanly (15s to drain requests, 15s for work handed off after",
 		"responses, 20s for the cleanup worker) plus 10s of headroom; Compose's default is 10s.")
+	writeHardening(&sb,
+		"/tmp is a tmpfs, where SQLite writes the temporary files of large sorts and VACUUM, and",
+		"where Go spills an upload larger than it keeps in memory.")
 
 	if config.Engine.hasServer {
 		sb.WriteString("    depends_on:\n")
@@ -174,6 +180,7 @@ func generateAdminConsoleService(config *Config) string {
 	writeStopGracePeriod(&sb,
 		"The auth server's value: this service stops within its 15s drain, and a grace",
 		"period is a ceiling, not a wait. Compose's default is 10s.")
+	writeHardening(&sb, "/tmp is a tmpfs, where Go spills an upload larger than it keeps in memory.")
 	sb.WriteString("    depends_on:\n")
 	sb.WriteString("      goiabada-authserver:\n")
 	sb.WriteString("        condition: service_healthy\n")
@@ -221,6 +228,27 @@ func writeStopGracePeriod(sb *strings.Builder, comment ...string) {
 		fmt.Fprintf(sb, "    # %s\n", line)
 	}
 	fmt.Fprintf(sb, "    stop_grace_period: %s\n", composeStopGracePeriod)
+}
+
+// writeHardening writes a service's posture, the Compose counterpart of the manifest's restricted
+// securityContext: the images' own uid and gid, no capabilities, no privileges gained through a
+// setuid binary, and a read-only root with a tmpfs at /tmp, under the comment lines saying what
+// writes there in that service. Docker applies its default seccomp profile without being asked
+// (#396 decisions 1 and 2).
+func writeHardening(sb *strings.Builder, tmpComment ...string) {
+	sb.WriteString("    # Runs as the image's own uid and gid, 10001, with every capability dropped, no privilege\n")
+	sb.WriteString("    # gained through a setuid binary, and a read-only root.\n")
+	for _, line := range tmpComment {
+		fmt.Fprintf(sb, "    # %s\n", line)
+	}
+	sb.WriteString("    user: \"10001:10001\"\n")
+	sb.WriteString("    cap_drop:\n")
+	sb.WriteString("      - ALL\n")
+	sb.WriteString("    security_opt:\n")
+	sb.WriteString("      - no-new-privileges:true\n")
+	sb.WriteString("    read_only: true\n")
+	sb.WriteString("    tmpfs:\n")
+	sb.WriteString("      - /tmp\n")
 }
 
 // writeComposeVariable writes one entry of a service's list-form environment, quoted whole, so

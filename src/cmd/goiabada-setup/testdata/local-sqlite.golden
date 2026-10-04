@@ -9,6 +9,18 @@ services:
     # Up to 50s to stop cleanly (15s to drain requests, 15s for work handed off after
     # responses, 20s for the cleanup worker) plus 10s of headroom; Compose's default is 10s.
     stop_grace_period: 60s
+    # Runs as the image's own uid and gid, 10001, with every capability dropped, no privilege
+    # gained through a setuid binary, and a read-only root.
+    # /tmp is a tmpfs, where SQLite writes the temporary files of large sorts and VACUUM, and
+    # where Go spills an upload larger than it keeps in memory.
+    user: "10001:10001"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     ports:
       - 9090:9090
     networks:
@@ -58,6 +70,17 @@ services:
     # The auth server's value: this service stops within its 15s drain, and a grace
     # period is a ceiling, not a wait. Compose's default is 10s.
     stop_grace_period: 60s
+    # Runs as the image's own uid and gid, 10001, with every capability dropped, no privilege
+    # gained through a setuid binary, and a read-only root.
+    # /tmp is a tmpfs, where Go spills an upload larger than it keeps in memory.
+    user: "10001:10001"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     depends_on:
       goiabada-authserver:
         condition: service_healthy
