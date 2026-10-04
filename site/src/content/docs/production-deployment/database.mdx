@@ -66,6 +66,32 @@ changed. The admin console holds no database
 connection of its own and reaches the auth server through its API, so restarting it migrates
 nothing.
 
+Only one process migrates a database at a time. A process takes the migration lock before it
+migrates and releases it when it is done, so with several replicas the first to start migrates and
+the others wait for it. A waiting process waits for as long as the lock is held, on every engine;
+nothing in Goiabada gives up, and the startup budget your platform gives the container (the
+Kubernetes startup probe, or the Compose healthcheck's start period) is what limits how long a start
+may take. The lock belongs to the holder's database session, so a holder that dies releases it and
+cannot strand the others. Once a waiting process has the lock, it finds the schema already current
+and starts. The `migrate` command takes the same lock and waits the same way. On SQLite the lock
+covers one process only, so a starting auth server never reports waiting for it there.
+
+A starting auth server writes these Info records about the schema, between `opening the database`
+and the listeners starting:
+
+| Record | When | Attributes |
+|---|---|---|
+| `waiting for the migration lock` | Another process holds the lock. Written once, before the wait | none |
+| `migrating the database` | Before the first migration runs | `from_version`, `to_version`, `pending` |
+| `database migrated` | After the last migration has run | `from_version`, `to_version`, `applied`, `duration` |
+| `no need to migrate the database` | The schema is already current | none |
+
+`from_version` is the schema version the database recorded, 0 for one that was never migrated, and
+`to_version` the one this release expects. `pending` and `applied` count migration files. A replica
+that waited behind another one's migration writes `waiting for the migration lock` and then `no
+need to migrate the database`. A start that writes `waiting for the migration lock` and nothing more
+is waiting for a process that is still migrating, not hung.
+
 The commands below run against the database in `GOIABADA_DB_*` and do not start the server. The
 `--db-*` flags override those variables, given before or after `migrate`; any other flag goes before
 it. A mistyped command, such as `migrat`, is refused rather than starting the server.

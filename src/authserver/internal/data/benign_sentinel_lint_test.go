@@ -39,8 +39,8 @@ import (
 
 // benignSentinels are the migrator errors that mean "nothing happened, and that is fine". Both
 // can arrive joined with a real failure, and neither has a caller that wants the joined one.
-// ErrLocked and the two typed errors are absent deliberately: they ARE failures, so a caller
-// matching one is asking whether it is in there, which is what errors.Is is for.
+// The typed errors are absent deliberately: they ARE failures, so a caller matching one is asking
+// whether it is in there, which is what errors.Is is for.
 var benignSentinels = map[string]bool{
 	"ErrNoChange":   true,
 	"ErrNilVersion": true,
@@ -233,7 +233,7 @@ func migrate(m *migrator.Migrator) error {
 	if migrator.IsNoChange(err) {
 		return nil
 	}
-	if errors.Is(err, migrator.ErrLocked) {
+	if errors.Is(err, context.Canceled) {
 		return err
 	}
 	if matcher.Is(err, migrator.ErrNoChange) {

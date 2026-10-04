@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"time"
 
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -83,16 +84,31 @@ func (m *Migrator) Version(ctx context.Context) (version int, dirty bool, err er
 // migrated: the recorded version is simply not among its files, and running its own chain from
 // there would apply migrations that have already been applied.
 func (m *Migrator) Up(ctx context.Context) error {
-	return m.run(ctx, func(ctx context.Context, conn *sql.Conn) error {
+	return m.up(ctx, noProgress{})
+}
+
+// up is Up, telling progress what it does: the wait for the lock, if there is one, and the
+// migration around its files, if there are any. Nothing is reported for a database at head,
+// which the caller learns from ErrNoChange, or after a file fails, since the schema did not reach
+// head.
+func (m *Migrator) up(ctx context.Context, progress Progress) error {
+	return m.run(ctx, progress, func(ctx context.Context, conn *sql.Conn) error {
 		current, err := m.currentVersion(ctx, conn)
 		if err != nil {
 			return err
 		}
-		steps, err := m.stepsFrom(current, m.src.head())
+		head := m.src.head()
+		steps, err := m.stepsFrom(current, head)
 		if err != nil {
 			return err
 		}
-		return m.apply(ctx, conn, steps)
+		progress.Migrating(current, head, len(steps))
+		started := time.Now()
+		if err := m.apply(ctx, conn, steps); err != nil {
+			return err
+		}
+		progress.Migrated(current, head, len(steps), time.Since(started))
+		return nil
 	})
 }
 
@@ -100,7 +116,7 @@ func (m *Migrator) Up(ctx context.Context) error {
 // Pass NilVersion to step all the way down to an unmigrated database. It answers ErrNoChange when
 // the database is already there.
 func (m *Migrator) Migrate(ctx context.Context, target int) error {
-	return m.run(ctx, func(ctx context.Context, conn *sql.Conn) error {
+	return m.run(ctx, noProgress{}, func(ctx context.Context, conn *sql.Conn) error {
 		current, err := m.currentVersion(ctx, conn)
 		if err != nil {
 			return err
@@ -120,7 +136,7 @@ func (m *Migrator) Migrate(ctx context.Context, target int) error {
 // repair after an interrupted migration, and the tests use it to place a database at a version so
 // one migration can be exercised on its own.
 func (m *Migrator) Force(ctx context.Context, version int) error {
-	return m.run(ctx, func(ctx context.Context, conn *sql.Conn) error {
+	return m.run(ctx, noProgress{}, func(ctx context.Context, conn *sql.Conn) error {
 		return m.setVersion(ctx, conn, version, false)
 	})
 }
@@ -194,14 +210,17 @@ func (m *Migrator) withConn(ctx context.Context, fn func(ctx context.Context, co
 // driver.ErrBadConn so database/sql discards it, rather than lending the next borrower a
 // connection that holds a migration lock for the rest of the process's life. Returning it is
 // exactly the leak this package exists to end, in the one case where it is invisible.
-func (m *Migrator) run(ctx context.Context, fn func(ctx context.Context, conn *sql.Conn) error) error {
+//
+// progress is told when the lock is held by another session and the operation is about to wait
+// for it; see takeLock.
+func (m *Migrator) run(ctx context.Context, progress Progress, fn func(ctx context.Context, conn *sql.Conn) error) error {
 	return m.withConn(ctx, func(ctx context.Context, conn *sql.Conn) (err error) {
 		if m.eng.lock == nil {
 			// SQLite: no session-scoped lock statement exists, so the exclusion is in-process.
 			sqliteMigrationMu.Lock()
 			defer sqliteMigrationMu.Unlock()
 		} else {
-			if lockErr := m.eng.lock(ctx, conn); lockErr != nil {
+			if lockErr := m.takeLock(ctx, conn, progress); lockErr != nil {
 				return lockErr
 			}
 			defer func() {
@@ -213,6 +232,24 @@ func (m *Migrator) run(ctx context.Context, fn func(ctx context.Context, conn *s
 		}
 		return fn(ctx, conn)
 	})
+}
+
+// takeLock tries the lock without waiting first, and only when another session holds it tells
+// progress, once, and then waits for it. A wait is what makes a starting process look hung, so it
+// is said before it begins, and a lock taken at once is no wait to say (#390 decision 7). An
+// engine with no try statement waits without telling.
+func (m *Migrator) takeLock(ctx context.Context, conn *sql.Conn, progress Progress) error {
+	if m.eng.tryLock != nil {
+		acquired, err := m.eng.tryLock(ctx, conn)
+		if err != nil {
+			return err
+		}
+		if acquired {
+			return nil
+		}
+		progress.WaitingForLock()
+	}
+	return m.eng.lock(ctx, conn)
 }
 
 // ---------------------------------------------------------------------------

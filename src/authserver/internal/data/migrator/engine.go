@@ -73,9 +73,20 @@ type Engine struct {
 	placeholder func(i int) string
 
 	// lock and unlock take and release the cross-process migration lock on one connection. Both
-	// are nil on SQLite, which takes sqliteMigrationMu instead.
+	// are nil on SQLite, which takes sqliteMigrationMu instead. lock waits for as long as another
+	// session holds the lock, on every engine: the holder's lock is released when its session
+	// ends, so a dead holder strands nobody, and how long a start may take is the platform's
+	// startup probe's to decide, not a number in here (#390 decision 6).
 	lock   func(ctx context.Context, conn *sql.Conn) error
 	unlock func(ctx context.Context, conn *sql.Conn) error
+
+	// tryLock takes the same lock on the same resource without waiting, and answers whether it
+	// did. The runner asks it first, so it knows a wait is coming before it waits and can tell
+	// the starting process, which says so (#390 decision 7). When it answers true the lock is
+	// held and lock must not be issued as well: GET_LOCK and PostgreSQL's advisory locks count
+	// re-entrant acquisitions, so the one release would leave the lock held for the life of the
+	// session. Nil where lock is.
+	tryLock func(ctx context.Context, conn *sql.Conn) (bool, error)
 }
 
 // Name is the engine's name, as it appears in a refusal.
@@ -121,22 +132,47 @@ func SQLite() Engine {
 	}
 }
 
-// MySQL locks with GET_LOCK, the one lock in the four with a timeout: ten seconds, then
-// ErrLocked. The resource name is "<database>:schema_migrations", which is what
-// golang-migrate's MySQL driver passed.
+// MySQL locks with GET_LOCK. The resource name is "<database>:schema_migrations", which is what
+// golang-migrate's MySQL driver passed, and it must not change (#268).
+//
+// GET_LOCK is the one lock statement of the three with a timeout of its own. The runner used to
+// pass ten seconds and give up after them, so a start queued behind another process's migration
+// exited 1 and was restarted with growing back-off, which a multi-replica upgrade showed as
+// CrashLoopBackOff. A negative timeout waits indefinitely, as PostgreSQL's and SQL Server's locks
+// always have (#390 decision 6). A timeout of zero is the try.
 func MySQL(dbName string) Engine {
 	resource := advisoryLockID(fmt.Sprintf("%s:%s", dbName, migrationsTable))
+	getLock := func(ctx context.Context, conn *sql.Conn, timeout int) (sql.NullBool, error) {
+		// GET_LOCK answers 1 when the lock was taken, 0 when the timeout ran out first and NULL
+		// on an error, such as the waiting session being killed.
+		var acquired sql.NullBool
+		if err := conn.QueryRowContext(ctx, "SELECT GET_LOCK(?, ?)", resource, timeout).Scan(&acquired); err != nil {
+			return acquired, errs.Errorf("unable to take the migration lock: %w", err)
+		}
+		return acquired, nil
+	}
 	return Engine{
 		name:        "mysql",
 		txWrap:      false,
 		placeholder: questionMark,
-		lock: func(ctx context.Context, conn *sql.Conn) error {
-			var acquired sql.NullBool
-			if err := conn.QueryRowContext(ctx, "SELECT GET_LOCK(?, 10)", resource).Scan(&acquired); err != nil {
-				return errs.Errorf("unable to take the migration lock: %w", err)
+		tryLock: func(ctx context.Context, conn *sql.Conn) (bool, error) {
+			acquired, err := getLock(ctx, conn, 0)
+			if err != nil {
+				return false, err
 			}
+			if !acquired.Valid {
+				return false, errs.New("unable to take the migration lock: GET_LOCK answered NULL")
+			}
+			return acquired.Bool, nil
+		},
+		lock: func(ctx context.Context, conn *sql.Conn) error {
+			acquired, err := getLock(ctx, conn, -1)
+			if err != nil {
+				return err
+			}
+			// With no timeout, anything but 1 is a failure rather than a wait that ran out.
 			if !acquired.Valid || !acquired.Bool {
-				return ErrLocked
+				return errs.Errorf("unable to take the migration lock: GET_LOCK answered %v", nullBoolString(acquired))
 			}
 			return nil
 		},
@@ -156,9 +192,10 @@ func MySQL(dbName string) Engine {
 	}
 }
 
-// Postgres locks with pg_advisory_lock, which waits indefinitely. The resource name mixes in the
-// schema the migrations table lives in, resolved on the connection, because that is what
-// golang-migrate's PostgreSQL driver did.
+// Postgres locks with pg_advisory_lock, which waits indefinitely, and tries with
+// pg_try_advisory_lock on the same key. The resource name mixes in the schema the migrations
+// table lives in, resolved on the connection, because that is what golang-migrate's PostgreSQL
+// driver did.
 func Postgres(dbName string) Engine {
 	resource := func(ctx context.Context, conn *sql.Conn) (string, error) {
 		var schema string
@@ -171,6 +208,20 @@ func Postgres(dbName string) Engine {
 		name:        "postgres",
 		txWrap:      false,
 		placeholder: func(i int) string { return "$" + strconv.Itoa(i) },
+		tryLock: func(ctx context.Context, conn *sql.Conn) (bool, error) {
+			id, err := resource(ctx, conn)
+			if err != nil {
+				return false, err
+			}
+			var acquired sql.NullBool
+			if err := conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", id).Scan(&acquired); err != nil {
+				return false, errs.Errorf("unable to take the migration lock: %w", err)
+			}
+			if !acquired.Valid {
+				return false, errs.New("unable to take the migration lock: pg_try_advisory_lock answered NULL")
+			}
+			return acquired.Bool, nil
+		},
 		lock: func(ctx context.Context, conn *sql.Conn) error {
 			id, err := resource(ctx, conn)
 			if err != nil {
@@ -203,7 +254,8 @@ func Postgres(dbName string) Engine {
 }
 
 // SQLServer locks with sp_getapplock at LockOwner='Session', which waits indefinitely
-// (LockTimeout = -1). The resource name mixes in the schema, resolved on the connection.
+// (LockTimeout = -1), and tries with LockTimeout = 0. The resource name mixes in the schema,
+// resolved on the connection.
 func SQLServer(dbName string) Engine {
 	resource := func(ctx context.Context, conn *sql.Conn) (string, error) {
 		var schema string
@@ -212,26 +264,48 @@ func SQLServer(dbName string) Engine {
 		}
 		return advisoryLockID(dbName, schema), nil
 	}
+	// getAppLock answers sp_getapplock's status: 0 when the lock was granted and 1 when it was
+	// granted after waiting, -1 when the timeout ran out first, and any lower value a failure.
+	getAppLock := func(ctx context.Context, conn *sql.Conn, timeout int) (int, error) {
+		id, err := resource(ctx, conn)
+		if err != nil {
+			return 0, err
+		}
+		const query = `
+		DECLARE @lockResult int;
+		EXEC @lockResult = sp_getapplock @Resource = @p1, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = @p2;
+		SELECT @lockResult;`
+		var status int
+		if err := conn.QueryRowContext(ctx, query, id, timeout).Scan(&status); err != nil {
+			return 0, errs.Errorf("unable to take the migration lock: %w", err)
+		}
+		return status, nil
+	}
 	return Engine{
 		name:        "sqlserver",
 		txWrap:      false,
 		placeholder: func(i int) string { return "@p" + strconv.Itoa(i) },
+		tryLock: func(ctx context.Context, conn *sql.Conn) (bool, error) {
+			status, err := getAppLock(ctx, conn, 0)
+			if err != nil {
+				return false, err
+			}
+			switch {
+			case status >= 0:
+				return true, nil
+			case status == -1:
+				return false, nil
+			default:
+				return false, errs.Errorf("unable to take the migration lock: sp_getapplock answered %d", status)
+			}
+		},
 		lock: func(ctx context.Context, conn *sql.Conn) error {
-			id, err := resource(ctx, conn)
+			status, err := getAppLock(ctx, conn, -1)
 			if err != nil {
 				return err
 			}
-			const query = `
-		DECLARE @lockResult int;
-		EXEC @lockResult = sp_getapplock @Resource = @p1, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = -1;
-		SELECT @lockResult;`
-			var status int
-			if err := conn.QueryRowContext(ctx, query, id).Scan(&status); err != nil {
-				return errs.Errorf("unable to take the migration lock: %w", err)
-			}
-			// sp_getapplock answers 0 when the lock was granted and 1 when it was granted after
-			// waiting; every negative value is a failure, and -1 is the timeout this call cannot
-			// reach with LockTimeout = -1.
+			// -1 is the timeout, which this call cannot reach with LockTimeout = -1, so every
+			// negative value is a failure.
 			if status < 0 {
 				return errs.Errorf("unable to take the migration lock: sp_getapplock answered %d", status)
 			}

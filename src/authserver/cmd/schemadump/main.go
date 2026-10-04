@@ -176,7 +176,7 @@ func dumpOne(t target) ([]byte, error) {
 	if err != nil {
 		return nil, errs.Errorf("prepare the scratch database's migration runner: %w", err)
 	}
-	if _, migrateErr := m.UpToHead(ctx, buildinfo.Version); migrateErr != nil {
+	if _, migrateErr := m.UpToHead(ctx, buildinfo.Version, nil); migrateErr != nil {
 		return nil, errs.Errorf("migrate the scratch database to head: %w", migrateErr)
 	}
 	// Read off the database that was just migrated rather than counted from the files on

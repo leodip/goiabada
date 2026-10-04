@@ -38,11 +38,6 @@ func IsNilVersion(err error) bool {
 	return err == ErrNilVersion
 }
 
-// ErrLocked is answered when another process holds the migration lock and this one gave up
-// waiting. Only MySQL can produce it: GET_LOCK is the one lock statement with a timeout, ten
-// seconds, while PostgreSQL and SQL Server wait indefinitely and SQLite locks in-process only.
-var ErrLocked = errors.New("another migration is already running on this database")
-
 // NilVersion is the version of a database with no row in schema_migrations. It is -1 rather than
 // 0 because 0 is a number a migration set could legitimately carry, and it is the same value
 // golang-migrate wrote into the table for the one case that records a nil version (a down step
