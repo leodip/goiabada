@@ -12,6 +12,12 @@ import (
 // unit tier holds the goldens to (#390 decisions 3 and 4).
 const composeStopGracePeriod = "60s"
 
+// composeAuthServerStartPeriod is how long the auth server's healthcheck failures do not count while
+// it opens, migrates and seeds the database, the same five minutes as the Kubernetes startup probe.
+// The admin console waits for that healthcheck, so a shorter window left it never started (#390
+// decision 5).
+const composeAuthServerStartPeriod = "300s"
+
 func generateDockerCompose(config *Config) string {
 	var sb strings.Builder
 
@@ -99,7 +105,9 @@ func generateAuthServerService(config *Config) string {
 	sb.WriteString("      interval: 10s\n")
 	sb.WriteString("      timeout: 5s\n")
 	sb.WriteString("      retries: 3\n")
-	sb.WriteString("      start_period: 10s\n")
+	sb.WriteString("      # Up to 5 minutes for a first start to seed the database, or an upgrade to migrate it;\n")
+	sb.WriteString("      # failures in that window do not count, and the first success ends it.\n")
+	fmt.Fprintf(&sb, "      start_period: %s\n", composeAuthServerStartPeriod)
 
 	if !config.Engine.hasServer {
 		sb.WriteString("    volumes:\n")

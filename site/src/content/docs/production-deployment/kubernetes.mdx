@@ -383,6 +383,23 @@ application's own error and recovery would wait a probe period longer. A pod tha
 database at start never answers `/health` at all, because the auth server opens and migrates the
 database before it listens.
 
+## First start and upgrades
+
+The auth server does its database work before it listens: it opens the database, runs every
+outstanding migration, and on a first start seeds the empty database. Until that is done `/health`
+does not answer, so the generated manifest gives each container a startup probe on it, every 5
+seconds with 60 failures allowed: up to 5 minutes to start. Liveness and readiness wait for the
+startup probe's first success, so neither counts a slow start against the pod, and once it
+succeeds they take over at their own periods. The admin console gets the same probe and starts in
+seconds.
+
+With several replicas, the first pod to start takes the migration lock and migrates; the others
+wait for the lock, then find the schema current and start. Every pod's wait counts against its own
+startup budget, so the budget must exceed the longest migration an upgrade runs. If yours takes
+longer, as it can on a large installation, raise the startup probe's `failureThreshold` on the auth
+server's container until `failureThreshold × periodSeconds` covers it; otherwise Kubernetes restarts
+the container before the migration finishes. Leave liveness on `/health` with its own thresholds.
+
 ## Stopping and the grace period
 
 When a pod is deleted (a rollout, a scale-down, a node drain), Kubernetes removes it from the

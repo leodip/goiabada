@@ -109,18 +109,37 @@ spec:
             secretKeyRef:
               name: goiabada-secrets
               key: oauth-client-secret
+        # Allows the container up to 5 minutes (60 failures, 5s apart) to start listening;
+        # liveness and readiness wait for it, and its first success ends it.
+        # The auth server opens the database, runs any outstanding migrations and seeds an
+        # empty one before it listens; with several replicas, the first pod migrates and the
+        # others wait for its lock. If an upgrade's migrations take longer, raise
+        # failureThreshold until it times periodSeconds covers them, or the container is
+        # restarted mid-migration.
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 9090
+          periodSeconds: 5
+          timeoutSeconds: 1
+          failureThreshold: 60
+        # /health answers 200 whenever the process is up and touches neither the database nor
+        # the auth server. Keep liveness on it: a check that follows a dependency would restart
+        # every pod at once when that dependency has a short outage.
         livenessProbe:
           httpGet:
             path: /health
             port: 9090
-          initialDelaySeconds: 10
           periodSeconds: 10
+          timeoutSeconds: 1
+          failureThreshold: 3
         readinessProbe:
           httpGet:
             path: /health
             port: 9090
-          initialDelaySeconds: 5
           periodSeconds: 5
+          timeoutSeconds: 1
+          failureThreshold: 3
         # Keep serving for a few seconds after the pod is deleted, while the gateway learns
         # it is gone: the server closes its listener the moment it is signalled, and a
         # connection the gateway opens before then would be refused.
@@ -183,18 +202,33 @@ spec:
             secretKeyRef:
               name: goiabada-secrets
               key: admin-session-enc-key
+        # Allows the container up to 5 minutes (60 failures, 5s apart) to start listening;
+        # liveness and readiness wait for it, and its first success ends it.
+        # The auth server's budget: this server starts in seconds.
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 9091
+          periodSeconds: 5
+          timeoutSeconds: 1
+          failureThreshold: 60
+        # /health answers 200 whenever the process is up and touches neither the database nor
+        # the auth server. Keep liveness on it: a check that follows a dependency would restart
+        # every pod at once when that dependency has a short outage.
         livenessProbe:
           httpGet:
             path: /health
             port: 9091
-          initialDelaySeconds: 10
           periodSeconds: 10
+          timeoutSeconds: 1
+          failureThreshold: 3
         readinessProbe:
           httpGet:
             path: /health
             port: 9091
-          initialDelaySeconds: 5
           periodSeconds: 5
+          timeoutSeconds: 1
+          failureThreshold: 3
         # Keep serving for a few seconds after the pod is deleted, while the gateway learns
         # it is gone: the server closes its listener the moment it is signalled, and a
         # connection the gateway opens before then would be refused.
