@@ -88,34 +88,50 @@ The wizard will ask you a few questions:
 
 The wizard creates a `docker-compose.yml` file with:
 
-- All session keys cryptographically generated
-- OAuth client credentials pre-configured
 - Database service configured
 - Both auth server and admin console ready to start
 
-Start with:
+and, beside it, a `docker-compose.override.yml` file holding every secret, under the service that reads
+it:
+
+- All session keys and the AES key cryptographically generated
+- OAuth client credentials pre-configured
+- The admin and database passwords
+
+Docker Compose merges the override into `docker-compose.yml` by itself, so you start both with:
 
 ```bash
 docker compose up -d
 ```
+
+`docker-compose.yml` holds no secret and can be committed; keep `docker-compose.override.yml` out of
+version control. With `--output` naming a file, the override is that name with `.override` before its
+extension, so a `compose.yaml` gets the `compose.override.yaml` Compose looks for; any other name is
+started with both files named, `docker compose -f <file> -f <override> up -d`, as the wizard prints.
 
 ### For Kubernetes (option 3)
 
 The wizard creates a `goiabada-k8s.yaml` file with:
 
 - Namespace (labelled to warn about pods that break the restricted Pod Security Standard)
-- Secret (credentials pre-generated and base64 encoded)
 - One ConfigMap per server, holding only what that server reads
 - Deployments (auth server and admin console), each with a PodDisruptionBudget
 - Services
 - Gateway and HTTPRoutes (TLS by cert-manager)
 - NetworkPolicies, one per Deployment, if you asked for them
 
-Deploy with:
+and, beside it, a `goiabada-secrets.yaml` file with the Secrets the manifest reads, pre-generated and
+base64 encoded: the AES key alone in `goiabada-encryption-key`, so access to it can be restricted on its
+own, and every other secret in `goiabada-secrets`. With `--output` naming a file, the Secrets file is
+that name with `-secrets` before its extension.
+
+Deploy both with one command, the manifest first, since it creates the namespace the Secrets are in:
 
 ```bash
-kubectl apply -f goiabada-k8s.yaml
+kubectl apply -f goiabada-k8s.yaml -f goiabada-secrets.yaml
 ```
+
+The manifest holds no secret and can be committed; keep `goiabada-secrets.yaml` out of version control.
 
 ### For native binaries (option 4)
 
@@ -127,12 +143,20 @@ The wizard creates a `goiabada.env` file with:
 - Database connection settings
 - Listen hosts and proxy trust following your reverse proxy answer, under a comment saying whom each server trusts (see [native binaries: reverse proxy](/production-deployment/native-binaries/#reverse-proxy))
 
+The file is the secret material itself: keep it out of version control.
+
 Use with:
 
 ```bash
 set -a && . ./goiabada.env && set +a && ./goiabada-authserver
 set -a && . ./goiabada.env && set +a && ./goiabada-adminconsole
 ```
+
+Every file the wizard writes is readable by its owner alone (mode `0600`), the secret-free ones too.
+When it writes into a git working tree, it warns and gives the line to add to the tree's
+`.gitignore`; it never edits one itself. It also warns when it generates the AES key: back it up
+separately from the database, since without it the client secrets, SMTP credentials, OTP seeds and
+signing keys the database holds cannot be recovered.
 
 ## Next steps
 

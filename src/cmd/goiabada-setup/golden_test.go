@@ -11,8 +11,9 @@ import (
 )
 
 // updateGoldens rewrites testdata/*.golden from the generators: `go test ./... -update` from this
-// module. A golden is the whole file an operator deploys from, so a change to any generator shows
-// up here as a diff to read rather than as a line a test happened not to look for (#430).
+// module. A golden is a whole file an operator deploys from, the description and, beside it, the
+// secrets file, so a change to any generator shows up here as a diff to read rather than as a line
+// a test happened not to look for (#430, #396 decision 14).
 var updateGoldens = flag.Bool("update", false, "rewrite testdata/*.golden from the generators")
 
 // goldenCase is one reachable deployment type and engine. The name is the CLI's own spelling of
@@ -30,6 +31,29 @@ type goldenCase struct {
 
 func (c goldenCase) path() string {
 	return filepath.Join("testdata", c.name+".golden")
+}
+
+// secretsPath is the golden of the case's secrets file, for a deployment type that writes its
+// secrets apart from its description.
+func (c goldenCase) secretsPath() string {
+	return filepath.Join("testdata", c.name+".secrets.golden")
+}
+
+// goldenFiles are the case's goldens, each with the generated file it holds: the description, and
+// the secrets file when it is a file of its own.
+func (c goldenCase) goldenFiles() map[string]generatedFile {
+	description, secrets := generatedConfiguration(c.config())
+	files := map[string]generatedFile{c.path(): description}
+	if secrets != description {
+		files[c.secretsPath()] = secrets
+	}
+	return files
+}
+
+// descriptionOf is the generated file describing the configuration's deployment.
+func descriptionOf(config *Config) string {
+	description, _ := generatedConfiguration(config)
+	return description.content
 }
 
 // goldenCases is every deployment type by every engine it accepts, read from the two tables: a row
@@ -168,28 +192,29 @@ func goldenConfig(kind deploymentType, engineName string) *Config {
 func TestGeneratedConfiguration_MatchesTheGoldens(t *testing.T) {
 	for _, testCase := range goldenCases() {
 		t.Run(testCase.name, func(t *testing.T) {
-			_, content := generatedConfiguration(testCase.config())
-
-			if *updateGoldens {
-				if err := os.MkdirAll("testdata", 0o750); err != nil {
-					t.Fatalf("creating testdata: %v", err)
+			for path, file := range testCase.goldenFiles() {
+				content := file.content
+				if *updateGoldens {
+					if err := os.MkdirAll("testdata", 0o750); err != nil {
+						t.Fatalf("creating testdata: %v", err)
+					}
+					if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+						t.Fatalf("writing %s: %v", path, err)
+					}
 				}
-				if err := os.WriteFile(testCase.path(), []byte(content), 0o600); err != nil {
-					t.Fatalf("writing %s: %v", testCase.path(), err)
-				}
-			}
 
-			// A missing golden is a failure, never a skip: a case whose file is gone would
-			// otherwise pass having compared nothing.
-			want, err := os.ReadFile(testCase.path())
-			if err != nil {
-				t.Fatalf("reading %s: %v (regenerate with `go test ./... -update` from src/cmd/goiabada-setup)",
-					testCase.path(), err)
-			}
-			if content != string(want) {
-				t.Errorf("%s differs from the generator's output. %s\nIf the change is intended, regenerate with "+
-					"`go test ./... -update` from src/cmd/goiabada-setup and read the diff.",
-					testCase.path(), firstDifference(string(want), content))
+				// A missing golden is a failure, never a skip: a case whose file is gone would
+				// otherwise pass having compared nothing.
+				want, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatalf("reading %s: %v (regenerate with `go test ./... -update` from src/cmd/goiabada-setup)",
+						path, err)
+				}
+				if content != string(want) {
+					t.Errorf("%s differs from the generator's output. %s\nIf the change is intended, regenerate with "+
+						"`go test ./... -update` from src/cmd/goiabada-setup and read the diff.",
+						path, firstDifference(string(want), content))
+				}
 			}
 		})
 	}
@@ -201,7 +226,9 @@ func TestGeneratedConfiguration_MatchesTheGoldens(t *testing.T) {
 func TestGoldens_EveryFileHasACase(t *testing.T) {
 	expected := map[string]bool{}
 	for _, testCase := range goldenCases() {
-		expected[testCase.path()] = true
+		for path := range testCase.goldenFiles() {
+			expected[path] = true
+		}
 	}
 
 	found, err := filepath.Glob(filepath.Join("testdata", "*.golden"))
@@ -268,6 +295,11 @@ func TestGeneratedOutputsOmitTheRemovedAdminConsoleVars(t *testing.T) {
 		{
 			name:         "admin console compose service",
 			generated:    generateAdminConsoleService(config),
+			stillEmitted: "GOIABADA_ADMINCONSOLE_BASEURL=https://admin.example.com",
+		},
+		{
+			name:         "compose override",
+			generated:    generateComposeOverride(config),
 			stillEmitted: "GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=oauth-client-secret",
 		},
 		{

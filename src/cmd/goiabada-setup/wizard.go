@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -21,7 +20,7 @@ type wizard struct {
 	// defaultAdminEmail is the admin email offered: admin@example.com for local testing, admin@
 	// and the auth server host's parent otherwise, and none for a host without one.
 	defaultAdminEmail string
-	outputPath        string
+	paths             outputPaths
 	// testConnection dials the database the operator described and reports what it found.
 	testConnection func(out *console, e *engine, host, port, name, user, password string) bool
 }
@@ -125,7 +124,7 @@ func (w *wizard) setup() error {
 			return err
 		}
 	}
-	printCompletionMessage(w.out, w.config, w.outputPath)
+	printCompletionMessage(w.out, w.config, w.paths)
 	return nil
 }
 
@@ -661,6 +660,9 @@ func (w *wizard) askDatabasePassword() error {
 
 func (w *wizard) generateCredentials() error {
 	c := w.config
+	// The files are placed here, before anything is written, so the AES key's warning can say
+	// where it will be.
+	w.paths = resolveOutputPaths(c.Deployment, w.flags.Output)
 	c.AuthSessionAuthKey = generateHexKey(64)
 	c.AuthSessionEncKey = generateHexKey(32)
 	c.AdminSessionAuthKey = generateHexKey(64)
@@ -671,8 +673,22 @@ func (w *wizard) generateCredentials() error {
 	w.out.success("Auth server session keys generated")
 	w.out.success("Admin console session keys generated")
 	w.out.success("Auth server AES encryption key generated")
+	w.warnAboutTheAESKey()
 	w.out.success("OAuth client secret generated")
 	return nil
+}
+
+// warnAboutTheAESKey says, beside the AES key's generation, that it is backed up apart from the
+// database, and where it is stored, without printing it: it is the one secret whose loss loses
+// data, and this is the moment at which a backup can still be made (#396 decision 16).
+func (w *wizard) warnAboutTheAESKey() {
+	stored := w.paths.secrets
+	if w.config.Deployment.kind == deploymentKubernetes {
+		stored = fmt.Sprintf("the %s Secret in %s", encryptionKeySecret, w.paths.secrets)
+	}
+	w.out.warning("Back up the AES encryption key separately from the database: without it, the client")
+	w.out.println("   secrets, SMTP credentials, OTP seeds and signing keys the database holds cannot be")
+	w.out.printf("   recovered. It is stored in %s.\n", stored)
 }
 
 // confirm shows the summary and asks before anything is written. Non-interactive mode has
@@ -694,25 +710,20 @@ func (w *wizard) confirm() error {
 	return nil
 }
 
+// writeConfiguration writes the description and, beside it, the secrets file, each 0600 through
+// writePrivateFile whatever it holds, so no file's mode depends on its content and a later change
+// that moves a secret back into the description cannot leak it (#426, #396 decision 14).
 func (w *wizard) writeConfiguration() error {
-	output := w.flags.Output
-	outputDir, _ := os.Getwd()
-	if output != "" {
-		if isDirectory(output) {
-			outputDir = output
-		} else {
-			outputDir = filepath.Dir(output)
+	description, secrets := generatedConfiguration(w.config)
+	files := []struct{ path, content string }{{w.paths.description, description.content}}
+	if w.paths.separate() {
+		files = append(files, struct{ path, content string }{w.paths.secrets, secrets.content})
+	}
+	for _, file := range files {
+		if err := writePrivateFile(file.path, file.content); err != nil {
+			return errs.Wrapf(err, "unable to write %s", filepath.Base(file.path))
 		}
+		w.out.success("Created: %s", file.path)
 	}
-
-	filename, content := generatedConfiguration(w.config)
-	if output != "" && !isDirectory(output) {
-		filename = filepath.Base(output)
-	}
-	w.outputPath = filepath.Join(outputDir, filename)
-	if err := writePrivateFile(w.outputPath, content); err != nil {
-		return errs.Wrapf(err, "unable to write %s", filename)
-	}
-	w.out.success("Created: %s", w.outputPath)
 	return nil
 }

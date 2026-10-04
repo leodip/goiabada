@@ -100,7 +100,7 @@ func trustedOutputs(t *testing.T) []trustedOutput {
 	var outputs []trustedOutput
 	for _, testCase := range goldenCases() {
 		config := testCase.config()
-		_, content := generatedConfiguration(config)
+		content := descriptionOf(config)
 		trust, proxies := wantedTrust(t, config)
 		outputs = append(outputs, trustedOutput{
 			name: testCase.name, content: content, env: serverEnvironments(t, config, content),
@@ -182,7 +182,7 @@ func TestEnvFile_ListensOnLoopbackOnlyBehindALocalProxy(t *testing.T) {
 			continue
 		}
 		t.Run(testCase.name, func(t *testing.T) {
-			_, content := generatedConfiguration(config)
+			content := descriptionOf(config)
 			env, _, err := systemdEnvironmentFile(content)
 			if err != nil {
 				t.Fatalf("the systemd emulation cannot read the file: %v", err)

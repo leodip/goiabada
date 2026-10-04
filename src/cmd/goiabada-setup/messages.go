@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -58,14 +59,14 @@ func printSummary(out *console, config *Config) {
 	out.printf("%s%s==========================================================%s\n", out.bold, out.cyan, out.reset)
 }
 
-func printCompletionMessage(out *console, config *Config, outputPath string) {
+func printCompletionMessage(out *console, config *Config, paths outputPaths) {
 	out.println()
 	out.printf("%s%s================================================================================\n", out.bold, out.green)
 	out.printf("                            SETUP COMPLETE!\n")
 	out.printf("================================================================================%s\n", out.reset)
 	out.println()
 
-	config.Deployment.printInstructions(out, config, outputPath)
+	config.Deployment.printInstructions(out, config, paths)
 
 	out.println()
 	out.println("URLs:")
@@ -74,16 +75,19 @@ func printCompletionMessage(out *console, config *Config, outputPath string) {
 	out.println()
 	out.printf("Login with: %s%s%s / %s\n", out.bold, config.AdminEmail, out.reset, config.AdminPassword)
 	out.println()
+	printSecretsAdvice(out, paths)
 	if config.AdminPassword == "changeme" || len(config.AdminPassword) < 8 {
 		out.warning("Change the default password after first login!")
 		out.println()
 	}
 }
 
-func printKubernetesInstructions(out *console, config *Config, outputPath string) {
+func printKubernetesInstructions(out *console, config *Config, paths outputPaths) {
 	out.println("To deploy Goiabada to Kubernetes:")
 	out.println()
-	out.printf("    %skubectl apply -f %s%s\n", out.cyan, filepath.Base(outputPath), out.reset)
+	out.printf("    %s%s%s\n", out.cyan, kubernetesApplyCommand(filepath.Base(paths.description), filepath.Base(paths.secrets)), out.reset)
+	out.println()
+	out.printf("The manifest goes first: it creates the namespace the Secrets in %s are in.\n", filepath.Base(paths.secrets))
 	out.println()
 	// A release build stamps its version as the tag; only a source build reaches here with latest
 	// (#396 decision 10).
@@ -248,7 +252,7 @@ func printEnvoyProxyPrerequisite(out *console, policy trafficPolicy) {
 	out.printf("             externalTrafficPolicy: %s\n", policy)
 }
 
-func printNativeInstructions(out *console, config *Config, outputPath string) {
+func printNativeInstructions(out *console, config *Config, paths outputPaths) {
 	out.println("To run Goiabada with native binaries:")
 	out.println()
 	out.printf("%s%s1. DOWNLOAD BINARIES%s\n", out.bold, out.yellow, out.reset)
@@ -264,10 +268,10 @@ func printNativeInstructions(out *console, config *Config, outputPath string) {
 	out.println("  Load the environment and start both servers (in separate terminals):")
 	out.println()
 	out.println("  Auth server:")
-	out.printf("  %sset -a && . ./%s && set +a && ./goiabada-authserver%s\n", out.cyan, filepath.Base(outputPath), out.reset)
+	out.printf("  %sset -a && . ./%s && set +a && ./goiabada-authserver%s\n", out.cyan, filepath.Base(paths.description), out.reset)
 	out.println()
 	out.println("  Admin console:")
-	out.printf("  %sset -a && . ./%s && set +a && ./goiabada-adminconsole%s\n", out.cyan, filepath.Base(outputPath), out.reset)
+	out.printf("  %sset -a && . ./%s && set +a && ./goiabada-adminconsole%s\n", out.cyan, filepath.Base(paths.description), out.reset)
 	out.println()
 	out.printf("%s%sIMPORTANT NOTES%s\n", out.bold, out.yellow, out.reset)
 	out.println()
@@ -279,7 +283,7 @@ func printNativeInstructions(out *console, config *Config, outputPath string) {
 		out.println("    and have it set X-Forwarded-For and X-Forwarded-Proto.")
 	} else {
 		out.println("  • Both servers listen on every interface and serve plain HTTP until you set")
-		out.printf("    their CERTFILE and KEYFILE in %s, as its comments say.\n", filepath.Base(outputPath))
+		out.printf("    their CERTFILE and KEYFILE in %s, as its comments say.\n", filepath.Base(paths.description))
 	}
 	out.println()
 	out.println("  • The database must be empty for a fresh deployment. Goiabada will")
@@ -291,12 +295,48 @@ func printNativeInstructions(out *console, config *Config, outputPath string) {
 	out.println()
 }
 
-func printComposeInstructions(out *console, _ *Config, _ string) {
+func printComposeInstructions(out *console, _ *Config, paths outputPaths) {
 	out.println("To start Goiabada, run:")
 	out.println()
-	out.printf("    %sdocker compose up -d%s\n", out.cyan, out.reset)
+	out.printf("    %s%s%s\n", out.cyan, composeUpCommand(paths), out.reset)
 	out.println()
 	out.println("Then access:")
+}
+
+// composeDefaultFiles are the names docker compose looks for when given no -f, each of which takes
+// the override of the same name with .override before its extension without being asked.
+var composeDefaultFiles = []string{"compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"}
+
+// composeUpCommand starts the Compose file with its override merged in: with no -f under a name
+// docker compose looks for by itself, and with both files named, the Compose file first, under any
+// other.
+func composeUpCommand(paths outputPaths) string {
+	description, secrets := filepath.Base(paths.description), filepath.Base(paths.secrets)
+	if slices.Contains(composeDefaultFiles, description) {
+		return "docker compose up -d"
+	}
+	return "docker compose -f " + description + " -f " + secrets + " up -d"
+}
+
+// printSecretsAdvice names the one file holding the secrets and says to keep it out of version
+// control, and, when it is written inside a git working tree, warns and gives the line that keeps it
+// out. It writes no .gitignore: that file is the operator's, and its rules may live elsewhere (#396
+// decision 15).
+func printSecretsAdvice(out *console, paths outputPaths) {
+	secrets := filepath.Base(paths.secrets)
+	out.printf("Keep %s%s%s out of version control: it holds every secret, the AES key among them.\n", out.bold, secrets, out.reset)
+	if paths.separate() {
+		out.printf("%s holds none, and can be committed.\n", filepath.Base(paths.description))
+	}
+	out.println()
+	root, inTree := gitWorkingTree(filepath.Dir(paths.secrets))
+	if !inTree {
+		return
+	}
+	out.warning("%s is inside the git working tree at %s.", filepath.Dir(paths.secrets), root)
+	out.printf("   Add this line to %s before you commit, so %s never is:\n", filepath.Join(root, ".gitignore"), secrets)
+	out.printf("    %s%s%s\n", out.cyan, gitignorePattern(root, paths.secrets), out.reset)
+	out.println()
 }
 
 func maskPassword(password string) string {

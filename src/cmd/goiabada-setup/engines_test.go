@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"go.yaml.in/yaml/v3"
 )
 
 // A server engine's row is read field by field by the prompts, the Compose generator and the
@@ -14,7 +12,6 @@ import (
 // An engine with no server must carry none of them: each is read only behind hasServer, and a
 // value set there would read as a fact the wizard acts on.
 func TestEngines_EveryRowIsComplete(t *testing.T) {
-	const password = "row-password"
 	for _, e := range engines {
 		t.Run(e.name, func(t *testing.T) {
 			for field, value := range map[string]string{
@@ -30,11 +27,11 @@ func TestEngines_EveryRowIsComplete(t *testing.T) {
 				"kubernetesHost": e.kubernetesHost, "composeService": e.composeService,
 				"healthcheck": e.healthcheck, "healthInterval": e.healthInterval, "healthTimeout": e.healthTimeout,
 				"driver": e.driver, "existenceQuery": e.existenceQuery, "emptinessQuery": e.emptinessQuery,
+				"composePasswordVariable": e.composePasswordVariable,
 			}
 			serverFuncs := map[string]bool{
-				"composeEnvironment": e.composeEnvironment != nil,
-				"dsn":                e.dsn != nil,
-				"maintenanceDSN":     e.maintenanceDSN != nil,
+				"dsn":            e.dsn != nil,
+				"maintenanceDSN": e.maintenanceDSN != nil,
 			}
 
 			if !e.hasServer {
@@ -64,11 +61,6 @@ func TestEngines_EveryRowIsComplete(t *testing.T) {
 					t.Fatalf("%s is nil on a server engine", field)
 				}
 			}
-			// The database container is where the password is set: a row whose environment
-			// drops it starts a database nobody can log in to.
-			if !strings.Contains(strings.Join(e.composeEnvironment(password), "\n"), password) {
-				t.Errorf("the database service's environment does not carry the password")
-			}
 		})
 	}
 }
@@ -77,7 +69,9 @@ var containerVariable = regexp.MustCompile(`\$\{([A-Z_]+)\}`)
 
 // A healthcheck carries no password. One that needs it names the database container's variable,
 // which must be one the service's environment sets, to exactly the password: a misspelt name
-// expands to nothing in the container's shell, and the database never reports healthy (#430).
+// expands to nothing in the container's shell, and the database never reports healthy (#430). The
+// environment is read as Compose gives it to the container, the Compose file's merged with the
+// override's, where the password is (#396 decision 14).
 func TestEngines_TheHealthcheckReadsTheContainersOwnPassword(t *testing.T) {
 	const password = `pa"ss'$HOME` + "`id`" + `\x #y: z`
 	for _, e := range engines {
@@ -88,24 +82,20 @@ func TestEngines_TheHealthcheckReadsTheContainersOwnPassword(t *testing.T) {
 			if strings.Contains(e.healthcheck, password) {
 				t.Errorf("the healthcheck carries the password")
 			}
-			set := map[string]string{}
-			for _, line := range e.composeEnvironment(password) {
-				var entry map[string]string
-				if err := yaml.Unmarshal([]byte(line), &entry); err != nil {
-					t.Fatalf("environment line %q is not YAML: %v", line, err)
-				}
-				for name, value := range entry {
-					set[name] = value
-				}
-			}
+			config := goldenConfig(deploymentProduction, e.name)
+			config.DBPassword = password
+			description, secrets := generatedConfiguration(config)
+			base := only[map[string]any](t, toAny(yamlDocuments(t, description.content)), "the Compose file's documents")
+			override := only[map[string]any](t, toAny(yamlDocuments(t, secrets.content)), "the override's documents")
+			set := composeMergedEnvironment(t, base, override, e.composeService)
 			for _, m := range containerVariable.FindAllStringSubmatch(e.healthcheck, -1) {
 				value, ok := set[m[1]]
 				if !ok {
 					t.Errorf("the healthcheck reads %s, which the service's environment does not set", m[1])
 					continue
 				}
-				if got, _ := composeInterpolate(value); got != password {
-					t.Errorf("%s is set to %q, want the password %q", m[1], got, password)
+				if value != password {
+					t.Errorf("%s is set to %q, want the password %q", m[1], value, password)
 				}
 			}
 		})

@@ -17,7 +17,7 @@ func TestComposeFile_GivesEachServerTimeToStop(t *testing.T) {
 			continue
 		}
 		t.Run(testCase.name, func(t *testing.T) {
-			_, content := generatedConfiguration(testCase.config())
+			content := descriptionOf(testCase.config())
 			doc := only[map[string]any](t, toAny(yamlDocuments(t, content)), "the Compose file's documents")
 			for _, name := range []string{"goiabada-authserver", "goiabada-adminconsole"} {
 				if got := at[string](t, doc, "services", name, "stop_grace_period"); got != "60s" {
@@ -52,7 +52,7 @@ func TestComposeFile_GivesTheAuthServerTimeToStart(t *testing.T) {
 			continue
 		}
 		t.Run(testCase.name, func(t *testing.T) {
-			_, content := generatedConfiguration(testCase.config())
+			content := descriptionOf(testCase.config())
 			doc := only[map[string]any](t, toAny(yamlDocuments(t, content)), "the Compose file's documents")
 			healthcheck := at[map[string]any](t, doc, "services", "goiabada-authserver", "healthcheck")
 			if got := at[string](t, healthcheck, "start_period"); got != "300s" {
@@ -99,7 +99,7 @@ func composeCases(t *testing.T) []goldenCase {
 func TestComposeFile_RunsEachServerHardened(t *testing.T) {
 	for _, testCase := range composeCases(t) {
 		t.Run(testCase.name, func(t *testing.T) {
-			_, content := generatedConfiguration(testCase.config())
+			content := descriptionOf(testCase.config())
 			doc := only[map[string]any](t, toAny(yamlDocuments(t, content)), "the Compose file's documents")
 			for _, name := range []string{"goiabada-authserver", "goiabada-adminconsole"} {
 				service := at[map[string]any](t, doc, "services", name)
@@ -145,7 +145,7 @@ func TestComposeFile_PinsTheDatabaseMajor(t *testing.T) {
 			continue
 		}
 		t.Run(testCase.name, func(t *testing.T) {
-			_, content := generatedConfiguration(config)
+			content := descriptionOf(config)
 			doc := only[map[string]any](t, toAny(yamlDocuments(t, content)), "the Compose file's documents")
 			service := config.Engine.composeService
 			if got := at[string](t, doc, "services", service, "image"); got != want[testCase.engine] {

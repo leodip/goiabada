@@ -52,6 +52,17 @@ func (c *Config) rateLimiterDefault() bool {
 	return !c.Deployment.servedByEnvoyGateway || c.GatewayTrafficPolicy != trafficPolicyCluster
 }
 
+// aesKeyComment is the warning every output writes beside the AES key: it is the one secret whose
+// loss loses data, and the moment it is written is the one at which a backup can still be made
+// (#396 decision 16).
+func aesKeyComment() []string {
+	return []string{
+		"GOIABADA_AES_ENCRYPTION_KEY encrypts the client secrets, SMTP credentials, OTP seeds and",
+		"signing keys the database holds. Back it up separately from the database: without it they",
+		"cannot be recovered, and a backup holding both gives them to whoever reads it.",
+	}
+}
+
 // rateLimiterComment is the comment above the rate limiter's switch in every output that writes it:
 // what it turns on, where the limits are listed, and the startup warning it brings with this
 // output's proxy trust, which the auth server logs only with the limiter on.

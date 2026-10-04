@@ -79,7 +79,8 @@ func TestWritePrivateFile_AnEarlierReaderDoesNotSeeTheNewSecrets(t *testing.T) {
 
 	for _, kind := range []deploymentType{deploymentLocal, deploymentKubernetes, deploymentNative} {
 		config.Deployment = deployments[kind]
-		filename, content := generatedConfiguration(config)
+		_, secrets := generatedConfiguration(config)
+		filename, content := secrets.name, secrets.content
 		t.Run(filename, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), filename)
 			const yesterday = "yesterday's secrets"
@@ -165,16 +166,15 @@ func TestGeneratedConfiguration_NamesEachDeploymentTypesFile(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(deployments[testCase.deployment].name, func(t *testing.T) {
 			config.Deployment = deployments[testCase.deployment]
-			filename, content := generatedConfiguration(config)
-			wantContent := testCase.generator(config)
-			if filename != testCase.wantFilename {
-				t.Errorf("file name is %q, want %q", filename, testCase.wantFilename)
+			description, secrets := generatedConfiguration(config)
+			if description.name != testCase.wantFilename {
+				t.Errorf("file name is %q, want %q", description.name, testCase.wantFilename)
 			}
-			if content != wantContent {
+			if description.content != testCase.generator(config) {
 				t.Errorf("content is not %s's generator output", testCase.wantFilename)
 			}
-			if !strings.Contains(content, "admin-password") {
-				t.Errorf("content carries no admin password, so it is not the file whose mode matters")
+			if !strings.Contains(secrets.content, "admin-password") {
+				t.Errorf("%s carries no admin password, so it is not the file whose mode matters", secrets.name)
 			}
 		})
 	}

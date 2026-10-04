@@ -56,6 +56,9 @@ func generateEnvFile(config *Config) string {
 	writeEnvVariable(&sb, "GOIABADA_AUTHSERVER_RATELIMITER_ENABLED", strconv.FormatBool(config.RateLimiter))
 	writeEnvVariable(&sb, "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY", config.AuthSessionAuthKey)
 	writeEnvVariable(&sb, "GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY", config.AuthSessionEncKey)
+	for _, line := range aesKeyComment() {
+		fmt.Fprintf(&sb, "# %s\n", line)
+	}
 	writeEnvVariable(&sb, "GOIABADA_AES_ENCRYPTION_KEY", config.AESEncryptionKey)
 	sb.WriteString("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=\"true\"\n")
 	sb.WriteString("GOIABADA_AUTHSERVER_LOG_LEVEL=\"info\"\n")

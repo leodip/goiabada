@@ -100,23 +100,29 @@ func composeListEnvironment(t *testing.T, service map[string]any) map[string]str
 	return env
 }
 
-// The Compose file of hostile answers is read back by YAML and the interpolation rule with every
-// answer exactly as given, and no string anywhere in it holds a `$` Compose would substitute.
+// The Compose file and its override of hostile answers are read back by YAML, the interpolation
+// rule and Compose's merge with every answer exactly as given, and no string anywhere in either
+// holds a `$` Compose would substitute.
 func TestHostileGolden_ComposeReadsBackEveryAnswer(t *testing.T) {
 	config := hostileCase(t, "hostile-compose").config()
-	_, content := generatedConfiguration(config)
-	docs := yamlDocuments(t, content)
-	if len(docs) != 1 {
-		t.Fatalf("%d documents, want 1", len(docs))
-	}
-	everyString(docs[0], func(s string) {
-		if _, ok := composeInterpolate(s); !ok {
-			t.Errorf("%q holds a variable reference Compose would substitute", s)
+	description, secrets := generatedConfiguration(config)
+	var files []map[string]any
+	for _, file := range []generatedFile{description, secrets} {
+		docs := yamlDocuments(t, file.content)
+		if len(docs) != 1 {
+			t.Fatalf("%s has %d documents, want 1", file.name, len(docs))
 		}
-	})
+		everyString(docs[0], func(s string) {
+			if _, ok := composeInterpolate(s); !ok {
+				t.Errorf("%q holds a variable reference Compose would substitute", s)
+			}
+		})
+		files = append(files, docs[0])
+	}
+	base, override := files[0], files[1]
 
-	services := at[map[string]any](t, docs[0], "services")
-	auth := composeListEnvironment(t, at[map[string]any](t, services, "goiabada-authserver"))
+	services := at[map[string]any](t, base, "services")
+	auth := composeMergedEnvironment(t, base, override, "goiabada-authserver")
 	for name, want := range map[string]string{
 		"GOIABADA_ADMIN_EMAIL":          config.AdminEmail,
 		"GOIABADA_ADMIN_PASSWORD":       config.AdminPassword,
@@ -128,7 +134,7 @@ func TestHostileGolden_ComposeReadsBackEveryAnswer(t *testing.T) {
 			t.Errorf("auth server %s reads back as %q, want %q", name, auth[name], want)
 		}
 	}
-	admin := composeListEnvironment(t, at[map[string]any](t, services, "goiabada-adminconsole"))
+	admin := composeMergedEnvironment(t, base, override, "goiabada-adminconsole")
 	for name, want := range map[string]string{
 		"GOIABADA_AUTHSERVER_BASEURL":   config.AuthServerURL,
 		"GOIABADA_ADMINCONSOLE_BASEURL": config.AdminConsoleURL,
@@ -139,7 +145,7 @@ func TestHostileGolden_ComposeReadsBackEveryAnswer(t *testing.T) {
 	}
 
 	db := at[map[string]any](t, services, config.Engine.composeService)
-	if got, _ := composeInterpolate(at[string](t, db, "environment", "MSSQL_SA_PASSWORD")); got != config.DBPassword {
+	if got := composeMergedEnvironment(t, base, override, config.Engine.composeService)["MSSQL_SA_PASSWORD"]; got != config.DBPassword {
 		t.Errorf("MSSQL_SA_PASSWORD reads back as %q, want %q", got, config.DBPassword)
 	}
 	test := at[[]any](t, db, "healthcheck", "test")
@@ -156,11 +162,11 @@ func TestHostileGolden_ComposeReadsBackEveryAnswer(t *testing.T) {
 // given, the passwords through the Secret's base64.
 func TestHostileGolden_KubernetesReadsBackEveryAnswer(t *testing.T) {
 	config := hostileCase(t, "hostile-kubernetes").config()
-	_, content := generatedConfiguration(config)
-	docs := yamlDocuments(t, content)
+	description, secrets := generatedConfiguration(config)
+	docs := append(yamlDocuments(t, description.content), yamlDocuments(t, secrets.content)...)
 
-	byKind := map[string]map[string]any{}
-	configMaps := map[string]map[string]any{}
+	// The ConfigMaps and Secrets, by kind/name.
+	documents := map[string]map[string]any{}
 	for _, doc := range docs {
 		kind := at[string](t, doc, "kind")
 		if kind == "Namespace" {
@@ -170,9 +176,8 @@ func TestHostileGolden_KubernetesReadsBackEveryAnswer(t *testing.T) {
 		} else if namespace := at[string](t, doc, "metadata", "namespace"); namespace != config.K8sNamespace {
 			t.Errorf("%s is in namespace %q, want %q", kind, namespace, config.K8sNamespace)
 		}
-		byKind[kind] = doc
-		if kind == "ConfigMap" {
-			configMaps[at[string](t, doc, "metadata", "name")] = doc
+		if kind == "ConfigMap" || kind == "Secret" {
+			documents[kind+"/"+at[string](t, doc, "metadata", "name")] = doc
 		}
 	}
 
@@ -191,7 +196,7 @@ func TestHostileGolden_KubernetesReadsBackEveryAnswer(t *testing.T) {
 			"GOIABADA_ADMINCONSOLE_BASEURL": config.AdminConsoleURL,
 		},
 	} {
-		data := at[map[string]any](t, configMaps[configMap], "data")
+		data := at[map[string]any](t, documents["ConfigMap/"+configMap], "data")
 		for name, want := range wants {
 			if got := at[string](t, data, name); got != want {
 				t.Errorf("ConfigMap %s's %s reads back as %q, want %q", configMap, name, got, want)
@@ -199,7 +204,7 @@ func TestHostileGolden_KubernetesReadsBackEveryAnswer(t *testing.T) {
 		}
 	}
 
-	secret := at[map[string]any](t, byKind["Secret"], "data")
+	secret := at[map[string]any](t, documents["Secret/goiabada-secrets"], "data")
 	for name, want := range map[string]string{
 		"admin-password": config.AdminPassword,
 		"db-password":    config.DBPassword,
@@ -243,7 +248,7 @@ func goiabadaVariables(env map[string]string) map[string]string {
 // every answer exactly as given, under bash and under POSIX sh.
 func TestHostileGolden_EnvFileReadsBackEveryAnswerThroughAShell(t *testing.T) {
 	config := hostileCase(t, "hostile-env").config()
-	_, content := generatedConfiguration(config)
+	content := descriptionOf(config)
 	for _, shell := range posixShells(t) {
 		t.Run(shell, func(t *testing.T) {
 			env := sourceWithSetA(t, shell, content)
@@ -270,7 +275,7 @@ func TestHostileGolden_EnvFileReadsBackEveryAnswerThroughAShell(t *testing.T) {
 // exactly as given, and not one assignment dropped.
 func TestHostileGolden_EnvFileReadsBackEveryAnswerThroughTheSystemdRule(t *testing.T) {
 	config := hostileCase(t, "hostile-env").config()
-	_, content := generatedConfiguration(config)
+	content := descriptionOf(config)
 	env, dropped, err := systemdEnvironmentFile(content)
 	if err != nil {
 		t.Fatalf("the systemd emulation cannot read the file: %v", err)
@@ -296,7 +301,7 @@ func TestEnvFile_SystemdReadsEveryAssignment(t *testing.T) {
 			continue
 		}
 		t.Run(testCase.name, func(t *testing.T) {
-			_, content := generatedConfiguration(testCase.config())
+			content := descriptionOf(testCase.config())
 			env, dropped, err := systemdEnvironmentFile(content)
 			if err != nil {
 				t.Fatalf("the systemd emulation cannot read the file: %v", err)

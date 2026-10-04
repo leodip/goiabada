@@ -19,12 +19,17 @@ func kubernetesConfig() *Config {
 	return config
 }
 
-// kubernetesDocuments is the generated manifest's documents by kind and then name.
+// kubernetesDocuments is the documents of the generated manifest and its secrets file, by kind and
+// then name.
 func kubernetesDocuments(t *testing.T, config *Config) map[string]map[string]map[string]any {
 	t.Helper()
-	_, content := generatedConfiguration(config)
+	description, secrets := generatedConfiguration(config)
+	docs := yamlDocuments(t, description.content)
+	if secrets != description {
+		docs = append(docs, yamlDocuments(t, secrets.content)...)
+	}
 	byKind := map[string]map[string]map[string]any{}
-	for _, doc := range yamlDocuments(t, content) {
+	for _, doc := range docs {
 		kind := at[string](t, doc, "kind")
 		if byKind[kind] == nil {
 			byKind[kind] = map[string]map[string]any{}
@@ -212,7 +217,7 @@ func TestKubernetesInstructions_SetUpWhatTheManifestNames(t *testing.T) {
 			config.GatewayTrafficPolicy = policy
 			gateway := kubernetesDocuments(t, config)["Gateway"]["goiabada"]
 			var buf bytes.Buffer
-			printKubernetesInstructions(&console{w: &buf}, config, "goiabada-k8s.yaml")
+			printKubernetesInstructions(&console{w: &buf}, config, outputPaths{"goiabada-k8s.yaml", "goiabada-secrets.yaml"})
 			message := buf.String()
 
 			for _, gone := range []string{"ingress-nginx", "Ingress", "ingress:", "LoadBalancer"} {
@@ -305,7 +310,7 @@ func TestKubernetesInstructions_FollowTheTrafficPolicy(t *testing.T) {
 			config := kubernetesConfig()
 			config.GatewayTrafficPolicy = testCase.policy
 			var buf bytes.Buffer
-			printKubernetesInstructions(&console{w: &buf}, config, "goiabada-k8s.yaml")
+			printKubernetesInstructions(&console{w: &buf}, config, outputPaths{"goiabada-k8s.yaml", "goiabada-secrets.yaml"})
 			message := buf.String()
 			if !strings.Contains(message, "cluster-wide") || !strings.Contains(message, "whoever runs") {
 				t.Errorf("the message does not say the EnvoyProxy and GatewayClass are cluster-wide, so the choice is whoever runs Envoy Gateway's:\n%s", message)
@@ -339,7 +344,7 @@ func TestKubernetesManifest_SaysWhichAddressTheServersSee(t *testing.T) {
 		t.Run(string(testCase.policy), func(t *testing.T) {
 			config := kubernetesConfig()
 			config.GatewayTrafficPolicy = testCase.policy
-			_, content := generatedConfiguration(config)
+			content := descriptionOf(config)
 			lines := strings.Split(content, "\n")
 			checked := 0
 			for i, line := range lines {
@@ -413,7 +418,7 @@ func TestKubernetesManifest_AdmitsOnlyEnvoyWhenAsked(t *testing.T) {
 		config := kubernetesConfig()
 		config.NetworkPolicy = true
 		docs := kubernetesDocuments(t, config)
-		_, content := generatedConfiguration(config)
+		content := descriptionOf(config)
 		if len(docs["NetworkPolicy"]) != len(workloads) {
 			t.Errorf("the manifest has NetworkPolicies %v, want one per Deployment", slices.Sorted(maps.Keys(docs["NetworkPolicy"])))
 		}
@@ -765,7 +770,7 @@ func TestKubernetesInstructions_WarnWhenTheManifestFollowsAMovingTag(t *testing.
 		t.Run(testCase.tag, func(t *testing.T) {
 			withImageTag(t, testCase.tag)
 			var buf bytes.Buffer
-			printKubernetesInstructions(&console{w: &buf}, kubernetesConfig(), "goiabada-k8s.yaml")
+			printKubernetesInstructions(&console{w: &buf}, kubernetesConfig(), outputPaths{"goiabada-k8s.yaml", "goiabada-secrets.yaml"})
 			message := buf.String()
 			if got := strings.Contains(message, warning); got != testCase.warn {
 				t.Errorf("the message warns %q: %v, want %v\n%s", warning, got, testCase.warn, message)

@@ -59,8 +59,8 @@ Choose the deployment type that matches your setup:
 
 | Option | Use case | Output |
 |--------|----------|--------|
-| **2. Production with reverse proxy** | Docker with Nginx/Cloudflare | `docker-compose.yml` |
-| **3. Kubernetes cluster** | Kubernetes deployment | `goiabada-k8s.yaml` |
+| **2. Production with reverse proxy** | Docker with Nginx/Cloudflare | `docker-compose.yml`, and its secrets in `docker-compose.override.yml` |
+| **3. Kubernetes cluster** | Kubernetes deployment | `goiabada-k8s.yaml`, and its Secrets in `goiabada-secrets.yaml` |
 | **4. Native binaries** | Running without Docker | `goiabada.env` |
 
 The wizard will ask for your domain names, generate all credentials (session keys, OAuth secrets), and create the appropriate configuration file.
