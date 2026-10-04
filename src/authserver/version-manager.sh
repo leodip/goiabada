@@ -17,8 +17,8 @@
 #   all     - Run all commands in sequence (check → update → deps)
 #
 # Scope: this script manages TOOLCHAIN and CDN pins (Go, Tailwind,
-# golangci-lint, mockery, staticcheck, unparam, govulncheck, daisyUI,
-# humanize-duration). It does NOT manage the product version.
+# golangci-lint, mockery, staticcheck, unparam, govulncheck, the release
+# images' Alpine base, daisyUI, humanize-duration). It does NOT manage the product version.
 #
 # Workflow, for bumping a tool or CDN pin:
 #   1. Edit versions.yaml to set desired versions
@@ -138,6 +138,7 @@ get_all_versions() {
         echo "tools.staticcheck=$(get_version 'tools.staticcheck')"
         echo "tools.unparam=$(get_version 'tools.unparam')"
         echo "tools.govulncheck=$(get_version 'tools.govulncheck')"
+        echo "tools.alpine=$(get_version 'tools.alpine')"
         echo "cdn.daisyui=$(get_version 'cdn.daisyui')"
         echo "cdn.humanize-duration=$(get_version 'cdn.humanize-duration')"
     }
@@ -260,6 +261,7 @@ cmd_show() {
     printf "  %-23s ${GREEN}%s${NC}\n" "staticcheck" "$(get_version 'tools.staticcheck')"
     printf "  %-23s ${GREEN}%s${NC}\n" "unparam" "$(get_version 'tools.unparam')"
     printf "  %-23s ${GREEN}%s${NC}\n" "govulncheck" "$(get_version 'tools.govulncheck')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "alpine" "$(get_version 'tools.alpine')"
 
     # CDN versions
     echo -e "\n${BOLD}CDN Dependencies:${NC}"
@@ -466,6 +468,7 @@ cmd_update() {
     local STATICCHECK_VERSION=$(get_version 'tools.staticcheck')
     local UNPARAM_VERSION=$(get_version 'tools.unparam')
     local GOVULNCHECK_VERSION=$(get_version 'tools.govulncheck')
+    local ALPINE_VERSION=$(get_version 'tools.alpine')
     local DAISYUI_VERSION=$(get_version 'cdn.daisyui')
     local HUMANIZE_VERSION=$(get_version 'cdn.humanize-duration')
 
@@ -599,6 +602,18 @@ cmd_update() {
                 ((success_count++))
             else
                 ((fail_count++))
+            fi
+
+            # Alpine base of the release images' final stage: FROM alpine:X.Y.
+            # Dockerfile-test has no such stage; it runs from its build stage.
+            if [[ "$dockerfile" != *"Dockerfile-test"* ]]; then
+                if update_file "$dockerfile" \
+                    "s|^FROM alpine:[0-9.]* |FROM alpine:${ALPINE_VERSION} |" \
+                    "Alpine base image"; then
+                    ((success_count++))
+                else
+                    ((fail_count++))
+                fi
             fi
 
             # Tailwind in Dockerfile-test (musl variant)
