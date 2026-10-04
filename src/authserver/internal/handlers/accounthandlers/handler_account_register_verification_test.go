@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -250,7 +251,7 @@ func TestHandleRegisterPost_WithVerificationTheJobSendsNothingButALinkOrANotice(
 			details, auditCtx := captureRequestedRegistration(h.auditLogger, nil)
 
 			h.handler.ServeHTTP(rr, req)
-			h.jobs.runAll(t)
+			h.jobs.runAll(t, afterresponse.ClassRegistration)
 
 			assert.Equal(t, tc.wantDetails, *details)
 			assert.Equal(t, registerRequestId, (*auditCtx).Value(chimiddleware.RequestIDKey),
@@ -298,7 +299,7 @@ func TestHandleRegisterPost_WithVerificationANewAddressIsGivenAPendingRegistrati
 
 	h.handler.ServeHTTP(rr, req)
 	assert.Nil(t, created, "the pending registration is written after the response")
-	h.jobs.runAll(t)
+	h.jobs.runAll(t, afterresponse.ClassRegistration)
 
 	require.NotNil(t, created)
 	assert.Equal(t, registerSomeoneEmail, created.Email)
@@ -366,7 +367,7 @@ func TestHandleRegisterPost_WithVerificationAVerifiedEnabledAccountIsSentTheNoti
 				}).Return(nil).Once()
 
 			h.handler.ServeHTTP(rr, req)
-			h.jobs.runAll(t)
+			h.jobs.runAll(t, afterresponse.ClassRegistration)
 
 			assert.Equal(t, map[string]interface{}{
 				"ip":          testClientIP,
@@ -511,7 +512,7 @@ func TestHandleRegisterPost_WithVerificationTheJobsFaultsAreErrorRecords(t *test
 		details, _ := captureRequestedRegistration(h.auditLogger, nil)
 
 		h.handler.ServeHTTP(rr, req)
-		h.jobs.runAll(t)
+		h.jobs.runAll(t, afterresponse.ClassRegistration)
 
 		assert.Equal(t, http.StatusOK, rr.Code, "the response has gone before the row is written")
 		assert.Equal(t, map[string]interface{}{
@@ -540,7 +541,7 @@ func TestHandleRegisterPost_WithVerificationTheJobsFaultsAreErrorRecords(t *test
 		h.emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError).Once()
 
 		h.handler.ServeHTTP(rr, req)
-		h.jobs.runAll(t)
+		h.jobs.runAll(t, afterresponse.ClassRegistration)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		assert.Equal(t, "link_issued", (*details)["outcome"])
@@ -563,7 +564,7 @@ func TestHandleRegisterPost_WithVerificationTheJobsFaultsAreErrorRecords(t *test
 		h.emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError).Once()
 
 		h.handler.ServeHTTP(rr, req)
-		h.jobs.runAll(t)
+		h.jobs.runAll(t, afterresponse.ClassRegistration)
 
 		assert.Equal(t, "notice_issued", (*details)["outcome"])
 		h.pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)

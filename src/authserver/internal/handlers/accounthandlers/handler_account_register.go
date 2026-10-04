@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -456,7 +457,7 @@ func registerWithVerification(
 		pageRenderer.InternalServerError(w, r, err)
 	}
 
-	afterResponse.Go(r.Context(), func(ctx context.Context) {
+	afterResponse.Go(r.Context(), afterresponse.ClassRegistration, func(ctx context.Context) {
 		finishRegistration(ctx, r, database, emailSender, auditLogger, pageRenderer, dataCipher, baseURL,
 			settings, clientIP, email, user, preRegistration)
 	})

@@ -3,6 +3,7 @@ package accounthandlers
 import (
 	"context"
 	"database/sql"
+	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -166,7 +167,7 @@ func HandleForgotPasswordPost(
 
 		renderForgotPasswordLinkSent(pageRenderer, w, r)
 
-		afterResponse.Go(r.Context(), func(ctx context.Context) {
+		afterResponse.Go(r.Context(), afterresponse.ClassRecovery, func(ctx context.Context) {
 			finishForgotPassword(ctx, r, database, emailSender, auditLogger, pageRenderer, dataCipher, baseURL,
 				clientIP, email, user)
 		})

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -95,12 +96,14 @@ func accountEmailHandlerWith(database *datamocks.Database, auditLogger *handlers
 // runs the jobs and asserts what they did. Each job runs under the context it was handed, which is
 // the request's.
 type heldJobs struct {
-	ctxs []context.Context
-	jobs []func(ctx context.Context)
+	ctxs    []context.Context
+	classes []afterresponse.Class
+	jobs    []func(ctx context.Context)
 }
 
-func (h *heldJobs) Go(ctx context.Context, job func(ctx context.Context)) {
+func (h *heldJobs) Go(ctx context.Context, class afterresponse.Class, job func(ctx context.Context)) {
 	h.ctxs = append(h.ctxs, ctx)
+	h.classes = append(h.classes, class)
 	h.jobs = append(h.jobs, job)
 }
 
@@ -110,6 +113,7 @@ func (h *heldJobs) runAll(t *testing.T) {
 	t.Helper()
 	require.Len(t, h.jobs, 1, "a completed change hands exactly one job to run after its response")
 	for i, job := range h.jobs {
+		assert.Equal(t, afterresponse.ClassAccountNotice, h.classes[i], "an email change is admitted against its own budget (#394 review)")
 		job(h.ctxs[i])
 	}
 }
