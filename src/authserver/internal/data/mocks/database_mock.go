@@ -13036,6 +13036,102 @@ func (_c *Database_TryInstallPendingOTPEnrollment_Call) RunAndReturn(run func(ct
 	return _c
 }
 
+// TryReplacePreRegistrationCode provides a mock function for the type Database
+func (_mock *Database) TryReplacePreRegistrationCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64, deadCodeHash string, codeEncrypted []byte, codeHash string, issuedAt time.Time) (bool, error) {
+	ret := _mock.Called(ctx, tx, preRegistrationId, deadCodeHash, codeEncrypted, codeHash, issuedAt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TryReplacePreRegistrationCode")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string, []byte, string, time.Time) (bool, error)); ok {
+		return returnFunc(ctx, tx, preRegistrationId, deadCodeHash, codeEncrypted, codeHash, issuedAt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string, []byte, string, time.Time) bool); ok {
+		r0 = returnFunc(ctx, tx, preRegistrationId, deadCodeHash, codeEncrypted, codeHash, issuedAt)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, string, []byte, string, time.Time) error); ok {
+		r1 = returnFunc(ctx, tx, preRegistrationId, deadCodeHash, codeEncrypted, codeHash, issuedAt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_TryReplacePreRegistrationCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TryReplacePreRegistrationCode'
+type Database_TryReplacePreRegistrationCode_Call struct {
+	*mock.Call
+}
+
+// TryReplacePreRegistrationCode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - preRegistrationId int64
+//   - deadCodeHash string
+//   - codeEncrypted []byte
+//   - codeHash string
+//   - issuedAt time.Time
+func (_e *Database_Expecter) TryReplacePreRegistrationCode(ctx any, tx any, preRegistrationId any, deadCodeHash any, codeEncrypted any, codeHash any, issuedAt any) *Database_TryReplacePreRegistrationCode_Call {
+	return &Database_TryReplacePreRegistrationCode_Call{Call: _e.mock.On("TryReplacePreRegistrationCode", ctx, tx, preRegistrationId, deadCodeHash, codeEncrypted, codeHash, issuedAt)}
+}
+
+func (_c *Database_TryReplacePreRegistrationCode_Call) Run(run func(ctx context.Context, tx *sql.Tx, preRegistrationId int64, deadCodeHash string, codeEncrypted []byte, codeHash string, issuedAt time.Time)) *Database_TryReplacePreRegistrationCode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 []byte
+		if args[4] != nil {
+			arg4 = args[4].([]byte)
+		}
+		var arg5 string
+		if args[5] != nil {
+			arg5 = args[5].(string)
+		}
+		var arg6 time.Time
+		if args[6] != nil {
+			arg6 = args[6].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_TryReplacePreRegistrationCode_Call) Return(b bool, err error) *Database_TryReplacePreRegistrationCode_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_TryReplacePreRegistrationCode_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, preRegistrationId int64, deadCodeHash string, codeEncrypted []byte, codeHash string, issuedAt time.Time) (bool, error)) *Database_TryReplacePreRegistrationCode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // TrySetUserEmail provides a mock function for the type Database
 func (_mock *Database) TrySetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, fromEmail string, fromVerified bool, toEmail string) (bool, error) {
 	ret := _mock.Called(ctx, tx, userId, fromEmail, fromVerified, toEmail)

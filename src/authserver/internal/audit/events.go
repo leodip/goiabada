@@ -234,11 +234,13 @@ const (
 	// the SHA-256 hex of the submitted address normalized as the lookups normalize it, never the
 	// address itself; userId, present only when an account matched; preRegistrationId, present
 	// only when a pending registration was written or found; and outcome, one of link_issued (a
-	// new pending registration and its link), link_pending (a pending registration that can still
-	// complete; nothing sent), notice_issued (a verified, enabled account, sent a notice that it
-	// already exists), unverified_address (an enabled account whose address is not verified;
-	// nothing sent), account_disabled (a disabled account, verified or not; nothing sent),
-	// invalid_address (the form was redrawn with its error) or server_error (the server failed
+	// new pending registration, or a dead one given a fresh code, and its link), link_pending (a
+	// pending registration that can still complete; nothing sent), notice_issued (a verified,
+	// enabled account, sent a notice that it already exists), unverified_address (an enabled
+	// account whose address is not verified; nothing sent), account_disabled (a disabled account,
+	// verified or not; nothing sent), replacement_lost (a dead pending registration whose
+	// conditional replacement was declined, because another request replaced it first; nothing
+	// sent), invalid_address (the form was redrawn with its error) or server_error (the server failed
 	// before deciding; the cause is the Error log line on the same request id).
 	//
 	// It replaced created_pre_registration, which recorded the address in plain text and only
