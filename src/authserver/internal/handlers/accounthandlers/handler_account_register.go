@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
@@ -165,6 +166,17 @@ func HandleRegisterPost(
 			default:
 				pageRenderer.InternalServerError(w, r, err)
 			}
+			return
+		}
+
+		// The limit the administrator's and the self-service email change apply, checked with the
+		// shape and before either lookup. Without it an address the columns cannot hold answered
+		// the 500 page on MySQL, PostgreSQL and SQL Server and registered on SQLite (#207 decision
+		// 11). The shape admits ASCII alone, so the byte length is the character count.
+		if len(email) > accountvalidation.MaxEmailLength {
+			// i18n surface: A — browser-flow form rerender.
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeEmailTooLong,
+				map[string]any{"max": accountvalidation.MaxEmailLength}).Localize(r.Context()))
 			return
 		}
 

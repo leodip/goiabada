@@ -28,6 +28,11 @@ func NewEmailValidator(database emailValidatorDatabase) *EmailValidator {
 	}
 }
 
+// MaxEmailLength is the longest address an account may hold, in characters: every place that sets
+// one applies it, the administrator's and the self-service change through ValidateEmailChange and
+// self-registration in its own handler, so all four engines store the same addresses (#207).
+const MaxEmailLength = 60
+
 // emailShape is the basic shape of an address: a local part, one @, and a domain ending in a label
 // of two or more letters.
 var emailShape = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
@@ -67,8 +72,8 @@ func (val *EmailValidator) ValidateEmailChange(ctx context.Context, email string
 		return err
 	}
 
-	if len(email) > 60 {
-		return i18n.NewLocalizedError(i18n.ErrCodeEmailTooLong, map[string]any{"max": 60})
+	if len(email) > MaxEmailLength {
+		return i18n.NewLocalizedError(i18n.ErrCodeEmailTooLong, map[string]any{"max": MaxEmailLength})
 	}
 
 	user, err := val.database.GetUserBySubject(ctx, nil, subject)

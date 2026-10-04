@@ -831,3 +831,115 @@ func TestHandleRegisterPost_AWrappedRefusalStillRedrawsTheForm(t *testing.T) {
 		})
 	}
 }
+
+// TestHandleRegisterPost_RefusesAnAddressOverSixtyCharacters holds registration to the limit the
+// administrator's and the self-service email change already apply: an address over 60
+// characters redraws the form with the "too long" message, in both modes, before either lookup,
+// so the database is never asked about it (#207 decision 11). The addresses are well formed, so
+// it is the length and nothing else that refuses them.
+func TestHandleRegisterPost_RefusesAnAddressOverSixtyCharacters(t *testing.T) {
+	// 49 + len("@example.com") = 61 characters.
+	const tooLong = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.com"
+	require.Len(t, tooLong, 61)
+
+	modes := []struct {
+		name     string
+		settings *record.Settings
+	}{
+		{
+			name: "with email verification",
+			settings: &record.Settings{
+				SelfRegistrationEnabled: true,
+				SMTPEnabled:             true,
+				SelfRegistrationRequiresEmailVerification: true,
+			},
+		},
+		{
+			name:     "without email verification",
+			settings: &record.Settings{SelfRegistrationEnabled: true},
+		},
+	}
+
+	for _, mode := range modes {
+		t.Run(mode.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			database := datamocks.NewDatabase(t)
+			userCreator := accounthandlersmocks.NewUserCreator(t)
+			emailValidator := accounthandlersmocks.NewEmailValidator(t)
+			passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+			emailSender := accounthandlersmocks.NewEmailSender(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator,
+				passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+
+			form := url.Values{}
+			form.Add("email", tooLong)
+			form.Add("password", "Str0ngP4ss!")
+			form.Add("passwordConfirmation", "Str0ngP4ss!")
+			req, _ := http.NewRequest("POST", "/register", strings.NewReader(form.Encode()))
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			rr := httptest.NewRecorder()
+			req = req.WithContext(reqctx.WithSettings(req.Context(), mode.settings))
+
+			emailValidator.On("ValidateEmailAddress", tooLong).Return(nil).Maybe()
+			pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html",
+				"/account_register.html", mock.Anything).Return(nil)
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Equal(t, http.StatusOK, rr.Code)
+			pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html",
+				"/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+					return data["error"] == "The email address cannot exceed a maximum length of 60 characters." &&
+						data["email"] == tooLong
+				}))
+			database.AssertNotCalled(t, "GetUserByEmail", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "GetPreRegistrationByEmail", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "CreatePreRegistration", mock.Anything, mock.Anything, mock.Anything)
+			userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
+			emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// TestHandleRegisterPost_AcceptsAnAddressOfExactlySixtyCharacters is the boundary beside it: 60
+// characters is within the limit, so the address goes on to the lookup, here finding an account
+// and answering as an address already registered does in this mode.
+func TestHandleRegisterPost_AcceptsAnAddressOfExactlySixtyCharacters(t *testing.T) {
+	// 48 + len("@example.com") = 60 characters.
+	const atTheLimit = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.com"
+	require.Len(t, atTheLimit, 60)
+
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
+	userCreator := accounthandlersmocks.NewUserCreator(t)
+	emailValidator := accounthandlersmocks.NewEmailValidator(t)
+	passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+	emailSender := accounthandlersmocks.NewEmailSender(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator,
+		passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+
+	form := url.Values{}
+	form.Add("email", atTheLimit)
+	req, _ := http.NewRequest("POST", "/register", strings.NewReader(form.Encode()))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SelfRegistrationEnabled: true}))
+
+	emailValidator.On("ValidateEmailAddress", atTheLimit).Return(nil)
+	database.On("GetUserByEmail", mock.Anything, mock.Anything, atTheLimit).Return(&record.User{}, nil).Once()
+	pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html",
+		"/account_register.html", mock.Anything).Return(nil)
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html",
+		"/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+			return data["error"] == "Apologies, but this email address is already registered."
+		}))
+}
