@@ -35,11 +35,19 @@ const (
 	kubernetesDefaultGrace = 30 * time.Second
 )
 
+// headroom is what every deployment file gives over the budget, for the signal's delivery and the
+// last records: the "plus 10s of headroom" the generator's two grace-period constants, the comment
+// each golden and sample file carries and the Kubernetes docs page all state. It is a floor here
+// so that a raised shutdown constant cannot spend it with every one of those still saying 10s.
+const headroom = 10 * time.Second
+
 // Every deployment file running the admin console gives it the time its stop can take, which is
-// its listeners' drain: Compose's stop_grace_period, and in Kubernetes the pod's grace period less
-// the preStop pause, which counts against it. Raising httpShutdownTimeout fails here until the
-// generator, its goldens and the sample files follow (#390 decision 3). The auth server holds the
-// same files to its own budget from its own tier.
+// its listeners' drain, and the headroom over it: Compose's stop_grace_period, and in Kubernetes
+// the pod's grace period less the preStop pause, which counts against it. Raising
+// httpShutdownTimeout by any amount fails here until the generator, its goldens and the sample
+// files follow (#390 decision 3). The auth server holds the same files to its own budget from its
+// own tier, and since every file gives both binaries the auth server's ceiling (decision 4), it is
+// that tier a small raise fails first; this one is the floor the admin console's own stop owes.
 func TestDeploymentFiles_GracePeriodsCoverTheShutdownBudget(t *testing.T) {
 	assertGracePeriodsCover(t, guard.SourceRoot(t), adminConsoleImage, httpShutdownTimeout)
 }
@@ -59,13 +67,20 @@ services:
   console:
     image: leodip/goiabada:adminconsole-latest
 `)
+	// 20 covers the budget, and not the headroom over it.
+	writeDeploymentFixture(t, root, "build/docker-compose-budget-only.yml", `
+services:
+  console:
+    image: leodip/goiabada:adminconsole-latest
+    stop_grace_period: 20s
+`)
 	writeDeploymentFixture(t, root, "build/docker-compose-enough.yml", `
 services:
   console:
     image: leodip/goiabada:adminconsole-latest
-    stop_grace_period: 15s
+    stop_grace_period: 25s
 `)
-	// 30 covers the budget alone, and not once the 20-second pause is taken from it.
+	// 40 covers the budget and the headroom alone, and not once the 20-second pause is taken from it.
 	writeDeploymentFixture(t, root, "cmd/goiabada-setup/testdata/kubernetes-pause.golden", `
 apiVersion: v1
 kind: Namespace
@@ -79,7 +94,7 @@ metadata:
 spec:
   template:
     spec:
-      terminationGracePeriodSeconds: 30
+      terminationGracePeriodSeconds: 40
       containers:
       - name: adminconsole
         image: leodip/goiabada:adminconsole-1.0
@@ -100,6 +115,7 @@ spec:
 	text := report.Text()
 	for _, want := range []string{
 		"build/docker-compose-short.yml",
+		"build/docker-compose-budget-only.yml",
 		"build/docker-compose-default.yml",
 		"cmd/goiabada-setup/testdata/kubernetes-pause.golden",
 	} {
@@ -109,11 +125,11 @@ spec:
 	}
 	for _, unwanted := range []string{"docker-compose-enough.yml", "local-env.golden", "unrelated"} {
 		if strings.Contains(text, unwanted) {
-			t.Errorf("a failure names %s, which covers the budget or runs no admin console:\n%s", unwanted, text)
+			t.Errorf("a failure names %s, which covers the budget and the headroom or runs no admin console:\n%s", unwanted, text)
 		}
 	}
-	if len(report.Errors) != 3 {
-		t.Errorf("%d failures, want 3:\n%s", len(report.Errors), text)
+	if len(report.Errors) != 4 {
+		t.Errorf("%d failures, want 4:\n%s", len(report.Errors), text)
 	}
 }
 
@@ -166,7 +182,7 @@ func assertGracePeriodsCover(r guard.Reporter, root, image string, budget time.D
 }
 
 // gracePeriodShortfalls reads every file matching pattern under root that names image, and returns
-// one line per service or Deployment running it whose grace period does not cover budget, with
+// one line per service or Deployment running it whose grace period does not cover budget plus the headroom, with
 // how many files it read.
 func gracePeriodShortfalls(root, pattern, image string, budget time.Duration) ([]string, int, error) {
 	paths, err := filepath.Glob(filepath.Join(root, filepath.FromSlash(pattern)))
@@ -230,10 +246,11 @@ func shortfallsIn(content []byte, image string, budget time.Duration) ([]string,
 						return nil, 0, fmt.Errorf("service %s: stop_grace_period %v: %w", name, value, err)
 					}
 				}
-				if grace < budget {
+				if grace < budget+headroom {
 					shortfalls = append(shortfalls, fmt.Sprintf(
-						"service %s stops within stop_grace_period %s, short of the %s its shutdown can take",
-						name, grace, budget))
+						"service %s stops within stop_grace_period %s, short of the %s its shutdown can take "+
+							"plus %s of headroom",
+						name, grace, budget, headroom))
 				}
 			}
 		}
@@ -259,11 +276,11 @@ func shortfallsIn(content []byte, image string, budget time.Duration) ([]string,
 				if err != nil {
 					return nil, 0, fmt.Errorf("the Deployment %v: %w", mapAt(doc, "metadata")["name"], err)
 				}
-				if grace < budget+pause {
+				if grace < budget+headroom+pause {
 					shortfalls = append(shortfalls, fmt.Sprintf(
 						"Deployment %v gives its pod terminationGracePeriodSeconds %s, short of the %s preStop pause "+
-							"plus the %s its shutdown can take",
-						mapAt(doc, "metadata")["name"], grace, pause, budget))
+							"plus the %s its shutdown can take plus %s of headroom",
+						mapAt(doc, "metadata")["name"], grace, pause, budget, headroom))
 				}
 			}
 		}
