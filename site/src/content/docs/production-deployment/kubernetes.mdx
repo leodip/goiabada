@@ -484,8 +484,21 @@ If the rate limiter is on, more replicas also multiply its per-pod limits (see b
 
 ### Rate limiting across replicas
 
-The built-in rate limiter is off by default (`GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`). If you
-turn it on, not every limit holds across replicas:
+The built-in rate limiter is off in the server by default (`GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`).
+The wizard asks whether to turn it on, and writes the answer into the auth server's ConfigMap, under
+a comment, either way; `--rate-limiter=true` or `=false` answers without the prompt. Its default
+follows the traffic policy of Step 1:
+
+- **Under `Cluster`, off.** Goiabada sees a node's address for every client, so a per-IP limit
+  counts every user the load balancer sends through one node together: 30 password posts a minute
+  and 20 forgot-password requests per 5 minutes per node, for example, which throttles sign-ins on a
+  busy site. The limits on failed passwords and codes would still hold, being keyed on the email or
+  the user rather than the address; turn the limiter on if those matter more to you than the per-IP
+  limits cost.
+- **Under `Local`, on.** Goiabada sees each client's address, so each per-IP limit counts one
+  client.
+
+With the limiter on, not every limit holds across replicas:
 
 - **Shared:** the limits on credential guessing, which count failed passwords (at sign-in and
   through the password grant), failed OTP codes, failed account password checks and failed email
@@ -502,6 +515,15 @@ turn it on, not every limit holds across replicas:
   together; under `Local` it is the client's. See [client IP and proxy trust](#client-ip-and-proxy-trust) before relying on one.
 
 The budgets are in the [rate limiting table](/reference/environment-variables/#security-settings).
+
+**The startup warning.** With the limiter on, the auth server logs a `rate limiter configuration
+warning` at every start, saying it trusts one proxy hop with no `GOIABADA_AUTHSERVER_TRUSTED_PROXIES`.
+With the generated manifest that is expected. The server cannot see what is in front of it, and the
+record is there for the cases where one hop is not sound: a proxy that passes `X-Forwarded-For`
+through untouched, or a caller that reaches the Service around the proxy. Envoy appends to the
+header, so one hop is sound behind it (see [client IP and proxy trust](#client-ip-and-proxy-trust)).
+Once Envoy is the only gateway in front, and the [NetworkPolicies](#who-can-reach-goiabada) or your
+own controls keep other pods off the Services, the warning has been checked and can be left as it is.
 
 ### Resource limits
 

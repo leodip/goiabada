@@ -45,6 +45,9 @@ type deployment struct {
 	// servedByEnvoyGateway says the manifest is served through Envoy Gateway, so the type asks its
 	// traffic policy and whether a NetworkPolicy admits only Envoy (#396 decisions 4 and 5).
 	servedByEnvoyGateway bool
+	// asksRateLimiter says the type asks whether to turn the auth server's rate limiter on, and
+	// writes the answer explicitly (#396 decision 9). Local testing never asks.
+	asksRateLimiter bool
 	// routesByHost says the manifest routes and certifies each URL by its host, which must then be
 	// a lowercase domain name (validateListenerHostname) and not the other URL's host.
 	routesByHost bool
@@ -74,6 +77,7 @@ var deployments = []*deployment{
 		displayName:       "Production with reverse proxy",
 		asksURLs:          true,
 		behindProxy:       true,
+		asksRateLimiter:   true,
 		outputFile:        "docker-compose.yml",
 		generate:          generateDockerCompose,
 		printInstructions: printComposeInstructions,
@@ -90,6 +94,7 @@ var deployments = []*deployment{
 		externalDatabase:     true,
 		routesByHost:         true,
 		servedByEnvoyGateway: true,
+		asksRateLimiter:      true,
 		outputFile:           "goiabada-k8s.yaml",
 		generate:             generateKubernetesManifests,
 		printInstructions:    printKubernetesInstructions,
@@ -104,6 +109,7 @@ var deployments = []*deployment{
 		asksURLs:          true,
 		externalDatabase:  true,
 		asksLocalProxy:    true,
+		asksRateLimiter:   true,
 		outputFile:        "goiabada.env",
 		generate:          generateEnvFile,
 		printInstructions: printNativeInstructions,

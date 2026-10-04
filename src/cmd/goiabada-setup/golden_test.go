@@ -52,12 +52,25 @@ var answerCases = []goldenCase{
 	// Native binaries with no reverse proxy on the same machine (#396 decision 7).
 	{name: "native-direct-postgres", deployment: deploymentNative, engine: "postgres", answers: func(c *Config) { c.LocalProxy = false }},
 	// Kubernetes behind Envoy with the Local traffic policy (#396 decision 4).
+	// The rate limiter is on by default under Local (#396 decision 9).
 	{name: "kubernetes-local-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
 		c.GatewayTrafficPolicy = trafficPolicyLocal
+		c.RateLimiter = true
 	}},
 	// Kubernetes with the NetworkPolicies admitting only Envoy and the admin console (#396 decision 5).
 	{name: "kubernetes-network-policy-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
 		c.NetworkPolicy = true
+	}},
+	// The rate limiter answered against its default: off for production Compose and native
+	// binaries, on for Kubernetes under the Cluster traffic policy (#396 decision 9).
+	{name: "production-no-rate-limiter-postgres", deployment: deploymentProduction, engine: "postgres", answers: func(c *Config) {
+		c.RateLimiter = false
+	}},
+	{name: "native-no-rate-limiter-postgres", deployment: deploymentNative, engine: "postgres", answers: func(c *Config) {
+		c.RateLimiter = false
+	}},
+	{name: "kubernetes-rate-limiter-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.RateLimiter = true
 	}},
 }
 
@@ -146,6 +159,9 @@ func goldenConfig(kind deploymentType, engineName string) *Config {
 		config.GatewayTrafficPolicy = trafficPolicyCluster
 	}
 	config.NetworkPolicy = false
+	// Production Compose, native binaries and Kubernetes ask whether to turn the rate limiter on,
+	// yes by default but for Kubernetes under the Cluster traffic policy; local testing never asks.
+	config.RateLimiter = kind == deploymentProduction || kind == deploymentNative
 	return config
 }
 

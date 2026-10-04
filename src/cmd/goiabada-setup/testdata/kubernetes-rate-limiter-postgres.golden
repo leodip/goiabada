@@ -68,7 +68,7 @@ data:
   # per-IP limits count every client arriving through one node together.
   # With it on, the auth server logs a warning at every start that it trusts one proxy hop
   # with no list; behind Envoy alone, that is expected.
-  GOIABADA_AUTHSERVER_RATELIMITER_ENABLED: "false"
+  GOIABADA_AUTHSERVER_RATELIMITER_ENABLED: "true"
   GOIABADA_DB_TYPE: "postgres"
   GOIABADA_DB_HOST: "goiabada-db"
   GOIABADA_DB_PORT: "5432"

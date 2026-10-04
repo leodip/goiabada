@@ -76,9 +76,11 @@ The wizard will ask you a few questions:
 
 6. **Reverse proxy** (native binaries only) - Whether a reverse proxy on the same machine, such as Nginx, forwards to Goiabada. Yes, the default, has both servers listen on `127.0.0.1` and trust its forwarded headers alone; no has them listen on every interface, trust no forwarded header, and wait for you to configure HTTPS. `--local-proxy=false` answers no without the prompt
 
-7. **Admin credentials** - Email and password for the first admin user
+7. **Rate limiter** (production, Kubernetes and native binaries) - Whether to turn on the auth server's built-in [rate limiter](/reference/environment-variables/#security-settings), which the server leaves off by default. Yes is the default, except for Kubernetes under the `Cluster` traffic policy: there Goiabada sees a node's address for every client, so the per-IP limits would count every user arriving through one node together and throttle sign-ins on a busy site, while the limits on failed passwords and codes hold under either policy. The answer is written as `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`, `true` or `false`, under a comment. `--rate-limiter=true` or `=false` answers without the prompt; left out, the deployment's default applies. Local testing never asks and leaves it off. With the limiter on, the auth server logs a warning about its proxy trust at every start of a production Compose or Kubernetes deployment, which is expected behind one proxy (see [client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection))
 
-8. **Database password** - A strong password (auto-generated if you press Enter)
+8. **Admin credentials** - Email and password for the first admin user
+
+9. **Database password** - A strong password (auto-generated if you press Enter)
 
 ## What gets generated
 

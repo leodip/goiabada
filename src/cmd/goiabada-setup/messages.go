@@ -40,6 +40,13 @@ func printSummary(out *console, config *Config) {
 			out.println("  Reverse proxy:    none (HTTPS served by Goiabada)")
 		}
 	}
+	if config.Deployment.asksRateLimiter {
+		if config.RateLimiter {
+			out.println("  Rate limiter:     on")
+		} else {
+			out.println("  Rate limiter:     off")
+		}
+	}
 	out.printf("  Admin Email:      %s\n", config.AdminEmail)
 	out.printf("  Admin Password:   %s\n", maskPassword(config.AdminPassword))
 	if config.DBHost != "" {

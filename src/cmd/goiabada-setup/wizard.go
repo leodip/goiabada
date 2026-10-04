@@ -79,6 +79,11 @@ var wizardSteps = []wizardStep{
 		applies: func(c *Config) bool { return c.Deployment.asksLocalProxy },
 		run:     (*wizard).askLocalProxy,
 	},
+	{
+		title:   "Rate limiter",
+		applies: func(c *Config) bool { return c.Deployment.asksRateLimiter },
+		run:     (*wizard).askRateLimiter,
+	},
 	{title: "Admin credentials", run: (*wizard).askAdmin},
 	{
 		title:   "Database connection",
@@ -432,6 +437,47 @@ func (w *wizard) askLocalProxy() error {
 	w.out.println()
 	localProxy, err := w.yesNo("Does a reverse proxy on this machine forward to Goiabada?", true)
 	w.config.LocalProxy = localProxy
+	return err
+}
+
+// askRateLimiter asks whether to turn the auth server's rate limiter on, yes by default but for
+// Kubernetes under the Cluster traffic policy, after which the question comes, since it decides
+// that default (#396 decision 9).
+func (w *wizard) askRateLimiter() error {
+	defaultOn := w.config.rateLimiterDefault()
+	if !w.interactive {
+		w.config.RateLimiter = w.flags.RateLimiter.or(defaultOn)
+		answer := "off"
+		if w.config.RateLimiter {
+			answer = "on"
+		}
+		if !w.flags.RateLimiter.set && !defaultOn {
+			answer += " (the default under the Cluster traffic policy; --rate-limiter turns it on)"
+		}
+		w.out.info("Rate limiter: %s", answer)
+		return nil
+	}
+	w.out.println("The auth server's built-in rate limiter caps sign-ins, password resets,")
+	w.out.println("self-registrations and client registrations per client address, and failed")
+	w.out.println("passwords and codes per account.")
+	if w.config.Deployment.servedByEnvoyGateway {
+		w.out.println("Its limits on failed passwords and codes are keyed on the email or the user and counted")
+		w.out.println("in the database every pod shares, so they hold under either traffic policy.")
+		if defaultOn {
+			w.out.println("Under the Local traffic policy Goiabada sees each client's address, so the per-IP")
+			w.out.println("limits count each client alone.")
+		} else {
+			w.out.println("Its per-IP limits do not: under the Cluster traffic policy Goiabada sees a node's")
+			w.out.println("address, so they count every user the load balancer sends through one node together")
+			w.out.println("(30 password posts a minute and 20 forgot-password requests per 5 minutes per node,")
+			w.out.println("for example), which throttles sign-ins on a busy site. That is why it is off by")
+			w.out.println("default here.")
+		}
+	}
+	w.out.printf("The limits are listed at %s\n", rateLimitsDocsURL)
+	w.out.println()
+	rateLimiter, err := w.yesNo("Turn on the rate limiter?", defaultOn)
+	w.config.RateLimiter = rateLimiter
 	return err
 }
 
