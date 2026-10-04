@@ -23,8 +23,11 @@ import (
 //   - false (default): headers are ignored and the socket peer is used. Secure
 //     default, correct when there is no reverse proxy.
 //   - true, trustedProxies empty: a single proxy hop is trusted (the rightmost
-//     X-Forwarded-For entry, or X-Real-IP). Sound only when that single proxy
-//     overwrites the forwarded headers.
+//     X-Forwarded-For entry, or X-Real-IP when there is none). Sound behind one
+//     proxy that sets or appends to X-Forwarded-For the address it received the
+//     connection from, so that the rightmost entry is the one it wrote, as long
+//     as every caller passes through that proxy: a caller reaching the server
+//     without passing it chooses the address it is resolved to.
 //   - true, trustedProxies set (the ranges ParseTrustedProxies returns): the
 //     forwarded chain is walked from the right, crossing only trusted hops,
 //     which is spoof-resistant across multiple proxies / a CDN.

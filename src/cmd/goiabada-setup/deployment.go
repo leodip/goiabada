@@ -60,9 +60,10 @@ type deployment struct {
 	outputFile    string
 	secretsFile   string
 	secretsSuffix string
-	generate      func(config *Config) string
-	// generateSecrets writes the secrets file, for a type that has one.
-	generateSecrets   func(config *Config) string
+	// generate writes the description, to be written at paths, and generateSecrets the secrets
+	// file, for a type that has one; each header names the files by the names paths give them.
+	generate          func(config *Config, paths outputPaths) string
+	generateSecrets   func(config *Config, paths outputPaths) string
 	printInstructions func(out *console, config *Config, paths outputPaths)
 }
 

@@ -104,6 +104,9 @@ var wizardSteps = []wizardStep{
 // before it writes nothing.
 func (w *wizard) setup() error {
 	printBanner(w.out)
+	if err := checkOutput(w.flags.Output); err != nil {
+		return err
+	}
 	if !w.interactive {
 		if err := w.flags.checkWritable(); err != nil {
 			return err
@@ -742,7 +745,7 @@ func (w *wizard) confirm() error {
 // writePrivateFile whatever it holds, so no file's mode depends on its content and a later change
 // that moves a secret back into the description cannot leak it (#426, #396 decision 14).
 func (w *wizard) writeConfiguration() error {
-	description, secrets := generatedConfiguration(w.config)
+	description, secrets := writtenConfiguration(w.config, w.paths)
 	files := []struct{ path, content string }{{w.paths.description, description.content}}
 	if w.paths.separate() {
 		files = append(files, struct{ path, content string }{w.paths.secrets, secrets.content})

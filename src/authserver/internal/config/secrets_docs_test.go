@@ -166,6 +166,10 @@ const contractPage = "## Secrets\n\n" +
 	"```bash\nkubectl create secret generic goiabada-secrets -n goiabada \\\n" +
 	"  --from-file=db-password=<(printf %s \"$DB_PASSWORD\") \\\n" +
 	"  --from-file=oauth-client-secret=<(openssl rand -hex 32)\n```\n\n" +
+	"A rotation step merges one key into a sealed file, creating no Secret:\n\n" +
+	"```bash\nkubectl create secret generic goiabada-secrets -n goiabada --dry-run=client -o json \\\n" +
+	"  --from-file=db-password-previous=<(openssl rand -hex 32) \\\n" +
+	"  | kubeseal --format yaml --merge-into goiabada-secrets.sealed.yaml\n```\n\n" +
 	"## Updating Goiabada\n\n" +
 	"```bash\nprintf x | kubectl create secret generic goiabada-encryption-key -n goiabada --from-file=aes-encryption-key=/dev/stdin\n```\n"
 
@@ -530,16 +534,20 @@ type createCommand struct {
 var (
 	createSecret = regexp.MustCompile(`kubectl create secret generic (\S+)`)
 	createKey    = regexp.MustCompile(`--from-(?:file|literal)=([^=\s]+)=`)
+	// mergedIntoSealedFile is a pipe into kubeseal --merge-into.
+	mergedIntoSealedFile = regexp.MustCompile(`\|\s*kubeseal\b[^|]*--merge-into`)
 )
 
 // createSecretCommands is every `kubectl create secret generic` in a section, its continuation
-// lines joined, with the keys its --from-file and --from-literal arguments create.
+// lines joined, with the keys its --from-file and --from-literal arguments create. One whose output
+// kubeseal merges into an existing sealed file creates no Secret: it writes the keys it names into
+// one beside those already sealed, as a rotation step does, so it is not one of them.
 func createSecretCommands(section string) []createCommand {
 	var commands []createCommand
 	joined := strings.ReplaceAll(section, "\\\n", " ")
 	for _, line := range strings.Split(joined, "\n") {
 		match := createSecret.FindStringSubmatchIndex(line)
-		if match == nil {
+		if match == nil || mergedIntoSealedFile.MatchString(line[match[1]:]) {
 			continue
 		}
 		command := createCommand{secret: line[match[2]:match[3]], keys: map[string]bool{}}

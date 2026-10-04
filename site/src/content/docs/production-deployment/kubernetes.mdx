@@ -825,10 +825,13 @@ backups is a sound home for the AES key's backup. The cost is an operator and it
 credential that lets it read the manager (workload identity where your cloud offers it), and a
 Kubernetes Secret that still exists, readable as above. A value changed in the manager reaches the
 Secret at the next refresh, but a pod reads it only when it starts, so a pod restarted for any reason
-picks it up alone. Change a session key or the AES key in the manager only as a step of the
-[rotation procedures](#rotating-secrets) below. An AES key replaced on its own is the worst case: an
-auth server started with no previous key re-encrypts nothing and cannot decrypt what the database
-holds.
+picks it up alone. The operator also writes the Secret back to what the manager holds, the keys its
+`data` lists and no other, so a `kubectl patch` of the Secret lasts until the next refresh. Change a
+session key or the AES key only as the [rotation procedures](#rotating-secrets) below say, with the
+changes in the manager as [Rotating Secrets something else
+owns](#rotating-secrets-something-else-owns) describes. An AES key replaced on its own is the worst
+case: an auth server started with no previous key re-encrypts nothing and cannot decrypt what the
+database holds.
 
 **[SealedSecrets](https://github.com/bitnami-labs/sealed-secrets), an encrypted Secret you can
 commit.** `kubeseal` encrypts a Secret with the public key of the controller running in your
@@ -846,8 +849,13 @@ holds no readable secret. The controller's private key is now what decrypts all 
 as the SealedSecrets documentation describes, since without it the sealed files are useless. That
 backup does not replace the AES key's own, which must be readable without the cluster. A sealed
 Secret is bound to its name and namespace, so a renamed namespace means sealing again, and once
-unsealed it is an ordinary Secret, readable as above. Changing a value means sealing and committing
-a new file, then following the [rotation procedures](#rotating-secrets).
+unsealed it is an ordinary Secret, readable as above. The controller writes the Secret from the
+sealed file, so a `kubectl patch` of the Secret does not last, and a value changes by sealing it.
+Change a session key or the AES key only as the [rotation procedures](#rotating-secrets) below say,
+sealing what each step says as [Rotating Secrets something else
+owns](#rotating-secrets-something-else-owns) describes. A new `aes-encryption-key` sealed on its own,
+before them, replaces the key the database is under, and once it is applied the cluster no longer
+holds that key.
 
 ### Who can read the AES key
 
@@ -902,6 +910,16 @@ reaches a pod when the pod restarts and not before, so every change is followed 
 any other reason, a crash, an eviction or a scale-up, picks up the new value on its own; the steps
 below are ordered so that this is harmless.
 
+Each step says what the Secrets hold when it ends, and its commands get them there with `kubectl
+patch`, which suits Secrets nothing else writes: created with `kubectl create secret`, or from the
+generated `goiabada-secrets.yaml` applied once. If you kept that file, it still holds the keys from
+before the rotation, and applying it again puts them back, so delete it once the Secrets are in the
+cluster. When the External Secrets Operator, the SealedSecrets controller or a GitOps tool owns the
+Secrets, it writes back what its source holds, undoing a patch partway through a rotation, which is
+the failure the steps are ordered to prevent: the session keys swapped back, or an auth server
+restarted with an AES key the database is no longer under. Then make each step's change in the source
+instead, as [Rotating Secrets something else owns](#rotating-secrets-something-else-owns) describes.
+
 #### The session keys
 
 Each server seals its browser sessions with its session key pair, and opens them with that pair and
@@ -938,6 +956,9 @@ previous pair and the two are then swapped. Done this way, nobody is signed out.
    that it "transferred" each key, which is expected. Changing the pod template starts the first
    rollout.
 
+   When this step ends, `goiabada-secrets` holds the current pairs under their usual keys and the new
+   pairs under the four `-previous` keys, and both Deployments reference the `-previous` keys.
+
 2. **Swap the pairs,** so that the new one is current and the old one previous, and restart:
 
    ```bash
@@ -961,6 +982,9 @@ previous pair and the two are then swapped. Done this way, nobody is signed out.
    Every value is read before the patch is sent, so the swap is whole. During this rollout a new pod
    seals under the new pair and opens the old, and an old pod seals under the old pair and opens the
    new, so either opens every session.
+
+   When this step ends, the usual keys hold the new pairs and the `-previous` keys the old ones; the
+   Secret must hold that before the restart.
 
 3. **Remove the previous pairs once the maximum session lifetime has passed** since step 2. The
    lifetime is on the admin console's **Settings → Sessions** page, 24 hours unless you changed it,
@@ -988,6 +1012,9 @@ previous pair and the two are then swapped. Done this way, nobody is signed out.
    A sign-in still in progress, one not yet signed in, can still be under the old pair, so removing it
    may restart that sign-in, at the cost of the form being filled in. Replacing the keys in one step
    instead signs everybody out once.
+
+   When this step ends, neither Deployment references a `-previous` key, and `goiabada-secrets` holds
+   its seven keys again, the session keys being the new pairs.
 
 #### The AES key
 
@@ -1018,6 +1045,9 @@ console's requests to it fail until it is back.
    EOF
    ```
 
+   When this step ends, `aes-encryption-key` holds a new key, and `aes-encryption-key-previous` the
+   key the database is under, the one you backed up in step 1.
+
 4. Back up the new key now, with the command of [Backing up the AES key](#backing-up-the-aes-key):
    the next start puts the database under it.
 5. Start one pod with both keys:
@@ -1032,7 +1062,9 @@ console's requests to it fail until it is back.
 
    `kubectl set env` adds `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` while the Deployment runs no pod, so
    nothing starts until the scale. The log line, `rotated data-at-rest encryption to the new
-   GOIABADA_AES_ENCRYPTION_KEY`, says the re-encryption committed. If the pod stops instead with
+   GOIABADA_AES_ENCRYPTION_KEY`, says the re-encryption committed. From then on the database is under
+   the new key alone, and the Secret must go on holding it as `aes-encryption-key`: an auth server
+   started with the old key there decrypts nothing. If the pod stops instead with
    `data-at-rest decrypts under neither GOIABADA_AES_ENCRYPTION_KEY nor
    GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS`, the previous key is not the one the database is under, and
    nothing was changed.
@@ -1054,6 +1086,9 @@ console's requests to it fail until it is back.
      -p='[{"op": "remove", "path": "/data/aes-encryption-key-previous"}]'
    ```
 
+   When this step ends, the Deployment does not reference `aes-encryption-key-previous`, and
+   `goiabada-encryption-key` holds the new key alone.
+
 Keep the old key as long as you keep a database backup taken before the rotation.
 
 #### The other secrets
@@ -1063,6 +1098,122 @@ administrator's password in the admin console. `oauth-client-secret` must match 
 client's secret in the database, and `db-password` the database user's password. Each changes in
 both places, the Secret followed by a rollout, and the server that uses it fails to authenticate
 between the two changes.
+
+#### Rotating Secrets something else owns
+
+When the External Secrets Operator or the SealedSecrets controller owns a Secret, its source, the
+secret manager or the sealed file, is what the Secret holds, and a step's change goes there. Three
+rules apply to every step above:
+
+- **Put the whole state the step ends in into the source,** every key the step says the Secret
+  holds, and only those. Both write the Secret from their source, its keys and no other, so a key
+  left out of the source is removed from the Secret, a `-previous` key included.
+- **Wait until the Secret holds it before the step's rollout or scale,** since a pod reads whatever
+  the Secret holds when it starts. Compare a digest of each key the step changed with the same
+  digest of the value in your source, which shows the value without printing it:
+
+  ```bash
+  digest() { kubectl get secret "$1" -n goiabada -o "jsonpath={.data.$2}" | base64 -d | sha256sum | cut -c1-16; }
+  digest goiabada-encryption-key aes-encryption-key-previous
+  ```
+
+- **Leave the source holding what the Secret holds when the rotation is done,** so that a refresh,
+  a reapply, a deleted Secret or a rebuilt cluster brings back the rotated keys and not the old ones.
+
+**With the External Secrets Operator,** each key is an entry in the manager and a line in the
+`ExternalSecret`'s `data`: a `-previous` key needs both, an entry of its own such as
+`goiabada/aes-encryption-key-previous` and a line mapping it to `aes-encryption-key-previous`, which
+you add in the step that adds the key. Ask the operator to refresh at once rather than at its
+`refreshInterval`, then wait for the digests:
+
+```bash
+kubectl annotate externalsecret goiabada-encryption-key -n goiabada force-sync="$(date +%s)" --overwrite
+```
+
+- For the session keys, step 1 creates the four `-previous` entries with new values, `openssl rand
+  -hex 64` for each authentication key and `openssl rand -hex 32` for each encryption key, and maps
+  them; step 2 swaps the values in the manager, each pair's into the other's entries, reading all
+  eight before writing any; step 3 removes the Deployments' references first, as above, then the
+  four lines from `data`, then the four entries.
+- For the AES key, step 3 first copies the value of `goiabada/aes-encryption-key` to
+  `goiabada/aes-encryption-key-previous`, checking that its digest is that of the key you backed up in
+  step 1, then writes a new key, `openssl rand -hex 32`, into `goiabada/aes-encryption-key`, then maps
+  the previous entry. Copy before you overwrite: the entry's old value is the only key the database
+  is under. Step 4 reads the new key out of the cluster once it has arrived. Step 7 removes the
+  Deployment's reference, then the line from `data`, then the entry; the old key lives on in your
+  backup, not in the manager.
+
+Removing a line from `data` before its entry keeps the operator from failing on an entry it can no
+longer read, which would leave the Secret as it was.
+
+**With SealedSecrets,** each step's state is sealed into the file and applied, by you or by your
+GitOps tool. `kubeseal --merge-into` adds or replaces keys in an existing sealed file, each key sealed
+on its own, and deleting a key's line from the file's `spec.encryptedData` removes that key. The
+values come from the Secret the controller unsealed, through process substitutions, so none reaches
+a file, an argument or the screen:
+
+```bash
+key() { kubectl get secret goiabada-secrets -n goiabada -o "jsonpath={.data.$1}" | base64 -d; }
+seal() { kubectl create secret generic goiabada-secrets -n goiabada --dry-run=client -o json "$@" \
+  | kubeseal --format yaml --merge-into goiabada-secrets.sealed.yaml; }
+
+# Session keys, step 1: the new pairs as the previous pairs.
+seal --from-file=authserver-session-authentication-key-previous=<(openssl rand -hex 64 | tr -d '\n') \
+  --from-file=authserver-session-encryption-key-previous=<(openssl rand -hex 32 | tr -d '\n') \
+  --from-file=adminconsole-session-authentication-key-previous=<(openssl rand -hex 64 | tr -d '\n') \
+  --from-file=adminconsole-session-encryption-key-previous=<(openssl rand -hex 32 | tr -d '\n')
+
+# Session keys, step 2: the pairs swapped, once step 1's file has been applied and unsealed.
+seal --from-file=auth-session-auth-key=<(key authserver-session-authentication-key-previous) \
+  --from-file=auth-session-enc-key=<(key authserver-session-encryption-key-previous) \
+  --from-file=admin-session-auth-key=<(key adminconsole-session-authentication-key-previous) \
+  --from-file=admin-session-enc-key=<(key adminconsole-session-encryption-key-previous) \
+  --from-file=authserver-session-authentication-key-previous=<(key auth-session-auth-key) \
+  --from-file=authserver-session-encryption-key-previous=<(key auth-session-enc-key) \
+  --from-file=adminconsole-session-authentication-key-previous=<(key admin-session-auth-key) \
+  --from-file=adminconsole-session-encryption-key-previous=<(key admin-session-enc-key)
+```
+
+Step 3 deletes the four `-previous` lines from `spec.encryptedData`, after the Deployments' references
+are gone. For the AES key, step 3 seals the key the cluster holds now as the previous key, beside a
+new one, in one file:
+
+```bash
+kubectl create secret generic goiabada-encryption-key -n goiabada --dry-run=client -o json \
+  --from-file=aes-encryption-key-previous=<(kubectl get secret goiabada-encryption-key -n goiabada \
+    -o jsonpath='{.data.aes-encryption-key}' | base64 -d) \
+  --from-file=aes-encryption-key=<(openssl rand -hex 32 | tr -d '\n') \
+  | kubeseal --format yaml --merge-into goiabada-encryption-key.sealed.yaml
+```
+
+Before you apply it, check that the digest of `aes-encryption-key` in the cluster is that of the key
+you backed up in step 1: that is the key the previous entry has to hold. Step 7 deletes the
+`aes-encryption-key-previous` line. Commit each file as you apply it, so the repository's file is
+always the one the controller last unsealed.
+
+**When a GitOps tool applies the manifest,** it also puts back what the manifest says about the
+Deployments: `replicas` certainly, which would start auth server pods while step 2 of the AES key
+keeps them stopped, and, depending on how it compares, the `-previous` references `kubectl set env`
+added. Suspend its automated sync for the rotation (in Argo CD, turn off the Application's automated
+sync; in Flux, `flux suspend kustomization <name>`) and resume it once the repository says what the
+cluster does, or make each Deployment change in the manifest instead. A reference is one more `env`
+entry beside the key it follows, the same for each `-previous` key:
+
+```yaml
+        - name: GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS
+          valueFrom:
+            secretKeyRef:
+              name: goiabada-encryption-key
+              key: aes-encryption-key-previous
+```
+
+The session keys' references are `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS` and
+`GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS` on the auth server, and
+`GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS` and
+`GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS` on the admin console, each from the
+`goiabada-secrets` key that is its name without `GOIABADA_`, in lowercase with hyphens:
+`authserver-session-authentication-key-previous` and so on. The AES key's scale to zero and back is simpler with sync suspended, since it happens
+between commits.
 
 ## Health endpoints
 

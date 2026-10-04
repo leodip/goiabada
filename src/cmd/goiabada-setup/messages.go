@@ -87,7 +87,7 @@ func printCompletionMessage(out *console, config *Config, paths outputPaths) {
 func printKubernetesInstructions(out *console, config *Config, paths outputPaths) {
 	out.println("To deploy Goiabada to Kubernetes:")
 	out.println()
-	out.printf("    %s%s%s\n", out.cyan, kubernetesApplyCommand(filepath.Base(paths.description), filepath.Base(paths.secrets)), out.reset)
+	out.printf("    %s%s%s\n", out.cyan, kubernetesApplyCommand(paths), out.reset)
 	out.println()
 	out.printf("The manifest goes first: it creates the namespace the Secrets in %s are in.\n", filepath.Base(paths.secrets))
 	out.println()
@@ -270,10 +270,10 @@ func printNativeInstructions(out *console, config *Config, paths outputPaths) {
 	out.println("  Load the environment and start both servers (in separate terminals):")
 	out.println()
 	out.println("  Auth server:")
-	out.printf("  %sset -a && . ./%s && set +a && ./goiabada-authserver%s\n", out.cyan, filepath.Base(paths.description), out.reset)
+	out.printf("  %s%s%s\n", out.cyan, nativeStartCommand(paths, "goiabada-authserver"), out.reset)
 	out.println()
 	out.println("  Admin console:")
-	out.printf("  %sset -a && . ./%s && set +a && ./goiabada-adminconsole%s\n", out.cyan, filepath.Base(paths.description), out.reset)
+	out.printf("  %s%s%s\n", out.cyan, nativeStartCommand(paths, "goiabada-adminconsole"), out.reset)
 	out.println()
 	out.printf("%s%sIMPORTANT NOTES%s\n", out.bold, out.yellow, out.reset)
 	out.println()
@@ -309,15 +309,27 @@ func printComposeInstructions(out *console, _ *Config, paths outputPaths) {
 // the override of the same name with .override before its extension without being asked.
 var composeDefaultFiles = []string{"compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"}
 
+// composeFindsByItself says whether docker compose, given no -f, finds the Compose file and its
+// override by itself: the Compose file has a name it looks for, and the override the name it takes
+// with it.
+func composeFindsByItself(paths outputPaths) bool {
+	return slices.Contains(composeDefaultFiles, filepath.Base(paths.description))
+}
+
 // composeUpCommand starts the Compose file with its override merged in: with no -f under a name
 // docker compose looks for by itself, and with both files named, the Compose file first, under any
-// other.
+// other, each one shell word whatever its name.
 func composeUpCommand(paths outputPaths) string {
-	description, secrets := filepath.Base(paths.description), filepath.Base(paths.secrets)
-	if slices.Contains(composeDefaultFiles, description) {
+	if composeFindsByItself(paths) {
 		return "docker compose up -d"
 	}
-	return "docker compose -f " + description + " -f " + secrets + " up -d"
+	return "docker compose -f " + shellQuote(filepath.Base(paths.description)) + " -f " + shellQuote(filepath.Base(paths.secrets)) + " up -d"
+}
+
+// nativeStartCommand loads the env file into the environment and starts one of the two binaries
+// with it, the file one shell word whatever its name.
+func nativeStartCommand(paths outputPaths, binary string) string {
+	return "set -a && . " + shellQuote("./"+filepath.Base(paths.description)) + " && set +a && ./" + binary
 }
 
 // printSecretsAdvice names the one file holding the secrets and says to keep it out of version

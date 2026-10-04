@@ -155,7 +155,7 @@ func TestGeneratedConfiguration_NamesEachDeploymentTypesFile(t *testing.T) {
 	testCases := []struct {
 		deployment   deploymentType
 		wantFilename string
-		generator    func(*Config) string
+		generator    func(*Config, outputPaths) string
 	}{
 		{deployment: deploymentLocal, wantFilename: "docker-compose.yml", generator: generateDockerCompose},
 		{deployment: deploymentProduction, wantFilename: "docker-compose.yml", generator: generateDockerCompose},
@@ -170,7 +170,7 @@ func TestGeneratedConfiguration_NamesEachDeploymentTypesFile(t *testing.T) {
 			if description.name != testCase.wantFilename {
 				t.Errorf("file name is %q, want %q", description.name, testCase.wantFilename)
 			}
-			if description.content != testCase.generator(config) {
+			if description.content != testCase.generator(config, config.Deployment.defaultPaths()) {
 				t.Errorf("content is not %s's generator output", testCase.wantFilename)
 			}
 			if !strings.Contains(secrets.content, "admin-password") {

@@ -299,22 +299,22 @@ func TestGeneratedOutputsOmitTheRemovedAdminConsoleVars(t *testing.T) {
 		},
 		{
 			name:         "compose override",
-			generated:    generateComposeOverride(config),
+			generated:    generateComposeOverride(config, deployments[deploymentProduction].defaultPaths()),
 			stillEmitted: "GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=oauth-client-secret",
 		},
 		{
 			name:         "whole compose file",
-			generated:    generateDockerCompose(config),
+			generated:    generateDockerCompose(config, deployments[deploymentProduction].defaultPaths()),
 			stillEmitted: "goiabada-adminconsole:",
 		},
 		{
 			name:         "env file for native binaries",
-			generated:    generateEnvFile(config),
+			generated:    generateEnvFile(config, deployments[deploymentNative].defaultPaths()),
 			stillEmitted: `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET="oauth-client-secret"`,
 		},
 		{
 			name:         "kubernetes manifests",
-			generated:    generateKubernetesManifests(config),
+			generated:    generateKubernetesManifests(config, deployments[deploymentKubernetes].defaultPaths()),
 			stillEmitted: "GOIABADA_ADMINCONSOLE_BASEURL: \"https://admin.example.com\"",
 		},
 	}
