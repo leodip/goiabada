@@ -48,12 +48,10 @@ func generateEnvFile(config *Config) string {
 	sb.WriteString("# Auth server settings\n")
 	sb.WriteString("# =============================================================================\n")
 	writeEnvVariable(&sb, "GOIABADA_AUTHSERVER_BASEURL", config.AuthServerURL)
-	sb.WriteString("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=\"0.0.0.0\"\n")
-	sb.WriteString("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=\"9090\"\n")
+	writeEnvListenerAndTrust(&sb, config, "AUTHSERVER", "9090", "9443")
 	writeEnvVariable(&sb, "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY", config.AuthSessionAuthKey)
 	writeEnvVariable(&sb, "GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY", config.AuthSessionEncKey)
 	writeEnvVariable(&sb, "GOIABADA_AES_ENCRYPTION_KEY", config.AESEncryptionKey)
-	sb.WriteString("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=\"true\"\n")
 	sb.WriteString("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=\"true\"\n")
 	sb.WriteString("GOIABADA_AUTHSERVER_LOG_LEVEL=\"info\"\n")
 	sb.WriteString("GOIABADA_AUTHSERVER_LOG_FORMAT=\"text\"\n")
@@ -63,11 +61,9 @@ func generateEnvFile(config *Config) string {
 	sb.WriteString("# Admin console settings\n")
 	sb.WriteString("# =============================================================================\n")
 	writeEnvVariable(&sb, "GOIABADA_ADMINCONSOLE_BASEURL", config.AdminConsoleURL)
-	sb.WriteString("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=\"0.0.0.0\"\n")
-	sb.WriteString("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=\"9091\"\n")
+	writeEnvListenerAndTrust(&sb, config, "ADMINCONSOLE", "9091", "9444")
 	writeEnvVariable(&sb, "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY", config.AdminSessionAuthKey)
 	writeEnvVariable(&sb, "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY", config.AdminSessionEncKey)
-	sb.WriteString("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=\"true\"\n")
 	sb.WriteString("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=\"true\"\n")
 	sb.WriteString("GOIABADA_ADMINCONSOLE_LOG_LEVEL=\"info\"\n")
 	sb.WriteString("GOIABADA_ADMINCONSOLE_LOG_FORMAT=\"text\"\n")
@@ -81,6 +77,35 @@ func generateEnvFile(config *Config) string {
 	sb.WriteString("\n")
 
 	return sb.String()
+}
+
+// writeEnvListenerAndTrust writes one server's HTTP listener and its proxy trust, which the answer
+// to the local proxy question decides together, under the comment saying whom it trusts (#396
+// decision 7). server is the variables' infix, AUTHSERVER or ADMINCONSOLE, and httpsPort the
+// server's own default HTTPS port, which the comment names.
+func writeEnvListenerAndTrust(sb *strings.Builder, config *Config, server, port, httpsPort string) {
+	prefix := "GOIABADA_" + server + "_"
+	if config.LocalProxy {
+		sb.WriteString("# A reverse proxy on this machine forwards to this server, so it listens on 127.0.0.1\n")
+		sb.WriteString("# alone, and trusts the forwarded headers of a connection from 127.0.0.1 alone. For a\n")
+		sb.WriteString("# proxy on another host, set the listen host to an address that host reaches, and the\n")
+		sb.WriteString("# trusted proxies to that host's address.\n")
+		fmt.Fprintf(sb, "%sLISTEN_HOST_HTTP=\"127.0.0.1\"\n", prefix)
+		fmt.Fprintf(sb, "%sLISTEN_PORT_HTTP=\"%s\"\n", prefix, port)
+		sb.WriteString("# The client is the rightmost X-Forwarded-For entry the proxy appends, read only from a\n")
+		sb.WriteString("# connection that comes from 127.0.0.1.\n")
+		fmt.Fprintf(sb, "%sTRUST_PROXY_HEADERS=\"true\"\n", prefix)
+		fmt.Fprintf(sb, "%sTRUSTED_PROXIES=\"127.0.0.1\"\n", prefix)
+		return
+	}
+	sb.WriteString("# No reverse proxy fronts this server: it listens on every interface and trusts no\n")
+	sb.WriteString("# forwarded header, so each client is the address it connects from. It serves plain HTTP\n")
+	fmt.Fprintf(sb, "# until you set %sCERTFILE and %sKEYFILE, which turn\n", prefix, prefix)
+	fmt.Fprintf(sb, "# on HTTPS at 0.0.0.0:%s (%sLISTEN_HOST_HTTPS and _LISTEN_PORT_HTTPS\n", httpsPort, prefix)
+	sb.WriteString("# change it); then set the HTTP listen host below empty to stop serving plain HTTP.\n")
+	fmt.Fprintf(sb, "%sLISTEN_HOST_HTTP=\"0.0.0.0\"\n", prefix)
+	fmt.Fprintf(sb, "%sLISTEN_PORT_HTTP=\"%s\"\n", prefix, port)
+	fmt.Fprintf(sb, "%sTRUST_PROXY_HEADERS=\"false\"\n", prefix)
 }
 
 // writeEnvVariable writes one assignment, with no `export`: systemd's EnvironmentFile= reads the

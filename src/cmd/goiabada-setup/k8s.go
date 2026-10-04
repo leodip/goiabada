@@ -86,7 +86,7 @@ func generateKubernetesManifests(config *Config) string {
 	writeSharedURLs(&sb, config)
 	sb.WriteString("  GOIABADA_APPNAME: \"Goiabada\"\n")
 	fmt.Fprintf(&sb, "  GOIABADA_ADMIN_EMAIL: %s\n", yamlQuote(config.AdminEmail))
-	sb.WriteString("  GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS: \"true\"\n")
+	writeKubernetesTrust(&sb, "AUTHSERVER")
 	fmt.Fprintf(&sb, "  GOIABADA_DB_TYPE: %s\n", yamlQuote(config.Engine.name))
 	fmt.Fprintf(&sb, "  GOIABADA_DB_HOST: %s\n", yamlQuote(config.DBHost))
 	fmt.Fprintf(&sb, "  GOIABADA_DB_PORT: %s\n", yamlQuote(config.DBPort))
@@ -96,7 +96,7 @@ func generateKubernetesManifests(config *Config) string {
 
 	writeConfigMapHead(&sb, ns, "goiabada-adminconsole-config", "What the admin console reads.")
 	writeSharedURLs(&sb, config)
-	sb.WriteString("  GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS: \"true\"\n")
+	writeKubernetesTrust(&sb, "ADMINCONSOLE")
 	sb.WriteString("\n")
 
 	// Auth Server Deployment
@@ -511,6 +511,23 @@ func writeHTTPRoute(sb *strings.Builder, ns, service, listener, host string, por
 	sb.WriteString("  - backendRefs:\n")
 	fmt.Fprintf(sb, "    - name: %s\n", service)
 	fmt.Fprintf(sb, "      port: %d\n", port)
+}
+
+// writeKubernetesTrust writes one ConfigMap's proxy trust: one hop, with the list beside it set
+// empty, under the comment saying why. Envoy appends the address it received each connection from,
+// so the rightmost X-Forwarded-For entry is Envoy's own observation; a private-range or pod-CIDR
+// list would instead adopt a forged entry wherever nodes or pods share those addresses, and no list
+// stops a pod calling the Service around Envoy (#396 decision 3). server is the variables' infix,
+// AUTHSERVER or ADMINCONSOLE.
+func writeKubernetesTrust(sb *strings.Builder, server string) {
+	sb.WriteString("  # Envoy, the one gateway in front, appends the address it received each connection from\n")
+	sb.WriteString("  # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list. Set the list\n")
+	sb.WriteString("  # only when a CDN or a second load balancer sits in front of Envoy, naming every hop, the\n")
+	sb.WriteString("  # Envoy pods included. A pod that calls the Service directly, around Envoy, chooses the\n")
+	sb.WriteString("  # address it is counted and audited under: a NetworkPolicy admitting only Envoy stops\n")
+	sb.WriteString("  # that, and no list does.\n")
+	fmt.Fprintf(sb, "  GOIABADA_%s_TRUST_PROXY_HEADERS: \"true\"\n", server)
+	fmt.Fprintf(sb, "  GOIABADA_%s_TRUSTED_PROXIES: \"\"\n", server)
 }
 
 func base64Encode(s string) string {

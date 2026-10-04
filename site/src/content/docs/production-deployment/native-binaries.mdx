@@ -223,9 +223,25 @@ For production, use Nginx as a reverse proxy (see [reverse proxy guide](/product
 - Auth server: `http://127.0.0.1:9090`
 - Admin console: `http://127.0.0.1:9091`
 
+The setup wizard asks whether a reverse proxy on the same machine forwards to Goiabada (`--local-proxy`, yes by default). On yes, `goiabada.env` has both servers listen on `127.0.0.1` alone and trust the forwarded headers of a connection from `127.0.0.1` alone:
+
+```bash
+GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP="127.0.0.1"
+GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS="true"
+GOIABADA_AUTHSERVER_TRUSTED_PROXIES="127.0.0.1"
+
+GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP="127.0.0.1"
+GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS="true"
+GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES="127.0.0.1"
+```
+
+Nothing outside the machine reaches the plain HTTP listeners, and Goiabada takes the client from the `X-Forwarded-For` entry Nginx appends. For a proxy on another host, set each listen host to an address that host reaches and each list to that host's address, and keep the ports closed to everything else.
+
+On no (`--local-proxy=false`), both servers listen on every interface and trust no forwarded header, so each client is the address it connects from. They serve plain HTTP until you configure direct HTTPS, below.
+
 ## Direct HTTPS (optional)
 
-If you prefer not to use a reverse proxy, configure direct HTTPS:
+If you prefer not to use a reverse proxy, configure direct HTTPS. Setting the certificate and key turns on the HTTPS listener; set `LISTEN_HOST_HTTP` empty as well to stop serving plain HTTP:
 
 ```bash
 # Auth server

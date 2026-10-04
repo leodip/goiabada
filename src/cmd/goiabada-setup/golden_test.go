@@ -23,6 +23,9 @@ type goldenCase struct {
 	engine     string
 	// hostile cases carry hostileConfig's values, one per generated format.
 	hostile bool
+	// answers, when set, changes the answers to the questions only some deployments ask from the
+	// defaults goldenConfig gives them, so each answer has a golden of its own.
+	answers func(config *Config)
 }
 
 func (c goldenCase) path() string {
@@ -39,7 +42,15 @@ func goldenCases() []goldenCase {
 			cases = append(cases, goldenCase{name: d.name + "-" + e.name, deployment: d.kind, engine: e.name})
 		}
 	}
+	cases = append(cases, answerCases...)
 	return append(cases, hostileCases...)
+}
+
+// answerCases are one configuration for each answer to a deployment's own question that differs
+// from the default goldenConfig gives it.
+var answerCases = []goldenCase{
+	// Native binaries with no reverse proxy on the same machine (#396 decision 7).
+	{name: "native-direct-postgres", deployment: deploymentNative, engine: "postgres", answers: func(c *Config) { c.LocalProxy = false }},
 }
 
 // hostileCases are one configuration per format, Compose, Kubernetes and the env file, whose
@@ -53,6 +64,9 @@ var hostileCases = []goldenCase{
 
 func (c goldenCase) config() *Config {
 	config := goldenConfig(c.deployment, c.engine)
+	if c.answers != nil {
+		c.answers(config)
+	}
 	if c.hostile {
 		hostileConfig(config)
 	}
@@ -114,6 +128,9 @@ func goldenConfig(kind deploymentType, engineName string) *Config {
 	if kind != deploymentKubernetes {
 		config.K8sNamespace = ""
 	}
+	// Only native binaries ask whether a reverse proxy on the same machine forwards to them, and
+	// the default answer is yes.
+	config.LocalProxy = kind == deploymentNative
 	return config
 }
 

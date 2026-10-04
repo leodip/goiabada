@@ -68,11 +68,13 @@ The wizard will ask you a few questions:
 
 2. **Database** - MySQL, PostgreSQL, SQL Server, or SQLite
 
-3. **Domain names** - Your auth and admin console URLs (production/Kubernetes)
+3. **Domain names** - Your auth and admin console URLs (production/Kubernetes/native)
 
-4. **Admin credentials** - Email and password for the first admin user
+4. **Reverse proxy** (native binaries only) - Whether a reverse proxy on the same machine, such as Nginx, forwards to Goiabada. Yes, the default, has both servers listen on `127.0.0.1` and trust its forwarded headers alone; no has them listen on every interface, trust no forwarded header, and wait for you to configure HTTPS. `--local-proxy=false` answers no without the prompt
 
-5. **Database password** - A strong password (auto-generated if you press Enter)
+5. **Admin credentials** - Email and password for the first admin user
+
+6. **Database password** - A strong password (auto-generated if you press Enter)
 
 ## What gets generated
 
@@ -116,6 +118,7 @@ The wizard creates a `goiabada.env` file with:
 - Session keys cryptographically generated
 - OAuth client credentials pre-configured
 - Database connection settings
+- Listen hosts and proxy trust following your reverse proxy answer, under a comment saying whom each server trusts (see [native binaries: reverse proxy](/production-deployment/native-binaries/#reverse-proxy))
 
 Use with:
 

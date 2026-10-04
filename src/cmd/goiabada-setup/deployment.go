@@ -39,6 +39,9 @@ type deployment struct {
 	// behindProxy says the Compose services sit behind a reverse proxy on the same host: they
 	// trust its forwarded headers and listen on loopback alone.
 	behindProxy bool
+	// asksLocalProxy says the type asks whether a reverse proxy on the same machine forwards to it,
+	// which decides the env file's listen hosts and proxy trust (#396 decision 7).
+	asksLocalProxy bool
 	// routesByHost says the manifest routes and certifies each URL by its host, which must then be
 	// a lowercase domain name (validateListenerHostname) and not the other URL's host.
 	routesByHost bool
@@ -96,6 +99,7 @@ var deployments = []*deployment{
 		displayName:       "Native binaries",
 		asksURLs:          true,
 		externalDatabase:  true,
+		asksLocalProxy:    true,
 		outputFile:        "goiabada.env",
 		generate:          generateEnvFile,
 		printInstructions: printNativeInstructions,

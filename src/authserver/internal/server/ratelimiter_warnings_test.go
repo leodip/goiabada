@@ -69,6 +69,24 @@ func TestRateLimiterConfigWarnings(t *testing.T) {
 	}
 }
 
+// TestRateLimiterSingleHopWarning_SaysWhenOneHopIsSound pins the single-hop text whole, because
+// what it advises is the point of it. It used to say one hop is sound only behind a proxy that
+// overwrites X-Forwarded-For and to set a trusted-proxy list, which is wrong for Envoy, nginx and
+// Cloudflare, all of which append, and which behind Envoy is exactly the list that adopts a forged
+// entry (#396 decision 8).
+func TestRateLimiterSingleHopWarning_SaysWhenOneHopIsSound(t *testing.T) {
+	assert.Equal(t,
+		"config: GOIABADA_AUTHSERVER_RATELIMITER_ENABLED is true and "+
+			"GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS is true with no GOIABADA_AUTHSERVER_TRUSTED_PROXIES, "+
+			"so the client is the rightmost X-Forwarded-For entry. That is sound behind one reverse proxy "+
+			"that sets or appends X-Forwarded-For, as Envoy, nginx and Cloudflare do; what defeats it is a "+
+			"caller that reaches this server without passing the proxy, which then chooses the address it "+
+			"is rate-limited and audited under. Set GOIABADA_AUTHSERVER_TRUSTED_PROXIES only when a second "+
+			"proxy hop, such as a CDN or a load balancer, sits in front of the one that connects here. "+
+			"See https://goiabada.dev/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection",
+		warnRateLimiterSingleHopTrust)
+}
+
 // -----------------------------------------------------------------------------
 // The emission itself
 // -----------------------------------------------------------------------------

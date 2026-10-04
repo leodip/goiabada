@@ -25,6 +25,13 @@ func printSummary(out *console, config *Config) {
 	if config.K8sNamespace != "" {
 		out.printf("  K8s Namespace:    %s\n", config.K8sNamespace)
 	}
+	if config.Deployment.asksLocalProxy {
+		if config.LocalProxy {
+			out.println("  Reverse proxy:    on this machine (listen on 127.0.0.1)")
+		} else {
+			out.println("  Reverse proxy:    none (HTTPS served by Goiabada)")
+		}
+	}
 	out.printf("  Admin Email:      %s\n", config.AdminEmail)
 	out.printf("  Admin Password:   %s\n", maskPassword(config.AdminPassword))
 	if config.DBHost != "" {
@@ -188,7 +195,7 @@ func printKubernetesInstructions(out *console, config *Config, outputPath string
 	out.println()
 }
 
-func printNativeInstructions(out *console, _ *Config, outputPath string) {
+func printNativeInstructions(out *console, config *Config, outputPath string) {
 	out.println("To run Goiabada with native binaries:")
 	out.println()
 	out.printf("%s%s1. DOWNLOAD BINARIES%s\n", out.bold, out.yellow, out.reset)
@@ -212,6 +219,15 @@ func printNativeInstructions(out *console, _ *Config, outputPath string) {
 	out.printf("%s%sIMPORTANT NOTES%s\n", out.bold, out.yellow, out.reset)
 	out.println()
 	out.println("  • The environment file contains sensitive secrets. Keep it secure!")
+	out.println()
+	if config.LocalProxy {
+		out.println("  • Both servers listen on 127.0.0.1 alone. Point your reverse proxy at")
+		out.println("    http://127.0.0.1:9090 (auth server) and http://127.0.0.1:9091 (admin console),")
+		out.println("    and have it set X-Forwarded-For and X-Forwarded-Proto.")
+	} else {
+		out.println("  • Both servers listen on every interface and serve plain HTTP until you set")
+		out.printf("    their CERTFILE and KEYFILE in %s, as its comments say.\n", filepath.Base(outputPath))
+	}
 	out.println()
 	out.println("  • The database must be empty for a fresh deployment. Goiabada will")
 	out.println("    automatically seed the database with initial data including the")

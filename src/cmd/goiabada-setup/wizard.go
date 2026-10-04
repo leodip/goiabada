@@ -64,6 +64,11 @@ var wizardSteps = []wizardStep{
 		applies: func(c *Config) bool { return c.Deployment.asksNamespace },
 		run:     (*wizard).askNamespace,
 	},
+	{
+		title:   "Reverse proxy",
+		applies: func(c *Config) bool { return c.Deployment.asksLocalProxy },
+		run:     (*wizard).askLocalProxy,
+	},
 	{title: "Admin credentials", run: (*wizard).askAdmin},
 	{
 		title:   "Database connection",
@@ -339,6 +344,31 @@ func (w *wizard) askNamespace() error {
 	w.out.info("Kubernetes namespace: %s", namespace)
 	w.config.K8sNamespace = namespace
 	return nil
+}
+
+// askLocalProxy asks whether a reverse proxy on the same machine forwards to the native binaries,
+// yes by default: they then listen on 127.0.0.1 alone and trust forwarded headers from 127.0.0.1
+// alone, and otherwise listen on every interface and trust none (#396 decision 7).
+func (w *wizard) askLocalProxy() error {
+	if !w.interactive {
+		w.config.LocalProxy = w.flags.LocalProxy.or(true)
+		answer := "no, Goiabada serves HTTPS itself"
+		if w.config.LocalProxy {
+			answer = "yes"
+		}
+		w.out.info("A reverse proxy on this machine forwards to Goiabada: %s", answer)
+		return nil
+	}
+	w.out.println("A reverse proxy on this machine (nginx, Caddy, Apache) can serve HTTPS and forward to")
+	w.out.println("Goiabada at http://127.0.0.1:9090 and :9091.")
+	w.out.println("  Yes: both servers listen on 127.0.0.1 alone, and trust the forwarded headers of a")
+	w.out.println("       connection from 127.0.0.1 alone, so the proxy is the only way in.")
+	w.out.println("  No:  both servers listen on every interface and trust no forwarded header; set up")
+	w.out.println("       their HTTPS listeners in the generated file before going live.")
+	w.out.println()
+	localProxy, err := w.yesNo("Does a reverse proxy on this machine forward to Goiabada?", true)
+	w.config.LocalProxy = localProxy
+	return err
 }
 
 func (w *wizard) askAdmin() error {

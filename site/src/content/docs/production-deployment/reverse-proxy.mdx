@@ -45,7 +45,7 @@ Use the [setup wizard](/getting-started/setup-wizard/) to generate your `docker-
 
 1. Select **"2. Production with reverse proxy"** when prompted
 2. Enter your domain names (e.g., `https://auth.example.com` and `https://admin.example.com`)
-3. The wizard automatically sets `TRUST_PROXY_HEADERS=true` (and, because your base URLs are `https://`, cookies get the `Secure` flag automatically)
+3. The wizard automatically sets `TRUST_PROXY_HEADERS=true` with `TRUSTED_PROXIES` empty, trusting Nginx as the one proxy hop (see [client IP resolution](#client-ip-resolution-and-spoofing-protection)); and because your base URLs are `https://`, cookies get the `Secure` flag automatically
 
 Then start the containers:
 
@@ -246,22 +246,36 @@ Goiabada resolves the real client IP for rate limiting (auth server) and audit
 logging. Behind a reverse proxy the direct connection comes from the proxy, so
 Goiabada must read the forwarded headers to recover the original client IP.
 
-- Setting `TRUST_PROXY_HEADERS=true` (the setup wizard does this) tells Goiabada
-  to trust `X-Forwarded-For` / `X-Real-IP` when resolving the client IP. With no
-  `TRUSTED_PROXIES` set, it trusts a **single** proxy hop, using the rightmost
-  `X-Forwarded-For` entry (or `X-Real-IP`).
-- This single-hop mode is safe **only if your proxy overwrites the inbound
-  headers**. The Nginx config above does exactly that: `X-Real-IP $remote_addr`
-  replaces any client-supplied value, and `$proxy_add_x_forwarded_for` appends
-  the real peer to the right of the chain. A value a client tries to inject ends
-  up on the left and is ignored.
+- Setting `TRUST_PROXY_HEADERS=true` tells Goiabada to read `X-Forwarded-For` /
+  `X-Real-IP` when resolving the client IP. With `TRUSTED_PROXIES` empty, it
+  trusts a **single** proxy hop: the client is the rightmost `X-Forwarded-For`
+  entry (or `X-Real-IP` when there is no `X-Forwarded-For`). The setup wizard
+  writes both settings side by side, `TRUSTED_PROXIES` explicitly empty, under a
+  comment saying why.
+- One hop is sound behind any proxy that **sets or appends** `X-Forwarded-For`.
+  The Nginx config above appends: `$proxy_add_x_forwarded_for` adds the address
+  Nginx received the connection from to the right of whatever the client sent, so
+  a value the client injects ends up on the left and is never read. Envoy and a
+  Cloudflare Tunnel append the same way.
+- What one hop does not survive is a caller that reaches Goiabada **without
+  passing the proxy**: it connects directly and can send any `X-Forwarded-For` it
+  likes, choosing the address it is rate limited and audited under. The wizard's
+  Compose file publishes both ports on `127.0.0.1` alone, so only processes on
+  this host can do that; keep it that way, and keep ports 9090 and 9091 closed in
+  the firewall.
 
-<Aside type="caution">
-If you run **more than one** proxy layer (for example an external load balancer
-or a CDN in front of Nginx), single-hop mode is not enough: a client could forge
-extra `X-Forwarded-For` entries. Set `TRUSTED_PROXIES` to the IPs/CIDRs of every
-proxy you control so Goiabada walks the chain from the right across only those
-trusted hops and stops at the real client.
+<Aside type="caution" title="A second proxy hop in front">
+If a second proxy that appends `X-Forwarded-For` sits in front of the one that
+connects to Goiabada (a load balancer in front of Nginx, for example), the
+rightmost entry is that second proxy's address. Set `TRUSTED_PROXIES` to the
+addresses of every hop you control, **including the one that connects to
+Goiabada**: Goiabada reads the forwarded headers only from a connection whose
+address is in the list, and walks `X-Forwarded-For` from the right past each
+listed address to the first one that is not, the client.
+
+For Cloudflare's proxy in front of Nginx, have Nginx resolve Cloudflare instead,
+as the [Cloudflare + Nginx guide](/production-deployment/cloudflare-nginx/#client-ip-behind-cloudflare)
+does, so Goiabada still sees one hop and needs no list.
 </Aside>
 
 ```bash
@@ -269,6 +283,22 @@ trusted hops and stops at the real client.
 GOIABADA_AUTHSERVER_TRUSTED_PROXIES=10.0.0.0/8,192.168.1.5
 GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES=10.0.0.0/8,192.168.1.5
 ```
+
+<Aside type="note" title="Under Docker Compose the peer is not 127.0.0.1">
+Nginx connects to `127.0.0.1:9090`, but the connection a Compose service sees
+comes from the Compose network's gateway, an address such as `172.21.0.1`. A list
+naming `127.0.0.1` therefore makes Goiabada ignore the forwarded headers and
+resolve every request to the gateway, putting everyone in one rate-limit bucket.
+With one proxy, leave the list empty. The [native binaries](/production-deployment/native-binaries/#reverse-proxy),
+which Nginx reaches over loopback directly, are different: there the wizard
+writes `TRUSTED_PROXIES=127.0.0.1`.
+</Aside>
+
+If you turn the rate limiter on while trusting one hop with no list, the auth
+server logs a warning at every start saying so. It cannot tell a proxy that
+appends from one that passes the header through untouched, nor see whether
+anything reaches it around the proxy. Once you have checked both against your
+setup, the warning is expected and can be left as it is.
 
 <Aside type="tip">
 If you enable a reverse proxy but forget `TRUST_PROXY_HEADERS=true`, every

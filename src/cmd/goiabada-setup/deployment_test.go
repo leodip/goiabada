@@ -92,13 +92,14 @@ func TestDeployments_StepFacts(t *testing.T) {
 		return map[string]bool{
 			"asksURLs": d.asksURLs, "asksNamespace": d.asksNamespace,
 			"externalDatabase": d.externalDatabase, "behindProxy": d.behindProxy,
+			"asksLocalProxy": d.asksLocalProxy,
 		}
 	}
 	want := map[deploymentType][]string{
 		deploymentLocal:      nil,
 		deploymentProduction: {"asksURLs", "behindProxy"},
 		deploymentKubernetes: {"asksURLs", "asksNamespace", "externalDatabase"},
-		deploymentNative:     {"asksURLs", "externalDatabase"},
+		deploymentNative:     {"asksURLs", "externalDatabase", "asksLocalProxy"},
 	}
 	for kind, wantTrue := range want {
 		d := deployments[kind]

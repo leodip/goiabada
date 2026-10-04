@@ -50,7 +50,14 @@ data:
   GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com"
   GOIABADA_APPNAME: "Goiabada"
   GOIABADA_ADMIN_EMAIL: "admin@example.com"
+  # Envoy, the one gateway in front, appends the address it received each connection from
+  # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list. Set the list
+  # only when a CDN or a second load balancer sits in front of Envoy, naming every hop, the
+  # Envoy pods included. A pod that calls the Service directly, around Envoy, chooses the
+  # address it is counted and audited under: a NetworkPolicy admitting only Envoy stops
+  # that, and no list does.
   GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS: "true"
+  GOIABADA_AUTHSERVER_TRUSTED_PROXIES: ""
   GOIABADA_DB_TYPE: "postgres"
   GOIABADA_DB_HOST: "goiabada-db"
   GOIABADA_DB_PORT: "5432"
@@ -69,7 +76,14 @@ data:
   GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com"
   GOIABADA_AUTHSERVER_INTERNALBASEURL: "http://goiabada-authserver:9090"
   GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com"
+  # Envoy, the one gateway in front, appends the address it received each connection from
+  # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list. Set the list
+  # only when a CDN or a second load balancer sits in front of Envoy, naming every hop, the
+  # Envoy pods included. A pod that calls the Service directly, around Envoy, chooses the
+  # address it is counted and audited under: a NetworkPolicy admitting only Envoy stops
+  # that, and no list does.
   GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS: "true"
+  GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES: ""
 
 ---
 apiVersion: apps/v1
