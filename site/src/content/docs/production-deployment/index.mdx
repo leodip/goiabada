@@ -71,6 +71,112 @@ You still need to set up SSL termination using one of the methods above (except 
 Before going live, review the [production checklist](/production-deployment/production-checklist/) for security and configuration requirements.
 </Aside>
 
+## Secrets
+
+This section is about the Docker Compose output. The [Kubernetes](/production-deployment/kubernetes/#secrets)
+and [native binaries](/production-deployment/native-binaries/#secrets) pages have their own.
+
+The wizard writes every secret into `docker-compose.override.yml`, under the service that reads it,
+and none into `docker-compose.yml`, which can therefore be committed. The override is plain text, and
+its mode, `0600`, is its only protection: keep it out of version control and out of shared
+directories. Anyone who can run `docker` on the host reads the secrets too, since `docker inspect`
+shows a container's environment, and so does root.
+
+### Backing up the AES key
+
+`GOIABADA_AES_ENCRYPTION_KEY`, under `goiabada-authserver` in the override, encrypts the client
+secrets, the SMTP password, the OTP seeds, the verification and reset codes, and the token signing
+keys the database holds. A database backup restored without it gives an auth server that can decrypt
+none of them, and a backup kept with it gives all of them to whoever reads it. Copy the key to a
+password manager, a secret manager or an offline copy, apart from your database backups, after the
+first start and after every rotation. Keep each key as long as you keep a database backup taken under
+it: to restore one, start the auth server with that key as `GOIABADA_AES_ENCRYPTION_KEY`, or with
+today's key there and the old one as `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS`, which re-encrypts the
+restored data to today's key at start.
+
+### Rotating secrets
+
+Both servers read their secrets from the environment, and only when they start. Compose runs one
+container per service, and `docker compose up -d` stops the container of a changed service before it
+starts the new one, so two containers of one service never run together and each change below is one
+restart. Generate each new key with `openssl rand -hex 64` for an authentication key and `openssl rand
+-hex 32` for the rest.
+
+**The session keys.** Each server seals its browser sessions with its current session key pair, and
+opens them with that pair and then, when it is set, the previous one. In
+`docker-compose.override.yml`, give each server's current pair to its previous pair, and new keys to
+the current pair:
+
+```yaml
+  goiabada-authserver:
+    environment:
+      # ...the other entries stay as they are
+      - "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=<new, openssl rand -hex 64>"
+      - "GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=<new, openssl rand -hex 32>"
+      - "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS=<its value before>"
+      - "GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS=<its value before>"
+
+  goiabada-adminconsole:
+    environment:
+      # ...the other entries stay as they are
+      - "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=<new, openssl rand -hex 64>"
+      - "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=<new, openssl rand -hex 32>"
+      - "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS=<its value before>"
+      - "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS=<its value before>"
+```
+
+Then run `docker compose up -d`. Nobody is signed out: each server seals under the new pair and still
+opens what the old one sealed. Once the maximum session lifetime has passed, which is on the admin
+console's **Settings → Sessions** page, 24 hours unless you changed it, every signed-in session has
+been sealed again under the new pair: delete the four `_PREVIOUS` lines and run `docker compose up
+-d` again. A sign-in still in progress may restart, costing that person the form they were filling
+in.
+
+**The AES key.** The auth server encrypts and decrypts with `GOIABADA_AES_ENCRYPTION_KEY` alone, and
+reads `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` only when it starts: if the database is still under that
+key, it re-encrypts all of it to the current one, in one transaction, before it listens.
+
+1. Back up the database and the current key.
+2. Under `goiabada-authserver` in the override, add
+   `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS=<the current key>`, set `GOIABADA_AES_ENCRYPTION_KEY` to a
+   new key, and back the new key up: the next start puts the database under it.
+3. Restart the auth server, and check that the re-encryption committed:
+
+   ```bash
+   docker compose up -d goiabada-authserver
+   docker compose logs goiabada-authserver | grep 'rotated data-at-rest encryption'
+   ```
+
+   If it stops instead with `data-at-rest decrypts under neither GOIABADA_AES_ENCRYPTION_KEY nor
+   GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS`, the previous key is not the one the database is under, and
+   nothing was changed.
+4. Once sign-ins and your clients work, delete the `_PREVIOUS` line and run `docker compose up -d
+   goiabada-authserver` again. Until then it is harmless: at each start the auth server finds the
+   database under the current key and re-encrypts nothing.
+
+The other secrets are not Goiabada's to rotate. `GOIABADA_ADMIN_PASSWORD` is read only by the first
+start: change the administrator's password in the admin console. The OAuth client secret must match
+the admin console client's secret in the database, and the database password the database user's.
+
+### Upgrading a configuration from an earlier release
+
+Earlier releases of the wizard wrote every secret into `docker-compose.yml` itself. That file keeps
+working as it is. To move to the new shape, generate the new pair of files, then copy every secret
+value from the old `docker-compose.yml` into the new `docker-compose.override.yml`, over the new
+values the wizard generated:
+
+- `GOIABADA_AES_ENCRYPTION_KEY`, above all: a new key cannot decrypt the database.
+- The database password, in `GOIABADA_DB_PASSWORD` and in the database service's own variable
+  (`POSTGRES_PASSWORD`, `MYSQL_ROOT_PASSWORD` or `MSSQL_SA_PASSWORD`). The database image sets the
+  password only on an empty volume, so a new one would not match it.
+- `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET`, under both services: it must match the admin console's
+  client in the database.
+- The four session keys, unless everybody signing in again is acceptable.
+
+Then run `docker compose up -d`, and keep the old `docker-compose.yml` as carefully as the override,
+or delete it. A deployment on SQLite also needs the one-time `chown` of [Upgrading a Compose deployment
+that uses SQLite](#upgrading-a-compose-deployment-that-uses-sqlite).
+
 ## The user the images run as
 
 Both images run as uid 10001 and gid 10001, a user and group named `goiabada`, and never as root.

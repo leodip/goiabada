@@ -56,6 +56,9 @@ export GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP="9090"
 export GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY="<64-byte-hex>"
 export GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY="<32-byte-hex>"
 
+# Data encryption key (generate: openssl rand -hex 32). Back it up apart from the database
+export GOIABADA_AES_ENCRYPTION_KEY="<32-byte-hex>"
+
 # Database (MySQL example)
 export GOIABADA_DB_TYPE="mysql"
 export GOIABADA_DB_USERNAME="goiabada"
@@ -96,6 +99,90 @@ export GOIABADA_AUTHSERVER_INTERNALBASEURL="http://127.0.0.1:9090"
 <Aside type="tip">
 Use the [setup wizard](/getting-started/setup-wizard/) and select **"4. Native binaries"** to automatically generate a `goiabada.env` file with all keys and secrets pre-configured.
 </Aside>
+
+## Secrets
+
+The wizard writes one file, `goiabada.env`, holding the configuration and every secret, which both
+servers read. It is plain text, and its mode, `0600`, is its only protection: keep it out of version
+control, owned by the user the servers run as, and readable by that user alone. Root reads it, and
+the environment of the running processes, whatever its mode.
+
+### Backing up the AES key
+
+`GOIABADA_AES_ENCRYPTION_KEY` encrypts the client secrets, the SMTP password, the OTP seeds, the
+verification and reset codes, and the token signing keys the database holds. A database backup
+restored without it gives an auth server that can decrypt none of them, and a backup kept with it
+gives all of them to whoever reads it. Copy the key to a password manager, a secret manager or an
+offline copy, apart from your database backups, after the first start and after every rotation. Keep
+each key as long as you keep a database backup taken under it: to restore one, start the auth server
+with that key as `GOIABADA_AES_ENCRYPTION_KEY`, or with today's key there and the old one as
+`GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS`, which re-encrypts the restored data to today's key at start.
+
+### Rotating secrets
+
+Both servers read their secrets from the environment, and only when they start. Each runs as one
+process, which a restart stops before it starts the new one, so each change below is one restart.
+Generate each new key with `openssl rand -hex 64` for an authentication key and `openssl rand -hex 32`
+for the rest.
+
+**The session keys.** Each server seals its browser sessions with its current session key pair, and
+opens them with that pair and then, when it is set, the previous one. In the env file, give each
+server's current pair to its previous pair, and new keys to the current pair:
+
+```bash
+GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY="<new, openssl rand -hex 64>"
+GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY="<new, openssl rand -hex 32>"
+GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS="<its value before>"
+GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS="<its value before>"
+
+GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY="<new, openssl rand -hex 64>"
+GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY="<new, openssl rand -hex 32>"
+GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS="<its value before>"
+GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS="<its value before>"
+```
+
+Then restart both servers, with systemd `sudo systemctl restart goiabada-authserver
+goiabada-adminconsole`. Nobody is signed out: each server seals under the new pair and still opens
+what the old one sealed. Once the maximum session lifetime has passed, which is on the admin
+console's **Settings → Sessions** page, 24 hours unless you changed it, every signed-in session has
+been sealed again under the new pair: delete the four `_PREVIOUS` lines and restart both again. A
+sign-in still in progress may restart, costing that person the form they were filling in.
+
+**The AES key.** The auth server encrypts and decrypts with `GOIABADA_AES_ENCRYPTION_KEY` alone, and
+reads `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` only when it starts: if the database is still under that
+key, it re-encrypts all of it to the current one, in one transaction, before it listens. Run one auth
+server process while you rotate: a second one still running with the old key would decrypt nothing
+once the first has re-encrypted, and what it encrypted would stay unreadable.
+
+1. Back up the database and the current key.
+2. In the env file, add `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS="<the current key>"`, set
+   `GOIABADA_AES_ENCRYPTION_KEY` to a new key, and back the new key up: the next start puts the
+   database under it.
+3. Restart the auth server, and check that the re-encryption committed:
+
+   ```bash
+   sudo systemctl restart goiabada-authserver
+   sudo journalctl -u goiabada-authserver | grep 'rotated data-at-rest encryption'
+   ```
+
+   If it stops instead with `data-at-rest decrypts under neither GOIABADA_AES_ENCRYPTION_KEY nor
+   GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS`, the previous key is not the one the database is under, and
+   nothing was changed.
+4. Once sign-ins and your clients work, delete the `_PREVIOUS` line and restart the auth server
+   again. Until then it is harmless: at each start the auth server finds the database under the
+   current key and re-encrypts nothing.
+
+The other secrets are not Goiabada's to rotate. `GOIABADA_ADMIN_PASSWORD` is read only by the first
+start: change the administrator's password in the admin console. The OAuth client secret must match
+the admin console client's secret in the database, and the database password the database user's.
+
+### Upgrading a configuration from an earlier release
+
+An env file from an earlier release keeps working. If you generate a new one, copy every secret
+value from the old file over the new values the wizard generated: `GOIABADA_AES_ENCRYPTION_KEY` above
+all, since a new key cannot decrypt the database; `GOIABADA_DB_PASSWORD`, which must match the
+database user's; `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET`, which must match the admin console's
+client in the database; and the four session keys, unless everybody signing in again is acceptable.
 
 ## Running on Linux with systemd
 

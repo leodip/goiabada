@@ -46,7 +46,9 @@ Internet → Gateway/Ingress (HTTPS/TLS) → {
 The setup wizard generates:
 - **Namespace**: Isolated environment for Goiabada resources, labelled to warn about any pod that
   breaks the restricted Pod Security Standard (see [Pod security](#pod-security))
-- **Secret**: Database password, session keys, OAuth client secret (base64 encoded)
+- **Secrets**, in a file of their own: the AES key in `goiabada-encryption-key`, and the database
+  password, admin password, session keys and OAuth client secret in `goiabada-secrets` (see
+  [Secrets](#secrets))
 - **ConfigMaps**: `goiabada-authserver-config` and `goiabada-adminconsole-config`, one per server,
   each holding only the variables that server reads. The three URLs are in both, written from the
   same answers, so if you change one, change it in both
@@ -299,7 +301,9 @@ kubectl apply -f goiabada-k8s.yaml -f goiabada-secrets.yaml
 Keep `goiabada-secrets.yaml` out of version control; the manifest can be committed. The wizard warns
 when it writes into a git working tree, and gives the line to add to its `.gitignore`. Back up the AES
 key separately from the database: without it, the client secrets, SMTP credentials, OTP seeds and
-signing keys the database holds cannot be recovered.
+signing keys the database holds cannot be recovered (see [Backing up the AES
+key](#backing-up-the-aes-key)). For production, consider creating the Secrets by one of the routes in
+[Creating the Secrets another way](#creating-the-secrets-another-way) rather than from the file.
 
 The wizard prints no secret, a generated admin password included. Read the admin password back out of
 the cluster when you first sign in:
@@ -713,6 +717,353 @@ To see what the policies admit:
 kubectl describe networkpolicy -n goiabada
 ```
 
+## Secrets
+
+### What the generated Secrets are
+
+`goiabada-secrets.yaml` holds two Secrets: `goiabada-encryption-key`, holding the AES key alone, and
+`goiabada-secrets`, holding every other secret. The AES key has a Secret of its own so that a role
+can be allowed to read the others without it (see [Who can read the AES key](#who-can-read-the-aes-key)).
+
+What they are not:
+
+- **Encrypted.** A Secret's `data` is base64, an encoding that `base64 -d` reverses with no key. On
+  disk, the file's mode, `0600`, is its only protection: anyone who reads the file, or a backup or a
+  repository holding it, reads every secret.
+- **Encrypted in the cluster, unless you make them so.** The API server keeps Secrets in etcd, in
+  the clear unless the cluster configures
+  [encryption at rest](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/); many
+  managed clusters do, so check yours. Anyone allowed to `get`, `list` or `watch` Secrets in the
+  namespace reads them, and so does anyone who can create a pod there or `kubectl exec` into
+  Goiabada's, since the values are in the containers' environment.
+- **Rotated.** Nothing changes them after the wizard writes them; [Rotating
+  secrets](#rotating-secrets) says how to.
+- **Backed up.** Deleting the namespace deletes them, and the AES key needs a backup of its own
+  (see [Backing up the AES key](#backing-up-the-aes-key)).
+
+The generated file suits a first deployment on a cluster you control. For production, keep the
+manifest and create the Secrets by one of the routes in [Creating the Secrets another
+way](#creating-the-secrets-another-way) instead: the manifest needs only the Secrets below to exist.
+
+### The Secrets the manifest reads
+
+The manifest reads two Secrets from its namespace, by these names and keys. Created by any route,
+they are all it needs:
+
+| Secret | Key | Variable | Read by | Value |
+|--------|-----|----------|---------|-------|
+| `goiabada-secrets` | `db-password` | `GOIABADA_DB_PASSWORD` | auth server | The database user's password |
+| `goiabada-secrets` | `admin-password` | `GOIABADA_ADMIN_PASSWORD` | auth server | The first administrator's password, read only by the first start, which creates the account. Change it later in the admin console, not here |
+| `goiabada-secrets` | `auth-session-auth-key` | `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY` | auth server | 64 random bytes as 128 hex characters, `openssl rand -hex 64` |
+| `goiabada-secrets` | `auth-session-enc-key` | `GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY` | auth server | 32 random bytes as 64 hex characters, `openssl rand -hex 32` |
+| `goiabada-secrets` | `admin-session-auth-key` | `GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY` | admin console | 64 random bytes as 128 hex characters, `openssl rand -hex 64` |
+| `goiabada-secrets` | `admin-session-enc-key` | `GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY` | admin console | 32 random bytes as 64 hex characters, `openssl rand -hex 32` |
+| `goiabada-secrets` | `oauth-client-secret` | `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` | both | The admin console's OAuth client secret. The auth server reads it only at the first start, to create the admin console's client with it; the admin console authenticates with it from then on, so it must match the client's secret in the database |
+| `goiabada-encryption-key` | `aes-encryption-key` | `GOIABADA_AES_ENCRYPTION_KEY` | auth server | 32 random bytes as 64 hex characters, `openssl rand -hex 32`. It encrypts the secrets the database holds |
+
+Each Secret must exist before the pods that read it start, so apply the manifest, which creates the
+namespace, then the Secrets; a pod that starts first waits in `CreateContainerConfigError` and starts
+once they exist.
+
+### Creating the Secrets another way
+
+**`kubectl create secret`, from your terminal.** Nothing is written to disk, and no value reaches the
+process list or your shell history: each one is passed through a process substitution, a key
+straight from `openssl` and a password from a variable read without echo. In bash, once the manifest
+has created the namespace:
+
+```bash
+read -rsp 'Database password: ' DB_PASSWORD; echo
+read -rsp 'Admin password: ' ADMIN_PASSWORD; echo
+kubectl create secret generic goiabada-secrets -n goiabada \
+  --from-file=db-password=<(printf %s "$DB_PASSWORD") \
+  --from-file=admin-password=<(printf %s "$ADMIN_PASSWORD") \
+  --from-file=auth-session-auth-key=<(openssl rand -hex 64 | tr -d '\n') \
+  --from-file=auth-session-enc-key=<(openssl rand -hex 32 | tr -d '\n') \
+  --from-file=admin-session-auth-key=<(openssl rand -hex 64 | tr -d '\n') \
+  --from-file=admin-session-enc-key=<(openssl rand -hex 32 | tr -d '\n') \
+  --from-file=oauth-client-secret=<(openssl rand -hex 32 | tr -d '\n')
+kubectl create secret generic goiabada-encryption-key -n goiabada \
+  --from-file=aes-encryption-key=<(openssl rand -hex 32 | tr -d '\n')
+unset DB_PASSWORD ADMIN_PASSWORD
+```
+
+The values then live in the cluster alone: there is no file to leak or to commit, and none to restore
+from. Losing the namespace or the cluster loses them, so [back up the AES
+key](#backing-up-the-aes-key) and keep the passwords wherever you keep others. Nothing is
+declarative, so a GitOps tool cannot recreate the Secrets, and rebuilding the cluster means creating
+them again with the same values: new session keys sign everybody out, a new OAuth client secret no
+longer matches the one in the database, and a new AES key cannot read it.
+
+**The [External Secrets Operator](https://external-secrets.io/), syncing from a secret manager**
+such as AWS Secrets Manager, Google Secret Manager, Azure Key Vault or HashiCorp Vault. You keep each
+value in the manager, and an `ExternalSecret` per Secret has the operator create it under the names
+and keys above, then refresh it:
+
+```yaml
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: goiabada-encryption-key
+  namespace: goiabada
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: my-secret-store                # yours
+  target:
+    name: goiabada-encryption-key
+  data:
+  - secretKey: aes-encryption-key
+    remoteRef:
+      key: goiabada/aes-encryption-key   # the entry in your secret manager
+```
+
+The second, `goiabada-secrets`, lists its seven keys the same way. The manager becomes the source of
+truth, with its own access control, audit log and backups; a manager kept apart from the database's
+backups is a sound home for the AES key's backup. The cost is an operator and its CRDs to run, a
+credential that lets it read the manager (workload identity where your cloud offers it), and a
+Kubernetes Secret that still exists, readable as above. A value changed in the manager reaches the
+Secret at the next refresh, but a pod reads it only when it starts, so a pod restarted for any reason
+picks it up alone. Change a session key or the AES key in the manager only as a step of the
+[rotation procedures](#rotating-secrets) below. An AES key replaced on its own is the worst case: an
+auth server started with no previous key re-encrypts nothing and cannot decrypt what the database
+holds.
+
+**[SealedSecrets](https://github.com/bitnami-labs/sealed-secrets), an encrypted Secret you can
+commit.** `kubeseal` encrypts a Secret with the public key of the controller running in your
+cluster, and only that controller can decrypt it, which it does by creating the Secret:
+
+```bash
+kubectl create secret generic goiabada-encryption-key -n goiabada --dry-run=client -o yaml \
+  --from-file=aes-encryption-key=<(openssl rand -hex 32 | tr -d '\n') \
+  | kubeseal --format yaml > goiabada-encryption-key.sealed.yaml
+```
+
+Seal `goiabada-secrets` the same way, with the keys of the first `kubectl create secret` above, and
+commit both files beside the manifest. A GitOps tool can then apply everything, and the repository
+holds no readable secret. The controller's private key is now what decrypts all of them: back it up
+as the SealedSecrets documentation describes, since without it the sealed files are useless. That
+backup does not replace the AES key's own, which must be readable without the cluster. A sealed
+Secret is bound to its name and namespace, so a renamed namespace means sealing again, and once
+unsealed it is an ordinary Secret, readable as above. Changing a value means sealing and committing
+a new file, then following the [rotation procedures](#rotating-secrets).
+
+### Who can read the AES key
+
+RBAC grants and never denies, so the AES key's Secret of its own protects it only from roles that
+name what they may read. This Role reads `goiabada-secrets` and not the key:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: goiabada-secrets-reader
+  namespace: goiabada
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["goiabada-secrets"]
+  verbs: ["get"]
+```
+
+A role that may `list` or `watch` Secrets in the namespace, or `get` them with no `resourceNames`,
+reads the key too, since a list returns every Secret with its data; so does one that may create pods
+in the namespace, or exec into the auth server's. Goiabada's own pods need no role at all: the
+kubelet reads the Secrets to set their environment, and the pods mount no service account token.
+
+### Backing up the AES key
+
+`GOIABADA_AES_ENCRYPTION_KEY` encrypts the client secrets, the SMTP password, the OTP seeds, the
+verification and reset codes, and the token signing keys the database holds. A database backup
+restored without it gives an auth server that can decrypt none of them, and a backup kept with it
+gives all of them to whoever reads it. After the first deployment, and after every
+[rotation](#the-aes-key):
+
+1. Read the key out of the cluster:
+
+   ```bash
+   kubectl get secret goiabada-encryption-key -n goiabada -o jsonpath='{.data.aes-encryption-key}' | base64 -d
+   ```
+
+2. Store it where your database backups are not: a password manager, a secret manager, or an offline
+   copy. Not in the repository, and not beside the backups.
+3. Keep each key as long as you keep a database backup taken under it. A rotation re-encrypts the
+   live database only, so a backup from before it needs the old key. To restore one, start the auth
+   server with the old key as `GOIABADA_AES_ENCRYPTION_KEY`, or with today's key there and the old one
+   as `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS`, which re-encrypts the restored data to today's key at
+   start.
+
+### Rotating secrets
+
+Both servers read their secrets from the environment, and only when they start. A changed Secret
+reaches a pod when the pod restarts and not before, so every change is followed by a rollout,
+`kubectl rollout restart` or a change to the pod template. Until that rollout, a pod restarted for
+any other reason, a crash, an eviction or a scale-up, picks up the new value on its own; the steps
+below are ordered so that this is harmless.
+
+#### The session keys
+
+Each server seals its browser sessions with its session key pair, and opens them with that pair and
+then, when it is set, a previous pair. It seals with the current pair only. A rollout runs old and new
+pods side by side, and each must open what the other seals, so the new pair goes in first as the
+previous pair and the two are then swapped. Done this way, nobody is signed out.
+
+1. **Add the new pairs as the previous pairs.** Every pod still seals under the current pair, and can
+   now open the new one, which nothing uses yet:
+
+   ```bash
+   kubectl patch secret goiabada-secrets -n goiabada --type=merge --patch-file=/dev/stdin <<EOF
+   {"stringData": {
+     "authserver-session-authentication-key-previous": "$(openssl rand -hex 64)",
+     "authserver-session-encryption-key-previous": "$(openssl rand -hex 32)",
+     "adminconsole-session-authentication-key-previous": "$(openssl rand -hex 64)",
+     "adminconsole-session-encryption-key-previous": "$(openssl rand -hex 32)"
+   }}
+   EOF
+   kubectl set env deployment/goiabada-authserver -n goiabada --prefix=GOIABADA_ \
+     --from=secret/goiabada-secrets \
+     --keys=authserver-session-authentication-key-previous,authserver-session-encryption-key-previous
+   kubectl set env deployment/goiabada-adminconsole -n goiabada --prefix=GOIABADA_ \
+     --from=secret/goiabada-secrets \
+     --keys=adminconsole-session-authentication-key-previous,adminconsole-session-encryption-key-previous
+   kubectl rollout status deployment/goiabada-authserver deployment/goiabada-adminconsole -n goiabada
+   ```
+
+   The patch reads the new keys from a here-document, so they never reach the process list. `kubectl
+   set env` gives the auth server `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS` and
+   `GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS`, and the admin console
+   `GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS` and
+   `GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS`, each a reference to its key, and warns
+   that it "transferred" each key, which is expected. Changing the pod template starts the first
+   rollout.
+
+2. **Swap the pairs,** so that the new one is current and the old one previous, and restart:
+
+   ```bash
+   key() { kubectl get secret goiabada-secrets -n goiabada -o "jsonpath={.data.$1}"; }
+   kubectl patch secret goiabada-secrets -n goiabada --type=merge --patch-file=/dev/stdin <<EOF
+   {"data": {
+     "auth-session-auth-key": "$(key authserver-session-authentication-key-previous)",
+     "auth-session-enc-key": "$(key authserver-session-encryption-key-previous)",
+     "admin-session-auth-key": "$(key adminconsole-session-authentication-key-previous)",
+     "admin-session-enc-key": "$(key adminconsole-session-encryption-key-previous)",
+     "authserver-session-authentication-key-previous": "$(key auth-session-auth-key)",
+     "authserver-session-encryption-key-previous": "$(key auth-session-enc-key)",
+     "adminconsole-session-authentication-key-previous": "$(key admin-session-auth-key)",
+     "adminconsole-session-encryption-key-previous": "$(key admin-session-enc-key)"
+   }}
+   EOF
+   kubectl rollout restart deployment/goiabada-authserver deployment/goiabada-adminconsole -n goiabada
+   kubectl rollout status deployment/goiabada-authserver deployment/goiabada-adminconsole -n goiabada
+   ```
+
+   Every value is read before the patch is sent, so the swap is whole. During this rollout a new pod
+   seals under the new pair and opens the old, and an old pod seals under the old pair and opens the
+   new, so either opens every session.
+
+3. **Remove the previous pairs once the maximum session lifetime has passed** since step 2. The
+   lifetime is on the admin console's **Settings → Sessions** page, 24 hours unless you changed it,
+   and it bounds both servers' sessions. A session is sealed under the new pair the next time it is
+   saved, and none outlives that lifetime, so by then every signed-in session is under the new pair.
+   Remove the variables first, and the keys once that rollout is done, since a pod whose variable
+   names a missing key does not start:
+
+   ```bash
+   kubectl set env deployment/goiabada-authserver -n goiabada \
+     GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS- \
+     GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS-
+   kubectl set env deployment/goiabada-adminconsole -n goiabada \
+     GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS- \
+     GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS-
+   kubectl rollout status deployment/goiabada-authserver deployment/goiabada-adminconsole -n goiabada
+   kubectl patch secret goiabada-secrets -n goiabada --type=json -p='[
+     {"op": "remove", "path": "/data/authserver-session-authentication-key-previous"},
+     {"op": "remove", "path": "/data/authserver-session-encryption-key-previous"},
+     {"op": "remove", "path": "/data/adminconsole-session-authentication-key-previous"},
+     {"op": "remove", "path": "/data/adminconsole-session-encryption-key-previous"}
+   ]'
+   ```
+
+   A sign-in still in progress, one not yet signed in, can still be under the old pair, so removing it
+   may restart that sign-in, at the cost of the form being filled in. Replacing the keys in one step
+   instead signs everybody out once.
+
+#### The AES key
+
+The auth server encrypts and decrypts with `GOIABADA_AES_ENCRYPTION_KEY` alone. It reads
+`GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` only when it starts: if the database is still under that key,
+it re-encrypts all of it to the current one, in one transaction, before it listens. From that commit
+on, a pod still running with the old key decrypts nothing, and whatever it encrypts, a new client
+secret or an OTP enrollment, is written under a key the database is no longer under and stays
+unreadable. A rollout always overlaps old and new pods, at one replica too, since the generated
+`maxSurge: 1` starts the new pod before it stops the old one. So the key rotates with every auth
+server pod stopped, and one started alone. The auth server is down for that start, and the admin
+console's requests to it fail until it is back.
+
+1. Back up the database, and the current key as in [Backing up the AES key](#backing-up-the-aes-key).
+2. Stop every auth server pod:
+
+   ```bash
+   kubectl scale deployment goiabada-authserver -n goiabada --replicas=0
+   kubectl wait pod -n goiabada -l app=goiabada-authserver --for=delete --timeout=2m
+   ```
+
+3. Make a new key current and the old one previous:
+
+   ```bash
+   kubectl patch secret goiabada-encryption-key -n goiabada --type=merge --patch-file=/dev/stdin <<EOF
+   {"data": {"aes-encryption-key-previous": "$(kubectl get secret goiabada-encryption-key -n goiabada -o jsonpath='{.data.aes-encryption-key}')"},
+    "stringData": {"aes-encryption-key": "$(openssl rand -hex 32)"}}
+   EOF
+   ```
+
+4. Back up the new key now, with the command of [Backing up the AES key](#backing-up-the-aes-key):
+   the next start puts the database under it.
+5. Start one pod with both keys:
+
+   ```bash
+   kubectl set env deployment/goiabada-authserver -n goiabada --prefix=GOIABADA_ \
+     --from=secret/goiabada-encryption-key --keys=aes-encryption-key-previous
+   kubectl scale deployment goiabada-authserver -n goiabada --replicas=1
+   kubectl rollout status deployment/goiabada-authserver -n goiabada
+   kubectl logs -n goiabada deployment/goiabada-authserver | grep 'rotated data-at-rest encryption'
+   ```
+
+   `kubectl set env` adds `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` while the Deployment runs no pod, so
+   nothing starts until the scale. The log line, `rotated data-at-rest encryption to the new
+   GOIABADA_AES_ENCRYPTION_KEY`, says the re-encryption committed. If the pod stops instead with
+   `data-at-rest decrypts under neither GOIABADA_AES_ENCRYPTION_KEY nor
+   GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS`, the previous key is not the one the database is under, and
+   nothing was changed.
+6. Scale back to your replica count. Every pod now starts with the new key, so this and every later
+   rollout overlaps safely:
+
+   ```bash
+   kubectl scale deployment goiabada-authserver -n goiabada --replicas=<n>
+   ```
+
+7. Remove the previous key once you have checked that sign-ins and your clients work. Until then it
+   is harmless: at each start the auth server finds the database under the current key and
+   re-encrypts nothing.
+
+   ```bash
+   kubectl set env deployment/goiabada-authserver -n goiabada GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS-
+   kubectl rollout status deployment/goiabada-authserver -n goiabada
+   kubectl patch secret goiabada-encryption-key -n goiabada --type=json \
+     -p='[{"op": "remove", "path": "/data/aes-encryption-key-previous"}]'
+   ```
+
+Keep the old key as long as you keep a database backup taken before the rotation.
+
+#### The other secrets
+
+The rest are not Goiabada's to rotate. `admin-password` is read only by the first start: change the
+administrator's password in the admin console. `oauth-client-secret` must match the admin console
+client's secret in the database, and `db-password` the database user's password. Each changes in
+both places, the Secret followed by a rollout, and the server that uses it fails to authenticate
+between the two changes.
+
 ## Health endpoints
 
 Both services expose a health endpoint, and the generated manifest points every probe at it:
@@ -801,8 +1152,10 @@ no version to write and uses `latest` with `imagePullPolicy: Always`, under a co
 when it finishes: `latest` moves, so pods started at different times can run different releases.
 Replace it with a [release version](https://github.com/leodip/goiabada/releases) before production.
 
-1. Update image tags in your manifest or regenerate with the setup wizard
-2. Apply changes. The manifest alone carries the image tags, so the Secrets need not be applied again:
+1. Update the image tags in your manifest. If you regenerate it with the setup wizard instead, apply
+   only the new `goiabada-k8s.yaml`: the `goiabada-secrets.yaml` written beside it holds new secrets,
+   which the database was not set up with
+2. Apply the manifest. It alone carries the image tags, so the Secrets need not be applied again:
    ```bash
    kubectl apply -f goiabada-k8s.yaml
    ```
@@ -811,13 +1164,51 @@ Replace it with a [release version](https://github.com/leodip/goiabada/releases)
    kubectl rollout status deployment/goiabada-authserver -n goiabada
    ```
 
-### From a manifest with one shared ConfigMap
+### From a manifest generated by an earlier release
 
-Manifests generated before each server got its own ConfigMap had one, `goiabada-config`, read by
-both. Applying a new manifest creates the two new ConfigMaps and points the Deployments at them, but
-`kubectl apply` does not delete a resource the file no longer names, so delete the old one once the
-rollout has finished:
+Manifests generated by earlier releases held every secret in the manifest itself, in one Secret,
+`goiabada-secrets`, the AES key included, and one ConfigMap, `goiabada-config`, read by both
+servers. Move to the new shape without changing a single secret value: keep the Secret you have, and
+never apply a newly generated `goiabada-secrets.yaml` over it. A new AES key cannot decrypt the
+database, a new OAuth client secret no longer matches the admin console's client in it, a new
+database password does not match the database user's, and new session keys sign everybody out.
 
-```bash
-kubectl delete configmap goiabada-config -n goiabada
-```
+1. Create `goiabada-encryption-key` from the AES key your Secret already holds. The key passes from
+   one command to the other through a pipe, never through a file or an argument:
+
+   ```bash
+   kubectl get secret goiabada-secrets -n goiabada -o jsonpath='{.data.aes-encryption-key}' | base64 -d \
+     | kubectl create secret generic goiabada-encryption-key -n goiabada --from-file=aes-encryption-key=/dev/stdin
+   ```
+
+2. Apply the new manifest alone, and wait for its rollout. It points both Deployments at their own
+   ConfigMaps and the auth server at the new Secret, and its keys in `goiabada-secrets` are the ones
+   your Secret already has:
+
+   ```bash
+   kubectl apply -f goiabada-k8s.yaml
+   kubectl rollout status deployment/goiabada-authserver deployment/goiabada-adminconsole -n goiabada
+   ```
+
+3. Delete the old ConfigMap, which `kubectl apply` leaves behind because it does not delete a
+   resource the file no longer names:
+
+   ```bash
+   kubectl delete configmap goiabada-config -n goiabada
+   ```
+
+4. Remove the AES key from `goiabada-secrets`, so that a role allowed to read that Secret no longer
+   reads the key:
+
+   ```bash
+   kubectl patch secret goiabada-secrets -n goiabada --type=json \
+     -p='[{"op": "remove", "path": "/data/aes-encryption-key"}]'
+   ```
+
+5. [Back up the AES key](#backing-up-the-aes-key), if you have not. Your old manifest still holds
+   every secret in base64: keep it as carefully as a secrets file, or delete it once the key is
+   backed up.
+
+The images now run as uid 10001 rather than root. That changes nothing for a Kubernetes deployment,
+which mounts no volume; a Compose deployment on SQLite needs [a one-time
+`chown`](/production-deployment/#upgrading-a-compose-deployment-that-uses-sqlite).
