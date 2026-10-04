@@ -77,7 +77,7 @@ func TestHandleRegisterPost_TheRedrawnFormKeepsOnlyAWellFormedCeremony(t *testin
 			handler := HandleRegisterPost(pageRenderer, datamocks.NewDatabase(t),
 				accounthandlersmocks.NewUserCreator(t), accounthandlersmocks.NewEmailValidator(t),
 				accounthandlersmocks.NewPasswordValidator(t), accounthandlersmocks.NewEmailSender(t),
-				handlersmocks.NewAuditLogger(t), testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+				handlersmocks.NewAuditLogger(t), &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 			req := httptest.NewRequest(http.MethodPost, "/account/register"+tc.query, strings.NewReader(""))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

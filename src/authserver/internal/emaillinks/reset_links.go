@@ -12,6 +12,11 @@ import "net/url"
 const ResetPasswordPath = "/reset-password"
 const AccountActivatePath = "/account/activate"
 
+// ForgotPasswordPath is the page a user asks for a reset link from. It carries no code, and the
+// notice self-registration mails an existing account points at it (#207 decision 5), so the
+// notice's link and the route are one constant.
+const ForgotPasswordPath = "/forgot-password"
+
 // ResetPasswordLink builds the password reset link emailed to a user, under the auth
 // server's public base URL, which the caller is handed at construction (#434).
 //

@@ -58,11 +58,17 @@ If this setting is disabled, only administrators can create new user accounts th
 
 For user self-registrations, there's an option to require email verification for new accounts.
 
-With it enabled, and SMTP configured, the registration form asks for the email address only. Goiabada emails that address a link, valid for 5 minutes. Following it opens a form where the person who received the message chooses the account's password, and the account is created, with its address marked verified, only when that form is submitted. Opening the link alone creates nothing, so a mail scanner or link previewer that fetches it cannot complete a registration, and someone who registers an address that is not theirs never chooses the password the account gets.
+With it enabled, and SMTP configured, the registration form asks for the email address only, and every well-formed address gets the same "check your email" page, whether or not it already has an account. What happens next travels in the mail. A new address is sent a link, valid for 5 minutes. Following it opens a form where the person who received the message chooses the account's password, and the account is created, with its address marked verified, only when that form is submitted. Opening the link alone creates nothing, so a mail scanner or link previewer that fetches it cannot complete a registration, and someone who registers an address that is not theirs never chooses the password the account gets.
+
+An address that already has an account is sent a notice instead, saying that no new account was created and pointing at the forgot-password page, if the account is enabled and its address verified (the rule [password recovery](#password-recovery) applies). Any other account is sent nothing, and so is an address whose registration is still pending. Each such request leaves one `requested_registration` entry in the audit log, recording what it led to, with the address digested rather than stored.
 
 If the address has meanwhile gained an account, for instance because an administrator created one, following the link is refused and the pending registration is discarded.
 
 Without email verification, the registration form asks for the password too, and the account is created at once, with its address unverified.
+
+<Aside type="caution">
+Only registration with email verification hides whether an address has an account. Without it, the form tells the visitor when an address is already registered: the account it creates is usable at once, so answering a taken address the same way would hide nothing, since signing in with the chosen password would fail. Enable email verification if the list of registered addresses should not be discoverable from the registration form.
+</Aside>
 
 <Aside>
 To use email verification, be sure to configure your SMTP settings in the admin console.

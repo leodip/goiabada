@@ -843,13 +843,15 @@ func TestLimitActivate_PerIP(t *testing.T) {
 // TestLimitRegister_PerIP verifies self-registration is bounded per client block, and that a
 // distinct address per request buys nothing (#219).
 //
-// That last case is the one the limiter exists for. The endpoint answers whether an address
-// already has an account, sends mail to whichever do not, and writes a pre_registrations row for
-// each, and all three are only harmful across distinct addresses. A limiter keyed on the submitted
-// address would bucket the attacker's own choice of victim and bound none of it, which is why
-// decision 8 has no per-email tier.
+// That last case is the one the IP tier exists for. The endpoint writes a pre_registrations row
+// for each new address and mails each address given to it, and without verification it answers
+// whether an address already has an account, all of which are harmful across distinct addresses.
+// A limiter keyed on the submitted address alone would bucket the attacker's own choice of victim
+// and bound none of it, which is why the per-address tier beside it is a second tier and not a
+// replacement (TestLimitRegister_PerAddress).
 //
-// The budget is exact because it is published policy: 20 requests per 5 minutes.
+// The budget is exact because it is published policy: 20 requests per 5 minutes. Every case
+// submits a distinct address per request, so only the IP tier can trip.
 //
 // The handler stub writes 418 rather than 200 on purpose: a middleware that writes nothing
 // produces exactly 200 with an empty body, so 418 is what tells "the handler ran" apart from
@@ -870,35 +872,21 @@ func TestLimitRegister_PerIP(t *testing.T) {
 		})).ServeHTTP(rr, req)
 		return rr.Code, reached, rr
 	}
+	candidate := func(i int) string { return fmt.Sprintf("candidate%d@example.com", i) }
 
-	t.Run("the budget is exactly 20 per IP", func(t *testing.T) {
-		m := newTestMiddleware(nil, true)
-		for i := 0; i < budget; i++ {
-			if code, reached, _ := run(m, "newuser@example.com", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
-					i+1, code, reached, http.StatusTeapot)
-			}
-		}
-		if code, reached, _ := run(m, "newuser@example.com", "203.0.113.7:5000"); code != http.StatusTooManyRequests || reached {
-			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
-				budget+1, code, reached, http.StatusTooManyRequests)
-		}
-	})
-
-	t.Run("a distinct address per request shares one host's bucket", func(t *testing.T) {
+	t.Run("a distinct address per request shares one host's bucket of exactly 20", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
 		// The enumeration bound itself: 21 addresses probed from one host, and the 21st is
-		// refused. A per-address key would allow all of them.
+		// refused. A per-address key alone would allow all of them.
 		for i := 0; i < budget; i++ {
-			email := fmt.Sprintf("candidate%d@example.com", i)
-			if code, reached, _ := run(m, email, "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
+			if code, reached, _ := run(m, candidate(i), "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
 				t.Fatalf("request %d for %s: got code %d, handler reached %v; want %d and true",
-					i+1, email, code, reached, http.StatusTeapot)
+					i+1, candidate(i), code, reached, http.StatusTeapot)
 			}
 		}
-		if code, _, _ := run(m, "candidate20@example.com", "203.0.113.7:5000"); code != http.StatusTooManyRequests {
-			t.Errorf("request %d with a fresh address: got code %d, want %d",
-				budget+1, code, http.StatusTooManyRequests)
+		if code, reached, _ := run(m, candidate(budget), "203.0.113.7:5000"); code != http.StatusTooManyRequests || reached {
+			t.Errorf("request %d with a fresh address: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
 		}
 	})
 
@@ -906,27 +894,27 @@ func TestLimitRegister_PerIP(t *testing.T) {
 		m := newTestMiddleware(nil, true)
 		addr := func(i int) string { return fmt.Sprintf("[2001:db8:1:2::%x]:5000", i+1) }
 		for i := 0; i < budget; i++ {
-			if code, _, _ := run(m, "newuser@example.com", addr(i)); code != http.StatusTeapot {
+			if code, _, _ := run(m, candidate(i), addr(i)); code != http.StatusTeapot {
 				t.Fatalf("request %d from %s: got code %d, want %d", i+1, addr(i), code, http.StatusTeapot)
 			}
 		}
-		if code, _, _ := run(m, "newuser@example.com", addr(budget)); code != http.StatusTooManyRequests {
+		if code, _, _ := run(m, candidate(budget), addr(budget)); code != http.StatusTooManyRequests {
 			t.Errorf("request %d from %s: got code %d, want %d",
 				budget+1, addr(budget), code, http.StatusTooManyRequests)
 		}
 		// A neighbouring /64 is a different client, which is what makes the mask observable
 		// rather than the limiter.
-		if code, reached, _ := run(m, "newuser@example.com", "[2001:db8:1:3::1]:5000"); code != http.StatusTeapot || !reached {
+		if code, reached, _ := run(m, candidate(budget+1), "[2001:db8:1:3::1]:5000"); code != http.StatusTeapot || !reached {
 			t.Errorf("second /64: got code %d, handler reached %v; want %d and true",
 				code, reached, http.StatusTeapot)
 		}
 	})
 
 	t.Run("the refusal is the browser shape, with Retry-After and no rate-limit headers", func(t *testing.T) {
-		m := newTestMiddleware(nil, true)
+		m, auditLog := newAuditedTestMiddleware(nil, true)
 		var rr *httptest.ResponseRecorder
 		for i := 0; i < budget+1; i++ {
-			_, _, rr = run(m, "newuser@example.com", "203.0.113.7:5000")
+			_, _, rr = run(m, candidate(i), "203.0.113.7:5000")
 		}
 		if rr.Code != http.StatusTooManyRequests {
 			t.Fatalf("got code %d, want %d", rr.Code, http.StatusTooManyRequests)
@@ -940,12 +928,111 @@ func TestLimitRegister_PerIP(t *testing.T) {
 			t.Errorf("Content-Type = %q, want text/html; charset=UTF-8", got)
 		}
 		assertNoRateLimitHeaders(t, rr, "registration rejection")
+
+		auditLog.mu.Lock()
+		events := append([]auditEvent(nil), auditLog.events...)
+		auditLog.mu.Unlock()
+		want := map[string]interface{}{"limiter": "register", "ip": "203.0.113.7"}
+		if len(events) != 1 || !reflect.DeepEqual(events[0].details, want) {
+			t.Errorf("audited %v, want one event with details %v", events, want)
+		}
 	})
 
 	t.Run("disabled limiter never blocks", func(t *testing.T) {
 		m := newTestMiddleware(nil, false)
 		for i := 0; i < budget*2; i++ {
 			if code, reached, _ := run(m, "newuser@example.com", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
+					i+1, code, reached)
+			}
+		}
+	})
+}
+
+// TestLimitRegister_PerAddress verifies the second tier on self-registration: one address is
+// bounded to forgot-password's per-address budget, 5 requests per 5 minutes, every request
+// counted, keyed on the address normalized as the account key is (#207 decision 5). With
+// verification a registration for an address that has an account mails that account a notice,
+// so without this tier one host could mail any account holder 20 notices every 5 minutes, and
+// many hosts without bound.
+func TestLimitRegister_PerAddress(t *testing.T) {
+	const budget = 5
+
+	run := func(m *RateLimiter, email, ip string) (int, bool, *httptest.ResponseRecorder) {
+		form := url.Values{"email": {email}}
+		req := limiterRequest(http.MethodPost, "/account/register", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = ip
+		rr := httptest.NewRecorder()
+		reached := false
+		m.LimitRegister(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reached = true
+			w.WriteHeader(http.StatusTeapot)
+		})).ServeHTTP(rr, req)
+		return rr.Code, reached, rr
+	}
+	// A distinct IPv4 address per request, so only the per-address tier can trip.
+	freshIP := func(i int) string { return fmt.Sprintf("203.0.113.%d:5000", i+1) }
+
+	t.Run("the budget is exactly 5 per address, from varied IPs", func(t *testing.T) {
+		m, auditLog := newAuditedTestMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			if code, reached, _ := run(m, "holder@example.com", freshIP(i)); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		code, reached, rr := run(m, "holder@example.com", freshIP(budget))
+		if code != http.StatusTooManyRequests || reached {
+			t.Fatalf("request %d: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+		if got := rr.Header().Get("Retry-After"); got != "300" {
+			t.Errorf("Retry-After = %q, want 300, the tier's 5 minute window", got)
+		}
+		if got := rr.Header().Get("Content-Type"); got != "text/html; charset=UTF-8" {
+			t.Errorf("Content-Type = %q, want text/html; charset=UTF-8", got)
+		}
+
+		auditLog.mu.Lock()
+		events := append([]auditEvent(nil), auditLog.events...)
+		auditLog.mu.Unlock()
+		want := map[string]interface{}{"limiter": "register_email", "email": "holder@example.com"}
+		if len(events) != 1 || !reflect.DeepEqual(events[0].details, want) {
+			t.Errorf("audited %v, want one event with details %v", events, want)
+		}
+	})
+
+	t.Run("case and whitespace variants of one address share the bucket", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		spellings := spellingsOf("holder", "example.com")
+		for i := 0; i < budget; i++ {
+			if code, reached, _ := run(m, spellings[i%len(spellings)], freshIP(i)); code != http.StatusTeapot || !reached {
+				t.Fatalf("spelling %q (request %d): got code %d, handler reached %v; want %d and true",
+					spellings[i%len(spellings)], i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached, _ := run(m, spellings[budget%len(spellings)], freshIP(budget)); code != http.StatusTooManyRequests || reached {
+			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("a second address still has its own bucket", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget+1; i++ {
+			run(m, "holder@example.com", freshIP(i))
+		}
+		if code, reached, _ := run(m, "other@example.com", freshIP(budget+1)); code != http.StatusTeapot || !reached {
+			t.Errorf("second address: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("disabled limiter never blocks", func(t *testing.T) {
+		m := newTestMiddleware(nil, false)
+		for i := 0; i < budget*2; i++ {
+			if code, reached, _ := run(m, "holder@example.com", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
 				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
 					i+1, code, reached)
 			}
@@ -1792,8 +1879,8 @@ func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
 	})
 }
 
-// builtLimiter is one of the seven route-facing limiters whose body is written by a builder rather
-// than by hand (#439 decision 1): the four per-IP ones and the three failures-per-subject ones. It
+// builtLimiter is one of the six route-facing limiters whose body is written by a builder rather
+// than by hand (#439 decision 1): the three per-IP ones and the three failures-per-subject ones. It
 // holds what the route sends and everything its refusal is, as literals from the published budgets
 // and the refusal shapes #219 settled rather than read back off a tier, so a builder handed the
 // wrong tier, the wrong shape or the wrong audit identifier for one route fails here by name.
@@ -1845,12 +1932,6 @@ func builtLimiters() []builtLimiter {
 			request: ipRequest(http.MethodGet, "/activate"), budget: 30,
 			contentType: "text/html; charset=UTF-8", retryAfter: "300",
 			audited: map[string]interface{}{"limiter": "activate", "ip": ip}, warned: ipWarned("activate"),
-		},
-		{
-			name: "LimitRegister", limit: func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitRegister },
-			request: ipRequest(http.MethodPost, "/register"), budget: 20,
-			contentType: "text/html; charset=UTF-8", retryAfter: "300",
-			audited: map[string]interface{}{"limiter": "register", "ip": ip}, warned: ipWarned("register"),
 		},
 		{
 			name: "LimitResetPwd", limit: func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitResetPwd },
@@ -1913,12 +1994,12 @@ func runBuilt(m *RateLimiter, c builtLimiter, req *http.Request, failed bool) (*
 	return rr, reached
 }
 
-// TestBuiltLimiters_EachKeepsItsOwnRefusal holds the seven limiters a builder writes to what each
+// TestBuiltLimiters_EachKeepsItsOwnRefusal holds the six limiters a builder writes to what each
 // of them answered when it was written by hand (#439 decisions 1 and 2): the budget on both sides,
 // the refusal shape its caller parses, Retry-After at its own window, the one audit event with
 // exactly the identifier that route records, and a warning on every refusal that names a client
 // block for a per-IP tier and nobody for a per-subject one. The per-route tests above cover the
-// keys; this is the whole refusal, for all seven at once, because a builder writes all seven and
+// keys; this is the whole refusal, for all six at once, because a builder writes all six and
 // one wrong argument at one call site is the defect it makes possible.
 func TestBuiltLimiters_EachKeepsItsOwnRefusal(t *testing.T) {
 	for _, c := range builtLimiters() {
@@ -2039,8 +2120,8 @@ func TestBuiltLimiters_EachKeepsItsOwnRefusal(t *testing.T) {
 //
 // Over every tier the production constructor builds, found by walking the struct rather than by
 // listing them, because a listed set is green on the tier nobody added it to: the two keys a trip
-// test can reach today are two of fourteen tiers, and the next tier is what this exists for (#320
-// decision 3). The fourteen are nine request tiers and three failures-only ones, plus the two
+// test can reach today are two of fifteen tiers, and the next tier is what this exists for (#320
+// decision 3). The fifteen are ten request tiers and three failures-only ones, plus the two
 // failures-only tiers of the password gate, which ratelimit.AccountLimiter counts and accountTiers
 // names (#439).
 func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
@@ -2055,9 +2136,9 @@ func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
 	// The count is asserted because a walk that silently stopped matching would pass over an
 	// empty set exactly as it passes over a conformant one. It counts instances rather than
 	// distinct names, so a second tier carrying a name an earlier one already used is a
-	// fifteenth tier here rather than a replacement for the fourteenth.
-	if len(tiers) != 14 {
-		t.Fatalf("walked %d tiers, expected the 14 the constructor builds: %v", len(tiers), tiers)
+	// sixteenth tier here rather than a replacement for the fifteenth.
+	if len(tiers) != 15 {
+		t.Fatalf("walked %d tiers, expected the 15 the constructor builds: %v", len(tiers), tiers)
 	}
 	for _, found := range tiers {
 		if found.keyField == "" {

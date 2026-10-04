@@ -133,7 +133,6 @@ const (
 
 	EventCreatedUser              = "created_user"
 	EventActivatedAccount         = "activated_account"
-	EventCreatedPreRegistration   = "created_pre_registration"
 	EventDeletedUserSessionClient = "deleted_user_session_client"
 	EventLogout                   = "logout"
 
@@ -219,7 +218,33 @@ const (
 	// the code's encryption or store), whose cause is the Error log line on the same request id.
 	// The digest is a pseudonym, not a secret: anyone holding a candidate address can test it.
 	EventRequestedPasswordReset = "requested_password_reset"
-	EventChangedPassword        = "changed_password"
+	// EventRequestedRegistration records one self-registration request made while registration
+	// requires email verification, the twin of EventRequestedPasswordReset: written exactly once
+	// for every POST in that mode that reaches the handler, a malformed address included. Every
+	// well-formed request is answered with the same "check your email" page whatever became of
+	// it, so this entry is the only place an administrator can see what it led to (#207
+	// decision 8). A request the rate limiter refuses never reaches the handler and is
+	// EventRateLimitExceeded's. Registration without verification writes created_user instead.
+	//
+	// Written once the outcome is decided and before any mail is sent, so link_issued and
+	// notice_issued say what was issued, not that the mail went out: a send failure is an Error
+	// log line carrying the same request id, never a second entry.
+	//
+	// Payload: ip, the client IP truncated as the emailed-link records truncate it; emailDigest,
+	// the SHA-256 hex of the submitted address normalized as the lookups normalize it, never the
+	// address itself; userId, present only when an account matched; preRegistrationId, present
+	// only when a pending registration was written or found; and outcome, one of link_issued (a
+	// new pending registration and its link), link_pending (a pending registration that can still
+	// complete; nothing sent), notice_issued (a verified, enabled account, sent a notice that it
+	// already exists), unverified_address (an enabled account whose address is not verified;
+	// nothing sent), account_disabled (a disabled account, verified or not; nothing sent),
+	// invalid_address (the form was redrawn with its error) or server_error (the server failed
+	// before deciding; the cause is the Error log line on the same request id).
+	//
+	// It replaced created_pre_registration, which recorded the address in plain text and only
+	// for a new one. Rows already written under that name keep it; nothing writes it any more.
+	EventRequestedRegistration = "requested_registration"
+	EventChangedPassword       = "changed_password"
 	// EventRevokedUserAuthState records that a credential change invalidated a user's live
 	// authentication state: their generation advanced, their sessions were terminated and their
 	// refresh tokens revoked. Emitted by the four sites that perform that action AFTER their
@@ -383,7 +408,6 @@ var auditEventTypes = []string{
 	EventCreatedAuthCode,
 	EventCreatedClient,
 	EventCreatedGroup,
-	EventCreatedPreRegistration,
 	EventCreatedResource,
 	EventCreatedUser,
 	EventCrossUserSessionReplaced,
@@ -418,6 +442,7 @@ var auditEventTypes = []string{
 	EventRedemptionRefusedRedirectURI,
 	EventRefreshTokenReplayDetected,
 	EventRequestedPasswordReset,
+	EventRequestedRegistration,
 	EventRevokedClientGrants,
 	EventRevokedKey,
 	EventRevokedUserAuthState,

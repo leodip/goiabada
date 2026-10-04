@@ -145,13 +145,10 @@
 "account.register_success.login_prompt_prefix" = "Se desejar, "
 "account.register_success.login_prompt_suffix" = " para entrar e acessar sua página de conta."
 
-"account.activation.page_title" = "Cadastro"
-"account.activation.title" = "Cadastro"
-"account.activation.account_created" = "Sua conta foi criada."
-"account.activation.must_activate_prefix" = "Antes de acessar sua conta, é preciso completar o "
-"account.activation.must_activate_inner" = "processo de ativação por e-mail"
-"account.activation.must_activate_suffix" = "."
-"account.activation.check_inbox" = "Verifique sua caixa de entrada e a pasta de spam/lixo eletrônico em busca do e-mail de ativação, e clique no link de verificação contido nele para prosseguir."
+"account.register_check_email.page_title" = "Verifique seu e-mail"
+"account.register_check_email.title" = "Verifique seu e-mail"
+"account.register_check_email.message_sent" = "Enviamos uma mensagem para {{.email}} com o próximo passo. Se o endereço for novo, ela contém um link para você escolher sua senha, válido por 5 minutos. Se o endereço já tiver uma conta, ela explica como entrar."
+"account.register_check_email.no_message" = "Não recebeu a mensagem? Verifique sua pasta de spam ou cadastre-se novamente em 10 minutos para receber um novo link."
 
 "account.activate_password.page_title" = "Escolha sua senha"
 "account.activate_password.title" = "Escolha sua senha"
@@ -1516,6 +1513,7 @@
 
 "email.forgot_password.subject" = "Redefinição de senha"
 "email.register_activate.subject" = "Ative sua conta"
+"email.register_existing_account.subject" = "Você já tem uma conta"
 "email.register_confirmation.subject" = "Bem-vindo(a)!"
 "email.verification.subject" = "Verificação de e-mail - código {{.code}}"
 "email.newuser_set_password.subject" = "{{.appName}} - crie uma senha para sua nova conta"

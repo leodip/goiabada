@@ -84,8 +84,8 @@ func (s *Server) initRoutes(branches appBranches) {
 	pages.NotFound(handlers.HandleNotFoundGet(httpHelper))
 	pages.Get("/", handlers.HandleIndexGet(adminConsoleBaseURL))
 	pages.Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
-	pages.Get("/forgot-password", accounthandlers.HandleForgotPasswordGet(httpHelper))
-	pages.With(rateLimiter.LimitForgotPwd).Post("/forgot-password", accounthandlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL))
+	pages.Get(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordGet(httpHelper))
+	pages.With(rateLimiter.LimitForgotPwd).Post(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL))
 	// The two endpoints an emailed link points at register from the constants the links are
 	// built from, so a link and the endpoint it names cannot drift apart (#112, #434).
 	pages.With(rateLimiter.LimitResetPwd).Get(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
@@ -146,7 +146,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Get("/register", accounthandlers.HandleRegisterGet(httpHelper))
 		// The POST alone is limited: the GET renders a static form, while the POST probes
 		// whether an address already has an account, sends mail to it and writes a row.
-		r.With(rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleRegisterPost(httpHelper, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.dataCipher, baseURL, adminConsoleBaseURL))
+		r.With(rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleRegisterPost(httpHelper, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL, adminConsoleBaseURL))
 	})
 	// From emaillinks.AccountActivatePath, as the reset endpoints above are.
 	pages.With(rateLimiter.LimitActivate).Get(emaillinks.AccountActivatePath, accounthandlers.HandleActivateGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))

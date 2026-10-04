@@ -248,6 +248,7 @@ When enabled, Goiabada applies rate limits to security-sensitive endpoints:
 | `POST /forgot-password` | 5 / 5min | every request | email (lowercased) |
 | `POST /forgot-password` | 20 / 5min | every request | IP address (IPv6 grouped by /64) |
 | `GET` and `POST /reset-password` | 30 / 5min | every request | IP address (IPv6 grouped by /64) |
+| `POST /account/register` (self-registration) | 5 / 5min | every request | email (lowercased) |
 | `POST /account/register` (self-registration) | 20 / 5min | every request | IP address (IPv6 grouped by /64) |
 | `GET` and `POST /account/activate` | 30 / 5min | every request | IP address (IPv6 grouped by /64) |
 | `POST /connect/register` (DCR) | 10 / min | every request | IP address (IPv6 grouped by /64) |
