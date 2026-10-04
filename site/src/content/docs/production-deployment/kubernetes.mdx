@@ -1120,31 +1120,43 @@ rules apply to every step above:
 - **Leave the source holding what the Secret holds when the rotation is done,** so that a refresh,
   a reapply, a deleted Secret or a rebuilt cluster brings back the rotated keys and not the old ones.
 
-**With the External Secrets Operator,** each key is an entry in the manager and a line in the
-`ExternalSecret`'s `data`: a `-previous` key needs both, an entry of its own such as
-`goiabada/aes-encryption-key-previous` and a line mapping it to `aes-encryption-key-previous`, which
-you add in the step that adds the key. Ask the operator to refresh at once rather than at its
-`refreshInterval`, then wait for the digests:
+**With the External Secrets Operator,** never change the value of an entry the `ExternalSecret`
+reads. The operator reads each line of its `data` from the manager on its own, not as one snapshot,
+so a refresh that runs while you change several entries can write the Secret with some changed and
+the rest not: halfway through the session keys' swap, the new authentication key beside the old
+encryption key, a current pair that opens nothing while the previous pair is already the new one. A
+pod a crash or an eviction restarts then cannot open any session sealed under the old pair. Instead,
+each new value goes into an entry of its own, named for the rotation it belongs to, such as
+`goiabada/auth-session-auth-key-2026-10`, and a step changes which entries the `ExternalSecret`
+maps, in one edit of it, applied once. A refresh reads every line under one version of the
+`ExternalSecret`, and the entries that version names do not change while it reads them, so it writes
+the state before the edit or the state after it, each whole; a refresh already running when you
+apply the edit writes the state before it, and the next one the state after. Ask the operator to
+refresh at once rather than at its `refreshInterval`, then wait for the digests:
 
 ```bash
 kubectl annotate externalsecret goiabada-encryption-key -n goiabada force-sync="$(date +%s)" --overwrite
 ```
 
-- For the session keys, step 1 creates the four `-previous` entries with new values, `openssl rand
-  -hex 64` for each authentication key and `openssl rand -hex 32` for each encryption key, and maps
-  them; step 2 swaps the values in the manager, each pair's into the other's entries, reading all
-  eight before writing any; step 3 removes the Deployments' references first, as above, then the
-  four lines from `data`, then the four entries.
-- For the AES key, step 3 first copies the value of `goiabada/aes-encryption-key` to
-  `goiabada/aes-encryption-key-previous`, checking that its digest is that of the key you backed up in
-  step 1, then writes a new key, `openssl rand -hex 32`, into `goiabada/aes-encryption-key`, then maps
-  the previous entry. Copy before you overwrite: the entry's old value is the only key the database
-  is under. Step 4 reads the new key out of the cluster once it has arrived. Step 7 removes the
-  Deployment's reference, then the line from `data`, then the entry; the old key lives on in your
-  backup, not in the manager.
+- For the session keys, step 1 creates four entries holding the new pairs, `openssl rand -hex 64`
+  for each authentication key and `openssl rand -hex 32` for each encryption key, then adds the four
+  lines mapping the `-previous` keys to them. Step 2 is one edit that maps the four current keys,
+  `auth-session-auth-key` and the rest, to the new entries, and the four `-previous` keys to the
+  entries the current keys mapped until then; no entry's value changes. Step 3 removes the
+  Deployments' references first, as above, then the four `-previous` lines from `data`, then the old
+  pairs' entries.
+- For the AES key, step 3 creates an entry holding a new key, `openssl rand -hex 32`, such as
+  `goiabada/aes-encryption-key-2026-10`, then, in one edit, maps `aes-encryption-key` to it and adds
+  a line mapping `aes-encryption-key-previous` to the entry `aes-encryption-key` mapped until then,
+  the one holding the key the database is under. Once the Secret holds both, check that the digest
+  of `aes-encryption-key-previous` is that of the key you backed up in step 1. Step 4 reads the new
+  key out of the cluster. Step 7 removes the Deployment's reference, then the line from `data`. The
+  old key's entry can stay as that key's backup, for as long as you keep a database backup taken
+  under it.
 
-Removing a line from `data` before its entry keeps the operator from failing on an entry it can no
-longer read, which would leave the Secret as it was.
+Removing a line from `data` before its entry, and deleting the entry only once the Secret no longer
+holds that key, keeps the operator from failing on an entry it can no longer read, which would leave
+the Secret as it was.
 
 **With SealedSecrets,** each step's state is sealed into the file and applied, by you or by your
 GitOps tool. `kubeseal --merge-into` adds or replaces keys in an existing sealed file, each key sealed

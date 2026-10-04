@@ -92,3 +92,28 @@ func shellQuote(s string) string {
 	}
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
+
+// systemdPath writes s as a path a unit file's EnvironmentFile= reads back as s, or reports that
+// none does. systemd expands `%` specifiers in the setting (systemd.unit(5), "Specifiers"), `%%`
+// being a literal `%`, and then expands the path as a glob(3) pattern, which reads `*`, `?` and `[`
+// as wildcards and a `\` as making the character after it literal (systemd.exec(5),
+// EnvironmentFile=): `id[x]*.env` loaded an `idxa.env` beside it, and `identity%Z.env` was ignored
+// with "Failed to resolve unit specifiers". POSIX shell quoting means nothing there. A unit file
+// strips the whitespace that ends a value, so a path ending in a space has no spelling, and ok is
+// false. Control characters, the other whitespace systemd strips, never reach here (checkOutput).
+func systemdPath(s string) (path string, ok bool) {
+	if strings.HasSuffix(s, " ") {
+		return "", false
+	}
+	var b strings.Builder
+	for _, r := range s {
+		switch r {
+		case '%':
+			b.WriteByte('%')
+		case '\\', '*', '?', '[':
+			b.WriteByte('\\')
+		}
+		b.WriteRune(r)
+	}
+	return b.String(), true
+}

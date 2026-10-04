@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -178,4 +179,80 @@ func TestWizard_RefusesAnOutputNoHeaderCanName(t *testing.T) {
 			})
 		}
 	}
+}
+
+// The env file's header names it for systemd's EnvironmentFile=, which expands `%` specifiers and
+// then reads the path as a glob pattern, so the shell's quoting does not carry over: `id[x]*.env`
+// loaded an `idxa.env` beside it, and `identity%Z.env` was ignored. Each name is read back through
+// an emulation of those two expansions and must select the file written and not the decoy beside
+// it. The escapes were checked against systemd 259's unit loader for every name here.
+func TestEnvFileHeader_SystemdNamesTheFileWritten(t *testing.T) {
+	cases := []struct{ output, decoy string }{
+		{output: "id[x]*.env", decoy: "idxa.env"},
+		{output: "q?.env", decoy: "qa.env"},
+		{output: `back\slash.env`, decoy: "backslash.env"},
+		{output: "identity%Z.env"},
+		{output: "100%%.env", decoy: "100%.env"},
+		{output: "prod's x.env"},
+		{output: "goiabada.env"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.output, func(t *testing.T) {
+			config := testConfig()
+			config.Deployment = deployments[deploymentNative]
+			description, _ := writtenConfiguration(config, resolveOutputPaths(config.Deployment, filepath.Join(t.TempDir(), tc.output)))
+			_, setting, found := strings.Cut(header(description.content), "EnvironmentFile=/path/to/")
+			if !found {
+				t.Fatalf("the header names no EnvironmentFile=:\n%s", header(description.content))
+			}
+			setting, _, _ = strings.Cut(setting, "\n")
+			pattern, err := systemdSpecifiers(setting)
+			if err != nil {
+				t.Fatalf("systemd ignores EnvironmentFile=/path/to/%s: %v", setting, err)
+			}
+			if matched, err := filepath.Match(pattern, tc.output); err != nil || !matched {
+				t.Errorf("EnvironmentFile=/path/to/%s does not load %q (%v)", setting, tc.output, err)
+			}
+			if tc.decoy == "" {
+				return
+			}
+			if matched, _ := filepath.Match(pattern, tc.decoy); matched {
+				t.Errorf("EnvironmentFile=/path/to/%s loads %q too", setting, tc.decoy)
+			}
+		})
+	}
+}
+
+// A name ending in a space has no spelling in a unit file, which strips it, so the header says to
+// rename the file rather than name another one.
+func TestEnvFileHeader_SystemdCannotNameATrailingSpace(t *testing.T) {
+	config := testConfig()
+	config.Deployment = deployments[deploymentNative]
+	description, _ := writtenConfiguration(config, resolveOutputPaths(config.Deployment, filepath.Join(t.TempDir(), "goiabada.env ")))
+	head := header(description.content)
+	if strings.Contains(head, "EnvironmentFile=/") {
+		t.Errorf("the header names a path systemd would strip:\n%s", head)
+	}
+	if !strings.Contains(head, "a unit file cannot name one ending in a space") {
+		t.Errorf("the header does not say why it names no path:\n%s", head)
+	}
+}
+
+// systemdSpecifiers is an emulation, not systemd: it expands a unit setting's specifiers as
+// systemd.unit(5) describes for a setting holding none but `%%`, which is a literal `%`, and
+// refuses any other, which in a generated header names nothing the operator chose.
+func systemdSpecifiers(s string) (string, error) {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] != '%' {
+			b.WriteByte(s[i])
+			continue
+		}
+		if i+1 == len(s) || s[i+1] != '%' {
+			return "", fmt.Errorf("an unresolved specifier at %q", s[i:])
+		}
+		b.WriteByte('%')
+		i++
+	}
+	return b.String(), nil
 }

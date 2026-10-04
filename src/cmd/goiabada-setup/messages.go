@@ -332,6 +332,16 @@ func nativeStartCommand(paths outputPaths, binary string) string {
 	return "set -a && . " + shellQuote("./"+filepath.Base(paths.description)) + " && set +a && ./" + binary
 }
 
+// systemdEnvironmentFileHint is the env file's header line on loading it from a unit, naming the
+// file as systemd reads it rather than as a shell does (systemdPath).
+func systemdEnvironmentFileHint(paths outputPaths) string {
+	name, ok := systemdPath(filepath.Base(paths.description))
+	if !ok {
+		return "Or with systemd, add an EnvironmentFile= naming this file, renamed first: a unit file cannot name one ending in a space"
+	}
+	return "Or with systemd, add EnvironmentFile=/path/to/" + name
+}
+
 // printSecretsAdvice names the one file holding the secrets and says to keep it out of version
 // control, and, when it is written inside a git working tree, warns and gives the line that keeps it
 // out. It writes no .gitignore: that file is the operator's, and its rules may live elsewhere (#396
