@@ -3107,6 +3107,69 @@ func (_c *Database_DeleteCodesWithoutRefreshTokens_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// DeleteDeadPreRegistrations provides a mock function for the type Database
+func (_mock *Database) DeleteDeadPreRegistrations(ctx context.Context, tx *sql.Tx, deadBefore time.Time) error {
+	ret := _mock.Called(ctx, tx, deadBefore)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteDeadPreRegistrations")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, time.Time) error); ok {
+		r0 = returnFunc(ctx, tx, deadBefore)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteDeadPreRegistrations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteDeadPreRegistrations'
+type Database_DeleteDeadPreRegistrations_Call struct {
+	*mock.Call
+}
+
+// DeleteDeadPreRegistrations is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - deadBefore time.Time
+func (_e *Database_Expecter) DeleteDeadPreRegistrations(ctx any, tx any, deadBefore any) *Database_DeleteDeadPreRegistrations_Call {
+	return &Database_DeleteDeadPreRegistrations_Call{Call: _e.mock.On("DeleteDeadPreRegistrations", ctx, tx, deadBefore)}
+}
+
+func (_c *Database_DeleteDeadPreRegistrations_Call) Run(run func(ctx context.Context, tx *sql.Tx, deadBefore time.Time)) *Database_DeleteDeadPreRegistrations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteDeadPreRegistrations_Call) Return(err error) *Database_DeleteDeadPreRegistrations_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteDeadPreRegistrations_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, deadBefore time.Time) error) *Database_DeleteDeadPreRegistrations_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteExpiredAuthorizeRequests provides a mock function for the type Database
 func (_mock *Database) DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error {
 	ret := _mock.Called(ctx, tx, now)

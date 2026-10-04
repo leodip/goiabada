@@ -7,6 +7,7 @@ import (
 	"math/rand/v2"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
@@ -52,7 +53,7 @@ const (
 )
 
 // backgroundWorkerDatabase is what the cleanup worker needs: the claim that makes one instance
-// the sweeper, and the eight deletes it sweeps with.
+// the sweeper, and the nine deletes it sweeps with.
 type backgroundWorkerDatabase interface {
 	DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error
 	DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error
@@ -62,6 +63,7 @@ type backgroundWorkerDatabase interface {
 	DeleteIdleSessions(ctx context.Context, tx *sql.Tx, idleTimeout time.Duration) error
 	DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)
 	DeleteCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error
+	DeleteDeadPreRegistrations(ctx context.Context, tx *sql.Tx, deadBefore time.Time) error
 	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
 	TryClaimCleanupRun(ctx context.Context, tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)
 }
@@ -270,6 +272,22 @@ func (w *Worker) performTask(ctx context.Context) {
 		slog.ErrorContext(ctx, "unable to delete codes without refresh tokens", "error", err)
 	} else {
 		slog.InfoContext(ctx, "deleted codes without refresh tokens")
+	}
+
+	if cancelled(ctx) {
+		return
+	}
+
+	// Before the settings read, since it needs nothing from settings. The cutoff is the one
+	// definition of a pending registration that can no longer complete, the one the registration's
+	// replacement of a dead row reads, so this never deletes a row that could still be activated
+	// (#207 decision 7). On the claim rather than the poll: registration writes at most one row per
+	// address, and only after a well-formed submission at the cost of a sent mail.
+	err = w.database.DeleteDeadPreRegistrations(ctx, nil, emaillinks.PreRegistrationDeadBefore(time.Now().UTC()))
+	if err != nil {
+		slog.ErrorContext(ctx, "unable to delete dead pre-registrations", "error", err)
+	} else {
+		slog.InfoContext(ctx, "deleted dead pre-registrations")
 	}
 
 	if cancelled(ctx) {
