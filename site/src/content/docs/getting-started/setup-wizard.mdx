@@ -95,10 +95,10 @@ docker compose up -d
 
 The wizard creates a `goiabada-k8s.yaml` file with:
 
-- Namespace
+- Namespace (labelled to warn about pods that break the restricted Pod Security Standard)
 - Secret (credentials pre-generated and base64 encoded)
-- ConfigMap
-- Deployments (auth server and admin console)
+- One ConfigMap per server, holding only what that server reads
+- Deployments (auth server and admin console), each with a PodDisruptionBudget
 - Services
 - Gateway and HTTPRoutes (TLS by cert-manager)
 

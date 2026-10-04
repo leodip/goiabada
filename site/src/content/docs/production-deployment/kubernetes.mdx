@@ -44,10 +44,15 @@ Internet → Gateway/Ingress (HTTPS/TLS) → {
 ```
 
 The setup wizard generates:
-- **Namespace**: Isolated environment for Goiabada resources
+- **Namespace**: Isolated environment for Goiabada resources, labelled to warn about any pod that
+  breaks the restricted Pod Security Standard (see [Pod security](#pod-security))
 - **Secret**: Database password, session keys, OAuth client secret (base64 encoded)
-- **ConfigMap**: URLs, database connection details, app configuration
-- **Deployments**: Auth server and admin console with health checks and resource limits
+- **ConfigMaps**: `goiabada-authserver-config` and `goiabada-adminconsole-config`, one per server,
+  each holding only the variables that server reads. The three URLs are in both, written from the
+  same answers, so if you change one, change it in both
+- **Deployments**: Auth server and admin console, hardened to the restricted standard, with health
+  checks, resource limits, a rolling update strategy and a spread over nodes
+- **PodDisruptionBudgets**: One per Deployment (see [Disruptions](#disruptions-and-spread))
 - **Services**: ClusterIP services for internal routing
 - **Gateway and HTTPRoutes**: External access with TLS termination
 
@@ -356,13 +361,15 @@ that the pods fit under the database's connection limit:
 (replicas + surge) × GOIABADA_DB_MAX_OPEN_CONNS + headroom < max_connections
 ```
 
-- **Surge** is the extra pods a rolling update runs beside the old ones. A Deployment's default
-  `maxSurge` of 25%, rounded up, adds one pod to three replicas, so a deploy briefly runs four.
+- **Surge** is the extra pods a rolling update runs beside the old ones. The generated Deployments
+  set `maxSurge: 1` and `maxUnavailable: 0`: a rollout starts one new pod, waits for it to be ready,
+  and only then stops an old one, so three replicas briefly run four and never fewer than three.
 - **Headroom** is every other connection the database must accept: the `migrate` subcommand, the
   maintenance connection a starting pod opens to create the database when `GOIABADA_DB_CREATE` is
   on, your own sessions, and any other application on the same server. The admin console opens
   none.
-- With a HorizontalPodAutoscaler, **replicas is its `maxReplicas`**, not today's count.
+- With a HorizontalPodAutoscaler, **replicas is its `maxReplicas`**, not today's count (see
+  [Autoscaling](#autoscaling)).
 
 With the defaults, three replicas and one surge pod make 4 × 20 = 80 connections. A stock
 PostgreSQL allows 100, less 3 reserved for superusers, which leaves 17 for the headroom; a stock
@@ -375,6 +382,38 @@ than the database refusing a new connection to every pod at once. Raising replic
 `max_connections` does not add capacity at the database: it moves the bottleneck from the pods'
 queues to the database's refusals. The pool settings are in the
 [environment variable reference](/reference/environment-variables/#database-configuration).
+
+### Disruptions and spread
+
+Each Deployment has a PodDisruptionBudget with `maxUnavailable: 1`, so a voluntary disruption (a
+`kubectl drain`, a node pool upgrade, a cluster autoscaler removing a node) evicts at most one of its
+pods at a time. The budget does not stop that one: at the generated `replicas: 1`, a drain evicts the
+only pod, and the server is down until its replacement is scheduled elsewhere and ready. The rollout
+strategy does not help here, because an eviction is not a rollout and starts no surge pod first. To
+keep serving through a drain, run at least two replicas; the same budget then keeps all but one
+serving at any replica count, so it needs no change when you scale.
+
+Each pod template also spreads its pods over nodes (`topologySpreadConstraints` on
+`kubernetes.io/hostname`, `maxSkew: 1`, `whenUnsatisfiable: ScheduleAnyway`). At one replica it does
+nothing. At three on three nodes it places one per node, so losing or draining a node takes one pod
+rather than all of them; on fewer nodes than replicas it still schedules every pod rather than
+leaving one pending.
+
+### Autoscaling
+
+The manifest runs one replica of each server and emits no HorizontalPodAutoscaler. You can add one,
+but settle two things first:
+
+- **The database's connections.** An autoscaler's `maxReplicas`, plus the one surge pod, is the
+  count the [connection arithmetic](#scale-replicas) above has to hold for, because it may scale out
+  to it at the worst moment, under load. Size `GOIABADA_DB_MAX_OPEN_CONNS` and the database's
+  `max_connections` for that count before you set it.
+- **What to scale on.** CPU is the auth server's bottleneck under a burst of sign-ins (see
+  [Resource limits](#resource-limits)), so a CPU target relative to the `100m` request is a
+  reasonable signal; the admin console verifies no passwords and rarely needs more than one or two
+  replicas.
+
+If the rate limiter is on, more replicas also multiply its per-pod limits (see below).
 
 ### Rate limiting across replicas
 
@@ -400,7 +439,7 @@ The budgets are in the [rate limiting table](/reference/environment-variables/#s
 
 ### Resource limits
 
-The generated manifests include default limits. Adjust based on your load:
+Both containers request `100m` of CPU and `128Mi` of memory, and are limited to `500m` and `512Mi`:
 
 ```yaml
 resources:
@@ -410,6 +449,67 @@ resources:
   limits:
     memory: "512Mi"
     cpu: "500m"
+```
+
+What the CPU numbers mean for the auth server comes down to one operation. A sign-in costs one
+bcrypt password check at cost 10, about 35 ms of CPU on a modern core, which no limit slows when it
+runs alone. Under the `500m` limit a pod verifies about 14 passwords a second, and a burst queues
+behind that: measured, 16 sign-ins arriving at once took about 1.2 s to complete, and every other
+request on that pod waited with them. Cloud vCPUs are often slower than the core measured, and the
+`100m` request is all the scheduler guarantees when the node is busy. If your sign-in peak is higher,
+raise the CPU limit or add replicas. The limit stays because it bounds a server an attacker can make
+spend CPU on purpose, by sending passwords to check.
+
+The admin console verifies no passwords and needs less; it carries the same numbers for simplicity.
+
+## Pod security
+
+Every generated container runs with this `securityContext`, which is everything the restricted
+[Pod Security Standard](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
+requires and a read-only root filesystem besides:
+
+```yaml
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+```
+
+uid 10001 is the user both images run as (see [the user the images run
+as](/production-deployment/#the-user-the-images-run-as)). No writable volume is mounted, because
+neither server writes to its filesystem under Kubernetes: the legacy bootstrap file is not used here,
+and the auth server's one other write, Go spilling a picture upload over its size limit to `/tmp`,
+fails on the read-only root and is refused as `FILE_TOO_LARGE` rather than by the image check, a 400
+either way.
+A certificate or customization you mount from a Secret or ConfigMap volume is readable by default
+(mode `0644`); if you set a stricter `defaultMode`, keep it readable by uid or gid 10001.
+
+Both pod specs also set:
+
+- `automountServiceAccountToken: false`, because neither server calls the Kubernetes API, so a
+  compromised pod gets no API credential.
+- `enableServiceLinks: false`, because Kubernetes would otherwise inject variables for every Service
+  in the namespace, and two of the generated Services are named so that those variables begin with
+  `GOIABADA_` (`GOIABADA_AUTHSERVER_PORT`, `GOIABADA_ADMINCONSOLE_SERVICE_HOST` and the rest), which
+  neither server reads.
+
+The generated Namespace is labelled `pod-security.kubernetes.io/warn: restricted` and
+`pod-security.kubernetes.io/audit: restricted`. `kubectl apply` then prints a warning, and the API
+server writes an audit entry, for any pod in the namespace that breaks the standard, Goiabada's own
+included, and nothing is refused. It does not enforce, because the wizard accepts an existing
+namespace whose other workloads `kubectl apply` would then start refusing. If you own the namespace
+outright, add the enforcing label once you have checked that everything else running there meets
+the standard, including cert-manager's HTTP-01 solver pods, which run in it while a certificate is
+issued:
+
+```bash
+kubectl label namespace goiabada pod-security.kubernetes.io/enforce=restricted
 ```
 
 ## Health endpoints
@@ -494,6 +594,12 @@ then the handed-off work, then requests still in flight.
 
 ## Updating Goiabada
 
+A release of the setup wizard writes its own version into both image lines with
+`imagePullPolicy: IfNotPresent`, since a version tag names one build. A wizard built from source has
+no version to write and uses `latest` with `imagePullPolicy: Always`, under a comment, and warns you
+when it finishes: `latest` moves, so pods started at different times can run different releases.
+Replace it with a [release version](https://github.com/leodip/goiabada/releases) before production.
+
 1. Update image tags in your manifest or regenerate with the setup wizard
 2. Apply changes:
    ```bash
@@ -503,3 +609,14 @@ then the handed-off work, then requests still in flight.
    ```bash
    kubectl rollout status deployment/goiabada-authserver -n goiabada
    ```
+
+### From a manifest with one shared ConfigMap
+
+Manifests generated before each server got its own ConfigMap had one, `goiabada-config`, read by
+both. Applying a new manifest creates the two new ConfigMaps and points the Deployments at them, but
+`kubectl apply` does not delete a resource the file no longer names, so delete the old one once the
+rollout has finished:
+
+```bash
+kubectl delete configmap goiabada-config -n goiabada
+```

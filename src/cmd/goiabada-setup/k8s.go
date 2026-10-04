@@ -49,6 +49,14 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("kind: Namespace\n")
 	sb.WriteString("metadata:\n")
 	fmt.Fprintf(&sb, "  name: %s\n", yamlQuote(ns))
+	sb.WriteString("  # Pod Security admission warns on apply, and writes to the audit log, for any pod in this\n")
+	sb.WriteString("  # namespace that breaks the restricted standard, and refuses none. If you own the namespace\n")
+	sb.WriteString("  # outright, add pod-security.kubernetes.io/enforce: restricted to refuse such pods; check\n")
+	sb.WriteString("  # first that everything else running here meets it, cert-manager's HTTP-01 solver pods\n")
+	sb.WriteString("  # included, which run here while a certificate is issued.\n")
+	sb.WriteString("  labels:\n")
+	sb.WriteString("    pod-security.kubernetes.io/warn: restricted\n")
+	sb.WriteString("    pod-security.kubernetes.io/audit: restricted\n")
 	sb.WriteString("\n")
 
 	// Secret
@@ -72,21 +80,13 @@ func generateKubernetesManifests(config *Config) string {
 	fmt.Fprintf(&sb, "  oauth-client-secret: %s\n", base64Encode(config.OAuthClientSecret))
 	sb.WriteString("\n")
 
-	// ConfigMap
-	sb.WriteString("---\n")
-	sb.WriteString("apiVersion: v1\n")
-	sb.WriteString("kind: ConfigMap\n")
-	sb.WriteString("metadata:\n")
-	sb.WriteString("  name: goiabada-config\n")
-	fmt.Fprintf(&sb, "  namespace: %s\n", yamlQuote(ns))
-	sb.WriteString("data:\n")
+	// One ConfigMap per process, holding exactly what that process reads, so neither is handed the
+	// other's settings; each server's unit tier holds its container to that (#396 decision 13).
+	writeConfigMapHead(&sb, ns, "goiabada-authserver-config", "What the auth server reads.")
+	writeSharedURLs(&sb, config)
 	sb.WriteString("  GOIABADA_APPNAME: \"Goiabada\"\n")
 	fmt.Fprintf(&sb, "  GOIABADA_ADMIN_EMAIL: %s\n", yamlQuote(config.AdminEmail))
-	fmt.Fprintf(&sb, "  GOIABADA_AUTHSERVER_BASEURL: %s\n", yamlQuote(config.AuthServerURL))
-	sb.WriteString("  GOIABADA_AUTHSERVER_INTERNALBASEURL: \"http://goiabada-authserver:9090\"\n")
-	fmt.Fprintf(&sb, "  GOIABADA_ADMINCONSOLE_BASEURL: %s\n", yamlQuote(config.AdminConsoleURL))
 	sb.WriteString("  GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS: \"true\"\n")
-	sb.WriteString("  GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS: \"true\"\n")
 	fmt.Fprintf(&sb, "  GOIABADA_DB_TYPE: %s\n", yamlQuote(config.Engine.name))
 	fmt.Fprintf(&sb, "  GOIABADA_DB_HOST: %s\n", yamlQuote(config.DBHost))
 	fmt.Fprintf(&sb, "  GOIABADA_DB_PORT: %s\n", yamlQuote(config.DBPort))
@@ -94,32 +94,23 @@ func generateKubernetesManifests(config *Config) string {
 	fmt.Fprintf(&sb, "  GOIABADA_DB_USERNAME: %s\n", yamlQuote(config.DBUsername))
 	sb.WriteString("\n")
 
+	writeConfigMapHead(&sb, ns, "goiabada-adminconsole-config", "What the admin console reads.")
+	writeSharedURLs(&sb, config)
+	sb.WriteString("  GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS: \"true\"\n")
+	sb.WriteString("\n")
+
 	// Auth Server Deployment
-	sb.WriteString("---\n")
-	sb.WriteString("apiVersion: apps/v1\n")
-	sb.WriteString("kind: Deployment\n")
-	sb.WriteString("metadata:\n")
-	sb.WriteString("  name: goiabada-authserver\n")
-	fmt.Fprintf(&sb, "  namespace: %s\n", yamlQuote(ns))
-	sb.WriteString("spec:\n")
-	sb.WriteString("  replicas: 1\n")
-	sb.WriteString("  selector:\n")
-	sb.WriteString("    matchLabels:\n")
-	sb.WriteString("      app: goiabada-authserver\n")
-	sb.WriteString("  template:\n")
-	sb.WriteString("    metadata:\n")
-	sb.WriteString("      labels:\n")
-	sb.WriteString("        app: goiabada-authserver\n")
-	sb.WriteString("    spec:\n")
+	writeDeploymentHead(&sb, ns, "goiabada-authserver",
+		"The surge pod opens its own database connections: the docs' connection arithmetic counts it.")
 	writeTerminationGracePeriod(&sb, "Set lower, it cuts the cleanup worker short first.")
+	writeTopologySpread(&sb, "goiabada-authserver")
 	sb.WriteString("      containers:\n")
-	sb.WriteString("      - name: authserver\n")
-	fmt.Fprintf(&sb, "        image: leodip/goiabada:authserver-%s\n", imageTag)
+	writeContainerHead(&sb, "authserver")
 	sb.WriteString("        ports:\n")
 	sb.WriteString("        - containerPort: 9090\n")
 	sb.WriteString("        envFrom:\n")
 	sb.WriteString("        - configMapRef:\n")
-	sb.WriteString("            name: goiabada-config\n")
+	sb.WriteString("            name: goiabada-authserver-config\n")
 	sb.WriteString("        env:\n")
 	sb.WriteString("        - name: GOIABADA_ADMIN_PASSWORD\n")
 	sb.WriteString("          valueFrom:\n")
@@ -158,43 +149,31 @@ func generateKubernetesManifests(config *Config) string {
 		"failureThreshold until it times periodSeconds covers them, or the container is",
 		"restarted mid-migration.")
 	writePreStopPause(&sb)
-	sb.WriteString("        resources:\n")
-	sb.WriteString("          requests:\n")
-	sb.WriteString("            memory: \"128Mi\"\n")
-	sb.WriteString("            cpu: \"100m\"\n")
-	sb.WriteString("          limits:\n")
-	sb.WriteString("            memory: \"512Mi\"\n")
-	sb.WriteString("            cpu: \"500m\"\n")
+	writeResources(&sb,
+		"A sign-in costs one bcrypt check at cost 10, about 35ms of CPU on a modern core, which no",
+		"limit slows on its own. At the 500m limit a pod verifies about 14 a second, and a burst",
+		"queues behind that: 16 at once take about 1.2s, and every other request on the pod waits",
+		"with them. Cloud cores are often slower than the one measured, and the 100m request is all",
+		"the scheduler guarantees on a busy node. For a higher sign-in peak, raise the limit or add",
+		"replicas.")
+	sb.WriteString("\n")
+	writeDisruptionBudget(&sb, ns, "goiabada-authserver")
 	sb.WriteString("\n")
 
 	// Admin Console Deployment
-	sb.WriteString("---\n")
-	sb.WriteString("apiVersion: apps/v1\n")
-	sb.WriteString("kind: Deployment\n")
-	sb.WriteString("metadata:\n")
-	sb.WriteString("  name: goiabada-adminconsole\n")
-	fmt.Fprintf(&sb, "  namespace: %s\n", yamlQuote(ns))
-	sb.WriteString("spec:\n")
-	sb.WriteString("  replicas: 1\n")
-	sb.WriteString("  selector:\n")
-	sb.WriteString("    matchLabels:\n")
-	sb.WriteString("      app: goiabada-adminconsole\n")
-	sb.WriteString("  template:\n")
-	sb.WriteString("    metadata:\n")
-	sb.WriteString("      labels:\n")
-	sb.WriteString("        app: goiabada-adminconsole\n")
-	sb.WriteString("    spec:\n")
+	writeDeploymentHead(&sb, ns, "goiabada-adminconsole",
+		"This server opens no database connections, so its surge pod costs the database nothing.")
 	writeTerminationGracePeriod(&sb,
 		"The auth server's value: this server stops within its 15s drain, and a grace period",
 		"is a ceiling, not a wait.")
+	writeTopologySpread(&sb, "goiabada-adminconsole")
 	sb.WriteString("      containers:\n")
-	sb.WriteString("      - name: adminconsole\n")
-	fmt.Fprintf(&sb, "        image: leodip/goiabada:adminconsole-%s\n", imageTag)
+	writeContainerHead(&sb, "adminconsole")
 	sb.WriteString("        ports:\n")
 	sb.WriteString("        - containerPort: 9091\n")
 	sb.WriteString("        envFrom:\n")
 	sb.WriteString("        - configMapRef:\n")
-	sb.WriteString("            name: goiabada-config\n")
+	sb.WriteString("            name: goiabada-adminconsole-config\n")
 	sb.WriteString("        env:\n")
 	sb.WriteString("        - name: GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET\n")
 	sb.WriteString("          valueFrom:\n")
@@ -214,13 +193,10 @@ func generateKubernetesManifests(config *Config) string {
 	writeProbes(&sb, 9091,
 		"The auth server's budget: this server starts in seconds.")
 	writePreStopPause(&sb)
-	sb.WriteString("        resources:\n")
-	sb.WriteString("          requests:\n")
-	sb.WriteString("            memory: \"128Mi\"\n")
-	sb.WriteString("            cpu: \"100m\"\n")
-	sb.WriteString("          limits:\n")
-	sb.WriteString("            memory: \"512Mi\"\n")
-	sb.WriteString("            cpu: \"500m\"\n")
+	writeResources(&sb,
+		"The auth server's numbers. This server verifies no passwords and needs less.")
+	sb.WriteString("\n")
+	writeDisruptionBudget(&sb, ns, "goiabada-adminconsole")
 	sb.WriteString("\n")
 
 	// Services
@@ -313,6 +289,139 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("        statusCode: 301\n")
 
 	return sb.String()
+}
+
+// writeConfigMapHead opens the ConfigMap name, under a comment saying whose it is.
+func writeConfigMapHead(sb *strings.Builder, ns, name, whose string) {
+	sb.WriteString("---\n")
+	fmt.Fprintf(sb, "# %s\n", whose)
+	sb.WriteString("# The three URLs are in both ConfigMaps, written from the same answers; change them in both.\n")
+	sb.WriteString("apiVersion: v1\n")
+	sb.WriteString("kind: ConfigMap\n")
+	sb.WriteString("metadata:\n")
+	fmt.Fprintf(sb, "  name: %s\n", name)
+	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
+	sb.WriteString("data:\n")
+}
+
+// writeSharedURLs writes the three URLs both processes read, the one place either ConfigMap takes
+// them from, so the two cannot disagree.
+func writeSharedURLs(sb *strings.Builder, config *Config) {
+	fmt.Fprintf(sb, "  GOIABADA_AUTHSERVER_BASEURL: %s\n", yamlQuote(config.AuthServerURL))
+	sb.WriteString("  GOIABADA_AUTHSERVER_INTERNALBASEURL: \"http://goiabada-authserver:9090\"\n")
+	fmt.Fprintf(sb, "  GOIABADA_ADMINCONSOLE_BASEURL: %s\n", yamlQuote(config.AdminConsoleURL))
+}
+
+// writeDeploymentHead opens the Deployment name, whose pods carry the label app: name, down to its
+// pod spec's first fields: its rollout, under the line saying what its surge pod costs, and the two
+// things Kubernetes hands a pod unasked that neither server uses.
+func writeDeploymentHead(sb *strings.Builder, ns, name, surge string) {
+	sb.WriteString("---\n")
+	sb.WriteString("apiVersion: apps/v1\n")
+	sb.WriteString("kind: Deployment\n")
+	sb.WriteString("metadata:\n")
+	fmt.Fprintf(sb, "  name: %s\n", name)
+	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
+	sb.WriteString("spec:\n")
+	sb.WriteString("  replicas: 1\n")
+	sb.WriteString("  # A rollout starts one new pod and waits for it to be ready before it stops an old one, so\n")
+	sb.WriteString("  # it never runs fewer pods than replicas.\n")
+	fmt.Fprintf(sb, "  # %s\n", surge)
+	sb.WriteString("  strategy:\n")
+	sb.WriteString("    type: RollingUpdate\n")
+	sb.WriteString("    rollingUpdate:\n")
+	sb.WriteString("      maxUnavailable: 0\n")
+	sb.WriteString("      maxSurge: 1\n")
+	sb.WriteString("  selector:\n")
+	sb.WriteString("    matchLabels:\n")
+	fmt.Fprintf(sb, "      app: %s\n", name)
+	sb.WriteString("  template:\n")
+	sb.WriteString("    metadata:\n")
+	sb.WriteString("      labels:\n")
+	fmt.Fprintf(sb, "        app: %s\n", name)
+	sb.WriteString("    spec:\n")
+	sb.WriteString("      # Neither server calls the Kubernetes API, so the pod mounts no service account token.\n")
+	sb.WriteString("      automountServiceAccountToken: false\n")
+	sb.WriteString("      # Kubernetes would otherwise give the container variables for every Service in the\n")
+	sb.WriteString("      # namespace, GOIABADA_AUTHSERVER_PORT and GOIABADA_ADMINCONSOLE_SERVICE_HOST among them,\n")
+	sb.WriteString("      # none of which either server reads.\n")
+	sb.WriteString("      enableServiceLinks: false\n")
+}
+
+// writeTopologySpread writes a pod spec's preference for one pod of the Deployment name per node.
+func writeTopologySpread(sb *strings.Builder, name string) {
+	sb.WriteString("      # Spread the pods over nodes, so losing or draining one takes as few as it can. Inert at\n")
+	sb.WriteString("      # one replica; with more, a pod is still scheduled when the nodes cannot be balanced.\n")
+	sb.WriteString("      topologySpreadConstraints:\n")
+	sb.WriteString("      - maxSkew: 1\n")
+	sb.WriteString("        topologyKey: kubernetes.io/hostname\n")
+	sb.WriteString("        whenUnsatisfiable: ScheduleAnyway\n")
+	sb.WriteString("        labelSelector:\n")
+	sb.WriteString("          matchLabels:\n")
+	fmt.Fprintf(sb, "            app: %s\n", name)
+}
+
+// writeContainerHead opens the container name, running the image of the same name at the wizard's
+// tag, with the pull policy that tag needs and the container's securityContext.
+func writeContainerHead(sb *strings.Builder, name string) {
+	fmt.Fprintf(sb, "      - name: %s\n", name)
+	fmt.Fprintf(sb, "        image: leodip/goiabada:%s-%s\n", name, imageTag)
+	if imageTag == "latest" {
+		sb.WriteString("        # latest is a moving tag: each start pulls whatever release it names then, so pods can\n")
+		sb.WriteString("        # run different releases. Replace it with a release version to pin the image.\n")
+		sb.WriteString("        imagePullPolicy: Always\n")
+	} else {
+		sb.WriteString("        # A version tag names one build, so a node pulls it once.\n")
+		sb.WriteString("        imagePullPolicy: IfNotPresent\n")
+	}
+	sb.WriteString("        # Everything the restricted Pod Security Standard requires, and a read-only root besides.\n")
+	sb.WriteString("        # Neither server writes to its filesystem here: the legacy bootstrap file is unused under\n")
+	sb.WriteString("        # Kubernetes, and the auth server's one other write, Go spilling an upload over the size\n")
+	sb.WriteString("        # limit to /tmp, is refused as FILE_TOO_LARGE rather than by the image check, a 400 either\n")
+	sb.WriteString("        # way. No writable mount is needed.\n")
+	sb.WriteString("        securityContext:\n")
+	sb.WriteString("          runAsNonRoot: true\n")
+	sb.WriteString("          runAsUser: 10001\n")
+	sb.WriteString("          runAsGroup: 10001\n")
+	sb.WriteString("          allowPrivilegeEscalation: false\n")
+	sb.WriteString("          readOnlyRootFilesystem: true\n")
+	sb.WriteString("          capabilities:\n")
+	sb.WriteString("            drop: [\"ALL\"]\n")
+	sb.WriteString("          seccompProfile:\n")
+	sb.WriteString("            type: RuntimeDefault\n")
+}
+
+// writeResources writes a container's requests and limits under the lines saying what they mean
+// for it (#396 decision 12).
+func writeResources(sb *strings.Builder, meaning ...string) {
+	for _, line := range meaning {
+		fmt.Fprintf(sb, "        # %s\n", line)
+	}
+	sb.WriteString("        resources:\n")
+	sb.WriteString("          requests:\n")
+	sb.WriteString("            memory: \"128Mi\"\n")
+	sb.WriteString("            cpu: \"100m\"\n")
+	sb.WriteString("          limits:\n")
+	sb.WriteString("            memory: \"512Mi\"\n")
+	sb.WriteString("            cpu: \"500m\"\n")
+}
+
+// writeDisruptionBudget writes the PodDisruptionBudget of the Deployment name.
+func writeDisruptionBudget(sb *strings.Builder, ns, name string) {
+	sb.WriteString("---\n")
+	sb.WriteString("# A voluntary disruption, such as a node drain or a cluster upgrade, evicts one pod at a\n")
+	sb.WriteString("# time. At one replica that pod is still evicted, and the server is down until its\n")
+	sb.WriteString("# replacement is ready; at n replicas, n-1 keep serving.\n")
+	sb.WriteString("apiVersion: policy/v1\n")
+	sb.WriteString("kind: PodDisruptionBudget\n")
+	sb.WriteString("metadata:\n")
+	fmt.Fprintf(sb, "  name: %s\n", name)
+	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
+	sb.WriteString("spec:\n")
+	sb.WriteString("  maxUnavailable: 1\n")
+	sb.WriteString("  selector:\n")
+	sb.WriteString("    matchLabels:\n")
+	fmt.Fprintf(sb, "      app: %s\n", name)
 }
 
 // writeTerminationGracePeriod writes a pod spec's grace period under the formula an operator who
