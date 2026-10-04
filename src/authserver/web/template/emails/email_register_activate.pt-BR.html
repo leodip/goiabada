@@ -7,11 +7,13 @@
 <div>
     <p>Olá,</p>
 
-    <p>Para ativar sua conta, verifique seu endereço de e-mail clicando no link abaixo:</p>
+    <p>Para terminar de criar sua conta no {{ .appName }}, clique no link abaixo e escolha uma senha:</p>
 
     <p><a href="{{.link}}">{{.link}}</a></p>
 
-    <p>Se tiver problemas para clicar no link, copie e cole o endereço no seu navegador.</p>
+    <p>O link expira em 5 minutos. Se tiver problemas para clicar nele, copie e cole o endereço no seu navegador.</p>
+
+    <p>Se você não pediu para criar uma conta, ignore esta mensagem: nenhuma conta é criada a menos que o link seja usado.</p>
 
     <p>Atenciosamente,<br />{{ .appName }}</p>
 </div>

@@ -44,6 +44,85 @@ func assertSelfRegistrationDisabledLogged(t *testing.T, logs *logtest.SlogCaptur
 	assert.Equal(t, "self-registration request refused because self-registration is disabled", records[0].Message)
 }
 
+// TestHandleRegisterGet_TheFormAsksForThePasswordOnlyWithoutVerification pins what the page is
+// bound with: with verification required (SMTP on and the setting on) the form takes the address
+// alone and the password is chosen from the emailed link; in every other mode it is unchanged
+// (#207 decision 1).
+func TestHandleRegisterGet_TheFormAsksForThePasswordOnlyWithoutVerification(t *testing.T) {
+	for _, tc := range []struct {
+		name                     string
+		smtpEnabled              bool
+		requiresVerification     bool
+		wantRequiresVerification bool
+	}{
+		{"SMTP on and verification required", true, true, true},
+		{"SMTP on and verification not required", true, false, false},
+		{"SMTP off and verification required", false, true, false},
+		{"SMTP off and verification not required", false, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			req := httptest.NewRequest("GET", "/account/register", nil)
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{
+				SelfRegistrationEnabled: true,
+				SMTPEnabled:             tc.smtpEnabled,
+				SelfRegistrationRequiresEmailVerification: tc.requiresVerification,
+			}))
+
+			var rendered map[string]interface{}
+			pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).
+				Run(func(args mock.Arguments) { rendered = args.Get(4).(map[string]interface{}) }).
+				Return(nil).Once()
+
+			HandleRegisterGet(pageRenderer).ServeHTTP(httptest.NewRecorder(), req)
+
+			require.NotNil(t, rendered)
+			assert.Equal(t, tc.wantRequiresVerification, rendered["requiresEmailVerification"])
+		})
+	}
+}
+
+// A redrawn form keeps the shape the mode gives it: with verification, still the address alone.
+func TestHandleRegisterPost_TheRedrawnFormKeepsItsMode(t *testing.T) {
+	for _, tc := range []struct {
+		name                     string
+		settings                 *record.Settings
+		wantRequiresVerification bool
+	}{
+		{"with verification", &record.Settings{SelfRegistrationEnabled: true, SMTPEnabled: true,
+			SelfRegistrationRequiresEmailVerification: true}, true},
+		{"without verification", &record.Settings{SelfRegistrationEnabled: true}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			database := datamocks.NewDatabase(t)
+			userCreator := accounthandlersmocks.NewUserCreator(t)
+			emailValidator := accounthandlersmocks.NewEmailValidator(t)
+			passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+			emailSender := accounthandlersmocks.NewEmailSender(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator,
+				passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+
+			req := httptest.NewRequest("POST", "/account/register", strings.NewReader(url.Values{"email": {""}}.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req = req.WithContext(reqctx.WithSettings(req.Context(), tc.settings))
+
+			var rendered map[string]interface{}
+			pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).
+				Run(func(args mock.Arguments) { rendered = args.Get(4).(map[string]interface{}) }).
+				Return(nil).Once()
+
+			handler.ServeHTTP(httptest.NewRecorder(), req)
+
+			require.NotNil(t, rendered)
+			assert.Equal(t, "Email is required.", rendered["error"])
+			assert.Equal(t, tc.wantRequiresVerification, rendered["requiresEmailVerification"])
+		})
+	}
+}
+
 func TestHandleRegisterGet(t *testing.T) {
 	t.Run("Self registration enabled", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
@@ -547,6 +626,9 @@ func TestHandleRegisterPost(t *testing.T) {
 
 		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
+		// The form with verification has the address alone. A password submitted anyway is
+		// ignored: the person who follows the emailed link chooses it (#207 decision 1), so the
+		// validator is never asked and nothing derived from it is stored.
 		form := url.Values{}
 		form.Add("email", "test@example.com")
 		form.Add("password", "password123")
@@ -568,13 +650,12 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
-		passwordValidator.On("ValidatePassword", mock.Anything, "password123").Return(nil)
 
 		var capturedVerificationCode string
 		database.On("CreatePreRegistration", mock.Anything, mock.Anything, mock.AnythingOfType("*record.PreRegistration")).Return(nil).Run(func(args mock.Arguments) {
 			preReg := args.Get(2).(*record.PreRegistration)
 			assert.Equal(t, "test@example.com", preReg.Email)
-			assert.NotEmpty(t, preReg.PasswordHash)
+			assert.Empty(t, preReg.PasswordHash, "the pending registration stores no password")
 			assert.NotEmpty(t, preReg.VerificationCodeEncrypted)
 			assert.True(t, preReg.VerificationCodeIssuedAt.Valid)
 
@@ -623,7 +704,8 @@ func TestHandleRegisterPost(t *testing.T) {
 
 		database.AssertExpectations(t)
 		emailValidator.AssertExpectations(t)
-		passwordValidator.AssertExpectations(t)
+		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything)
+		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 		auditLogger.AssertExpectations(t)
 		emailSender.AssertExpectations(t)
 		pageRenderer.AssertExpectations(t)

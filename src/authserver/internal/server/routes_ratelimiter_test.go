@@ -77,7 +77,7 @@ const (
 	// another that publishes the same number.
 	registerBudget              = 20  // requests per 5 minutes per /64
 	registerWindow              = 300 // seconds
-	activateBudget              = 20  // requests per 5 minutes per /64
+	activateBudget              = 30  // requests per 5 minutes per /64, shared by GET and POST
 	activateWindow              = 300
 	forgotPwdIpBudget           = 20 // requests per 5 minutes per /64
 	forgotPwdEmailBudget        = 5  // requests per 5 minutes per address
@@ -429,6 +429,9 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 		{"GET /account/activate", activateBudget, activateWindow, shapeBrowser, func(int) *http.Request {
 			return browserRequest(http.MethodGet, "/account/activate")
 		}},
+		{"POST /account/activate", activateBudget, activateWindow, shapeBrowser, func(int) *http.Request {
+			return browserRequest(http.MethodPost, "/account/activate")
+		}},
 		{"POST /connect/register", 10, 60, shapeOAuth, func(int) *http.Request {
 			r := httptest.NewRequest(http.MethodPost, "/connect/register", strings.NewReader("{}"))
 			r.Header.Set("Content-Type", "application/json")
@@ -601,6 +604,22 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 			"the POST is refused by the budget the GET spent")
 		assert.True(t, reachesHandler(server, browserRequest(http.MethodPost, "/auth/pwd")),
 			"the password form is not in that bucket")
+	})
+
+	t.Run("both activation registrations share one bucket", func(t *testing.T) {
+		// The same property for activation, whose POST joined its GET under one tier (#207
+		// decision 9). The reset routes publish the same budget over the same window in the
+		// same class, so the reset GET still answering is what says this is activation's own
+		// bucket and not a lookalike's.
+		server := newRoutesTestServer(t)
+		assertRefused(t, exhaust(t, server, activateBudget, func(int) *http.Request {
+			return browserRequest(http.MethodGet, "/account/activate")
+		}), activateWindow, shapeBrowser)
+
+		assert.False(t, reachesHandler(server, browserRequest(http.MethodPost, "/account/activate")),
+			"the POST is refused by the budget the GET spent")
+		assert.True(t, reachesHandler(server, browserRequest(http.MethodGet, "/reset-password")),
+			"the reset routes are not in that bucket")
 	})
 
 	t.Run("the password form and the ROPC grant hold separate IP budgets", func(t *testing.T) {

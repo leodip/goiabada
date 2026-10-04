@@ -137,6 +137,7 @@
 "account.register.button" = "Cadastrar"
 "account.register.have_account_prompt" = "Já tem uma conta?"
 "account.register.login_link" = "Entrar"
+"account.register.verification_hint" = "Enviaremos por e-mail um link para você escolher sua senha."
 
 "account.register_success.page_title" = "Cadastro"
 "account.register_success.title" = "Cadastro"
@@ -151,6 +152,11 @@
 "account.activation.must_activate_inner" = "processo de ativação por e-mail"
 "account.activation.must_activate_suffix" = "."
 "account.activation.check_inbox" = "Verifique sua caixa de entrada e a pasta de spam/lixo eletrônico em busca do e-mail de ativação, e clique no link de verificação contido nele para prosseguir."
+
+"account.activate_password.page_title" = "Escolha sua senha"
+"account.activate_password.title" = "Escolha sua senha"
+"account.activate_password.intro" = "Escolha uma senha para {{.email}} para terminar de criar sua conta."
+"account.activate_password.button" = "Criar conta"
 
 "account.activation_result.page_title" = "Cadastro"
 "account.activation_result.title" = "Cadastro"

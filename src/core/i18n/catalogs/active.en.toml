@@ -146,6 +146,7 @@
 "account.register.button" = "Register"
 "account.register.have_account_prompt" = "Already have an account?"
 "account.register.login_link" = "Login"
+"account.register.verification_hint" = "We'll email you a link to choose your password."
 
 "account.register_success.page_title" = "Register"
 "account.register_success.title" = "Register"
@@ -160,6 +161,11 @@
 "account.activation.must_activate_inner" = "email activation process"
 "account.activation.must_activate_suffix" = "."
 "account.activation.check_inbox" = "Be sure to check both your inbox and junk folder for the activation email, and click on the verification link within it to proceed."
+
+"account.activate_password.page_title" = "Choose your password"
+"account.activate_password.title" = "Choose your password"
+"account.activate_password.intro" = "Choose a password for {{.email}} to finish creating your account."
+"account.activate_password.button" = "Create account"
 
 "account.activation_result.page_title" = "Register"
 "account.activation_result.title" = "Register"

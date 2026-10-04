@@ -293,15 +293,15 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// second factor, since the disable branch takes no OTP code at all. Failures only, so
 		// a user changing their password successfully spends nothing (#113, #219).
 		accountPassword: newFailureTier("account_password", 5, 15*time.Minute),
-		// per-IP: 10 activation operations per 5 minutes, at the two requests an activation
-		// now costs (the link's GET, the clean GET). The same operation rate as
-		// resetPwd over a chain one request shorter (#112)
-		activate: newTier("activate", "ip", 20, 5*time.Minute),
-		// per-IP: self-registration, at the same budget as the activation step that follows
-		// it, so a registration and its activation trip at the same rate. It bounds three
-		// things at once, all of which are only harmful across distinct addresses: the
-		// account-existence oracle the form answers, the mail it sends to any address given
-		// to it, and the pre_registrations rows it writes.
+		// per-IP: 10 activation operations per 5 minutes, at the three requests an activation
+		// now costs (the link's GET, the clean GET that renders the password form, and its
+		// POST), shared by both methods. resetPwd's budget for the same chain (#112, #207
+		// decision 9)
+		activate: newTier("activate", "ip", 30, 5*time.Minute),
+		// per-IP: self-registration, 20 per 5 minutes. It bounds three things at once, all of
+		// which are only harmful across distinct addresses: the account-existence oracle the
+		// form answers, the mail it sends to any address given to it, and the
+		// pre_registrations rows it writes.
 		//
 		// No per-email tier, and the issue asks for one. A second submission for the same
 		// address finds the user or the pre-registration row and renders "already
@@ -700,6 +700,9 @@ func (m *RateLimiter) limitPerIP(next http.Handler, t *requestTier, class reject
 // The threat model moved with it, as it did for LimitResetPwd. The code is the sole
 // credential at 193 bits of entropy, so blind guessing is infeasible; what is left to bound is
 // one host driving unauthenticated account creation, which an IP key does.
+//
+// One tier covers the GET and the POST that creates the account, as one covers both reset
+// methods, so the chain is bounded as a whole (#207 decision 9).
 func (m *RateLimiter) LimitActivate(next http.Handler) http.Handler {
 	return m.limitPerIP(next, m.activate, rejectBrowser)
 }

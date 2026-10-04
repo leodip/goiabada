@@ -28,7 +28,7 @@ const ceremonyIdField = "ceremonyId"
 // form. The cost is that a user mid-flow across a deploy is refused once and starts the
 // authorization again.
 //
-// Constant time, like forgotPasswordCodeMatches and the client secret comparison in
+// Constant time, like emailedCodeMatches and the client secret comparison in
 // protocolvalidation.ValidateTokenRequest. Not because this value is guessed at, but because a
 // plain comparison stopping at the first differing byte is the kind of thing that is cheap to avoid
 // and expensive to notice later.

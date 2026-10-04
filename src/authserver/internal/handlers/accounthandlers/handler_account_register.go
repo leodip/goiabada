@@ -56,6 +56,14 @@ func registrationCeremonyId(r *http.Request) string {
 	return id
 }
 
+// registrationRequiresEmailVerification is the mode in which an account comes from the emailed
+// link: SMTP on and "requires email verification" on. In it the register form asks for the
+// address alone, and the password is chosen on the form the link leads to (#207 decision 1). In
+// every other mode the form creates a usable account at once, and asks for the password.
+func registrationRequiresEmailVerification(settings *record.Settings) bool {
+	return settings.SMTPEnabled && settings.SelfRegistrationRequiresEmailVerification
+}
+
 func HandleRegisterGet(
 	pageRenderer PageRenderer,
 ) http.HandlerFunc {
@@ -73,7 +81,8 @@ func HandleRegisterGet(
 		}
 
 		bind := map[string]interface{}{
-			"ceremonyId": registrationCeremonyId(r),
+			"ceremonyId":                registrationCeremonyId(r),
+			"requiresEmailVerification": registrationRequiresEmailVerification(settings),
 		}
 
 		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
@@ -117,24 +126,18 @@ func HandleRegisterPost(
 			return
 		}
 
+		requiresEmailVerification := registrationRequiresEmailVerification(settings)
+
 		email := strings.TrimSpace(strings.ToLower(r.FormValue("email")))
-		// r.PostFormValue rather than r.FormValue: r.Form merges the URL query behind the
-		// body, so /account/register?password=... would register an account with a password
-		// taken from a request target, where it reaches the browser's history, the Referer of
-		// anything the page loads, and the access log of every proxy in front of the
-		// deployment. Only the submitted body is a submission (#202). The email read above
-		// keeps the merged accessor: it is not a credential, and the rate limiter derives its
-		// per-account key from the same accessor, so the two must not diverge (#219).
-		password := r.PostFormValue("password")
-		passwordConfirmation := r.PostFormValue("passwordConfirmation")
 
 		renderError := func(message string) {
 			// The form posts to action="", so the URL the visitor arrived at, ceremony parameter
 			// included, is the one this request has, and the re-render carries the id on.
 			bind := map[string]interface{}{
-				"email":      email,
-				"error":      message,
-				"ceremonyId": registrationCeremonyId(r),
+				"email":                     email,
+				"error":                     message,
+				"ceremonyId":                registrationCeremonyId(r),
+				"requiresEmailVerification": requiresEmailVerification,
 			}
 
 			err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
@@ -202,41 +205,11 @@ func HandleRegisterPost(
 			return
 		}
 
-		// i18n surface: A — browser-flow form rerender.
-		if len(password) == 0 {
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordRequired, nil).Localize(r.Context()))
-			return
-		}
-
-		if len(password) > 0 && len(passwordConfirmation) == 0 {
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationRequired, nil).Localize(r.Context()))
-			return
-		}
-
-		if password != passwordConfirmation {
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationMismatch, nil).Localize(r.Context()))
-			return
-		}
-
-		err = passwordValidator.ValidatePassword(settings.PasswordPolicy, password)
-		if err != nil {
-			// i18n surface: A — browser-flow form rerender.
-			var locErr *i18n.LocalizedError
-			if errors.As(err, &locErr) {
-				renderError(locErr.Localize(r.Context()))
-			} else {
-				renderError(err.Error())
-			}
-			return
-		}
-
-		if settings.SMTPEnabled && settings.SelfRegistrationRequiresEmailVerification {
-			passwordHash, err := passwordhash.Hash(password)
-			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
-				return
-			}
-
+		if requiresEmailVerification {
+			// No password is read here, and the pending registration stores none: whoever
+			// follows the emailed link chooses it, on a form only a POST submits (#207
+			// decision 1). A password submitted anyway is ignored, so the person who registers
+			// someone else's address never chooses the password that account gets.
 			verificationCode := securerandom.String(32)
 			verificationCodeEncrypted, err := dataCipher.Encrypt(verificationCode)
 			if err != nil {
@@ -252,7 +225,6 @@ func HandleRegisterPost(
 			utcNow := time.Now().UTC()
 			preRegistration := &record.PreRegistration{
 				Email:                     email,
-				PasswordHash:              passwordHash,
 				VerificationCodeEncrypted: verificationCodeEncrypted,
 				VerificationCodeIssuedAt:  sql.NullTime{Time: utcNow, Valid: true},
 				VerificationCodeHash:      verificationCodeHash,
@@ -305,6 +277,44 @@ func HandleRegisterPost(
 				pageRenderer.InternalServerError(w, r, err)
 			}
 		} else {
+			// r.PostFormValue rather than r.FormValue: r.Form merges the URL query behind the
+			// body, so /account/register?password=... would register an account with a password
+			// taken from a request target, where it reaches the browser's history, the Referer of
+			// anything the page loads, and the access log of every proxy in front of the
+			// deployment. Only the submitted body is a submission (#202). The email read above
+			// keeps the merged accessor: it is not a credential, and the rate limiter derives its
+			// per-account key from the same accessor, so the two must not diverge (#219).
+			password := r.PostFormValue("password")
+			passwordConfirmation := r.PostFormValue("passwordConfirmation")
+
+			// i18n surface: A — browser-flow form rerender.
+			if len(password) == 0 {
+				renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordRequired, nil).Localize(r.Context()))
+				return
+			}
+
+			if len(password) > 0 && len(passwordConfirmation) == 0 {
+				renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationRequired, nil).Localize(r.Context()))
+				return
+			}
+
+			if password != passwordConfirmation {
+				renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationMismatch, nil).Localize(r.Context()))
+				return
+			}
+
+			err := passwordValidator.ValidatePassword(settings.PasswordPolicy, password)
+			if err != nil {
+				// i18n surface: A — browser-flow form rerender.
+				var locErr *i18n.LocalizedError
+				if errors.As(err, &locErr) {
+					renderError(locErr.Localize(r.Context()))
+				} else {
+					renderError(err.Error())
+				}
+				return
+			}
+
 			passwordHash, err := passwordhash.Hash(password)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
