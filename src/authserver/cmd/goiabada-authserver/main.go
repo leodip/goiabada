@@ -11,6 +11,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -98,6 +99,16 @@ func main() {
 		os.Exit(migrateCommand(migrateArgs, cfg.Database, os.Stdout, os.Stderr))
 	}
 
+	// The process owns the signals, from here to its exit, so a stop arriving while the server is
+	// still starting is handled rather than ending the process mid-step (#390 decisions 8 and 9).
+	// On SIGTERM, what a container runtime sends, or SIGINT, signalled is cancelled: during startup
+	// the running step finishes and no new one starts, and once the server runs, Start drains the
+	// listeners and stops the background worker before returning. Installed after `migrate` is
+	// dispatched, which is no server start.
+	signalled, stopListeningForSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopListeningForSignals()
+	startupCtx, finishStartup := watchStartup(signalled)
+
 	// A trusted-proxy entry that is neither an IP nor a CIDR stops the server whatever
 	// TRUST_PROXY_HEADERS says. Skipping it would leave a list of typos empty, which the real-IP
 	// middleware reads as trusting any single hop, and a typo in a list trust is off for today
@@ -161,23 +172,29 @@ func main() {
 		"local_time", now,
 		"utc_time", now.UTC())
 
-	// main owns this root: the startup sequence below is what the process exists to complete,
-	// and there is no request and no operator above it to cancel. Everything it reaches takes a
-	// context rather than opening one where it lands (#386).
-	startupCtx := context.Background()
-
+	// startupCtx is the root of the startup sequence below, and a shutdown signal is what ends it.
+	// Everything it reaches takes a context rather than opening one where it lands (#386), and
+	// reads its end as a stop rather than a failure: a wait (connecting, creating the database,
+	// the migration lock) is cancelled at once; a migration file already running runs to its end
+	// and the next does not start, leaving the schema clean at the version it reached; the
+	// data-key rotation and the seed, each one transaction, complete if they are under way and do
+	// not start otherwise (#390 decision 9). A step stopped that way answers an error matching
+	// context.Canceled, and the start then exits 0, as it does after a drain.
 	database, err := datafactory.NewDatabase(startupCtx, &cfg.Database,
 		currentDataKey, previousDataKey, cfg.AuthServer.LogSQL)
 	if err != nil {
+		if stoppedDuringStartup(startupCtx, err) {
+			exitStopped()
+		}
 		slog.Error("unable to create the database connection", "error", err)
 		os.Exit(1)
 	}
 	slog.Info("created database connection")
 
 	// An empty database is seeded here, in the mode the configuration selects, before the server
-	// listens and before the signal context exists: nothing cancels the seed, since it commits
-	// whole or not at all and the next start retries it (#386, #424). bootstrap owns the choice
-	// and the records; main owns only what the process does next.
+	// listens. A seed commits whole or not at all and the next start retries it (#386, #424), so a
+	// signal keeps one from beginning and lets one under way commit. bootstrap owns the choice and
+	// the records; main owns only what the process does next.
 	outcome, err := bootstrap.Run(startupCtx, database, dataCipher, bootstrap.Config{
 		AdminEmail:          cfg.AdminEmail,
 		AdminPassword:       cfg.AdminPassword,
@@ -188,6 +205,9 @@ func main() {
 		BootstrapEnvOutFile: cfg.AuthServer.BootstrapEnvOutFile,
 	})
 	if err != nil {
+		if stoppedDuringStartup(startupCtx, err) {
+			exitStopped()
+		}
 		slog.Error("unable to bootstrap the database", "error", err)
 		os.Exit(1)
 	}
@@ -243,22 +263,63 @@ func main() {
 	r := chi.NewRouter()
 	s := server.NewServer(r, database, sessionStore, dataCipher, trustedProxies, cfg)
 
-	// The process owns the signals; the server just gets told when to stop. On
-	// SIGTERM (what a container runtime sends) or SIGINT, ctx is cancelled and
-	// Start drains the listeners and stops the background worker before returning.
-	ctx, stopListeningForSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stopListeningForSignals()
+	// A signal that arrived during the steps above that read no context, the session keys and the
+	// store, is still a stop during startup: the server does not start. From here on a signal is
+	// the running server's to say and to act on.
+	if finishStartup() {
+		exitStopped()
+	}
 
-	// Start has already drained whatever it started by the time it returns an error, and logs
-	// none of them: this is the one record, and the one exit, for all of them (#426). The deferred
-	// stop does not run under os.Exit, hence the explicit call.
-	if err := s.Start(ctx); err != nil {
+	// The server just gets told when to stop. Start has already drained whatever it started by the
+	// time it returns an error, and logs none of them: this is the one record, and the one exit,
+	// for all of them (#426). The deferred stop does not run under os.Exit, hence the explicit call.
+	if err := s.Start(signalled); err != nil {
 		slog.Error("the auth server stopped on an error", "error", err)
 		stopListeningForSignals()
 		os.Exit(1)
 	}
 
 	slog.Info("auth server stopped")
+}
+
+// watchStartup answers the context the startup steps run under, which ends when signalled does,
+// and finish, which hands the signal over to the running server.
+//
+// The record saying the signal arrived is written when it arrives, with the running server's own
+// message so both phases read alike in an aggregator, and the startup context ends only after it,
+// so whatever a step says about its stop, such as where a migration stopped, follows it. finish
+// reports whether the signal arrived during startup; when it did, the record has been written,
+// and when it did not, nothing here will write it, so the running server's drain says it once.
+func watchStartup(signalled context.Context) (startup context.Context, finish func() (stopped bool)) {
+	startup, endStartup := context.WithCancel(context.Background())
+	stopWatching := context.AfterFunc(signalled, func() {
+		slog.InfoContext(signalled, "shutdown signal received")
+		endStartup()
+	})
+	return startup, func() bool {
+		if stopWatching() {
+			endStartup()
+			return false
+		}
+		<-startup.Done()
+		return true
+	}
+}
+
+// stoppedDuringStartup reports whether err is a startup step's answer to the shutdown signal
+// rather than a failure: the signal arrived, and the step answered with the cancellation it
+// caused. A step that failed for its own reason while the signal arrived is still a failure.
+func stoppedDuringStartup(startup context.Context, err error) bool {
+	return startup.Err() != nil && errors.Is(err, context.Canceled)
+}
+
+// exitStopped ends a start the shutdown signal stopped: the running step finished and nothing new
+// started, so the platform's request was carried out cleanly, and the process exits 0, as it does
+// after a drain. Kubernetes restarts the container whatever the code, and Compose does not restart
+// one it was told to stop (#390 decision 9).
+func exitStopped() {
+	slog.Info("auth server stopped")
+	os.Exit(0)
 }
 
 // dispatch chooses the command from the positional arguments the flag parse left: none serves,

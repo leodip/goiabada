@@ -39,7 +39,13 @@ type keyRotationStore interface {
 // The keys are parameters rather than config reads for the same reason. The caller has already
 // validated envKey as 32 bytes; previousKey is optional and is acted on only at that length.
 func runStartupDataTasks(ctx context.Context, database keyRotationStore, envKey []byte, previousKey []byte) error {
-	rotated, err := rotateDataKeyIfNeeded(ctx, database, envKey, previousKey)
+	// A start asked to stop does not begin the rotation, and one that has begun runs to its end
+	// whatever the stop: the re-key is one transaction, and a rotation cut short would only have to
+	// begin again at the next start (#390 decision 9).
+	if stopErr := ctx.Err(); stopErr != nil {
+		return errs.Wrap(stopErr, "the start was stopped before the data key rotation")
+	}
+	rotated, err := rotateDataKeyIfNeeded(context.WithoutCancel(ctx), database, envKey, previousKey)
 	if err != nil {
 		return errs.Wrap(err, "AES data key rotation failed")
 	}

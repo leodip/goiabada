@@ -400,6 +400,15 @@ longer, as it can on a large installation, raise the startup probe's `failureThr
 server's container until `failureThreshold × periodSeconds` covers it; otherwise Kubernetes restarts
 the container before the migration finishes. Leave liveness on `/health` with its own thresholds.
 
+A pod stopped while it starts, because it was deleted or its startup budget ran out, stops cleanly:
+a wait for the database or the migration lock ends at once, a migration file already running runs to
+its end and the next does not start, and the auth server exits 0 with the schema clean at the version
+it reached, which the next start carries on from. The [database
+page](/production-deployment/database/#schema-migrations-and-rollback) has the details and the
+records. The grace period below bounds that too: a single migration file running longer than 65
+seconds is ended by SIGKILL mid-file, leaving the schema dirty, so the startup budget is what has to
+cover the longest migration, not the grace period.
+
 ## Stopping and the grace period
 
 When a pod is deleted (a rollout, a scale-down, a node drain), Kubernetes removes it from the

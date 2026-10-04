@@ -77,7 +77,7 @@ func (m *Migrator) Version(ctx context.Context) (version int, dirty bool, err er
 }
 
 // Up migrates to the highest version this binary carries. It answers ErrNoChange when there is
-// nothing to do.
+// nothing to do, and StoppedError when ctx ends between two files.
 //
 // It checks the version the database records against the migration set and refuses one it does
 // not carry. That is what stops an older binary migrating a database a newer release already
@@ -104,7 +104,7 @@ func (m *Migrator) up(ctx context.Context, progress Progress) error {
 		}
 		progress.Migrating(current, head, len(steps))
 		started := time.Now()
-		if err := m.apply(ctx, conn, steps); err != nil {
+		if err := m.apply(ctx, conn, current, steps); err != nil {
 			return err
 		}
 		progress.Migrated(current, head, len(steps), time.Since(started))
@@ -114,7 +114,7 @@ func (m *Migrator) up(ctx context.Context, progress Progress) error {
 
 // Migrate steps the schema to target in whichever direction that is, one migration at a time.
 // Pass NilVersion to step all the way down to an unmigrated database. It answers ErrNoChange when
-// the database is already there.
+// the database is already there, and StoppedError when ctx ends between two files.
 func (m *Migrator) Migrate(ctx context.Context, target int) error {
 	return m.run(ctx, noProgress{}, func(ctx context.Context, conn *sql.Conn) error {
 		current, err := m.currentVersion(ctx, conn)
@@ -128,7 +128,7 @@ func (m *Migrator) Migrate(ctx context.Context, target int) error {
 		if err != nil {
 			return err
 		}
-		return m.apply(ctx, conn, steps)
+		return m.apply(ctx, conn, current, steps)
 	})
 }
 
@@ -224,7 +224,9 @@ func (m *Migrator) run(ctx context.Context, progress Progress, fn func(ctx conte
 				return lockErr
 			}
 			defer func() {
-				if unlockErr := m.eng.unlock(ctx, conn); unlockErr != nil {
+				// The release runs whatever became of ctx: an operation stopped between two files
+				// still gives the lock back, rather than leaving it to the connection's close.
+				if unlockErr := m.eng.unlock(context.WithoutCancel(ctx), conn); unlockErr != nil {
 					err = errs.Join(err, unlockErr)
 					_ = conn.Raw(func(any) error { return driver.ErrBadConn })
 				}
@@ -434,33 +436,56 @@ func (m *Migrator) stepsFrom(current, target int) ([]step, error) {
 }
 
 // apply runs the steps in order, writing the dirty marker before each file and clearing it after,
-// which is what makes an interruption visible as the version it stopped on.
-func (m *Migrator) apply(ctx context.Context, conn *sql.Conn, steps []step) error {
-	for _, s := range steps {
-		if err := m.setVersion(ctx, conn, s.marker, true); err != nil {
+// which is what makes an interruption visible as the version it stopped on. from is the version
+// the database is at before the first step.
+//
+// ctx is read before each step and reaches none of them. A step, its file and the two writes
+// around it, runs to its end under a context ctx's end cannot cut short, and once ctx has ended no
+// further step starts: the runner answers StoppedError with the schema clean at the version it
+// reached (#390 decision 9). Cutting the running file short instead leaves it dirty, and on MySQL
+// and SQL Server, which run a file bare, partly applied; the next start then refuses until an
+// operator repairs it. A file longer than the time the platform allows a stop is still ended by its
+// kill, which nothing here can prevent.
+func (m *Migrator) apply(ctx context.Context, conn *sql.Conn, from int, steps []step) error {
+	unstoppable := context.WithoutCancel(ctx)
+	reached := from
+	for i, s := range steps {
+		if stopErr := ctx.Err(); stopErr != nil {
+			return StoppedError{From: from, Reached: reached, Applied: i, Remaining: len(steps) - i, Cause: stopErr}
+		}
+		if err := m.applyStep(unstoppable, conn, s); err != nil {
 			return err
 		}
+		reached = s.marker
+	}
+	return nil
+}
 
-		body, name, present, err := m.readFile(s)
-		if err != nil {
-			return err
-		}
-		if present {
-			if err := m.runFile(ctx, conn, body); err != nil {
-				return errs.Errorf("migration %s failed: %w; %w", name, err,
-					// Below is the source's own predecessor of the marker, never marker minus
-					// one: the sets have gaps, and beneath the first migration there is no
-					// version at all rather than 000000.
-					DirtyError{Version: s.marker, Applied: s.apply, Below: m.src.prev(s.marker),
-						Above: NilVersion, Carried: true})
-			}
-		}
-		// A version with no file in the direction being travelled runs nothing and still moves
-		// the marker, which golang-migrate did too and which the four migration sets rely on.
+// applyStep is one step of apply: the dirty marker, the file and the clean marker.
+func (m *Migrator) applyStep(ctx context.Context, conn *sql.Conn, s step) error {
+	if err := m.setVersion(ctx, conn, s.marker, true); err != nil {
+		return err
+	}
 
-		if err := m.setVersion(ctx, conn, s.marker, false); err != nil {
-			return err
+	body, name, present, err := m.readFile(s)
+	if err != nil {
+		return err
+	}
+	if present {
+		if err := m.runFile(ctx, conn, body); err != nil {
+			return errs.Errorf("migration %s failed: %w; %w", name, err,
+				// Below is the source's own predecessor of the marker, never marker minus
+				// one: the sets have gaps, and beneath the first migration there is no
+				// version at all rather than 000000.
+				DirtyError{Version: s.marker, Applied: s.apply, Below: m.src.prev(s.marker),
+					Above: NilVersion, Carried: true})
 		}
+	}
+	// A version with no file in the direction being travelled runs nothing and still moves
+	// the marker, which golang-migrate did too and which the four migration sets rely on.
+
+	if err := m.setVersion(ctx, conn, s.marker, false); err != nil {
+		return err
 	}
 	return nil
 }

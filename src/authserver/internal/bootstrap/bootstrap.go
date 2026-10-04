@@ -85,6 +85,11 @@ func newRunner(db runDatabase, dataCipher *encryption.DataCipher, cfg Config) *r
 // fixed, seeds from the beginning. The exception is a bootstrap file that could not be moved into
 // place after the commit: the database is seeded, a restart regenerates nothing, and the error
 // names the staged file holding the only copy of the credentials, which the operator moves.
+//
+// ctx is the start's, and its end is a shutdown signal: it cancels the emptiness check, keeps a
+// seed that has not begun from beginning, and leaves one under way to commit (#390 decision 9). A
+// start stopped before its seed is answered with an error matching context.Canceled, which is how
+// main tells the stop from a failure.
 func Run(ctx context.Context, db runDatabase, dataCipher *encryption.DataCipher, cfg Config) (Outcome, error) {
 	return newRunner(db, dataCipher, cfg).run(ctx)
 }
@@ -98,6 +103,14 @@ func (r *runner) run(ctx context.Context) (Outcome, error) {
 		slog.InfoContext(ctx, "database already initialized, proceeding with normal startup")
 		return Continue, nil
 	}
+
+	// A start asked to stop does not begin the seed, and a seed that has begun commits whatever
+	// the stop: it is one transaction, and a seed cut short would only leave the next start to
+	// seed again (#390 decision 9).
+	if stopErr := ctx.Err(); stopErr != nil {
+		return Refused, errs.Wrap(stopErr, "the start was stopped before seeding the database")
+	}
+	ctx = context.WithoutCancel(ctx)
 
 	slog.InfoContext(ctx, "database is empty, performing initial bootstrap")
 
