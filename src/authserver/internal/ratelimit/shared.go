@@ -5,9 +5,11 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"math"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -44,7 +46,8 @@ import (
 //
 // HOW A SLOT IS HELD. A reservation is a charge: Reserve increments the current window when the
 // decayed rate, the in-memory limiter's arithmetic, admits one more, atomically across every pod
-// (data.Database's ReserveRateLimitHit says how). A wrong credential keeps the charge; a right
+// and across a window's roll (data.Database's ReserveRateLimitHit says how, and reserveShared how
+// a reservation whose window ends before it is charged is placed again). A wrong credential keeps the charge; a right
 // one is refunded from the window it was charged in. So a successful check spends nothing once
 // it completes, and the in-flight protection #219 measured holds across pods rather than per
 // pod. A pod that dies between the two leaves one charge behind, which decays with its window:
@@ -88,26 +91,67 @@ func NewSharedFailureLimiter(store sharedStore, tier string, limit int, window t
 	}
 }
 
-// reserveShared is Reserve over the database.
-func (f *FailureLimiter) reserveShared(ctx context.Context, key string) (*Reservation, error) {
-	current, previous, elapsed := f.rl.windows(f.rl.now())
-	admit := func(curr, prev int) bool {
-		return int(math.Round(f.rl.rate(curr, prev, elapsed)))+1 <= f.limit
-	}
+// maxPlacements is how many windows one reservation may be placed in before it gives up. A
+// placement moves on only when the window it was placed in has ended, so a second one is a
+// reservation that met a window's roll and a third one met two, which with windows of minutes
+// against a five-second bound is a store whose rows are far ahead of this pod's clock.
+const maxPlacements = 3
 
+// reserveShared is Reserve over the database.
+//
+// A reservation is placed in the window this pod's clock is in, and placed again, in the next
+// one, when that window ends before the reservation is charged: the store answers
+// data.ErrRateLimitWindowMoved when another pod has already opened a later window, and admit
+// reads the clock again when the store asks it under the rows' locks, so a reservation that
+// waited there across the boundary refuses itself and is placed again. Either way nothing was
+// charged. The rate the admission is decided on is the one at the instant admit is asked, which
+// under the locks is after every reservation the wait was for. When this pod's clock is still in
+// the window another pod has left, the next placement starts at the start of the next window
+// rather than at this clock, which weighs the window just ended in full: the refusing direction.
+func (f *FailureLimiter) reserveShared(ctx context.Context, key string) (*Reservation, error) {
 	ctx, cancel := context.WithTimeout(ctx, f.bound)
 	defer cancel()
 
 	keyHash := f.keyHash(key)
-	admitted, err := f.shared.ReserveRateLimitHit(ctx, keyHash, current, previous,
-		current.Add(2*f.rl.window), admit)
-	if err != nil {
-		return nil, errs.Wrapf(err, "unable to reserve against the shared %s rate limit", f.tier)
+	at := f.rl.now()
+	for placement := 1; placement <= maxPlacements; placement++ {
+		current, previous, _ := f.rl.windows(at)
+		next := current.Add(f.rl.window)
+		ended := false
+		placedAt := at
+		admit := func(curr, prev int) bool {
+			now := latest(f.rl.now(), placedAt)
+			if !now.Before(next) {
+				ended = true
+				return false
+			}
+			return int(math.Round(f.rl.rate(curr, prev, now.Sub(current))))+1 <= f.limit
+		}
+
+		admitted, err := f.shared.ReserveRateLimitHit(ctx, keyHash, current, previous,
+			current.Add(2*f.rl.window), admit)
+		if errors.Is(err, data.ErrRateLimitWindowMoved) || (err == nil && !admitted && ended) {
+			at = latest(f.rl.now(), next)
+			continue
+		}
+		if err != nil {
+			return nil, errs.Wrapf(err, "unable to reserve against the shared %s rate limit", f.tier)
+		}
+		if !admitted {
+			return nil, nil
+		}
+		return &Reservation{limiter: f, key: key, window: current}, nil
 	}
-	if !admitted {
-		return nil, nil
+	return nil, errs.Errorf("unable to reserve against the shared %s rate limit: its window moved on %d times",
+		f.tier, maxPlacements)
+}
+
+// latest is the later of two instants.
+func latest(a, b time.Time) time.Time {
+	if a.After(b) {
+		return a
 	}
-	return &Reservation{limiter: f, key: key, window: current}, nil
+	return b
 }
 
 // releaseShared keeps the charge for a wrong credential and refunds it, from the window it was

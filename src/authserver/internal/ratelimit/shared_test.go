@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/leodip/goiabada/authserver/internal/data"
 )
 
 // countingStore stands in for the database at the one boundary a shared limiter crosses. It
@@ -15,7 +17,9 @@ import (
 // store is atomic across handles is the data tier's to prove, on every engine.
 //
 // reserveErr and refundErr make a call fail; blockReserve and blockRefund make it wait for its
-// context, which is a store too slow to answer.
+// context, which is a store too slow to answer. moved answers that many reservations with
+// data.ErrRateLimitWindowMoved, which is another pod having opened a later window, and
+// beforeAdmit runs before admit is asked, which is where a reservation waits on the rows' locks.
 type countingStore struct {
 	mu   sync.Mutex
 	hits map[string]int
@@ -24,6 +28,8 @@ type countingStore struct {
 	refundErr    error
 	blockReserve bool
 	blockRefund  bool
+	moved        int
+	beforeAdmit  func()
 
 	reserves []storeCall
 	refunds  []storeCall
@@ -67,6 +73,13 @@ func (s *countingStore) ReserveRateLimitHit(ctx context.Context, keyHash string,
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.moved > 0 {
+		s.moved--
+		return false, data.ErrRateLimitWindowMoved
+	}
+	if s.beforeAdmit != nil {
+		s.beforeAdmit()
+	}
 	if !admit(s.hits[counterKey(keyHash, current)], s.hits[counterKey(keyHash, previous)]) {
 		return false, nil
 	}
@@ -262,6 +275,116 @@ func TestSharedFailureLimiter_RefundsTheWindowItCharged(t *testing.T) {
 	}
 	if store.refunds[0].keyHash != store.reserves[0].keyHash {
 		t.Error("the refund was keyed differently from the charge")
+	}
+}
+
+// TestSharedFailureLimiter_AWindowAnotherPodHasLeftIsPlacedAgainInTheNext: this pod's clock is a
+// moment behind another's, which has already opened the next window for the key. The store
+// charges nothing in the window this clock is still in, and the reservation is placed again at
+// the start of the next one, where the window just ended weighs in full rather than by this
+// clock's elapsed time, which is the refusing direction.
+func TestSharedFailureLimiter_AWindowAnotherPodHasLeftIsPlacedAgainInTheNext(t *testing.T) {
+	c := newClockAt(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	store := newCountingStore()
+	f := newSharedAt(c, store, "pwd_account", 5, 15*time.Minute)
+	for i := 0; i < 4; i++ {
+		if !fail(t, f, "k") {
+			t.Fatalf("setup: failure #%d refused", i+1)
+		}
+	}
+
+	c.advance(15*time.Minute - time.Millisecond) // the last millisecond of the first window
+	store.moved = 1
+	r := reserve(t, f, "k")
+	if r == nil {
+		t.Fatal("Reserve refused with four failures against a budget of five, want admitted in the next window")
+	}
+	calls := store.reserves[len(store.reserves)-2:]
+	if first := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC); !calls[0].current.Equal(first) {
+		t.Fatalf("the reservation was first placed in %v, want %v", calls[0].current, first)
+	}
+	next := time.Date(2026, 1, 1, 0, 15, 0, 0, time.UTC)
+	if !calls[1].current.Equal(next) || !r.window.Equal(next) {
+		t.Errorf("the reservation was placed again in %v and charged %v, want both %v", calls[1].current, r.window, next)
+	}
+
+	// The fifth failure fills the budget the next window inherits in full at its start.
+	release(t, r, true)
+	store.moved = 1
+	if reserve(t, f, "k") != nil {
+		t.Error("Reserve admitted at the start of the next window with five failures across the two, " +
+			"want refused: the placement is the next window's start, not this pod's lagging clock")
+	}
+}
+
+// TestSharedFailureLimiter_AReservationWaitingAcrossTheBoundaryIsPlacedAgain: the reservation is
+// placed in the last moment of a window and waits on the rows' locks past its end. Asked under
+// them, it reads the clock again, refuses to charge the window that has ended, and is placed in
+// the one that has begun, which is the window its charge and its refund then name.
+func TestSharedFailureLimiter_AReservationWaitingAcrossTheBoundaryIsPlacedAgain(t *testing.T) {
+	c := newClockAt(time.Date(2026, 1, 1, 0, 14, 59, 0, time.UTC))
+	store := newCountingStore()
+	f := newSharedAt(c, store, "pwd_account", 5, 15*time.Minute)
+	waits := 1
+	store.beforeAdmit = func() {
+		if waits > 0 {
+			waits--
+			c.advance(2 * time.Second)
+		}
+	}
+
+	r := reserve(t, f, "k")
+	if r == nil {
+		t.Fatal("Reserve refused against an empty budget, want admitted")
+	}
+	next := time.Date(2026, 1, 1, 0, 15, 0, 0, time.UTC)
+	if len(store.reserves) != 2 || !store.reserves[1].current.Equal(next) {
+		t.Fatalf("the store was asked %d times, the last in %v, want twice, the second in %v",
+			len(store.reserves), store.reserves[len(store.reserves)-1].current, next)
+	}
+	if !r.window.Equal(next) {
+		t.Errorf("the reservation charged the window starting %v, want %v: its own had ended", r.window, next)
+	}
+	if got := store.hits[counterKey(store.reserves[0].keyHash, store.reserves[0].current)]; got != 0 {
+		t.Errorf("the window that ended during the wait was charged %d hits, want 0", got)
+	}
+}
+
+// TestSharedFailureLimiter_TheRateIsTheOneWhenAdmitIsAsked: five failures in one window, a
+// reservation placed a hundredth of the way into the next, at a rate of 4.95, which refuses, and
+// asked under the locks a fifth of the way in, at 4.0, which admits. The rate is decided at the
+// ask, after every reservation the wait was for, not when the reservation was placed.
+func TestSharedFailureLimiter_TheRateIsTheOneWhenAdmitIsAsked(t *testing.T) {
+	c := newClockAt(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	store := newCountingStore()
+	f := newSharedAt(c, store, "otp", 5, testWindow)
+	for i := 0; i < 5; i++ {
+		if !fail(t, f, "k") {
+			t.Fatalf("setup: failure #%d refused", i+1)
+		}
+	}
+
+	c.advance(testWindow + testWindow/100)
+	store.beforeAdmit = func() {
+		store.beforeAdmit = nil
+		c.advance(testWindow/5 - testWindow/100)
+	}
+	if reserve(t, f, "k") == nil {
+		t.Error("Reserve refused at the rate it was placed at, want admitted at the rate when admit was asked")
+	}
+}
+
+func TestSharedFailureLimiter_AWindowThatKeepsMovingIsAFault(t *testing.T) {
+	store := newCountingStore()
+	store.moved = maxPlacements
+	f := newSharedAt(newClock(), store, "pwd_account", 5, testWindow)
+
+	r, err := f.Reserve(context.Background(), "k")
+	if r != nil || err == nil {
+		t.Errorf("Reserve = (%v, %v), want no reservation and an error after %d placements", r, err, maxPlacements)
+	}
+	if len(store.reserves) != maxPlacements {
+		t.Errorf("the store was asked %d times, want %d", len(store.reserves), maxPlacements)
 	}
 }
 

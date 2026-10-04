@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/ratelimit"
 	"github.com/stretchr/testify/assert"
@@ -295,6 +297,228 @@ func TestRateLimitCounters_ARefundComesOutOfTheWindowItNames(t *testing.T) {
 	curr, _, err = database.GetRateLimitCounts(ctx, nil, keyHash, w2, w1)
 	require.NoError(t, err)
 	assert.Equal(t, 0, curr)
+}
+
+// A reservation's window can end while it is still in flight: it read the clock before the
+// boundary and its transaction runs after it, so a reservation charging the window that has just
+// ended overlaps one charging the window that has just begun. The newer one reads the older
+// window as its previous count, so the two have to be serialized between them as surely as two
+// in the same window are, or both take the last slot (#394, review round 1). The three tests
+// below hold one of the two in its transaction, after its charge and before its commit, and send
+// the other through the second handle, which is another pod.
+
+// rolloverBudget is the budget the rollover tests count against, with no decay, so the arithmetic
+// they assert is the sum of the two windows.
+const rolloverBudget = 5
+
+func underRolloverBudget(curr, prev int) bool { return curr+prev < rolloverBudget }
+
+// heldReservation is a reservation stopped inside its transaction. Its admission rule is asked
+// twice, once by the read before the transaction and once under the transaction's locks; the
+// second ask signals locked and then waits for release, so the charge it has just taken is held,
+// uncommitted, until the test lets it go.
+type heldReservation struct {
+	locked  chan struct{}
+	release chan struct{}
+	done    chan reservationResult
+}
+
+type reservationResult struct {
+	admitted bool
+	err      error
+}
+
+func holdReservation(ctx context.Context, db data.Database, keyHash string, current, previous, expiresAt time.Time) *heldReservation {
+
+	h := &heldReservation{
+		locked:  make(chan struct{}),
+		release: make(chan struct{}),
+		done:    make(chan reservationResult, 1),
+	}
+	asks := 0
+	go func() {
+		admitted, err := db.ReserveRateLimitHit(ctx, keyHash, current, previous, expiresAt,
+			func(curr, prev int) bool {
+				asks++
+				if asks == 2 {
+					close(h.locked)
+					select {
+					case <-h.release:
+					case <-ctx.Done():
+					}
+				}
+				return underRolloverBudget(curr, prev)
+			})
+		h.done <- reservationResult{admitted, err}
+	}()
+	return h
+}
+
+// reserveAsync runs one reservation on its own goroutine and answers on the channel it returns.
+func reserveAsync(ctx context.Context, db data.Database, keyHash string, current, previous, expiresAt time.Time) chan reservationResult {
+
+	done := make(chan reservationResult, 1)
+	go func() {
+		admitted, err := db.ReserveRateLimitHit(ctx, keyHash, current, previous, expiresAt, underRolloverBudget)
+		done <- reservationResult{admitted, err}
+	}()
+	return done
+}
+
+// seedRolloverWindow spends budget-1 slots in w0, so one slot is left.
+func seedRolloverWindow(t *testing.T, ctx context.Context, keyHash string) {
+	t.Helper()
+	w0, _, w2 := rateLimitWindows()
+	for i := 0; i < rolloverBudget-1; i++ {
+		ok, err := database.ReserveRateLimitHit(ctx, keyHash, w0, w0.Add(-15*time.Minute), w2, underRolloverBudget)
+		require.NoError(t, err)
+		require.True(t, ok, "setup: seed reservation #%d", i+1)
+	}
+}
+
+// TestRateLimitCounters_TheNewerWindowWaitsForTheOlderWindowsLastSlot: the older window's last
+// slot is charged and held; a reservation in the newer window, on the other handle, must wait
+// for that charge and count it, so it is refused. Reading the older window's last committed
+// count instead admits both, a rate of six against a budget of five.
+func TestRateLimitCounters_TheNewerWindowWaitsForTheOlderWindowsLastSlot(t *testing.T) {
+	second := secondDatabase(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	w0, w1, w2 := rateLimitWindows()
+	keyHash := newCounterKeyHash()
+	seedRolloverWindow(t, ctx, keyHash)
+
+	older := holdReservation(ctx, database, keyHash, w0, w0.Add(-15*time.Minute), w2)
+	select {
+	case <-older.locked:
+	case <-ctx.Done():
+		t.Fatal("the older reservation never reached its admission under the lock")
+	}
+
+	newer := reserveAsync(ctx, second, keyHash, w1, w0, w1.Add(30*time.Minute))
+	var newerResult reservationResult
+	answeredWhileHeld := false
+	select {
+	case newerResult = <-newer:
+		answeredWhileHeld = true
+	case <-time.After(500 * time.Millisecond):
+	}
+	close(older.release)
+	olderResult := <-older.done
+	if !answeredWhileHeld {
+		newerResult = <-newer
+	}
+
+	require.NoError(t, olderResult.err)
+	require.NoError(t, newerResult.err)
+	assert.True(t, olderResult.admitted, "the older window's last slot was refused")
+	assert.False(t, newerResult.admitted,
+		"the newer window admitted a reservation while the older window's last slot was charged and held")
+
+	curr, prev, err := database.GetRateLimitCounts(ctx, nil, keyHash, w1, w0)
+	require.NoError(t, err)
+	assert.LessOrEqual(t, curr+prev, rolloverBudget,
+		"the two windows hold (curr, prev) = (%d, %d) against a budget of %d", curr, prev, rolloverBudget)
+}
+
+// TestRateLimitCounters_TheOlderWindowCannotChargeOnceTheNewerHasAdmitted is the other order: the
+// newer window's reservation has read the older window's count and charged the newer one, and
+// holds it. A reservation still placed in the older window must not then take a slot there,
+// because the newer window's admission was decided without it; it waits for the newer
+// reservation and is told its window has moved on, writing nothing.
+func TestRateLimitCounters_TheOlderWindowCannotChargeOnceTheNewerHasAdmitted(t *testing.T) {
+	second := secondDatabase(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	w0, w1, w2 := rateLimitWindows()
+	keyHash := newCounterKeyHash()
+	seedRolloverWindow(t, ctx, keyHash)
+
+	newer := holdReservation(ctx, database, keyHash, w1, w0, w1.Add(30*time.Minute))
+	select {
+	case <-newer.locked:
+	case <-ctx.Done():
+		t.Fatal("the newer reservation never reached its admission under the lock")
+	}
+
+	older := reserveAsync(ctx, second, keyHash, w0, w0.Add(-15*time.Minute), w2)
+	var olderResult reservationResult
+	answeredWhileHeld := false
+	select {
+	case olderResult = <-older:
+		answeredWhileHeld = true
+	case <-time.After(500 * time.Millisecond):
+	}
+	close(newer.release)
+	newerResult := <-newer.done
+	if !answeredWhileHeld {
+		olderResult = <-older
+	}
+
+	require.NoError(t, newerResult.err)
+	assert.True(t, newerResult.admitted, "the newer window's reservation was refused with one slot left")
+	assert.False(t, olderResult.admitted,
+		"the older window took a slot after the newer window had admitted against its count")
+	assert.ErrorIs(t, olderResult.err, data.ErrRateLimitWindowMoved,
+		"the older window's reservation was not told its window had moved on")
+
+	curr, prev, err := database.GetRateLimitCounts(ctx, nil, keyHash, w1, w0)
+	require.NoError(t, err)
+	assert.Equal(t, [2]int{1, rolloverBudget - 1}, [2]int{curr, prev},
+		"the two windows hold (curr, prev) against a budget of %d", rolloverBudget)
+}
+
+// TestRateLimitCounters_ConcurrentReservationsAcrossARolloverAdmitOneBudget: forty reservations
+// at once, half placed in the older window and half in the newer, alternating handles, against
+// one key with a budget of five and no decay. Whatever the interleaving, the two windows end
+// holding no more than the budget between them, and exactly what was admitted.
+func TestRateLimitCounters_ConcurrentReservationsAcrossARolloverAdmitOneBudget(t *testing.T) {
+	second := secondDatabase(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	w0, w1, w2 := rateLimitWindows()
+	keyHash := newCounterKeyHash()
+
+	const callers = 40
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	admitted := 0
+	var failures []error
+	start := make(chan struct{})
+	for i := 0; i < callers; i++ {
+		db := database
+		if i%2 == 1 {
+			db = second
+		}
+		current, previous, expiresAt := w0, w0.Add(-15*time.Minute), w2
+		if (i/2)%2 == 1 {
+			current, previous, expiresAt = w1, w0, w1.Add(30*time.Minute)
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			ok, err := db.ReserveRateLimitHit(ctx, keyHash, current, previous, expiresAt, underRolloverBudget)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil && !errors.Is(err, data.ErrRateLimitWindowMoved) {
+				failures = append(failures, err)
+			}
+			if ok {
+				admitted++
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	require.Empty(t, failures, "no reservation may fail but by finding its window moved on")
+	curr, prev, err := database.GetRateLimitCounts(ctx, nil, keyHash, w1, w0)
+	require.NoError(t, err)
+	assert.LessOrEqual(t, curr+prev, rolloverBudget,
+		"%d reservations across a rollover left (curr, prev) = (%d, %d) against a budget of %d",
+		callers, curr, prev, rolloverBudget)
+	assert.Equal(t, admitted, curr+prev, "the counts are not what was admitted")
 }
 
 // TestRateLimitCounters_TheSweepRemovesOnlyRowsPastTwoWindows: a row is swept once both windows
