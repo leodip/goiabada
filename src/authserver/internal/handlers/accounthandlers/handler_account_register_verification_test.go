@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -161,7 +162,7 @@ func registrationAddressCases() []struct {
 		{name: "a disabled account",
 			user: &record.User{Id: 7, Enabled: false, EmailVerified: true, Email: registerSomeoneEmail}},
 		{name: "a pending registration",
-			preRegistration: &record.PreRegistration{Id: 42, Email: registerSomeoneEmail}},
+			preRegistration: pendingRegistrationIssuedAgo(time.Minute)},
 	}
 }
 
@@ -226,7 +227,7 @@ func TestHandleRegisterPost_WithVerificationTheJobSendsNothingButALinkOrANotice(
 		},
 		{
 			name:            "a pending registration",
-			preRegistration: &record.PreRegistration{Id: 42, Email: registerSomeoneEmail},
+			preRegistration: pendingRegistrationIssuedAgo(time.Minute),
 			wantDetails: map[string]interface{}{"ip": testClientIP, "emailDigest": someoneDigest,
 				"preRegistrationId": int64(42), "outcome": "link_pending"},
 		},
@@ -234,7 +235,7 @@ func TestHandleRegisterPost_WithVerificationTheJobSendsNothingButALinkOrANotice(
 			// The account decides, and the pending registration found beside it is named.
 			name:            "an unverified account with a pending registration beside it",
 			user:            &record.User{Id: 7, Enabled: true, Email: registerSomeoneEmail},
-			preRegistration: &record.PreRegistration{Id: 42, Email: registerSomeoneEmail},
+			preRegistration: pendingRegistrationIssuedAgo(time.Minute),
 			wantDetails: map[string]interface{}{"ip": testClientIP, "emailDigest": someoneDigest,
 				"userId": int64(7), "preRegistrationId": int64(42), "outcome": "unverified_address"},
 		},

@@ -515,6 +515,12 @@ type Database interface {
 	// (#112). An empty codeHash returns (nil, nil) without querying, as the user lookup
 	// does.
 	GetPreRegistrationByVerificationCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*record.PreRegistration, error)
+	// TryReplacePreRegistrationCode gives a dead pending registration a fresh code, only while
+	// the row still holds the dead code the caller read, and reports whether this call did.
+	// Compare-and-set for the same reason MarkCodeAsUsed is: of two repeats racing for one dead
+	// row, exactly one replaces it and sends a link (#207 decision 6).
+	TryReplacePreRegistrationCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64, deadCodeHash string,
+		codeEncrypted []byte, codeHash string, issuedAt time.Time) (bool, error)
 	DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationId int64) error
 
 	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *record.UserGroup) error

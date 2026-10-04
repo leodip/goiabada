@@ -384,8 +384,8 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 			issuedAt time.Time
 			expired  bool
 		}{
-			{"just inside the window", time.Now().UTC().Add(-verificationCodeLifetime + 2*time.Second), false},
-			{"just outside the window", time.Now().UTC().Add(-verificationCodeLifetime - 2*time.Second), true},
+			{"just inside the window", time.Now().UTC().Add(-emaillinks.ActivationCodeLifetime + 2*time.Second), false},
+			{"just outside the window", time.Now().UTC().Add(-emaillinks.ActivationCodeLifetime - 2*time.Second), true},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				pageRenderer := handlersmocks.NewPageRenderer(t)

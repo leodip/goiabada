@@ -148,6 +148,58 @@ func (d *Database) GetPreRegistrationByVerificationCodeHash(ctx context.Context,
 	return preRegistration, nil
 }
 
+// TryReplacePreRegistrationCode gives a dead pending registration a fresh code in one
+// conditional UPDATE, taking effect only while the row still holds deadCodeHash, the code the
+// caller read and judged dead, and reports whether this call is the one that wrote it.
+//
+// The condition is the code and not the issued-at: a row still holding the code the caller read
+// is still the row the caller judged, and time only moves on, so it is still dead. A repeat that
+// lost the race to another names a code the row no longer holds, and so does a caller whose row
+// was consumed or swept meanwhile, and each is told false and sends nothing (#207 decision 6).
+// The row keeps its id, its address and its created_at, so it is the same pending registration
+// with a new link.
+func (d *Database) TryReplacePreRegistrationCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64,
+	deadCodeHash string, codeEncrypted []byte, codeHash string, issuedAt time.Time) (bool, error) {
+
+	if preRegistrationId == 0 {
+		return false, errs.New("can't replace the code of preRegistration with id 0")
+	}
+	// '' is the dormant value, which no link can find, so a code stored with it could never be
+	// activated; and a dead code of '' would match a row nobody issued a code for.
+	if codeHash == "" || deadCodeHash == "" {
+		return false, errs.New("can't replace a preRegistration code with an empty code hash")
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("pre_registrations")
+	ub.Set(
+		ub.Assign("verification_code_encrypted", codeEncrypted),
+		ub.Assign("verification_code_hash", codeHash),
+		ub.Assign("verification_code_issued_at", issuedAt),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("id", preRegistrationId),
+		ub.Equal("verification_code_hash", deadCodeHash),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to replace preRegistration code")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errs.Wrap(err, "unable to get rows affected when replacing preRegistration code")
+	}
+
+	// rowsAffected == 1 means the row was replaced on all four engines: the fresh code's hash
+	// always differs from the dead one the row matched on, so the row always changes and MySQL's
+	// changed-rows accounting agrees with matched rows.
+	return rowsAffected == 1, nil
+}
+
 func (d *Database) GetPreRegistrationByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.PreRegistration, error) {
 
 	preRegistrationStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).

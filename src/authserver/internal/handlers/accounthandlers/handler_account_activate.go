@@ -23,16 +23,6 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// verificationCodeLifetime bounds how long an activation code stays usable after
-// HandleRegisterPost issues it.
-//
-// Consulted on the FIRST hop only, where the emailed code arrives. The two steps after the
-// redirect, the form and its POST, are bounded by the marker's own window instead, which starts
-// when the code was validated, so someone clicking at 4:59 still has five minutes to choose a
-// password. That is the same rule the reset flow states in isForgotPasswordCodeExpired (#112
-// decision 7).
-const verificationCodeLifetime = 5 * time.Minute
-
 // The reasons an activation link is refused, as recorded in the audit entry. They are the reset
 // flow's names for the same states, so one audit query reads both emailed-link flows. The marker's
 // own rejections (marker_missing, marker_wrong_flow, marker_expired, continuation_in_flight) pass
@@ -280,7 +270,7 @@ func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession session
 // pre-registration is past its lifetime. A row with no issued-at is treated as expired, which
 // fails closed.
 func isVerificationCodeExpired(preRegistration *record.PreRegistration) bool {
-	return preRegistration.VerificationCodeIssuedAt.Time.Add(verificationCodeLifetime).Before(time.Now().UTC())
+	return preRegistration.VerificationCodeIssuedAt.Time.Add(emaillinks.ActivationCodeLifetime).Before(time.Now().UTC())
 }
 
 // resolveActivationMarker is what both steps after the redirect run before anything else: read

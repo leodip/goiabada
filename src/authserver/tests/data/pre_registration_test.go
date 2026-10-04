@@ -309,3 +309,153 @@ func TestCreatePreRegistration_DistinctCodeHashesCoexist(t *testing.T) {
 		t.Fatalf("the second hash must find the second row: row=%v err=%v", foundSecond, err)
 	}
 }
+
+// TestTryReplacePreRegistrationCode is the conditional replacement of a dead pending registration
+// (#207 decision 6): a fresh code takes effect only while the row still holds the dead code the
+// caller read, so of two repeats racing for one dead row exactly one replaces it and sends a link.
+func TestTryReplacePreRegistrationCode(t *testing.T) {
+	freshEncrypted := []byte("ENCRYPTEDFRESHCODE")
+	issuedAt := time.Now().UTC().Truncate(time.Microsecond)
+
+	t.Run("a row still holding the dead code takes the fresh one and nothing else", func(t *testing.T) {
+		dead := createTestPreRegistration(t)
+		freshHash := codeHashOf(t, fake.UUID())
+		before, err := database.GetPreRegistrationById(context.Background(), nil, dead.Id)
+		if err != nil || before == nil {
+			t.Fatalf("Failed to reload the pre-registration: row=%v err=%v", before, err)
+		}
+
+		time.Sleep(timestampTick)
+
+		replaced, err := database.TryReplacePreRegistrationCode(context.Background(), nil, dead.Id,
+			dead.VerificationCodeHash, freshEncrypted, freshHash, issuedAt)
+		if err != nil {
+			t.Fatalf("TryReplacePreRegistrationCode failed: %v", err)
+		}
+		if !replaced {
+			t.Fatal("the replacement must take effect on a row still holding the dead code")
+		}
+
+		after, err := database.GetPreRegistrationById(context.Background(), nil, dead.Id)
+		if err != nil || after == nil {
+			t.Fatalf("Failed to reload the pre-registration: row=%v err=%v", after, err)
+		}
+		expected := *dead
+		expected.VerificationCodeEncrypted = freshEncrypted
+		expected.VerificationCodeHash = freshHash
+		expected.VerificationCodeIssuedAt = sql.NullTime{Time: issuedAt, Valid: true}
+		validatePreRegistration(t, &expected, after)
+		if !after.CreatedAt.Time.Equal(before.CreatedAt.Time) {
+			t.Errorf("CreatedAt changed: was %v, now %v", before.CreatedAt.Time, after.CreatedAt.Time)
+		}
+		if !after.UpdatedAt.Time.After(before.UpdatedAt.Time) {
+			t.Error("UpdatedAt must move forward with the replacement")
+		}
+
+		// The fresh link finds the row, and the dead one no longer does.
+		found, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), nil, freshHash)
+		if err != nil || found == nil || found.Id != dead.Id {
+			t.Errorf("the fresh hash must find the replaced row: row=%v err=%v", found, err)
+		}
+		stale, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), nil, dead.VerificationCodeHash)
+		if err != nil || stale != nil {
+			t.Errorf("the dead hash must find nothing once replaced: row=%v err=%v", stale, err)
+		}
+	})
+
+	t.Run("a row that changed underneath is left as it is", func(t *testing.T) {
+		dead := createTestPreRegistration(t)
+		firstHash := codeHashOf(t, fake.UUID())
+		firstEncrypted := []byte("ENCRYPTEDFIRSTCODE")
+
+		// The first of two repeats that read the same dead row.
+		first, err := database.TryReplacePreRegistrationCode(context.Background(), nil, dead.Id,
+			dead.VerificationCodeHash, firstEncrypted, firstHash, issuedAt)
+		if err != nil || !first {
+			t.Fatalf("the first replacement must take effect: replaced=%v err=%v", first, err)
+		}
+
+		// The second still names the dead code it read, which the row no longer holds.
+		second, err := database.TryReplacePreRegistrationCode(context.Background(), nil, dead.Id,
+			dead.VerificationCodeHash, freshEncrypted, codeHashOf(t, fake.UUID()), issuedAt.Add(time.Second))
+		if err != nil {
+			t.Fatalf("TryReplacePreRegistrationCode failed: %v", err)
+		}
+		if second {
+			t.Fatal("a replacement naming a code the row no longer holds must not take effect")
+		}
+
+		after, err := database.GetPreRegistrationById(context.Background(), nil, dead.Id)
+		if err != nil || after == nil {
+			t.Fatalf("Failed to reload the pre-registration: row=%v err=%v", after, err)
+		}
+		expected := *dead
+		expected.VerificationCodeEncrypted = firstEncrypted
+		expected.VerificationCodeHash = firstHash
+		expected.VerificationCodeIssuedAt = sql.NullTime{Time: issuedAt, Valid: true}
+		validatePreRegistration(t, &expected, after)
+	})
+
+	t.Run("a row consumed underneath is not recreated", func(t *testing.T) {
+		dead := createTestPreRegistration(t)
+		if err := database.DeletePreRegistration(context.Background(), nil, dead.Id); err != nil {
+			t.Fatalf("Failed to delete the pre-registration: %v", err)
+		}
+
+		replaced, err := database.TryReplacePreRegistrationCode(context.Background(), nil, dead.Id,
+			dead.VerificationCodeHash, freshEncrypted, codeHashOf(t, fake.UUID()), issuedAt)
+		if err != nil {
+			t.Fatalf("TryReplacePreRegistrationCode failed: %v", err)
+		}
+		if replaced {
+			t.Error("a replacement of a row that no longer exists must not report taking effect")
+		}
+		gone, err := database.GetPreRegistrationById(context.Background(), nil, dead.Id)
+		if err != nil || gone != nil {
+			t.Errorf("the deleted row must stay deleted: row=%v err=%v", gone, err)
+		}
+	})
+
+	t.Run("an empty fresh hash is refused", func(t *testing.T) {
+		dead := createTestPreRegistration(t)
+
+		replaced, err := database.TryReplacePreRegistrationCode(context.Background(), nil, dead.Id,
+			dead.VerificationCodeHash, freshEncrypted, "", issuedAt)
+		if err == nil {
+			t.Error("a fresh code with no hash could never be found by its link, and must be refused")
+		}
+		if replaced {
+			t.Error("a refused replacement must not report taking effect")
+		}
+		after, err := database.GetPreRegistrationById(context.Background(), nil, dead.Id)
+		if err != nil || after == nil {
+			t.Fatalf("Failed to reload the pre-registration: row=%v err=%v", after, err)
+		}
+		validatePreRegistration(t, dead, after)
+	})
+
+	t.Run("it runs on the caller's transaction", func(t *testing.T) {
+		dead := createTestPreRegistration(t)
+		freshHash := codeHashOf(t, fake.UUID())
+
+		tx := beginTx(t)
+		replaced, err := database.TryReplacePreRegistrationCode(context.Background(), tx, dead.Id,
+			dead.VerificationCodeHash, freshEncrypted, freshHash, issuedAt)
+		if err != nil || !replaced {
+			t.Fatalf("the replacement inside the transaction must take effect: replaced=%v err=%v", replaced, err)
+		}
+		inTx, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), tx, freshHash)
+		if err != nil || inTx == nil || inTx.Id != dead.Id {
+			t.Fatalf("the replacement must be visible through its transaction: row=%v err=%v", inTx, err)
+		}
+		if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
+			t.Fatalf("RollbackTransaction failed: %v", rollbackErr)
+		}
+
+		after, err := database.GetPreRegistrationById(context.Background(), nil, dead.Id)
+		if err != nil || after == nil {
+			t.Fatalf("Failed to reload the pre-registration: row=%v err=%v", after, err)
+		}
+		validatePreRegistration(t, dead, after)
+	})
+}

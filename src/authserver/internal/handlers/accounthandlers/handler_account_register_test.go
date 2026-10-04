@@ -3,12 +3,14 @@ package accounthandlers
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -300,7 +302,9 @@ func TestHandleRegisterPost(t *testing.T) {
 
 		emailValidator.On("ValidateEmailAddress", "preregistered@example.com").Return(nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "preregistered@example.com").Return(nil, nil)
-		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "preregistered@example.com").Return(&record.PreRegistration{}, nil)
+		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "preregistered@example.com").Return(&record.PreRegistration{
+			VerificationCodeIssuedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
+		}, nil)
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)

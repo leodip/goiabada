@@ -94,11 +94,24 @@ func HandleRegisterGet(
 }
 
 // accountRegisterDatabase is what the self-registration page needs: the account and the pending
-// registration an address may already have, and the pending registration it writes for a new one.
+// registration an address may already have, the pending registration it writes for a new one, and
+// the fresh code it gives a dead one.
 type accountRegisterDatabase interface {
 	CreatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *record.PreRegistration) error
 	GetPreRegistrationByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.PreRegistration, error)
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
+	TryReplacePreRegistrationCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64, deadCodeHash string,
+		codeEncrypted []byte, codeHash string, issuedAt time.Time) (bool, error)
+}
+
+// livePreRegistration is the pending registration a lookup found, or nil when it found none or a
+// dead one: every reader treats a registration that can no longer complete as absent (#207
+// decision 6).
+func livePreRegistration(preRegistration *record.PreRegistration, now time.Time) *record.PreRegistration {
+	if preRegistration == nil || emaillinks.IsPreRegistrationDead(preRegistration.VerificationCodeIssuedAt.Time, now) {
+		return nil
+	}
+	return preRegistration
 }
 
 // The outcomes a registration with verification is recorded with, one per request, in the
@@ -106,9 +119,10 @@ type accountRegisterDatabase interface {
 // same "check your email" page whichever of these it was, so the entry is the only place the
 // difference is visible.
 const (
-	// registrationOutcomeLinkIssued is a new pending registration written and its link issued.
-	// It says the row was written, not that the mail went out: the entry is written before the
-	// send, and a send failure is an Error log line on the same request id.
+	// registrationOutcomeLinkIssued is a new pending registration written, or a dead one given
+	// a fresh code, and its link issued. It says the row was written, not that the mail went
+	// out: the entry is written before the send, and a send failure is an Error log line on the
+	// same request id.
 	registrationOutcomeLinkIssued = "link_issued"
 	// registrationOutcomeLinkPending is an address whose pending registration can still
 	// complete, for which nothing is sent.
@@ -121,12 +135,16 @@ const (
 	registrationOutcomeUnverifiedAddress = "unverified_address"
 	// registrationOutcomeAccountDisabled is a disabled account, verified or not.
 	registrationOutcomeAccountDisabled = "account_disabled"
+	// registrationOutcomeReplacementLost is a dead pending registration whose replacement the
+	// conditional write declined, because a concurrent repeat replaced it first or it was
+	// consumed or swept meanwhile, for which nothing is sent (#207 decision 6).
+	registrationOutcomeReplacementLost = "replacement_lost"
 	// registrationOutcomeInvalidAddress is a submission the format or length check refused,
 	// answered with the form redrawn and looking nothing up.
 	registrationOutcomeInvalidAddress = "invalid_address"
 	// registrationOutcomeServerError is a request the server failed before deciding it: a
-	// lookup, or the code's encryption or the pending registration's write. The cause is the
-	// Error log line on the same request id.
+	// lookup, or the code's encryption or the pending registration's write or replacement. The
+	// cause is the Error log line on the same request id.
 	registrationOutcomeServerError = "server_error"
 )
 
@@ -287,12 +305,14 @@ func HandleRegisterPost(
 			return
 		}
 
+		// A pending registration keeps the address taken only while it can still complete: a dead
+		// one is treated as absent, as every reader treats it (#207 decision 6).
 		preRegistration, err := database.GetPreRegistrationByEmail(r.Context(), nil, email)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
-		if preRegistration != nil {
+		if livePreRegistration(preRegistration, time.Now().UTC()) != nil {
 			renderError(alreadyRegisteredMessage)
 			return
 		}
@@ -488,16 +508,25 @@ func finishRegistration(
 		auditRequestedRegistration(ctx, auditLogger, clientIP, email, userId, preRegistrationId,
 			registrationOutcomeNoticeIssued)
 		sendExistingAccountNotice(ctx, r, emailSender, pageRenderer, baseURL, settings, user)
-	case preRegistration != nil:
+	case livePreRegistration(preRegistration, time.Now().UTC()) != nil:
+		// It can still complete, so its link is still the one that completes it, and replacing
+		// it would change the code under a form already on screen (#207 decision 6).
 		auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, preRegistrationId,
 			registrationOutcomeLinkPending)
 	default:
+		// No pending registration, or a dead one, which this replaces.
 		issueActivationLink(ctx, r, database, emailSender, auditLogger, pageRenderer, dataCipher, baseURL,
-			settings, clientIP, email)
+			settings, clientIP, email, preRegistration)
 	}
 }
 
-// issueActivationLink writes a new address's pending registration and mails its link.
+// issueActivationLink writes a new address's pending registration, or gives a dead one a fresh
+// code, and mails its link.
+//
+// dead is the pending registration the lookup found and judged dead, or nil when it found none.
+// Its replacement is conditional on the row still holding the dead code, so of two repeats racing
+// for it exactly one sends a link; the other is recorded as replacement_lost and sends nothing
+// (#207 decision 6).
 func issueActivationLink(
 	ctx context.Context,
 	r *http.Request,
@@ -510,12 +539,18 @@ func issueActivationLink(
 	settings *record.Settings,
 	clientIP string,
 	email string,
+	dead *record.PreRegistration,
 ) {
+	var deadId int64
+	if dead != nil {
+		deadId = dead.Id
+	}
+
 	verificationCode := securerandom.String(32)
 	verificationCodeEncrypted, err := dataCipher.Encrypt(verificationCode)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to encrypt the activation code", "error", err)
-		auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, 0, registrationOutcomeServerError)
+		auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, deadId, registrationOutcomeServerError)
 		return
 	}
 
@@ -528,11 +563,29 @@ func issueActivationLink(
 		VerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC(), Valid: true},
 		VerificationCodeHash:      hashutil.HashString(verificationCode),
 	}
-	err = database.CreatePreRegistration(ctx, nil, preRegistration)
-	if err != nil {
-		slog.ErrorContext(ctx, "unable to store the pending registration", "error", err)
-		auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, 0, registrationOutcomeServerError)
-		return
+	if dead == nil {
+		err = database.CreatePreRegistration(ctx, nil, preRegistration)
+		if err != nil {
+			slog.ErrorContext(ctx, "unable to store the pending registration", "error", err)
+			auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, 0, registrationOutcomeServerError)
+			return
+		}
+	} else {
+		var replaced bool
+		replaced, err = database.TryReplacePreRegistrationCode(ctx, nil, dead.Id, dead.VerificationCodeHash,
+			preRegistration.VerificationCodeEncrypted, preRegistration.VerificationCodeHash,
+			preRegistration.VerificationCodeIssuedAt.Time)
+		if err != nil {
+			slog.ErrorContext(ctx, "unable to replace the dead pending registration", "pre_registration_id", dead.Id,
+				"error", err)
+			auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, dead.Id, registrationOutcomeServerError)
+			return
+		}
+		if !replaced {
+			auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, dead.Id, registrationOutcomeReplacementLost)
+			return
+		}
+		preRegistration.Id = dead.Id
 	}
 	auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, preRegistration.Id,
 		registrationOutcomeLinkIssued)
