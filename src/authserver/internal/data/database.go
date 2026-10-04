@@ -496,6 +496,26 @@ type Database interface {
 	// DeleteExpiredAuthorizeRequests reaps on expires_at alone.
 	DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error
 
+	// A rate-limit counter is one shared tier's count for one key digest in one window, which is
+	// what lets every replica spend the same credential-guessing budget (#394).
+	//
+	// ReserveRateLimitHit charges one hit to keyHash's current window when admit, handed the
+	// current and previous windows' counts before this hit, answers true, and reports whether it
+	// charged. The read, the decision and the charge are atomic across every handle on the
+	// database: the charge takes the row's lock first and admit is asked again under it, so two
+	// pods can never both take the last slot. A refusal writes nothing. It owns its transaction,
+	// as ReencryptToKey does, because creating a window's row can lose a race on the key, which
+	// on PostgreSQL aborts the transaction it ran in. expiresAt is when the row stops counting.
+	ReserveRateLimitHit(ctx context.Context, keyHash string, current, previous, expiresAt time.Time,
+		admit func(curr, prev int) bool) (bool, error)
+	// RefundRateLimitHit takes one hit back from the window it was charged in, never below zero.
+	RefundRateLimitHit(ctx context.Context, tx *sql.Tx, keyHash string, windowStart time.Time) error
+	// GetRateLimitCounts reports keyHash's hits in the current and the previous window, zero
+	// where there is no row.
+	GetRateLimitCounts(ctx context.Context, tx *sql.Tx, keyHash string, current, previous time.Time) (curr, prev int, err error)
+	// DeleteExpiredRateLimitCounters reaps on expires_at alone.
+	DeleteExpiredRateLimitCounters(ctx context.Context, tx *sql.Tx, now time.Time) error
+
 	CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *record.UserConsent) error
 	UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *record.UserConsent) error
 	GetUserConsentById(ctx context.Context, tx *sql.Tx, userConsentId int64) (*record.UserConsent, error)

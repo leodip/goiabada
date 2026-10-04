@@ -1,6 +1,7 @@
 package ratelimit
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -16,13 +17,31 @@ func newAccountAt(c *clock, tight, backstop int) *AccountLimiter {
 	)
 }
 
+// reserveAccount is AccountLimiter.Reserve for a test that expects both counts to be
+// readable.
+func reserveAccount(t *testing.T, a *AccountLimiter, networkKey, account string) (*AccountReservation, Refusal) {
+	t.Helper()
+	r, refusal, err := a.Reserve(context.Background(), networkKey, account)
+	if err != nil {
+		t.Fatalf("Reserve(%q, %q) returned an error: %v", networkKey, account, err)
+	}
+	if (r != nil) != (refusal == Admitted) {
+		t.Fatalf("Reserve(%q, %q) = (%v, %v): a reservation comes back exactly when it is admitted",
+			networkKey, account, r, refusal)
+	}
+	return r, refusal
+}
+
 // failAccount runs one wrong password through the account limiter and reports what Reserve
 // answered.
-func failAccount(a *AccountLimiter, network, account string) Refusal {
+func failAccount(t *testing.T, a *AccountLimiter, network, account string) Refusal {
+	t.Helper()
 	networkKey := network + "|" + account
-	refusal := a.Reserve(networkKey, account)
-	if refusal == Admitted {
-		a.Release(networkKey, account, true)
+	r, refusal := reserveAccount(t, a, networkKey, account)
+	if r != nil {
+		if err := r.Release(context.Background(), true); err != nil {
+			t.Fatalf("Release returned an error: %v", err)
+		}
 	}
 	return refusal
 }
@@ -32,16 +51,16 @@ func TestAccountLimiter_TheTightTierIsPerNetwork(t *testing.T) {
 	a := newAccountAt(c, 2, 5)
 
 	for i := 1; i <= 2; i++ {
-		if got := failAccount(a, "203.0.113.7", "victim@example.com"); got != Admitted {
+		if got := failAccount(t, a, "203.0.113.7", "victim@example.com"); got != Admitted {
 			t.Fatalf("failure #%d from one network: Reserve = %v, want Admitted", i, got)
 		}
 	}
-	if got := failAccount(a, "203.0.113.7", "victim@example.com"); got != RefusedTight {
+	if got := failAccount(t, a, "203.0.113.7", "victim@example.com"); got != RefusedTight {
 		t.Errorf("third failure from one network: Reserve = %v, want RefusedTight", got)
 	}
 	// The owner, elsewhere, is untouched by it: that is what the tight tier carrying the
 	// network buys.
-	if got := failAccount(a, "198.51.100.9", "victim@example.com"); got != Admitted {
+	if got := failAccount(t, a, "198.51.100.9", "victim@example.com"); got != Admitted {
 		t.Errorf("a failure from a second network: Reserve = %v, want Admitted", got)
 	}
 }
@@ -53,23 +72,26 @@ func TestAccountLimiter_TheBackstopIsAccountWide(t *testing.T) {
 	// A success spends neither tier, however often.
 	for i := 0; i < 20; i++ {
 		networkKey := "203.0.113.7|victim@example.com"
-		if got := a.Reserve(networkKey, "victim@example.com"); got != Admitted {
+		r, got := reserveAccount(t, a, networkKey, "victim@example.com")
+		if got != Admitted {
 			t.Fatalf("successful check #%d: Reserve = %v, want Admitted", i+1, got)
 		}
-		a.Release(networkKey, "victim@example.com", false)
+		if err := r.Release(context.Background(), false); err != nil {
+			t.Fatalf("Release returned an error: %v", err)
+		}
 	}
 
 	// One failure from each of five networks, so no tight bucket is near its budget and
 	// only the backstop can refuse the sixth.
 	for i := 0; i < 5; i++ {
-		if got := failAccount(a, fmt.Sprintf("192.0.2.%d", i), "victim@example.com"); got != Admitted {
+		if got := failAccount(t, a, fmt.Sprintf("192.0.2.%d", i), "victim@example.com"); got != Admitted {
 			t.Fatalf("failure from network %d: Reserve = %v, want Admitted", i, got)
 		}
 	}
-	if got := failAccount(a, "192.0.2.99", "victim@example.com"); got != RefusedBackstop {
+	if got := failAccount(t, a, "192.0.2.99", "victim@example.com"); got != RefusedBackstop {
 		t.Errorf("sixth failure, from a fresh network: Reserve = %v, want RefusedBackstop", got)
 	}
-	if got := failAccount(a, "192.0.2.99", "other@example.com"); got != Admitted {
+	if got := failAccount(t, a, "192.0.2.99", "other@example.com"); got != Admitted {
 		t.Errorf("a failure against another account: Reserve = %v, want Admitted", got)
 	}
 }
@@ -81,16 +103,16 @@ func TestAccountLimiter_ATightRefusalReservesNothingOnTheBackstop(t *testing.T) 
 	c := newClock()
 	a := newAccountAt(c, 1, 2)
 
-	if got := a.Reserve("203.0.113.7|victim@example.com", "victim@example.com"); got != Admitted {
+	if _, got := reserveAccount(t, a, "203.0.113.7|victim@example.com", "victim@example.com"); got != Admitted {
 		t.Fatalf("first reservation: Reserve = %v, want Admitted", got)
 	}
 	for i := 0; i < 10; i++ {
-		if got := a.Reserve("203.0.113.7|victim@example.com", "victim@example.com"); got != RefusedTight {
+		if _, got := reserveAccount(t, a, "203.0.113.7|victim@example.com", "victim@example.com"); got != RefusedTight {
 			t.Fatalf("held tight slot, attempt %d: Reserve = %v, want RefusedTight", i+1, got)
 		}
 	}
 	// One backstop slot is held; the second is still free.
-	if got := a.Reserve("198.51.100.9|victim@example.com", "victim@example.com"); got != Admitted {
+	if _, got := reserveAccount(t, a, "198.51.100.9|victim@example.com", "victim@example.com"); got != Admitted {
 		t.Errorf("second network: Reserve = %v, want Admitted: the tight refusals above held "+
 			"backstop slots they were never admitted against", got)
 	}
@@ -108,7 +130,7 @@ func TestAccountLimiter_ABackstopRefusalHandsTheTightSlotBack(t *testing.T) {
 
 	// The attacker exhausts the backstop from networks of their own.
 	for i := 0; i < 3; i++ {
-		if got := failAccount(a, fmt.Sprintf("192.0.2.%d", i), "victim@example.com"); got != Admitted {
+		if got := failAccount(t, a, fmt.Sprintf("192.0.2.%d", i), "victim@example.com"); got != Admitted {
 			t.Fatalf("setup: attacker failure %d: Reserve = %v, want Admitted", i+1, got)
 		}
 	}
@@ -118,7 +140,7 @@ func TestAccountLimiter_ABackstopRefusalHandsTheTightSlotBack(t *testing.T) {
 	// slot.
 	const home = "203.0.113.7|victim@example.com"
 	for i := 1; i <= 10; i++ {
-		if got := a.Reserve(home, "victim@example.com"); got != RefusedBackstop {
+		if _, got := reserveAccount(t, a, home, "victim@example.com"); got != RefusedBackstop {
 			t.Fatalf("owner attempt %d while the backstop is exhausted: Reserve = %v, want "+
 				"RefusedBackstop", i, got)
 		}
@@ -126,7 +148,7 @@ func TestAccountLimiter_ABackstopRefusalHandsTheTightSlotBack(t *testing.T) {
 
 	// Past the backstop's window twice over, nothing recorded counts on either tier.
 	c.advance(2 * time.Hour)
-	if got := a.Reserve(home, "victim@example.com"); got != Admitted {
+	if _, got := reserveAccount(t, a, home, "victim@example.com"); got != Admitted {
 		t.Errorf("owner from home after the backstop's window passed: Reserve = %v, want "+
 			"Admitted; the refusals stranded tight slots that never decay", got)
 	}
