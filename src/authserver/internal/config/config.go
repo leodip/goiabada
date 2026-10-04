@@ -15,6 +15,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/httpmw"
@@ -105,7 +106,38 @@ type DatabaseConfig struct {
 	Name     string
 	DSN      string
 	Create   bool
+
+	// The pool PostgreSQL, MySQL and SQL Server open the application database with. SQLite reads
+	// none of it: its pool is one connection, whatever is set here (#394 decisions 5 and 6).
+	//
+	// MaxOpenConns is at least 1, because database/sql reads 0 as unlimited.
+	MaxOpenConns int
+	// MaxIdleConns is nil while neither GOIABADA_DB_MAX_IDLE_CONNS nor its flag sets it, and then
+	// follows MaxOpenConns; read it through EffectiveMaxIdleConns. It is kept unresolved because
+	// the `migrate` subcommand parses the --db-* flags again over a copy, and an open cap given
+	// there must move an idle cap nobody set.
+	MaxIdleConns *int
+	// ConnMaxLifetime and ConnMaxIdleTime are 0 or more, 0 meaning no limit.
+	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
 }
+
+// EffectiveMaxIdleConns is the idle cap the engines are given: the one set, or the open cap.
+func (c *DatabaseConfig) EffectiveMaxIdleConns() int {
+	if c.MaxIdleConns != nil {
+		return *c.MaxIdleConns
+	}
+	return c.MaxOpenConns
+}
+
+const (
+	// The pool's defaults (#394 decision 6). Four pods of 20, three replicas and a rolling
+	// update's surge pod, are 80 connections, under a stock PostgreSQL's 97 usable with room for
+	// `migrate`, a starting pod's maintenance connection and an operator's session.
+	defaultMaxOpenConns    = 20
+	defaultConnMaxLifetime = 30 * time.Minute
+	defaultConnMaxIdleTime = 5 * time.Minute
+)
 
 type Config struct {
 	AuthServer    AuthServerConfig
@@ -188,6 +220,11 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			Name:     getEnv("GOIABADA_DB_NAME", "goiabada"),
 			DSN:      getEnv("GOIABADA_DB_DSN", "file::memory:?cache=shared"),
 			Create:   getEnvAsBoolDefault("GOIABADA_DB_CREATE", true, &malformed),
+
+			MaxOpenConns:    getEnvAsIntAtLeast("GOIABADA_DB_MAX_OPEN_CONNS", defaultMaxOpenConns, 1, &malformed),
+			MaxIdleConns:    getEnvAsOptionalIntAtLeast("GOIABADA_DB_MAX_IDLE_CONNS", 0, &malformed),
+			ConnMaxLifetime: getEnvAsDuration("GOIABADA_DB_CONN_MAX_LIFETIME", defaultConnMaxLifetime, &malformed),
+			ConnMaxIdleTime: getEnvAsDuration("GOIABADA_DB_CONN_MAX_IDLE_TIME", defaultConnMaxIdleTime, &malformed),
 		},
 		AdminEmail:               getEnv("GOIABADA_ADMIN_EMAIL", "admin"),
 		AdminPassword:            getEnv("GOIABADA_ADMIN_PASSWORD", "changeme"),
@@ -240,6 +277,10 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	}
 	c.Args = fs.Args()
 
+	// The pool flags parse as the flag package reads an integer or a duration; their ranges, and
+	// the one rule between two of them, are held here, in the same line as the variables' (#394).
+	checkDatabaseFlags(fs, &c.Database, &malformed)
+
 	// Re-derive slice-valued config after flag parsing so a command-line flag
 	// (comma-separated) overrides the environment value.
 	c.AuthServer.TrustedProxies = splitCSV(authServerTrustedProxies)
@@ -267,7 +308,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	return c, nil
 }
 
-// RegisterDatabaseFlags registers the eight --db-* flags on fs, each writing into c and
+// RegisterDatabaseFlags registers the twelve --db-* flags on fs, each writing into c and
 // defaulting to the value c already holds.
 //
 // It is the one registration of those names. The server's parse registers them over the loaded
@@ -283,6 +324,72 @@ func RegisterDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig) {
 	fs.StringVar(&c.Name, "db-name", c.Name, "Database name")
 	fs.StringVar(&c.DSN, "db-dsn", c.DSN, "Database DSN (only for sqlite)")
 	fs.BoolVar(&c.Create, "db-create", c.Create, "Create the database if it does not exist (only for mysql, postgres, mssql)")
+	fs.IntVar(&c.MaxOpenConns, "db-max-open-conns", c.MaxOpenConns, "Most connections open to the database at once, at least 1 (only for mysql, postgres, mssql)")
+	fs.Var(optionalIntFlag{&c.MaxIdleConns}, "db-max-idle-conns", "Most idle connections kept open, from 0 to the max open connections; unset follows the max open connections (only for mysql, postgres, mssql)")
+	fs.DurationVar(&c.ConnMaxLifetime, "db-conn-max-lifetime", c.ConnMaxLifetime, "Longest a connection is reused, such as 30m; 0 is no limit (only for mysql, postgres, mssql)")
+	fs.DurationVar(&c.ConnMaxIdleTime, "db-conn-max-idle-time", c.ConnMaxIdleTime, "Longest a connection stays idle before it is closed, such as 5m; 0 is no limit (only for mysql, postgres, mssql)")
+}
+
+// optionalIntFlag is a flag over an *int that stays nil until the flag is given, which is how the
+// idle cap tells "not set, follow the open cap" from any number an operator can write. Set
+// replaces the pointer rather than writing through it, so a copy of the configuration made
+// before the parse, the base the `migrate` subcommand parses over, keeps its own value.
+type optionalIntFlag struct{ p **int }
+
+func (f optionalIntFlag) String() string {
+	if f.p == nil || *f.p == nil {
+		return ""
+	}
+	return strconv.Itoa(**f.p)
+}
+
+func (f optionalIntFlag) Set(s string) error {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return errs.New("parse error")
+	}
+	*f.p = &n
+	return nil
+}
+
+// CheckDatabaseFlags refuses what the pool flags given on fs leave out of range, in the one
+// malformed-configuration line Load answers with. The `migrate` subcommand calls it after its own
+// parse of the --db-* flags, so a pool flag given after `migrate` is held to the rules one given
+// before it is (#394 decision 5).
+func CheckDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig) error {
+	var malformed malformedValues
+	checkDatabaseFlags(fs, c, &malformed)
+	return malformed.err()
+}
+
+// checkDatabaseFlags records each pool flag given on fs whose value is out of range, then the one
+// rule between two settings: the idle cap is at most the open cap, whichever of the variable and
+// the flag supplied each. A variable's own range was checked as it was read, so it is not
+// reported twice, and the rule between the two is skipped while either is out of its own range.
+// The flags are checked in the order the settings are declared, which fs.Visit's lexical order is
+// not.
+func checkDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig, malformed *malformedValues) {
+	given := map[string]string{}
+	fs.Visit(func(f *flag.Flag) { given[f.Name] = f.Value.String() })
+
+	if v, ok := given["db-max-open-conns"]; ok && c.MaxOpenConns < 1 {
+		malformed.add("--db-max-open-conns", v, "at least 1")
+	}
+	if v, ok := given["db-max-idle-conns"]; ok && c.EffectiveMaxIdleConns() < 0 {
+		malformed.add("--db-max-idle-conns", v, "at least 0")
+	}
+	if v, ok := given["db-conn-max-lifetime"]; ok && c.ConnMaxLifetime < 0 {
+		malformed.add("--db-conn-max-lifetime", v, "at least 0")
+	}
+	if v, ok := given["db-conn-max-idle-time"]; ok && c.ConnMaxIdleTime < 0 {
+		malformed.add("--db-conn-max-idle-time", v, "at least 0")
+	}
+
+	// Refused rather than lowered, which is what database/sql would do with it in silence.
+	if idle := c.EffectiveMaxIdleConns(); c.MaxOpenConns >= 1 && idle >= 0 && idle > c.MaxOpenConns {
+		malformed.add("GOIABADA_DB_MAX_IDLE_CONNS (--db-max-idle-conns)", strconv.Itoa(idle),
+			"at most GOIABADA_DB_MAX_OPEN_CONNS (--db-max-open-conns), which is "+strconv.Itoa(c.MaxOpenConns))
+	}
 }
 
 // DataKeys decodes the data-encryption keys: the current one, which must be present,
@@ -358,6 +465,45 @@ func getEnvAsInt(key string, defaultVal int, malformed *malformedValues) int {
 	if err != nil {
 		malformed.add(key, valueStr, "an integer")
 		return defaultVal
+	}
+	return value
+}
+
+// getEnvAsIntAtLeast is getEnvAsInt for a setting with a lower bound: a value below it is recorded
+// as malformed too.
+func getEnvAsIntAtLeast(key string, defaultVal, least int, malformed *malformedValues) int {
+	before := len(*malformed)
+	value := getEnvAsInt(key, defaultVal, malformed)
+	if len(*malformed) == before && value < least {
+		malformed.add(key, getEnv(key, ""), "at least "+strconv.Itoa(least))
+	}
+	return value
+}
+
+// getEnvAsOptionalIntAtLeast is getEnvAsIntAtLeast for a setting whose absence means something of
+// its own: nil when the variable is unset or empty.
+func getEnvAsOptionalIntAtLeast(key string, least int, malformed *malformedValues) *int {
+	if getEnv(key, "") == "" {
+		return nil
+	}
+	value := getEnvAsIntAtLeast(key, 0, least, malformed)
+	return &value
+}
+
+// getEnvAsDuration is getEnvAsInt's rule for a duration in Go's syntax, 0 or more: `30m`, `1h`,
+// `90s`, or `0` for no limit. A bare number is refused, since it names no unit (#394 decision 5).
+func getEnvAsDuration(key string, defaultVal time.Duration, malformed *malformedValues) time.Duration {
+	valueStr := getEnv(key, "")
+	if valueStr == "" {
+		return defaultVal
+	}
+	value, err := time.ParseDuration(valueStr)
+	if err != nil {
+		malformed.add(key, valueStr, "a duration such as 30m, 1h or 90s")
+		return defaultVal
+	}
+	if value < 0 {
+		malformed.add(key, valueStr, "at least 0")
 	}
 	return value
 }

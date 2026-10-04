@@ -272,8 +272,8 @@ func rawHandle() *sql.DB {
 // connection, right now.
 //
 // It runs on the pool behind the package's shared handle, which opens a further connection for
-// it: every engine that answers this leaves its pool unbounded, and only sqlitedb caps it at one,
-// which is the engine that never gets here. Each view is the server's own accounting rather than
+// it: every engine that answers this caps its pool at the default 20, far above what a test holds,
+// and only sqlitedb caps it at one, which is the engine that never gets here (#394). Each view is the server's own accounting rather than
 // anything this package maintains, and each is readable by the user the data tier runs as (root
 // on MySQL, postgres on PostgreSQL, sa on SQL Server, the last of which needs VIEW SERVER STATE
 // and has it).

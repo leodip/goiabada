@@ -348,6 +348,34 @@ kubectl scale deployment goiabada-authserver -n goiabada --replicas=3
 kubectl scale deployment goiabada-adminconsole -n goiabada --replicas=2
 ```
 
+Every auth server pod opens its own connection pool, of at most `GOIABADA_DB_MAX_OPEN_CONNS`
+connections (20 unless you set it), against the one database they share. Before you scale, check
+that the pods fit under the database's connection limit:
+
+```text
+(replicas + surge) × GOIABADA_DB_MAX_OPEN_CONNS + headroom < max_connections
+```
+
+- **Surge** is the extra pods a rolling update runs beside the old ones. A Deployment's default
+  `maxSurge` of 25%, rounded up, adds one pod to three replicas, so a deploy briefly runs four.
+- **Headroom** is every other connection the database must accept: the `migrate` subcommand, the
+  maintenance connection a starting pod opens to create the database when `GOIABADA_DB_CREATE` is
+  on, your own sessions, and any other application on the same server. The admin console opens
+  none.
+- With a HorizontalPodAutoscaler, **replicas is its `maxReplicas`**, not today's count.
+
+With the defaults, three replicas and one surge pod make 4 × 20 = 80 connections. A stock
+PostgreSQL allows 100, less 3 reserved for superusers, which leaves 17 for the headroom; a stock
+MySQL allows 151. Lower `GOIABADA_DB_MAX_OPEN_CONNS`, or raise `max_connections`, until the
+arithmetic holds for the replica count you run.
+
+A capped pool trades one failure for another, deliberately: when every connection of a pod is busy,
+its next request waits for one to be released, until the client or the gateway gives up, rather
+than the database refusing a new connection to every pod at once. Raising replicas without raising
+`max_connections` does not add capacity at the database: it moves the bottleneck from the pods'
+queues to the database's refusals. The pool settings are in the
+[environment variable reference](/reference/environment-variables/#database-configuration).
+
 ### Resource limits
 
 The generated manifests include default limits. Adjust based on your load:

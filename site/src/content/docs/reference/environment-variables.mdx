@@ -96,8 +96,37 @@ Used only on first startup:
       <td><code>file::memory:</code></td>
       <td>SQLite DSN (only for sqlite)</td>
     </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_DB_MAX_OPEN_CONNS</code><br/><code>--db-max-open-conns</code></td>
+      <td><code>20</code></td>
+      <td>Most connections the auth server holds open to the database at once (server engines only). At least <code>1</code>: there is no unlimited setting. A request that finds every connection busy waits for one</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_DB_MAX_IDLE_CONNS</code><br/><code>--db-max-idle-conns</code></td>
+      <td><em>(max open connections)</em></td>
+      <td>Most idle connections kept open for reuse (server engines only). From <code>0</code>, keep none, to the max open connections; a value above it is refused. Unset, it follows the max open connections</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_DB_CONN_MAX_LIFETIME</code><br/><code>--db-conn-max-lifetime</code></td>
+      <td><code>30m</code></td>
+      <td>Longest a connection is reused before it is replaced, so connections move to the new endpoint after a failover or a proxy restart (server engines only). A duration such as <code>30m</code>, <code>1h</code> or <code>90s</code>; <code>0</code> is no limit</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_DB_CONN_MAX_IDLE_TIME</code><br/><code>--db-conn-max-idle-time</code></td>
+      <td><code>5m</code></td>
+      <td>Longest a connection stays idle before it is closed, so a quiet pod hands its connections back (server engines only). A duration such as <code>5m</code>; <code>0</code> is no limit</td>
+    </tr>
   </tbody>
 </table>
+
+The four pool settings apply to PostgreSQL, MySQL and SQL Server. A value out of range stops the auth
+server at start, on one line naming every bad value, exit code 2; a bare number of seconds such as
+`1800` is refused, because a duration needs its unit. The values are checked on SQLite too, but
+otherwise ignored there: SQLite always runs on one connection. Every start writes one
+`database connection pool` record with the pool it opened. The `migrate` subcommand reads the same
+settings. With several replicas, every pod opens its own pool against one database: see
+[Kubernetes](/production-deployment/kubernetes/#scale-replicas) for sizing it against
+`max_connections`.
 
 <Aside type="tip">
 For SQLite with a file, use: `file:/path/to/goiabada.db?_pragma=busy_timeout=5000&_pragma=journal_mode=WAL`

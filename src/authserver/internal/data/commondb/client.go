@@ -78,8 +78,8 @@ func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *record.
 // a window on three engines, and does so silently, because everything still passes when nothing
 // else is writing (#245).
 //
-// SQLite is the one engine where the interleaving cannot be constructed: sqlitedb/db.go calls
-// SetMaxOpenConns(1), so a second writer queues behind the open transaction rather than landing
+// SQLite is the one engine where the interleaving cannot be constructed: sqlitedb/db.go's Pool
+// is one connection, so a second writer queues behind the open transaction rather than landing
 // inside it.
 //
 // The transaction is required rather than optional. Without one the statement autocommits and

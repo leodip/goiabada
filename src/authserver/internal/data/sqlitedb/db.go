@@ -36,6 +36,14 @@ type Database struct {
 // the adapter out (#438).
 var _ data.Database = (*Database)(nil)
 
+// Pool is SQLite's connection pool, whatever the GOIABADA_DB_* pool settings say: one connection,
+// kept idle, never recycled. A function rather than a variable, so nothing can change it. One writer at a time is SQLite's own rule, and the single connection
+// is what the comments in issuance, refresh-token rotation and commondb reason from, so the pool
+// settings are not this engine's to apply (#394).
+func Pool() data.PoolConfig {
+	return data.PoolConfig{MaxOpenConns: 1, MaxIdleConns: 1}
+}
+
 // New opens the SQLite database dsn names, or a shared in-memory one when dsn is empty.
 //
 // The DSN is all SQLite reads, so it is all New takes. GOIABADA_DB_CREATE does not apply here:
@@ -58,9 +66,7 @@ func New(ctx context.Context, dsn string, logSQL bool) (*Database, error) {
 		return nil, errs.Wrap(err, "unable to open database")
 	}
 
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
-	db.SetConnMaxLifetime(0)
+	Pool().ApplyTo(db)
 
 	// The ping comes before the PRAGMAs because the first statement on the pool is what opens
 	// the file, so it is what an unopenable file fails: behind the PRAGMAs, an operator read
@@ -148,7 +154,7 @@ func applyPragmas(ctx context.Context, db *sql.DB, dsn string) error {
 }
 
 // isDeadlock is SQLite's half of RunInTransaction's classifier, and it is always false: the
-// pool has one connection (SetMaxOpenConns(1) above), so no two transactions of this process
+// pool has one connection (Pool above), so no two transactions of this process
 // ever overlap and there is no cycle for the engine to break (#301).
 func isDeadlock(error) bool {
 	return false

@@ -37,7 +37,32 @@ func sourceConfig() *config.DatabaseConfig {
 		Name:     "source-name",
 		DSN:      "source-dsn",
 		Create:   true,
+
+		MaxOpenConns:    41,
+		MaxIdleConns:    intPtr(17),
+		ConnMaxLifetime: 43 * time.Minute,
+		ConnMaxIdleTime: 7 * time.Minute,
 	}
+}
+
+// sourcePool is the pool sourceConfig describes, written out rather than read off it, so a mapper
+// that read the wrong field cannot agree with the expectation by construction.
+var sourcePool = data.PoolConfig{
+	MaxOpenConns:    41,
+	MaxIdleConns:    17,
+	ConnMaxLifetime: 43 * time.Minute,
+	ConnMaxIdleTime: 7 * time.Minute,
+}
+
+func intPtr(n int) *int { return &n }
+
+// poolOf is what a mapper put in an engine's Pool, nil included, so a mapper that left it out
+// fails its row rather than panicking the table.
+func poolOf(p *data.PoolConfig) any {
+	if p == nil {
+		return nil
+	}
+	return *p
 }
 
 // fieldCase is one field of one engine's configuration: where the mapper put it, and where the
@@ -70,10 +95,10 @@ func assertMapping(t *testing.T, engine string, mapped any, cases []fieldCase) {
 		engine, declared, len(cases))
 }
 
-// TestMysqlConfig_CopiesEveryField is seam 2 for MySQL: all six fields, Create included. The
-// loaded Type and DSN are not among them, because the engine reads neither, and the field count
-// assertMapping pins is what says they stay out (#438 decision 3). SQLite has no mapper: its
-// constructor takes the DSN alone.
+// TestMysqlConfig_CopiesEveryField is seam 2 for MySQL: all seven fields, Create and the pool
+// included. The loaded Type and DSN are not among them, because the engine reads neither, and the
+// field count assertMapping pins is what says they stay out (#438 decision 3). SQLite has no
+// mapper: its constructor takes the DSN alone, and its pool is its own (#394).
 func TestMysqlConfig_CopiesEveryField(t *testing.T) {
 	c := sourceConfig()
 	got := mysqlConfig(c)
@@ -85,6 +110,7 @@ func TestMysqlConfig_CopiesEveryField(t *testing.T) {
 		{"Port", got.Port, c.Port},
 		{"Name", got.Name, c.Name},
 		{"Create", got.Create, c.Create},
+		{"Pool", poolOf(got.Pool), sourcePool},
 	})
 }
 
@@ -100,6 +126,7 @@ func TestPostgresConfig_CopiesEveryField(t *testing.T) {
 		{"Port", got.Port, c.Port},
 		{"Name", got.Name, c.Name},
 		{"Create", got.Create, c.Create},
+		{"Pool", poolOf(got.Pool), sourcePool},
 	})
 }
 
@@ -115,7 +142,59 @@ func TestMssqlConfig_CopiesEveryField(t *testing.T) {
 		{"Port", got.Port, c.Port},
 		{"Name", got.Name, c.Name},
 		{"Create", got.Create, c.Create},
+		{"Pool", poolOf(got.Pool), sourcePool},
 	})
+}
+
+// TestEngineConfigs_AnUnsetIdleCapFollowsTheOpenCap: with no idle cap configured, each server
+// engine is given the open cap as its idle cap, so a busy pod keeps the connections it opened
+// rather than closing and reopening them above a smaller idle cap (#394 decision 6).
+func TestEngineConfigs_AnUnsetIdleCapFollowsTheOpenCap(t *testing.T) {
+	c := sourceConfig()
+	c.MaxIdleConns = nil
+	want := data.PoolConfig{MaxOpenConns: 41, MaxIdleConns: 41, ConnMaxLifetime: 43 * time.Minute, ConnMaxIdleTime: 7 * time.Minute}
+
+	assert.Equal(t, want, poolOf(mysqlConfig(c).Pool), "mysqldb")
+	assert.Equal(t, want, poolOf(postgresConfig(c).Pool), "postgresdb")
+	assert.Equal(t, want, poolOf(mssqlConfig(c).Pool), "mssqldb")
+}
+
+// TestOpenDatabase_SQLiteKeepsItsOneConnectionWhateverIsConfigured pins SQLite's pool, which the
+// pool settings never reach: one open connection, one idle, no lifetime and no idle time, whatever
+// the four settings say. The single connection is what the comments in issuance, refresh-token
+// rotation and commondb reason from. The handle's own statistics show the open cap that took, and
+// the start's pool record, the one place all four values are visible, says the same (#394).
+func TestOpenDatabase_SQLiteKeepsItsOneConnectionWhateverIsConfigured(t *testing.T) {
+	capture := logtest.CaptureSlog(t)
+	cfg := &config.DatabaseConfig{
+		Type:            "sqlite",
+		DSN:             filepath.Join(t.TempDir(), "pool.db"),
+		MaxOpenConns:    9,
+		MaxIdleConns:    intPtr(8),
+		ConnMaxLifetime: time.Hour,
+		ConnMaxIdleTime: 2 * time.Hour,
+	}
+
+	database, err := OpenDatabase(context.Background(), cfg, false)
+	require.NoError(t, err)
+	concrete, ok := database.(*sqlitedb.Database)
+	require.True(t, ok, "a sqlite type opens the sqlite engine")
+	t.Cleanup(func() { _ = concrete.DB.Close() })
+
+	assert.Equal(t, 1, concrete.DB.Stats().MaxOpenConnections, "SQLite runs on one connection whatever is configured")
+
+	records := recordsNamed(capture, "database connection pool")
+	require.Len(t, records, 1, "a start says once what pool it opened: %s", capture.Text())
+	assert.Equal(t, slog.LevelInfo, records[0].Level, "the pool a start opened is configuration, which is Info")
+	assert.Equal(t, map[string]any{
+		"max_open_conns":     int64(1),
+		"max_idle_conns":     int64(1),
+		"conn_max_lifetime":  time.Duration(0),
+		"conn_max_idle_time": time.Duration(0),
+	}, records[0].Attrs, "the record shows SQLite's fixed values, not the configured ones")
+	assert.Equal(t, []string{"opening the database", "database connection pool"},
+		messageOrder(capture, "opening the database", "database connection pool"),
+		"the pool is said once the engine has opened it")
 }
 
 // unreachable is a configuration pointed at a port nothing listens on, which is how every server
@@ -276,6 +355,8 @@ func TestOpenDatabase_Dispatch(t *testing.T) {
 				var noDatabase Migratable
 				assert.Equalf(t, noDatabase, database,
 					"a failed open returns no database at all, not a typed nil behind a non-nil interface: %s", tc.why)
+				assert.Emptyf(t, recordsNamed(capture, "database connection pool"),
+					"a failed open opened no pool, so it says nothing about one: %s", tc.why)
 
 				if tc.exact {
 					assert.Equalf(t, tc.wantErr, err.Error(),
