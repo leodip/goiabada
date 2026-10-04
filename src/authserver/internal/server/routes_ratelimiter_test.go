@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -76,6 +77,7 @@ const (
 	// the refusal carries as Retry-After and is therefore how a case tells one tier from
 	// another that publishes the same number.
 	registerBudget              = 20  // requests per 5 minutes per /64
+	registerEmailBudget         = 5   // requests per 5 minutes per address
 	registerWindow              = 300 // seconds
 	activateBudget              = 30  // requests per 5 minutes per /64, shared by GET and POST
 	activateWindow              = 300
@@ -146,9 +148,13 @@ func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Serv
 		// and refuses, which is the branch that spends that budget.
 		EmailVerified: false,
 	}, nil).Maybe()
-	// /forgot-password looks the address up before deciding what to render. No account
-	// means no mail is sent, which keeps these cases about the limiter alone.
+	// /forgot-password and /account/register look the address up before deciding what to
+	// render. No account and nothing pending means no mail is sent, and registration without
+	// verification then stops at the missing password, which keeps these cases about the
+	// limiter alone.
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, mock.Anything).Return((*record.User)(nil), nil).Maybe()
+	database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, mock.Anything).
+		Return((*record.PreRegistration)(nil), nil).Maybe()
 	// What the OTP step reads: the user the auth context names, not yet enrolled, and the
 	// client whose branding the form carries.
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
@@ -305,6 +311,12 @@ func exhaust(t *testing.T, s *Server, budget int, request func(attempt int) *htt
 	return serve(s, request(budget))
 }
 
+// registrationOf is a registration of a distinct address per attempt, which spends only the
+// registration's per-IP tier.
+func registrationOf(attempt int) *http.Request {
+	return browserForm(http.MethodPost, "/account/register", fmt.Sprintf("email=candidate%d@example.com", attempt))
+}
+
 // reachesHandler reports whether one more request on this route is still allowed through.
 // The isolation cases use it to show that a budget spent on one route was not the budget
 // belonging to another.
@@ -336,10 +348,9 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 		server := newRoutesTestServer(t)
 
 		// Every request counts here, failures and successes alike: the budget bounds
-		// enumeration, outbound mail and pre_registration rows rather than guesses.
-		assertRefused(t, exhaust(t, server, registerBudget, func(int) *http.Request {
-			return browserRequest(http.MethodPost, "/account/register")
-		}), registerWindow, shapeBrowser)
+		// enumeration, outbound mail and pre_registration rows rather than guesses. A distinct
+		// address per request, so the per-address tier cannot be what refuses.
+		assertRefused(t, exhaust(t, server, registerBudget, registrationOf), registerWindow, shapeBrowser)
 
 		// The GET beside it is deliberately unlimited, so the refusal above is attributable
 		// to the registration POST's own wrapper rather than to something covering /account.
@@ -520,9 +531,7 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 		// /account/register to LimitActivate, or /forgot-password to either of the other
 		// two, left every case above green.
 		server := newRoutesTestServer(t)
-		assertRefused(t, exhaust(t, server, registerBudget, func(int) *http.Request {
-			return browserRequest(http.MethodPost, "/account/register")
-		}), registerWindow, shapeBrowser)
+		assertRefused(t, exhaust(t, server, registerBudget, registrationOf), registerWindow, shapeBrowser)
 
 		assert.True(t, reachesHandler(server, browserRequest(http.MethodGet, "/account/activate")),
 			"activation keeps its own budget when registration's is spent")
@@ -544,11 +553,29 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 			"registration keeps its own budget when activation's is spent")
 	})
 
+	t.Run("registration bounds one address as well as one client block", func(t *testing.T) {
+		// The second tier #207 decision 5 added, at forgot-password's per-address budget: the
+		// same address five times is allowed and the sixth is refused, far below the 20 the IP
+		// tier would take, while a second address is still let through.
+		server := newRoutesTestServer(t)
+		assertRefused(t, exhaust(t, server, registerEmailBudget, func(int) *http.Request {
+			return browserForm(http.MethodPost, "/account/register", "email=one@example.com")
+		}), registerWindow, shapeBrowser)
+
+		assert.True(t, reachesHandler(server, browserForm(http.MethodPost, "/account/register",
+			"email=another@example.com")),
+			"a second address has its own budget, so what refused above was the per-address tier")
+		assert.True(t, reachesHandler(server, browserForm(http.MethodPost, "/forgot-password",
+			"email=one@example.com")),
+			"forgot-password's per-address tier is its own, not registration's")
+	})
+
 	t.Run("forgot-password bounds one address as well as one client block", func(t *testing.T) {
-		// Its second tier, which neither of its lookalikes has at all: the same address
-		// five times is allowed and the sixth is refused, far below the 20 the IP tier
-		// would take. A registration wired to LimitRegister or LimitActivate answers the
-		// sixth normally, so this is what says LimitForgotPwd itself is mounted here.
+		// Its second tier, which activation does not have at all: the same address five
+		// times is allowed and the sixth is refused, far below the 20 the IP tier would take.
+		// A route wired to LimitActivate answers the sixth normally; one wired to
+		// LimitRegister, whose per-address tier has the same budget, is caught by the
+		// separate-budget cases instead.
 		server := newRoutesTestServer(t)
 		assertRefused(t, exhaust(t, server, forgotPwdEmailBudget, func(int) *http.Request {
 			return browserForm(http.MethodPost, "/forgot-password", "email=one@example.com")

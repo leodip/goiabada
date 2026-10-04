@@ -1,0 +1,21 @@
+{{define "title"}}{{ .appName }} - {{ T $.ctx "account.register_check_email.page_title" }}{{end}}
+{{define "head"}}
+
+{{end}}
+
+{{define "body"}}
+
+    <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "account.register_check_email.title" }}</h2>
+
+    <div class="mb-3">
+
+        {{/* One page for every well-formed address, whatever it leads to, so the page itself does
+             not tell a new address from one that already has an account (#207 decisions 4 and 13). */}}
+        <div class="w-full mt-4 form-control">
+            <p>{{ T $.ctx "account.register_check_email.message_sent" "email" .email }}</p>
+            <p class="mt-2">{{ T $.ctx "account.register_check_email.no_message" }}</p>
+        </div>
+
+    </div>
+
+{{end}}

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -215,10 +216,13 @@ var activationLinkPattern = regexp.MustCompile(`https?://[^"'<>\s]+/account/acti
 // rebuilt (decision 6). Rebuilding it is precisely why the old version of this test would have
 // kept passing with every build site broken: it exercised a correct URL against a handler fed
 // a correct URL.
+//
+// It waits for the first link to arrive, since registration with verification sends it after the
+// response (#207 decision 4).
 func latestActivationLink(t *testing.T, to string) string {
 	t.Helper()
 
-	links := emailedLinksMatching(t, to, activationLinkPattern)
+	links := awaitActivationLinks(t, to, 1)
 	require.NotEmpty(t, links, "expected an activation link emailed to %s", to)
 
 	link := links[0]
@@ -230,6 +234,22 @@ func latestActivationLink(t *testing.T, to string) string {
 	assert.Equal(t, []string{"code"}, queryKeys(parsed), "the link must carry the code and nothing else")
 
 	return link
+}
+
+// awaitActivationLinks returns every activation link sent to an address, newest first, once at
+// least count have arrived, or whatever has arrived when afterResponseWait runs out, for the
+// caller to refuse.
+func awaitActivationLinks(t *testing.T, to string, count int) []string {
+	t.Helper()
+
+	deadline := time.Now().Add(afterResponseWait)
+	for {
+		links := emailedLinksMatching(t, to, activationLinkPattern)
+		if len(links) >= count || time.Now().After(deadline) {
+			return links
+		}
+		time.Sleep(afterResponsePoll)
+	}
 }
 
 // followActivationLink performs the first hop and asserts the credential leaves the URL there.
@@ -332,13 +352,17 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
+	// The pending registration is written after the response, before its link is sent, so the
+	// link arriving is what says it is there (#207 decision 4).
+	link := latestActivationLink(t, email)
+
 	user, err := database.GetUserByEmail(context.Background(), nil, email)
 	assert.NoError(t, err)
 	assert.Nil(t, user, "user should not exist before activation")
 
 	preReg, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
 	assert.NoError(t, err)
-	if !assert.NotNil(t, preReg, "pre-registration should exist after POST") {
+	if !assert.NotNil(t, preReg, "pre-registration should exist once its link is sent") {
 		return
 	}
 
@@ -350,7 +374,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	expectedHash := hashutil.HashString(verificationCode)
 	assert.Equal(t, expectedHash, preReg.VerificationCodeHash)
 
-	cleanURL := followActivationLink(t, httpClient, latestActivationLink(t, email))
+	cleanURL := followActivationLink(t, httpClient, link)
 	continuationId := loadActivationForm(t, httpClient, cleanURL, email)
 
 	user, err = database.GetUserByEmail(context.Background(), nil, email)
@@ -678,29 +702,48 @@ func TestSelfRegister_Post_DuplicateEmail(t *testing.T) {
 	assert.Contains(t, body, "this email address is already registered")
 }
 
-// Scenario 5c: duplicate pre-registration is rejected with the same message.
+// Scenario 5c: with verification, a second registration for an address whose registration is
+// still pending gets the same "check your email" page and is sent nothing new: the one link
+// already sent is still the one that completes it (#207 decisions 4 and 6).
 func TestSelfRegister_Post_DuplicatePreRegistration(t *testing.T) {
+	useMailpitSMTP(t)
+	requireDatabaseAuditLogs(t)
 	setRegSettings(t, true, true, true)
 
 	httpClient := createHttpClient(t)
 	loadRegisterPage(t, httpClient)
 
-	email := fake.Email()
-	resp1 := postRegister(t, httpClient, email, "Password123!", "Password123!")
+	email := registerPlusAddress()
+	resp1 := postRegisterAddress(t, httpClient, email)
 	_ = resp1.Body.Close()
 	assert.Equal(t, http.StatusOK, resp1.StatusCode)
+	firstLink := latestActivationLink(t, email)
 
 	preReg, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
-	assert.NoError(t, err)
-	assert.NotNil(t, preReg, "pre-registration should exist after first POST")
+	require.NoError(t, err)
+	require.NotNil(t, preReg, "pre-registration should exist after the first POST")
 
-	loadRegisterPage(t, httpClient)
-	resp2 := postRegister(t, httpClient, email, "Password123!", "Password123!")
+	resp2 := postRegisterAddress(t, httpClient, email)
 	defer func() { _ = resp2.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 	body := bodyString(t, resp2)
-	assert.Contains(t, body, "this email address is already registered")
+	assert.Contains(t, body, checkYourEmailTitle)
+	assert.NotContains(t, body, "this email address is already registered")
+
+	// The second request's record is the last thing its work does, so once it is there nothing
+	// more is coming.
+	records := awaitRequestedRegistrationRecords(t, email, 2)
+	require.Len(t, records, 2)
+	assert.Equal(t, []string{"link_issued", "link_pending"}, outcomesOf(records))
+	assert.Equal(t, []string{firstLink}, emailedLinksMatching(t, email, activationLinkPattern),
+		"the pending registration's one link is all that is sent")
+
+	after, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
+	require.NoError(t, err)
+	require.NotNil(t, after)
+	assert.Equal(t, preReg.Id, after.Id, "the pending registration is untouched")
+	assert.Equal(t, preReg.VerificationCodeHash, after.VerificationCodeHash)
 }
 
 // Scenario 5d: password confirmation mismatch is reported and no user is

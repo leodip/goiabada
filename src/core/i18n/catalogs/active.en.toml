@@ -154,13 +154,10 @@
 "account.register_success.login_prompt_prefix" = "If you wish, "
 "account.register_success.login_prompt_suffix" = " to login and access your account page."
 
-"account.activation.page_title" = "Register"
-"account.activation.title" = "Register"
-"account.activation.account_created" = "Your account has been created."
-"account.activation.must_activate_prefix" = "Before you can access your account, please complete the "
-"account.activation.must_activate_inner" = "email activation process"
-"account.activation.must_activate_suffix" = "."
-"account.activation.check_inbox" = "Be sure to check both your inbox and junk folder for the activation email, and click on the verification link within it to proceed."
+"account.register_check_email.page_title" = "Check your email"
+"account.register_check_email.title" = "Check your email"
+"account.register_check_email.message_sent" = "We've sent a message to {{.email}} with the next step. If the address is new, it contains a link to choose your password, valid for 5 minutes. If the address already has an account, it tells you how to sign in."
+"account.register_check_email.no_message" = "No message? Check your spam folder, or register again in 10 minutes to get a new link."
 
 "account.activate_password.page_title" = "Choose your password"
 "account.activate_password.title" = "Choose your password"
@@ -1609,6 +1606,7 @@
 
 "email.forgot_password.subject" = "Password reset"
 "email.register_activate.subject" = "Activate your account"
+"email.register_existing_account.subject" = "You already have an account"
 "email.register_confirmation.subject" = "Welcome!"
 "email.verification.subject" = "Email verification - code {{.code}}"
 "email.newuser_set_password.subject" = "{{.appName}} - create a password for your new account"

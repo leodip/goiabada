@@ -229,6 +229,7 @@ type RateLimiter struct {
 	accountPassword *failureTier
 	activate        *requestTier
 	register        *requestTier
+	registerEmail   *requestTier
 	resetPwd        *requestTier
 	forgotPwd       *requestTier
 	forgotPwdIp     *requestTier
@@ -298,22 +299,21 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// POST), shared by both methods. resetPwd's budget for the same chain (#112, #207
 		// decision 9)
 		activate: newTier("activate", "ip", 30, 5*time.Minute),
-		// per-IP: self-registration, 20 per 5 minutes. It bounds three things at once, all of
-		// which are only harmful across distinct addresses: the account-existence oracle the
-		// form answers, the mail it sends to any address given to it, and the
-		// pre_registrations rows it writes.
-		//
-		// No per-email tier, and the issue asks for one. A second submission for the same
-		// address finds the user or the pre-registration row and renders "already
-		// registered" before the password hash, the row write or the mail send, so one
-		// address yields at most one mail however often it is submitted. A per-email tier
-		// would bound a path that already stops itself.
-		//
-		// This slows the oracle to 240 addresses an hour per client block rather than
-		// closing it. Closing it means answering identically for a taken and a free
-		// address, which is a change to what self-registration tells a legitimate user
-		// (#219).
+		// per-IP: self-registration, 20 per 5 minutes. It bounds what is only harmful across
+		// distinct addresses: the pre_registrations rows and the mail registration with
+		// verification sends to any address given to it, and, without verification, the
+		// account-existence oracle the form answers. That oracle is closed with verification,
+		// which answers every address alike, and cannot be closed without it, where the account
+		// is usable at once (#219, #207 decision 3); this slows it to 240 addresses an hour per
+		// client block.
 		register: newTier("register", "ip", 20, 5*time.Minute),
+		// per-email: self-registration, at forgot-password's per-address budget. With
+		// verification a registration for an address that has a verified, enabled account mails
+		// it a notice, so without this tier one host could mail any account holder 20 notices
+		// every 5 minutes, and many hosts without bound. It used to be argued unneeded, when a
+		// second submission for an address stopped at "already registered" before any mail; the
+		// notice ended that (#207 decision 5).
+		registerEmail: newTier("register_email", "", 5, 5*time.Minute),
 		// per-IP: 10 reset operations per 5 minutes, at the three requests a reset now
 		// costs (the link's GET, the clean GET, the clean POST). Half of what
 		// forgotPwdIp allows, which is the only other endpoint with an IP tier (#112)
@@ -669,8 +669,9 @@ func tokenSubjectRateLimitKey(r *http.Request) (string, bool) {
 }
 
 // limitPerIP writes the body of a limiter every request spends, keyed on the client block and
-// refusing in the shape class names. LimitActivate, LimitRegister, LimitResetPwd and LimitDCR
-// are this over their own tier (#439); the event a refusal audits records the block as ip.
+// refusing in the shape class names. LimitActivate, LimitResetPwd and LimitDCR are this over
+// their own tier (#439); the event a refusal audits records the block as ip. LimitRegister was
+// too, until it gained a per-address tier (#207).
 func (m *RateLimiter) limitPerIP(next http.Handler, t *requestTier, class rejectClass) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip rate limiting if disabled
@@ -707,18 +708,41 @@ func (m *RateLimiter) LimitActivate(next http.Handler) http.Handler {
 	return m.limitPerIP(next, m.activate, rejectBrowser)
 }
 
-// LimitRegister rate limits self-registration, on the client IP.
+// LimitRegister rate limits self-registration, on the client IP and on the submitted address.
 //
-// The endpoint had no limiter at all, while being unauthenticated and enabled by default. The key
-// is the client block rather than the submitted address because every harm here is spread across
-// distinct addresses: probing which of them already have an account, sending mail to whichever do
-// not, and writing a pre_registrations row for each. A per-address key would bucket the attacker's
-// own choice of victim and bound nothing (#219).
+// The endpoint had no limiter at all, while being unauthenticated and enabled by default. The IP
+// tier is the one that bounds what is spread across distinct addresses: probing which of them
+// already have an account, sending mail to each, and writing a pre_registrations row for each new
+// one. A per-address key alone would bucket the attacker's own choice of victim and bound none of
+// it (#219). The per-address tier beside it bounds the one harm aimed at a single address, the
+// notice a registration with verification mails an existing account (#207 decision 5), at the
+// budget forgot-password gives the reset mail it sends that same account.
 //
 // The POST alone is limited. The GET renders a static form and reaches no probe, no mail and no
 // row, so limiting it would only refuse the page to a household behind one address.
 func (m *RateLimiter) LimitRegister(next http.Handler) http.Handler {
-	return m.limitPerIP(next, m.register, rejectBrowser)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// The client IP is trustworthy here (resolved by httpmw.RealIP).
+		ipKey := clientIPRateLimitKey(r)
+		if m.tripped(w, r, m.register, ipKey, rejectBrowser, map[string]interface{}{"ip": ipKey}) {
+			return
+		}
+
+		// Normalized as the handler normalizes the address it looks up, so every spelling it
+		// treats as one address spends one budget.
+		emailKey := ratelimit.AccountKey(r.FormValue("email"))
+		if m.tripped(w, r, m.registerEmail, emailKey, rejectBrowser, map[string]interface{}{"email": emailKey}) {
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 // LimitResetPwd rate limits the password reset endpoint, on the client IP.
