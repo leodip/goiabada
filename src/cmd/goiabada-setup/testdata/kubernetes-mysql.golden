@@ -64,6 +64,12 @@ spec:
       labels:
         app: goiabada-authserver
     spec:
+      # The most Kubernetes waits after deleting the pod before it kills the container: the
+      # 5s preStop pause, plus up to 50s for the auth server to stop cleanly (15s to drain
+      # requests, 15s for work handed off after responses, 20s for the cleanup worker),
+      # plus 10s of headroom.
+      # Set lower, it cuts the cleanup worker short first.
+      terminationGracePeriodSeconds: 65
       containers:
       - name: authserver
         image: leodip/goiabada:authserver-latest
@@ -115,6 +121,13 @@ spec:
             port: 9090
           initialDelaySeconds: 5
           periodSeconds: 5
+        # Keep serving for a few seconds after the pod is deleted, while the gateway learns
+        # it is gone: the server closes its listener the moment it is signalled, and a
+        # connection the gateway opens before then would be refused.
+        lifecycle:
+          preStop:
+            sleep:
+              seconds: 5
         resources:
           requests:
             memory: "128Mi"
@@ -139,6 +152,13 @@ spec:
       labels:
         app: goiabada-adminconsole
     spec:
+      # The most Kubernetes waits after deleting the pod before it kills the container: the
+      # 5s preStop pause, plus up to 50s for the auth server to stop cleanly (15s to drain
+      # requests, 15s for work handed off after responses, 20s for the cleanup worker),
+      # plus 10s of headroom.
+      # The auth server's value: this server stops within its 15s drain, and a grace period
+      # is a ceiling, not a wait.
+      terminationGracePeriodSeconds: 65
       containers:
       - name: adminconsole
         image: leodip/goiabada:adminconsole-latest
@@ -175,6 +195,13 @@ spec:
             port: 9091
           initialDelaySeconds: 5
           periodSeconds: 5
+        # Keep serving for a few seconds after the pod is deleted, while the gateway learns
+        # it is gone: the server closes its listener the moment it is signalled, and a
+        # connection the gateway opens before then would be refused.
+        lifecycle:
+          preStop:
+            sleep:
+              seconds: 5
         resources:
           requests:
             memory: "128Mi"

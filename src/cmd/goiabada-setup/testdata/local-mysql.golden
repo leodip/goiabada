@@ -21,6 +21,9 @@ services:
   goiabada-authserver:
     image: leodip/goiabada:authserver-latest
     restart: unless-stopped
+    # Up to 50s to stop cleanly (15s to drain requests, 15s for work handed off after
+    # responses, 20s for the cleanup worker) plus 10s of headroom; Compose's default is 10s.
+    stop_grace_period: 60s
     depends_on:
       mysql-server:
         condition: service_healthy
@@ -70,6 +73,9 @@ services:
   goiabada-adminconsole:
     image: leodip/goiabada:adminconsole-latest
     restart: unless-stopped
+    # The auth server's value: this service stops within its 15s drain, and a grace
+    # period is a ceiling, not a wait. Compose's default is 10s.
+    stop_grace_period: 60s
     depends_on:
       goiabada-authserver:
         condition: service_healthy

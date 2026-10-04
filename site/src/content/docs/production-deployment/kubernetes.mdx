@@ -383,6 +383,39 @@ application's own error and recovery would wait a probe period longer. A pod tha
 database at start never answers `/health` at all, because the auth server opens and migrates the
 database before it listens.
 
+## Stopping and the grace period
+
+When a pod is deleted (a rollout, a scale-down, a node drain), Kubernetes removes it from the
+Service and starts stopping its containers at the same moment. The generated manifest gives both
+containers a five-second pause before they are signalled, through Kubernetes' native `preStop`
+sleep action, because both servers close their listening socket the moment the signal arrives: a
+connection the gateway opens before it has learned the pod is gone would be refused, and its client
+answered 503. The pause keeps the pod serving normally while the gateway catches up. The sleep
+action is on by default from Kubernetes 1.30 and GA from 1.34.
+
+Once signalled, the auth server stops in three steps, each bounded:
+
+1. up to 15 seconds for in-flight requests to finish,
+2. up to 15 seconds for the work handlers hand off after answering (a forgot-password request's
+   code, audit record and email, for example),
+3. up to 20 seconds for the background cleanup worker.
+
+The admin console only drains its requests, within 15 seconds. Both pods get the same grace period,
+`terminationGracePeriodSeconds: 65`, from this formula:
+
+```
+terminationGracePeriodSeconds = preStop pause + auth server's stop + headroom
+                           65 =              5 +       (15 + 15 + 20) +       10
+```
+
+The grace period is a ceiling, not a wait: a container that exits sooner is not held, so the admin
+console loses nothing by sharing the auth server's value. Kubernetes counts the `preStop` pause
+against it, so if you change the pause, change the grace period by the same amount.
+
+Do not set it lower. Kubernetes' default is 30 seconds, and whatever is left of the stop when the
+grace period runs out is ended by SIGKILL: the cleanup worker, the last step, is cut short first,
+then the handed-off work, then requests still in flight.
+
 ## Updating Goiabada
 
 1. Update image tags in your manifest or regenerate with the setup wizard

@@ -6,6 +6,23 @@ import (
 	"strings"
 )
 
+// The grace periods restate each server's shutdown budget, which this module cannot read: the wizard
+// imports only core, and the budgets are the servers' own unexported constants. A test in each
+// server's unit tier holds the goldens, the generator's output, to that server's budget, so raising
+// a constant fails there until these follow (#390 decision 3).
+const (
+	// preStopPauseSeconds holds each container for this long before it is signalled, while the
+	// gateway learns the pod is going; both servers close their listener on the signal (#390
+	// decision 2).
+	preStopPauseSeconds = 5
+
+	// terminationGracePeriodSeconds is the pause, plus the auth server's longest clean stop (15s to
+	// drain its listeners, 15s for the work handed off after responses, 20s for the cleanup worker),
+	// plus 10s of headroom. One value for both Deployments, since it is a ceiling and the admin
+	// console exits once its 15s drain is done (#390 decision 4).
+	terminationGracePeriodSeconds = preStopPauseSeconds + 60
+)
+
 func generateKubernetesManifests(config *Config) string {
 	var sb strings.Builder
 
@@ -87,6 +104,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("      labels:\n")
 	sb.WriteString("        app: goiabada-authserver\n")
 	sb.WriteString("    spec:\n")
+	writeTerminationGracePeriod(&sb, "Set lower, it cuts the cleanup worker short first.")
 	sb.WriteString("      containers:\n")
 	sb.WriteString("      - name: authserver\n")
 	fmt.Fprintf(&sb, "        image: leodip/goiabada:authserver-%s\n", imageTag)
@@ -138,6 +156,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("            port: 9090\n")
 	sb.WriteString("          initialDelaySeconds: 5\n")
 	sb.WriteString("          periodSeconds: 5\n")
+	writePreStopPause(&sb)
 	sb.WriteString("        resources:\n")
 	sb.WriteString("          requests:\n")
 	sb.WriteString("            memory: \"128Mi\"\n")
@@ -164,6 +183,9 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("      labels:\n")
 	sb.WriteString("        app: goiabada-adminconsole\n")
 	sb.WriteString("    spec:\n")
+	writeTerminationGracePeriod(&sb,
+		"The auth server's value: this server stops within its 15s drain, and a grace period",
+		"is a ceiling, not a wait.")
 	sb.WriteString("      containers:\n")
 	sb.WriteString("      - name: adminconsole\n")
 	fmt.Fprintf(&sb, "        image: leodip/goiabada:adminconsole-%s\n", imageTag)
@@ -200,6 +222,7 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("            port: 9091\n")
 	sb.WriteString("          initialDelaySeconds: 5\n")
 	sb.WriteString("          periodSeconds: 5\n")
+	writePreStopPause(&sb)
 	sb.WriteString("        resources:\n")
 	sb.WriteString("          requests:\n")
 	sb.WriteString("            memory: \"128Mi\"\n")
@@ -299,6 +322,31 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("        statusCode: 301\n")
 
 	return sb.String()
+}
+
+// writeTerminationGracePeriod writes a pod spec's grace period under the formula an operator who
+// changes one of its terms recomputes it from, and then the lines saying what it means for this pod.
+func writeTerminationGracePeriod(sb *strings.Builder, consequence ...string) {
+	sb.WriteString("      # The most Kubernetes waits after deleting the pod before it kills the container: the\n")
+	fmt.Fprintf(sb, "      # %ds preStop pause, plus up to 50s for the auth server to stop cleanly (15s to drain\n", preStopPauseSeconds)
+	sb.WriteString("      # requests, 15s for work handed off after responses, 20s for the cleanup worker),\n")
+	sb.WriteString("      # plus 10s of headroom.\n")
+	for _, line := range consequence {
+		fmt.Fprintf(sb, "      # %s\n", line)
+	}
+	fmt.Fprintf(sb, "      terminationGracePeriodSeconds: %d\n", terminationGracePeriodSeconds)
+}
+
+// writePreStopPause writes a container's preStop sleep, through Kubernetes' native sleep action
+// rather than an exec of a sleep binary the image may not carry (#390 decision 2).
+func writePreStopPause(sb *strings.Builder) {
+	sb.WriteString("        # Keep serving for a few seconds after the pod is deleted, while the gateway learns\n")
+	sb.WriteString("        # it is gone: the server closes its listener the moment it is signalled, and a\n")
+	sb.WriteString("        # connection the gateway opens before then would be refused.\n")
+	sb.WriteString("        lifecycle:\n")
+	sb.WriteString("          preStop:\n")
+	sb.WriteString("            sleep:\n")
+	fmt.Fprintf(sb, "              seconds: %d\n", preStopPauseSeconds)
 }
 
 // writeHTTPSListener writes one HTTPS listener of the Gateway, terminating TLS for host with the

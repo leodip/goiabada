@@ -259,3 +259,31 @@ func TestKubernetesInstructions_SetUpWhatTheManifestNames(t *testing.T) {
 		}
 	}
 }
+
+// Each container is held for five seconds before it is signalled, through Kubernetes' own sleep
+// action, so the gateway learns the pod is going before the server closes its listener; and each
+// pod's grace period is 65 seconds, the auth server's 50-second stop with 10 seconds of headroom
+// plus that pause, which counts against it (#390 decisions 2 and 4).
+func TestKubernetesManifest_GivesEachContainerTimeToStop(t *testing.T) {
+	deployments := kubernetesDocuments(t, kubernetesConfig())["Deployment"]
+	for _, name := range []string{"goiabada-authserver", "goiabada-adminconsole"} {
+		t.Run(name, func(t *testing.T) {
+			deployment := deployments[name]
+			if deployment == nil {
+				t.Fatalf("no Deployment named %s", name)
+			}
+			podSpec := at[map[string]any](t, deployment, "spec", "template", "spec")
+			if got := at[int](t, podSpec, "terminationGracePeriodSeconds"); got != 65 {
+				t.Errorf("terminationGracePeriodSeconds is %d, want 65", got)
+			}
+			container := only[map[string]any](t, at[[]any](t, podSpec, "containers"), name+"'s containers")
+			preStop := at[map[string]any](t, container, "lifecycle", "preStop")
+			if len(preStop) != 1 {
+				t.Errorf("the preStop hook is %v, want the sleep action alone", preStop)
+			}
+			if got := at[int](t, preStop, "sleep", "seconds"); got != 5 {
+				t.Errorf("the preStop sleep is %d seconds, want 5", got)
+			}
+		})
+	}
+}

@@ -5,6 +5,13 @@ import (
 	"strings"
 )
 
+// composeStopGracePeriod is the auth server's longest clean stop (15s to drain its listeners, 15s
+// for the work handed off after responses, 20s for the cleanup worker) plus 10s of headroom, given
+// to both services, since it is a ceiling and the admin console exits once its 15s drain is done.
+// Compose's default is 10s. It restates the auth server's budget, which a test in that server's
+// unit tier holds the goldens to (#390 decisions 3 and 4).
+const composeStopGracePeriod = "60s"
+
 func generateDockerCompose(config *Config) string {
 	var sb strings.Builder
 
@@ -66,6 +73,9 @@ func generateAuthServerService(config *Config) string {
 	sb.WriteString("  goiabada-authserver:\n")
 	fmt.Fprintf(&sb, "    image: leodip/goiabada:authserver-%s\n", imageTag)
 	sb.WriteString("    restart: unless-stopped\n")
+	writeStopGracePeriod(&sb,
+		"Up to 50s to stop cleanly (15s to drain requests, 15s for work handed off after",
+		"responses, 20s for the cleanup worker) plus 10s of headroom; Compose's default is 10s.")
 
 	if config.Engine.hasServer {
 		sb.WriteString("    depends_on:\n")
@@ -153,6 +163,9 @@ func generateAdminConsoleService(config *Config) string {
 	sb.WriteString("  goiabada-adminconsole:\n")
 	fmt.Fprintf(&sb, "    image: leodip/goiabada:adminconsole-%s\n", imageTag)
 	sb.WriteString("    restart: unless-stopped\n")
+	writeStopGracePeriod(&sb,
+		"The auth server's value: this service stops within its 15s drain, and a grace",
+		"period is a ceiling, not a wait. Compose's default is 10s.")
 	sb.WriteString("    depends_on:\n")
 	sb.WriteString("      goiabada-authserver:\n")
 	sb.WriteString("        condition: service_healthy\n")
@@ -191,6 +204,15 @@ func generateAdminConsoleService(config *Config) string {
 	sb.WriteString("\n")
 
 	return sb.String()
+}
+
+// writeStopGracePeriod writes a service's stop_grace_period under the comment lines saying what it
+// covers for that service.
+func writeStopGracePeriod(sb *strings.Builder, comment ...string) {
+	for _, line := range comment {
+		fmt.Fprintf(sb, "    # %s\n", line)
+	}
+	fmt.Fprintf(sb, "    stop_grace_period: %s\n", composeStopGracePeriod)
 }
 
 // writeComposeVariable writes one entry of a service's list-form environment, quoted whole, so
