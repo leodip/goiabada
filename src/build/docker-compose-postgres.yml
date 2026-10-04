@@ -2,6 +2,9 @@ services:
 
   # you can also use mysql, mssql, or sqlite
   postgres-server:
+    # A major, the one latest named when this sample was written. A major upgrade is a dump and
+    # restore or pg_upgrade, not a tag edit: PostgreSQL does not start on a data directory
+    # another major wrote.
     image: postgres:18
     restart: unless-stopped
     volumes:
@@ -20,11 +23,25 @@ services:
 
 
   goiabada-authserver:
+    # latest moves with every release: pin a release's version tag instead, such as
+    # authserver-<version>, and change it when you upgrade.
     image: leodip/goiabada:authserver-latest
     restart: unless-stopped
     # Up to 50s to stop cleanly (15s to drain requests, 15s for work handed off after
     # responses, 20s for the cleanup worker) plus 10s of headroom; Compose's default is 10s.
     stop_grace_period: 60s
+    # Runs as the image's own uid and gid, 10001, with every capability dropped, no privilege
+    # gained through a setuid binary, and a read-only root.
+    # /tmp is a tmpfs, where SQLite writes the temporary files of large sorts and VACUUM, and
+    # where Go spills an upload larger than it keeps in memory.
+    user: "10001:10001"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     depends_on:
       postgres-server:
         condition: service_healthy
@@ -42,13 +59,16 @@ services:
       # failures in that window do not count, and the first success ends it.
       start_period: 300s
     volumes:
-      # Bootstrap credentials directory - auth server writes OAuth and session keys here
-      - ./bootstrap:/bootstrap
+      # The auth server writes the bootstrap file here: a named volume, which the image's
+      # /bootstrap, owned by uid 10001, makes writable. A ./bootstrap bind mount would be
+      # created owned by root, and the write refused.
+      - bootstrap:/bootstrap
     # =============================================================================
     # BOOTSTRAP: On first startup, auth server seeds DB, generates credentials
-    # in ./bootstrap/bootstrap.env (OAuth client secret + session keys),
-    # then EXITS. Copy session keys from bootstrap file, uncomment them below,
-    # and restart for normal operation.
+    # in bootstrap.env on the bootstrap volume (OAuth client secret + session keys),
+    # then EXITS. Read the file with:
+    #   docker compose cp goiabada-authserver:/bootstrap/bootstrap.env .
+    # Copy session keys from it, uncomment them below, and restart for normal operation.
     # =============================================================================
     environment:
       # See all timezones:
@@ -89,8 +109,8 @@ services:
       - GOIABADA_AES_ENCRYPTION_KEY=00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
 
       # UNCOMMENT AND FILL IN AFTER FIRST STARTUP:
-      # - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=<copy from ./bootstrap/bootstrap.env>
-      # - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=<copy from ./bootstrap/bootstrap.env>
+      # - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=<copy from bootstrap.env>
+      # - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=<copy from bootstrap.env>
 
       # Database (postgres) details
       - GOIABADA_DB_TYPE=postgres # you can also use mysql, mssql, or sqlite
@@ -106,11 +126,24 @@ services:
 
 
   goiabada-adminconsole:
+    # latest moves with every release: pin a release's version tag instead, such as
+    # adminconsole-<version>, and change it when you upgrade.
     image: leodip/goiabada:adminconsole-latest
     restart: unless-stopped
     # The auth server's value: this service stops within its 15s drain, and a grace
     # period is a ceiling, not a wait. Compose's default is 10s.
     stop_grace_period: 60s
+    # Runs as the image's own uid and gid, 10001, with every capability dropped, no privilege
+    # gained through a setuid binary, and a read-only root.
+    # /tmp is a tmpfs, where Go spills an upload larger than it keeps in memory.
+    user: "10001:10001"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     depends_on:
       goiabada-authserver:
         condition: service_healthy
@@ -121,14 +154,15 @@ services:
       - goiabada-network
     # =============================================================================
     # FIRST-TIME SETUP: Run `docker compose up`, wait for auth server to exit,
-    # then copy all credentials from ./bootstrap/bootstrap.env and uncomment
+    # then copy all credentials from bootstrap.env (read it with the
+    # `docker compose cp` command above) and uncomment
     # the 3 lines below. Restart to complete setup.
     # =============================================================================
     environment:
       # UNCOMMENT AND FILL IN AFTER FIRST STARTUP:
-      # - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=<copy from ./bootstrap/bootstrap.env>
-      # - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=<copy from ./bootstrap/bootstrap.env>
-      # - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=<copy from ./bootstrap/bootstrap.env>
+      # - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=<copy from bootstrap.env>
+      # - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=<copy from bootstrap.env>
+      # - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=<copy from bootstrap.env>
       # See all timezones:
       # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
       - TZ=Europe/Lisbon
@@ -154,6 +188,7 @@ services:
 
 volumes:
   postgres-data:
+  bootstrap:
 
 networks:
   goiabada-network:

@@ -24,9 +24,12 @@ type engine struct {
 	// where an auth server's only copy of its data can live.
 	kubernetes bool
 
-	image       string
-	defaultPort string
-	defaultUser string
+	image string
+	// imageComment is the comment written above the database service's image, saying why its tag
+	// names a major and what upgrading past it takes; empty where the tag already names its line.
+	imageComment []string
+	defaultPort  string
+	defaultUser  string
 	// kubernetesHost is the database host the Kubernetes prompt offers.
 	kubernetesHost string
 
@@ -62,12 +65,17 @@ type engine struct {
 // accepts keep their numbers when it is left out.
 var engines = []*engine{
 	{
-		number:         "1",
-		name:           "mysql",
-		label:          "MySQL",
-		hasServer:      true,
-		kubernetes:     true,
-		image:          "mysql:latest",
+		number:     "1",
+		name:       "mysql",
+		label:      "MySQL",
+		hasServer:  true,
+		kubernetes: true,
+		image:      "mysql:26",
+		imageComment: []string{
+			"A major, the one latest named when this file's generator was released. A major upgrade",
+			"is a dump and restore, not a tag edit: MySQL upgrades a data directory in place only",
+			"along its documented paths, and does not start on one it cannot.",
+		},
 		defaultPort:    "3306",
 		defaultUser:    "root",
 		kubernetesHost: "mysql-service",
@@ -87,13 +95,18 @@ var engines = []*engine{
 		emptinessQuery: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'users'",
 	},
 	{
-		number:         "2",
-		name:           "postgres",
-		aliases:        []string{"postgresql"},
-		label:          "PostgreSQL",
-		hasServer:      true,
-		kubernetes:     true,
-		image:          "postgres:latest",
+		number:     "2",
+		name:       "postgres",
+		aliases:    []string{"postgresql"},
+		label:      "PostgreSQL",
+		hasServer:  true,
+		kubernetes: true,
+		image:      "postgres:18",
+		imageComment: []string{
+			"A major, the one latest named when this file's generator was released. A major upgrade",
+			"is a dump and restore or pg_upgrade, not a tag edit: PostgreSQL does not start on a",
+			"data directory another major wrote.",
+		},
 		defaultPort:    "5432",
 		defaultUser:    "postgres",
 		kubernetesHost: "postgres-service",
