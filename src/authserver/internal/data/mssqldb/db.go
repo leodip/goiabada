@@ -343,11 +343,14 @@ const schemaMigrationsTableDDL = `IF OBJECT_ID(N'schema_migrations', N'U') IS NU
 // for the life of the process, blocking every later migrator.
 //
 // A table already there is answered before the lock, because there is nothing to create and the
-// lock may be held by another process's migration for as long as that takes. Waiting for it here
-// would be a wait the start never says it is in; the runner waits for the same lock next, and
-// says so (#390 decision 7). Only a table that is absent, a first start, takes the lock, and the
-// DDL checks again under it.
-func (d *Database) ensureSchemaMigrationsTable(ctx context.Context) (err error) {
+// lock may be held by another process's migration for as long as that takes; the runner waits for
+// the same lock next. Only a table that is absent, a first start, takes the lock, and the DDL checks
+// again under it. That wait is not necessarily short: a start that found no table can queue behind
+// another process that has since created it and begun migrating, and the runner holds the lock
+// across its whole chain. So the lock is taken as the runner takes it, tried first, with progress
+// told before a wait, and the start says it is waiting from here as it would from the runner (#390
+// decision 7).
+func (d *Database) ensureSchemaMigrationsTable(ctx context.Context, progress migrator.Progress) (err error) {
 	var existing sql.NullInt64
 	if checkErr := d.DB.QueryRowContext(ctx, `SELECT OBJECT_ID(N'schema_migrations', N'U')`).Scan(&existing); checkErr != nil {
 		return errs.Wrap(checkErr, "unable to check for the schema_migrations table")
@@ -370,10 +373,8 @@ func (d *Database) ensureSchemaMigrationsTable(ctx context.Context) (err error) 
 		}
 	}()
 
-	// The lock waits indefinitely, which is what the library did too. The table was absent a
-	// moment ago, so the holder is another process starting against the same empty database:
-	// its pre-create, which is short, and at worst the first migration it runs right after.
-	if lockErr := eng.Lock(ctx, conn); lockErr != nil {
+	// The lock waits indefinitely, which is what the library did too, and a stop ends the wait.
+	if lockErr := eng.LockReporting(ctx, conn, progress); lockErr != nil {
 		return errs.Wrap(lockErr, "unable to take the migration lock")
 	}
 	defer func() {
@@ -382,8 +383,9 @@ func (d *Database) ensureSchemaMigrationsTable(ctx context.Context) (err error) 
 		// later migrator on this database indefinitely, so reporting the start as successful is
 		// the answer nobody investigates; and the session that still holds it must not go back
 		// to the pool, where the next borrower would carry a migration lock for the life of the
-		// process. driver.ErrBadConn is how database/sql is told to discard it (#268).
-		if unlockErr := eng.Unlock(ctx, conn); unlockErr != nil {
+		// process. driver.ErrBadConn is how database/sql is told to discard it (#268). The
+		// release runs whatever became of ctx, as the runner's does.
+		if unlockErr := eng.Unlock(context.WithoutCancel(ctx), conn); unlockErr != nil {
 			err = errs.Join(err, errs.Wrap(unlockErr, "unable to release the migration lock"))
 			_ = conn.Raw(func(any) error { return driver.ErrBadConn })
 		}
@@ -401,8 +403,11 @@ func (d *Database) ensureSchemaMigrationsTable(ctx context.Context) (err error) 
 //
 // There is nothing to close. The runner takes a connection out of the pool for the duration
 // of one operation and gives it back before returning (#268 decision 8).
-func (d *Database) NewMigrator(ctx context.Context) (*migrator.Migrator, error) {
-	if err := d.ensureSchemaMigrationsTable(ctx); err != nil {
+//
+// progress is told when the schema_migrations pre-create has to wait for the migration lock, and
+// may be nil.
+func (d *Database) NewMigrator(ctx context.Context, progress migrator.Progress) (*migrator.Migrator, error) {
+	if err := d.ensureSchemaMigrationsTable(ctx, progress); err != nil {
 		return nil, err
 	}
 

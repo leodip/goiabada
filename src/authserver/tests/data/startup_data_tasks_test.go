@@ -28,7 +28,7 @@ func seedThrowawayDatabase(t *testing.T, name string, seed func(db data.Database
 	dsn := filepath.Join(t.TempDir(), name)
 	db, err := sqlitedb.New(context.Background(), dsn, false)
 	require.NoError(t, err, "the seeding handle has to open before anything can be seeded")
-	m, err := db.NewMigrator(context.Background())
+	m, err := db.NewMigrator(context.Background(), nil)
 	require.NoError(t, err)
 	require.NoError(t, m.Up(context.Background()), "seeding writes rows, so the schema has to be at head first")
 

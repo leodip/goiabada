@@ -405,6 +405,23 @@ func TestNewDatabase_SaysWhenItMigratesAndWhenItHasMigrated(t *testing.T) {
 	assert.Len(t, recordsNamed(second, "no need to migrate the database"), 1, "and says that instead")
 }
 
+// TestStartupProgress_SaysTheWaitOncePerStart: a start can queue for the migration lock twice,
+// on SQL Server, whose schema_migrations pre-create takes it before the runner does, and it says it
+// is waiting once, before the first wait. The records are the operator's, and a second one would
+// read as a second process queued (#390 decision 7). The real engine's cases are the data tier's
+// TestMigrationLock tests; this is the record's half.
+func TestStartupProgress_SaysTheWaitOncePerStart(t *testing.T) {
+	capture := logtest.CaptureSlog(t)
+	progress := &startupProgress{ctx: context.Background()}
+
+	progress.WaitingForLock()
+	progress.WaitingForLock()
+
+	waits := recordsNamed(capture, "waiting for the migration lock")
+	require.Len(t, waits, 1, "two waits in one start are said once")
+	assert.Equal(t, slog.LevelInfo, waits[0].Level)
+}
+
 // TestNewDatabase_AStopDuringTheMigrationsSaysWhereItLeftTheSchema is #390 decision 9's record: a
 // start stopped while it migrates says where the schema stopped, from where, and how many files
 // ran and remained, so an operator reading the last start knows the next one carries on from
@@ -499,7 +516,7 @@ func sqliteMigrator(t *testing.T, dsn string) *migrator.Migrator {
 	db, err := sqlitedb.New(context.Background(), dsn, false)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DB.Close() })
-	m, err := db.NewMigrator(context.Background())
+	m, err := db.NewMigrator(context.Background(), nil)
 	require.NoError(t, err)
 	return m
 }

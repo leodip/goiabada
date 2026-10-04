@@ -33,7 +33,7 @@ func newTestMigrator(t *testing.T) (data.Database, *migrator.Migrator, *sql.DB) 
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DB.Close() })
 
-	m, err := db.NewMigrator(context.Background())
+	m, err := db.NewMigrator(context.Background(), nil)
 	require.NoError(t, err)
 	return db, m, db.DB
 }

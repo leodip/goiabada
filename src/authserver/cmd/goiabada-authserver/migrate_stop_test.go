@@ -92,7 +92,7 @@ func newHeldMigrator(t *testing.T) (*sqlitedb.Database, *migrator.Migrator) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DB.Close() })
 	// The engine's own migrator is built first for what it creates on the way, schema_migrations.
-	_, err = db.NewMigrator(context.Background())
+	_, err = db.NewMigrator(context.Background(), nil)
 	require.NoError(t, err)
 
 	files := fstest.MapFS{

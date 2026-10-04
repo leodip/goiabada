@@ -37,7 +37,7 @@ func newActivationSQLiteDB(t *testing.T) *sqlitedb.Database {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DB.Close() })
 
-	m, err := db.NewMigrator(context.Background())
+	m, err := db.NewMigrator(context.Background(), nil)
 	require.NoError(t, err)
 	if err := m.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 		require.NoError(t, err, "migrate to head")

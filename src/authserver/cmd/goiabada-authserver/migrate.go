@@ -99,8 +99,15 @@ func migrateCommand(args []string, base config.DatabaseConfig, stdout, stderr io
 		return migrateExitError
 	}
 
-	m, err := database.NewMigrator(ctx)
+	// Preparing the runner can wait for the migration lock too, on SQL Server, whose
+	// schema_migrations pre-create takes it on a database never migrated. The subcommand's output
+	// is its own, so nothing is told of that wait; a signal ends it as it ends any other.
+	m, err := database.NewMigrator(ctx, nil)
 	if err != nil {
+		if stoppedBySignal(ctx, err) {
+			reportStop(stdout, err)
+			return migrateExitError
+		}
 		outf(stderr, "unable to prepare the migration runner: %+v\n", err)
 		return migrateExitError
 	}

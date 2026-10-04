@@ -42,7 +42,7 @@ import (
 // #438).
 type Migratable interface {
 	data.Database
-	NewMigrator(ctx context.Context) (*migrator.Migrator, error)
+	NewMigrator(ctx context.Context, progress migrator.Progress) (*migrator.Migrator, error)
 }
 
 // OpenDatabase constructs the concrete database for the configured engine and returns it having
@@ -156,9 +156,9 @@ func mssqlConfig(c *config.DatabaseConfig) *mssqldb.DatabaseConfig {
 //
 // One migrator serves both the pre-flight's version read and the step to head, and the startup
 // records are written here, by the process starting, rather than by the runner or by each engine:
-// the runner reports a wait for the migration lock and the migration around its files through
-// startupProgress, and the record saying nothing needed migrating is this function's own (#438,
-// #390 decision 7).
+// the runner, and SQL Server's schema_migrations pre-create before it, report a wait for the
+// migration lock, and the runner the migration around its files, through startupProgress, and the
+// record saying nothing needed migrating is this function's own (#438, #390 decision 7).
 //
 // ctx is the start's, and its end is a shutdown signal (#390 decision 9): it cancels a wait, for
 // the engine, its creation or the migration lock, at once; a migration file already running runs
@@ -176,7 +176,11 @@ func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []
 		return nil, err
 	}
 
-	m, err := database.NewMigrator(ctx)
+	// One progress for the whole start: SQL Server's schema_migrations pre-create can wait for the
+	// migration lock before the runner does, and the start says it is waiting once.
+	progress := &startupProgress{ctx: ctx}
+
+	m, err := database.NewMigrator(ctx, progress)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to prepare the migration runner")
 	}
@@ -185,7 +189,7 @@ func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []
 		return nil, preflightEmailCaseErr
 	}
 
-	migrated, err := m.UpToHead(ctx, buildinfo.Version, startupProgress{ctx: ctx})
+	migrated, err := m.UpToHead(ctx, buildinfo.Version, progress)
 	if err != nil {
 		var stopped migrator.StoppedError
 		if errors.As(err, &stopped) {
@@ -220,20 +224,29 @@ func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []
 // for the migration lock or running a long migration says so rather than looking hung (#390
 // decision 7). A queued start that finds another process has already migrated writes the wait
 // record and then "no need to migrate the database".
+//
+// The wait record is written once per start, however many times the start queues: SQL Server's
+// schema_migrations pre-create takes the migration lock before the runner does, and a start can
+// find it held at both.
 type startupProgress struct {
-	ctx context.Context
+	ctx    context.Context
+	waited bool
 }
 
-func (p startupProgress) WaitingForLock() {
+func (p *startupProgress) WaitingForLock() {
+	if p.waited {
+		return
+	}
+	p.waited = true
 	slog.InfoContext(p.ctx, "waiting for the migration lock")
 }
 
-func (p startupProgress) Migrating(from, to, pending int) {
+func (p *startupProgress) Migrating(from, to, pending int) {
 	slog.InfoContext(p.ctx, "migrating the database",
 		"from_version", recordedVersion(from), "to_version", to, "pending", pending)
 }
 
-func (p startupProgress) Migrated(from, to, applied int, took time.Duration) {
+func (p *startupProgress) Migrated(from, to, applied int, took time.Duration) {
 	slog.InfoContext(p.ctx, "database migrated",
 		"from_version", recordedVersion(from), "to_version", to, "applied", applied, "duration", took)
 }

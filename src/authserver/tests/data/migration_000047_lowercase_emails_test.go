@@ -300,7 +300,7 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 	// deployment upgrading across this release looks like.
 	seed, err := sqlitedb.New(context.Background(), dsn, false)
 	require.NoError(t, err, "open the throwaway database")
-	m, err := seed.NewMigrator(context.Background())
+	m, err := seed.NewMigrator(context.Background(), nil)
 	require.NoError(t, err)
 	require.NoError(t, m.Migrate(context.Background(), beforeLowercaseEmails000047), "step the throwaway database to 000046")
 	require.NoError(t, seed.CreateUser(context.Background(), nil, &record.User{
@@ -325,7 +325,7 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 	check, err := sqlitedb.New(context.Background(), dsn, false)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = check.DB.Close() })
-	checkMigrator, err := check.NewMigrator(context.Background())
+	checkMigrator, err := check.NewMigrator(context.Background(), nil)
 	require.NoError(t, err)
 	version, dirty, err := checkMigrator.Version(context.Background())
 	require.NoError(t, err)
