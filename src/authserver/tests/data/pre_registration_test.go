@@ -35,7 +35,6 @@ func TestUpdatePreRegistration(t *testing.T) {
 	preReg := createTestPreRegistration(t)
 
 	preReg.Email = "updated_" + fake.Email()
-	preReg.PasswordHash = fake.Password(16)
 	preReg.VerificationCodeEncrypted = []byte(fake.UUID())
 	preReg.VerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 
@@ -124,7 +123,6 @@ func createTestPreRegistration(t *testing.T) *record.PreRegistration {
 	// would be refused by the index (#112).
 	preReg := &record.PreRegistration{
 		Email:                     fake.Email(),
-		PasswordHash:              fake.Password(16),
 		VerificationCodeEncrypted: []byte(fake.UUID()),
 		VerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 		VerificationCodeHash:      codeHashOf(t, fake.UUID()),
@@ -142,9 +140,6 @@ func validatePreRegistration(t *testing.T, expected, actual *record.PreRegistrat
 	}
 	if actual.Email != expected.Email {
 		t.Errorf("Expected Email %s, got %s", expected.Email, actual.Email)
-	}
-	if actual.PasswordHash != expected.PasswordHash {
-		t.Errorf("Expected PasswordHash %s, got %s", expected.PasswordHash, actual.PasswordHash)
 	}
 	if string(actual.VerificationCodeEncrypted) != string(expected.VerificationCodeEncrypted) {
 		t.Errorf("Expected VerificationCodeEncrypted %v, got %v", expected.VerificationCodeEncrypted, actual.VerificationCodeEncrypted)
@@ -209,8 +204,7 @@ func TestGetPreRegistrationByVerificationCodeHash_EmptyNeverMatches(t *testing.T
 	t.Cleanup(deleteDormant)
 
 	dormant := &record.PreRegistration{
-		Email:        dormantEmail,
-		PasswordHash: fake.Password(16),
+		Email: dormantEmail,
 	}
 	if err := database.CreatePreRegistration(context.Background(), nil, dormant); err != nil {
 		t.Fatalf("Failed to create the dormant pre-registration: %v", err)
@@ -250,7 +244,6 @@ func TestGetPreRegistrationByVerificationCodeHash_Transaction(t *testing.T) {
 
 	preReg := &record.PreRegistration{
 		Email:                     fake.Email(),
-		PasswordHash:              fake.Password(16),
 		VerificationCodeEncrypted: []byte(fake.UUID()),
 		VerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 		VerificationCodeHash:      hash,

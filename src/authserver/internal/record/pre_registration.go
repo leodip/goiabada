@@ -7,7 +7,6 @@ type PreRegistration struct {
 	CreatedAt                 sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt                 sql.NullTime `db:"updated_at"`
 	Email                     string       `db:"email"`
-	PasswordHash              string       `db:"password_hash"`
 	VerificationCodeEncrypted []byte       `db:"verification_code_encrypted"`
 	VerificationCodeIssuedAt  sql.NullTime `db:"verification_code_issued_at"`
 	// VerificationCodeHash is an unsalted SHA-256 of the activation code, and the only

@@ -655,7 +655,6 @@ func TestHandleRegisterPost(t *testing.T) {
 		database.On("CreatePreRegistration", mock.Anything, mock.Anything, mock.AnythingOfType("*record.PreRegistration")).Return(nil).Run(func(args mock.Arguments) {
 			preReg := args.Get(2).(*record.PreRegistration)
 			assert.Equal(t, "test@example.com", preReg.Email)
-			assert.Empty(t, preReg.PasswordHash, "the pending registration stores no password")
 			assert.NotEmpty(t, preReg.VerificationCodeEncrypted)
 			assert.True(t, preReg.VerificationCodeIssuedAt.Valid)
 
