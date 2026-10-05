@@ -59,8 +59,8 @@ func expectAuthServerPermissionsOn(database *datamocks.Database, tx *sql.Tx) {
 }
 
 // expectOrdinaryOwner registers the target ceiling's reads of a save's owner for a caller without
-// authserver:manage, as an owner holding nothing: a user directly or through a group, or a group.
-// A client is not read here.
+// authserver:manage, as an owner holding nothing: a user directly or through a group, a group, or a
+// client.
 func expectOrdinaryOwner(database *datamocks.Database, save grantSave) {
 	switch save.kind {
 	case targetKindUser:
@@ -68,6 +68,9 @@ func expectOrdinaryOwner(database *datamocks.Database, save grantSave) {
 	case targetKindGroup:
 		database.On("GetGroupPermissionsByGroupIds", mock.Anything, (*sql.Tx)(nil), []int64{grantOwnerId}).
 			Return([]record.GroupPermission{}, nil).Once()
+	case targetKindClient:
+		database.On("GetClientPermissionsByClientId", mock.Anything, (*sql.Tx)(nil), grantOwnerId).
+			Return([]record.ClientPermission{}, nil).Once()
 	}
 }
 

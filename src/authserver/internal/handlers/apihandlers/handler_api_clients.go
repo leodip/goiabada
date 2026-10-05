@@ -30,9 +30,11 @@ import (
 // origins, and the transaction that changes them together.
 //
 // It embeds the revocation port because making a confidential client public revokes the grants it
-// held while it still had to authenticate.
+// held while it still had to authenticate, and what the administrative policy reads to judge whether
+// the client is an administrator.
 type clientsDatabase interface {
 	revocation.Database
+	clientTargetPolicyDatabase
 
 	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
@@ -242,6 +244,12 @@ func HandleClientSecretGet(
 			return
 		}
 
+		// Only authserver:manage reads an administrator client's secret, which is signing in as it
+		// (#402 decisions 1 and 8).
+		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
+			return
+		}
+
 		response := api.GetClientSecretResponse{}
 		if client.ClientSecretEncrypted != nil {
 			response.ClientSecret, err = dataCipher.Decrypt(client.ClientSecretEncrypted)
@@ -292,6 +300,11 @@ func HandleClientDelete(
 
 		if client.IsSystemLevelClient() {
 			writeJSONError(w, "Trying to delete a system level client", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		// Only authserver:manage writes to an administrator client (#402 decision 1).
+		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
 			return
 		}
 
@@ -604,6 +617,11 @@ func HandleClientUpdatePut(
 			client.DefaultAcrLevel = acrLevel
 		}
 
+		// Only authserver:manage writes to an administrator client (#402 decision 1).
+		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
+			return
+		}
+
 		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client"), "client_id", client.Id, "client_identifier", client.ClientIdentifier)
 			return
@@ -691,6 +709,11 @@ func HandleClientAuthenticationPut(
 			client.IsPublic = false
 			client.ClientSecretEncrypted = enc
 			// Preserve ClientCredentialsEnabled as-is
+		}
+
+		// Only authserver:manage writes to an administrator client (#402 decision 1).
+		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
+			return
 		}
 
 		// The confidential-to-public transition is the one that REMOVES the requirement for the
@@ -819,6 +842,11 @@ func HandleClientOAuth2FlowsPut(
 		client.PKCERequired = req.PKCERequired
 		client.ImplicitGrantEnabled = req.ImplicitGrantEnabled
 		client.ResourceOwnerPasswordCredentialsEnabled = req.ResourceOwnerPasswordCredentialsEnabled
+
+		// Only authserver:manage writes to an administrator client (#402 decision 1).
+		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
+			return
+		}
 
 		// The two public-client rules are applied by the writer below, inside the write's
 		// transaction and against the is_public the row really carries. They cannot run out
@@ -974,6 +1002,11 @@ func HandleClientRedirectURIsPut(
 			}
 			seen[uri] = struct{}{}
 			normalized = append(normalized, uri)
+		}
+
+		// Only authserver:manage writes to an administrator client (#402 decision 1).
+		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
+			return
 		}
 
 		expected := make([]string, 0, len(req.ExpectedRedirectURIs))
@@ -1144,6 +1177,12 @@ func HandleClientWebOriginsPut(
 			}
 			expected = append(expected, origin)
 		}
+
+		// Only authserver:manage writes to an administrator client (#402 decision 1).
+		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
+			return
+		}
+
 		// The stored value is already canonical, migration 000034 having repaired the rows
 		// written before this endpoint canonicalized, so it is keyed as it stands (#250).
 		webOriginKey := func(wo record.WebOrigin) string { return wo.Origin }
@@ -1285,6 +1324,11 @@ func HandleClientTokensPut(
 		client.RefreshTokenOfflineMaxLifetimeInSeconds = req.RefreshTokenOfflineMaxLifetimeInSeconds
 		client.IncludeOpenIDConnectClaimsInAccessToken = includeClaimsInAccessToken.String()
 		client.IncludeOpenIDConnectClaimsInIdToken = includeClaimsInIdToken.String()
+
+		// Only authserver:manage writes to an administrator client (#402 decision 1).
+		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
+			return
+		}
 
 		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client tokens"), "client_id", client.Id)

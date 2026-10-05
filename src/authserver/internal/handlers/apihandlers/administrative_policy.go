@@ -591,3 +591,74 @@ func groupTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database a
 	})
 	return false
 }
+
+// clientTargetPolicyDatabase is what the policy reads to judge a write on a client: the
+// administrative set and the permissions the client holds.
+type clientTargetPolicyDatabase interface {
+	administrativePolicyDatabase
+	GetClientPermissionsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientPermission, error)
+}
+
+// clientIsAdministrator reports whether the client is an administrator: the admin console's own
+// client, whatever it holds, or a client holding an administrative permission. The admin console's
+// client is one by what it is, the client every administrator signs in through, so that editing its
+// redirect URIs, its flows or its secret stays authserver:manage's however its grants are changed.
+// Read outside any transaction; the admin console's client and a client holding no grant read
+// nothing more.
+func clientIsAdministrator(ctx context.Context, database clientTargetPolicyDatabase, client *record.Client) (bool, error) {
+	if client.IsSystemLevelClient() {
+		return true, nil
+	}
+	grants, err := database.GetClientPermissionsByClientId(ctx, nil, client.Id)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to read the client's permissions for the administrative policy")
+	}
+	if len(grants) == 0 {
+		return false, nil
+	}
+
+	administrative, err := administrativePermissions(ctx, database, nil)
+	if err != nil {
+		return false, err
+	}
+	for _, grant := range grants {
+		if administrative[grant.PermissionId] != "" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// clientTargetCeilingAllows applies the target ceiling to a write on a client, or to reading its
+// secret: only an authserver:manage token writes to an administrator client in any way, its
+// settings, authentication, flows, redirect URIs, web origins, token settings, permissions, logo or
+// its deletion, or reads its secret. A client holding manage is obtained on a plain
+// client_credentials request by whoever holds its secret, so replacing or reading that secret, or
+// redirecting the admin console's codes, is taking the client over. It reports whether the request
+// may go on, and when it may not it has answered the request. An authserver:manage caller reads
+// nothing here (#402 decisions 1 and 8).
+//
+// A save of the client's permissions meets the grant ceiling first; this refuses what the grant
+// ceiling lets through, such as granting an administrator client an ordinary permission.
+func clientTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database clientTargetPolicyDatabase, auditLogger AuditLogger,
+	client *record.Client) bool {
+	if callerHoldsManage(r) {
+		return true
+	}
+
+	administrator, err := clientIsAdministrator(r.Context(), database, client)
+	if err != nil {
+		writeInternalServerError(w, r, err, "client_id", client.Id)
+		return false
+	}
+	if !administrator {
+		return true
+	}
+
+	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
+		ceiling:    ceilingTarget,
+		targetKind: targetKindClient,
+		targetId:   client.Id,
+	})
+	return false
+}

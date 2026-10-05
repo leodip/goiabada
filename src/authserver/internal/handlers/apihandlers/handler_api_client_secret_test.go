@@ -21,11 +21,11 @@ import (
 // /clients/{id} carries no secret, so admin-read, which reaches the detail and not this route,
 // receives no credential (#402 decision 8, #403).
 
-// clientSecretRequest is GET /api/v1/admin/clients/{id}/secret with its chi parameter and a token
-// whose sub is the caller an audit row names.
+// clientSecretRequest is GET /api/v1/admin/clients/{id}/secret with its chi parameter and a manage
+// token, which the target ceiling reads nothing for, whose sub is the caller an audit row names.
 func clientSecretRequest(id string) *http.Request {
 	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/clients/"+id+"/secret", nil)
-	r = setTokenContextWithClaims(r, map[string]interface{}{"sub": "the-caller"})
+	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage", "sub": "the-caller"})
 	return setChiURLParam(r, "id", id)
 }
 

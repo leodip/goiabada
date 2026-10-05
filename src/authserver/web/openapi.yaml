@@ -1898,8 +1898,11 @@ paths:
         Get a client's secret, decrypted. This is the one operation that answers a
         client secret, and it requires `authserver:manage-clients` or
         `authserver:manage`: `authserver:admin-read` reads every client and is
-        refused here. A client holding no secret, a public one, is answered an empty
-        `clientSecret`.
+        refused here. The secret of an administrator client, one holding an
+        administrative permission or the admin console's own client, is read with
+        `authserver:manage` alone, and `authserver:manage-clients` is refused it
+        with MANAGE_SCOPE_REQUIRED. A client holding no secret, a public one, is
+        answered an empty `clientSecret`.
 
         Every read that answers a secret leaves a `viewed_client_secret` audit
         record naming the client and the caller. A read of a client holding none
@@ -3694,8 +3697,12 @@ components:
         refused here. So is any write on an administrator: a user holding one
         of the six, directly or through any of its groups, or a group holding
         one, whether its profile, credentials, sessions, consents, attributes,
-        memberships or permissions; a granular scope still reads them. So is
-        changing the email or the audit-log settings, which only
+        memberships or permissions; or a client holding one, and the admin
+        console's own client whatever it holds, whether its settings,
+        authentication, flows, redirect URIs, web origins, token settings,
+        permissions, logo or its deletion. A granular scope still reads them,
+        except an administrator client's secret, which only `authserver:manage`
+        reads. So is changing the email or the audit-log settings, which only
         `authserver:manage` may change. No granular
         scope will ever be enough. It is answered after the request's 400 and
         404, writes nothing, carries `WWW-Authenticate: Bearer

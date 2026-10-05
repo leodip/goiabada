@@ -46,6 +46,8 @@ func authenticationPutRequest(t *testing.T, id string, req api.UpdateClientAuthe
 	body, err := json.Marshal(req)
 	require.NoError(t, err)
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/"+id+"/authentication", bytes.NewReader(body))
+	// A manage token: the target ceiling reads nothing for it, and this file is about the save (#402).
+	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage"})
 	return setChiURLParam(r, "id", id)
 }
 
@@ -415,6 +417,8 @@ func webOriginsBody(t *testing.T, wanted, expected []string) string {
 func webOriginsPutRequest(t *testing.T, id string, body string) *http.Request {
 	t.Helper()
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/"+id+"/web-origins", strings.NewReader(body))
+	// A manage token: the target ceiling reads nothing for it, and this file is about the save (#402).
+	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage"})
 	return setChiURLParam(r, "id", id)
 }
 
@@ -886,6 +890,8 @@ func redirectURIsPutRequest(t *testing.T, id string, body string) *http.Request 
 	t.Helper()
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/"+id+"/redirect-uris", strings.NewReader(body))
 	r = r.WithContext(reqctx.WithSettings(r.Context(), &record.Settings{}))
+	// A manage token: the target ceiling reads nothing for it, and this file is about the save (#402).
+	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage"})
 	return setChiURLParam(r, "id", id)
 }
 

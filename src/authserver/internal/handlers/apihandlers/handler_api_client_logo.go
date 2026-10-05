@@ -16,8 +16,10 @@ import (
 )
 
 // clientLogoDatabase is what the client logo endpoints need: the client and the logo row they
-// read, write and delete.
+// read, write and delete, and what the administrative policy reads to judge whether the client is
+// an administrator.
 type clientLogoDatabase interface {
+	clientTargetPolicyDatabase
 	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
 	CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *record.ClientLogo) error
 	DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientId int64) error
@@ -67,6 +69,11 @@ func HandleClientLogoPost(
 		result, err := imageupload.Validate(fileData, maxUploadBytes)
 		if err != nil {
 			writeValidationError(w, r, err)
+			return
+		}
+
+		// Only authserver:manage writes to an administrator client (#402 decision 1).
+		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
 			return
 		}
 
@@ -147,6 +154,11 @@ func HandleClientLogoDelete(
 
 		if client == nil {
 			writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
+			return
+		}
+
+		// Only authserver:manage writes to an administrator client (#402 decision 1).
+		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
 			return
 		}
 
