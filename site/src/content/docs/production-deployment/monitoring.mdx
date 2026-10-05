@@ -1,13 +1,249 @@
 ---
 title: Monitoring
-description: Watch a running Goiabada deployment through its Prometheus metrics.
+description: Watch a running Goiabada deployment through its Prometheus metrics and its logs.
 ---
 
+import { Aside } from '@astrojs/starlight/components';
+
 Goiabada can serve Prometheus metrics in the text exposition format, on a listener of its own that
-answers `GET /metrics` and nothing else. It is off unless you enable it, with
-`GOIABADA_AUTHSERVER_METRICS_ENABLED` for the auth server and `GOIABADA_ADMINCONSOLE_METRICS_ENABLED`
-for the admin console; see the [environment variables](/reference/environment-variables/) for each
-listener's host and port.
+answers `GET /metrics` and nothing else. They say how many requests each route answers and how fast,
+how close the database pool is to its cap and how long requests wait for a connection, how often the
+rate limiter refuses, how many tokens are issued and refused, whether the cleanup run succeeds, and,
+from the admin console, how the auth server answers it. The logs say the rest: which request failed,
+and the audit events. This page covers turning the metrics on, scraping them, what each one means,
+what to alert on, and what to watch in the logs.
+
+## Turning the endpoint on
+
+Each server has its own metrics listener, off unless you turn it on:
+
+| Server | Turned on by | Port |
+|--------|--------------|------|
+| Auth server | `GOIABADA_AUTHSERVER_METRICS_ENABLED=true` | `9190`, set by `GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS` |
+| Admin console | `GOIABADA_ADMINCONSOLE_METRICS_ENABLED=true` | `9191`, set by `GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS` |
+
+Each listens on all addresses by default, as the servers' other listeners do, because a scraper in
+another container or pod reaches it over the network. When the scraper runs on the same host, set
+`GOIABADA_AUTHSERVER_LISTEN_HOST_METRICS` and `GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS` to
+`127.0.0.1`. See the [environment variables](/reference/environment-variables/#metrics) for every
+setting and its flag.
+
+On Kubernetes, the [setup wizard](/getting-started/setup-wizard/) asks whether to expose the metrics
+and turns both listeners on when you say yes; see [Metrics](/production-deployment/kubernetes/#metrics)
+in the Kubernetes guide. The Compose files and the native env file leave them off: add the two
+variables to each server's environment to turn them on.
+
+<Aside type="caution" title="Keep the metrics ports off the internet">
+The metrics listener has no authentication. What it serves holds no user data, since no label can
+carry a user, a client or anything else from a request, but it does show your routes, how much
+traffic each one gets, how many tokens you issue and which release you run. Publish its port through
+no Service, route, proxy or Compose `ports:` entry, and let only your scraper reach it. The
+manifests the wizard generates publish it nowhere, and with the NetworkPolicies on they admit only
+the scraper's namespace to it.
+</Aside>
+
+To see what it serves, on Kubernetes:
+
+```bash
+kubectl port-forward -n goiabada deploy/goiabada-authserver 9190:9190
+curl -s http://localhost:9190/metrics | grep goiabada_build_info
+```
+
+or from a container on the Compose network, `curl -s http://goiabada-authserver:9190/metrics`. Any
+path but `/metrics` is answered 404, and a scrape is neither logged nor counted in the request
+metrics.
+
+## Scraping the endpoint
+
+Which way your scraper finds the pods depends on what runs it:
+
+| Scraper | Finds Goiabada by | Setup wizard answer |
+|---------|-------------------|---------------------|
+| The prometheus-community `prometheus` Helm chart, Datadog with Prometheus scraping on | [Pod annotations](#pod-annotations) | Pod annotations |
+| kube-prometheus-stack, or any Prometheus the Prometheus Operator runs | [A PodMonitor](#a-podmonitor) | PodMonitor |
+| Google Managed Prometheus | [A PodMonitoring](#google-managed-prometheus) | Pod annotations, then apply a PodMonitoring |
+| Grafana Alloy, the OpenTelemetry Collector | [The `metrics` container port](#grafana-alloy) | Pod annotations |
+| A Prometheus outside Kubernetes | [A static target](#outside-kubernetes) | Not asked |
+
+Either yes answer to the wizard turns both listeners on and declares a container port named
+`metrics` on each server, 9190 and 9191, which every method below scrapes. Where the table says pod
+annotations for a scraper that does not read them, the annotations do nothing, and the answer is the
+one that turns the listeners on without writing a PodMonitor, which `kubectl apply` refuses on a
+cluster without the Operator.
+
+With the NetworkPolicies on, the wizard also asks which namespace the scraper runs in, and admits
+that namespace to the metrics ports alone. Give it the namespace each section below names.
+
+### Pod annotations
+
+The wizard writes these on each server's pod template, here the auth server's:
+
+```yaml
+annotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9190"
+  prometheus.io/path: "/metrics"
+```
+
+They are a convention, not part of Kubernetes or Prometheus. The prometheus-community `prometheus`
+chart's default configuration reads them, and so does the Datadog Agent once its Prometheus scraping
+is turned on (`datadog.prometheusScrape.enabled=true` in its Helm chart). kube-prometheus-stack
+ignores them. For the NetworkPolicy, the namespace is the one the chart or the Agent runs in.
+
+### A PodMonitor
+
+The Prometheus Operator, which kube-prometheus-stack installs, scrapes only what a PodMonitor or a
+ServiceMonitor names. The wizard writes one PodMonitor for both servers:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: goiabada
+  namespace: goiabada
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchExpressions:
+    - key: app
+      operator: In
+      values:
+      - goiabada-authserver
+      - goiabada-adminconsole
+  podMetricsEndpoints:
+  - port: metrics
+    path: /metrics
+```
+
+A Prometheus the Operator runs selects only the PodMonitors its `podMonitorSelector` matches, in the
+namespaces its `podMonitorNamespaceSelector` matches. kube-prometheus-stack, by default, selects only
+those labeled `release: <its release name>`, so give the wizard that label when it asks, as
+`release=kube-prometheus-stack` for a release of that name, or add it under `metadata.labels`. Read
+what your Prometheus selects by with:
+
+```bash
+kubectl get prometheus -A -o jsonpath='{..podMonitorSelector}'
+```
+
+A PodMonitor no Prometheus selects is accepted and scraped by nothing. PodMonitor is one of the
+Operator's CRDs: on a cluster without them, `kubectl apply` exits 1 after applying everything else in
+the file. For the NetworkPolicy, the namespace is the one Prometheus runs in, `monitoring` in the
+usual kube-prometheus-stack install.
+
+### Google Managed Prometheus
+
+On GKE with managed collection, apply a `PodMonitoring` in Goiabada's namespace, after answering pod
+annotations to the wizard:
+
+```yaml
+apiVersion: monitoring.googleapis.com/v1
+kind: PodMonitoring
+metadata:
+  name: goiabada
+  namespace: goiabada
+spec:
+  selector:
+    matchExpressions:
+    - key: app
+      operator: In
+      values:
+      - goiabada-authserver
+      - goiabada-adminconsole
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+```
+
+The managed collectors run in the `gmp-system` namespace, which is the one to give the wizard for the
+NetworkPolicy.
+
+### Grafana Alloy
+
+Alloy discovers pods itself. Keep the targets on the `metrics` container port, and forward them to
+the `prometheus.remote_write` component your configuration already has:
+
+```hcl
+discovery.kubernetes "goiabada" {
+  role = "pod"
+  namespaces {
+    names = ["goiabada"]
+  }
+}
+
+discovery.relabel "goiabada" {
+  targets = discovery.kubernetes.goiabada.targets
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_port_name"]
+    regex         = "metrics"
+    action        = "keep"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    target_label  = "pod"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_name"]
+    target_label  = "container"
+  }
+}
+
+prometheus.scrape "goiabada" {
+  targets    = discovery.relabel.goiabada.output
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+```
+
+Alloy's service account needs to list and watch pods in the `goiabada` namespace, which the Alloy
+Helm chart grants. For the NetworkPolicy, the namespace is the one Alloy runs in.
+
+### The OpenTelemetry Collector
+
+The Collector's `prometheus` receiver takes a Prometheus scrape configuration, so it finds the pods
+the same way:
+
+```yaml
+receivers:
+  prometheus:
+    config:
+      scrape_configs:
+      - job_name: goiabada
+        kubernetes_sd_configs:
+        - role: pod
+          namespaces:
+            names: [goiabada]
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_container_port_name]
+          regex: metrics
+          action: keep
+        - source_labels: [__meta_kubernetes_pod_name]
+          target_label: pod
+        - source_labels: [__meta_kubernetes_pod_container_name]
+          target_label: container
+```
+
+Add the receiver to a metrics pipeline, and give the Collector's service account permission to list
+and watch pods in the `goiabada` namespace. For the NetworkPolicy, the namespace is the one the
+Collector runs in.
+
+### Outside Kubernetes
+
+A Prometheus on the same Compose network as Goiabada scrapes both servers by their service names,
+with the ports published nowhere:
+
+```yaml
+scrape_configs:
+- job_name: goiabada
+  static_configs:
+  - targets:
+    - goiabada-authserver:9190
+    - goiabada-adminconsole:9191
+```
+
+For native binaries, list the hosts the servers run on, and set the listen hosts to `127.0.0.1` when
+Prometheus runs on the same host.
 
 ## Metrics catalog
 
@@ -47,3 +283,134 @@ both, and those labels tell them apart.
 | `goiabada_build_info` | gauge | `version`: this binary's version; `commit`: this binary's commit | both | Always 1. The labels say which release is running. |
 | `go_goroutines` | gauge | none | both | Goroutines that currently exist. |
 | `go_memstats_heap_inuse_bytes` | gauge | none | both | Heap bytes in use. |
+
+## Suggested alerts
+
+A starting set, as a Prometheus rules file. The thresholds are where to begin, not measurements: tune
+them to your traffic once you have a few weeks of it. With the Prometheus Operator, put the `groups`
+under the `spec` of a `PrometheusRule` carrying the labels your Prometheus selects rules by, as for
+the PodMonitor.
+
+```yaml
+groups:
+- name: goiabada
+  rules:
+  - alert: GoiabadaDatabasePoolWaits
+    expr: sum by (instance) (rate(goiabada_db_wait_duration_seconds_total[5m])) > 0.1
+    for: 10m
+    annotations:
+      summary: Requests are waiting for a database connection.
+  - alert: GoiabadaServerErrors
+    expr: |
+      sum(rate(goiabada_http_requests_total{status=~"5.."}[5m]))
+        / sum(rate(goiabada_http_requests_total[5m])) > 0.02
+    for: 10m
+    annotations:
+      summary: More than 2% of requests are answered with a server error.
+  - alert: GoiabadaRateLimitRefusals
+    expr: sum by (limiter) (increase(goiabada_rate_limit_refusals_total[10m])) > 50
+    annotations:
+      summary: The rate limiter is refusing a burst of requests.
+  - alert: GoiabadaNoSuccessfulCleanup
+    expr: |
+      time() - max(max_over_time(goiabada_cleanup_last_success_timestamp_seconds[1d])) > 86400
+        and on () count(goiabada_db_max_open_connections offset 1d) > 0
+    annotations:
+      summary: No cleanup run has completed in 24 hours.
+  - alert: GoiabadaAfterResponseJobsDropped
+    expr: sum by (class) (increase(goiabada_after_response_jobs_dropped_total[10m])) > 0
+    annotations:
+      summary: Mail was not sent because too many jobs were in flight.
+  - alert: GoiabadaAuthServerFailingTheConsole
+    expr: |
+      sum(rate(goiabada_upstream_requests_total{status=~"error|5.."}[5m]))
+        / sum(rate(goiabada_upstream_requests_total[5m])) > 0.05
+    for: 5m
+    annotations:
+      summary: The admin console's calls to the auth server are failing.
+```
+
+What each one is for:
+
+- **Pool waits.** The database pool is capped at `GOIABADA_DB_MAX_OPEN_CONNS` connections per pod,
+  and a request that finds every connection in use waits for one. The expression is the time spent
+  waiting, per second, on one pod: above 0.1, requests are waiting a tenth of a second for every
+  second that passes. Compare `goiabada_db_connections{state="in_use"}` with
+  `goiabada_db_max_open_connections`: a pool that sits at its cap needs a larger cap, if the
+  database's connection limit has room for it across every pod, or more pods. The average wait is
+  `rate(goiabada_db_wait_duration_seconds_total[5m]) / rate(goiabada_db_wait_count_total[5m])`.
+- **Server errors.** A 5xx is a fault on Goiabada's side or in what it depends on, the database or
+  the mail server, rather than a client's mistake. Find which route with `sum by (route, status) (rate(goiabada_http_requests_total{status=~"5.."}[5m]))`,
+  and the cause in the error records the same requests wrote (see below).
+- **Rate-limit refusals.** Every refusal is counted, so a credential-stuffing run or a flood shows as
+  a spike on the limiter it hit, as it happens. The limiters are:
+
+  | `limiter` | Refuses |
+  |-----------|---------|
+  | `pwd_account_net` | Failed sign-ins on one account from one address, at the login form and the password grant together |
+  | `pwd_account` | Failed sign-ins on one account from any address, at the login form and the password grant together |
+  | `pwd_ip` | Every login form submission from one address |
+  | `otp` | Failed OTP codes for one user |
+  | `email_verification` | Failed email verification codes for one account |
+  | `email_verification_send` | Requests to send a verification email for one account |
+  | `account_password` | Failed passwords on one account's password, OTP and email changes together |
+  | `activate` | Account activation requests from one address |
+  | `register` | Self-registrations from one address |
+  | `register_email` | Self-registrations for one email address |
+  | `reset_pwd` | Password reset requests from one address |
+  | `forgot_pwd_email` | Forgot-password requests for one email address |
+  | `forgot_pwd_ip` | Forgot-password requests from one address |
+  | `dcr` | Dynamic client registrations from one address |
+  | `ropc_ip` | Every password grant request from one address |
+
+  The [rate limiting details](/reference/environment-variables/#security-settings) give each one's
+  budget. The limiter is off unless `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` is on, and then this
+  metric records nothing.
+- **No successful cleanup.** One auth server pod claims a cleanup run every 12 hours, deleting
+  expired sessions, tokens, codes and audit records. Each pod reports the last run it completed, so
+  the deployment's latest is the maximum across pods, kept for a day so a rollout does not lose it. The
+  second line holds the alert back until the metrics go back a day, since a new deployment has had
+  no run yet. A run that keeps failing writes an error record for the step that failed.
+- **Dropped jobs.** Forgot-password, self-registration and the notice of an email change send their
+  mail after the response, at most 64 of each at once. A dropped job's mail is never sent: the user
+  waits for an email that does not arrive. A sustained `goiabada_after_response_jobs_in_flight` near
+  64 is the same thing about to happen, usually a slow SMTP server.
+- **The auth server failing the console.** The admin console's failure mode is the auth server. A
+  `status` of `error` is a call that got no response at all: refused, reset or timed out.
+
+Alert as well on the scrape itself failing, Prometheus's `up` series at 0 for Goiabada's targets,
+and on pods restarting, which Kubernetes reports through kube-state-metrics rather than Goiabada.
+
+## What to watch in the logs
+
+The metrics count; the logs say which request and why. Both servers write their log to stderr, one
+record per line, as `key=value` text by default or as JSON with
+`GOIABADA_AUTHSERVER_LOG_FORMAT=json` and `GOIABADA_ADMINCONSOLE_LOG_FORMAT=json`, which most log
+pipelines parse without a pattern. Every record written while serving a request carries its
+`request_id`, the client's or proxy's `X-Request-Id` or one Goiabada made, so the records of one
+request can be gathered.
+
+The level says who should look: `ERROR` means someone must act, `WARN` a request that was refused or
+handled, `INFO` startup, shutdown and the records below, and `DEBUG` per-request tracing, written
+only with `GOIABADA_AUTHSERVER_LOG_LEVEL` or `GOIABADA_ADMINCONSOLE_LOG_LEVEL` at `debug`. Count the `ERROR` records: each is something that
+went wrong on Goiabada's side, and a rate of them belongs on the same dashboard as the 5xx rate.
+
+The records worth knowing by name:
+
+| Record (`msg`) | Level | What it says |
+|----------------|-------|--------------|
+| `http request` | `INFO` | One per request, with its `method`, `target` (query values redacted), `ip`, `status`, `bytes` and `duration`. Written only when `GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS` or `GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS` is on, which every generated deployment sets; health checks and static files are left out |
+| `audit event` | `INFO` | One audit event, with its `event` name and `details`, written when the console target of the audit log is on |
+| `worker task completed` | `INFO` | A cleanup run that reached every step, with its `duration`; a failed step wrote an `ERROR` record before it |
+| `a job to run after its response was dropped, too many in flight` | `WARN` | A forgot-password, registration or email-change mail that was not sent |
+| `cross-origin request refused` | `WARN` | A state-changing request the CSRF check refused as cross-origin, with its `explanation` and `remedy`; a run of them after a change of hostname or proxy is a misconfiguration rather than an attack |
+| `database migrated` | `INFO` | How many migrations a starting auth server `applied`, and their `duration` |
+
+The audit log is where the security events are, not the metrics: every sign-in, failed password,
+token issued, rate-limit refusal and administrative change, each with who did it. It goes to the
+console as the `audit event` records above, to the database, where the admin console browses it, or
+to both, as the **Audit log settings** page says. Send it to your log pipeline if you alert on
+security events: a run of `auth_failed_pwd` or `ropc_auth_failed` events against one account, or
+`rate_limit_exceeded`, which is written at most once per key and window by each pod and so shows
+which accounts and addresses the refusals counted above were about. See [Audit
+log](/concepts/audit-log/) for the events and where they go.
