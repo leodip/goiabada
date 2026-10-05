@@ -3,7 +3,6 @@ package accounthandlers
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
@@ -88,9 +87,13 @@ func HandleChangePasswordPost(
 			return
 		}
 
+		// Both sent as typed: surrounding whitespace is part of a password everywhere else, so
+		// trimming the current one would refuse the right password and charge the account's
+		// failure budget for it, and trimming the new one would store a password other than the
+		// one the user typed and confirmed. The auth server refuses a blank field itself.
 		req := &api.UpdateAccountPasswordRequest{
-			CurrentPassword: strings.TrimSpace(currentPassword),
-			NewPassword:     strings.TrimSpace(newPassword),
+			CurrentPassword: currentPassword,
+			NewPassword:     newPassword,
 		}
 
 		_, err := apiClient.UpdateAccountPassword(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
