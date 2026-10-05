@@ -65,6 +65,11 @@ func HandleSettingsAuditLogsPut(
 			return
 		}
 
+		// Reserved to authserver:manage, refused before the change is recorded or made.
+		if !settingsCeilingAllows(w, r, auditLogger) {
+			return
+		}
+
 		// Audit log before saving, so the logger reads the old settings
 		// and always records the change (even when disabling logging)
 		auditLogger.Log(r.Context(), audit.EventUpdatedAuditLogsSettings, map[string]interface{}{

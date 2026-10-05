@@ -47,8 +47,12 @@ const manageScopeRequiredDescription = "Only a token with the authserver:manage 
 
 // The ceiling a refusal names. The grant ceiling is granting or revoking an administrative
 // permission, directly or by moving a user into or out of a group that holds one, and deleting such
-// a group (#402 decisions 1 and 5).
-const ceilingGrant = "grant"
+// a group; the settings ceiling is changing the email or the audit-log settings (#402 decisions 1,
+// 5 and 7).
+const (
+	ceilingGrant    = "grant"
+	ceilingSettings = "settings"
+)
 
 // The kind of target a refusal names.
 const (
@@ -111,7 +115,9 @@ func administrativePermissions(ctx context.Context, database administrativePolic
 
 // administratorChangeRefusal is what one refusal records beside the caller and the route.
 type administratorChangeRefusal struct {
-	ceiling    string
+	ceiling string
+	// targetKind and targetId name the user, group or client the request acts on. A request with
+	// no target, a settings write, leaves targetKind empty and the record names neither.
 	targetKind string
 	targetId   int64
 	// permissionIds is the administrative permissions whose change caused a grant refusal.
@@ -135,8 +141,10 @@ func refuseAdministratorChange(w http.ResponseWriter, r *http.Request, auditLogg
 		"method":       r.Method,
 		"route":        routePattern(r),
 		"ceiling":      refusal.ceiling,
-		"targetKind":   refusal.targetKind,
-		"targetId":     refusal.targetId,
+	}
+	if refusal.targetKind != "" {
+		details["targetKind"] = refusal.targetKind
+		details["targetId"] = refusal.targetId
 	}
 	if refusal.permissionIds != nil {
 		details["permissionIds"] = refusal.permissionIds
@@ -446,5 +454,20 @@ func groupDeletionCeilingAllows(w http.ResponseWriter, r *http.Request, database
 		targetId:      groupId,
 		permissionIds: causes,
 	})
+	return false
+}
+
+// settingsCeilingAllows applies the settings ceiling to a write of the email or the audit-log
+// settings. The email settings decide where every reset link and verification code goes, so a
+// token that may point SMTP at a server it controls may sign in as any administrator; the audit-log
+// settings can switch off the record every other refusal rests on, for every token and not only the
+// caller's. Both are reserved to authserver:manage. It reports whether the write may go on, and when
+// it may not it has answered the request. The ceiling reads nothing: the route is the whole of what
+// it judges (#402 decision 7).
+func settingsCeilingAllows(w http.ResponseWriter, r *http.Request, auditLogger AuditLogger) bool {
+	if callerHoldsManage(r) {
+		return true
+	}
+	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{ceiling: ceilingSettings})
 	return false
 }
