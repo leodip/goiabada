@@ -2,10 +2,12 @@ package main
 
 import (
 	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -66,4 +68,35 @@ func TestLogSessionKeysNotConfigured_IsOneRecordCarryingTheErrorAndTheRemedy(t *
 		"both, or the operator sets what they were told and restarts into the next failure")
 	assert.Contains(t, records[0].Attrs["generate_with"], "openssl rand -hex 64",
 		"the command is the reader's next action, so it is an attribute rather than a third record")
+}
+
+// A previous pair set in part is a rotation mistake, not a key the deployment lacks: the record
+// names the two _PREVIOUS variables to set both of or neither, where this record's required list
+// and generate_with pointed the operator at the current keys, which were fine. The refusal is the
+// rule's own, from ParseKeys, so the record is chosen for the type main receives.
+func TestLogSessionKeysNotConfigured_APreviousPairIsARotationMistake(t *testing.T) {
+	_, _, err := sessionstore.ParseKeys(sessionstore.ConfiguredKeys{
+		Authentication:         sessionstore.ConfiguredKey{Name: "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY", Value: strings.Repeat("ab", 64)},
+		Encryption:             sessionstore.ConfiguredKey{Name: "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY", Value: strings.Repeat("cd", 32)},
+		PreviousAuthentication: sessionstore.ConfiguredKey{Name: "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS", Value: strings.Repeat("12", 64)},
+		PreviousEncryption:     sessionstore.ConfiguredKey{Name: "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS"},
+	})
+	require.Error(t, err)
+	logs := logtest.CaptureSlog(t)
+
+	logSessionKeysNotConfigured(err)
+
+	records := logs.Records()
+	require.Len(t, records, 1)
+	assert.Equal(t, slog.LevelError, records[0].Level, "the console cannot start and somebody has to act")
+	assert.Contains(t, records[0].Message, "previous session key pair")
+	assert.Equal(t, []string{
+		"GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS",
+		"GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS",
+	}, records[0].Attrs["previous"])
+	assert.NotContains(t, records[0].Attrs, "required", "the current keys are not what is wrong")
+	assert.NotContains(t, records[0].Attrs, "generate_with")
+	logged, _ := records[0].Attrs["error"].(error)
+	require.NotNil(t, logged)
+	assert.Contains(t, logged.Error(), "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS is required when")
 }

@@ -15,6 +15,7 @@ package main
 import (
 	"context"
 	"encoding/gob"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -247,6 +248,11 @@ func newTokenClient(cfg *config.Config, httpClient *http.Client) *oauthclient.To
 // logSessionKeysNotConfigured reports session keys the console cannot use, which
 // it needs before it can seal a cookie and therefore before it can serve anything.
 //
+// A previous pair set in part or malformed is a rotation mistake rather than a key
+// the deployment lacks, so it gets a record of its own, naming the two _PREVIOUS
+// variables to set both of or neither: this one's required list and generate_with
+// pointed that operator at the current keys, which are fine.
+//
 // One record where three used to be, for the reason decision 6 collapses the
 // banners: the failure, the two variables to set and the command that generates
 // them are one instruction, and as three records a JSON deployment received them
@@ -254,6 +260,16 @@ func newTokenClient(cfg *config.Config, httpClient *http.Client) *oauthclient.To
 // function rather than three lines inside main so that the record has a seam to be
 // asserted at (#320).
 func logSessionKeysNotConfigured(err error) {
+	var previousErr *sessionstore.PreviousKeysError
+	if errors.As(err, &previousErr) {
+		slog.Error("the previous session key pair is incomplete or malformed, so the admin console cannot start: set both of its variables, or neither once the rotation is done",
+			"error", err,
+			"previous", []string{
+				"GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS",
+				"GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS",
+			})
+		return
+	}
 	slog.Error("the admin console session keys are missing or malformed, so the admin console cannot start",
 		"error", err,
 		"required", []string{

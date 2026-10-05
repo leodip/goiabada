@@ -2,6 +2,7 @@ package sessionstore
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -226,6 +227,12 @@ func TestParseKeys(t *testing.T) {
 			if c.wantErr != "" {
 				require.Error(t, err)
 				assert.Equal(t, c.wantErr, err.Error())
+				// Every refusal of the previous pair, and only those, is a *PreviousKeysError, which
+				// is what tells each application's startup record a rotation mistake from a
+				// credential the deployment lacks. The rows refusing a TEST_PREV_ variable are those.
+				var previousErr *PreviousKeysError
+				assert.Equal(t, strings.HasPrefix(c.wantErr, "TEST_PREV_"), errors.As(err, &previousErr),
+					"whether the refusal is a *PreviousKeysError")
 				assert.Equal(t, KeyPair{}, gotCurrent, "a refusal hands back no current pair")
 				assert.Nil(t, gotPrevious, "a refusal hands back no previous pair")
 				return

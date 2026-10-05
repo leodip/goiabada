@@ -99,6 +99,8 @@ type ConfiguredKeys struct {
 // Both halves or neither. One alone opens nothing, so it is an error rather than a silent
 // no-rotation: an operator who mistypes one variable name would otherwise be told a rotation
 // is in place while every session sealed under the old pair is being turned away.
+//
+// A refusal of the previous pair, the current one having decoded, is a *PreviousKeysError.
 func ParseKeys(keys ConfiguredKeys) (KeyPair, *KeyPair, error) {
 	authentication := strings.TrimSpace(keys.Authentication.Value)
 	encryption := strings.TrimSpace(keys.Encryption.Value)
@@ -132,40 +134,64 @@ func ParseKeys(keys ConfiguredKeys) (KeyPair, *KeyPair, error) {
 
 	current := KeyPair{AuthenticationKey: authenticationKey, EncryptionKey: encryptionKey}
 
+	previous, err := parsePreviousKeys(keys)
+	if err != nil {
+		return KeyPair{}, nil, &PreviousKeysError{err: err}
+	}
+	return current, previous, nil
+}
+
+// PreviousKeysError is ParseKeys' refusal of the previous pair, the current pair having decoded:
+// one half set without the other, or a half that is not hex of its length. It is a key rotation
+// applied in part or mistyped, where a refusal of the current pair is a credential the deployment
+// lacks, and each application says so in the record it stops on: the advice for one is wrong
+// for the other. Its text is the refusal's own, which names the variable.
+type PreviousKeysError struct {
+	err error
+}
+
+func (e *PreviousKeysError) Error() string { return e.err.Error() }
+
+// Unwrap puts the refusal on the chain, and with it the stack errs captured where it was made.
+func (e *PreviousKeysError) Unwrap() error { return e.err }
+
+// parsePreviousKeys decodes the optional previous pair: nil when neither half is set, and an
+// error naming the variable when one half is missing or either is malformed.
+func parsePreviousKeys(keys ConfiguredKeys) (*KeyPair, error) {
 	previousAuthentication := strings.TrimSpace(keys.PreviousAuthentication.Value)
 	previousEncryption := strings.TrimSpace(keys.PreviousEncryption.Value)
 
 	if previousAuthentication == "" && previousEncryption == "" {
-		return current, nil, nil
+		return nil, nil
 	}
 	if previousAuthentication == "" {
-		return KeyPair{}, nil, errs.Errorf("%s is required when %s is set: both halves of the previous pair are needed to open a session sealed under it",
+		return nil, errs.Errorf("%s is required when %s is set: both halves of the previous pair are needed to open a session sealed under it",
 			keys.PreviousAuthentication.Name, keys.PreviousEncryption.Name)
 	}
 	if previousEncryption == "" {
-		return KeyPair{}, nil, errs.Errorf("%s is required when %s is set: both halves of the previous pair are needed to open a session sealed under it",
+		return nil, errs.Errorf("%s is required when %s is set: both halves of the previous pair are needed to open a session sealed under it",
 			keys.PreviousEncryption.Name, keys.PreviousAuthentication.Name)
 	}
 
 	previousAuthenticationKey, err := hex.DecodeString(previousAuthentication)
 	if err != nil {
-		return KeyPair{}, nil, errs.Errorf("%s must be hex-encoded (error: %w)", keys.PreviousAuthentication.Name, err)
+		return nil, errs.Errorf("%s must be hex-encoded (error: %w)", keys.PreviousAuthentication.Name, err)
 	}
 	if len(previousAuthenticationKey) != authenticationKeyBytes {
-		return KeyPair{}, nil, errs.Errorf("%s must be 64 bytes (128 hex chars), got %d bytes",
+		return nil, errs.Errorf("%s must be 64 bytes (128 hex chars), got %d bytes",
 			keys.PreviousAuthentication.Name, len(previousAuthenticationKey))
 	}
 
 	previousEncryptionKey, err := hex.DecodeString(previousEncryption)
 	if err != nil {
-		return KeyPair{}, nil, errs.Errorf("%s must be hex-encoded (error: %w)", keys.PreviousEncryption.Name, err)
+		return nil, errs.Errorf("%s must be hex-encoded (error: %w)", keys.PreviousEncryption.Name, err)
 	}
 	if len(previousEncryptionKey) != encryptionKeyBytes {
-		return KeyPair{}, nil, errs.Errorf("%s must be 32 bytes (64 hex chars), got %d bytes",
+		return nil, errs.Errorf("%s must be 32 bytes (64 hex chars), got %d bytes",
 			keys.PreviousEncryption.Name, len(previousEncryptionKey))
 	}
 
-	return current, &KeyPair{AuthenticationKey: previousAuthenticationKey, EncryptionKey: previousEncryptionKey}, nil
+	return &KeyPair{AuthenticationKey: previousAuthenticationKey, EncryptionKey: previousEncryptionKey}, nil
 }
 
 // sealer holds one AEAD per purpose, both derived from one KeyPair.

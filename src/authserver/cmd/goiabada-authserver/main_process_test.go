@@ -290,7 +290,8 @@ func TestMain_RefusesAMalformedPreviousSessionKeyAfterBootstrap(t *testing.T) {
 
 	require.Equal(t, 1, code, "stderr: %s", stderr)
 	assert.Contains(t, stderr, "database seeded")
-	assert.Contains(t, stderr, "bootstrap credentials are not configured, so the auth server cannot start")
+	assert.Contains(t, stderr, "the previous session key pair is incomplete or malformed, so the auth server cannot start")
+	assert.NotContains(t, stderr, "bootstrap credentials are not configured")
 	assert.Contains(t, stderr, "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS is required when GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
 	assert.NotContains(t, stderr, "no listener is enabled")
 }
