@@ -21,7 +21,9 @@ import (
 
 // usersAttributesDatabase is what the user attribute endpoints need: the user and the attributes
 // hanging off it.
+// It embeds what the administrative policy reads to judge whether the user is an administrator.
 type usersAttributesDatabase interface {
+	userTargetPolicyDatabase
 	CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *record.UserAttribute) error
 	DeleteUserAttribute(ctx context.Context, tx *sql.Tx, userAttributeId int64) error
 	GetUserAttributeById(ctx context.Context, tx *sql.Tx, userAttributeId int64) (*record.UserAttribute, error)
@@ -171,6 +173,11 @@ func HandleUserAttributeCreatePost(
 			return
 		}
 
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+			return
+		}
+
 		// Create user attribute
 		userAttribute := &record.UserAttribute{
 			Key:                  req.Key,
@@ -282,6 +289,11 @@ func HandleUserAttributeUpdatePut(
 		attribute.IncludeInIdToken = req.IncludeInIdToken
 
 		// Update attribute in database
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, attribute.UserId) {
+			return
+		}
+
 		err = database.UpdateUserAttribute(r.Context(), nil, attribute)
 		if err != nil {
 			writeInternalServerError(w, r, err)
@@ -345,6 +357,11 @@ func HandleUserAttributeDelete(
 		}
 
 		// Delete attribute from database
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, attribute.UserId) {
+			return
+		}
+
 		err = database.DeleteUserAttribute(r.Context(), nil, attributeId)
 		if err != nil {
 			writeInternalServerError(w, r, err)

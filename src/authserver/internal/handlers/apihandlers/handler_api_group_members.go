@@ -18,7 +18,7 @@ import (
 // groupMembersDatabase is what the group membership endpoints need: the group, its members, and
 // the rows that join them, and what the administrative policy reads to judge a change.
 type groupMembersDatabase interface {
-	administrativeGroupPolicyDatabase
+	userTargetPolicyDatabase
 	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *record.UserGroup) error
 	DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupId int64) error
 	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
@@ -158,6 +158,11 @@ func HandleGroupMemberAddPost(
 			return
 		}
 
+		// The grant ceiling judged the group; this judges the user moved (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+			return
+		}
+
 		// Add user to group
 		err = database.CreateUserGroup(r.Context(), nil, &record.UserGroup{
 			UserId:  user.Id,
@@ -254,6 +259,11 @@ func HandleGroupMemberDelete(
 		// What it read is what the administrative_permission_changed record is written from (#402).
 		administrative, allowed := membershipCeilingAllows(w, r, database, auditLogger, user.Id, []int64{group.Id})
 		if !allowed {
+			return
+		}
+
+		// The grant ceiling judged the group; this judges the user moved (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
 			return
 		}
 

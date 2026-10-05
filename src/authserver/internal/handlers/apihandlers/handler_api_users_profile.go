@@ -20,7 +20,9 @@ import (
 )
 
 // usersProfileDatabase is what the administrator's user profile endpoint needs: the user row.
+// It embeds what the administrative policy reads to judge whether the user is an administrator.
 type usersProfileDatabase interface {
+	userTargetPolicyDatabase
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
@@ -89,6 +91,11 @@ func HandleUserProfilePut(
 		err = profileValidator.ValidateProfile(r.Context(), input)
 		if err != nil {
 			writeValidationError(w, r, err)
+			return
+		}
+
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
 			return
 		}
 
@@ -208,6 +215,11 @@ func HandleUserAddressPut(
 		err = addressValidator.ValidateAddress(input)
 		if err != nil {
 			writeValidationError(w, r, err)
+			return
+		}
+
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
 			return
 		}
 

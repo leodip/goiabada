@@ -42,6 +42,7 @@ const maxGroupIdsPerRequest = 1000
 // userGroupsDatabase is what the user group membership endpoints need: the user, the groups, and
 // the rows that join them, and what the administrative policy reads to judge a save.
 type userGroupsDatabase interface {
+	userTargetPolicyDatabase
 	userGroupsPolicyDatabase
 	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
 	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *record.UserGroup) error
@@ -173,6 +174,11 @@ func HandleUserGroupsPut(
 		// only authserver:manage moves a user into or out of a group holding an administrative
 		// permission (#402).
 		if !userGroupsCeilingAllows(w, r, database, auditLogger, user.Id, wanted, request.ExpectedGroupIds) {
+			return
+		}
+
+		// The grant ceiling judged what the save changes; this judges whom it changes (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
 			return
 		}
 

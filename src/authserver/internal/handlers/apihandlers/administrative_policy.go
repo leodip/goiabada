@@ -47,10 +47,11 @@ const manageScopeRequiredDescription = "Only a token with the authserver:manage 
 
 // The ceiling a refusal names. The grant ceiling is granting or revoking an administrative
 // permission, directly or by moving a user into or out of a group that holds one, and deleting such
-// a group; the settings ceiling is changing the email or the audit-log settings (#402 decisions 1,
-// 5 and 7).
+// a group; the target ceiling is any other write on an administrator; the settings ceiling is
+// changing the email or the audit-log settings (#402 decisions 1, 5 and 7).
 const (
 	ceilingGrant    = "grant"
+	ceilingTarget   = "target"
 	ceilingSettings = "settings"
 )
 
@@ -80,6 +81,14 @@ type administrativeGroupPolicyDatabase interface {
 type userGroupsPolicyDatabase interface {
 	administrativeGroupPolicyDatabase
 	GetUserGroupsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserGroup, error)
+}
+
+// userTargetPolicyDatabase is what the policy reads to judge a write on a user: the administrative
+// set, the permissions the user holds directly, and those its groups hold.
+type userTargetPolicyDatabase interface {
+	administrativeGroupPolicyDatabase
+	GetUserGroupsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserGroup, error)
+	GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserPermission, error)
 }
 
 // callerHoldsManage reports whether the request's validated token carries authserver:manage.
@@ -469,5 +478,116 @@ func settingsCeilingAllows(w http.ResponseWriter, r *http.Request, auditLogger A
 		return true
 	}
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{ceiling: ceilingSettings})
+	return false
+}
+
+// userIsAdministrator reports whether the user holds an administrative permission, directly or
+// through any of its groups. Read on tx, or outside any transaction when tx is nil; a user holding
+// no grant at all, directly or through a group, reads nothing more.
+func userIsAdministrator(ctx context.Context, database userTargetPolicyDatabase, tx *sql.Tx, userId int64) (bool, error) {
+	direct, err := database.GetUserPermissionsByUserId(ctx, tx, userId)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to read the user's permissions for the administrative policy")
+	}
+	memberships, err := database.GetUserGroupsByUserId(ctx, tx, userId)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to read the user's groups for the administrative policy")
+	}
+	held := make([]int64, 0, len(direct))
+	for _, grant := range direct {
+		held = append(held, grant.PermissionId)
+	}
+	if len(memberships) > 0 {
+		groupIds := make([]int64, 0, len(memberships))
+		for _, membership := range memberships {
+			groupIds = append(groupIds, membership.GroupId)
+		}
+		grants, groupErr := database.GetGroupPermissionsByGroupIds(ctx, tx, groupIds)
+		if groupErr != nil {
+			return false, errs.Wrap(groupErr, "unable to read the user's groups' permissions for the administrative policy")
+		}
+		for _, grant := range grants {
+			held = append(held, grant.PermissionId)
+		}
+	}
+	if len(held) == 0 {
+		return false, nil
+	}
+
+	administrative, err := administrativePermissions(ctx, database, tx)
+	if err != nil {
+		return false, err
+	}
+	for _, permissionId := range held {
+		if administrative[permissionId] != "" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// userTargetCeilingAllows applies the target ceiling to a write on a user: a user holding an
+// administrative permission, directly or through any of its groups, is an administrator, and only
+// an authserver:manage token writes to one in any way, its profile, credentials, sessions,
+// consents, attributes, memberships or permissions alike. Setting an administrator's password,
+// switching off their OTP or changing their email is signing in as them. It reports whether the
+// write may go on, and when it may not it has answered the request. An authserver:manage caller
+// reads nothing here (#402 decision 1).
+//
+// A write the grant ceiling also judges, a save of the user's permissions or groups and a change of
+// one membership, meets the grant ceiling first, whose refusal names the permissions and groups
+// that caused it; this refuses what the grant ceiling lets through, such as granting an
+// administrator an ordinary permission or moving one into an ordinary group.
+func userTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database userTargetPolicyDatabase, auditLogger AuditLogger,
+	userId int64) bool {
+	if callerHoldsManage(r) {
+		return true
+	}
+
+	administrator, err := userIsAdministrator(r.Context(), database, nil, userId)
+	if err != nil {
+		writeInternalServerError(w, r, err, "user_id", userId)
+		return false
+	}
+	if !administrator {
+		return true
+	}
+
+	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
+		ceiling:    ceilingTarget,
+		targetKind: targetKindUser,
+		targetId:   userId,
+	})
+	return false
+}
+
+// groupTargetCeilingAllows applies the target ceiling to a write on a group: a group holding an
+// administrative permission is an administrator, and so is every member it gives one, so only an
+// authserver:manage token renames it, changes its attributes or changes its permissions, ordinary
+// ones included. It reports whether the write may go on, and when it may not it has answered the
+// request. An authserver:manage caller reads nothing here (#402 decision 1).
+//
+// A save of the group's permissions meets the grant ceiling first. Deleting the group and changing
+// its members are the grant ceiling's alone, which refuses exactly the groups this would.
+func groupTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database administrativeGroupPolicyDatabase, auditLogger AuditLogger,
+	groupId int64) bool {
+	if callerHoldsManage(r) {
+		return true
+	}
+
+	groups, err := administrativeGroups(r.Context(), database, nil, []int64{groupId})
+	if err != nil {
+		writeInternalServerError(w, r, err, "group_id", groupId)
+		return false
+	}
+	if len(groups) == 0 {
+		return true
+	}
+
+	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
+		ceiling:    ceilingTarget,
+		targetKind: targetKindGroup,
+		targetId:   groupId,
+	})
 	return false
 }

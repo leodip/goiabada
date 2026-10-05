@@ -63,7 +63,7 @@ func stubTermination(database *datamocks.Database, userSession *record.UserSessi
 func adminSessionDeleteRequest(sessionId string, subject string) *http.Request {
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/user-sessions/"+sessionId, nil)
 	req = setChiURLParam(req, "id", sessionId)
-	return setTokenContextWithClaims(req, map[string]interface{}{"sub": subject})
+	return setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": subject})
 }
 
 // TestHandleUserSessionDelete_TerminatesAndAuditsBothEvents is the wiring test for the
@@ -142,6 +142,9 @@ func TestHandleUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
 	userSession := &record.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
 
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
+	// No token holds no authority, so the target ceiling reads what the user holds; an ordinary
+	// user's session is terminated as before.
+	expectHoldsNothing(database, 42)
 	stubTermination(database, userSession, 0, []*record.RefreshToken{})
 
 	var payloads []map[string]interface{}

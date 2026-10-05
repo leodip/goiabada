@@ -122,7 +122,7 @@ func TestHandleUserConsentDelete_Success(t *testing.T) {
 	req = setChiURLParam(req, "id", "5")
 	// The audit row names the administrator the token belongs to. It read an untyped "subject"
 	// key nothing writes, so every such row named nobody (#433).
-	req = setTokenContext(req, "admin-subject-1")
+	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": "admin-subject-1"})
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(&record.UserConsent{Id: 5, UserId: 7}, nil)
@@ -166,6 +166,8 @@ func TestHandleUserConsentDelete_DeleteFails_JSON500(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(&record.UserConsent{Id: 5, UserId: 7}, nil)
+	// No token: the target ceiling reads what the user holds, and an ordinary user's write goes on.
+	expectHoldsNothing(database, 7)
 	database.On("DeleteUserConsent", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(assert.AnError)
 
 	handler.ServeHTTP(rr, req)

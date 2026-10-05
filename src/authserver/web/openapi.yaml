@@ -3647,8 +3647,12 @@ components:
         (`manage`, `admin-read`, `manage-users`, `manage-clients`,
         `manage-settings`, `browser-sessions`), directly or by moving a user
         into or out of a group that holds one, or deleting such a group, is
-        refused here, and so is changing the email or the audit-log settings,
-        which only `authserver:manage` may change. No granular
+        refused here. So is any write on an administrator: a user holding one
+        of the six, directly or through any of its groups, or a group holding
+        one, whether its profile, credentials, sessions, consents, attributes,
+        memberships or permissions; a granular scope still reads them. So is
+        changing the email or the audit-log settings, which only
+        `authserver:manage` may change. No granular
         scope will ever be enough. It is answered after the request's 400 and
         404, writes nothing, carries `WWW-Authenticate: Bearer
         error="insufficient_scope", scope="authserver:manage"`, and leaves an

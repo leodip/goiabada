@@ -20,7 +20,9 @@ import (
 //
 // It embeds the row builder's port because the listing is built by buildSessionDetails, and the
 // revocation port because terminating a session goes through revocation.TerminateUserSessionTx.
+// It embeds what the administrative policy reads to judge whether the user is an administrator.
 type usersSessionsDatabase interface {
+	userTargetPolicyDatabase
 	sessionDetailsDatabase
 	revocation.Database
 
@@ -142,6 +144,11 @@ func HandleUserSessionDelete(
 		// session revoked and sweeps the refresh tokens those grants produced, all in one
 		// transaction (#129 decision 5). The 404 above answers first, so a missing session never
 		// opens one.
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, userSession.UserId) {
+			return
+		}
+
 		result, err := revocation.TerminateUserSessionTx(r.Context(), database, userSession)
 		if err != nil {
 			writeInternalServerError(w, r, err)

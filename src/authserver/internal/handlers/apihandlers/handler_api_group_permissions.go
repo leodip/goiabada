@@ -18,7 +18,7 @@ import (
 // groupPermissionsDatabase is what the group permission endpoints need: the group's grants and
 // the catalogue they are granted from, and what the administrative policy reads to judge a save.
 type groupPermissionsDatabase interface {
-	administrativePolicyDatabase
+	administrativeGroupPolicyDatabase
 	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
 	CreateGroupPermission(ctx context.Context, tx *sql.Tx, groupPermission *record.GroupPermission) error
 	DeleteGroupPermission(ctx context.Context, tx *sql.Tx, groupPermissionId int64) error
@@ -150,6 +150,11 @@ func HandleGroupPermissionsPut(
 		// what the save's administrative_permission_changed records are written from (#402).
 		administrative, allowed := grantCeilingAllows(w, r, database, auditLogger, targetKindGroup, group.Id, wanted, request.ExpectedPermissionIds)
 		if !allowed {
+			return
+		}
+
+		// The grant ceiling judged what the save changes; this judges whom it changes (#402 decision 1).
+		if !groupTargetCeilingAllows(w, r, database, auditLogger, group.Id) {
 			return
 		}
 

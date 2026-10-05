@@ -49,7 +49,7 @@ func adminProfilePutRequest(t *testing.T, gender string) *http.Request {
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/profile", bytes.NewReader(body))
 	req = setChiURLParam(req, "id", "42")
-	return setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
+	return setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject})
 }
 
 // requireGenderRefused asserts the 400 and the error code a gender no profile can carry has

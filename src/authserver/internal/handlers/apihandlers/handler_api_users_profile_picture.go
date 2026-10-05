@@ -17,7 +17,9 @@ import (
 
 // usersProfilePictureDatabase is what the administrator's user picture endpoints need: the user
 // row and the picture attached to it.
+// It embeds what the administrative policy reads to judge whether the user is an administrator.
 type usersProfilePictureDatabase interface {
+	userTargetPolicyDatabase
 	CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *record.UserProfilePicture) error
 	DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) error
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
@@ -67,6 +69,11 @@ func HandleUserProfilePicturePost(
 		result, err := imageupload.Validate(data, maxUploadBytes)
 		if err != nil {
 			writeValidationError(w, r, err)
+			return
+		}
+
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
 			return
 		}
 
@@ -151,6 +158,11 @@ func HandleUserProfilePictureDelete(
 		}
 
 		// Delete the profile picture
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+			return
+		}
+
 		err = database.DeleteUserProfilePicture(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)

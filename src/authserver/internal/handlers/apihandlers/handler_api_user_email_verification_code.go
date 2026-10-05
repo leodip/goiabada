@@ -18,7 +18,9 @@ import (
 
 // userEmailVerificationCodeDatabase is what the user email verification code endpoint needs: the
 // user row it stamps.
+// It embeds what the administrative policy reads to judge whether the user is an administrator.
 type userEmailVerificationCodeDatabase interface {
+	userTargetPolicyDatabase
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
@@ -51,6 +53,11 @@ func HandleUserEmailVerificationCodePost(
 		}
 		if user == nil {
 			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
+			return
+		}
+
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
 			return
 		}
 

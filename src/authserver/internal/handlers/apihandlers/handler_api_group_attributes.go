@@ -20,7 +20,9 @@ import (
 
 // groupAttributesDatabase is what the group attribute endpoints need: the group and the
 // attributes hanging off it.
+// It embeds what the administrative policy reads to judge whether the group is an administrator.
 type groupAttributesDatabase interface {
+	administrativeGroupPolicyDatabase
 	CreateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *record.GroupAttribute) error
 	DeleteGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttributeId int64) error
 	GetGroupAttributeById(ctx context.Context, tx *sql.Tx, groupAttributeId int64) (*record.GroupAttribute, error)
@@ -185,6 +187,11 @@ func HandleGroupAttributeCreatePost(
 			GroupId:              createReq.GroupId,
 		}
 
+		// Only authserver:manage writes to an administrative group (#402 decision 1).
+		if !groupTargetCeilingAllows(w, r, database, auditLogger, group.Id) {
+			return
+		}
+
 		err = database.CreateGroupAttribute(r.Context(), nil, groupAttribute)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error creating group attribute"), "group_id", groupAttribute.GroupId, "key", groupAttribute.Key)
@@ -276,6 +283,11 @@ func HandleGroupAttributeUpdatePut(
 			return
 		}
 
+		// Only authserver:manage writes to an administrative group (#402 decision 1).
+		if !groupTargetCeilingAllows(w, r, database, auditLogger, attribute.GroupId) {
+			return
+		}
+
 		// Get group for audit log
 		group, err := database.GetGroupById(r.Context(), nil, attribute.GroupId)
 		if err != nil {
@@ -348,6 +360,11 @@ func HandleGroupAttributeDelete(
 		}
 
 		// Get group for audit log
+		// Only authserver:manage writes to an administrative group (#402 decision 1).
+		if !groupTargetCeilingAllows(w, r, database, auditLogger, attribute.GroupId) {
+			return
+		}
+
 		group, err := database.GetGroupById(r.Context(), nil, attribute.GroupId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
