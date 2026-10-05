@@ -88,6 +88,11 @@ var wizardSteps = []wizardStep{
 		applies: func(c *Config) bool { return c.Deployment.asksRateLimiter },
 		run:     (*wizard).askRateLimiter,
 	},
+	{
+		title:   "Metrics",
+		applies: func(c *Config) bool { return c.Deployment.asksMetrics },
+		run:     (*wizard).askMetrics,
+	},
 	{title: "Admin credentials", run: (*wizard).askAdmin},
 	{
 		title:   "Database connection",
@@ -491,6 +496,86 @@ func (w *wizard) askRateLimiter() error {
 	rateLimiter, err := w.yesNo("Turn on the rate limiter?", defaultOn)
 	w.config.RateLimiter = rateLimiter
 	return err
+}
+
+// askMetrics asks whether to expose the servers' Prometheus metrics, and to which kind of scraper,
+// none by default; for a PodMonitor, the labels the operator's Prometheus selects it by; and, with
+// the NetworkPolicies on, the namespace the scraper runs in, which they admit to the metrics ports
+// alone (#400 decisions 7 and 8).
+func (w *wizard) askMetrics() error {
+	c := w.config
+	if !w.interactive {
+		return w.metricsFromFlags()
+	}
+	w.out.printf("Both servers can serve Prometheus metrics on a port of their own, %d on the auth server\n", authServerMetricsPort)
+	w.out.printf("and %d on the admin console, which no Service or route publishes. A scraper finds the\n", adminConsoleMetricsPort)
+	w.out.println("pods by one of:")
+	w.out.println("  1. None: the metrics listeners stay off.")
+	w.out.println("  2. Pod annotations, prometheus.io/scrape, port and path: read by the prometheus-community")
+	w.out.println("     prometheus chart's default configuration, and by Datadog once its Prometheus scraping")
+	w.out.println("     is on. kube-prometheus-stack ignores them.")
+	w.out.println("  3. A PodMonitor for the Prometheus Operator, which kube-prometheus-stack runs. On a cluster")
+	w.out.println("     without the Operator's CRDs, kubectl apply exits 1 after applying everything else.")
+	w.out.printf("Google Managed Prometheus, Alloy and the OpenTelemetry collector: %s\n", monitoringDocsURL)
+	w.out.println()
+	choice, err := w.choice("Expose Prometheus metrics? [1-3]", []string{"1", "2", "3"})
+	if err != nil {
+		return err
+	}
+	c.Metrics = map[string]metricsExposure{"1": metricsNone, "2": metricsAnnotations, "3": metricsPodMonitor}[choice]
+
+	if c.Metrics == metricsPodMonitor {
+		w.out.println()
+		w.out.println("A Prometheus the Operator runs selects only the PodMonitors its podMonitorSelector")
+		w.out.println("matches: kube-prometheus-stack, by default, only those labeled release: <its release name>.")
+		answer, err := w.validated("Labels your Prometheus selects PodMonitors by (e.g., release=kube-prometheus-stack), blank for none",
+			"", "labels", func(value string) error {
+				_, invalid := parsePodMonitorLabels(value)
+				return invalid
+			})
+		if err != nil {
+			return err
+		}
+		c.PodMonitorLabels, _ = parsePodMonitorLabels(answer)
+	}
+
+	if c.admitsMetricsScraper() {
+		w.out.println()
+		w.out.println("The NetworkPolicies admit the scraper's namespace to the metrics ports, and to nothing else.")
+		namespace, err := w.namespace("Namespace your metrics scraper runs in", defaultMetricsNamespace)
+		if err != nil {
+			return err
+		}
+		c.MetricsNamespace = namespace
+	}
+	return nil
+}
+
+// metricsFromFlags is askMetrics answered by --metrics, none when left out, --podmonitor-labels, read
+// only for a PodMonitor, and --metrics-namespace, read only with the NetworkPolicies on.
+func (w *wizard) metricsFromFlags() error {
+	c := w.config
+	c.Metrics = w.flags.Metrics
+	if c.Metrics == "" {
+		c.Metrics = metricsNone
+	}
+	if c.Metrics == metricsPodMonitor {
+		c.PodMonitorLabels = w.flags.PodMonitorLabels
+	}
+	w.out.info("Metrics: %s", c.metricsAnswer())
+	if !c.admitsMetricsScraper() {
+		return nil
+	}
+	namespace := w.flags.MetricsNamespace
+	if namespace == "" {
+		namespace = defaultMetricsNamespace
+	}
+	if err := validateNamespace(namespace); err != nil {
+		return errs.Wrap(err, "invalid --metrics-namespace")
+	}
+	c.MetricsNamespace = namespace
+	w.out.info("Metrics scraper: namespace %s, admitted by the NetworkPolicies", namespace)
+	return nil
 }
 
 func (w *wizard) askAdmin() error {

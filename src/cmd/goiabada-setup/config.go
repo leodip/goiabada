@@ -36,6 +36,13 @@ type Config struct {
 	// RateLimiter turns on the auth server's built-in rate limiter. Production Compose, native
 	// binaries and Kubernetes ask; local testing leaves it off (#396 decision 9).
 	RateLimiter bool
+	// Metrics is how a scraper discovers the servers' metrics listeners, which either answer but
+	// none turns on: pod annotations, or a PodMonitor carrying PodMonitorLabels. MetricsNamespace is
+	// the scraper's namespace, which the NetworkPolicies admit to the metrics ports, set only when
+	// both are on. Only Kubernetes asks (#400 decisions 7 and 8).
+	Metrics          metricsExposure
+	PodMonitorLabels []podMonitorLabel
+	MetricsNamespace string
 }
 
 // trafficPolicy is an externalTrafficPolicy, spelled as Kubernetes spells it.

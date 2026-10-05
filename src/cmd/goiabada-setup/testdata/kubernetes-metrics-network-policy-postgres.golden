@@ -30,11 +30,11 @@ metadata:
   name: goiabada-authserver-config
   namespace: "goiabada"
 data:
-  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com/p\"a$HOME #x: y"
+  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com"
   GOIABADA_AUTHSERVER_INTERNALBASEURL: "http://goiabada-authserver:9090"
-  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com/`id`\\q'r ${PATH}"
+  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com"
   GOIABADA_APPNAME: "Goiabada"
-  GOIABADA_ADMIN_EMAIL: "a\"b$c`d\\e #f'g@example.com"
+  GOIABADA_ADMIN_EMAIL: "admin@example.com"
   # Envoy, the one gateway in front, appends the address it received each connection from
   # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list.
   # Under the gateway's Cluster traffic policy, Envoy receives each connection from a node,
@@ -56,11 +56,14 @@ data:
   GOIABADA_AUTHSERVER_RATELIMITER_ENABLED: "false"
   # One log record per request answered, as every other generated configuration writes.
   GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS: "true"
+  # Prometheus metrics, on a listener of their own at 9190, the container's metrics port, which
+  # no Service or route publishes.
+  GOIABADA_AUTHSERVER_METRICS_ENABLED: "true"
   GOIABADA_DB_TYPE: "postgres"
   GOIABADA_DB_HOST: "goiabada-db"
   GOIABADA_DB_PORT: "5432"
   GOIABADA_DB_NAME: "goiabada"
-  GOIABADA_DB_USERNAME: "us\"er\\na$me #x: '"
+  GOIABADA_DB_USERNAME: "goiabada-user"
 
 ---
 # What the admin console reads.
@@ -71,9 +74,9 @@ metadata:
   name: goiabada-adminconsole-config
   namespace: "goiabada"
 data:
-  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com/p\"a$HOME #x: y"
+  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com"
   GOIABADA_AUTHSERVER_INTERNALBASEURL: "http://goiabada-authserver:9090"
-  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com/`id`\\q'r ${PATH}"
+  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com"
   # Envoy, the one gateway in front, appends the address it received each connection from
   # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list.
   # Under the gateway's Cluster traffic policy, Envoy receives each connection from a node,
@@ -86,6 +89,9 @@ data:
   GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES: ""
   # One log record per request answered, as every other generated configuration writes.
   GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS: "true"
+  # Prometheus metrics, on a listener of their own at 9191, the container's metrics port, which
+  # no Service or route publishes.
+  GOIABADA_ADMINCONSOLE_METRICS_ENABLED: "true"
 
 ---
 apiVersion: apps/v1
@@ -155,6 +161,8 @@ spec:
             type: RuntimeDefault
         ports:
         - containerPort: 9090
+        - name: metrics
+          containerPort: 9190
         envFrom:
         - configMapRef:
             name: goiabada-authserver-config
@@ -346,6 +354,8 @@ spec:
             type: RuntimeDefault
         ports:
         - containerPort: 9091
+        - name: metrics
+          containerPort: 9191
         envFrom:
         - configMapRef:
             name: goiabada-adminconsole-config
@@ -463,6 +473,114 @@ spec:
   ports:
   - port: 9091
     targetPort: 9091
+
+---
+# Admits the auth server's port from Envoy's proxies and from the admin console's pods,
+# and from nothing else. Enforced only by a CNI that implements NetworkPolicy (Calico and
+# Cilium do; some clusters' default CNI does not, and accepts the policy and ignores it).
+# The kubelet's probes come from the pod's own node, which no NetworkPolicy blocks.
+# There are no egress rules: the SMTP host and port are settings in the database, and the
+# database host is often a DNS name, neither of which a NetworkPolicy can select, so an
+# egress rule would cut email or the database.
+# A workload in another namespace that calls the auth server through its Service, for
+# /certs or /userinfo, is refused until you admit its namespace by adding to the first rule's from:
+#   - namespaceSelector:
+#       matchLabels:
+#         kubernetes.io/metadata.name: <its namespace>
+# If Envoy Gateway runs its proxies in a namespace other than envoy-gateway-system, its
+# default, name that one below instead.
+# The second rule admits the metrics scraper's namespace, monitoring, to the metrics port, 9190,
+# and to nothing else. To admit a scraper in another namespace, add its namespaceSelector to
+# that rule's from.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: goiabada-authserver
+  namespace: "goiabada"
+spec:
+  podSelector:
+    matchLabels:
+      app: goiabada-authserver
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: envoy-gateway-system
+    - podSelector:
+        matchLabels:
+          app: goiabada-adminconsole
+    ports:
+    - protocol: TCP
+      port: 9090
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: "monitoring"
+    ports:
+    - protocol: TCP
+      port: 9190
+
+---
+# Admits the admin console's port from Envoy's proxies alone: nothing in the cluster calls
+# it. Ingress only, with no egress rules, as the auth server's is, and enforced only by a
+# CNI that implements NetworkPolicy.
+# The second rule admits the metrics scraper's namespace, monitoring, to the metrics port, 9191,
+# and to nothing else. To admit a scraper in another namespace, add its namespaceSelector to
+# that rule's from.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: goiabada-adminconsole
+  namespace: "goiabada"
+spec:
+  podSelector:
+    matchLabels:
+      app: goiabada-adminconsole
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: envoy-gateway-system
+    ports:
+    - protocol: TCP
+      port: 9091
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: "monitoring"
+    ports:
+    - protocol: TCP
+      port: 9191
+
+---
+# Has the Prometheus Operator scrape both servers' metrics ports. A Prometheus the Operator runs
+# selects only the PodMonitors its podMonitorSelector matches, in the namespaces its
+# podMonitorNamespaceSelector matches: kube-prometheus-stack, by default, only those labeled
+# release: <its release name>. Give this one the labels it selects by, with the wizard's
+# --podmonitor-labels or under metadata, and read a Prometheus's selector with:
+#   kubectl get prometheus -A -o jsonpath='{..podMonitorSelector}'
+# PodMonitor is one of the Prometheus Operator's CRDs: on a cluster without them, kubectl apply
+# exits 1 after applying everything else in this file.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: goiabada
+  namespace: "goiabada"
+spec:
+  selector:
+    matchExpressions:
+    - key: app
+      operator: In
+      values:
+      - goiabada-authserver
+      - goiabada-adminconsole
+  podMetricsEndpoints:
+  - port: metrics
+    path: /metrics
 
 ---
 apiVersion: gateway.networking.k8s.io/v1

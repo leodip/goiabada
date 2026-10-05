@@ -33,6 +33,12 @@ func printSummary(out *console, config *Config) {
 			out.println("  NetworkPolicies:  none")
 		}
 	}
+	if config.Deployment.asksMetrics {
+		out.printf("  Metrics:          %s\n", config.metricsAnswer())
+		if config.admitsMetricsScraper() {
+			out.printf("  Metrics scraper:  namespace %s\n", config.MetricsNamespace)
+		}
+	}
 	if config.Deployment.asksLocalProxy {
 		if config.LocalProxy {
 			out.println("  Reverse proxy:    on this machine (listen on 127.0.0.1)")
@@ -185,6 +191,7 @@ func printKubernetesInstructions(out *console, config *Config, paths outputPaths
 	out.println("  • If using a managed database service (Supabase, PlanetScale, etc.),")
 	out.println("    use the connection pooler endpoint for better compatibility (IPv4).")
 	out.println()
+	printMetricsNotes(out, config)
 
 	out.printf("%s%sTROUBLESHOOTING TIPS%s\n", out.bold, out.yellow, out.reset)
 	out.println()
@@ -222,6 +229,36 @@ func printKubernetesInstructions(out *console, config *Config, paths outputPaths
 	out.println("  • Check pod logs for errors:")
 	out.printf("      %skubectl logs -n %s deployment/goiabada-authserver%s\n", out.cyan, config.K8sNamespace, out.reset)
 	out.println()
+}
+
+// printMetricsNotes says, with metrics on, where they are served and what the answer needs to be
+// scraped: pod annotations only a scraper that reads them, a PodMonitor the Operator's CRDs and a
+// Prometheus whose selector matches it; and, with the NetworkPolicies on, the namespace they admit
+// (#400 decisions 7 and 8).
+func printMetricsNotes(out *console, config *Config) {
+	if !config.exposesMetrics() {
+		return
+	}
+	out.printf("  • Both servers serve Prometheus metrics on a container port named metrics, %d on the\n", authServerMetricsPort)
+	out.printf("    auth server and %d on the admin console, which no Service or route publishes.\n", adminConsoleMetricsPort)
+	if config.Metrics == metricsAnnotations {
+		out.println("    The pods carry the prometheus.io/scrape, port and path annotations, which the")
+		out.println("    prometheus-community prometheus chart reads by default. kube-prometheus-stack ignores")
+		out.println("    them: on a cluster that runs it, generate the manifest again with --metrics=podmonitor.")
+	} else {
+		out.println("    The PodMonitor goiabada has the Prometheus Operator scrape them. It is one of the")
+		out.println("    Operator's CRDs: on a cluster without them, kubectl apply exits 1 after applying")
+		out.println("    everything else. A Prometheus the Operator runs selects only the PodMonitors its")
+		out.println("    podMonitorSelector matches; read it with:")
+		out.printf("      %skubectl get prometheus -A -o jsonpath='{..podMonitorSelector}'%s\n", out.cyan, out.reset)
+	}
+	out.printf("    The metrics and what to alert on: %s\n", monitoringDocsURL)
+	out.println()
+	if config.admitsMetricsScraper() {
+		out.printf("  • The NetworkPolicies admit the namespace %s to the metrics ports alone. A scraper\n", config.MetricsNamespace)
+		out.println("    running elsewhere times out until its namespace is admitted, as the policies' comments show.")
+		out.println()
+	}
 }
 
 // printEnvoyProxyPrerequisite prints the opening of the completion message's second prerequisite,

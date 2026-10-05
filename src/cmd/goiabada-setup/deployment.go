@@ -49,6 +49,9 @@ type deployment struct {
 	// asksRateLimiter says the type asks whether to turn the auth server's rate limiter on, and
 	// writes the answer explicitly (#396 decision 9). Local testing never asks.
 	asksRateLimiter bool
+	// asksMetrics says the type asks whether to expose the servers' Prometheus metrics, and to which
+	// kind of scraper (#400 decision 7).
+	asksMetrics bool
 	// routesByHost says the manifest routes and certifies each URL by its host, which must then be
 	// a lowercase domain name (validateListenerHostname) and not the other URL's host.
 	routesByHost bool
@@ -111,6 +114,7 @@ var deployments = []*deployment{
 		routesByHost:         true,
 		servedByEnvoyGateway: true,
 		asksRateLimiter:      true,
+		asksMetrics:          true,
 		outputFile:           "goiabada-k8s.yaml",
 		secretsFile:          "goiabada-secrets.yaml",
 		secretsSuffix:        "-secrets",

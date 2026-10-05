@@ -41,6 +41,11 @@ type CLIFlags struct {
 	NetworkPolicy        bool
 	// RateLimiter is --rate-limiter, read by production Compose, native binaries and Kubernetes.
 	RateLimiter optionalBool
+	// Metrics is --metrics, empty when left out, PodMonitorLabels --podmonitor-labels and
+	// MetricsNamespace --metrics-namespace, read by Kubernetes alone.
+	Metrics          metricsExposure
+	PodMonitorLabels podMonitorLabels
+	MetricsNamespace string
 }
 
 // optionalBool is a boolean flag that knows whether it was given, so one left out takes the
@@ -128,6 +133,9 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 	fs.BoolVar(&flags.NoColor, "no-color", false, "Disable colored output")
 	fs.Var(&flags.GatewayTrafficPolicy, "gateway-traffic-policy", "Kubernetes: the traffic policy of Envoy Gateway's load balancer Service: cluster or local (default: cluster)")
 	fs.BoolVar(&flags.NetworkPolicy, "network-policy", false, "Kubernetes: admit only Envoy and the admin console to the servers with NetworkPolicies")
+	fs.Var(&flags.Metrics, "metrics", "Kubernetes: expose Prometheus metrics to a scraper finding them by: none, annotations or podmonitor (default: none)")
+	fs.Var(&flags.PodMonitorLabels, "podmonitor-labels", "Kubernetes: the labels the PodMonitor carries, key=value separated by commas")
+	fs.StringVar(&flags.MetricsNamespace, "metrics-namespace", "", "Kubernetes: the namespace the NetworkPolicies admit to the metrics ports (default: monitoring)")
 	fs.Var(&flags.RateLimiter, "rate-limiter", "Production, Kubernetes and native: turn on the auth server's rate limiter (default: true, but false for Kubernetes under the cluster traffic policy)")
 	fs.Var(&flags.LocalProxy, "local-proxy", "A reverse proxy on this machine forwards to the native binaries (default: true)")
 
@@ -179,7 +187,18 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 		p("                         Goiabada sees a node's address for every client; local runs Envoy on\n")
 		p("                         every node as a DaemonSet, and Goiabada sees the client's address\n")
 		p("  --network-policy       Admit only Envoy's namespace, and the admin console to the auth\n")
-		p("                         server, with NetworkPolicies (default: off, any pod can reach them)\n\n")
+		p("                         server, with NetworkPolicies (default: off, any pod can reach them)\n")
+		p("  --metrics=EXPOSURE     Expose Prometheus metrics on ports %d and %d (default: none).\n", authServerMetricsPort, adminConsoleMetricsPort)
+		p("                         annotations writes the prometheus.io pod annotations, which the\n")
+		p("                         prometheus-community prometheus chart reads; podmonitor writes a\n")
+		p("                         PodMonitor for the Prometheus Operator, kube-prometheus-stack's\n")
+		p("  --podmonitor-labels=LABELS\n")
+		p("                         With --metrics=podmonitor, the labels your Prometheus selects\n")
+		p("                         PodMonitors by, key=value separated by commas (e.g.,\n")
+		p("                         release=kube-prometheus-stack; default: none)\n")
+		p("  --metrics-namespace=NAME\n")
+		p("                         With metrics and --network-policy, the namespace the scraper runs\n")
+		p("                         in, admitted to the metrics ports alone (default: monitoring)\n\n")
 		p("Native Binaries Options:\n")
 		p("  --local-proxy=BOOL     A reverse proxy on this machine forwards to Goiabada (default: true):\n")
 		p("                         both servers listen on 127.0.0.1 and trust its forwarded headers.\n")

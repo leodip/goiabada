@@ -54,6 +54,8 @@ data:
   # With it on, the auth server logs a warning at every start that it trusts one proxy hop
   # with no list; behind Envoy alone, that is expected.
   GOIABADA_AUTHSERVER_RATELIMITER_ENABLED: "false"
+  # One log record per request answered, as every other generated configuration writes.
+  GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS: "true"
   GOIABADA_DB_TYPE: "postgres"
   GOIABADA_DB_HOST: "goiabada-db"
   GOIABADA_DB_PORT: "5432"
@@ -82,6 +84,8 @@ data:
   # Envoy stops that, and no list does.
   GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS: "true"
   GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES: ""
+  # One log record per request answered, as every other generated configuration writes.
+  GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS: "true"
 
 ---
 apiVersion: apps/v1
