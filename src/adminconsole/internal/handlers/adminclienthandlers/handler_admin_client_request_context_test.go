@@ -234,3 +234,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		})
 	}
 }
+
+func (s *ctxRecordingApiClient) GetClientSecret(ctx context.Context, _ string, _ int64) (string, error) {
+	return "", s.record(ctx)
+}

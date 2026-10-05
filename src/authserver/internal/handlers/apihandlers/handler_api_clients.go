@@ -155,9 +155,11 @@ func HandleClientsGet(
 }
 
 // HandleClientGet - GET /api/v1/admin/clients/{id}
+//
+// The client's secret is not in this response: it is read from HandleClientSecretGet, which
+// admin-read cannot reach and which records the read (#402 decision 8, #403).
 func HandleClientGet(
 	database clientsDatabase,
-	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -202,18 +204,56 @@ func HandleClientGet(
 
 		clientResponse := apimapping.ToClientResponse(client)
 
-		// Decrypt client secret if it exists
-		if client.ClientSecretEncrypted != nil {
-			clientSecretDecrypted, err := dataCipher.Decrypt(client.ClientSecretEncrypted)
-			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "failed to decrypt client secret"), "client_id", client.Id)
-				return
-			}
-			clientResponse.ClientSecret = clientSecretDecrypted
-		}
-
 		response := api.GetClientResponse{
 			Client: *clientResponse,
+		}
+
+		writeJSON(w, r, http.StatusOK, response)
+	}
+}
+
+// HandleClientSecretGet - GET /api/v1/admin/clients/{id}/secret
+//
+// The one route that answers a client's secret, decrypted, and only to manage-clients or manage:
+// admin-read, which reads every client, reaches no credential. A read that discloses a secret is
+// recorded as viewed_client_secret; a client holding none is answered an empty one and records
+// nothing, since nothing was disclosed (#402 decision 8, #403).
+func HandleClientSecretGet(
+	database clientsDatabase,
+	auditLogger AuditLogger,
+	dataCipher *encryption.DataCipher,
+) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		client, err := database.GetClientById(r.Context(), nil, id)
+		if err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID"), "client_id", id)
+			return
+		}
+		if client == nil {
+			writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
+			return
+		}
+
+		response := api.GetClientSecretResponse{}
+		if client.ClientSecretEncrypted != nil {
+			response.ClientSecret, err = dataCipher.Decrypt(client.ClientSecretEncrypted)
+			if err != nil {
+				writeInternalServerError(w, r, errs.Wrap(err, "unable to decrypt client secret"), "client_id", client.Id)
+				return
+			}
+			auditLogger.Log(r.Context(), audit.EventViewedClientSecret, map[string]interface{}{
+				"clientId":         client.Id,
+				"clientIdentifier": client.ClientIdentifier,
+				"loggedInUser":     callerSubject(r),
+			})
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

@@ -150,6 +150,22 @@ func (c *AuthServerClient) DeleteClient(ctx context.Context, accessToken string,
 	return err
 }
 
+// GetClientSecret reads a client's secret, decrypted, from the one route that answers it; the
+// client detail carries none (#403). It accepts 200 alone, as the methods written since the range
+// above do.
+func (c *AuthServerClient) GetClientSecret(ctx context.Context, accessToken string, clientId int64) (string, error) {
+	response, err := execute[api.GetClientSecretResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/secret",
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+	if err != nil {
+		return "", err
+	}
+	return response.ClientSecret, nil
+}
+
 // The three logo methods are the exception in this file: each accepts 200 alone, as it was
 // written.
 

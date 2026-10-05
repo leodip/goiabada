@@ -128,6 +128,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `GetAuditLogsResponse` | both-apps | — |
 | `core/api` | `GetClientPermissionsResponse` | both-apps | — |
 | `core/api` | `GetClientResponse` | both-apps | — |
+| `core/api` | `GetClientSecretResponse` | both-apps | — |
 | `core/api` | `GetClientSessionsResponse` | both-apps | — |
 | `core/api` | `GetClientsResponse` | both-apps | — |
 | `core/api` | `GetGroupAttributeResponse` | both-apps | — |

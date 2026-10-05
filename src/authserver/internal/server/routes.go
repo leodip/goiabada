@@ -163,7 +163,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	// Admin API routes
 	api.Route("/api/v1/admin", func(r chi.Router) {
 		// FIRST in the group, ahead of the debug middleware and every guard. GET
-		// /api/v1/admin/clients/{id} returns a decrypted client secret, so RFC 6749
+		// /api/v1/admin/clients/{id}/secret returns a decrypted client secret, so RFC 6749
 		// section 5.1's MUST reaches this group, and the 401 and 403 refusals below
 		// commit their status themselves: anything mounted behind the guards would
 		// never write the pair on a refusal (#247).
@@ -294,7 +294,9 @@ func (s *Server) initRoutes(branches appBranches) {
 
 		// Client management routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients", apihandlers.HandleClientsGet(s.database))
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}", apihandlers.HandleClientGet(s.database, s.dataCipher))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}", apihandlers.HandleClientGet(s.database))
+		// The secret is a credential, so admin-read does not reach it (#403).
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Get("/clients/{id}/secret", apihandlers.HandleClientSecretGet(s.database, auditLogger, s.dataCipher))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/sessions", apihandlers.HandleClientSessionsGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Post("/clients", apihandlers.HandleClientCreatePost(s.database, identifierValidator, auditLogger, s.dataCipher))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}", apihandlers.HandleClientUpdatePut(s.database, identifierValidator, auditLogger))

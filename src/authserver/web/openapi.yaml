@@ -20,6 +20,8 @@ info:
       `authserver:admin-read` alongside the domain's own scope, and writes accept the
       domain scope (`authserver:manage-users`, `authserver:manage-clients` or
       `authserver:manage-settings`). `authserver:manage` is accepted everywhere.
+      `getClientSecret` is the one read `authserver:admin-read` does not reach: it answers a
+      credential, so it accepts `authserver:manage-clients` or `authserver:manage`.
       A token from the client credentials flow is accepted here.
     - **Account API** (`/api/v1/account/*`): Self-service account management. Requires
       `authserver:manage-account` scope, **and** a token issued for a user: these operations
@@ -36,7 +38,7 @@ info:
     ```
 
     Do not cache these responses. Two operations return a credential in the body:
-    `getClient` returns the client secret decrypted, and `getAccountOTPEnrollment` returns
+    `getClientSecret` returns the client secret decrypted, and `getAccountOTPEnrollment` returns
     a new authenticator's setup key. The bearer token on the request does not make a
     cached copy safe: a private cache may still store a response it authenticated.
 
@@ -1805,7 +1807,14 @@ paths:
     get:
       tags: [Clients]
       summary: Get client
-      description: Get client details by ID
+      description: |
+        Get client details by ID.
+
+        The response carries no client secret: read it from `getClientSecret`.
+        Earlier versions answered a confidential client's decrypted secret here as
+        `clientSecret`, to every scope that reads clients, `authserver:admin-read`
+        included. That property is gone, which is a breaking change for an
+        integration that read it.
       operationId: getClient
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -1870,6 +1879,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/clients/{id}/secret:
+    get:
+      tags: [Clients]
+      summary: Get client secret
+      description: |
+        Get a client's secret, decrypted. This is the one operation that answers a
+        client secret, and it requires `authserver:manage-clients` or
+        `authserver:manage`: `authserver:admin-read` reads every client and is
+        refused here. A client holding no secret, a public one, is answered an empty
+        `clientSecret`.
+
+        Every read that answers a secret leaves a `viewed_client_secret` audit
+        record naming the client and the caller. A read of a client holding none
+        leaves no record.
+      operationId: getClientSecret
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      responses:
+        '200':
+          description: The client's secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetClientSecretResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -5052,9 +5096,6 @@ components:
           nullable: true
         clientIdentifier:
           type: string
-        clientSecret:
-          type: string
-          description: Only included in detail responses
         description:
           type: string
         websiteUrl:
@@ -5170,6 +5211,15 @@ components:
           $ref: '#/components/schemas/ClientResponse'
       required:
         - client
+
+    GetClientSecretResponse:
+      type: object
+      properties:
+        clientSecret:
+          type: string
+          description: The client's secret, decrypted; empty for a client that holds none
+      required:
+        - clientSecret
 
     CreateClientRequest:
       type: object
