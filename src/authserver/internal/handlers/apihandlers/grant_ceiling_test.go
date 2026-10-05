@@ -38,9 +38,14 @@ const (
 // expectAuthServerPermissions registers the policy's read of the authserver resource and its
 // permissions, outside any transaction.
 func expectAuthServerPermissions(database *datamocks.Database) {
-	database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), "authserver").
+	expectAuthServerPermissionsOn(database, nil)
+}
+
+// expectAuthServerPermissionsOn registers the same read on tx.
+func expectAuthServerPermissionsOn(database *datamocks.Database, tx *sql.Tx) {
+	database.On("GetResourceByResourceIdentifier", mock.Anything, tx, "authserver").
 		Return(&record.Resource{Id: ceilingResourceId, ResourceIdentifier: "authserver"}, nil).Once()
-	database.On("GetPermissionsByResourceId", mock.Anything, (*sql.Tx)(nil), ceilingResourceId).
+	database.On("GetPermissionsByResourceId", mock.Anything, tx, ceilingResourceId).
 		Return([]record.Permission{
 			{Id: permManageAccount, PermissionIdentifier: "manage-account", ResourceId: ceilingResourceId},
 			{Id: permManage, PermissionIdentifier: "manage", ResourceId: ceilingResourceId},
@@ -76,17 +81,17 @@ func assertManageScopeRequired(t *testing.T, rr interface {
 	assert.True(t, strings.HasSuffix(challenge, `, scope="authserver:manage"`), "the challenge names the scope that would do: %q", challenge)
 }
 
-// refusalRecord collects the one Log call a refusal makes.
-type refusalRecord struct {
+// loggedEvent is one Log call as the cases read it, the event and its details.
+type loggedEvent struct {
 	event   string
 	details map[string]interface{}
 }
 
-func recordRefusals(auditLogger *handlersmocks.AuditLogger) *[]refusalRecord {
-	records := &[]refusalRecord{}
+func recordLoggedEvents(auditLogger *handlersmocks.AuditLogger) *[]loggedEvent {
+	records := &[]loggedEvent{}
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
-			*records = append(*records, refusalRecord{event: args.String(1), details: args.Get(2).(map[string]interface{})})
+			*records = append(*records, loggedEvent{event: args.String(1), details: args.Get(2).(map[string]interface{})})
 		}).Return()
 	return records
 }
@@ -116,7 +121,7 @@ func TestGrantCeiling_AGranularTokenChangingAnAdministrativePermissionIsRefused(
 				save.expectOwner(database)
 				expectPermissionsExist(database, variant.wanted...)
 				expectAuthServerPermissions(database)
-				records := recordRefusals(auditLogger)
+				records := recordLoggedEvents(auditLogger)
 
 				rr := save.serveWithScope(database, auditLogger, save.body(t, variant.wanted, variant.expected), granularScopeOf(save))
 
@@ -164,7 +169,7 @@ func TestGrantCeiling_EveryOtherCallerIsHeldToIt(t *testing.T) {
 				save.expectOwner(database)
 				expectPermissionsExist(database, permManage)
 				expectAuthServerPermissions(database)
-				records := recordRefusals(auditLogger)
+				records := recordLoggedEvents(auditLogger)
 
 				rr := save.serveWithScope(database, auditLogger, save.body(t, []int64{permManage}, []int64{}), caller.scope)
 
@@ -227,33 +232,6 @@ func TestGrantCeiling_ASaveThatChangesNothingReadsNothingForThePolicy(t *testing
 			rr := save.serveWithScope(database, auditLogger, save.body(t, []int64{4}, []int64{4}), granularScopeOf(save))
 
 			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-			database.AssertExpectations(t)
-			assertNotAttemptedOnClientDatabase(t, database, "GetResourceByResourceIdentifier", "GetPermissionsByResourceId")
-		})
-	}
-}
-
-// authserver:manage grants and revokes administrative permissions, its own included, and the
-// policy reads nothing to let it: the token already carries every authority a grant confers.
-func TestGrantCeiling_AManageTokenChangesAdministrativePermissions(t *testing.T) {
-	for _, save := range grantSaves {
-		t.Run(save.name, func(t *testing.T) {
-			database := datamocks.NewDatabase(t)
-			auditLogger := handlersmocks.NewAuditLogger(t)
-
-			save.expectOwner(database)
-			expectPermissionsExist(database, permManage)
-			datamocks.ExpectRunInTransaction(database, grantsTx)
-			save.expectStored(database, grantRow{id: 21, permissionId: permManageUsers})
-			database.On(save.deleteMethod, mock.Anything, grantsTx, int64(21)).Return(nil).Once()
-			database.On(save.createMethod, mock.Anything, grantsTx, mock.Anything).Return(nil).Once()
-			records := save.recordAudits(t, auditLogger, nil)
-
-			rr := save.serveWithScope(database, auditLogger,
-				save.body(t, []int64{permManage}, []int64{permManageUsers}), "authserver:manage-users authserver:manage")
-
-			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-			assert.Equal(t, save.wantAudits([]int64{permManage}, []int64{permManageUsers}), *records)
 			database.AssertExpectations(t)
 			assertNotAttemptedOnClientDatabase(t, database, "GetResourceByResourceIdentifier", "GetPermissionsByResourceId")
 		})

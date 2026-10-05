@@ -167,7 +167,10 @@ var grantSaves = []grantSave{
 
 // serve runs the save on a PUT carrying body, as a caller holding authserver:manage, which every
 // grant save admits whatever it changes: the cases here are about the save, not the policy in
-// front of it, which grant_ceiling_test.go covers (#402).
+// front of it, which grant_ceiling_test.go covers (#402). A save that changes anything reads the
+// administrative set before its transaction, for the administrative_permission_changed records it
+// owes, which administrative_permission_changed_test.go covers; the permissions here are none of
+// the six.
 func (s grantSave) serve(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, body string) *httptest.ResponseRecorder {
 	return s.serveWithScope(database, auditLogger, body, "authserver:manage")
 }
@@ -266,6 +269,7 @@ func TestGrantListSaves_SaveTheExactPlanInOneTransaction(t *testing.T) {
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 4, 6)
+			expectAuthServerPermissions(database)
 			var order []string
 			stub := datamocks.ExpectRunInTransaction(database, grantsTx, func(edge string) { order = append(order, edge) })
 			save.expectStored(database, grantRow{id: 21, permissionId: 3}, grantRow{id: 22, permissionId: 4})
@@ -316,6 +320,7 @@ func TestGrantListSaves_AStoredDuplicateIsRemovedWithItsOriginal(t *testing.T) {
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 4)
+			expectAuthServerPermissions(database)
 			datamocks.ExpectRunInTransaction(database, grantsTx)
 			save.expectStored(database,
 				grantRow{id: 21, permissionId: 3}, grantRow{id: 22, permissionId: 3},
@@ -350,6 +355,7 @@ func TestGrantListSaves_AFailedWriteCommitsNothing(t *testing.T) {
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 6)
+			expectAuthServerPermissions(database)
 			stub := datamocks.ExpectRunInTransaction(database, grantsTx)
 			save.expectStored(database, grantRow{id: 21, permissionId: 3})
 			database.On(save.deleteMethod, mock.Anything, grantsTx, int64(21)).Return(nil).Once()
@@ -389,6 +395,10 @@ func TestGrantListSaves_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
 				auditLogger := handlersmocks.NewAuditLogger(t)
 
 				save.expectOwner(database)
+				if len(variant.expected) > 0 {
+					// The revocation is a change, read for before the transaction.
+					expectAuthServerPermissions(database)
+				}
 				stub := datamocks.ExpectRunInTransaction(database, grantsTx)
 				loadErr := errors.New("the read failed")
 				database.On(save.readMethod, mock.Anything, grantsTx, grantOwnerId).Return(nil, loadErr).Once()
@@ -418,6 +428,7 @@ func TestGrantListSaves_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 6)
+			expectAuthServerPermissions(database)
 
 			deadlock := errors.New("Error 1213: Deadlock found when trying to get lock")
 			attempts := 0
@@ -463,6 +474,7 @@ func TestGrantListSaves_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 6)
+			expectAuthServerPermissions(database)
 			datamocks.ExpectRunInTransactionRefused(database, errors.New("transaction aborted as a deadlock victim on all 3 attempts"))
 
 			rr := save.serve(database, auditLogger, save.body(t, []int64{6}, []int64{}))
@@ -486,6 +498,7 @@ func TestGrantListSaves_AnOutdatedLoadedListIsRefused(t *testing.T) {
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 3, 4, 6)
+			expectAuthServerPermissions(database)
 			stub := datamocks.ExpectRunInTransaction(database, grantsTx)
 			// Permission 3 was revoked by another save after this caller loaded {3, 4}.
 			save.expectStored(database, grantRow{id: 22, permissionId: 4})
@@ -523,6 +536,7 @@ func TestGrantListSaves_ALoadedListEqualAsASetProceeds(t *testing.T) {
 
 				save.expectOwner(database)
 				expectPermissionsExist(database, 6)
+				expectAuthServerPermissions(database)
 				datamocks.ExpectRunInTransaction(database, grantsTx)
 				save.expectStored(database, variant.stored...)
 				for _, row := range variant.stored {
@@ -614,6 +628,7 @@ func TestGrantListSaves_ARepeatedIdIsGrantedOnce(t *testing.T) {
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 6)
+			expectAuthServerPermissions(database)
 			datamocks.ExpectRunInTransaction(database, grantsTx)
 			save.expectStored(database)
 			database.On(save.createMethod, mock.Anything, grantsTx, mock.Anything).Return(nil).Once()

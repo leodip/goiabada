@@ -142,8 +142,10 @@ func HandleClientPermissionsPut(
 		}
 
 		// The grant ceiling, after the request's 400 and 404 answers and before the transaction:
-		// only authserver:manage grants or revokes an administrative permission (#402).
-		if !grantCeilingAllows(w, r, database, auditLogger, targetKindClient, client.Id, wanted, request.ExpectedPermissionIds) {
+		// only authserver:manage grants or revokes an administrative permission. What it read is
+		// what the save's administrative_permission_changed records are written from (#402).
+		administrative, allowed := grantCeilingAllows(w, r, database, auditLogger, targetKindClient, client.Id, wanted, request.ExpectedPermissionIds)
+		if !allowed {
 			return
 		}
 
@@ -163,6 +165,7 @@ func HandleClientPermissionsPut(
 		// which undoes the whole save as one 500; the second lookup the add loop made went with the
 		// loop, and so did the "get one, then delete it" lookup, whose nil answer this save
 		// reported as a 404 after the grants before it were already written (#406).
+		granted, revoked := []int64{}, []int64{}
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 			stored, loadErr := database.GetClientPermissionsByClientId(r.Context(), tx, client.Id)
 			if loadErr != nil {
@@ -186,6 +189,10 @@ func HandleClientPermissionsPut(
 					return errs.Wrapf(createErr, "database error granting permission %d", permissionId)
 				}
 			}
+			// Assigned only by an attempt that reached its end, as the user and group saves do.
+			// Never nil, so the record names an empty list rather than null (#402).
+			granted = append([]int64{}, insert...)
+			revoked = append([]int64{}, revokedKeys(stored, grantKey, wanted)...)
 			return nil
 		})
 		if err != nil {
@@ -193,11 +200,16 @@ func HandleClientPermissionsPut(
 			return
 		}
 
-		// Audit consolidated update, once the save has committed (#428).
+		// Audit consolidated update, once the save has committed (#428), naming what it granted and
+		// revoked, where it named only the client and a grant of authserver:manage to a client
+		// left no trace of which permission it was (#402).
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientPermissions, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": callerSubject(r),
+			"clientId":             client.Id,
+			"grantedPermissionIds": granted,
+			"revokedPermissionIds": revoked,
+			"loggedInUser":         callerSubject(r),
 		})
+		recordAdministrativePermissionChanges(r, auditLogger, administrative, targetKindClient, client.Id, granted, revoked)
 
 		// Respond success
 		resp := api.SuccessResponse{Success: true}

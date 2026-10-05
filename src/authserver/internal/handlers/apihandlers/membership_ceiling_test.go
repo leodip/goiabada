@@ -48,13 +48,18 @@ var groupPermissionRows = map[int64][]int64{
 // expectGroupPermissions registers the policy's one read of what the groups it judges hold,
 // outside any transaction.
 func expectGroupPermissions(database *datamocks.Database, groupIds ...int64) {
+	expectGroupPermissionsOn(database, nil, groupIds...)
+}
+
+// expectGroupPermissionsOn registers the same read on tx.
+func expectGroupPermissionsOn(database *datamocks.Database, tx *sql.Tx, groupIds ...int64) {
 	var rows []record.GroupPermission
 	for _, groupId := range groupIds {
 		for _, permissionId := range groupPermissionRows[groupId] {
 			rows = append(rows, record.GroupPermission{GroupId: groupId, PermissionId: permissionId})
 		}
 	}
-	database.On("GetGroupPermissionsByGroupIds", mock.Anything, (*sql.Tx)(nil), groupIds).Return(rows, nil).Once()
+	database.On("GetGroupPermissionsByGroupIds", mock.Anything, tx, groupIds).Return(rows, nil).Once()
 }
 
 // membershipRequest builds a request for one of the routes, with chi's URL parameters set and a
@@ -88,6 +93,21 @@ type membershipChange struct {
 	targetKind string
 	// namesGroups says whether a refusal names the groups that caused it beside its target.
 	namesGroups bool
+	// change is what the write does to the permissions the group holds, as an
+	// administrative_permission_changed record names it: granted for joining, revoked for leaving,
+	// and empty for a deletion, which keeps its own record alone.
+	change string
+	// expectAlertReads registers what an authserver:manage caller's write reads, outside its
+	// write, to know whether the group is administrative. A save of the user's groups reads it on
+	// its transaction, as part of expectWrite.
+	expectAlertReads func(database *datamocks.Database, group int64)
+}
+
+// expectAlertReadsOutsideTheWrite registers the read of what the group holds and of the
+// administrative set, outside any transaction.
+func expectAlertReadsOutsideTheWrite(database *datamocks.Database, group int64) {
+	expectGroupPermissions(database, group)
+	expectAuthServerPermissions(database)
 }
 
 func (c membershipChange) targetId(group int64) int64 {
@@ -134,11 +154,14 @@ var membershipChanges = []membershipChange{
 			database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.MatchedBy(func(ug *record.UserGroup) bool {
 				return ug.UserId == ceilingMemberId && ug.GroupId == group
 			})).Return(nil).Once()
+			expectGroupPermissionsOn(database, userGroupsTx, group)
+			expectAuthServerPermissionsOn(database, userGroupsTx)
 			expectAudit(auditLogger, audit.EventUserAddedToGroup)
 			expectReload(database, nil)
 		},
 		targetKind:  targetKindUser,
 		namesGroups: true,
+		change:      "granted",
 	},
 	{
 		name: "PUT /users/{id}/groups leaving",
@@ -162,11 +185,14 @@ var membershipChanges = []membershipChange{
 			datamocks.ExpectRunInTransaction(database, userGroupsTx)
 			expectStoredMemberships(database, membershipRow{id: ceilingMembershipRowId, groupId: group})
 			database.On("DeleteUserGroup", mock.Anything, userGroupsTx, ceilingMembershipRowId).Return(nil).Once()
+			expectGroupPermissionsOn(database, userGroupsTx, group)
+			expectAuthServerPermissionsOn(database, userGroupsTx)
 			expectAudit(auditLogger, audit.EventUserRemovedFromGroup)
 			expectReload(database, nil)
 		},
 		targetKind:  targetKindUser,
 		namesGroups: true,
+		change:      "revoked",
 	},
 	{
 		name: "POST /groups/{id}/members",
@@ -190,8 +216,10 @@ var membershipChanges = []membershipChange{
 			})).Return(nil).Once()
 			expectAudit(auditLogger, audit.EventUserAddedToGroup)
 		},
-		targetKind:  targetKindUser,
-		namesGroups: true,
+		targetKind:       targetKindUser,
+		namesGroups:      true,
+		change:           "granted",
+		expectAlertReads: expectAlertReadsOutsideTheWrite,
 	},
 	{
 		name: "DELETE /groups/{id}/members/{userId}",
@@ -213,8 +241,10 @@ var membershipChanges = []membershipChange{
 			database.On("DeleteUserGroup", mock.Anything, (*sql.Tx)(nil), ceilingMembershipRowId).Return(nil).Once()
 			expectAudit(auditLogger, audit.EventUserRemovedFromGroup)
 		},
-		targetKind:  targetKindUser,
-		namesGroups: true,
+		targetKind:       targetKindUser,
+		namesGroups:      true,
+		change:           "revoked",
+		expectAlertReads: expectAlertReadsOutsideTheWrite,
 	},
 	{
 		name: "DELETE /groups/{id}",
@@ -261,7 +291,7 @@ func TestMembershipCeiling_AGranularTokenMovingAUserThroughAnAdministrativeGroup
 			change.expectReads(database, administrativeGroupId, true)
 			expectGroupPermissions(database, administrativeGroupId)
 			expectAuthServerPermissions(database)
-			records := recordRefusals(auditLogger)
+			records := recordLoggedEvents(auditLogger)
 
 			rr := change.serve(database, auditLogger, administrativeGroupId, "authserver:manage-users")
 
@@ -311,7 +341,7 @@ func TestMembershipCeiling_EveryOtherCallerIsHeldToIt(t *testing.T) {
 				change.expectReads(database, adminReadGroupId, true)
 				expectGroupPermissions(database, adminReadGroupId)
 				expectAuthServerPermissions(database)
-				records := recordRefusals(auditLogger)
+				records := recordLoggedEvents(auditLogger)
 
 				rr := change.serve(database, auditLogger, adminReadGroupId, caller.scope)
 
@@ -347,26 +377,6 @@ func TestMembershipCeiling_AGranularTokenChangingAnOrdinaryGroupProceeds(t *test
 			assert.Empty(t, rr.Header().Get("WWW-Authenticate"))
 			database.AssertExpectations(t)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventAdministratorChangeRefused, mock.Anything)
-		})
-	}
-}
-
-// authserver:manage moves users into and out of administrative groups and deletes them, and the
-// policy reads nothing to let it.
-func TestMembershipCeiling_AManageTokenChangesAdministrativeGroups(t *testing.T) {
-	for _, change := range membershipChanges {
-		t.Run(change.name, func(t *testing.T) {
-			database := datamocks.NewDatabase(t)
-			auditLogger := handlersmocks.NewAuditLogger(t)
-
-			change.expectReads(database, administrativeGroupId, false)
-			change.expectWrite(t, database, auditLogger, administrativeGroupId)
-
-			rr := change.serve(database, auditLogger, administrativeGroupId, "authserver:manage-users authserver:manage")
-
-			assert.Less(t, rr.Code, 300, rr.Body.String())
-			database.AssertExpectations(t)
-			assertNoPolicyRead(t, database)
 		})
 	}
 }
@@ -451,7 +461,7 @@ func TestMembershipCeiling_AUserGroupsSaveIsJudgedOnEveryGroupItChanges(t *testi
 		Return([]record.UserGroup{{Id: ceilingMembershipRowId, UserId: ceilingMemberId, GroupId: adminReadGroupId}}, nil).Once()
 	expectGroupPermissions(database, ordinaryGroupId, administrativeGroupId, adminReadGroupId)
 	expectAuthServerPermissions(database)
-	records := recordRefusals(auditLogger)
+	records := recordLoggedEvents(auditLogger)
 
 	body := `{"groupIds":[8,7],"expectedGroupIds":[9]}`
 	r := membershipRequest(http.MethodPut, "/api/v1/admin/users/42/groups", body, "authserver:manage-users", map[string]string{"id": "42"})

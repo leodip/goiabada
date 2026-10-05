@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -187,7 +188,13 @@ func HandleUserGroupsPut(
 		// victim is rerun whole (#301). The body is safe to rerun: the plan is recomputed from the
 		// rows read on the transaction on every attempt, what is audited is assigned only by an
 		// attempt that reached its end, and nothing is written to the response inside it (#428).
+		//
+		// What the groups added and removed hold is read on the transaction too, after the writes,
+		// so the administrative_permission_changed records are written from what the committed
+		// attempt saw; that read failing undoes the save, so a membership is never committed
+		// without the records it owes (#402).
 		var added, removed []int64
+		var joined, left []administrativeGroup
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 			stored, loadErr := database.GetUserGroupsByUserId(r.Context(), tx, user.Id)
 			if loadErr != nil {
@@ -211,7 +218,23 @@ func HandleUserGroupsPut(
 					return errs.Wrapf(createErr, "database error adding the user to group %d", groupId)
 				}
 			}
-			added, removed = insert, revokedKeys(stored, membershipKey, wanted)
+			attemptRemoved := revokedKeys(stored, membershipKey, wanted)
+			var attemptJoined, attemptLeft []administrativeGroup
+			if changed := append(append([]int64{}, insert...), attemptRemoved...); len(changed) > 0 {
+				groups, readErr := administrativeGroups(r.Context(), database, tx, changed)
+				if readErr != nil {
+					return readErr
+				}
+				for _, group := range groups {
+					if slices.Contains(insert, group.id) {
+						attemptJoined = append(attemptJoined, group)
+					} else {
+						attemptLeft = append(attemptLeft, group)
+					}
+				}
+			}
+			added, removed = insert, attemptRemoved
+			joined, left = attemptJoined, attemptLeft
 			return nil
 		})
 		if err != nil {
@@ -236,6 +259,8 @@ func HandleUserGroupsPut(
 				"loggedInUser": loggedInSubject,
 			})
 		}
+		recordMembershipChanges(r, auditLogger, user.Id, changeGranted, joined)
+		recordMembershipChanges(r, auditLogger, user.Id, changeRevoked, left)
 
 		// Reload user groups to get updated state
 		err = database.UserLoadGroups(r.Context(), nil, user)

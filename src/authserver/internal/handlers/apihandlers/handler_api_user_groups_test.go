@@ -65,6 +65,7 @@ func TestHandleUserGroupsPut_AFailedCountAnswers500(t *testing.T) {
 	datamocks.ExpectRunInTransaction(database, userGroupsTx)
 	database.On("GetUserGroupsByUserId", mock.Anything, userGroupsTx, int64(42)).Return([]record.UserGroup{}, nil).Once()
 	database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.Anything).Return(nil).Once()
+	expectChangedGroupsHoldNothing(database, 5)
 	auditLogger.On("Log", mock.Anything, audit.EventUserAddedToGroup, mock.Anything).Return().Once()
 	database.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).
 		Run(loadGroupsOnto(record.Group{Id: 5, GroupIdentifier: "admins"})).Return(nil).Once()
@@ -109,7 +110,7 @@ func serveUserGroupsSave(t *testing.T, database *datamocks.Database, auditLogger
 }
 
 // serveUserGroupsBody runs the save on a PUT carrying body as written, as an authserver:manage
-// caller, whom the administrative policy reads nothing to admit (#402).
+// caller, whom the grant ceiling reads nothing to admit (#402).
 func serveUserGroupsBody(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/groups", strings.NewReader(body))
 	req = setChiURLParam(req, "id", "42")
@@ -141,6 +142,14 @@ func expectStoredMemberships(database *datamocks.Database, rows ...membershipRow
 		stored = append(stored, record.UserGroup{Id: r.id, UserId: userGroupsOwnerId, GroupId: r.groupId})
 	}
 	database.On("GetUserGroupsByUserId", mock.Anything, userGroupsTx, userGroupsOwnerId).Return(stored, nil).Once()
+}
+
+// expectChangedGroupsHoldNothing registers the save's read, on its transaction, of what the groups
+// it adds and then those it removes hold, for the administrative_permission_changed records it
+// owes (#402). The groups hold no grant at all, so the administrative set is not read.
+func expectChangedGroupsHoldNothing(database *datamocks.Database, groupIds ...int64) {
+	database.On("GetGroupPermissionsByGroupIds", mock.Anything, userGroupsTx, groupIds).
+		Return([]record.GroupPermission{}, nil).Once()
 }
 
 // expectReload registers the reload the answer is built from, after the commit. It finds no groups,
@@ -198,6 +207,7 @@ func TestHandleUserGroupsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
 			added = append(added, ug.GroupId)
 			order = append(order, "insert")
 		}).Return(nil).Once()
+	expectChangedGroupsHoldNothing(database, 6, 3)
 	records := recordMembershipAudits(t, auditLogger, &order)
 	expectReload(database, &order)
 
@@ -229,6 +239,7 @@ func TestHandleUserGroupsPut_AStoredDuplicateIsRemovedWithItsOriginal(t *testing
 	database.On("DeleteUserGroup", mock.Anything, userGroupsTx, mock.Anything).
 		Run(func(args mock.Arguments) { deleted = append(deleted, args.Get(2).(int64)) }).
 		Return(nil).Times(3)
+	expectChangedGroupsHoldNothing(database, 3)
 	records := recordMembershipAudits(t, auditLogger, nil)
 	expectReload(database, nil)
 
@@ -334,6 +345,8 @@ func TestHandleUserGroupsPut_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
 	// The first insert is the deadlock victim; the second lands.
 	database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.Anything).Return(deadlock).Once()
 	database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.Anything).Return(nil).Once()
+	// Read by the attempt that reached its end, and so once.
+	expectChangedGroupsHoldNothing(database, 6, 3)
 	records := recordMembershipAudits(t, auditLogger, nil)
 	expectReload(database, nil)
 
@@ -394,9 +407,11 @@ func TestHandleUserGroupsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
 		name     string
 		stored   []membershipRow
 		expected []int64
+		// changed is the groups the save adds, then those it removes.
+		changed []int64
 	}{
-		{name: "another order and a repeat", stored: []membershipRow{{id: 21, groupId: 3}, {id: 22, groupId: 4}}, expected: []int64{4, 3, 4}},
-		{name: "an empty loaded list against no stored memberships", stored: nil, expected: []int64{}},
+		{name: "another order and a repeat", stored: []membershipRow{{id: 21, groupId: 3}, {id: 22, groupId: 4}}, expected: []int64{4, 3, 4}, changed: []int64{6, 3, 4}},
+		{name: "an empty loaded list against no stored memberships", stored: nil, expected: []int64{}, changed: []int64{6}},
 	}
 
 	for _, variant := range variants {
@@ -411,6 +426,7 @@ func TestHandleUserGroupsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
 				database.On("DeleteUserGroup", mock.Anything, userGroupsTx, row.id).Return(nil).Once()
 			}
 			database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.Anything).Return(nil).Once()
+			expectChangedGroupsHoldNothing(database, variant.changed...)
 			recordMembershipAudits(t, auditLogger, nil)
 			expectReload(database, nil)
 
@@ -506,6 +522,7 @@ func TestHandleUserGroupsPut_ARepeatedIdIsAddedOnce(t *testing.T) {
 	datamocks.ExpectRunInTransaction(database, userGroupsTx)
 	expectStoredMemberships(database)
 	database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.Anything).Return(nil).Once()
+	expectChangedGroupsHoldNothing(database, 6)
 	records := recordMembershipAudits(t, auditLogger, nil)
 	expectReload(database, nil)
 
