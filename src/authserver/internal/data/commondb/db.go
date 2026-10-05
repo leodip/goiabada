@@ -494,6 +494,11 @@ func (d *Database) insertReturningId(ctx context.Context, tx *sql.Tx,
 	return id, nil
 }
 
+// PoolStats reads the handle's own statistics, which every engine keeps the same way.
+func (d *Database) PoolStats() sql.DBStats {
+	return d.DB.Stats()
+}
+
 func (d *Database) IsEmpty(ctx context.Context) (bool, error) {
 	settings, err := d.GetSettingsById(ctx, nil, initialSettingsId)
 	if err != nil {

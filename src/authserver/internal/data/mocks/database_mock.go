@@ -11679,6 +11679,50 @@ func (_c *Database_PermissionsLoadResources_Call) RunAndReturn(run func(ctx cont
 	return _c
 }
 
+// PoolStats provides a mock function for the type Database
+func (_mock *Database) PoolStats() sql.DBStats {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for PoolStats")
+	}
+
+	var r0 sql.DBStats
+	if returnFunc, ok := ret.Get(0).(func() sql.DBStats); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(sql.DBStats)
+	}
+	return r0
+}
+
+// Database_PoolStats_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PoolStats'
+type Database_PoolStats_Call struct {
+	*mock.Call
+}
+
+// PoolStats is a helper method to define mock.On call
+func (_e *Database_Expecter) PoolStats() *Database_PoolStats_Call {
+	return &Database_PoolStats_Call{Call: _e.mock.On("PoolStats")}
+}
+
+func (_c *Database_PoolStats_Call) Run(run func()) *Database_PoolStats_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Database_PoolStats_Call) Return(dBStats sql.DBStats) *Database_PoolStats_Call {
+	_c.Call.Return(dBStats)
+	return _c
+}
+
+func (_c *Database_PoolStats_Call) RunAndReturn(run func() sql.DBStats) *Database_PoolStats_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PromoteRefreshTokenGenerations provides a mock function for the type Database
 func (_mock *Database) PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error {
 	ret := _mock.Called(ctx, tx, refreshTokenIds, generation)

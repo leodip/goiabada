@@ -38,11 +38,6 @@ func (r *Registry) write(b *bytes.Buffer) {
 		b.WriteString("# HELP " + f.name + " " + escapeHelp(f.help) + "\n")
 		b.WriteString("# TYPE " + f.name + " " + f.typ + "\n")
 
-		if f.read != nil {
-			writeSample(b, f.name, nil, nil, "", formatFloat(f.read()))
-			continue
-		}
-
 		names := make([]string, len(f.resolved()))
 		for i, set := range f.resolved() {
 			names[i] = set.name

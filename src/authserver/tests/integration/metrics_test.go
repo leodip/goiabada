@@ -77,6 +77,10 @@ func TestMetrics_TheListenerCountsTheRequestsTheServerAnswers(t *testing.T) {
 	assert.NotContains(t, after, marker, "a request's path never reaches a label")
 	assert.Contains(t, after, "# TYPE goiabada_build_info gauge\n")
 	assert.Contains(t, after, "# TYPE go_goroutines gauge\n")
+	// The real pool behind the server, read at the scrape (#400 decision 5).
+	assert.Contains(t, after, "# TYPE goiabada_db_connections gauge\n")
+	assert.Contains(t, after, "# TYPE goiabada_db_wait_count_total counter\n")
+	assert.Positive(t, sampleValue(t, after, "goiabada_db_max_open_connections"), "the pool's cap is the one it runs on")
 	assert.NotContains(t, after, `route="/metrics"`, "a scrape is not counted")
 }
 
