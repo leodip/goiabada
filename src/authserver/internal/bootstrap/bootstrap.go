@@ -176,9 +176,11 @@ func logInitialSetupRequired(ctx context.Context) {
 }
 
 // LogCredentialsNotConfigured reports session keys that are missing or malformed on a
-// database that is already seeded. main calls it after Run, where the session keys are
-// validated; it is here so the variables it names come from the same list as the
-// bootstrap-complete record's.
+// database that is already seeded, in a deployment that configures the legacy two-step
+// bootstrap's file. main calls it after Run, where the session keys are validated, for a
+// refusal of the current pair alone: a previous pair's is a rotation mistake, and a deployment
+// with no bootstrap file has nothing to copy from, so each gets a record of its own there. It
+// is here so the variables it names come from the same list as the bootstrap-complete record's.
 //
 // bootstrap_file is read from the configuration. The banner this replaced printed
 // "./bootstrap/bootstrap.env", which is the path the shipped compose files happen

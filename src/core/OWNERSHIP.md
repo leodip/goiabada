@@ -450,6 +450,7 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `ParseKeys` | both-apps | — |
 | `core/sessionstore` | `PersistentCookie` | own-package | — |
 | `core/sessionstore` | `PreAuthLifetime` | contract | The unauthenticated half of the `ExpiresAt` rule beside it, and the one value that decides it. |
+| `core/sessionstore` | `PreviousKeysError` | both-apps | — |
 | `core/sessionstore` | `Record` | kernel | — |
 | `core/sessionstore` | `ServerSideStore` | both-apps | — |
 | `core/sessionstore` | `Session` | both-apps | — |

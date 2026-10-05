@@ -230,7 +230,7 @@ func main() {
 	// variables once the maximum session lifetime has passed (#269, #270, #434).
 	currentKeys, previousKeys, sessionKeysErr := cfg.AuthServer.SessionKeys()
 	if sessionKeysErr != nil {
-		bootstrap.LogCredentialsNotConfigured(startupCtx, sessionKeysErr, cfg.AuthServer.BootstrapEnvOutFile)
+		logSessionKeysRefused(startupCtx, sessionKeysErr, cfg.AuthServer.BootstrapEnvOutFile)
 		os.Exit(1)
 	}
 	slog.Info("session keys validated")
@@ -325,6 +325,46 @@ func stoppedDuringStartup(startup context.Context, err error) bool {
 func exitStopped() {
 	slog.Info("auth server stopped")
 	os.Exit(0)
+}
+
+// sessionKeysPrevious and sessionKeysRequired are the auth server's two session-key pairs, by the
+// variables a deployment sets them in.
+var (
+	sessionKeysPrevious = []string{
+		"GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS",
+		"GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS",
+	}
+	sessionKeysRequired = []string{
+		"GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY",
+		"GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY",
+	}
+)
+
+// logSessionKeysRefused reports the session keys the auth server stops on, by what is wrong with
+// them, since the remedy differs. Every refusal went to the bootstrap record, which told an operator
+// who had added one half of a previous pair, or who had never had a bootstrap file, to copy every
+// credential out of one. The error names the variable in all three cases:
+//   - a previous pair set in part or malformed is a rotation mistake, and the record says to set
+//     both halves or neither;
+//   - a current key, where the legacy two-step bootstrap wrote a file, is a credential not yet
+//     carried over from it, and the bootstrap record says so;
+//   - a current key anywhere else, the single-step mode the setup wizard configures, has no file
+//     to copy from, and the record names the two variables and how to generate them.
+func logSessionKeysRefused(ctx context.Context, err error, bootstrapFile string) {
+	var previousErr *sessionstore.PreviousKeysError
+	switch {
+	case errors.As(err, &previousErr):
+		slog.ErrorContext(ctx, "the previous session key pair is incomplete or malformed, so the auth server cannot start: set both of its variables, or neither once the rotation is done",
+			"error", err,
+			"previous", sessionKeysPrevious)
+	case bootstrapFile != "":
+		bootstrap.LogCredentialsNotConfigured(ctx, err, bootstrapFile)
+	default:
+		slog.ErrorContext(ctx, "the auth server session keys are missing or malformed, so the auth server cannot start",
+			"error", err,
+			"required", sessionKeysRequired,
+			"generate_with", "openssl rand -hex 64 (authentication key), openssl rand -hex 32 (encryption key)")
+	}
 }
 
 // dispatch chooses the command from the positional arguments the flag parse left: none serves,
