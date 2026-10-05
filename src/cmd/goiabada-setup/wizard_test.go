@@ -121,7 +121,7 @@ func interactiveScript(d *deployment, e *engine) []scriptedStep {
 	}
 	steps = append(steps,
 		scriptedStep{prompt: "Admin email [" + defaultEmail + "]: ", answer: ""},
-		scriptedStep{prompt: "Admin password [changeme]: ", hidden: true, answer: "Str0ng-Passw0rd!"},
+		scriptedStep{prompt: "Admin password [generated]: ", hidden: true, answer: "Str0ng-Passw0rd!"},
 	)
 	switch {
 	case e.hasServer && d.externalDatabase:
@@ -470,18 +470,19 @@ func TestWizard_NonInteractiveGeneratesWhatWasNotGiven(t *testing.T) {
 func TestWizard_EveryGeneratedPasswordHoldsThreeClasses(t *testing.T) {
 	d, e := deployments[deploymentLocal], testEngine("mssql")
 	steps := interactiveScript(d, e)
-	for i := range steps {
-		if strings.HasPrefix(steps[i].prompt, "Database password [generated]") {
-			steps[i].answer = "" // take the generated default
-		}
-	}
+	takeGeneratedPasswords(steps, "Admin password", "Database password")
 	w, in, out, _ := testWizard(t, &CLIFlags{}, steps)
 	if err := w.setup(); err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
 	in.assertConsumed()
-	if password := w.config.DBPassword; len(password) != 16 || !hasThreeClasses(password) {
-		t.Errorf("interactive default database password %q, want 16 characters of three classes", password)
+	for what, password := range map[string]string{"admin": w.config.AdminPassword, "database": w.config.DBPassword} {
+		if len(password) != 16 || !hasThreeClasses(password) {
+			t.Errorf("interactive default %s password %q, want 16 characters of three classes", what, password)
+		}
+	}
+	if !w.config.AdminPasswordGenerated {
+		t.Error("the interactive default admin password is not reported as generated")
 	}
 
 	for _, flags := range []CLIFlags{

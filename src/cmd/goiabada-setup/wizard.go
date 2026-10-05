@@ -491,12 +491,16 @@ func (w *wizard) askAdmin() error {
 		if err != nil {
 			return err
 		}
-		adminPassword, err := w.password("Admin password", "changeme")
+		// A generated default, where the prompt offered changeme, the password the docs and the
+		// samples print, to every operator who pressed Enter.
+		generated := generatePassword()
+		adminPassword, err := w.judgedPassword("Admin password", generated)
 		if err != nil {
 			return err
 		}
 		w.config.AdminEmail = adminEmail
 		w.config.AdminPassword = adminPassword
+		w.config.AdminPasswordGenerated = adminPassword == generated
 		return nil
 	}
 

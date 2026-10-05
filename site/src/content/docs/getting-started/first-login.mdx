@@ -14,10 +14,10 @@ Open the admin console URL in your browser:
 - **Local testing**: http://localhost:9091
 - **Production**: https://admin.yourdomain.com
 
-Log in with the email and password you configured in your `docker-compose.yml` file (the `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD` values).
+Log in with the admin email and password. For a deployment made with the [setup wizard](/getting-started/setup-wizard/), its completion message says where the password is: `GOIABADA_ADMIN_PASSWORD` in `docker-compose.override.yml` or `goiabada.env`, or, for Kubernetes, a `kubectl get secret` command that reads it back out of the cluster. Otherwise they are the `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD` values you configured.
 
 <Aside type="caution">
-If you used the defaults (`admin@example.com` / `changeme`), change the password immediately after first login!
+The sample Compose files, and the auth server when `GOIABADA_ADMIN_PASSWORD` is not set, use `admin@example.com` / `changeme`. If you started with those, change the password immediately after first login!
 </Aside>
 
 ## OpenID Connect discovery

@@ -78,8 +78,10 @@ func printCompletionMessage(out *console, config *Config, paths outputPaths) {
 	printWhereTheAdminPasswordIs(out, config, paths)
 	out.println()
 	printSecretsAdvice(out, paths)
+	// Only a password the operator chose reaches this: the one the wizard generates has 16
+	// characters, and the prompt no longer offers changeme.
 	if config.AdminPassword == "changeme" || len(config.AdminPassword) < 8 {
-		out.warning("Change the default password after first login!")
+		out.warning("Change the admin password after first login!")
 		out.println()
 	}
 }

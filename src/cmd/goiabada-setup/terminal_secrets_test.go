@@ -52,6 +52,18 @@ func engineCases(kind deploymentType) []*engine {
 	return append(cases, testEngine("postgres"))
 }
 
+// takeGeneratedPasswords answers each named password prompt of a script with Enter, which takes the
+// password the prompt generated.
+func takeGeneratedPasswords(steps []scriptedStep, prompts ...string) {
+	for i := range steps {
+		for _, prompt := range prompts {
+			if strings.HasPrefix(steps[i].prompt, prompt+" [generated]") {
+				steps[i].answer = ""
+			}
+		}
+	}
+}
+
 // assertNoSecretShown fails the test for each secret of the run's Config found in what the
 // operator was shown: the console and every prompt.
 func assertNoSecretShown(t *testing.T, w *wizard, shown string) {
@@ -88,18 +100,14 @@ func TestWizard_NoSecretReachesTheTerminal(t *testing.T) {
 				})
 			}
 			for _, typed := range []bool{false, true} {
-				name := deployments[kind].name + "-" + e.name + "-generated database password"
+				name := deployments[kind].name + "-" + e.name + "-generated passwords"
 				if typed {
-					name = deployments[kind].name + "-" + e.name + "-typed database password"
+					name = deployments[kind].name + "-" + e.name + "-typed passwords"
 				}
 				t.Run("prompts "+name, func(t *testing.T) {
 					steps := interactiveScript(deployments[kind], e)
 					if !typed {
-						for i := range steps {
-							if strings.HasPrefix(steps[i].prompt, "Database password [generated]") {
-								steps[i].answer = ""
-							}
-						}
+						takeGeneratedPasswords(steps, "Admin password", "Database password")
 					}
 					w, in, out, _ := testWizard(t, &CLIFlags{}, steps)
 					if err := w.setup(); err != nil {
@@ -148,24 +156,24 @@ func TestWizard_SaysWhereEachPasswordIsStored(t *testing.T) {
 // password's first and last two characters (#396 decision 17).
 func TestWizard_TheSummaryShowsWhetherEachPasswordWasSetOrGenerated(t *testing.T) {
 	for _, tc := range []struct {
-		name               string
-		typedDatabase      bool
-		wantAdmin, wantDB  string
-		deployment, engine string
+		name                      string
+		typedAdmin, typedDatabase bool
+		wantAdmin, wantDB         string
+		deployment, engine        string
 	}{
-		{"generated database password", false, "(set)", "(generated)", "production", "postgres"},
-		{"typed database password", true, "(set)", "(set)", "production", "postgres"},
-		{"external database, generated", false, "(set)", "(generated)", "kubernetes", "postgres"},
+		{"generated database password", true, false, "(set)", "(generated)", "production", "postgres"},
+		{"typed database password", true, true, "(set)", "(set)", "production", "postgres"},
+		{"external database, generated", true, false, "(set)", "(generated)", "kubernetes", "postgres"},
+		{"generated admin password", false, true, "(generated)", "(set)", "production", "postgres"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d, _ := resolveDeployment(tc.deployment)
 			steps := interactiveScript(d, testEngine(tc.engine))
+			if !tc.typedAdmin {
+				takeGeneratedPasswords(steps, "Admin password")
+			}
 			if !tc.typedDatabase {
-				for i := range steps {
-					if strings.HasPrefix(steps[i].prompt, "Database password [generated]") {
-						steps[i].answer = ""
-					}
-				}
+				takeGeneratedPasswords(steps, "Database password")
 			}
 			w, in, out, _ := testWizard(t, &CLIFlags{}, steps)
 			if err := w.setup(); err != nil {
