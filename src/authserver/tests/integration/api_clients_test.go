@@ -45,7 +45,6 @@ func TestAPIClientsGet_Success(t *testing.T) {
 	if adminConsoleClient != nil {
 		assert.True(t, adminConsoleClient.Enabled, "Admin console client should be enabled")
 		assert.True(t, adminConsoleClient.IsSystemLevelClient, "Admin console should be system level")
-		assert.Empty(t, adminConsoleClient.ClientSecret, "Client secret should not be included in list API")
 	}
 }
 

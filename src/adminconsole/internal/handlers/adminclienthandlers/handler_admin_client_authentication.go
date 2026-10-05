@@ -16,10 +16,11 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-// clientAuthenticationAPI is what the client authentication page needs: the client, and its
-// authentication write.
+// clientAuthenticationAPI is what the client authentication page needs: the client, its secret,
+// which the client detail does not carry (#403), and its authentication write.
 type clientAuthenticationAPI interface {
 	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	GetClientSecret(ctx context.Context, accessToken string, clientId int64) (string, error)
 	UpdateClientAuthentication(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error)
 }
 
@@ -58,6 +59,17 @@ func HandleAuthenticationGet(
 			return
 		}
 
+		// A public client holds no secret, so none is read: each read of one is audited as
+		// viewed_client_secret.
+		clientSecret := ""
+		if !client.IsPublic {
+			clientSecret, err = apiClient.GetClientSecret(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+			if err != nil {
+				render.HandleAPIError(httpHelper, w, r, err)
+				return
+			}
+		}
+
 		adminClientAuthentication := struct {
 			ClientId            int64
 			ClientIdentifier    string
@@ -68,7 +80,7 @@ func HandleAuthenticationGet(
 			ClientId:            client.Id,
 			ClientIdentifier:    client.ClientIdentifier,
 			IsPublic:            client.IsPublic,
-			ClientSecret:        client.ClientSecret,
+			ClientSecret:        clientSecret,
 			IsSystemLevelClient: client.IsSystemLevelClient,
 		}
 

@@ -412,6 +412,14 @@ const (
 	// membership change, the group joined or left; and loggedInUser. A permission save writes at
 	// most one per direction, a membership change one per administrative group.
 	EventAdministrativePermissionChanged = "administrative_permission_changed"
+
+	// EventViewedClientSecret records a read of a client's secret through GET
+	// /api/v1/admin/clients/{id}/secret, the one route that answers one, decrypted. Only a read
+	// that disclosed a secret writes it: a client holding none is answered an empty one and
+	// records nothing (#402 decision 8, #403).
+	//
+	// Payload: clientId and clientIdentifier, the client whose secret was read, and loggedInUser.
+	EventViewedClientSecret = "viewed_client_secret"
 )
 
 // EventTypes returns the canonical list of audit event names, which the admin console's
@@ -527,4 +535,5 @@ var auditEventTypes = []string{
 	EventUserDisabled,
 	EventUserRemovedFromGroup,
 	EventVerifiedEmail,
+	EventViewedClientSecret,
 }

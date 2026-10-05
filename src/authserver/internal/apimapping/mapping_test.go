@@ -118,10 +118,10 @@ func TestToUserResponse_DoesNotLeakSecrets(t *testing.T) {
 	assert.Equal(t, "user@example.com", resp.Email)
 }
 
-// ToClientResponse intentionally leaves ClientSecret empty; the handler sets it
-// only on the detail endpoint after decryption. Combined with `omitempty` that
-// means list responses carry no clientSecret key at all.
-func TestToClientResponse_DoesNotPopulateClientSecret(t *testing.T) {
+// ClientResponse carries no secret: it is answered by GET /clients/{id}/secret alone (#402
+// decision 8, #403), so neither the encrypted column nor a clientSecret key reaches the client
+// detail or the list.
+func TestToClientResponse_CarriesNoClientSecret(t *testing.T) {
 	client := &record.Client{
 		Id:                    1,
 		ClientIdentifier:      "some-client",
@@ -131,7 +131,6 @@ func TestToClientResponse_DoesNotPopulateClientSecret(t *testing.T) {
 
 	resp := ToClientResponse(client)
 	assert.NotNil(t, resp)
-	assert.Equal(t, "", resp.ClientSecret, "the mapper must not populate the client secret")
 
 	marshalled, err := json.Marshal(resp)
 	assert.NoError(t, err)
@@ -139,17 +138,7 @@ func TestToClientResponse_DoesNotPopulateClientSecret(t *testing.T) {
 
 	assert.NotContains(t, payload, "SENTINEL-client-secret-encrypted")
 	assert.NotContains(t, payload, base64.StdEncoding.EncodeToString(client.ClientSecretEncrypted))
-	assert.NotContains(t, payload, "clientSecret", "omitempty must drop the key when the secret is unset")
-}
-
-func TestToClientResponse_EmitsClientSecretOnceHandlerSetsIt(t *testing.T) {
-	resp := ToClientResponse(&record.Client{Id: 1, ClientIdentifier: "some-client"})
-	resp.ClientSecret = "decrypted-by-handler"
-
-	marshalled, err := json.Marshal(resp)
-	assert.NoError(t, err)
-
-	assert.Contains(t, string(marshalled), `"clientSecret":"decrypted-by-handler"`)
+	assert.NotContains(t, payload, "clientSecret")
 }
 
 // =============================================================================

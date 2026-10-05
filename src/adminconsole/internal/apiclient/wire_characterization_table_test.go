@@ -376,6 +376,14 @@ func wireCharacterization() []wireCase {
 			reply: `{"client":{"id":3}}`, want: int64(3),
 		},
 		{
+			name: "GetClientSecret",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				return c.GetClientSecret(ctx, charAccessToken, 3)
+			},
+			verb: "GET", path: "/api/v1/admin/clients/3/secret", contentType: charJSON,
+			successStatus: 200, reply: `{"clientSecret":"the-client-secret"}`, want: "the-client-secret",
+		},
+		{
 			name: "CreateClient",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
 				got, err := c.CreateClient(ctx, charAccessToken, charCreateClient)

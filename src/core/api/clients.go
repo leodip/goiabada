@@ -35,7 +35,6 @@ type ClientResponse struct {
 	CreatedAt        *time.Time `json:"createdAt"`
 	UpdatedAt        *time.Time `json:"updatedAt"`
 	ClientIdentifier string     `json:"clientIdentifier"`
-	ClientSecret     string     `json:"clientSecret,omitempty"` // Only in detail API
 	Description      string     `json:"description"`
 	WebsiteURL       string     `json:"websiteUrl"`
 	DisplayName      string     `json:"displayName"`
@@ -79,6 +78,14 @@ type GetClientsResponse struct {
 
 type GetClientResponse struct {
 	Client ClientResponse `json:"client"`
+}
+
+// GetClientSecretResponse is GET /clients/{id}/secret's answer, the client's secret decrypted, or
+// empty for a client that holds none. It is the one response that carries a client secret:
+// ClientResponse carried it on the detail until #402 moved it here, so that admin-read, which
+// reaches the detail and not this route, receives no credential (#403).
+type GetClientSecretResponse struct {
+	ClientSecret string `json:"clientSecret"`
 }
 
 type CreateClientRequest struct {

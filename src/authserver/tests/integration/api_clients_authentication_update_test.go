@@ -73,15 +73,15 @@ func TestAPIClientAuthenticationPut_PublicToConfidential_Success(t *testing.T) {
 	assert.False(t, refreshed.IsPublic)
 	assert.NotNil(t, refreshed.ClientSecretEncrypted)
 
-	// Detail GET should include decrypted secret matching newSecret
-	detailURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
-	resp2 := makeAPIRequest(t, "GET", detailURL, accessToken, nil)
+	// The secret route answers the new secret, decrypted
+	secretURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/secret"
+	resp2 := makeAPIRequest(t, "GET", secretURL, accessToken, nil)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
-	var getResp api.GetClientResponse
-	err = json.NewDecoder(resp2.Body).Decode(&getResp)
+	var secretResp api.GetClientSecretResponse
+	err = json.NewDecoder(resp2.Body).Decode(&secretResp)
 	assert.NoError(t, err)
-	assert.Equal(t, newSecret, getResp.Client.ClientSecret)
+	assert.Equal(t, newSecret, secretResp.ClientSecret)
 }
 
 func TestAPIClientAuthenticationPut_InvalidSecret_TooShort(t *testing.T) {

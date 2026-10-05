@@ -160,7 +160,7 @@ func TestHandleClientGet_MalformedIdReachesNoClientPort(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
-	HandleClientGet(database, testDataCipher).ServeHTTP(rr, apiClientRequest("not-a-number"))
+	HandleClientGet(database).ServeHTTP(rr, apiClientRequest("not-a-number"))
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 	database.AssertNotCalled(t, "GetClientById", mock.Anything, mock.Anything, mock.Anything)
