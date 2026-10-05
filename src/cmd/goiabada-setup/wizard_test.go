@@ -31,6 +31,8 @@ func testWizard(t *testing.T, flags *CLIFlags, steps []scriptedStep, results ...
 	in := &scriptedPrompter{t: t, steps: steps}
 	var buf bytes.Buffer
 	w := newWizard(flags, in, &console{w: &buf})
+	// A password file named - reads this rather than the test binary's own standard input.
+	w.stdin = strings.NewReader("")
 	calls := &[]connectionCall{}
 	w.testConnection = func(_ *console, e *engine, host, port, name, user, password string) bool {
 		*calls = append(*calls, connectionCall{e.name, host, port, name, user, password})
@@ -516,6 +518,55 @@ func TestWizard_AChosenAdminPasswordIsJudged(t *testing.T) {
 	}
 }
 
+// A non-interactive run can be given an existing database's password, and the admin password, with
+// nothing secret on its command line: --db-password and --admin-password reach shell history and the
+// process list, and leaving them out generates a password no existing database user has. Each file
+// loses one trailing line break, CRLF or LF, and its password is stored as given and never shown.
+func TestWizard_PasswordFilesGiveThePasswords(t *testing.T) {
+	const adminPassword, dbPassword = "Zq7AdminFromFile-Passw0rd", "Zq7DatabaseFromStdin-Passw0rd"
+	for _, kind := range []deploymentType{deploymentKubernetes, deploymentNative} {
+		t.Run(deployments[kind].name, func(t *testing.T) {
+			adminFile := filepath.Join(t.TempDir(), "admin-password")
+			if err := os.WriteFile(adminFile, []byte(adminPassword+"\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			flags := nonInteractiveFlags(kind, testEngine("postgres"), false)
+			flags.AdminPasswordFile, flags.DBPasswordFile = adminFile, "-"
+			w, _, out, _ := testWizard(t, flags, nil)
+			w.stdin = strings.NewReader(dbPassword + "\r\n")
+			if err := w.setup(); err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			c := w.config
+			if c.AdminPassword != adminPassword || c.AdminPasswordGenerated {
+				t.Errorf("admin password %q, generated %v; want the file's, set", c.AdminPassword, c.AdminPasswordGenerated)
+			}
+			if c.DBPassword != dbPassword || c.DBPasswordGenerated {
+				t.Errorf("database password %q, generated %v; want standard input's, set", c.DBPassword, c.DBPasswordGenerated)
+			}
+			secrets, err := os.ReadFile(w.paths.secrets)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := []string{`GOIABADA_ADMIN_PASSWORD="` + adminPassword + `"`, `GOIABADA_DB_PASSWORD="` + dbPassword + `"`}
+			if kind == deploymentKubernetes {
+				want = []string{"admin-password: " + base64Encode(adminPassword), "db-password: " + base64Encode(dbPassword)}
+			}
+			for _, line := range want {
+				if !strings.Contains(string(secrets), line) {
+					t.Errorf("the secrets file lacks %q:\n%s", line, secrets)
+				}
+			}
+			for _, line := range []string{"Admin password: set, stored in ", "Database password: set, stored in "} {
+				if !strings.Contains(out.String(), line) {
+					t.Errorf("output lacks %q:\n%s", line, out)
+				}
+			}
+			assertNoSecretShown(t, w, out.String())
+		})
+	}
+}
+
 // Without --admin-url and --admin-email the defaults follow the sibling rule, which the mismatch
 // warning agrees with: only a URL outside the auth server's parent warns (#430).
 func TestWizard_NonInteractiveDefaultsFollowTheSiblingRule(t *testing.T) {
@@ -722,6 +773,13 @@ func TestWizard_NonInteractiveRefusals(t *testing.T) {
 		f.DeploymentType = "kubernetes"
 		return f
 	}
+	passwordFile := func(content string) string {
+		file := filepath.Join(t.TempDir(), "password")
+		if err := os.WriteFile(file, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return file
+	}
 	cases := map[string]struct {
 		flags CLIFlags
 		want  string
@@ -756,6 +814,19 @@ func TestWizard_NonInteractiveRefusals(t *testing.T) {
 		"an uppercase Kubernetes admin host":    {kubernetes(func(f *CLIFlags) { f.AdminConsoleURL = "https://admin.Example.org" }), "invalid admin URL: host admin.Example.org has 'E'"},
 		"one Kubernetes host for both":          {kubernetes(func(f *CLIFlags) { f.AdminConsoleURL = "https://auth.example.org/admin" }), "invalid admin URL: the admin console URL has the auth server's host, auth.example.org, and each needs a host of its own"},
 		"one Kubernetes host by the default":    {kubernetes(func(f *CLIFlags) { f.AuthServerURL = "https://admin.example.org" }), "invalid admin URL: the admin console URL has the auth server's host, admin.example.org"},
+		// A password given twice is refused rather than one silently winning, and standard input
+		// can be read once.
+		"an admin password and its file":        {native(func(f *CLIFlags) { f.AdminPassword, f.AdminPasswordFile = "Zq7-Passw0rd", passwordFile("Zq7-Passw0rd") }), "give --admin-password or --admin-password-file, not both"},
+		"a database password and its file":      {native(func(f *CLIFlags) { f.DBPassword, f.DBPasswordFile = "Zq7-Passw0rd", passwordFile("Zq7-Passw0rd") }), "give --db-password or --db-password-file, not both"},
+		"both password files on standard input": {native(func(f *CLIFlags) { f.AdminPasswordFile, f.DBPasswordFile = "-", "-" }), "--admin-password-file and --db-password-file cannot both read standard input"},
+		"a missing password file":               {native(func(f *CLIFlags) { f.DBPasswordFile = filepath.Join(t.TempDir(), "absent") }), "unable to read --db-password-file"},
+		// Empty would otherwise read as "generate one", which leaving the flag out says.
+		"an empty password file":          {native(func(f *CLIFlags) { f.DBPasswordFile = passwordFile("") }), "--db-password-file holds no password"},
+		"a password file of a line break": {native(func(f *CLIFlags) { f.AdminPasswordFile = passwordFile("\n") }), "--admin-password-file holds no password"},
+		"empty standard input":            {native(func(f *CLIFlags) { f.DBPasswordFile = "-" }), "--db-password-file holds no password"},
+		"an oversized password file":      {native(func(f *CLIFlags) { f.DBPasswordFile = passwordFile(strings.Repeat("x", 4097)) }), "--db-password-file holds more than 4096 bytes"},
+		"a password file not UTF-8":       {native(func(f *CLIFlags) { f.AdminPasswordFile = passwordFile("pa\xffss") }), "--admin-password-file cannot be written to the configuration: it is not valid UTF-8"},
+		"a password file holding NUL":     {native(func(f *CLIFlags) { f.DBPasswordFile = passwordFile("pa\x00ss") }), "--db-password-file cannot be written to the configuration: it contains a NUL character"},
 	}
 	// Every flag whose value is written into the file, refused by its name when it is not UTF-8 or
 	// holds NUL, before a step reads it (#430). Each would otherwise be refused, if at all, by a

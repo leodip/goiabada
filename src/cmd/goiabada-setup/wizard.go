@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -14,9 +16,11 @@ type wizard struct {
 	asker
 	flags *CLIFlags
 	// interactive is false when --type was given: every answer then comes from a flag and nothing
-	// is read.
+	// is read but a password file named -.
 	interactive bool
-	config      *Config
+	// stdin is what a password file named - is read from.
+	stdin  io.Reader
+	config *Config
 	// defaultAdminEmail is the admin email offered: admin@example.com for local testing, admin@
 	// and the auth server host's parent otherwise, and none for a host without one.
 	defaultAdminEmail string
@@ -30,6 +34,7 @@ func newWizard(flags *CLIFlags, in prompter, out *console) *wizard {
 		asker:          asker{in: in, out: out},
 		flags:          flags,
 		interactive:    flags.DeploymentType == "",
+		stdin:          os.Stdin,
 		config:         &Config{},
 		testConnection: testDatabaseConnection,
 	}
@@ -109,6 +114,9 @@ func (w *wizard) setup() error {
 	}
 	if !w.interactive {
 		if err := w.flags.checkWritable(); err != nil {
+			return err
+		}
+		if err := w.flags.checkPasswordSources(); err != nil {
 			return err
 		}
 	}
@@ -516,7 +524,10 @@ func (w *wizard) askAdmin() error {
 	}
 	// Only a password the operator chose is judged: a generated one holds the classes SQL Server
 	// asks for and no symbol, and was warned about as weak (#430).
-	adminPassword := w.flags.AdminPassword
+	adminPassword, err := w.givenPassword(w.flags.AdminPassword, "--admin-password-file", w.flags.AdminPasswordFile)
+	if err != nil {
+		return err
+	}
 	generated := adminPassword == ""
 	if generated {
 		adminPassword = generatePassword()
@@ -642,7 +653,9 @@ func (w *wizard) databaseConnectionFromFlags() error {
 	if c.DBUsername == "" {
 		c.DBUsername = c.Engine.defaultUser
 	}
-	w.databasePasswordFromFlags()
+	if err := w.databasePasswordFromFlags(); err != nil {
+		return err
+	}
 	w.out.info("Database host: %s:%s", c.DBHost, c.DBPort)
 	w.out.info("Database name: %s", c.DBName)
 	w.out.info("Database user: %s", c.DBUsername)
@@ -654,8 +667,7 @@ func (w *wizard) askDatabasePassword() error {
 	if w.interactive {
 		return w.databasePasswordFromPrompt()
 	}
-	w.databasePasswordFromFlags()
-	return nil
+	return w.databasePasswordFromFlags()
 }
 
 // databasePasswordFromPrompt reads the database password hidden, offering a generated one, which is
@@ -668,15 +680,30 @@ func (w *wizard) databasePasswordFromPrompt() error {
 	return err
 }
 
-// databasePasswordFromFlags takes --db-password, or generates one, and reports which.
-func (w *wizard) databasePasswordFromFlags() {
+// databasePasswordFromFlags takes --db-password or --db-password-file, or generates one, and
+// reports which.
+func (w *wizard) databasePasswordFromFlags() error {
 	c := w.config
-	c.DBPassword = w.flags.DBPassword
+	password, err := w.givenPassword(w.flags.DBPassword, "--db-password-file", w.flags.DBPasswordFile)
+	if err != nil {
+		return err
+	}
+	c.DBPassword = password
 	c.DBPasswordGenerated = c.DBPassword == ""
 	if c.DBPasswordGenerated {
 		c.DBPassword = generatePassword()
 	}
 	w.reportPassword("Database password", c.DBPasswordGenerated)
+	return nil
+}
+
+// givenPassword is the password given as a flag's value, or read from the file the flag named
+// fileFlag names, and empty when neither was given. checkPasswordSources has refused both.
+func (w *wizard) givenPassword(value, fileFlag, file string) (string, error) {
+	if file == "" {
+		return value, nil
+	}
+	return readPasswordFile(fileFlag, file, w.stdin)
 }
 
 // reportPassword says whether a password was generated or set, and where it is stored, and never
