@@ -421,6 +421,9 @@ begin-transaction, benign-sentinel, page-offset, id-list-bound, transaction-pass
 SQL-context lints, the auth server's API error-code and audit-catalog lints, its discarded-error lint
 in `internal/server`, which refuses `_` in the error position of a hash, encryption or
 key-generation call (#409) and resolves the data cipher's methods by receiver type with `go/types` (#434),
+its admin-route classification lint beside it, which holds every admin write route, and every admin read
+whose handler applies a ceiling of the administrative policy, to a row naming the ceilings its handler applies
+or why it needs none, in both directions (#402),
 its write-once lint in `internal/ceremony`, which refuses a write to an `AuthContext` request field
 outside `HandleAuthorizeGet`, resolved with `go/types` (#436), and the import rule #387 added
 beside the child-package one: `record/import_lint_test.go`, which holds that package to the

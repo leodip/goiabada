@@ -318,7 +318,7 @@ func parseRoutes(t *testing.T) []routeRegistration {
 	}
 
 	var out []routeRegistration
-	collectRoutes(t, fset, file, "", false, &out)
+	collectRoutes(fset, file, "", false, &out)
 
 	// The floor. A parse that silently stopped matching chi's registration shape would make
 	// every test above vacuous, and the failure would look like a pass.
@@ -350,7 +350,7 @@ var specVerbs = func() map[string]bool {
 	return out
 }()
 
-func collectRoutes(t *testing.T, fset *token.FileSet, node ast.Node, prefix string,
+func collectRoutes(fset *token.FileSet, node ast.Node, prefix string,
 	groupScopeGuarded bool, out *[]routeRegistration) {
 
 	ast.Inspect(node, func(n ast.Node) bool {
@@ -371,7 +371,7 @@ func collectRoutes(t *testing.T, fset *token.FileSet, node ast.Node, prefix stri
 			if subOK && bodyOK {
 				// A guard mounted with r.Use here covers every route in the body, and a
 				// group nested inside an already-guarded one stays guarded.
-				collectRoutes(t, fset, body, prefix+sub,
+				collectRoutes(fset, body, prefix+sub,
 					groupScopeGuarded || usesScopeGuard(body), out)
 				return false
 			}
