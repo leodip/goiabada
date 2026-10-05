@@ -294,6 +294,18 @@ type Database interface {
 	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
 	DeletePermission(ctx context.Context, tx *sql.Tx, permissionId int64) error
 	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []record.Permission) error
+	// AcquireManagePermissionRow takes the authserver resource's manage permission row inside the
+	// caller's transaction, holds it until that transaction ends, and answers that permission's
+	// id. It is the one row every write that can remove the last holder of authserver:manage takes
+	// first, so two such removals serialize and the second decides, from rows it reads after the
+	// wait, what the first committed (#402 decision 11).
+	//
+	// A database with no manage permission is an error rather than an acquisition of nothing,
+	// because a guard behind a lock that holds nothing would count without serializing anything.
+	//
+	// A transaction is required: without one the statement autocommits and the row is released
+	// before the caller can count under it.
+	AcquireManagePermissionRow(ctx context.Context, tx *sql.Tx) (int64, error)
 
 	CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *record.KeyPair) error
 	UpdateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *record.KeyPair) error

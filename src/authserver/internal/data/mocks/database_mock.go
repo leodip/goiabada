@@ -117,6 +117,72 @@ func (_c *Database_AcquireClientRow_Call) RunAndReturn(run func(ctx context.Cont
 	return _c
 }
 
+// AcquireManagePermissionRow provides a mock function for the type Database
+func (_mock *Database) AcquireManagePermissionRow(ctx context.Context, tx *sql.Tx) (int64, error) {
+	ret := _mock.Called(ctx, tx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AcquireManagePermissionRow")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx) (int64, error)); ok {
+		return returnFunc(ctx, tx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx) int64); ok {
+		r0 = returnFunc(ctx, tx)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx) error); ok {
+		r1 = returnFunc(ctx, tx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_AcquireManagePermissionRow_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AcquireManagePermissionRow'
+type Database_AcquireManagePermissionRow_Call struct {
+	*mock.Call
+}
+
+// AcquireManagePermissionRow is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+func (_e *Database_Expecter) AcquireManagePermissionRow(ctx any, tx any) *Database_AcquireManagePermissionRow_Call {
+	return &Database_AcquireManagePermissionRow_Call{Call: _e.mock.On("AcquireManagePermissionRow", ctx, tx)}
+}
+
+func (_c *Database_AcquireManagePermissionRow_Call) Run(run func(ctx context.Context, tx *sql.Tx)) *Database_AcquireManagePermissionRow_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_AcquireManagePermissionRow_Call) Return(n int64, err error) *Database_AcquireManagePermissionRow_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *Database_AcquireManagePermissionRow_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx) (int64, error)) *Database_AcquireManagePermissionRow_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // AcquireUserRow provides a mock function for the type Database
 func (_mock *Database) AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error {
 	ret := _mock.Called(ctx, tx, userId)
