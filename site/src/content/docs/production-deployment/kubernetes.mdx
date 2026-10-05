@@ -694,9 +694,10 @@ Before you answer yes, check two things:
   does not, or does only once enforcement is turned on in the cluster's settings; there the policies
   are accepted and do nothing.
 - **Nothing else in the cluster calls the auth server through its Service.** A resource server that
-  fetches `/certs` or calls `/userinfo` at `http://goiabada-authserver.goiabada:9090` is refused once
-  the policy applies, and the connection times out rather than being refused. Admit its namespace
-  by adding a peer to the first rule of the auth server's policy, as its comment shows:
+  fetches `/certs` or calls `/userinfo` at `http://goiabada-authserver.goiabada:9090` is blocked once
+  the policy applies. Depending on the network plugin, its connection times out or is refused at
+  once. Admit its namespace by adding a peer to the first rule of the auth server's policy, as its
+  comment shows:
 
   ```yaml
   ingress:

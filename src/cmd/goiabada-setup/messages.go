@@ -211,8 +211,8 @@ func printKubernetesInstructions(out *console, config *Config, paths outputPaths
 	}
 	out.println()
 	if config.NetworkPolicy {
-		out.println("  • A connection a NetworkPolicy refuses times out rather than being refused. If a")
-		out.println("    workload cannot reach a server, check what the policies admit:")
+		out.println("  • A connection a NetworkPolicy blocks either times out or is refused at once, depending on")
+		out.println("    the network plugin. If a workload cannot reach a server, check what the policies admit:")
 		out.printf("      %skubectl describe networkpolicy -n %s%s\n", out.cyan, config.K8sNamespace, out.reset)
 		out.println()
 	}
@@ -261,7 +261,7 @@ func printMetricsNotes(out *console, config *Config) {
 	out.println()
 	if config.admitsMetricsScraper() {
 		out.printf("  • The NetworkPolicies admit the namespace %s to the metrics ports alone. A scraper\n", config.MetricsNamespace)
-		out.println("    running elsewhere times out until its namespace is admitted, as the policies' comments show.")
+		out.println("    running elsewhere cannot connect until its namespace is admitted, as the policies' comments show.")
 		out.println()
 	}
 }
