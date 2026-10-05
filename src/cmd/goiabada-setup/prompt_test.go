@@ -112,12 +112,12 @@ func TestAsker_AReadFaultIsNeverTheDefault(t *testing.T) {
 	})
 	t.Run("the weak-password confirmation", func(t *testing.T) {
 		a, in, _ := testAsker(t,
-			scriptedStep{prompt: "Password [changeme]: ", hidden: true, answer: ""},
+			scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "weak"},
 			scriptedStep{prompt: "Use this password anyway? [y/N]: ", err: errReadFault},
 		)
-		got, err := a.password("Password", "changeme")
+		got, err := a.judgedPassword("Password", generatePassword())
 		if !errors.Is(err, errReadFault) || got != "" {
-			t.Errorf("password = %q, %v; want \"\" and the read fault", got, err)
+			t.Errorf("judgedPassword = %q, %v; want \"\" and the read fault", got, err)
 		}
 		in.assertConsumed()
 	})
@@ -246,17 +246,17 @@ func TestAsker_AnInvalidAnswerIsAskedAgain(t *testing.T) {
 
 func TestAsker_AWeakPasswordIsKeptOnlyWhenConfirmed(t *testing.T) {
 	a, in, out := testAsker(t,
-		scriptedStep{prompt: "Password [changeme]: ", hidden: true, answer: ""},
+		scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "changeme"},
 		scriptedStep{prompt: "Use this password anyway? [y/N]: ", answer: ""},
-		scriptedStep{prompt: "Password [changeme]: ", hidden: true, answer: "weak"},
+		scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "weak"},
 		scriptedStep{prompt: "Use this password anyway? [y/N]: ", answer: "y"},
-		scriptedStep{prompt: "Password [changeme]: ", hidden: true, answer: "Str0ng-Passw0rd!"},
+		scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "Str0ng-Passw0rd!"},
 	)
-	if got, err := a.password("Password", "changeme"); err != nil || got != "weak" {
-		t.Errorf("password = %q, %v; want the confirmed \"weak\"", got, err)
+	if got, err := a.judgedPassword("Password", generatePassword()); err != nil || got != "weak" {
+		t.Errorf("judgedPassword = %q, %v; want the confirmed \"weak\"", got, err)
 	}
-	if got, err := a.password("Password", "changeme"); err != nil || got != "Str0ng-Passw0rd!" {
-		t.Errorf("password = %q, %v; want the strong one, not asked about", got, err)
+	if got, err := a.judgedPassword("Password", generatePassword()); err != nil || got != "Str0ng-Passw0rd!" {
+		t.Errorf("judgedPassword = %q, %v; want the strong one, not asked about", got, err)
 	}
 	in.assertConsumed()
 	if !strings.Contains(out.String(), "Weak password: ") {
@@ -474,5 +474,23 @@ func TestAsker_AGeneratedPasswordIsOfferedWithoutItsValue(t *testing.T) {
 	in.assertConsumed()
 	if shown := strings.Join(in.prompts, "") + out.String(); strings.Contains(shown, "Zq7GeneratedValue") {
 		t.Errorf("the generated value was shown: %q", shown)
+	}
+}
+
+// An empty answer takes the generated password, which is shown only as [generated] and not judged:
+// it holds no symbol, and a strength check would call it weak (#430). The prompt offered changeme,
+// which the docs and the samples print, until the generated default replaced it.
+func TestAsker_AnEmptyPasswordAnswerTakesTheGeneratedOneUnjudged(t *testing.T) {
+	generated := generatePassword()
+	a, in, out := testAsker(t, scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: ""})
+	if got, err := a.judgedPassword("Password", generated); err != nil || got != generated {
+		t.Errorf("judgedPassword = %q, %v; want the generated %q", got, err, generated)
+	}
+	in.assertConsumed()
+	if strings.Contains(out.String(), "Weak password") {
+		t.Errorf("the generated password is judged:\n%s", out.String())
+	}
+	if strings.Contains(strings.Join(in.prompts, "\n")+out.String(), generated) {
+		t.Errorf("the generated password reached the terminal")
 	}
 }

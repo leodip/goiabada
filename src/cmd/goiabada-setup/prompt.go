@@ -263,17 +263,17 @@ func (a asker) generatedPassword(prompt, generated string) (string, error) {
 	return a.hidden(prompt, generated, "generated")
 }
 
-// password asks for a password read hidden, judging its strength. Its default is shown, being no
-// secret: the well-known one the completion message warns about.
-func (a asker) password(prompt, defaultValue string) (string, error) {
+// judgedPassword asks for a password read hidden, offering one generated as generatedPassword
+// does, and judges the strength of one typed instead. The generated one is not judged: it holds the
+// classes SQL Server asks for and no symbol, and was warned about as weak (#430).
+func (a asker) judgedPassword(prompt, generated string) (string, error) {
 	for {
-		value, err := a.hidden(prompt, defaultValue, defaultValue)
+		value, err := a.generatedPassword(prompt, generated)
 		if err != nil {
 			return "", err
 		}
-		if value == "" {
-			a.out.println("Password cannot be empty. Please try again.")
-			continue
+		if value == generated {
+			return value, nil
 		}
 		if issues := checkPasswordStrength(value); len(issues) > 0 {
 			a.out.warning("Weak password: %s", strings.Join(issues, ", "))
