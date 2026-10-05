@@ -1,0 +1,30 @@
+---
+title: Monitoring
+description: Watch a running Goiabada deployment through its Prometheus metrics.
+---
+
+Goiabada can serve Prometheus metrics in the text exposition format, on a listener of its own that
+answers `GET /metrics` and nothing else. It is off unless you enable it, with
+`GOIABADA_AUTHSERVER_METRICS_ENABLED` for the auth server; see the
+[environment variables](/reference/environment-variables/) for the listener's host and port.
+
+## Metrics catalog
+
+Every metric Goiabada exposes is listed below, with each label and the values it can take.
+
+A label only ever takes a value from a set declared in the code when the metric is registered, and
+a value outside that set is recorded as `other`. So no metric can produce more series than the
+product of its label sets, whatever requests arrive, and nothing taken from a request or from the
+database reaches a label: no user, client, session, email address, IP address, path, query, user
+agent or error description. The route label is the server's own route table, read at startup, and a
+request no route answered is recorded under `unmatched`.
+
+Prometheus adds the `job`, `instance` and, on Kubernetes, `pod` and `container` labels itself.
+
+| metric | type | labels | server | meaning |
+|---|---|---|---|---|
+| `goiabada_http_requests_total` | counter | `route`: the route table, `unmatched`; `method`: `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `CONNECT`, `OPTIONS`, `TRACE`; `status`: the response's status code | auth server | HTTP requests answered, by the route that answered them, the method and the exact status code. Every request the server's main listeners answer is counted, `/health` and the static files included; a scrape of the metrics listener is not. |
+| `goiabada_http_request_duration_seconds` | histogram | `route`: the route table, `unmatched`; `method`: `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `CONNECT`, `OPTIONS`, `TRACE` | auth server | How long requests took to answer, in seconds. The buckets are 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30 and 60: the slowest requests send mail and can take up to 40 seconds. |
+| `goiabada_build_info` | gauge | `version`: this binary's version; `commit`: this binary's commit | auth server | Always 1. The labels say which release is running. |
+| `go_goroutines` | gauge | none | auth server | Goroutines that currently exist. |
+| `go_memstats_heap_inuse_bytes` | gauge | none | auth server | Heap bytes in use. |

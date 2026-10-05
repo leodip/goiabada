@@ -33,6 +33,7 @@ import (
 	"github.com/leodip/goiabada/core/hostport"
 	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/metrics"
 )
 
 type Server struct {
@@ -62,6 +63,11 @@ type Server struct {
 	// Loaded once by main and read here and in routes.go wherever a listener, a middleware or a
 	// handler needs a setting, so nothing below main reads a process-wide configuration (#434).
 	cfg *config.Config
+
+	// The families this server exposes on its metrics listener, registered at startup: the build
+	// stamp and the runtime gauges here, the HTTP requests where initMiddleware mounts their
+	// middleware (#400).
+	metrics *metrics.Registry
 }
 
 func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionstore.ServerSideStore,
@@ -78,7 +84,11 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionsto
 		trustedProxies: trustedProxies,
 
 		cfg: cfg,
+
+		metrics: metrics.NewRegistry(),
 	}
+	metrics.RegisterBuildInfo(s.metrics)
+	metrics.RegisterRuntime(s.metrics)
 
 	if envVar := cfg.AuthServer.StaticDir; len(envVar) == 0 {
 		s.staticFS = web.StaticFS()
@@ -134,6 +144,17 @@ func (s *Server) Start(ctx context.Context) error {
 		logHttpWithoutTlsWarning()
 	}
 
+	// The metrics listener is enabled by its own setting rather than by a host and port, since its
+	// defaults are both set; it does not count as a listener below, because it answers no client.
+	metricsEnabled := s.cfg.AuthServer.MetricsEnabled
+	metricsHost := s.cfg.AuthServer.ListenHostMetrics
+	metricsPort := s.cfg.AuthServer.ListenPortMetrics
+
+	slog.InfoContext(ctx, "metrics listener configuration",
+		"enabled", metricsEnabled,
+		"host", metricsHost,
+		"port", metricsPort)
+
 	// Refused before anything starts: the worker would otherwise be left running, and the routes
 	// half built, behind a process that is about to exit.
 	if !httpsEnabled && !httpEnabled {
@@ -162,9 +183,32 @@ func (s *Server) Start(ctx context.Context) error {
 		slog.InfoContext(ctx, "starting the http listener", "host", httpHost, "port", httpPort)
 	}
 
+	// Built by the same constructor, so it carries the same bounds, and drained with the others, so
+	// a scrape in flight at shutdown is answered. A port it cannot bind stops the server as theirs
+	// does (#400 decision 3).
+	if metricsEnabled {
+		metricsServer := newHTTPServer(metricsHost, metricsPort, metricsHandler(s.metrics))
+		listeners = append(listeners, listener{
+			server: metricsServer,
+			serve:  metricsServer.ListenAndServe,
+		})
+		slog.InfoContext(ctx, "starting the metrics listener", "host", metricsHost, "port", metricsPort)
+	}
+
 	s.worker.Start()
 
 	return serveAndDrain(ctx, listeners, s.stopBackgroundWork)
+}
+
+// metricsHandler is the metrics listener's whole handler: a mux of its own answering GET /metrics
+// with reg's exposition and 404 for every other path. It is never Go's default mux, on which the
+// net/http/pprof and expvar packages chi's middleware links register /debug/pprof/ and /debug/vars
+// (#462), and nothing on it passes through the main router's chain, so a scrape is neither logged
+// by the request logger nor counted in the HTTP metrics (#400 decision 3).
+func metricsHandler(reg *metrics.Registry) http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("GET /metrics", reg.Handler())
+	return mux
 }
 
 // registerRoutes mounts everything this server answers on s.router: the root chain, the static
@@ -395,6 +439,12 @@ func (s *Server) initMiddleware() appBranches {
 	logHttpRequests := s.cfg.AuthServer.LogHttpRequests
 	slog.Info("http request logging configured", "enabled", logHttpRequests)
 	s.router.Use(httpmw.RequestLogger(logHttpRequests))
+
+	// HTTP metrics: every request this router answers, by route, method and status. Beside the
+	// request logger and for the same reason, above Recoverer, so a panicking request is counted as
+	// the 500 its client received (#400). The route label's set is this router's own table, read
+	// once at the first request, by which time registerRoutes has registered every route.
+	s.router.Use(metrics.HTTPRequests(s.metrics, s.router))
 
 	// Recoverer, beneath the request logger so the 500 it writes reaches that logger's
 	// wrapped writer and lands in the record (#203).

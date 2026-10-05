@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -163,6 +164,7 @@ func newCsrfTestServer(t *testing.T) *Server {
 		database:     database,
 		sessionStore: newTestSessionStore(),
 		cfg:          &config.Config{},
+		metrics:      metrics.NewRegistry(),
 	}
 	s.initMiddleware()
 
