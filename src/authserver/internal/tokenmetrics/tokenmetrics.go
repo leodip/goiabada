@@ -10,6 +10,7 @@ package tokenmetrics
 
 import (
 	"errors"
+	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/core/metrics"
@@ -73,4 +74,41 @@ func (r *Recorder) Refused(grantType oidc.GrantType, err error) {
 		code = detail.Code()
 	}
 	r.refused.Inc(grantType.String(), code)
+}
+
+// ErrorWriter writes RFC 6749 section 5.2's error response for err: the JSON writer the token
+// endpoint answers through.
+type ErrorWriter interface {
+	JSONError(w http.ResponseWriter, r *http.Request, err error)
+}
+
+// RefusalWriter is the token endpoint's error writer for the refusals written before its handler
+// runs: the faults of the branch it is registered on, a settings or session read that failed or a
+// panic, and LimitROPC's own, a body that does not parse or a credential count that could not be
+// read. Each is counted as Refused counts the handler's, so the client's 400 or 500 is counted
+// whichever of the two answered it, and once, since a request either stops before the handler or
+// reaches it. A 429 is not written through it: it is the rate limiter's refusal, counted under its
+// limiter.
+type RefusalWriter struct {
+	recorder *Recorder
+	next     ErrorWriter
+}
+
+// Refusals returns next counting every refusal written through it.
+func (r *Recorder) Refusals(next ErrorWriter) RefusalWriter {
+	return RefusalWriter{recorder: r, next: next}
+}
+
+// JSONError counts the refusal under the grant the request's body names, then writes it.
+//
+// A fault met before anything parsed the body, the settings or the session failing, parses it here,
+// so it too is counted under the grant it asked for. Nothing reads the body after a refusal, and it
+// was bounded at the root by BodyLimit. A body that does not parse keeps the pairs that parsed
+// before the malformed one, as the handler reads them.
+func (w RefusalWriter) JSONError(rw http.ResponseWriter, r *http.Request, err error) {
+	if r.PostForm == nil {
+		_ = r.ParseForm()
+	}
+	w.recorder.Refused(oidc.GrantType(r.PostForm.Get("grant_type")), err)
+	w.next.JSONError(rw, r, err)
 }

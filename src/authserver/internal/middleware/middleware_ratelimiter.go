@@ -388,6 +388,13 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 	m.refusals = reg.Counter("goiabada_rate_limit_refusals_total",
 		"Requests the rate limiter refused, by the limiter that refused them.",
 		metrics.Enum("limiter", tierNames...))
+	// Every tier's series exists at zero from the first scrape. A labelled series appears only when
+	// it is first recorded, and increase() reads nothing over a window in which a series first
+	// appears, so without these a tier's first burst of refusals would raise no alert even on a pod
+	// scraped since it started.
+	for _, name := range tierNames {
+		m.refusals.Add(0, name)
+	}
 	return m
 }
 

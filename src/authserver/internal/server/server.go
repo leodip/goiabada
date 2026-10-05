@@ -30,6 +30,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/poolmetrics"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
+	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hostport"
 	"github.com/leodip/goiabada/core/httpmw"
@@ -69,6 +70,11 @@ type Server struct {
 	// stamp, the runtime gauges and the database pool here, the HTTP requests where initMiddleware mounts their
 	// middleware (#400).
 	metrics *metrics.Registry
+
+	// The tokens this server issues and the token requests it refuses, counted on the metrics
+	// listener. Registered here rather than in initRoutes because the token endpoint's branch, which
+	// initMiddleware builds, counts the refusals its faults answer too (#400 decision 5).
+	tokenMetrics *tokenmetrics.Recorder
 }
 
 func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionstore.ServerSideStore,
@@ -88,6 +94,8 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionsto
 		cfg: cfg,
 
 		metrics: registry,
+
+		tokenMetrics: tokenmetrics.Register(registry),
 	}
 	metrics.RegisterBuildInfo(s.metrics)
 	metrics.RegisterRuntime(s.metrics)
@@ -493,6 +501,7 @@ func (s *Server) initMiddleware() appBranches {
 	branches := appBranches{
 		pages:    s.applicationBranch(middleware.PageFaults(), i18nCeremonyStore),
 		protocol: s.applicationBranch(middleware.ProtocolFaults(render.New(s.templateFS)), i18nCeremonyStore),
+		token:    s.applicationBranch(middleware.ProtocolFaults(s.tokenMetrics.Refusals(render.New(s.templateFS))), i18nCeremonyStore),
 		api:      s.applicationBranch(middleware.APIFaults(), i18nCeremonyStore),
 	}
 
@@ -541,6 +550,10 @@ type appBranches struct {
 	// api carries the admin, account and session APIs and the public settings, which answer the
 	// {error_code, error_description} envelope.
 	api chi.Router
+	// token carries the token endpoint alone. It answers as protocol does, and counts each fault it
+	// answers as a token request refused, which the protocol branch cannot, since its faults are
+	// every protocol endpoint's (#400 decision 5).
+	token chi.Router
 }
 
 // csrfPolicy is the auth server's CSRF exemption policy: the endpoints this binary serves that are

@@ -231,12 +231,17 @@ func printKubernetesInstructions(out *console, config *Config, paths outputPaths
 	out.println()
 }
 
-// printMetricsNotes says, with metrics on, where they are served and what the answer needs to be
-// scraped: pod annotations only a scraper that reads them, a PodMonitor the Operator's CRDs and a
+// printMetricsNotes says what the metrics answer was and what it needs: with metrics off, that they
+// are off and how to turn them on; with them on, where they are served and what the answer needs to
+// be scraped: pod annotations only a scraper that reads them, a PodMonitor the Operator's CRDs and a
 // Prometheus whose selector matches it; and, with the NetworkPolicies on, the namespace they admit
 // (#400 decisions 7 and 8).
 func printMetricsNotes(out *console, config *Config) {
 	if !config.exposesMetrics() {
+		out.println("  • Prometheus metrics are off: neither server starts its metrics listener. To expose them,")
+		out.println("    generate the manifest again with --metrics=annotations or --metrics=podmonitor.")
+		out.printf("    The metrics and what to alert on: %s\n", monitoringDocsURL)
+		out.println()
 		return
 	}
 	out.printf("  • Both servers serve Prometheus metrics on a container port named metrics, %d on the\n", authServerMetricsPort)

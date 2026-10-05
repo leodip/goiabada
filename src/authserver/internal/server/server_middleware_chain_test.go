@@ -24,7 +24,8 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}
 	branches.pages.Get("/auth/authorize", probe)
-	branches.protocol.Post("/auth/token", probe)
+	branches.protocol.Get("/certs", probe)
+	branches.token.Post("/auth/token", probe)
 	branches.api.Get("/api/public/settings", probe)
 
 	chains := make(map[string][]string)
@@ -53,7 +54,7 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 		"github.com/leodip/goiabada/core/httpmw.SkipCSRF.func1",
 		"github.com/leodip/goiabada/core/httpmw.CSRF.func1",
 	}
-	// The same chain on all three branches, which differ only in how its faults are answered.
+	// The same chain on all four branches, which differ only in how its faults are answered.
 	wantApp := append(append([]string{}, wantRoot...),
 		"github.com/leodip/goiabada/authserver/internal/middleware.ServerFaults.Recoverer-fm",
 		"github.com/leodip/goiabada/authserver/internal/middleware.Settings.func1",
@@ -64,7 +65,7 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 
 	require.Contains(t, chains, "/static/*", "the static route must have been walked")
 	assert.Equal(t, wantRoot, chains["/static/*"])
-	for _, route := range []string{"/auth/authorize", "/auth/token", "/api/public/settings"} {
+	for _, route := range []string{"/auth/authorize", "/certs", "/auth/token", "/api/public/settings"} {
 		require.Contains(t, chains, route, "the application route must have been walked")
 		assert.Equal(t, wantApp, chains[route], route)
 	}
