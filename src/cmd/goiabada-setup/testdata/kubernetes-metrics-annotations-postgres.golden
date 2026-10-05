@@ -30,11 +30,11 @@ metadata:
   name: goiabada-authserver-config
   namespace: "goiabada"
 data:
-  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com/p\"a$HOME #x: y"
+  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com"
   GOIABADA_AUTHSERVER_INTERNALBASEURL: "http://goiabada-authserver:9090"
-  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com/`id`\\q'r ${PATH}"
+  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com"
   GOIABADA_APPNAME: "Goiabada"
-  GOIABADA_ADMIN_EMAIL: "a\"b$c`d\\e #f'g@example.com"
+  GOIABADA_ADMIN_EMAIL: "admin@example.com"
   # Envoy, the one gateway in front, appends the address it received each connection from
   # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list.
   # Under the gateway's Cluster traffic policy, Envoy receives each connection from a node,
@@ -56,11 +56,14 @@ data:
   GOIABADA_AUTHSERVER_RATELIMITER_ENABLED: "false"
   # One log record per request answered, as every other generated configuration writes.
   GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS: "true"
+  # Prometheus metrics, on a listener of their own at 9190, the container's metrics port, which
+  # no Service or route publishes.
+  GOIABADA_AUTHSERVER_METRICS_ENABLED: "true"
   GOIABADA_DB_TYPE: "postgres"
   GOIABADA_DB_HOST: "goiabada-db"
   GOIABADA_DB_PORT: "5432"
   GOIABADA_DB_NAME: "goiabada"
-  GOIABADA_DB_USERNAME: "us\"er\\na$me #x: '"
+  GOIABADA_DB_USERNAME: "goiabada-user"
 
 ---
 # What the admin console reads.
@@ -71,9 +74,9 @@ metadata:
   name: goiabada-adminconsole-config
   namespace: "goiabada"
 data:
-  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com/p\"a$HOME #x: y"
+  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com"
   GOIABADA_AUTHSERVER_INTERNALBASEURL: "http://goiabada-authserver:9090"
-  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com/`id`\\q'r ${PATH}"
+  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com"
   # Envoy, the one gateway in front, appends the address it received each connection from
   # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list.
   # Under the gateway's Cluster traffic policy, Envoy receives each connection from a node,
@@ -86,6 +89,9 @@ data:
   GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES: ""
   # One log record per request answered, as every other generated configuration writes.
   GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS: "true"
+  # Prometheus metrics, on a listener of their own at 9191, the container's metrics port, which
+  # no Service or route publishes.
+  GOIABADA_ADMINCONSOLE_METRICS_ENABLED: "true"
 
 ---
 apiVersion: apps/v1
@@ -110,6 +116,13 @@ spec:
     metadata:
       labels:
         app: goiabada-authserver
+      # Read by a scraper that discovers pods by these annotations, such as the
+      # prometheus-community prometheus chart's default configuration. kube-prometheus-stack
+      # ignores them, and scrapes only what a PodMonitor or ServiceMonitor names.
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9190"
+        prometheus.io/path: "/metrics"
     spec:
       # Neither server calls the Kubernetes API, so the pod mounts no service account token.
       automountServiceAccountToken: false
@@ -155,6 +168,8 @@ spec:
             type: RuntimeDefault
         ports:
         - containerPort: 9090
+        - name: metrics
+          containerPort: 9190
         envFrom:
         - configMapRef:
             name: goiabada-authserver-config
@@ -300,6 +315,13 @@ spec:
     metadata:
       labels:
         app: goiabada-adminconsole
+      # Read by a scraper that discovers pods by these annotations, such as the
+      # prometheus-community prometheus chart's default configuration. kube-prometheus-stack
+      # ignores them, and scrapes only what a PodMonitor or ServiceMonitor names.
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9191"
+        prometheus.io/path: "/metrics"
     spec:
       # Neither server calls the Kubernetes API, so the pod mounts no service account token.
       automountServiceAccountToken: false
@@ -346,6 +368,8 @@ spec:
             type: RuntimeDefault
         ports:
         - containerPort: 9091
+        - name: metrics
+          containerPort: 9191
         envFrom:
         - configMapRef:
             name: goiabada-adminconsole-config

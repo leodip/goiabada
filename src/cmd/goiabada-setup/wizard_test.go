@@ -117,6 +117,9 @@ func interactiveScript(d *deployment, e *engine) []scriptedStep {
 	case deploymentKubernetes:
 		steps = append(steps, scriptedStep{prompt: rateLimiterOffPrompt, answer: ""})
 	}
+	if d.kind == deploymentKubernetes {
+		steps = append(steps, scriptedStep{prompt: metricsPrompt, answer: ""})
+	}
 	defaultEmail := "admin@example.com"
 	if d.asksURLs {
 		defaultEmail = "admin@example.org"
@@ -154,8 +157,8 @@ func TestWizard_EveryDeploymentTypeRunsToItsFile(t *testing.T) {
 		{deploymentLocal, "mysql", []string{"Deployment type", "Database type", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
 		{deploymentProduction, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Rate limiter", "Admin credentials", "Generating credentials", "Generating configuration"}},
 		{deploymentProduction, "postgres", []string{"Deployment type", "Database type", "Domain names", "Rate limiter", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
-		{deploymentKubernetes, "postgres", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Gateway traffic policy", "Network policy", "Rate limiter", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
-		{deploymentKubernetes, "mssql", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Gateway traffic policy", "Network policy", "Rate limiter", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentKubernetes, "postgres", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentKubernetes, "mssql", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
 		{deploymentNative, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Rate limiter", "Admin credentials", "Generating credentials", "Generating configuration"}},
 		{deploymentNative, "mysql", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Rate limiter", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
 	}
@@ -385,7 +388,7 @@ func TestWizard_NonInteractiveRunsFromTheFlags(t *testing.T) {
 				DeploymentType: "k8s", DBType: "postgres", AuthServerURL: "https://auth.example.org",
 				Namespace: "identity", DBHost: "pg.internal", DBPort: "6543", DBName: "gb", DBUsername: "gbuser", DBPassword: "db-secret",
 			},
-			numbers:  []int{10, 11},
+			numbers:  []int{11, 12},
 			database: connectionCall{"postgres", "pg.internal", "6543", "gb", "gbuser", "db-secret"},
 			checked:  true,
 		},

@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -73,6 +74,7 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		fmt.Fprintf(&sb, "  # %s\n", line)
 	}
 	fmt.Fprintf(&sb, "  GOIABADA_AUTHSERVER_RATELIMITER_ENABLED: \"%t\"\n", config.RateLimiter)
+	writeObservability(&sb, "AUTHSERVER", config.exposedMetricsPort(authServerMetricsPort))
 	fmt.Fprintf(&sb, "  GOIABADA_DB_TYPE: %s\n", yamlQuote(config.Engine.name))
 	fmt.Fprintf(&sb, "  GOIABADA_DB_HOST: %s\n", yamlQuote(config.DBHost))
 	fmt.Fprintf(&sb, "  GOIABADA_DB_PORT: %s\n", yamlQuote(config.DBPort))
@@ -83,17 +85,17 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	writeConfigMapHead(&sb, ns, "goiabada-adminconsole-config", "What the admin console reads.")
 	writeSharedURLs(&sb, config)
 	writeKubernetesTrust(&sb, "ADMINCONSOLE", config.GatewayTrafficPolicy)
+	writeObservability(&sb, "ADMINCONSOLE", config.exposedMetricsPort(adminConsoleMetricsPort))
 	sb.WriteString("\n")
 
 	// Auth Server Deployment
-	writeDeploymentHead(&sb, ns, "goiabada-authserver",
+	writeDeploymentHead(&sb, ns, "goiabada-authserver", config.annotatedMetricsPort(authServerMetricsPort),
 		"The surge pod opens its own database connections: the docs' connection arithmetic counts it.")
 	writeTerminationGracePeriod(&sb, "Set lower, it cuts the cleanup worker short first.")
 	writeTopologySpread(&sb, "goiabada-authserver")
 	sb.WriteString("      containers:\n")
 	writeContainerHead(&sb, "authserver")
-	sb.WriteString("        ports:\n")
-	sb.WriteString("        - containerPort: 9090\n")
+	writeContainerPorts(&sb, 9090, config.exposedMetricsPort(authServerMetricsPort))
 	sb.WriteString("        envFrom:\n")
 	sb.WriteString("        - configMapRef:\n")
 	sb.WriteString("            name: goiabada-authserver-config\n")
@@ -152,7 +154,7 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	sb.WriteString("\n")
 
 	// Admin Console Deployment
-	writeDeploymentHead(&sb, ns, "goiabada-adminconsole",
+	writeDeploymentHead(&sb, ns, "goiabada-adminconsole", config.annotatedMetricsPort(adminConsoleMetricsPort),
 		"This server opens no database connections, so its surge pod costs the database nothing.")
 	writeTerminationGracePeriod(&sb,
 		"The auth server's value: this server stops within its 15s drain, and a grace period",
@@ -160,8 +162,7 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	writeTopologySpread(&sb, "goiabada-adminconsole")
 	sb.WriteString("      containers:\n")
 	writeContainerHead(&sb, "adminconsole")
-	sb.WriteString("        ports:\n")
-	sb.WriteString("        - containerPort: 9091\n")
+	writeContainerPorts(&sb, 9091, config.exposedMetricsPort(adminConsoleMetricsPort))
 	sb.WriteString("        envFrom:\n")
 	sb.WriteString("        - configMapRef:\n")
 	sb.WriteString("            name: goiabada-adminconsole-config\n")
@@ -224,7 +225,12 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	sb.WriteString("\n")
 
 	if config.NetworkPolicy {
-		writeNetworkPolicy(&sb, ns, "goiabada-authserver", 9090, []string{
+		// With metrics on, the policy has a second rule, so the recipe names the first.
+		admitTo := "from:"
+		if config.admitsMetricsScraper() {
+			admitTo = "the first rule's from:"
+		}
+		writeNetworkPolicy(&sb, ns, "goiabada-authserver", 9090, slices.Concat([]string{
 			"Admits the auth server's port from Envoy's proxies and from the admin console's pods,",
 			"and from nothing else. Enforced only by a CNI that implements NetworkPolicy (Calico and",
 			"Cilium do; some clusters' default CNI does not, and accepts the policy and ignores it).",
@@ -233,19 +239,26 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 			"database host is often a DNS name, neither of which a NetworkPolicy can select, so an",
 			"egress rule would cut email or the database.",
 			"A workload in another namespace that calls the auth server through its Service, for",
-			"/certs or /userinfo, is refused until you admit its namespace by adding to from:",
+			"/certs or /userinfo, is refused until you admit its namespace by adding to " + admitTo,
 			"  - namespaceSelector:",
 			"      matchLabels:",
 			"        kubernetes.io/metadata.name: <its namespace>",
 			"If Envoy Gateway runs its proxies in a namespace other than envoy-gateway-system, its",
 			"default, name that one below instead.",
-		}, "goiabada-adminconsole")
+		}, config.metricsScraperComment(authServerMetricsPort)), "goiabada-adminconsole",
+			config.scraperRule(authServerMetricsPort))
 		sb.WriteString("\n")
-		writeNetworkPolicy(&sb, ns, "goiabada-adminconsole", 9091, []string{
+		writeNetworkPolicy(&sb, ns, "goiabada-adminconsole", 9091, slices.Concat([]string{
 			"Admits the admin console's port from Envoy's proxies alone: nothing in the cluster calls",
 			"it. Ingress only, with no egress rules, as the auth server's is, and enforced only by a",
 			"CNI that implements NetworkPolicy.",
-		}, "")
+		}, config.metricsScraperComment(adminConsoleMetricsPort)), "",
+			config.scraperRule(adminConsoleMetricsPort))
+		sb.WriteString("\n")
+	}
+
+	if config.Metrics == metricsPodMonitor {
+		writePodMonitor(&sb, ns, config.PodMonitorLabels)
 		sb.WriteString("\n")
 	}
 
@@ -409,8 +422,9 @@ func writeSharedURLs(sb *strings.Builder, config *Config) {
 
 // writeDeploymentHead opens the Deployment name, whose pods carry the label app: name, down to its
 // pod spec's first fields: its rollout, under the line saying what its surge pod costs, and the two
-// things Kubernetes hands a pod unasked that neither server uses.
-func writeDeploymentHead(sb *strings.Builder, ns, name, surge string) {
+// things Kubernetes hands a pod unasked that neither server uses. A scrapePort other than 0 annotates
+// the pods for a scraper that discovers them by the prometheus.io annotations (#400 decision 7).
+func writeDeploymentHead(sb *strings.Builder, ns, name string, scrapePort int, surge string) {
 	sb.WriteString("---\n")
 	sb.WriteString("apiVersion: apps/v1\n")
 	sb.WriteString("kind: Deployment\n")
@@ -434,6 +448,15 @@ func writeDeploymentHead(sb *strings.Builder, ns, name, surge string) {
 	sb.WriteString("    metadata:\n")
 	sb.WriteString("      labels:\n")
 	fmt.Fprintf(sb, "        app: %s\n", name)
+	if scrapePort != 0 {
+		sb.WriteString("      # Read by a scraper that discovers pods by these annotations, such as the\n")
+		sb.WriteString("      # prometheus-community prometheus chart's default configuration. kube-prometheus-stack\n")
+		sb.WriteString("      # ignores them, and scrapes only what a PodMonitor or ServiceMonitor names.\n")
+		sb.WriteString("      annotations:\n")
+		sb.WriteString("        prometheus.io/scrape: \"true\"\n")
+		fmt.Fprintf(sb, "        prometheus.io/port: \"%d\"\n", scrapePort)
+		sb.WriteString("        prometheus.io/path: \"/metrics\"\n")
+	}
 	sb.WriteString("    spec:\n")
 	sb.WriteString("      # Neither server calls the Kubernetes API, so the pod mounts no service account token.\n")
 	sb.WriteString("      automountServiceAccountToken: false\n")
@@ -638,8 +661,10 @@ const envoyProxyNamespace = "envoy-gateway-system"
 // writeNetworkPolicy writes the ingress-only NetworkPolicy of the Deployment name, under the lines
 // saying what it admits and why: its pods admit port from the Envoy proxies' namespace and, when
 // caller is set, from the pods of that Deployment, and from nothing else. It states no egress rule,
-// since the SMTP server and the database are nothing a NetworkPolicy can select (#396 decision 5).
-func writeNetworkPolicy(sb *strings.Builder, ns, name string, port int, comment []string, caller string) {
+// since the SMTP server and the database are nothing a NetworkPolicy can select (#396 decision 5). A
+// scraper rule, when given, is a second rule admitting the metrics scraper's namespace to the metrics
+// port alone, leaving the first as it is (#400 decision 8).
+func writeNetworkPolicy(sb *strings.Builder, ns, name string, port int, comment []string, caller string, scraper *ingressRule) {
 	sb.WriteString("---\n")
 	for _, line := range comment {
 		fmt.Fprintf(sb, "# %s\n", line)
@@ -668,6 +693,15 @@ func writeNetworkPolicy(sb *strings.Builder, ns, name string, port int, comment 
 	sb.WriteString("    ports:\n")
 	sb.WriteString("    - protocol: TCP\n")
 	fmt.Fprintf(sb, "      port: %d\n", port)
+	if scraper != nil {
+		sb.WriteString("  - from:\n")
+		sb.WriteString("    - namespaceSelector:\n")
+		sb.WriteString("        matchLabels:\n")
+		fmt.Fprintf(sb, "          kubernetes.io/metadata.name: %s\n", yamlQuote(scraper.namespace))
+		sb.WriteString("    ports:\n")
+		sb.WriteString("    - protocol: TCP\n")
+		fmt.Fprintf(sb, "      port: %d\n", scraper.port)
+	}
 }
 
 // writeKubernetesTrust writes one ConfigMap's proxy trust: one hop, with the list beside it set
@@ -693,6 +727,83 @@ func writeKubernetesTrust(sb *strings.Builder, server string, policy trafficPoli
 	sb.WriteString("  # Envoy stops that, and no list does.\n")
 	fmt.Fprintf(sb, "  GOIABADA_%s_TRUST_PROXY_HEADERS: \"true\"\n", server)
 	fmt.Fprintf(sb, "  GOIABADA_%s_TRUSTED_PROXIES: \"\"\n", server)
+}
+
+// writeObservability writes what one ConfigMap turns on to watch its server: one log record per
+// request, as every other generated output writes (#400 decision 10), and, with metricsPort other
+// than 0, the metrics listener on its default port, which the container names metrics. server is
+// the variables' infix, AUTHSERVER or ADMINCONSOLE.
+func writeObservability(sb *strings.Builder, server string, metricsPort int) {
+	sb.WriteString("  # One log record per request answered, as every other generated configuration writes.\n")
+	fmt.Fprintf(sb, "  GOIABADA_%s_LOG_HTTP_REQUESTS: \"true\"\n", server)
+	if metricsPort == 0 {
+		return
+	}
+	fmt.Fprintf(sb, "  # Prometheus metrics, on a listener of their own at %d, the container's metrics port, which\n", metricsPort)
+	sb.WriteString("  # no Service or route publishes.\n")
+	fmt.Fprintf(sb, "  GOIABADA_%s_METRICS_ENABLED: \"true\"\n", server)
+}
+
+// writeContainerPorts writes a container's ports: the server's, and, with metricsPort other than 0,
+// its metrics listener's under the name metrics, which the PodMonitor scrapes by.
+func writeContainerPorts(sb *strings.Builder, port, metricsPort int) {
+	sb.WriteString("        ports:\n")
+	fmt.Fprintf(sb, "        - containerPort: %d\n", port)
+	if metricsPort != 0 {
+		sb.WriteString("        - name: metrics\n")
+		fmt.Fprintf(sb, "          containerPort: %d\n", metricsPort)
+	}
+}
+
+// scraperRule is the second ingress rule of a server's NetworkPolicy, admitting the metrics scraper's
+// namespace to that server's metrics port alone, and nil without one (#400 decision 8).
+func (c *Config) scraperRule(metricsPort int) *ingressRule {
+	if !c.admitsMetricsScraper() {
+		return nil
+	}
+	return &ingressRule{namespace: c.MetricsNamespace, port: metricsPort}
+}
+
+// ingressRule admits one namespace to one port.
+type ingressRule struct {
+	namespace string
+	port      int
+}
+
+// writePodMonitor writes the one PodMonitor having the Prometheus Operator scrape both servers'
+// metrics ports, carrying the labels its Prometheus selects PodMonitors by (#400 decision 7).
+func writePodMonitor(sb *strings.Builder, ns string, labels []podMonitorLabel) {
+	sb.WriteString("---\n")
+	sb.WriteString("# Has the Prometheus Operator scrape both servers' metrics ports. A Prometheus the Operator runs\n")
+	sb.WriteString("# selects only the PodMonitors its podMonitorSelector matches, in the namespaces its\n")
+	sb.WriteString("# podMonitorNamespaceSelector matches: kube-prometheus-stack, by default, only those labeled\n")
+	sb.WriteString("# release: <its release name>. Give this one the labels it selects by, with the wizard's\n")
+	sb.WriteString("# --podmonitor-labels or under metadata, and read a Prometheus's selector with:\n")
+	sb.WriteString("#   kubectl get prometheus -A -o jsonpath='{..podMonitorSelector}'\n")
+	sb.WriteString("# PodMonitor is one of the Prometheus Operator's CRDs: on a cluster without them, kubectl apply\n")
+	sb.WriteString("# exits 1 after applying everything else in this file.\n")
+	sb.WriteString("apiVersion: monitoring.coreos.com/v1\n")
+	sb.WriteString("kind: PodMonitor\n")
+	sb.WriteString("metadata:\n")
+	sb.WriteString("  name: goiabada\n")
+	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
+	if len(labels) > 0 {
+		sb.WriteString("  labels:\n")
+		for _, label := range labels {
+			fmt.Fprintf(sb, "    %s: %s\n", yamlQuote(label.key), yamlQuote(label.value))
+		}
+	}
+	sb.WriteString("spec:\n")
+	sb.WriteString("  selector:\n")
+	sb.WriteString("    matchExpressions:\n")
+	sb.WriteString("    - key: app\n")
+	sb.WriteString("      operator: In\n")
+	sb.WriteString("      values:\n")
+	sb.WriteString("      - goiabada-authserver\n")
+	sb.WriteString("      - goiabada-adminconsole\n")
+	sb.WriteString("  podMetricsEndpoints:\n")
+	sb.WriteString("  - port: metrics\n")
+	sb.WriteString("    path: /metrics\n")
 }
 
 func base64Encode(s string) string {

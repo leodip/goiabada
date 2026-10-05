@@ -78,12 +78,14 @@ The wizard will ask you a few questions:
 
 7. **Rate limiter** (production, Kubernetes and native binaries) - Whether to turn on the auth server's built-in [rate limiter](/reference/environment-variables/#security-settings), which the server leaves off by default. Yes is the default, except for Kubernetes under the `Cluster` traffic policy: there Goiabada sees a node's address for every client, so the per-IP limits would count every user arriving through one node together and throttle sign-ins on a busy site, while the limits on failed passwords and codes hold under either policy. The answer is written as `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`, `true` or `false`, under a comment. `--rate-limiter=true` or `=false` answers without the prompt; left out, the deployment's default applies. Local testing never asks and leaves it off. With the limiter on, the auth server logs a warning about its proxy trust at every start of a production Compose or Kubernetes deployment, which is expected behind one proxy (see [client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection))
 
-8. **Admin credentials** - Email and password for the first admin user. The password is a strong one
+8. **Metrics** (Kubernetes only) - Whether to expose both servers' [Prometheus metrics](/production-deployment/monitoring/), and to which kind of scraper. None, the default, leaves them off. Pod annotations turn the metrics listeners on, declare a container port named `metrics` on each server (9190 and 9191), and write the `prometheus.io/scrape`, `port` and `path` annotations, which the prometheus-community `prometheus` chart reads by default and kube-prometheus-stack ignores. A PodMonitor does the same without the annotations and writes one PodMonitor for the Prometheus Operator, which kube-prometheus-stack runs; it then asks for the labels the operator's Prometheus selects PodMonitors by, such as `release=kube-prometheus-stack`, blank for none. On a cluster without the Operator's CRDs, `kubectl apply` exits 1 after applying everything else. With the NetworkPolicies on, it also asks which namespace the scraper runs in, `monitoring` by default, and each policy admits that namespace to its server's metrics port alone. `--metrics=none`, `=annotations` or `=podmonitor`, `--podmonitor-labels` and `--metrics-namespace` answer without the prompts
+
+9. **Admin credentials** - Email and password for the first admin user. The password is a strong one
    generated if you press Enter, shown as `[generated]`, never its value. One you type is read without
    echo and checked for strength, and a weak one is kept only if you confirm it (see
    [Passwords and the terminal](#passwords-and-the-terminal))
 
-9. **Database password** - A strong password, generated if you press Enter. The prompt shows the
+10. **Database password** - A strong password, generated if you press Enter. The prompt shows the
    generated default as `[generated]`, never its value, and reads what you type without echo
 
 ## What gets generated
@@ -123,6 +125,7 @@ The wizard creates a `goiabada-k8s.yaml` file with:
 - Services
 - Gateway and HTTPRoutes (TLS by cert-manager)
 - NetworkPolicies, one per Deployment, if you asked for them
+- A PodMonitor, if you asked for one
 
 and, beside it, a `goiabada-secrets.yaml` file with the Secrets the manifest reads, pre-generated and
 base64 encoded: the AES key alone in `goiabada-encryption-key`, so access to it can be restricted on its

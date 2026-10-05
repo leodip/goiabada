@@ -96,6 +96,26 @@ var answerCases = []goldenCase{
 	{name: "kubernetes-rate-limiter-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
 		c.RateLimiter = true
 	}},
+	// Kubernetes exposing its metrics to a scraper that reads pod annotations, and to the Prometheus
+	// Operator through a PodMonitor, with and without the labels its Prometheus selects by (#400
+	// decision 7).
+	{name: "kubernetes-metrics-annotations-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.Metrics = metricsAnnotations
+	}},
+	{name: "kubernetes-metrics-podmonitor-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.Metrics = metricsPodMonitor
+	}},
+	{name: "kubernetes-metrics-podmonitor-labels-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.Metrics = metricsPodMonitor
+		c.PodMonitorLabels = []podMonitorLabel{{"release", "kube-prometheus-stack"}}
+	}},
+	// Metrics with the NetworkPolicies on, which admit the scraper's namespace, monitoring by
+	// default, to the metrics port alone (#400 decision 8).
+	{name: "kubernetes-metrics-network-policy-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.Metrics = metricsPodMonitor
+		c.NetworkPolicy = true
+		c.MetricsNamespace = "monitoring"
+	}},
 }
 
 // hostileCases are one configuration per format, Compose, Kubernetes and the env file, whose
@@ -186,6 +206,14 @@ func goldenConfig(kind deploymentType, engineName string) *Config {
 	// Production Compose, native binaries and Kubernetes ask whether to turn the rate limiter on,
 	// yes by default but for Kubernetes under the Cluster traffic policy; local testing never asks.
 	config.RateLimiter = kind == deploymentProduction || kind == deploymentNative
+	// Only Kubernetes asks whether to expose the metrics, none by default, and the scraper's
+	// namespace only with the NetworkPolicies on.
+	config.Metrics = ""
+	if kind == deploymentKubernetes {
+		config.Metrics = metricsNone
+	}
+	config.PodMonitorLabels = nil
+	config.MetricsNamespace = ""
 	return config
 }
 
