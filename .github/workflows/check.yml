@@ -570,8 +570,10 @@ jobs:
       # SQL Server log never fsync to the runner's virtual disk. The data tier
       # drops and rebuilds the schema per migration test, and on a slow Azure
       # host those fsyncs took the mysql tier from under 2 minutes to 8.
+      # The image the generated deployments run, which the setup wizard's
+      # TestDevelopmentStacks_RunTheGeneratedDatabaseImages holds this to.
       mysql-server:
-        image: mysql:latest
+        image: mysql:26
         env:
           MYSQL_ROOT_PASSWORD: mySqlPass123
           MYSQL_TCP_PORT: 13306

@@ -31,7 +31,11 @@ services:
       - goiabada-network
 
   mysql-server:
-    image: mysql:latest
+    # The image the generated deployments run, which the setup wizard's
+    # TestDevelopmentStacks_RunTheGeneratedDatabaseImages holds this to: a
+    # major upgrade is one change to both, and a dump and restore of the
+    # mysql-data volume, not a tag edit.
+    image: mysql:26
     command: --port=13306
     volumes:
       - mysql-data:/var/lib/mysql
