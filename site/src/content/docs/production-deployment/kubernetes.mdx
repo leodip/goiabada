@@ -57,8 +57,10 @@ The setup wizard generates:
 - **PodDisruptionBudgets**: One per Deployment (see [Disruptions](#disruptions-and-spread))
 - **Services**: ClusterIP services for internal routing
 - **NetworkPolicies**, if you ask for them: one per Deployment, admitting only Envoy and the admin
-  console (see [Who can reach Goiabada](#who-can-reach-goiabada))
+  console, and your metrics scraper to the metrics ports (see [Who can reach Goiabada](#who-can-reach-goiabada))
 - **Gateway and HTTPRoutes**: External access with TLS termination
+- **PodMonitor**, if you ask for one: has the Prometheus Operator scrape both servers' metrics (see
+  [Metrics](#metrics))
 
 ## Prerequisites
 
@@ -282,8 +284,9 @@ Use the [setup wizard](/getting-started/setup-wizard/):
 4. Enter your Kubernetes namespace (default: `goiabada`)
 5. Choose the gateway's traffic policy, `Cluster` (default) or `Local` (see [Step 1](#step-1-install-envoy-gateway))
 6. Choose whether NetworkPolicies restrict who can reach Goiabada (default: no; see [Who can reach Goiabada](#who-can-reach-goiabada))
-7. Configure admin credentials
-8. Enter your database connection details
+7. Choose whether to expose Prometheus metrics, and to which kind of scraper (default: no; see [Metrics](#metrics))
+8. Configure admin credentials
+9. Enter your database connection details
 </Steps>
 
 The wizard will:
@@ -672,6 +675,12 @@ On yes, the manifest carries one ingress-only NetworkPolicy per Deployment:
 |------|-------------|------|
 | `goiabada-authserver` | TCP 9090 | Envoy's namespace, `envoy-gateway-system`; the admin console's pods |
 | `goiabada-adminconsole` | TCP 9091 | Envoy's namespace, `envoy-gateway-system` |
+| `goiabada-authserver` | TCP 9190, with metrics exposed | The metrics scraper's namespace, `monitoring` unless you name another |
+| `goiabada-adminconsole` | TCP 9191, with metrics exposed | The metrics scraper's namespace, `monitoring` unless you name another |
+
+The metrics ports are a second rule of each policy, so the scraper's namespace reaches the metrics
+port and nothing else, and Envoy and the admin console do not reach it at all (see
+[Metrics](#metrics)).
 
 Envoy's namespace is selected by its `kubernetes.io/metadata.name` label, which Kubernetes sets on
 every namespace. `envoy-gateway-system` is where Envoy Gateway runs its proxies by default; if yours
@@ -687,7 +696,7 @@ Before you answer yes, check two things:
 - **Nothing else in the cluster calls the auth server through its Service.** A resource server that
   fetches `/certs` or calls `/userinfo` at `http://goiabada-authserver.goiabada:9090` is refused once
   the policy applies, and the connection times out rather than being refused. Admit its namespace
-  by adding a peer to the auth server's policy, as its comment shows:
+  by adding a peer to the first rule of the auth server's policy, as its comment shows:
 
   ```yaml
   ingress:
@@ -1382,6 +1391,56 @@ the Service together, so clients would get the gateway's "no healthy upstream" i
 application's own error and recovery would wait a probe period longer. A pod that cannot reach the
 database at start never answers `/health` at all, because the auth server opens and migrates the
 database before it listens.
+
+## Metrics
+
+Both servers can serve Prometheus metrics on a port of their own, 9190 for the auth server and 9191
+for the admin console, which no Service, HTTPRoute or Gateway publishes. The setup wizard asks
+whether to expose them, **Expose Prometheus metrics?**, with three answers:
+
+| Answer | Flag | What the manifest gets |
+|--------|------|------------------------|
+| No (default) | `--metrics=none` | Nothing: the metrics listeners stay off |
+| Pod annotations | `--metrics=annotations` | Both listeners on, a container port named `metrics` on each server, and the `prometheus.io/scrape`, `port` and `path` annotations on both pod templates |
+| PodMonitor | `--metrics=podmonitor` | Both listeners on, the `metrics` container ports, and one `monitoring.coreos.com/v1` PodMonitor selecting both Deployments by that port |
+
+Which one works depends on what scrapes your cluster. The annotations are read by the
+prometheus-community `prometheus` chart and by Datadog, and ignored by kube-prometheus-stack, which
+scrapes only what a PodMonitor or ServiceMonitor names. Choosing the PodMonitor asks one more thing,
+the labels your Prometheus selects PodMonitors by, such as `release=kube-prometheus-stack`
+(`--podmonitor-labels`), blank for none: a PodMonitor no Prometheus selects scrapes nothing. On a
+cluster without the Prometheus Operator's CRDs, `kubectl apply` exits 1 on the PodMonitor after
+applying everything else. For Google Managed Prometheus, Grafana Alloy or the OpenTelemetry
+Collector, answer pod annotations, which turns the listeners on and names the port, and see
+[scraping the endpoint](/production-deployment/monitoring/#scraping-the-endpoint).
+
+The listeners are turned on by `GOIABADA_AUTHSERVER_METRICS_ENABLED` and
+`GOIABADA_ADMINCONSOLE_METRICS_ENABLED`, each in its server's ConfigMap. To expose the metrics from a
+manifest generated without them, run the wizard again with the answer you want and compare, or set
+those two to `"true"` and add the `metrics` port to each container yourself, here the auth server's,
+with 9191 for the admin console:
+
+```yaml
+ports:
+- containerPort: 9090
+- name: metrics
+  containerPort: 9190
+```
+
+With the NetworkPolicies on, the wizard also asks which namespace the scraper runs in
+(`--metrics-namespace`, `monitoring` by default), and each policy gains a second ingress rule
+admitting that namespace to its server's metrics port alone. The first rule, for Envoy and the admin
+console, is unchanged and does not open the metrics port. To admit a scraper in another namespace,
+add its `namespaceSelector` to that second rule's `from`. Without the NetworkPolicies, any pod in the
+cluster can read the metrics; they hold no user data, but see [Who can reach
+Goiabada](#who-can-reach-goiabada).
+
+Every generated manifest also turns request logging on, `GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS` and
+`GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS` set to `"true"` in the two ConfigMaps, so each request
+writes one `http request` record to the pod's log.
+
+See [Monitoring](/production-deployment/monitoring/) for what the metrics report, what to alert on and
+what to watch in the logs.
 
 ## First start and upgrades
 

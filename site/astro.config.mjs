@@ -86,6 +86,7 @@ export default defineConfig({
 						{ label: 'Reverse proxy (no Cloudflare)', slug: 'production-deployment/reverse-proxy' },
 						{ label: 'Kubernetes', slug: 'production-deployment/kubernetes' },
 						{ label: 'Native binaries', slug: 'production-deployment/native-binaries' },
+						{ label: 'Monitoring', slug: 'production-deployment/monitoring' },
 						{ label: 'Production checklist', slug: 'production-deployment/production-checklist' },
 					],
 				},

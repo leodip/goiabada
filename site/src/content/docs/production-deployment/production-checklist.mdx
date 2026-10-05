@@ -71,9 +71,10 @@ sudo systemctl status certbot.timer
 
 ## Monitoring
 
-- [ ] **Health checks configured** - Monitor `/health` endpoints
-- [ ] **Logging configured** - Ensure logs are being captured
-- [ ] **Alerting set up** - Get notified of failures
+- [ ] **Health checks configured** - Monitor `/health` endpoints. They say the process is up, not that the database or the auth server answers
+- [ ] **Metrics scraped** - Both servers' metrics listeners turned on and scraped, with their ports published nowhere. See [Monitoring](/production-deployment/monitoring/#turning-the-endpoint-on)
+- [ ] **Alerting set up** - At least on server errors, database pool waits, rate-limit refusals and the cleanup run. See [suggested alerts](/production-deployment/monitoring/#suggested-alerts)
+- [ ] **Logging configured** - Both servers' logs captured, with request logging on and the error records counted. See [what to watch in the logs](/production-deployment/monitoring/#what-to-watch-in-the-logs)
 - [ ] **Audit log retention reviewed** - Confirm the **Audit log settings** page reflects your compliance and storage requirements (defaults: console and database both enabled, 180 day retention). See [Audit log](/concepts/audit-log/).
 
 Health check URLs:
