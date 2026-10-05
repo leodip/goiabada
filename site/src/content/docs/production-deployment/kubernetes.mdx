@@ -748,7 +748,7 @@ way](#creating-the-secrets-another-way) instead: the manifest needs only the Sec
 ### The Secrets the manifest reads
 
 The manifest reads two Secrets from its namespace, by these names and keys. Created by any route,
-they are all it needs:
+the rows not marked optional are all it needs:
 
 | Secret | Key | Variable | Read by | Value |
 |--------|-----|----------|---------|-------|
@@ -760,10 +760,20 @@ they are all it needs:
 | `goiabada-secrets` | `admin-session-enc-key` | `GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY` | admin console | 32 random bytes as 64 hex characters, `openssl rand -hex 32` |
 | `goiabada-secrets` | `oauth-client-secret` | `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` | both | The admin console's OAuth client secret. The auth server reads it only at the first start, to create the admin console's client with it; the admin console authenticates with it from then on, so it must match the client's secret in the database |
 | `goiabada-encryption-key` | `aes-encryption-key` | `GOIABADA_AES_ENCRYPTION_KEY` | auth server | 32 random bytes as 64 hex characters, `openssl rand -hex 32`. It encrypts the secrets the database holds |
+| `goiabada-secrets` | `auth-session-auth-key-previous` | `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS` | auth server | Optional, held only while the session keys rotate: with the next key, the pair the auth server opens sessions with beside its current one |
+| `goiabada-secrets` | `auth-session-enc-key-previous` | `GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS` | auth server | Optional, the other half of the auth server's previous pair |
+| `goiabada-secrets` | `admin-session-auth-key-previous` | `GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS` | admin console | Optional, held only while the session keys rotate: with the next key, the admin console's previous pair |
+| `goiabada-secrets` | `admin-session-enc-key-previous` | `GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS` | admin console | Optional, the other half of the admin console's previous pair |
+| `goiabada-encryption-key` | `aes-encryption-key-previous` | `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` | auth server | Optional, held only while the AES key rotates: the key the database is under, which the auth server re-encrypts from when it starts |
 
 Each Secret must exist before the pods that read it start, so apply the manifest, which creates the
 namespace, then the Secrets; a pod that starts first waits in `CreateContainerConfigError` and starts
 once they exist.
+
+The manifest's references to the five `-previous` keys are optional: a pod starts without them, and
+each server reads a missing one as no rotation in progress. Create them only as [Rotating
+secrets](#rotating-secrets) says. A previous session pair is read whole or not at all, since a server
+refuses to start with one half of it, so add and remove its two keys together.
 
 ### Creating the Secrets another way
 
@@ -910,9 +920,10 @@ reaches a pod when the pod restarts and not before, so every change is followed 
 any other reason, a crash, an eviction or a scale-up, picks up the new value on its own; the steps
 below are ordered so that this is harmless.
 
-Each step says what the Secrets hold when it ends, and its commands get them there with `kubectl
-patch`, which suits Secrets nothing else writes: created with `kubectl create secret`, or from the
-generated `goiabada-secrets.yaml` applied once. If you kept that file, it still holds the keys from
+The manifest references every `-previous` key a rotation uses, optionally, so a rotation changes the
+Secrets and restarts the pods, and edits no Deployment. Each step says what the Secrets hold when it
+ends, and its commands get them there with `kubectl patch`, which suits Secrets nothing else writes:
+created with `kubectl create secret`, or from the generated `goiabada-secrets.yaml` applied once. If you kept that file, it still holds the keys from
 before the rotation, and applying it again puts them back, so delete it once the Secrets are in the
 cluster. When the External Secrets Operator, the SealedSecrets controller or a GitOps tool owns the
 Secrets, it writes back what its source holds, undoing a patch partway through a rotation, which is
@@ -933,31 +944,25 @@ previous pair and the two are then swapped. Done this way, nobody is signed out.
    ```bash
    kubectl patch secret goiabada-secrets -n goiabada --type=merge --patch-file=/dev/stdin <<EOF
    {"stringData": {
-     "authserver-session-authentication-key-previous": "$(openssl rand -hex 64)",
-     "authserver-session-encryption-key-previous": "$(openssl rand -hex 32)",
-     "adminconsole-session-authentication-key-previous": "$(openssl rand -hex 64)",
-     "adminconsole-session-encryption-key-previous": "$(openssl rand -hex 32)"
+     "auth-session-auth-key-previous": "$(openssl rand -hex 64)",
+     "auth-session-enc-key-previous": "$(openssl rand -hex 32)",
+     "admin-session-auth-key-previous": "$(openssl rand -hex 64)",
+     "admin-session-enc-key-previous": "$(openssl rand -hex 32)"
    }}
    EOF
-   kubectl set env deployment/goiabada-authserver -n goiabada --prefix=GOIABADA_ \
-     --from=secret/goiabada-secrets \
-     --keys=authserver-session-authentication-key-previous,authserver-session-encryption-key-previous
-   kubectl set env deployment/goiabada-adminconsole -n goiabada --prefix=GOIABADA_ \
-     --from=secret/goiabada-secrets \
-     --keys=adminconsole-session-authentication-key-previous,adminconsole-session-encryption-key-previous
+   kubectl rollout restart deployment/goiabada-authserver deployment/goiabada-adminconsole -n goiabada
    kubectl rollout status deployment/goiabada-authserver deployment/goiabada-adminconsole -n goiabada
    ```
 
-   The patch reads the new keys from a here-document, so they never reach the process list. `kubectl
-   set env` gives the auth server `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS` and
-   `GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS`, and the admin console
+   The patch reads the new keys from a here-document, so they never reach the process list, and adds
+   both halves of each pair at once. The restarted pods read them through the manifest's references:
+   the auth server as `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS` and
+   `GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS`, the admin console as
    `GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS` and
-   `GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS`, each a reference to its key, and warns
-   that it "transferred" each key, which is expected. Changing the pod template starts the first
-   rollout.
+   `GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS`.
 
    When this step ends, `goiabada-secrets` holds the current pairs under their usual keys and the new
-   pairs under the four `-previous` keys, and both Deployments reference the `-previous` keys.
+   pairs under the four `-previous` keys.
 
 2. **Swap the pairs,** so that the new one is current and the old one previous, and restart:
 
@@ -965,14 +970,14 @@ previous pair and the two are then swapped. Done this way, nobody is signed out.
    key() { kubectl get secret goiabada-secrets -n goiabada -o "jsonpath={.data.$1}"; }
    kubectl patch secret goiabada-secrets -n goiabada --type=merge --patch-file=/dev/stdin <<EOF
    {"data": {
-     "auth-session-auth-key": "$(key authserver-session-authentication-key-previous)",
-     "auth-session-enc-key": "$(key authserver-session-encryption-key-previous)",
-     "admin-session-auth-key": "$(key adminconsole-session-authentication-key-previous)",
-     "admin-session-enc-key": "$(key adminconsole-session-encryption-key-previous)",
-     "authserver-session-authentication-key-previous": "$(key auth-session-auth-key)",
-     "authserver-session-encryption-key-previous": "$(key auth-session-enc-key)",
-     "adminconsole-session-authentication-key-previous": "$(key admin-session-auth-key)",
-     "adminconsole-session-encryption-key-previous": "$(key admin-session-enc-key)"
+     "auth-session-auth-key": "$(key auth-session-auth-key-previous)",
+     "auth-session-enc-key": "$(key auth-session-enc-key-previous)",
+     "admin-session-auth-key": "$(key admin-session-auth-key-previous)",
+     "admin-session-enc-key": "$(key admin-session-enc-key-previous)",
+     "auth-session-auth-key-previous": "$(key auth-session-auth-key)",
+     "auth-session-enc-key-previous": "$(key auth-session-enc-key)",
+     "admin-session-auth-key-previous": "$(key admin-session-auth-key)",
+     "admin-session-enc-key-previous": "$(key admin-session-enc-key)"
    }}
    EOF
    kubectl rollout restart deployment/goiabada-authserver deployment/goiabada-adminconsole -n goiabada
@@ -990,31 +995,25 @@ previous pair and the two are then swapped. Done this way, nobody is signed out.
    lifetime is on the admin console's **Settings → Sessions** page, 24 hours unless you changed it,
    and it bounds both servers' sessions. A session is sealed under the new pair the next time it is
    saved, and none outlives that lifetime, so by then every signed-in session is under the new pair.
-   Remove the variables first, and the keys once that rollout is done, since a pod whose variable
-   names a missing key does not start:
+   Remove the keys, and restart so that no pod opens sessions under the old pair any more:
 
    ```bash
-   kubectl set env deployment/goiabada-authserver -n goiabada \
-     GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS- \
-     GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS-
-   kubectl set env deployment/goiabada-adminconsole -n goiabada \
-     GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS- \
-     GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS-
-   kubectl rollout status deployment/goiabada-authserver deployment/goiabada-adminconsole -n goiabada
    kubectl patch secret goiabada-secrets -n goiabada --type=json -p='[
-     {"op": "remove", "path": "/data/authserver-session-authentication-key-previous"},
-     {"op": "remove", "path": "/data/authserver-session-encryption-key-previous"},
-     {"op": "remove", "path": "/data/adminconsole-session-authentication-key-previous"},
-     {"op": "remove", "path": "/data/adminconsole-session-encryption-key-previous"}
+     {"op": "remove", "path": "/data/auth-session-auth-key-previous"},
+     {"op": "remove", "path": "/data/auth-session-enc-key-previous"},
+     {"op": "remove", "path": "/data/admin-session-auth-key-previous"},
+     {"op": "remove", "path": "/data/admin-session-enc-key-previous"}
    ]'
+   kubectl rollout restart deployment/goiabada-authserver deployment/goiabada-adminconsole -n goiabada
+   kubectl rollout status deployment/goiabada-authserver deployment/goiabada-adminconsole -n goiabada
    ```
 
    A sign-in still in progress, one not yet signed in, can still be under the old pair, so removing it
    may restart that sign-in, at the cost of the form being filled in. Replacing the keys in one step
    instead signs everybody out once.
 
-   When this step ends, neither Deployment references a `-previous` key, and `goiabada-secrets` holds
-   its seven keys again, the session keys being the new pairs.
+   When this step ends, `goiabada-secrets` holds its seven keys again, the session keys being the new
+   pairs.
 
 #### The AES key
 
@@ -1053,15 +1052,13 @@ console's requests to it fail until it is back.
 5. Start one pod with both keys:
 
    ```bash
-   kubectl set env deployment/goiabada-authserver -n goiabada --prefix=GOIABADA_ \
-     --from=secret/goiabada-encryption-key --keys=aes-encryption-key-previous
    kubectl scale deployment goiabada-authserver -n goiabada --replicas=1
    kubectl rollout status deployment/goiabada-authserver -n goiabada
    kubectl logs -n goiabada deployment/goiabada-authserver | grep 'rotated data-at-rest encryption'
    ```
 
-   `kubectl set env` adds `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` while the Deployment runs no pod, so
-   nothing starts until the scale. The log line, `rotated data-at-rest encryption to the new
+   The pod reads `aes-encryption-key-previous` as `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` through the
+   manifest's reference. The log line, `rotated data-at-rest encryption to the new
    GOIABADA_AES_ENCRYPTION_KEY`, says the re-encryption committed. From then on the database is under
    the new key alone, and the Secret must go on holding it as `aes-encryption-key`: an auth server
    started with the old key there decrypts nothing. If the pod stops instead with
@@ -1080,13 +1077,13 @@ console's requests to it fail until it is back.
    re-encrypts nothing.
 
    ```bash
-   kubectl set env deployment/goiabada-authserver -n goiabada GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS-
-   kubectl rollout status deployment/goiabada-authserver -n goiabada
    kubectl patch secret goiabada-encryption-key -n goiabada --type=json \
      -p='[{"op": "remove", "path": "/data/aes-encryption-key-previous"}]'
+   kubectl rollout restart deployment/goiabada-authserver -n goiabada
+   kubectl rollout status deployment/goiabada-authserver -n goiabada
    ```
 
-   When this step ends, the Deployment does not reference `aes-encryption-key-previous`, and
+   The restart takes the old key out of the pods' environment. When this step ends,
    `goiabada-encryption-key` holds the new key alone.
 
 Keep the old key as long as you keep a database backup taken before the rotation.
@@ -1142,15 +1139,15 @@ kubectl annotate externalsecret goiabada-encryption-key -n goiabada force-sync="
   for each authentication key and `openssl rand -hex 32` for each encryption key, then adds the four
   lines mapping the `-previous` keys to them. Step 2 is one edit that maps the four current keys,
   `auth-session-auth-key` and the rest, to the new entries, and the four `-previous` keys to the
-  entries the current keys mapped until then; no entry's value changes. Step 3 removes the
-  Deployments' references first, as above, then the four `-previous` lines from `data`, then the old
-  pairs' entries.
+  entries the current keys mapped until then; no entry's value changes. Step 3 removes the four
+  `-previous` lines from `data`, restarts the pods once the Secret no longer holds those keys, then
+  deletes the old pairs' entries.
 - For the AES key, step 3 creates an entry holding a new key, `openssl rand -hex 32`, such as
   `goiabada/aes-encryption-key-2026-10`, then, in one edit, maps `aes-encryption-key` to it and adds
   a line mapping `aes-encryption-key-previous` to the entry `aes-encryption-key` mapped until then,
   the one holding the key the database is under. Once the Secret holds both, check that the digest
   of `aes-encryption-key-previous` is that of the key you backed up in step 1. Step 4 reads the new
-  key out of the cluster. Step 7 removes the Deployment's reference, then the line from `data`. The
+  key out of the cluster. Step 7 removes the line from `data`, then restarts the auth server. The
   old key's entry can stay as that key's backup, for as long as you keep a database backup taken
   under it.
 
@@ -1170,24 +1167,24 @@ seal() { kubectl create secret generic goiabada-secrets -n goiabada --dry-run=cl
   | kubeseal --format yaml --merge-into goiabada-secrets.sealed.yaml; }
 
 # Session keys, step 1: the new pairs as the previous pairs.
-seal --from-file=authserver-session-authentication-key-previous=<(openssl rand -hex 64 | tr -d '\n') \
-  --from-file=authserver-session-encryption-key-previous=<(openssl rand -hex 32 | tr -d '\n') \
-  --from-file=adminconsole-session-authentication-key-previous=<(openssl rand -hex 64 | tr -d '\n') \
-  --from-file=adminconsole-session-encryption-key-previous=<(openssl rand -hex 32 | tr -d '\n')
+seal --from-file=auth-session-auth-key-previous=<(openssl rand -hex 64 | tr -d '\n') \
+  --from-file=auth-session-enc-key-previous=<(openssl rand -hex 32 | tr -d '\n') \
+  --from-file=admin-session-auth-key-previous=<(openssl rand -hex 64 | tr -d '\n') \
+  --from-file=admin-session-enc-key-previous=<(openssl rand -hex 32 | tr -d '\n')
 
 # Session keys, step 2: the pairs swapped, once step 1's file has been applied and unsealed.
-seal --from-file=auth-session-auth-key=<(key authserver-session-authentication-key-previous) \
-  --from-file=auth-session-enc-key=<(key authserver-session-encryption-key-previous) \
-  --from-file=admin-session-auth-key=<(key adminconsole-session-authentication-key-previous) \
-  --from-file=admin-session-enc-key=<(key adminconsole-session-encryption-key-previous) \
-  --from-file=authserver-session-authentication-key-previous=<(key auth-session-auth-key) \
-  --from-file=authserver-session-encryption-key-previous=<(key auth-session-enc-key) \
-  --from-file=adminconsole-session-authentication-key-previous=<(key admin-session-auth-key) \
-  --from-file=adminconsole-session-encryption-key-previous=<(key admin-session-enc-key)
+seal --from-file=auth-session-auth-key=<(key auth-session-auth-key-previous) \
+  --from-file=auth-session-enc-key=<(key auth-session-enc-key-previous) \
+  --from-file=admin-session-auth-key=<(key admin-session-auth-key-previous) \
+  --from-file=admin-session-enc-key=<(key admin-session-enc-key-previous) \
+  --from-file=auth-session-auth-key-previous=<(key auth-session-auth-key) \
+  --from-file=auth-session-enc-key-previous=<(key auth-session-enc-key) \
+  --from-file=admin-session-auth-key-previous=<(key admin-session-auth-key) \
+  --from-file=admin-session-enc-key-previous=<(key admin-session-enc-key)
 ```
 
-Step 3 deletes the four `-previous` lines from `spec.encryptedData`, after the Deployments' references
-are gone. For the AES key, step 3 seals the key the cluster holds now as the previous key, beside a
+Step 3 deletes the four `-previous` lines from `spec.encryptedData`, and restarts the pods once the
+controller has removed those keys from the Secret. For the AES key, step 3 seals the key the cluster holds now as the previous key, beside a
 new one, in one file:
 
 ```bash
@@ -1200,32 +1197,16 @@ kubectl create secret generic goiabada-encryption-key -n goiabada --dry-run=clie
 
 Before you apply it, check that the digest of `aes-encryption-key` in the cluster is that of the key
 you backed up in step 1: that is the key the previous entry has to hold. Step 7 deletes the
-`aes-encryption-key-previous` line. Commit each file as you apply it, so the repository's file is
+`aes-encryption-key-previous` line, then restarts the auth server. Commit each file as you apply it, so the repository's file is
 always the one the controller last unsealed.
 
-**When a GitOps tool applies the manifest,** it also puts back what the manifest says about the
-Deployments: `replicas` certainly, which would start auth server pods while step 2 of the AES key
-keeps them stopped, and, depending on how it compares, the `-previous` references `kubectl set env`
-added. Suspend its automated sync for the rotation (in Argo CD, turn off the Application's automated
-sync; in Flux, `flux suspend kustomization <name>`) and resume it once the repository says what the
-cluster does, or make each Deployment change in the manifest instead. A reference is one more `env`
-entry beside the key it follows, the same for each `-previous` key:
-
-```yaml
-        - name: GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS
-          valueFrom:
-            secretKeyRef:
-              name: goiabada-encryption-key
-              key: aes-encryption-key-previous
-```
-
-The session keys' references are `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS` and
-`GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS` on the auth server, and
-`GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS` and
-`GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS` on the admin console, each from the
-`goiabada-secrets` key that is its name without `GOIABADA_`, in lowercase with hyphens:
-`authserver-session-authentication-key-previous` and so on. The AES key's scale to zero and back is simpler with sync suspended, since it happens
-between commits.
+**When a GitOps tool applies the manifest,** the only Deployment field a rotation changes is the
+AES key's `replicas`: the tool puts back the manifest's count, which would start auth server pods
+while step 2 keeps them stopped. Suspend its automated sync for the AES key's rotation (in Argo CD,
+turn off the Application's automated sync; in Flux, `flux suspend kustomization <name>`) and resume
+it once step 6 has scaled back. The session keys' rotation changes nothing the manifest sets: the
+`-previous` references are already in it, and `kubectl rollout restart` adds only an annotation to the
+pod template.
 
 ## Health endpoints
 

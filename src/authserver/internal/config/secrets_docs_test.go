@@ -49,9 +49,10 @@ func TestSecretsDocs_NameOnlyVariablesTheServersRead(t *testing.T) {
 }
 
 // The Secret contract in kubernetes.mdx is what the generated manifests read: every Secret, key
-// and variable, and which server reads it, row for row in both directions. Every `kubectl create
-// secret generic` the Kubernetes sections print creates exactly the keys the manifests read from
-// that Secret, so a Secret created by any route the docs show is one the manifest can start from
+// and variable, which server reads it, and whether its reference is optional, row for row in both
+// directions. Every `kubectl create secret generic` the Kubernetes sections print creates exactly
+// the keys the manifests require from that Secret, so a Secret created by any route the docs show
+// is one the manifest can start from; the optional ones are the previous keys a rotation fills
 // (#396 decision 18).
 func TestKubernetesDocs_TheSecretContractIsWhatTheManifestsRead(t *testing.T) {
 	assertSecretContract(t, filepath.Dir(guard.SourceRoot(t)))
@@ -138,6 +139,12 @@ spec:
             secretKeyRef:
               name: goiabada-encryption-key
               key: aes-encryption-key
+        - name: GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS
+          valueFrom:
+            secretKeyRef:
+              name: goiabada-encryption-key
+              key: aes-encryption-key-previous
+              optional: true
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -162,7 +169,8 @@ const contractPage = "## Secrets\n\n" +
 	"|--------|-----|----------|---------|-------|\n" +
 	"| `goiabada-secrets` | `db-password` | `GOIABADA_DB_PASSWORD` | auth server | the password |\n" +
 	"| `goiabada-secrets` | `oauth-client-secret` | `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` | both | a secret |\n" +
-	"| `goiabada-encryption-key` | `aes-encryption-key` | `GOIABADA_AES_ENCRYPTION_KEY` | auth server | a key |\n\n" +
+	"| `goiabada-encryption-key` | `aes-encryption-key` | `GOIABADA_AES_ENCRYPTION_KEY` | auth server | a key |\n" +
+	"| `goiabada-encryption-key` | `aes-encryption-key-previous` | `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` | auth server | Optional. A key |\n\n" +
 	"```bash\nkubectl create secret generic goiabada-secrets -n goiabada \\\n" +
 	"  --from-file=db-password=<(printf %s \"$DB_PASSWORD\") \\\n" +
 	"  --from-file=oauth-client-secret=<(openssl rand -hex 32)\n```\n\n" +
@@ -185,6 +193,8 @@ func TestKubernetesDocs_ADriftedContractFails(t *testing.T) {
 		"| `goiabada-encryption-key` | `aes-encryption-key` | `GOIABADA_AES_ENCRYPTION_KEY` | auth server | a key |\n",
 		"| `goiabada-secrets` | `extra` | `GOIABADA_EXTRA` | auth server | x |\n",
 		" \\\n  --from-file=oauth-client-secret=<(openssl rand -hex 32)", "",
+		// An optional reference the table does not say is optional.
+		"| auth server | Optional. A key |", "| auth server | A key |",
 	).Replace(contractPage)
 	writeManifestFixture(t, root, kubernetesPage, page)
 
@@ -199,6 +209,7 @@ func TestKubernetesDocs_ADriftedContractFails(t *testing.T) {
 		"kubernetes-postgres.golden: the manifest reads goiabada-encryption-key/aes-encryption-key as GOIABADA_AES_ENCRYPTION_KEY, read by auth server; the docs' table lacks it",
 		"kubernetes-postgres.golden: the docs' table has goiabada-secrets/extra as GOIABADA_EXTRA, which the manifest does not read",
 		"`kubectl create secret generic goiabada-secrets` creates [db-password], want [db-password oauth-client-secret]",
+		"kubernetes-postgres.golden: the manifest reads goiabada-encryption-key/aes-encryption-key-previous as GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS, read by auth server, optional; the docs' table says auth server",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("no failure says %q:\n%s", want, text)
@@ -207,8 +218,8 @@ func TestKubernetesDocs_ADriftedContractFails(t *testing.T) {
 	if strings.Contains(text, "secrets.golden") || strings.Contains(text, "goiabada-encryption-key` creates") {
 		t.Errorf("a failure names the secrets golden or the correct create command:\n%s", text)
 	}
-	if len(report.Errors) != 4 {
-		t.Errorf("%d failures, want 4:\n%s", len(report.Errors), text)
+	if len(report.Errors) != 5 {
+		t.Errorf("%d failures, want 5:\n%s", len(report.Errors), text)
 	}
 }
 
@@ -339,6 +350,21 @@ type secretRef struct{ secret, key, variable string }
 
 func (r secretRef) String() string { return r.secret + "/" + r.key + " as " + r.variable }
 
+// secretReader is which of the two servers reads a key, "auth server", "admin console" or "both",
+// and whether its reference is optional, which the table says by opening the row's Value with
+// "Optional". A pod starts with an optional key missing, so no route the docs show has to create it.
+type secretReader struct {
+	reader   string
+	optional bool
+}
+
+func (r secretReader) String() string {
+	if r.optional {
+		return r.reader + ", optional"
+	}
+	return r.reader
+}
+
 const contractHeader = "| Secret | Key | Variable | Read by |"
 
 // assertSecretContract is the reporting half of the contract check.
@@ -398,7 +424,9 @@ func secretContractFindings(root string) ([]string, error) {
 			if keysRead[ref.secret] == nil {
 				keysRead[ref.secret] = map[string]bool{}
 			}
-			keysRead[ref.secret][ref.key] = true
+			if !reader.optional {
+				keysRead[ref.secret][ref.key] = true
+			}
 			docReader, ok := documented[ref]
 			switch {
 			case !ok:
@@ -435,9 +463,9 @@ func secretContractFindings(root string) ([]string, error) {
 }
 
 // contractTable reads the table whose header begins contractHeader: each row's Secret, Key and
-// Variable, and its Read by.
-func contractTable(section string) (map[secretRef]string, error) {
-	rows := map[secretRef]string{}
+// Variable, its Read by, and whether its Value opens with "Optional".
+func contractTable(section string) (map[secretRef]secretReader, error) {
+	rows := map[secretRef]secretReader{}
 	inTable := false
 	for _, line := range strings.Split(section, "\n") {
 		line = strings.TrimSpace(line)
@@ -452,11 +480,11 @@ func contractTable(section string) (map[secretRef]string, error) {
 			break
 		}
 		cells := strings.Split(strings.Trim(line, "|"), "|")
-		if len(cells) < 4 || strings.HasPrefix(strings.TrimSpace(cells[0]), "---") {
+		if len(cells) < 5 || strings.HasPrefix(strings.TrimSpace(cells[0]), "---") {
 			continue
 		}
 		cell := func(i int) string { return strings.Trim(strings.TrimSpace(cells[i]), "`") }
-		rows[secretRef{cell(0), cell(1), cell(2)}] = cell(3)
+		rows[secretRef{cell(0), cell(1), cell(2)}] = secretReader{cell(3), strings.HasPrefix(cell(4), "Optional")}
 	}
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("%s: ## Secrets holds no table headed %s", kubernetesPage, contractHeader)
@@ -465,10 +493,11 @@ func contractTable(section string) (map[secretRef]string, error) {
 }
 
 // secretReferences is every Secret key a Deployment's container in one manifest reads, with which
-// of the two servers reads it: "auth server", "admin console" or "both", and how many Deployments
-// the manifest holds.
-func secretReferences(content []byte) (map[secretRef]string, int, error) {
+// of the two servers reads it and whether every reference to it is optional, and how many
+// Deployments the manifest holds.
+func secretReferences(content []byte) (map[secretRef]secretReader, int, error) {
 	readers := map[secretRef]map[string]bool{}
+	required := map[secretRef]bool{}
 	deployments := 0
 	decoder := yaml.NewDecoder(bytes.NewReader(content))
 	for {
@@ -509,19 +538,22 @@ func secretReferences(content []byte) (map[secretRef]string, int, error) {
 					readers[key] = map[string]bool{}
 				}
 				readers[key][reader] = true
+				if ref["optional"] != true {
+					required[key] = true
+				}
 			}
 		}
 	}
-	read := map[secretRef]string{}
+	read := map[secretRef]secretReader{}
 	for ref, by := range readers {
+		reader := "admin console"
 		switch {
 		case by["auth server"] && by["admin console"]:
-			read[ref] = "both"
+			reader = "both"
 		case by["auth server"]:
-			read[ref] = "auth server"
-		default:
-			read[ref] = "admin console"
+			reader = "auth server"
 		}
+		read[ref] = secretReader{reader, !required[ref]}
 	}
 	return read, deployments, nil
 }

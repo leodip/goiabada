@@ -185,6 +185,27 @@ spec:
             secretKeyRef:
               name: goiabada-secrets
               key: oauth-client-secret
+        # Read only while a key rotates, and optional: each is unset until its key is in the
+        # Secret. A rotation adds and removes these keys and restarts the pods; nothing here
+        # changes.
+        - name: GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS
+          valueFrom:
+            secretKeyRef:
+              name: goiabada-secrets
+              key: auth-session-auth-key-previous
+              optional: true
+        - name: GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS
+          valueFrom:
+            secretKeyRef:
+              name: goiabada-secrets
+              key: auth-session-enc-key-previous
+              optional: true
+        - name: GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS
+          valueFrom:
+            secretKeyRef:
+              name: goiabada-encryption-key
+              key: aes-encryption-key-previous
+              optional: true
         # Allows the container up to 5 minutes (60 failures, 5s apart) to start listening;
         # liveness and readiness wait for it, and its first success ends it.
         # The auth server opens the database, runs any outstanding migrations and seeds an
@@ -340,6 +361,21 @@ spec:
             secretKeyRef:
               name: goiabada-secrets
               key: admin-session-enc-key
+        # Read only while a key rotates, and optional: each is unset until its key is in the
+        # Secret. A rotation adds and removes these keys and restarts the pods; nothing here
+        # changes.
+        - name: GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS
+          valueFrom:
+            secretKeyRef:
+              name: goiabada-secrets
+              key: admin-session-auth-key-previous
+              optional: true
+        - name: GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS
+          valueFrom:
+            secretKeyRef:
+              name: goiabada-secrets
+              key: admin-session-enc-key-previous
+              optional: true
         # Allows the container up to 5 minutes (60 failures, 5s apart) to start listening;
         # liveness and readiness wait for it, and its first success ends it.
         # The auth server's budget: this server starts in seconds.

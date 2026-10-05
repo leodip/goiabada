@@ -128,6 +128,11 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	sb.WriteString("            secretKeyRef:\n")
 	sb.WriteString("              name: goiabada-secrets\n")
 	sb.WriteString("              key: oauth-client-secret\n")
+	writePreviousKeyRefs(&sb,
+		previousKeyRef{"GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS", goiabadaSecrets, "auth-session-auth-key-previous"},
+		previousKeyRef{"GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS", goiabadaSecrets, "auth-session-enc-key-previous"},
+		previousKeyRef{"GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS", encryptionKeySecret, "aes-encryption-key-previous"},
+	)
 	writeProbes(&sb, 9090,
 		"The auth server opens the database, runs any outstanding migrations and seeds an",
 		"empty one before it listens; with several replicas, the first pod migrates and the",
@@ -176,6 +181,10 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	sb.WriteString("            secretKeyRef:\n")
 	sb.WriteString("              name: goiabada-secrets\n")
 	sb.WriteString("              key: admin-session-enc-key\n")
+	writePreviousKeyRefs(&sb,
+		previousKeyRef{"GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS", goiabadaSecrets, "admin-session-auth-key-previous"},
+		previousKeyRef{"GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS", goiabadaSecrets, "admin-session-enc-key-previous"},
+	)
 	writeProbes(&sb, 9091,
 		"The auth server's budget: this server starts in seconds.")
 	writePreStopPause(&sb)
@@ -521,6 +530,29 @@ func writeTerminationGracePeriod(sb *strings.Builder, consequence ...string) {
 		fmt.Fprintf(sb, "      # %s\n", line)
 	}
 	fmt.Fprintf(sb, "      terminationGracePeriodSeconds: %d\n", terminationGracePeriodSeconds)
+}
+
+// previousKeyRef is a variable a server reads while one of its keys rotates, and the Secret key it
+// is read from.
+type previousKeyRef struct{ variable, secret, key string }
+
+// writePreviousKeyRefs writes the references a key rotation fills, each optional: a key missing from
+// its Secret leaves the variable unset, which each server reads as no rotation in progress. A
+// rotation then changes the Secrets and restarts the pods, with no Deployment edit to make, persist
+// against a GitOps tool, or undo before the keys can go, since a pod whose required reference names
+// a missing key does not start.
+func writePreviousKeyRefs(sb *strings.Builder, refs ...previousKeyRef) {
+	sb.WriteString("        # Read only while a key rotates, and optional: each is unset until its key is in the\n")
+	sb.WriteString("        # Secret. A rotation adds and removes these keys and restarts the pods; nothing here\n")
+	sb.WriteString("        # changes.\n")
+	for _, ref := range refs {
+		fmt.Fprintf(sb, "        - name: %s\n", ref.variable)
+		sb.WriteString("          valueFrom:\n")
+		sb.WriteString("            secretKeyRef:\n")
+		fmt.Fprintf(sb, "              name: %s\n", ref.secret)
+		fmt.Fprintf(sb, "              key: %s\n", ref.key)
+		sb.WriteString("              optional: true\n")
+	}
 }
 
 // writeProbes writes a container's startup, liveness and readiness probes, all on its static
