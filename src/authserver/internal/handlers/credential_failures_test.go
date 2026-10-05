@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/core/metrics"
 )
 
 // noCredentialFailures stands in for the rate limiter in every case that is not about it.
@@ -41,5 +42,5 @@ func (rateLimitTestRenderer) InternalServerError(w http.ResponseWriter, r *http.
 // and still emits its warning line and its rejection. It has no JSON writer, which LimitROPC
 // writes through only for a form that does not parse, and no case here sends one.
 func newTestRateLimiter(ceremonyStore CeremonyStore) *middleware.RateLimiter {
-	return middleware.NewRateLimiter(ceremonyStore, rateLimitTestRenderer{}, nil, nil, true, nil)
+	return middleware.NewRateLimiter(ceremonyStore, rateLimitTestRenderer{}, nil, nil, true, nil, metrics.NewRegistry())
 }

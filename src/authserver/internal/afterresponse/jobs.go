@@ -24,6 +24,8 @@ import (
 	"runtime/debug"
 	"sync"
 	"time"
+
+	"github.com/leodip/goiabada/core/metrics"
 )
 
 // maxInFlight is the number of jobs of one class Go admits at once: three times the server engines'
@@ -48,6 +50,10 @@ const (
 	ClassAccountNotice Class = "account_notice"
 )
 
+// classes is every class declared above, the closed set the metrics' class label takes (#400
+// decision 4). A class missing from it would be reported as other.
+var classes = []Class{ClassRecovery, ClassRegistration, ClassAccountNotice}
+
 // Jobs runs jobs after their responses and counts the ones in flight. The zero value is not used;
 // New builds one, and the server holds the one the routes hand to their handlers.
 //
@@ -64,10 +70,39 @@ type Jobs struct {
 	// idle is closed when total falls to zero, and replaced by an open one when it next rises from
 	// zero. It is only meaningful while total is above zero.
 	idle chan struct{}
+
+	// dropped counts the jobs Go dropped at their class's cap, by class (#400 decision 5).
+	dropped *metrics.Counter
 }
 
-func New() *Jobs {
-	return &Jobs{inFlight: map[Class]int{}}
+// New builds the jobs and registers their two families on reg: the jobs in flight by class, read
+// from the count Go admits against at every scrape, and the jobs dropped by class.
+func New(reg *metrics.Registry) *Jobs {
+	names := make([]string, len(classes))
+	for i, class := range classes {
+		names[i] = string(class)
+	}
+
+	j := &Jobs{inFlight: map[Class]int{}}
+	reg.GaugeVecFunc("goiabada_after_response_jobs_in_flight",
+		"Jobs handed off to run after their responses that are running now, by class.",
+		j.inFlightSamples,
+		metrics.Enum("class", names...))
+	j.dropped = reg.Counter("goiabada_after_response_jobs_dropped_total",
+		"Jobs handed off to run after their responses that were dropped because their class was at its cap, by class.",
+		metrics.Enum("class", names...))
+	return j
+}
+
+// inFlightSamples reads the jobs in flight of every class, under the lock admit counts them under.
+func (j *Jobs) inFlightSamples() []metrics.Sample {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	samples := make([]metrics.Sample, len(classes))
+	for i, class := range classes {
+		samples[i] = metrics.Sample{Value: float64(j.inFlight[class]), LabelValues: []string{string(class)}}
+	}
+	return samples
 }
 
 // Go runs job on a goroutine of its own and returns at once.
@@ -89,6 +124,7 @@ func New() *Jobs {
 // class are admitted as if the flood were not there (#485, #394 review).
 func (j *Jobs) Go(ctx context.Context, class Class, job func(ctx context.Context)) {
 	if !j.admit(class) {
+		j.dropped.Inc(string(class))
 		slog.WarnContext(ctx, "a job to run after its response was dropped, too many in flight",
 			"class", string(class),
 			"max_in_flight", maxInFlight)

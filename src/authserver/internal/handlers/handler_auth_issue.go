@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -46,6 +47,7 @@ func HandleIssueGet(
 	auditLogger AuditLogger,
 	userSessionManager UserSessionManager,
 	permissionChecker PermissionChecker,
+	tokenMetrics *tokenmetrics.Recorder,
 	baseURL string,
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
@@ -257,7 +259,7 @@ func HandleIssueGet(
 
 			if answer.outcome == issuanceIssueImplicit {
 				issueImplicitGrant(w, r, authContext, sessionIdentifier, issuingClient, facts.user, settings, ambientSession,
-					pageRenderer, ceremonyStore, templateFS, implicitTokenIssuer, database, auditLogger, baseURL)
+					pageRenderer, ceremonyStore, templateFS, implicitTokenIssuer, database, auditLogger, tokenMetrics, baseURL)
 				return
 			}
 
@@ -897,6 +899,7 @@ func issueImplicitGrant(
 	implicitTokenIssuer ImplicitTokenIssuer,
 	database authIssueDatabase,
 	auditLogger AuditLogger,
+	tokenMetrics *tokenmetrics.Recorder,
 	baseURL string,
 ) {
 	// Determine what tokens to issue based on response_type
@@ -954,6 +957,7 @@ func issueImplicitGrant(
 		"issueAccessToken": issueAccessToken,
 		"issueIdToken":     issueIdToken,
 	})
+	tokenMetrics.Issued(oidc.GrantTypeImplicit)
 
 	// Clear auth context
 	err = ceremonyStore.ClearAuthContext(w, r)

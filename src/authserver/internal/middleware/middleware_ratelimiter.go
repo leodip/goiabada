@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ratelimit"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/metrics"
 )
 
 // authContextGetter reads the ceremony a browser is in, whose user keys the OTP budget.
@@ -270,12 +271,29 @@ type RateLimiter struct {
 	forgotPwdIp     *requestTier
 	dcr             *requestTier
 	ropcIp          *requestTier // RFC 6749 §4.3.2 MUST protect against brute force
+
+	// refusals counts every refusal by the tier that refused it, on the metrics listener (#400
+	// decision 5). Every refusal, where the audit event is one per key per window: a rate is what an
+	// alert on a credential-stuffing spike reads.
+	refusals *metrics.Counter
 }
 
 func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jsonWriter jsonErrorWriter,
-	auditLogger auditEventLogger, enabled bool, credentialCounts credentialCounter) *RateLimiter {
+	auditLogger auditEventLogger, enabled bool, credentialCounts credentialCounter, reg *metrics.Registry) *RateLimiter {
 
-	return &RateLimiter{
+	// Every tier is built through one of these two, which is what makes the limiter label's set
+	// every tier's name: a tier built any other way would be counted as other.
+	var tierNames []string
+	request := func(name string, keyField string, limit int, window time.Duration) *requestTier {
+		tierNames = append(tierNames, name)
+		return newTier(name, keyField, limit, window)
+	}
+	failure := func(name string, limit int, window time.Duration) *failureTier {
+		tierNames = append(tierNames, name)
+		return newFailureTier(name, limit, window, credentialCounts)
+	}
+
+	m := &RateLimiter{
 		ceremonyStore: ceremonyStore,
 		renderer:      renderer,
 		jsonWriter:    jsonWriter,
@@ -289,18 +307,18 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// 800-63B §3.2.2 names. Both count failures only, so a user who signs in spends
 		// nothing (#219).
 		pwdAccount: newAccountTiers(
-			newFailureTier("pwd_account_net", 10, 15*time.Minute, credentialCounts),
-			newFailureTier("pwd_account", 100, 60*time.Minute, credentialCounts),
+			failure("pwd_account_net", 10, 15*time.Minute),
+			failure("pwd_account", 100, 60*time.Minute),
 		),
 		// per-IP: stops one host hammering many accounts
-		pwdIp: newTier("pwd_ip", "ip", 30, 1*time.Minute),
+		pwdIp: request("pwd_ip", "ip", 30, 1*time.Minute),
 		// per-user OTP failures. 5 per 15 minutes is 480 guesses a day against the 14,400
 		// the 10 a minute it replaces allowed, which takes the chance of a hit over a
 		// month from 72.6% to 4.2% against an attacker who already holds the password.
 		// Five rather than three because the same limiter covers enrollment, where
 		// pointing the wrong entry in an authenticator app at the form burns codes, and a
 		// resubmitted code is refused as a replay and so counts as a failure too (#219).
-		otp: newFailureTier("otp", 5, 15*time.Minute, credentialCounts),
+		otp: failure("otp", 5, 15*time.Minute),
 		// per-subject email verification failures. The code is four letters plus four
 		// digits, 26^4 x 10^4, so 5 failures per 15 minutes puts a hit on the far side of a
 		// human lifetime. It needs a bound at all because the chain in front of it is short:
@@ -309,14 +327,14 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// address the attacker does not control. That change now needs the account password
 		// too (#404), which shortens the chain without removing it. Failures only, so a user reading the code
 		// out of their inbox spends nothing (#219).
-		emailVerification: newFailureTier("email_verification", 5, 15*time.Minute, credentialCounts),
+		emailVerification: failure("email_verification", 5, 15*time.Minute),
 		// per-subject: verification mails sent, every request counted. The send mails a code to
 		// whatever address the account holds, and the account sets that address itself, so
 		// what this bounds is one account mailing addresses it does not own. The handler's own
 		// cooldown, one code per its five minute lifetime, holds whatever this switch says and
 		// allows 12 an hour; this is 5, which is room for a user whose first code went to spam
 		// or expired before a slow inbox delivered it (#404).
-		emailVerificationSend: newTier("email_verification_send", "", 5, 60*time.Minute),
+		emailVerificationSend: request("email_verification_send", "", 5, 60*time.Minute),
 		// per-subject account password failures, one bucket for the three routes that check
 		// that password: PUT /api/v1/account/password, PUT /api/v1/account/otp and
 		// PUT /api/v1/account/email (#404). All three verify the same secret, so separate
@@ -328,12 +346,12 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// higher: the password is the only credential guarding the removal of the account's
 		// second factor, since the disable branch takes no OTP code at all. Failures only, so
 		// a user changing their password successfully spends nothing (#113, #219).
-		accountPassword: newFailureTier("account_password", 5, 15*time.Minute, credentialCounts),
+		accountPassword: failure("account_password", 5, 15*time.Minute),
 		// per-IP: 10 activation operations per 5 minutes, at the three requests an activation
 		// now costs (the link's GET, the clean GET that renders the password form, and its
 		// POST), shared by both methods. resetPwd's budget for the same chain (#112, #207
 		// decision 9)
-		activate: newTier("activate", "ip", 30, 5*time.Minute),
+		activate: request("activate", "ip", 30, 5*time.Minute),
 		// per-IP: self-registration, 20 per 5 minutes. It bounds what is only harmful across
 		// distinct addresses: the pre_registrations rows and the mail registration with
 		// verification sends to any address given to it, and, without verification, the
@@ -341,32 +359,36 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// which answers every address alike, and cannot be closed without it, where the account
 		// is usable at once (#219, #207 decision 3); this slows it to 240 addresses an hour per
 		// client block.
-		register: newTier("register", "ip", 20, 5*time.Minute),
+		register: request("register", "ip", 20, 5*time.Minute),
 		// per-email: self-registration, at forgot-password's per-address budget. With
 		// verification a registration for an address that has a verified, enabled account mails
 		// it a notice, so without this tier one host could mail any account holder 20 notices
 		// every 5 minutes, and many hosts without bound. It used to be argued unneeded, when a
 		// second submission for an address stopped at "already registered" before any mail; the
 		// notice ended that (#207 decision 5).
-		registerEmail: newTier("register_email", "", 5, 5*time.Minute),
+		registerEmail: request("register_email", "", 5, 5*time.Minute),
 		// per-IP: 10 reset operations per 5 minutes, at the three requests a reset now
 		// costs (the link's GET, the clean GET, the clean POST). Half of what
 		// forgotPwdIp allows, which is the only other endpoint with an IP tier (#112)
-		resetPwd: newTier("reset_pwd", "ip", 30, 5*time.Minute),
+		resetPwd: request("reset_pwd", "ip", 30, 5*time.Minute),
 		// per-email: mail-bomb protection
-		forgotPwd: newTier("forgot_pwd_email", "", 5, 5*time.Minute),
+		forgotPwd: request("forgot_pwd_email", "", 5, 5*time.Minute),
 		// per-IP: resource DoS protection
-		forgotPwdIp: newTier("forgot_pwd_ip", "ip", 20, 5*time.Minute),
+		forgotPwdIp: request("forgot_pwd_ip", "ip", 20, 5*time.Minute),
 		// RFC 7591 §3 DoS protection
-		dcr: newTier("dcr", "ip", 10, 1*time.Minute),
+		dcr: request("dcr", "ip", 10, 1*time.Minute),
 		// per-IP: stops one host spraying passwords across many accounts through the
 		// password grant, exactly as pwdIp does for the browser form, and at the same
 		// budget. Its account half is pwdAccount above, shared rather than mirrored: the
 		// composite ropc_<clientId>_<username>_<ip> key this replaces gave every client
 		// and every source address a fresh budget against one account, so the per-account
 		// ceiling RFC 6749 §4.3.2 makes a MUST did not exist at all (#107, #219).
-		ropcIp: newTier("ropc_ip", "ip", 30, 1*time.Minute),
+		ropcIp: request("ropc_ip", "ip", 30, 1*time.Minute),
 	}
+	m.refusals = reg.Counter("goiabada_rate_limit_refusals_total",
+		"Requests the rate limiter refused, by the limiter that refused them.",
+		metrics.Enum("limiter", tierNames...))
+	return m
 }
 
 // tripped charges one request against the tier's bucket and, when that trips the budget,
@@ -420,6 +442,8 @@ func (m *RateLimiter) refuse(w http.ResponseWriter, r *http.Request, t *tier, ke
 // warning and no way to tell which request produced it (#320 decision 2).
 func (m *RateLimiter) reportTrip(ctx context.Context, t *tier, key string,
 	details map[string]interface{}) {
+
+	m.refusals.Inc(t.name)
 
 	attrs := []any{"limiter", t.name}
 	if t.keyField != "" {

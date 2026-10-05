@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -84,7 +85,7 @@ func newVerificationEnv(t *testing.T) *verificationEnv {
 		Return(true, nil).Maybe()
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
-	rateLimiter := middleware.NewRateLimiter(nil, unusedRenderer{t}, nil, nil, true, nil)
+	rateLimiter := middleware.NewRateLimiter(nil, unusedRenderer{t}, nil, nil, true, nil, metrics.NewRegistry())
 	handler := HandleAccountEmailVerificationPost(database, auditLogger, rateLimiter, testDataCipher)
 
 	return &verificationEnv{

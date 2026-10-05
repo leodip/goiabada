@@ -22,6 +22,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/metrics"
 )
 
 // countingStore stands for the database the five credential tiers count in on PostgreSQL, MySQL and
@@ -108,7 +109,7 @@ func sharedKey(tier, key string) string {
 func newSharedTestMiddleware(store credentialCounter) (*RateLimiter, *stubAuditLogger) {
 	auditLog := &stubAuditLogger{}
 	httpHelper := render.New(testTemplateFS)
-	return NewRateLimiter(stubCeremonyStore{}, httpHelper, httpHelper, auditLog, true, store), auditLog
+	return NewRateLimiter(stubCeremonyStore{}, httpHelper, httpHelper, auditLog, true, store, metrics.NewRegistry()), auditLog
 }
 
 const sharedTestSubject = "22222222-2222-2222-2222-222222222222"

@@ -7,6 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -19,7 +20,7 @@ import (
 // The sweep runs after the refresh token sweep and before the code sweep.
 func TestWorker_PerformTask_SweepsFamilyRevocationsAfterTheTokens(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	worker := New(mockDB)
+	worker := New(mockDB, metrics.NewRegistry())
 
 	var order []string
 	recordStep := func(step string) func(mock.Arguments) {
@@ -44,7 +45,7 @@ func TestWorker_PerformTask_SweepsFamilyRevocationsAfterTheTokens(t *testing.T) 
 // and the session sweeps to run, as the token step failing already does.
 func TestWorker_PerformTask_ContinuesAfterTheFamilySweepFails(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	worker := New(mockDB)
+	worker := New(mockDB, metrics.NewRegistry())
 
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).
@@ -67,7 +68,7 @@ func TestWorker_PerformTask_ContinuesAfterTheFamilySweepFails(t *testing.T) {
 // sits between the two steps, as between every other pair.
 func TestWorker_PerformTask_StopsAfterTheFamilySweepWhenCancelled(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	worker := New(mockDB)
+	worker := New(mockDB, metrics.NewRegistry())
 
 	ctx, cancel := context.WithCancel(context.Background())
 

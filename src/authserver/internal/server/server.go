@@ -74,19 +74,20 @@ type Server struct {
 func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionstore.ServerSideStore,
 	dataCipher *encryption.DataCipher, trustedProxies []*net.IPNet, cfg *config.Config) *Server {
 
+	registry := metrics.NewRegistry()
 	s := Server{
 		router:       router,
 		database:     database,
 		sessionStore: sessionStore,
 		dataCipher:   dataCipher,
-		worker:       cleanup.New(database),
-		jobs:         afterresponse.New(),
+		worker:       cleanup.New(database, registry),
+		jobs:         afterresponse.New(registry),
 
 		trustedProxies: trustedProxies,
 
 		cfg: cfg,
 
-		metrics: metrics.NewRegistry(),
+		metrics: registry,
 	}
 	metrics.RegisterBuildInfo(s.metrics)
 	metrics.RegisterRuntime(s.metrics)

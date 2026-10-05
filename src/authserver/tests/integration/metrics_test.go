@@ -3,6 +3,7 @@ package integration
 import (
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -82,6 +83,39 @@ func TestMetrics_TheListenerCountsTheRequestsTheServerAnswers(t *testing.T) {
 	assert.Contains(t, after, "# TYPE goiabada_db_wait_count_total counter\n")
 	assert.Positive(t, sampleValue(t, after, "goiabada_db_max_open_connections"), "the pool's cap is the one it runs on")
 	assert.NotContains(t, after, `route="/metrics"`, "a scrape is not counted")
+}
+
+// A client credentials grant is counted as a token issued, and a request naming no client as a
+// token request refused, under the grant it asked for and the RFC 6749 section 5.2 code it was
+// answered with (#400 decision 5).
+func TestMetrics_TheTokenEndpointCountsWhatItIssuesAndRefuses(t *testing.T) {
+	t.Parallel()
+
+	const issued = `goiabada_tokens_issued_total{grant_type="client_credentials"}`
+	const refused = `goiabada_token_requests_refused_total{grant_type="client_credentials",error="invalid_request"}`
+
+	before := scrapeMetrics(t)
+
+	accessToken, _ := createAdminClientWithToken(t)
+	require.NotEmpty(t, accessToken)
+
+	got := postTokenRequest(t, url.Values{"grant_type": {"client_credentials"}}, false, "", "")
+	require.Equal(t, "invalid_request", got.body["error"])
+
+	after := scrapeMetrics(t)
+
+	assert.GreaterOrEqual(t, sampleValue(t, after, issued)-sampleValue(t, before, issued), float64(1))
+	assert.GreaterOrEqual(t, sampleValue(t, after, refused)-sampleValue(t, before, refused), float64(1))
+	for _, family := range []string{
+		"goiabada_rate_limit_refusals_total",
+		"goiabada_cleanup_runs_total",
+		"goiabada_cleanup_last_run_duration_seconds",
+		"goiabada_cleanup_last_success_timestamp_seconds",
+		"goiabada_after_response_jobs_in_flight",
+		"goiabada_after_response_jobs_dropped_total",
+	} {
+		assert.Contains(t, after, "# TYPE "+family+" ", "the running server registers %s", family)
+	}
 }
 
 // The main listener serves no metrics, and the metrics listener nothing but them.

@@ -24,6 +24,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -170,13 +171,15 @@ func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Serv
 		configure(cfg)
 	}
 
+	registry := metrics.NewRegistry()
 	s := &Server{
 		router:       chi.NewRouter(),
 		database:     database,
 		sessionStore: newTestSessionStore(),
 		templateFS:   web.TemplateFS(),
 		cfg:          cfg,
-		jobs:         afterresponse.New(),
+		jobs:         afterresponse.New(registry),
+		metrics:      registry,
 	}
 	// What a forgot-password request hands off runs against this test's mocks, so it is waited
 	// for before they are torn down, as the server waits for it on shutdown.

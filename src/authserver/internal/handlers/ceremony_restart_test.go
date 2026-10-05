@@ -140,7 +140,7 @@ func TestRestartRoute2_SavesTheRequestWithTheAttemptDiscarded(t *testing.T) {
 	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 	handler := HandleIssueGet(pageRenderer, ceremonyStore, fstest.MapFS{}, codeIssuer, implicitTokenIssuer,
-		database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 	// The session this ceremony bound to at /auth/completed is gone by /auth/issue, and the
 	// request is interactive, so this is route 2.

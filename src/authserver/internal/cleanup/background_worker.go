@@ -9,6 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/metrics"
 )
 
 const (
@@ -69,8 +70,24 @@ type backgroundWorkerDatabase interface {
 	TryClaimCleanupRun(ctx context.Context, tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)
 }
 
+// The ways a claimed run ends, the outcome label's closed set (#400 decision 4). A run is completed
+// when every step ran and none failed, failed when a step failed, whether or not the steps after it
+// ran, and interrupted when shutdown cut it short.
+const (
+	outcomeCompleted   = "completed"
+	outcomeFailed      = "failed"
+	outcomeInterrupted = "interrupted"
+)
+
 type Worker struct {
 	database backgroundWorkerDatabase
+
+	// The claimed run on the metrics listener (#400 decision 5). Only the instance that wins the
+	// claim runs, so each instance reports its own runs, and the deployment's last success is the
+	// latest across instances.
+	runs         *metrics.Counter
+	lastDuration *metrics.Gauge
+	lastSuccess  *metrics.Gauge
 
 	// cancel and done are created by Start. cancel being nil means the worker was
 	// never started, which Stop treats as a no-op.
@@ -78,9 +95,17 @@ type Worker struct {
 	done   chan struct{}
 }
 
-func New(database backgroundWorkerDatabase) *Worker {
+// New builds the worker and registers its three families on reg.
+func New(database backgroundWorkerDatabase, reg *metrics.Registry) *Worker {
 	return &Worker{
 		database: database,
+		runs: reg.Counter("goiabada_cleanup_runs_total",
+			"Claimed cleanup runs this instance performed, by how they ended.",
+			metrics.Enum("outcome", outcomeCompleted, outcomeFailed, outcomeInterrupted)),
+		lastDuration: reg.Gauge("goiabada_cleanup_last_run_duration_seconds",
+			"How long this instance's last claimed cleanup run took, in seconds, however it ended."),
+		lastSuccess: reg.Gauge("goiabada_cleanup_last_success_timestamp_seconds",
+			"When this instance's last claimed cleanup run completed, in Unix seconds, or 0 when none has."),
 	}
 }
 
@@ -252,27 +277,60 @@ func jitter(limit time.Duration) time.Duration {
 	return time.Duration(rand.Int64N(int64(limit)))
 }
 
-// performTask executes the main worker task.
+// performTask executes the main worker task, and reports how it ended and how long it took.
+//
+// The duration is measured once, and is both the completion record's duration attribute and the
+// last-run gauge, so a deployment that does not enable metrics still sees a run growing (#400
+// decision 11). The completion record is written, as before, when every step ran, whether or not
+// one of them failed; a run that stopped at the settings row or at shutdown writes none.
+func (w *Worker) performTask(ctx context.Context) {
+	slog.InfoContext(ctx, "worker task started")
+	started := time.Now()
+
+	ranEveryStep, stepFailed := w.sweep(ctx)
+
+	duration := time.Since(started)
+	outcome := outcomeCompleted
+	switch {
+	case ctx.Err() != nil:
+		outcome = outcomeInterrupted
+	case stepFailed:
+		outcome = outcomeFailed
+	}
+
+	if ranEveryStep && outcome != outcomeInterrupted {
+		slog.InfoContext(ctx, "worker task completed", "duration", duration)
+	}
+
+	w.runs.Inc(outcome)
+	w.lastDuration.Set(duration.Seconds())
+	if outcome == outcomeCompleted {
+		w.lastSuccess.Set(float64(time.Now().Unix()))
+	}
+}
+
+// sweep runs the claimed run's steps, and reports whether it reached the end of them and whether
+// any failed.
 //
 // Each step logs its own failure and the next one still runs: this is
 // housekeeping, so one failing delete should not block the others. Cancellation is checked
 // between steps AND reaches into each of them, since every call below is issued under this
 // context (#386): the check between steps is what stops the next delete from starting, and the
 // context is what abandons the one already running.
-func (w *Worker) performTask(ctx context.Context) {
-	slog.InfoContext(ctx, "worker task started")
+func (w *Worker) sweep(ctx context.Context) (ranEveryStep, stepFailed bool) {
 
 	// Revoked rows are deliberately NOT swept here. They are the replay-detection
 	// signal, retained until the token itself expires (#128).
 	err := w.database.DeleteExpiredRefreshTokens(ctx, nil)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to delete expired refresh tokens", "error", err)
+		stepFailed = true
 	} else {
 		slog.InfoContext(ctx, "deleted expired refresh tokens")
 	}
 
 	if cancelled(ctx) {
-		return
+		return false, stepFailed
 	}
 
 	// After the tokens, since a family's record is removed when its last token is. A record whose
@@ -281,23 +339,25 @@ func (w *Worker) performTask(ctx context.Context) {
 	err = w.database.DeleteOrphanedRefreshTokenFamilyRevocations(ctx, nil)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to delete orphaned refresh token family revocations", "error", err)
+		stepFailed = true
 	} else {
 		slog.InfoContext(ctx, "deleted orphaned refresh token family revocations")
 	}
 
 	if cancelled(ctx) {
-		return
+		return false, stepFailed
 	}
 
 	err = w.database.DeleteCodesWithoutRefreshTokens(ctx, nil, time.Now().UTC().Add(-codeCleanupGrace))
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to delete codes without refresh tokens", "error", err)
+		stepFailed = true
 	} else {
 		slog.InfoContext(ctx, "deleted codes without refresh tokens")
 	}
 
 	if cancelled(ctx) {
-		return
+		return false, stepFailed
 	}
 
 	// Before the settings read, since it needs nothing from settings. The cutoff is the one
@@ -308,65 +368,71 @@ func (w *Worker) performTask(ctx context.Context) {
 	err = w.database.DeleteDeadPreRegistrations(ctx, nil, emaillinks.PreRegistrationDeadBefore(time.Now().UTC()))
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to delete dead pre-registrations", "error", err)
+		stepFailed = true
 	} else {
 		slog.InfoContext(ctx, "deleted dead pre-registrations")
 	}
 
 	if cancelled(ctx) {
-		return
+		return false, stepFailed
 	}
 
 	settings, err := w.database.GetSettingsById(ctx, nil, 1)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to read the settings row", "error", err)
-		return
+		return false, true
 	}
 	// GetSettingsById returns (nil, nil) when the row is absent. Every remaining
 	// step reads a value from settings, so there is nothing to salvage here, but
 	// it must not be dereferenced.
 	if settings == nil {
 		slog.ErrorContext(ctx, "settings row not found, skipping the cleanup steps that need it")
-		return
+		return false, true
 	}
 
 	err = w.database.DeleteIdleSessions(ctx, nil, time.Duration(settings.UserSessionIdleTimeoutInSeconds)*time.Second)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to delete idle sessions", "error", err)
+		stepFailed = true
 	} else {
 		slog.InfoContext(ctx, "deleted idle sessions",
 			"idle_timeout_seconds", settings.UserSessionIdleTimeoutInSeconds)
 	}
 
 	if cancelled(ctx) {
-		return
+		return false, stepFailed
 	}
 
 	err = w.database.DeleteExpiredSessions(ctx, nil, time.Duration(settings.UserSessionMaxLifetimeInSeconds)*time.Second)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to delete expired sessions", "error", err)
+		stepFailed = true
 	} else {
 		slog.InfoContext(ctx, "deleted expired sessions",
 			"max_lifetime_seconds", settings.UserSessionMaxLifetimeInSeconds)
 	}
 
 	if cancelled(ctx) {
-		return
+		return false, stepFailed
 	}
 
-	w.deleteOldAuditLogs(ctx, settings.AuditLogRetentionDays)
+	if !w.deleteOldAuditLogs(ctx, settings.AuditLogRetentionDays) {
+		stepFailed = true
+	}
 
-	slog.InfoContext(ctx, "worker task completed")
+	return true, stepFailed
 }
 
-// deleteOldAuditLogs removes audit history past the retention window, in batches.
-// Zero days means retain forever.
-func (w *Worker) deleteOldAuditLogs(ctx context.Context, retentionDays int) {
+// deleteOldAuditLogs removes audit history past the retention window, in batches, and reports
+// false when a batch failed. Zero days means retain forever.
+func (w *Worker) deleteOldAuditLogs(ctx context.Context, retentionDays int) bool {
 	if retentionDays <= 0 {
-		return
+		return true
 	}
 
 	cutoff := time.Now().UTC().Add(-time.Duration(retentionDays) * 24 * time.Hour)
 	totalDeleted := 0
+	failed := false
 
 	for i := 0; i < auditLogDeleteMaxBatches; i++ {
 		// Checked per batch, not just per task: this loop is the longest running
@@ -378,6 +444,7 @@ func (w *Worker) deleteOldAuditLogs(ctx context.Context, retentionDays int) {
 		deleted, err := w.database.DeleteOldAuditLogs(ctx, nil, cutoff, auditLogDeleteBatchSize)
 		if err != nil {
 			slog.ErrorContext(ctx, "unable to delete old audit logs", "error", err)
+			failed = true
 			break
 		}
 
@@ -392,6 +459,7 @@ func (w *Worker) deleteOldAuditLogs(ctx context.Context, retentionDays int) {
 			"deleted", totalDeleted,
 			"retention_days", retentionDays)
 	}
+	return !failed
 }
 
 // cancelled reports whether the worker has been asked to stop, logging once so a

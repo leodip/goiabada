@@ -24,6 +24,7 @@ import (
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -118,13 +119,15 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 // runner, which is what the notice tests wait on before they read their capture.
 func noticeTestServer(t *testing.T, database *datamocks.Database) *Server {
 	t.Helper()
+	registry := metrics.NewRegistry()
 	s := &Server{
 		router:       chi.NewRouter(),
 		database:     database,
 		sessionStore: newTestSessionStore(),
 		templateFS:   web.TemplateFS(),
 		cfg:          &config.Config{},
-		jobs:         afterresponse.New(),
+		jobs:         afterresponse.New(registry),
+		metrics:      registry,
 	}
 	s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router})
 	return s

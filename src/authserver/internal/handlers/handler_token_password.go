@@ -5,6 +5,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 )
@@ -27,7 +28,7 @@ func (tr tokenResponder) respondPassword(w http.ResponseWriter, r *http.Request,
 		Scope:  grant.Scope,
 	})
 	if err != nil {
-		tr.jsonWriter.JSONError(w, r, err)
+		tr.refuse(w, r, oidc.GrantTypePassword, err)
 		return
 	}
 
@@ -36,5 +37,5 @@ func (tr tokenResponder) respondPassword(w http.ResponseWriter, r *http.Request,
 		"clientId": grant.Client.Id,
 	})
 
-	tr.writeTokenResponse(w, r, tokenResponse)
+	tr.writeTokenResponse(w, r, oidc.GrantTypePassword, tokenResponse)
 }
