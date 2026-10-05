@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/metrics"
 )
 
 // recordingTransport records every request the HTTP client it sits in sends, then sends it.
@@ -76,10 +77,9 @@ func TestInitRoutes_TheSignInUsesTheTokenClientTheServerWasHanded(t *testing.T) 
 	}
 	transport := &recordingTransport{}
 	httpClient := &http.Client{Transport: transport, Timeout: oauthclient.TokenExchangeTimeout}
-	tokenClient := oauthclient.NewTokenClient(oauthclient.TokenEndpointURL(cfg.AuthServer.GetEffectiveBaseURL()),
-		builtin.AdminConsoleClientIdentifier, cfg.AdminConsole.OAuthClientSecret, httpClient)
+	tokenClient := oauthclient.NewTokenClient(oauthclient.TokenEndpointURL(cfg.AuthServer.GetEffectiveBaseURL()), builtin.AdminConsoleClientIdentifier, cfg.AdminConsole.OAuthClientSecret, httpClient, nil)
 
-	s := NewServer(chi.NewRouter(), newTestSessionStore(), nil, nil, cfg, httpClient, tokenClient)
+	s := NewServer(chi.NewRouter(), newTestSessionStore(), nil, nil, cfg, httpClient, tokenClient, metrics.NewRegistry(), nil)
 	s.initRoutes(s.router)
 
 	start := httptest.NewRecorder()

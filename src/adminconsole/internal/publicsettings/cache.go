@@ -15,6 +15,7 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/metrics"
 )
 
 // DefaultTTL is how long a fetched value is served before the next request asks again. A settings
@@ -44,6 +45,8 @@ type flight struct {
 type Cache struct {
 	fetch fetcher
 	ttl   time.Duration
+	// requests counts every Get by whether it found a fresh value (#400 decision 6).
+	requests *metrics.Counter
 
 	mu        sync.Mutex
 	settings  *api.PublicSettingsResponse
@@ -57,9 +60,22 @@ type Cache struct {
 	inFlight *flight
 }
 
-// NewCache builds a cache over fetch, serving each value it reads for ttl.
-func NewCache(fetch fetcher, ttl time.Duration) *Cache {
-	return &Cache{fetch: fetch, ttl: ttl}
+// The result label's two values: a request answered from a fresh value, and one that found none.
+const (
+	resultHit  = "hit"
+	resultMiss = "miss"
+)
+
+// NewCache builds a cache over fetch, serving each value it reads for ttl, and registers
+// goiabada_settings_cache_requests_total on reg, which counts its lookups by result.
+func NewCache(fetch fetcher, ttl time.Duration, reg *metrics.Registry) *Cache {
+	return &Cache{
+		fetch: fetch,
+		ttl:   ttl,
+		requests: reg.Counter("goiabada_settings_cache_requests_total",
+			"Lookups of the auth server's public settings, by whether a fresh cached value answered them.",
+			metrics.Enum("result", resultHit, resultMiss)),
+	}
 }
 
 // Get returns the cached settings, or waits on a fetch when they are expired or absent: the one in
@@ -67,13 +83,18 @@ func NewCache(fetch fetcher, ttl time.Duration) *Cache {
 // keeping its values, because it is shared by every request that arrives while it runs and is no
 // one caller's to abandon; the client's own timeout bounds it. What ctx's end does is end this
 // caller's wait, with ctx's error.
+//
+// Every call is counted once: a hit when a fresh value answers it, and a miss otherwise, whether it
+// starts the fetch or joins the one in flight (#400 decision 6).
 func (c *Cache) Get(ctx context.Context) (*api.PublicSettingsResponse, error) {
 	c.mu.Lock()
 	if c.settings != nil && time.Since(c.fetchedAt) < c.ttl {
 		settings := c.settings
 		c.mu.Unlock()
+		c.requests.Inc(resultHit)
 		return settings, nil
 	}
+	c.requests.Inc(resultMiss)
 	f := c.inFlight
 	if f == nil {
 		f = &flight{done: make(chan struct{})}

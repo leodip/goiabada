@@ -95,7 +95,7 @@ func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, w
 }
 
 // configVariables is every live GOIABADA_* variable this process loads: the admin console's own
-// 20 and the 2 auth server endpoints it talks to, of which 17 have a flag. The names Load
+// 23 and the 2 auth server endpoints it talks to, of which 20 have a flag. The names Load
 // mentions that are not live configuration are in nonLiveEnvVars.
 var configVariables = []configVar{
 	// Admin console
@@ -153,6 +153,17 @@ var configVariables = []configVar{
 		func(c *Config) any { return c.AdminConsole.SessionAuthenticationKeyPrevious }),
 	strVarNoFlag("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS", "", strings.Repeat("b4", 32),
 		func(c *Config) any { return c.AdminConsole.SessionEncryptionKeyPrevious }),
+	// The metrics listener, off unless enabled, on the host the other listeners default to and a
+	// port of its own (#400 decision 3).
+	boolVar("GOIABADA_ADMINCONSOLE_METRICS_ENABLED", "adminconsole-metrics-enabled", false,
+		true, false,
+		func(c *Config) any { return c.AdminConsole.MetricsEnabled }),
+	strVar("GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS", "adminconsole-listen-host-metrics", "0.0.0.0",
+		"10.0.3.1", "10.0.3.2",
+		func(c *Config) any { return c.AdminConsole.ListenHostMetrics }),
+	intVar("GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS", "adminconsole-listen-port-metrics", 9191,
+		19191, 29191,
+		func(c *Config) any { return c.AdminConsole.ListenPortMetrics }),
 	// No flag, and trimmed, which is what core/i18n did when it read the variable itself: the row
 	// is what pins both now that the configuration reads it instead (#431).
 	{
@@ -229,7 +240,7 @@ func loadMatrixRefusing(t *testing.T, env map[string]string, args []string) (*fl
 	return fs, c, err
 }
 
-// TestLoad_RefusesAMalformedVariable is decision 7 of #434 over the four numeric and boolean
+// TestLoad_RefusesAMalformedVariable is decision 7 of #434 over the six numeric and boolean
 // variables this binary loads, each through Load rather than the helper alone, so a row
 // fails if Load reads the variable any other way. Each case also gives a valid flag for the
 // same setting, which must not rescue the variable: the value the operator wrote is wrong
@@ -246,6 +257,10 @@ func TestLoad_RefusesAMalformedVariable(t *testing.T) {
 			`GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS is "yes", not a boolean (true or false)`},
 		{"GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS", "on", "-adminconsole-log-http-requests=true",
 			`GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS is "on", not a boolean (true or false)`},
+		{"GOIABADA_ADMINCONSOLE_METRICS_ENABLED", "1x", "-adminconsole-metrics-enabled=true",
+			`GOIABADA_ADMINCONSOLE_METRICS_ENABLED is "1x", not a boolean (true or false)`},
+		{"GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS", "9191/tcp", "-adminconsole-listen-port-metrics=9191",
+			`GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS is "9191/tcp", not an integer`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.env, func(t *testing.T) {
@@ -350,8 +365,9 @@ func TestLoad_FlagBeatsTheEnvironment(t *testing.T) {
 // Seam 2: the registered flag set of this binary
 // -----------------------------------------------------------------------------
 
-// adminConsoleFlags is the 17 flags the admin console registers after the split (#351): its own
-// 15, and the two auth server endpoints it talks to.
+// adminConsoleFlags is the 20 flags the admin console registers: its own 18, and the two auth
+// server endpoints it talks to. 17 were what the split left (#351); the three metrics listener
+// flags came after it (#400).
 //
 // It is written out rather than derived from configVariables, and that is the whole point. A
 // derived expectation cannot fail when a flag is dropped from the table and from config.go
@@ -364,11 +380,14 @@ var adminConsoleFlags = []string{
 	"adminconsole-keyfile",
 	"adminconsole-listen-host-http",
 	"adminconsole-listen-host-https",
+	"adminconsole-listen-host-metrics",
 	"adminconsole-listen-port-http",
 	"adminconsole-listen-port-https",
+	"adminconsole-listen-port-metrics",
 	"adminconsole-log-format",
 	"adminconsole-log-http-requests",
 	"adminconsole-log-level",
+	"adminconsole-metrics-enabled",
 	"adminconsole-oauth-client-secret",
 	"adminconsole-staticdir",
 	"adminconsole-templatedir",
@@ -376,6 +395,14 @@ var adminConsoleFlags = []string{
 	"adminconsole-trusted-proxies",
 	"authserver-baseurl",
 	"authserver-internalbaseurl",
+}
+
+// flagsAddedAfterTheSplit are the admin console's flags that no binary registered before #351, so
+// they are outside the partition TestFlagLists_AgreeWithTheTable counts.
+var flagsAddedAfterTheSplit = []string{
+	"adminconsole-listen-host-metrics",
+	"adminconsole-listen-port-metrics",
+	"adminconsole-metrics-enabled",
 }
 
 // refusedFlags is the other half of the narrowing, named rather than merely absent: the 28
@@ -499,10 +526,15 @@ func TestFlagLists_AgreeWithTheTable(t *testing.T) {
 	}
 
 	// 45 flags were registered by both binaries before the split, and the admin console keeps 17
-	// of them. The two lists partition that surface, so a flag that quietly left both is a flag
-	// nobody decided about.
-	if got := len(adminConsoleFlags) + len(refusedFlags); got != 45 {
-		t.Errorf("the two lists cover %d flags, want the 45 both binaries registered before the split", got)
+	// of them. The two lists partition that surface, less the flags added since, so a flag that
+	// quietly left both is a flag nobody decided about.
+	for _, name := range flagsAddedAfterTheSplit {
+		if !expected[name] {
+			t.Errorf("flagsAddedAfterTheSplit names %q, which adminConsoleFlags does not list", name)
+		}
+	}
+	if got := len(adminConsoleFlags) - len(flagsAddedAfterTheSplit) + len(refusedFlags); got != 45 {
+		t.Errorf("the two lists cover %d of the flags both binaries registered before the split, want 45", got)
 	}
 }
 

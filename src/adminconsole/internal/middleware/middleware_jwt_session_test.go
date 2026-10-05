@@ -424,7 +424,7 @@ func TestSessionHandler_AStoredIDTokenUnderAKeyUnpublishedAtTheFirstFetchIsSigne
 
 	signing, retired := oauthclienttest.Keys(t)
 	jwks, _ := oauthclienttest.NewJwksServer(t, oauthclienttest.JwkFromPublicKey("current", &signing.PublicKey))
-	parser := oauthclient.NewJWKSTokenParser(jwks.URL, jwks.Client(), oauthclienttest.ClientID,
+	parser := oauthclient.NewJWKSTokenParser(jwks.URL, jwks.Client(), nil, oauthclienttest.ClientID,
 		oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	response := storedResponse()
@@ -460,7 +460,7 @@ func TestSessionHandler_AKeyRemovedAfterTheConsoleFetchedIt(t *testing.T) {
 		t.Helper()
 		jwks := oauthclienttest.NewMutableJwksServer(t, oauthclienttest.JwkFromPublicKey("removed", &signing.PublicKey))
 		clock := oauthclienttest.NewClock()
-		parser := oauthclient.NewJWKSTokenParser(jwks.URL, jwks.Client(), oauthclienttest.ClientID,
+		parser := oauthclient.NewJWKSTokenParser(jwks.URL, jwks.Client(), nil, oauthclienttest.ClientID,
 			oauthclienttest.StaticIssuer(oauthclienttest.Issuer), oauthclient.WithClock(clock.Now))
 		_, err := parser.DecodeAndValidateStoredIDToken(context.Background(), stored)
 		require.NoError(t, err)

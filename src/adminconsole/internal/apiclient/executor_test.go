@@ -9,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/core/boundedread"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -108,7 +110,7 @@ func TestExecutor_ACancelledRequestContextStopsTheCall(t *testing.T) {
 		server.Close()
 	})
 
-	client := NewAuthServerClient(server.URL)
+	client := NewAuthServerClient(server.URL, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -128,7 +130,7 @@ func TestExecutor_ARequestDeadlineStopsACallTheAuthServerNeverAnswers(t *testing
 		server.Close()
 	})
 
-	client := NewAuthServerClient(server.URL)
+	client := NewAuthServerClient(server.URL, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -150,10 +152,43 @@ func TestExecutor_ARequestDeadlineStopsACallTheAuthServerNeverAnswers(t *testing
 // at the real value would cost the suite ten seconds of sleeping on every run, forever, to observe
 // a contract net/http already holds.
 func TestNewAuthServerClient_CarriesADeadline(t *testing.T) {
-	client := NewAuthServerClient("http://auth.example.com")
+	client := NewAuthServerClient("http://auth.example.com", nil)
 
 	assert.Equal(t, generalAPITimeout, client.httpClient.Timeout,
 		"every request this client makes is bounded")
 	assert.Equal(t, 10*time.Second, generalAPITimeout,
 		"decision 6's value, matching the three request-path clients already in the tree")
+}
+
+// Every call the executor makes is recorded under the admin_api target, whatever method made it,
+// by the status the auth server answered, a refusal included, as a scrape reports it (#400
+// decision 6). No method or path is a label, so two methods share one series.
+func TestExecutor_RecordsEveryCallUnderTheAdminAPITarget(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/account/profile" {
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"error_code":"FORBIDDEN","error_description":"no"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+
+	reg := metrics.NewRegistry()
+	client := NewAuthServerClient(server.URL, upstreammetrics.Register(reg))
+
+	_, err := client.GetSettingsGeneral(context.Background(), charAccessToken)
+	require.NoError(t, err)
+	_, err = client.GetAccountOTPEnrollment(context.Background(), charAccessToken)
+	require.NoError(t, err)
+	_, err = client.GetAccountProfile(context.Background(), charAccessToken)
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+
+	rec := httptest.NewRecorder()
+	reg.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	exposition := rec.Body.String()
+	assert.Contains(t, exposition, `goiabada_upstream_requests_total{target="admin_api",status="200"} 2`+"\n")
+	assert.Contains(t, exposition, `goiabada_upstream_requests_total{target="admin_api",status="403"} 1`+"\n")
+	assert.Contains(t, exposition, `goiabada_upstream_request_duration_seconds_count{target="admin_api"} 3`+"\n")
 }

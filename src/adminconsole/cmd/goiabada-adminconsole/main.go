@@ -34,11 +34,13 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/server"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionbackend"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
+	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/localzone"
 	"github.com/leodip/goiabada/core/logging"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
@@ -186,13 +188,21 @@ func main() {
 	// SessionTokenSource; the backend asks it for one and knows nothing of the grant. The same
 	// token client and HTTP client go to the server, for the sign-in's exchange, the refresh and
 	// the JWKS fetch, so no second construction can drift from this one (#441).
+	//
+	// Every one of those clients records its calls to the auth server on the metrics registry, each
+	// under its own target, through the one upstream recorder registered here; the settings cache
+	// counts its lookups there too. The registry is served only when the metrics listener is enabled
+	// (#400 decision 6).
+	registry := metrics.NewRegistry()
+	upstream := upstreammetrics.Register(registry)
+
 	authServerBaseURL := cfg.AuthServer.GetEffectiveBaseURL()
 	authServerHTTPClient := oauthclient.NewAuthServerHTTPClient()
-	tokenClient := newTokenClient(cfg, authServerHTTPClient)
+	tokenClient := newTokenClient(cfg, authServerHTTPClient, upstream)
 	tokenSource := oauthclient.NewSessionTokenSource(tokenClient)
 
 	sessionStore, err := newSessionStore(
-		sessionbackend.New(authServerBaseURL, tokenSource),
+		sessionbackend.New(authServerBaseURL, tokenSource, upstream),
 		cfg.AdminConsole.IsCookieSecure(),
 		currentKeys,
 		previousKeys,
@@ -207,11 +217,11 @@ func main() {
 	// Initialize settings cache (fetches from authserver public API)
 	// Prefer internal base URL for server-to-server communication
 	settingsCache := publicsettings.NewCache(
-		publicsettings.NewClient(cfg.AuthServer.GetEffectiveBaseURL()), publicsettings.DefaultTTL)
+		publicsettings.NewClient(cfg.AuthServer.GetEffectiveBaseURL(), upstream), publicsettings.DefaultTTL, registry)
 	slog.Info("initialized settings cache with 30s TTL")
 
 	r := chi.NewRouter()
-	s := server.NewServer(r, sessionStore, settingsCache, trustedProxies, cfg, authServerHTTPClient, tokenClient)
+	s := server.NewServer(r, sessionStore, settingsCache, trustedProxies, cfg, authServerHTTPClient, tokenClient, registry, upstream)
 
 	// The process owns the signals, as the auth server's does; the console just gets told when to
 	// stop. On SIGTERM (what a container runtime sends) or SIGINT, ctx is cancelled and Start
@@ -235,13 +245,14 @@ func main() {
 // token URL is the effective auth server base URL joined through TokenEndpointURL, so a configured
 // base URL ending in a slash still reaches /auth/token. The admin console is always the client the
 // seeder provisions, so the identifier is the constant and only the secret is per deployment
-// (#285, #441).
-func newTokenClient(cfg *config.Config, httpClient *http.Client) *oauthclient.TokenClient {
+// (#285, #441). Its grants are recorded by upstream (#400).
+func newTokenClient(cfg *config.Config, httpClient *http.Client, upstream *upstreammetrics.Recorder) *oauthclient.TokenClient {
 	return oauthclient.NewTokenClient(
 		oauthclient.TokenEndpointURL(cfg.AuthServer.GetEffectiveBaseURL()),
 		builtin.AdminConsoleClientIdentifier,
 		cfg.AdminConsole.OAuthClientSecret,
 		httpClient,
+		upstream,
 	)
 }
 

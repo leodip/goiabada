@@ -75,7 +75,7 @@ func servesStatus(t *testing.T, status int, body string) (*AuthServerClient, fun
 	}))
 	t.Cleanup(server.Close)
 
-	return NewAuthServerClient(server.URL), func() (string, string) { return gotPath, gotAuthorization }
+	return NewAuthServerClient(server.URL, nil), func() (string, string) { return gotPath, gotAuthorization }
 }
 
 func TestAuthServerClient_GetUserByIdDecodesEveryFieldTheConsoleBinds(t *testing.T) {

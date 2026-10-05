@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/errs"
@@ -41,11 +42,13 @@ type Client struct {
 	authServerBaseURL string
 }
 
-func NewClient(authServerBaseURL string) *Client {
+// NewClient builds the client, every call it makes recorded by upstream under the settings
+// target (#400 decision 6).
+func NewClient(authServerBaseURL string, upstream *upstreammetrics.Recorder) *Client {
 	return &Client{
-		httpClient: &http.Client{
+		httpClient: upstream.Client(upstreammetrics.Settings, &http.Client{
 			Timeout: clientTimeout,
-		},
+		}),
 		authServerBaseURL: authServerBaseURL,
 	}
 }

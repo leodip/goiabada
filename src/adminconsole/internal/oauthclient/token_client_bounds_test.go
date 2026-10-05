@@ -96,7 +96,7 @@ func TestTokenClient_RefusesAnAnswerOverTheCap(t *testing.T) {
 			body := oversizedTokenResponse()
 
 			tokenResponse, err := g.send(context.Background(),
-				NewTokenClient(testTokenURL, "ci", "cs", clientReturning(http.StatusOK, body)))
+				NewTokenClient(testTokenURL, "ci", "cs", clientReturning(http.StatusOK, body), nil))
 
 			require.Error(t, err)
 			assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge),
@@ -121,7 +121,7 @@ func TestTokenClient_AcceptsABodyOfExactlyTheCap(t *testing.T) {
 			body := io.NopCloser(strings.NewReader(prefix + strings.Repeat("x", padding) + suffix))
 
 			tokenResponse, err := g.send(context.Background(),
-				NewTokenClient(testTokenURL, "ci", "cs", clientReturning(http.StatusOK, body)))
+				NewTokenClient(testTokenURL, "ci", "cs", clientReturning(http.StatusOK, body), nil))
 
 			require.NoError(t, err)
 			require.NotNil(t, tokenResponse)
@@ -142,7 +142,7 @@ func TestTokenClient_AcceptsABodyUnderTheCap(t *testing.T) {
 			body := io.NopCloser(strings.NewReader(`{"access_token":"at","scope":"` + padding + `"}`))
 
 			tokenResponse, err := g.send(context.Background(),
-				NewTokenClient(testTokenURL, "ci", "cs", clientReturning(http.StatusOK, body)))
+				NewTokenClient(testTokenURL, "ci", "cs", clientReturning(http.StatusOK, body), nil))
 
 			require.NoError(t, err)
 			require.NotNil(t, tokenResponse)
@@ -201,7 +201,7 @@ func TestTokenClient_TheSingleUseGrantsSurviveACancelledCallerAndKeepItsRequestI
 			cancel()
 
 			outbound := &outboundContext{}
-			tokenResponse, err := g.send(ctx, NewTokenClient(testTokenURL, "ci", "cs", outbound.client()))
+			tokenResponse, err := g.send(ctx, NewTokenClient(testTokenURL, "ci", "cs", outbound.client(), nil))
 
 			require.Error(t, err)
 			assert.Nil(t, tokenResponse)
@@ -235,7 +235,7 @@ func TestClientCredentials_KeepsTheCallersCancellationUnderTheSharedDeadline(t *
 		cancel()
 
 		outbound := &outboundContext{}
-		tokenResponse, err := NewTokenClient(testTokenURL, "ci", "cs", outbound.client()).
+		tokenResponse, err := NewTokenClient(testTokenURL, "ci", "cs", outbound.client(), nil).
 			ClientCredentials(ctx, "s")
 
 		require.Error(t, err)
@@ -251,7 +251,7 @@ func TestClientCredentials_KeepsTheCallersCancellationUnderTheSharedDeadline(t *
 		ctx := context.WithValue(context.Background(), chimiddleware.RequestIDKey, wantRequestID)
 
 		outbound := &outboundContext{}
-		_, err := NewTokenClient(testTokenURL, "ci", "cs", outbound.client()).ClientCredentials(ctx, "s")
+		_, err := NewTokenClient(testTokenURL, "ci", "cs", outbound.client(), nil).ClientCredentials(ctx, "s")
 
 		require.Error(t, err)
 		require.True(t, outbound.called.Load())
@@ -268,7 +268,7 @@ func TestClientCredentials_KeepsTheCallersCancellationUnderTheSharedDeadline(t *
 		callerDeadline, _ := ctx.Deadline()
 
 		outbound := &outboundContext{}
-		_, err := NewTokenClient(testTokenURL, "ci", "cs", outbound.client()).ClientCredentials(ctx, "s")
+		_, err := NewTokenClient(testTokenURL, "ci", "cs", outbound.client(), nil).ClientCredentials(ctx, "s")
 
 		require.Error(t, err)
 		require.True(t, outbound.hasLimit)
@@ -291,8 +291,7 @@ func TestExchangeCode_TheExchangeIsDebugAndCarriesTheTokenUrlAndTheRequestId(t *
 	logs := logtest.CaptureSlog(t)
 	ctx := context.WithValue(context.Background(), chimiddleware.RequestIDKey, "req-admin-callback")
 
-	_, err := NewTokenClient("https://authserver.internal.example/auth/token", "ci", "cs",
-		clientReturning(http.StatusOK, io.NopCloser(strings.NewReader(`{}`)))).
+	_, err := NewTokenClient("https://authserver.internal.example/auth/token", "ci", "cs", clientReturning(http.StatusOK, io.NopCloser(strings.NewReader(`{}`))), nil).
 		ExchangeCode(ctx, "c", "r", "cv")
 	require.NoError(t, err)
 
@@ -310,8 +309,7 @@ func TestExchangeCode_TheExchangeIsDebugAndCarriesTheTokenUrlAndTheRequestId(t *
 func TestRefresh_WritesNoRecord(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 
-	_, err := NewTokenClient(testTokenURL, "ci", "cs",
-		clientReturning(http.StatusOK, io.NopCloser(strings.NewReader(`{}`)))).
+	_, err := NewTokenClient(testTokenURL, "ci", "cs", clientReturning(http.StatusOK, io.NopCloser(strings.NewReader(`{}`))), nil).
 		Refresh(context.Background(), "rt")
 	require.NoError(t, err)
 
@@ -341,10 +339,10 @@ func TestNewAuthServerHTTPClient_CarriesTheConfiguredTimeout(t *testing.T) {
 // production takes. It is here because a nil client used to mean an unbounded
 // one, and this is the whole of what stops that being true again.
 func TestNewTokenClient_DefaultsANilClientToTheConfiguredTimeout(t *testing.T) {
-	assert.Equal(t, TokenExchangeTimeout, NewTokenClient(testTokenURL, "ci", "cs", nil).httpClient.Timeout,
+	assert.Equal(t, TokenExchangeTimeout, NewTokenClient(testTokenURL, "ci", "cs", nil, nil).httpClient.Timeout,
 		"a nil client gets the deadline rather than no deadline")
 
 	injected := &http.Client{Timeout: 3 * time.Second}
-	assert.Same(t, injected, NewTokenClient(testTokenURL, "ci", "cs", injected).httpClient,
+	assert.Same(t, injected, NewTokenClient(testTokenURL, "ci", "cs", injected, nil).httpClient,
 		"an injected client is used as given, so the composition root sets the deadline")
 }

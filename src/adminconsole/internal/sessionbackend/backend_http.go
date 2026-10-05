@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/errs"
@@ -72,10 +73,13 @@ type httpBackend struct {
 // No owner parameter, matching the database backend: the endpoint's handlers hard-wire
 // the admin console's owner and accept no other, so there is nothing here a caller could
 // name an auth server session with however this is composed.
-func New(baseURL string, tokens TokenSource) sessionstore.Backend {
+//
+// Every attempt is recorded by upstream under the sessions target, a retry as a call of its own
+// (#400 decision 6).
+func New(baseURL string, tokens TokenSource, upstream *upstreammetrics.Recorder) sessionstore.Backend {
 	return &httpBackend{
 		baseURL: strings.TrimSuffix(baseURL, "/"),
-		client:  &http.Client{Timeout: httpBackendTimeout},
+		client:  upstream.Client(upstreammetrics.Sessions, &http.Client{Timeout: httpBackendTimeout}),
 		tokens:  tokens,
 	}
 }

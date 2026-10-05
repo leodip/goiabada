@@ -124,7 +124,7 @@ var singleUseGrants = grants[:2]
 
 // sendAgainst builds a client for tokenURL with a nil HTTP client and sends g.
 func (g grant) sendAgainst(tokenURL string) (*oauth.TokenResponse, error) {
-	return g.send(context.Background(), NewTokenClient(tokenURL, "ci", "cs", nil))
+	return g.send(context.Background(), NewTokenClient(tokenURL, "ci", "cs", nil, nil))
 }
 
 // exchangeAgainst is the authorization-code grant's sendAgainst, for the cases about
@@ -149,7 +149,7 @@ func formKeys(form url.Values) []string {
 func TestExchangeCode_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 	tokenURL, recorder := newTokenEndpoint(t, http.StatusOK, `{}`)
 
-	_, err := NewTokenClient(tokenURL, "the-client-id", "the-client-secret", nil).ExchangeCode(
+	_, err := NewTokenClient(tokenURL, "the-client-id", "the-client-secret", nil, nil).ExchangeCode(
 		context.Background(),
 		"the-code",
 		"https://console.example.com/auth/callback",
@@ -184,7 +184,7 @@ func TestExchangeCode_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 func TestRefresh_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 	tokenURL, recorder := newTokenEndpoint(t, http.StatusOK, `{}`)
 
-	_, err := NewTokenClient(tokenURL, "the-client-id", "the-client-secret", nil).
+	_, err := NewTokenClient(tokenURL, "the-client-id", "the-client-secret", nil, nil).
 		Refresh(context.Background(), "the-refresh-token")
 	require.NoError(t, err)
 
@@ -210,7 +210,7 @@ func TestRefresh_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 func TestClientCredentials_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 	tokenURL, recorder := newTokenEndpoint(t, http.StatusOK, `{"access_token":"at"}`)
 
-	_, err := NewTokenClient(tokenURL, "the-client-id", "the-client-secret", nil).
+	_, err := NewTokenClient(tokenURL, "the-client-id", "the-client-secret", nil, nil).
 		ClientCredentials(context.Background(), "the-resource:the-permission")
 	require.NoError(t, err)
 
@@ -295,7 +295,7 @@ func TestRefresh_KeepsTheOldRefreshTokenWhenTheAnswerCarriesNone(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tokenURL, _ := newTokenEndpoint(t, http.StatusOK, tc.body)
 
-			tokenResponse, err := NewTokenClient(tokenURL, "ci", "cs", nil).
+			tokenResponse, err := NewTokenClient(tokenURL, "ci", "cs", nil, nil).
 				Refresh(context.Background(), "the-old-refresh-token")
 
 			require.NoError(t, err)
@@ -566,7 +566,7 @@ func TestClientCredentials_ARefusalNamesTheClientAndTheRemedy(t *testing.T) {
 	send := func(t *testing.T, status int, body string) error {
 		t.Helper()
 		tokenURL, _ := newTokenEndpoint(t, status, body)
-		tokenResponse, err := NewTokenClient(tokenURL, "a-client-of-my-own", "the-secret", nil).
+		tokenResponse, err := NewTokenClient(tokenURL, "a-client-of-my-own", "the-secret", nil, nil).
 			ClientCredentials(context.Background(), scope)
 		require.Error(t, err)
 		assert.Nil(t, tokenResponse)
@@ -627,7 +627,7 @@ func TestClientCredentials_ARefusalNamesTheClientAndTheRemedy(t *testing.T) {
 		tokenURL := server.URL + "/auth/token"
 		server.Close()
 
-		_, err := NewTokenClient(tokenURL, "a-client-of-my-own", "the-secret", nil).
+		_, err := NewTokenClient(tokenURL, "a-client-of-my-own", "the-secret", nil, nil).
 			ClientCredentials(context.Background(), scope)
 
 		require.Error(t, err)
@@ -647,7 +647,7 @@ var errTransportStops = errors.New("the transport stops here")
 func TestTokenClient_KeepsTheCauseOfAFailure(t *testing.T) {
 	for _, g := range grants {
 		t.Run(g.name+"/a request that cannot be built", func(t *testing.T) {
-			_, err := g.send(context.Background(), NewTokenClient("://no-scheme", "ci", "cs", nil))
+			_, err := g.send(context.Background(), NewTokenClient("://no-scheme", "ci", "cs", nil, nil))
 
 			var urlErr *url.Error
 			require.ErrorAs(t, err, &urlErr)
@@ -658,7 +658,7 @@ func TestTokenClient_KeepsTheCauseOfAFailure(t *testing.T) {
 				return nil, errTransportStops
 			})}
 
-			_, err := g.send(context.Background(), NewTokenClient(testTokenURL, "ci", "cs", failing))
+			_, err := g.send(context.Background(), NewTokenClient(testTokenURL, "ci", "cs", failing, nil))
 
 			require.ErrorIs(t, err, errTransportStops)
 		})
@@ -678,7 +678,7 @@ func TestTokenClient_KeepsTheCauseOfAFailure(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		_, err := NewTokenClient(testTokenURL, "ci", "cs", nil).ClientCredentials(ctx, "s")
+		_, err := NewTokenClient(testTokenURL, "ci", "cs", nil, nil).ClientCredentials(ctx, "s")
 
 		require.ErrorIs(t, err, context.Canceled)
 	})

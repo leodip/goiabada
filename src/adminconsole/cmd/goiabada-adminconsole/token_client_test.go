@@ -40,7 +40,7 @@ func TestNewTokenClient_ReachesTheTokenEndpointUnderTheEffectiveBaseURL(t *testi
 					InternalBaseURL: peer.URL + suffix,
 				},
 			}
-			_, err := newTokenClient(cfg, nil).ClientCredentials(context.Background(), "a-scope")
+			_, err := newTokenClient(cfg, nil, nil).ClientCredentials(context.Background(), "a-scope")
 			require.NoError(t, err)
 
 			mu.Lock()

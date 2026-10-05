@@ -12,6 +12,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
+	"github.com/leodip/goiabada/core/metrics"
 )
 
 // The route table hands each handler the values it uses from the configuration the server was
@@ -35,7 +36,7 @@ func TestInitRoutes_TheHomePageLinksToTheConfiguredPublicAuthServerURL(t *testin
 		},
 	}
 	s := NewServer(chi.NewRouter(), newTestSessionStore(),
-		publicsettings.NewCache(publicsettings.NewClient(authServer.URL), publicsettings.DefaultTTL), nil, cfg, nil, nil)
+		publicsettings.NewCache(publicsettings.NewClient(authServer.URL, nil), publicsettings.DefaultTTL, metrics.NewRegistry()), nil, cfg, nil, nil, metrics.NewRegistry(), nil)
 	s.initRoutes(s.initMiddleware())
 
 	recorder := httptest.NewRecorder()

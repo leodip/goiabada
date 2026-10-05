@@ -422,20 +422,20 @@ command itself and fails on a tree it changed.
 | `core/logging/logtest` | `CaptureSlog` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
 | `core/logging/logtest` | `CapturedRecord` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
 | `core/logging/logtest` | `SlogCapture` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
-| `core/metrics` | `Counter` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
-| `core/metrics` | `Described` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
-| `core/metrics` | `DurationBuckets` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
-| `core/metrics` | `Enum` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
+| `core/metrics` | `Counter` | both-apps | — |
+| `core/metrics` | `Described` | own-package | — |
+| `core/metrics` | `DurationBuckets` | own-package | — |
+| `core/metrics` | `Enum` | both-apps | — |
 | `core/metrics` | `Family` | kernel | — |
-| `core/metrics` | `Gauge` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
-| `core/metrics` | `HTTPRequests` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
-| `core/metrics` | `Histogram` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
+| `core/metrics` | `Gauge` | own-package | — |
+| `core/metrics` | `HTTPRequests` | both-apps | — |
+| `core/metrics` | `Histogram` | own-package | — |
 | `core/metrics` | `Label` | kernel | — |
-| `core/metrics` | `NewRegistry` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
-| `core/metrics` | `RegisterBuildInfo` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
-| `core/metrics` | `RegisterRuntime` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
-| `core/metrics` | `Registry` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
-| `core/metrics` | `Sample` | contract | One series a family read at scrape time reports, through the Registry's `GaugeVecFunc` and `CounterVecFunc`. The auth server's pool metrics are its one caller so far (#400 decision 5); it stays beside the Registry whose API it is part of, the exposition both servers serve under shared metric names (#400 decisions 2 and 6). |
+| `core/metrics` | `NewRegistry` | both-apps | — |
+| `core/metrics` | `RegisterBuildInfo` | both-apps | — |
+| `core/metrics` | `RegisterRuntime` | both-apps | — |
+| `core/metrics` | `Registry` | both-apps | — |
+| `core/metrics` | `Sample` | own-package | — |
 | `core/oauth` | `ConformErrorDescription` | both-apps | — |
 | `core/oauth` | `ErrorDetail` | both-apps | — |
 | `core/oauth` | `GeneratePKCECodeChallenge` | both-apps | — |
