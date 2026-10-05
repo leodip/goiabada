@@ -268,12 +268,14 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 	permissions := make(map[string]*record.Permission)
 	for _, p := range []struct{ identifier, description string }{
 		{builtin.ManageAccountPermissionIdentifier, "View and update user account data for the current user"},
-		{builtin.ManagePermissionIdentifier, "Manage the authorization server via the admin console"},
-		// Granular admin API scopes
+		{builtin.ManagePermissionIdentifier, "Full administration, including administrators and administrative permissions"},
+		// Granular admin API scopes. Each description states what the scope cannot reach, since
+		// the console shows it where an operator picks a permission to grant; migration 000058
+		// writes the same wording on an installation seeded before it (#402).
 		{builtin.AdminReadPermissionIdentifier, "Read-only access to all admin API endpoints"},
-		{builtin.ManageUsersPermissionIdentifier, "Manage users, groups, and permissions"},
-		{builtin.ManageClientsPermissionIdentifier, "Manage OAuth2 clients"},
-		{builtin.ManageSettingsPermissionIdentifier, "Manage system settings and signing keys"},
+		{builtin.ManageUsersPermissionIdentifier, "Manage users and groups that are not administrators, and their non-administrative permissions"},
+		{builtin.ManageClientsPermissionIdentifier, "Manage OAuth2 clients that are not administrators"},
+		{builtin.ManageSettingsPermissionIdentifier, "Manage system settings, except email and audit logging, and signing keys"},
 		{builtin.BrowserSessionsPermissionIdentifier, "Read and write admin console browser sessions"},
 	} {
 		permission := &record.Permission{
