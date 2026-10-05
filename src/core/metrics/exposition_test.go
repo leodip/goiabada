@@ -193,6 +193,60 @@ func TestExposition_AGaugeReadAtScrapeTime(t *testing.T) {
 		scrape(t, reg))
 }
 
+// A counter read at scrape time reports the count something else keeps, as the connection pool
+// keeps its waits, and says it is a counter.
+func TestExposition_ACounterReadAtScrapeTime(t *testing.T) {
+	reg := metrics.NewRegistry()
+	waits := int64(0)
+	reg.CounterFunc("pool_waits_total", "Waits for a connection.", func() float64 { return float64(waits) })
+
+	waits = 7
+
+	assert.Equal(t, ""+
+		"# HELP pool_waits_total Waits for a connection.\n"+
+		"# TYPE pool_waits_total counter\n"+
+		"pool_waits_total 7\n",
+		scrape(t, reg))
+}
+
+// A labeled family read at scrape time writes the samples its function reports then, in the order
+// of their label values whatever order they were reported in. Its labels hold to their declared
+// sets as a recorded family's do: a value outside the set is written as other, and two samples
+// that land on one series are added, so a read can no more grow a family past its sets than a
+// request can.
+func TestExposition_LabeledFamiliesReadAtScrapeTime(t *testing.T) {
+	reg := metrics.NewRegistry()
+	inUse, idle := 1.0, 1.0
+	reg.GaugeVecFunc("pool_connections", "Connections by state.", func() []metrics.Sample {
+		return []metrics.Sample{
+			{Value: idle, LabelValues: []string{"idle"}},
+			{Value: inUse, LabelValues: []string{"in_use"}},
+		}
+	}, metrics.Enum("state", "in_use", "idle"))
+	reg.CounterVecFunc("pool_closed_total", "Connections closed by reason.", func() []metrics.Sample {
+		return []metrics.Sample{
+			{Value: 3, LabelValues: []string{"max_lifetime"}},
+			{Value: 2, LabelValues: []string{"max_idle"}},
+			{Value: 4, LabelValues: []string{"a reason nobody declared"}},
+			{Value: 5, LabelValues: []string{"another"}},
+		}
+	}, metrics.Enum("reason", "max_idle", "max_lifetime"))
+
+	inUse, idle = 4, 0
+
+	assert.Equal(t, ""+
+		"# HELP pool_closed_total Connections closed by reason.\n"+
+		"# TYPE pool_closed_total counter\n"+
+		"pool_closed_total{reason=\"max_idle\"} 2\n"+
+		"pool_closed_total{reason=\"max_lifetime\"} 3\n"+
+		"pool_closed_total{reason=\"other\"} 9\n"+
+		"# HELP pool_connections Connections by state.\n"+
+		"# TYPE pool_connections gauge\n"+
+		"pool_connections{state=\"idle\"} 0\n"+
+		"pool_connections{state=\"in_use\"} 4\n",
+		scrape(t, reg))
+}
+
 func TestExposition_SpecialValues(t *testing.T) {
 	reg := metrics.NewRegistry()
 	g := reg.Gauge("special", "Special values.", metrics.Enum("which", "inf", "neg", "small"))

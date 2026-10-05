@@ -17,7 +17,7 @@ import (
 //   - datafactory, which builds one and returns it; its own two readers, the email case pre-flight
 //     and the startup task, take ports like everything else (#438 decision 8);
 //   - server.Server, which holds it and hands it to every constructor, each of which narrows it;
-//   - tests/data, which exercises all 223 of these methods on every engine, and is the tier that
+//   - tests/data, which exercises all 224 of these methods on every engine, and is the tier that
 //     proves each one works there;
 //   - this declaration itself, which is the compiler's check that the four engine adapters still
 //     implement a complete set -- worth more since #416 replaced their explicit delegations with
@@ -56,6 +56,12 @@ type Database interface {
 	// task's question, answered from a canary before this is called (#83, #438 decision 8).
 	ReencryptToKey(ctx context.Context, oldKey, newKey []byte) error
 	IsEmpty(ctx context.Context) (bool, error)
+	// PoolStats answers the connection pool's statistics as database/sql keeps them: its cap, its
+	// connections by state, the requests that waited for one and for how long, and the connections
+	// it closed by reason. It is the one read of the pool from above this layer, which the metrics
+	// a scrape reports are read through (#400 decision 5). It runs no statement and takes no
+	// context, because it reads counters the pool already holds in memory.
+	PoolStats() sql.DBStats
 
 	CreateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	UpdateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error

@@ -27,6 +27,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/poolmetrics"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/errs"
@@ -65,7 +66,7 @@ type Server struct {
 	cfg *config.Config
 
 	// The families this server exposes on its metrics listener, registered at startup: the build
-	// stamp and the runtime gauges here, the HTTP requests where initMiddleware mounts their
+	// stamp, the runtime gauges and the database pool here, the HTTP requests where initMiddleware mounts their
 	// middleware (#400).
 	metrics *metrics.Registry
 }
@@ -89,6 +90,7 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionsto
 	}
 	metrics.RegisterBuildInfo(s.metrics)
 	metrics.RegisterRuntime(s.metrics)
+	poolmetrics.Register(s.metrics, database)
 
 	if envVar := cfg.AuthServer.StaticDir; len(envVar) == 0 {
 		s.staticFS = web.StaticFS()

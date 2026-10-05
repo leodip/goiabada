@@ -110,13 +110,53 @@ func (r *Registry) Gauge(name, help string, labels ...Label) *Gauge {
 	return &Gauge{r.register(name, help, typeGauge, labels, nil, nil)}
 }
 
+// Sample is one series a family read at scrape time reports: its value, and its label values in
+// the order the family declared its labels. Each value is mapped into its declared set as a
+// recorded value is, so a value outside it is written as other, and samples landing on one series
+// are added together.
+type Sample struct {
+	Value       float64
+	LabelValues []string
+}
+
 // GaugeFunc registers an unlabeled gauge whose value is read from read at every scrape, for a
 // value something else already keeps, such as the runtime's goroutine count.
 func (r *Registry) GaugeFunc(name, help string, read func() float64) {
+	r.register(name, help, typeGauge, nil, nil, readOne(name, typeGauge, read))
+}
+
+// CounterFunc registers an unlabeled counter whose value is read from read at every scrape, for a
+// count something else already keeps, such as the connection pool's waits. read must only go up
+// over the life of the process, as a counter does.
+func (r *Registry) CounterFunc(name, help string, read func() float64) {
+	r.register(name, help, typeCounter, nil, nil, readOne(name, typeCounter, read))
+}
+
+// GaugeVecFunc registers a labeled gauge whose series are read from read at every scrape, for
+// values something else keeps together, such as the connection pool's connections by state.
+func (r *Registry) GaugeVecFunc(name, help string, read func() []Sample, labels ...Label) {
+	r.register(name, help, typeGauge, labels, nil, readMany(name, typeGauge, read))
+}
+
+// CounterVecFunc registers a labeled counter whose series are read from read at every scrape, for
+// counts something else keeps together, such as the connections the pool closed by reason.
+func (r *Registry) CounterVecFunc(name, help string, read func() []Sample, labels ...Label) {
+	r.register(name, help, typeCounter, labels, nil, readMany(name, typeCounter, read))
+}
+
+// readOne adapts an unlabeled family's read to the one sample it reports.
+func readOne(name, typ string, read func() float64) func() []Sample {
 	if read == nil {
-		panic(fmt.Sprintf("metrics: %s is a gauge read at scrape time with nothing to read", name))
+		panic(fmt.Sprintf("metrics: %s is a %s read at scrape time with nothing to read", name, typ))
 	}
-	r.register(name, help, typeGauge, nil, nil, read)
+	return func() []Sample { return []Sample{{Value: read()}} }
+}
+
+func readMany(name, typ string, read func() []Sample) func() []Sample {
+	if read == nil {
+		panic(fmt.Sprintf("metrics: %s is a %s read at scrape time with nothing to read", name, typ))
+	}
+	return read
 }
 
 // Histogram registers a histogram with fixed buckets, given as their upper bounds in ascending
@@ -156,7 +196,7 @@ func (r *Registry) Families() []Family {
 	return out
 }
 
-func (r *Registry) register(name, help, typ string, labels []Label, buckets []float64, read func() float64) *family {
+func (r *Registry) register(name, help, typ string, labels []Label, buckets []float64, read func() []Sample) *family {
 	if !metricNamePattern.MatchString(name) {
 		panic(fmt.Sprintf("metrics: %q is not a metric name Prometheus can read", name))
 	}
@@ -227,7 +267,9 @@ type family struct {
 	name, help, typ string
 	labels          []Label
 	buckets         []float64
-	read            func() float64
+	// read, when set, is where the family's series come from: read at every scrape rather than
+	// recorded into series.
+	read func() []Sample
 
 	once sync.Once
 	sets []labelSet
@@ -274,10 +316,10 @@ func (f *family) newSeries(values []string) *series {
 	return s
 }
 
-// seriesFor returns the series for the given label values, each mapped into its declared set
-// first: a value outside it is recorded as other. A count of values that is not the number of
-// labels declared is a programming error, and panics.
-func (f *family) seriesFor(values []string) *series {
+// mapped maps label values into their declared sets: a value outside its set becomes other. It
+// answers the mapped values and the key their series is held under. A count of values that is not
+// the number of labels declared is a programming error, and panics.
+func (f *family) mapped(values []string) ([]string, string) {
 	sets := f.resolved()
 	if len(values) != len(sets) {
 		panic(fmt.Sprintf("metrics: %s has %d labels and was recorded with %d values", f.name, len(sets), len(values)))
@@ -290,7 +332,13 @@ func (f *family) seriesFor(values []string) *series {
 			mapped[i] = other
 		}
 	}
-	key := strings.Join(mapped, "\xff")
+	return mapped, strings.Join(mapped, "\xff")
+}
+
+// seriesFor returns the series for the given label values, each mapped into its declared set
+// first.
+func (f *family) seriesFor(values []string) *series {
+	mapped, key := f.mapped(values)
 
 	f.mu.RLock()
 	s := f.series[key]
@@ -308,9 +356,13 @@ func (f *family) seriesFor(values []string) *series {
 	return s
 }
 
-// snapshot returns the family's series ordered by their label values, label by label.
+// snapshot returns the family's series ordered by their label values, label by label. A family
+// read at scrape time is read now, into series of its own that nothing else holds.
 func (f *family) snapshot() []*series {
 	f.resolved()
+	if f.read != nil {
+		return f.readSeries()
+	}
 	f.mu.RLock()
 	out := make([]*series, 0, len(f.series))
 	for _, s := range f.series {
@@ -318,6 +370,28 @@ func (f *family) snapshot() []*series {
 	}
 	f.mu.RUnlock()
 
+	sort.Slice(out, func(i, j int) bool { return slices.Compare(out[i].values, out[j].values) < 0 })
+	return out
+}
+
+// readSeries reads a family read at scrape time, mapping each sample's label values as a record's
+// are and adding the samples that land on one series.
+func (f *family) readSeries() []*series {
+	byKey := map[string]*series{}
+	for _, sample := range f.read() {
+		mapped, key := f.mapped(sample.LabelValues)
+		s := byKey[key]
+		if s == nil {
+			s = f.newSeries(mapped)
+			byKey[key] = s
+		}
+		s.add(sample.Value)
+	}
+
+	out := make([]*series, 0, len(byKey))
+	for _, s := range byKey {
+		out = append(out, s)
+	}
 	sort.Slice(out, func(i, j int) bool { return slices.Compare(out[i].values, out[j].values) < 0 })
 	return out
 }

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +29,20 @@ import (
 // accept a scrape (#400 decision 2).
 const metricsContentType = "text/plain; version=0.0.4; charset=utf-8"
 
+// testPoolStats is what the database's pool reports in these tests, every field distinct so a
+// family reading the wrong one shows.
+var testPoolStats = sql.DBStats{
+	MaxOpenConnections: 20,
+	OpenConnections:    8,
+	InUse:              3,
+	Idle:               5,
+	WaitCount:          11,
+	WaitDuration:       1500 * time.Millisecond,
+	MaxIdleClosed:      2,
+	MaxIdleTimeClosed:  4,
+	MaxLifetimeClosed:  6,
+}
+
 // newMetricsTestServer is the server main builds, through NewServer, with its routes registered as
 // Start registers them. The database answers the settings read the application branch makes, and
 // nothing else.
@@ -37,6 +52,7 @@ func newMetricsTestServer(t *testing.T) *Server {
 	database := datamocks.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).
 		Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Maybe()
+	database.On("PoolStats").Return(testPoolStats).Maybe()
 
 	cfg := &config.Config{}
 	cfg.AuthServer.ProfilePictureMaxSizeBytes = testProfilePictureMaxSizeBytes
@@ -93,9 +109,9 @@ func TestMetricsListener_ServesTheExpositionAndNothingElse(t *testing.T) {
 	assert.Contains(t, body, "# TYPE goiabada_http_requests_total counter\n")
 
 	for _, path := range []string{"/debug/pprof/", "/debug/pprof/cmdline", "/debug/vars", "/", "/metrics/", "/health", "/auth/token"} {
-		status, _, body := get(t, http.MethodGet, base+path)
-		assert.Equal(t, http.StatusNotFound, status, "%s on the metrics listener", path)
-		assert.NotContains(t, body, "goiabada_", "%s on the metrics listener", path)
+		pathStatus, _, pathBody := get(t, http.MethodGet, base+path)
+		assert.Equal(t, http.StatusNotFound, pathStatus, "%s on the metrics listener", path)
+		assert.NotContains(t, pathBody, "goiabada_", "%s on the metrics listener", path)
 	}
 
 	status, _, body = get(t, http.MethodPost, base+"/metrics")
@@ -155,6 +171,34 @@ func TestRegisterRoutes_CountsTheRequestsTheMainRouterAnswers(t *testing.T) {
 	assert.NotContains(t, exposition, `route="/metrics"`, "a scrape is not a request the main router answered")
 	assert.Equal(t, 3, strings.Count(exposition, "goiabada_http_requests_total{"),
 		"three series and no more: the two scrapes added none")
+}
+
+// The database pool is reported as the database reads it at the scrape, not when the server was
+// built: NewServer registers the pool families over the database it is handed (#400 decision 5).
+func TestNewServer_ReportsTheDatabasePoolAtEveryScrape(t *testing.T) {
+	s := newMetricsTestServer(t)
+
+	assert.Equal(t, []string{
+		"goiabada_db_connections{state=\"idle\"} 5",
+		"goiabada_db_connections{state=\"in_use\"} 3",
+		"goiabada_db_connections_closed_total{reason=\"max_idle\"} 2",
+		"goiabada_db_connections_closed_total{reason=\"max_idle_time\"} 4",
+		"goiabada_db_connections_closed_total{reason=\"max_lifetime\"} 6",
+		"goiabada_db_max_open_connections 20",
+		"goiabada_db_wait_count_total 11",
+		"goiabada_db_wait_duration_seconds_total 1.5",
+	}, samplesOf(scrape(t, s), "goiabada_db_"))
+}
+
+// samplesOf answers the sample lines of a scrape whose names start with prefix.
+func samplesOf(exposition, prefix string) []string {
+	var out []string
+	for _, line := range strings.Split(exposition, "\n") {
+		if strings.HasPrefix(line, prefix) {
+			out = append(out, line)
+		}
+	}
+	return out
 }
 
 // The auth server's registry is held to the metrics catalog on the docs' Monitoring page, in both

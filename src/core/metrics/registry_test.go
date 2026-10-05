@@ -67,10 +67,13 @@ func TestRegistry_FamiliesDescribesWhatWasDeclared(t *testing.T) {
 	reg.Histogram("b_seconds", "B.", []float64{1}, metrics.Described("status", "the response's status code", "200", "404"))
 	reg.Counter("a_total", "A.", metrics.Enum("kind", "x", "y"))
 	reg.GaugeFunc("c_value", "C.", func() float64 { return 0 })
+	reg.CounterFunc("d_total", "D.", func() float64 { return 0 })
+	reg.GaugeVecFunc("e_value", "E.", func() []metrics.Sample { return nil }, metrics.Enum("state", "in_use", "idle"))
+	reg.CounterVecFunc("f_total", "F.", func() []metrics.Sample { return nil }, metrics.Enum("reason", "max_idle"))
 
 	families := reg.Families()
 
-	require.Len(t, families, 3)
+	require.Len(t, families, 6)
 	assert.Equal(t, "a_total", families[0].Name)
 	assert.Equal(t, "counter", families[0].Type)
 	assert.Equal(t, "A.", families[0].Help)
@@ -89,6 +92,21 @@ func TestRegistry_FamiliesDescribesWhatWasDeclared(t *testing.T) {
 	assert.Equal(t, "c_value", families[2].Name)
 	assert.Equal(t, "gauge", families[2].Type)
 	assert.Empty(t, families[2].Labels)
+
+	assert.Equal(t, "d_total", families[3].Name)
+	assert.Equal(t, "counter", families[3].Type)
+	assert.Empty(t, families[3].Labels)
+
+	assert.Equal(t, "e_value", families[4].Name)
+	assert.Equal(t, "gauge", families[4].Type)
+	require.Len(t, families[4].Labels, 1)
+	assert.Equal(t, "state", families[4].Labels[0].Name())
+	assert.Equal(t, []string{"in_use", "idle"}, families[4].Labels[0].Values())
+
+	assert.Equal(t, "f_total", families[5].Name)
+	assert.Equal(t, "counter", families[5].Type)
+	require.Len(t, families[5].Labels, 1)
+	assert.Equal(t, []string{"max_idle"}, families[5].Labels[0].Values())
 }
 
 // Each refusal is a programming error at a composition root, made once at startup, so it panics
@@ -128,6 +146,17 @@ func TestRegistry_RefusesWhatCannotBeExposed(t *testing.T) {
 		{"buckets out of order", func(reg *metrics.Registry) { reg.Histogram("a_seconds", "A.", []float64{1, 0.5}) }},
 		{"a bucket repeated", func(reg *metrics.Registry) { reg.Histogram("a_seconds", "A.", []float64{1, 1}) }},
 		{"an empty help", func(reg *metrics.Registry) { reg.Counter("a_total", "") }},
+		{"a gauge read at scrape time with nothing to read", func(reg *metrics.Registry) { reg.GaugeFunc("a_value", "A.", nil) }},
+		{"a counter read at scrape time with nothing to read", func(reg *metrics.Registry) { reg.CounterFunc("a_total", "A.", nil) }},
+		{"a labeled gauge read at scrape time with nothing to read", func(reg *metrics.Registry) {
+			reg.GaugeVecFunc("a_value", "A.", nil, metrics.Enum("kind", "x"))
+		}},
+		{"a labeled counter read at scrape time with nothing to read", func(reg *metrics.Registry) {
+			reg.CounterVecFunc("a_total", "A.", nil, metrics.Enum("kind", "x"))
+		}},
+		{"a labeled family read at scrape time with a label with no values", func(reg *metrics.Registry) {
+			reg.CounterVecFunc("a_total", "A.", func() []metrics.Sample { return nil }, metrics.Enum("kind"))
+		}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -145,6 +174,19 @@ func TestRegistry_RefusesARecordThatCannotBeRight(t *testing.T) {
 	assert.Panics(t, func() { c.Inc("x", "y", "z") }, "three values for two labels")
 	assert.Panics(t, func() { plain.Inc("x") }, "a value for an unlabeled counter")
 	assert.Panics(t, func() { plain.Add(-1) }, "a counter only goes up")
+}
+
+// A read reporting a sample whose label values do not match the labels declared is the same
+// programming error as a record that does, and is refused the same way.
+func TestRegistry_RefusesASampleThatCannotBeRight(t *testing.T) {
+	for _, values := range [][]string{nil, {"x", "y"}} {
+		reg := metrics.NewRegistry()
+		reg.GaugeVecFunc("a_value", "A.", func() []metrics.Sample {
+			return []metrics.Sample{{Value: 1, LabelValues: values}}
+		}, metrics.Enum("kind", "x"))
+
+		assert.Panics(t, func() { scrape(t, reg) }, "%d values for one label", len(values))
+	}
 }
 
 // Concurrent recording is a locking argument, which the race tier is where it is checked; here it

@@ -27,7 +27,7 @@ import (
 // exercise a single migration against seeded pre-migration data.
 type isolatedDB struct {
 	// The whole interface, and one of the four places that still holds it: this tier exercises all
-	// 223 methods on every engine, which is the broad capability #386 decision 8 names. Migratable
+	// 224 methods on every engine, which is the broad capability #386 decision 8 names. Migratable
 	// adds the engine's NewMigrator, which every migration case here steps through.
 	DB       datafactory.Migratable // concrete dialect DB (implements the interface)
 	SQL      *sql.DB                // raw handle for seeding / asserting
