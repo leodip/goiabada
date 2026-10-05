@@ -196,6 +196,30 @@ get_go_latest() {
     fi
 }
 
+# Reduce Alpine's releases.json, read on stdin, to its newest stable release as
+# major.minor, the form tools.alpine pins.
+#
+# Only an X.Y.Z version counts: edge publishes no release, and a release
+# candidate's version carries a suffix (3.25.0_rc1). A patch release does not
+# make the minor newer, so 3.24.2 reads as 3.24 (#396).
+alpine_latest_minor() {
+    grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' \
+        | cut -d'"' -f4 \
+        | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+        | cut -d. -f1,2 \
+        | sort -V \
+        | tail -1
+}
+
+# Fetch the newest stable Alpine minor from alpinelinux.org
+get_alpine_latest() {
+    local response
+    response=$(curl -s --connect-timeout 10 "https://alpinelinux.org/releases.json" 2>/dev/null)
+    if [ $? -eq 0 ] && [ -n "$response" ]; then
+        echo "$response" | alpine_latest_minor
+    fi
+}
+
 # Fetch latest version from npm registry
 # Usage: get_npm_latest "daisyui"
 get_npm_latest() {
@@ -399,6 +423,23 @@ cmd_check() {
             updates_available+=("govulncheck|$current_govulncheck|$latest_govulncheck|https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck")
         else
             print_success "Up to date ($current_govulncheck)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
+
+    # --- Alpine ---
+    # The release images' final stage. alpine:X.Y picks up patch releases at
+    # the next image build, so only a newer minor is an update (#396).
+    echo -n "Checking Alpine... "
+    local current_alpine=$(get_version 'tools.alpine')
+    local latest_alpine=$(get_alpine_latest)
+    if [ -n "$latest_alpine" ]; then
+        if version_lt "$current_alpine" "$latest_alpine"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("Alpine|$current_alpine|$latest_alpine|https://alpinelinux.org/releases/")
+        else
+            print_success "Up to date ($current_alpine)"
         fi
     else
         print_warning "Check failed"
@@ -909,6 +950,12 @@ show_help() {
 # =============================================================================
 # Main Entry Point
 # =============================================================================
+
+# Sourced rather than run, as a test does to call one function, the script stops
+# here with its functions defined.
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+    return 0
+fi
 
 # Check that versions.yaml exists
 if [ ! -f "$VERSIONS_FILE" ]; then
