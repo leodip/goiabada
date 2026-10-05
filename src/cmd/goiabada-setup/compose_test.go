@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -164,6 +165,82 @@ func TestComposeFile_PinsTheDatabaseMajor(t *testing.T) {
 	if checked == 0 {
 		t.Fatal("no Compose golden case runs a database server, so this checked nothing")
 	}
+}
+
+// developmentStacks are the files that run a database for development and testing: the dev
+// container, the test stack, and CI's check workflow, whose database jobs the data and integration
+// tiers run in.
+var developmentStacks = []string{
+	"../../.devcontainer/docker-compose.yml",
+	"../../build/docker-compose-test.yml",
+	"../../../.github/workflows/check.yml",
+}
+
+// The development and test stacks run each database the image the generated deployments run, so
+// the tiers test the database an operator deploys and a major upgrade is one reviewed change to
+// all of them. A tag that moves on its own also moved the tiers onto a new major with no change in
+// this repository, and stopped the dev container on a data volume the old one wrote.
+func TestDevelopmentStacks_RunTheGeneratedDatabaseImages(t *testing.T) {
+	for _, file := range developmentStacks {
+		t.Run(file, func(t *testing.T) {
+			content, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatalf("unable to read %s: %v", file, err)
+			}
+			var doc any
+			if err := yaml.Unmarshal(content, &doc); err != nil {
+				t.Fatalf("yaml.v3 refuses %s: %v", file, err)
+			}
+			images := imagesIn(doc)
+			for _, e := range engines {
+				if !e.hasServer {
+					continue
+				}
+				repository := imageRepository(e.image)
+				found := false
+				for _, image := range images {
+					if imageRepository(image) != repository {
+						continue
+					}
+					found = true
+					if image != e.image {
+						t.Errorf("runs %s, want %s, the image the generated deployments run", image, e.image)
+					}
+				}
+				if !found {
+					t.Errorf("runs no %s image, so this checked nothing for %s", repository, e.label)
+				}
+			}
+		})
+	}
+}
+
+// imagesIn is every value under an image key anywhere in a YAML document.
+func imagesIn(node any) []string {
+	var images []string
+	switch value := node.(type) {
+	case map[string]any:
+		for key, child := range value {
+			if image, ok := child.(string); ok && key == "image" {
+				images = append(images, image)
+				continue
+			}
+			images = append(images, imagesIn(child)...)
+		}
+	case []any:
+		for _, child := range value {
+			images = append(images, imagesIn(child)...)
+		}
+	}
+	return images
+}
+
+// imageRepository is an image reference without its tag.
+func imageRepository(image string) string {
+	if i := strings.LastIndex(image, ":"); i > strings.LastIndex(image, "/") {
+		return image[:i]
+	}
+	return image
 }
 
 // imageComment is the comment written above a service's image key.
