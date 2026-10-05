@@ -261,6 +261,11 @@ func HandleGroupUpdatePut(
 			return
 		}
 
+		// Only authserver:manage writes to an administrative group (#402 decision 1).
+		if !groupTargetCeilingAllows(w, r, database, auditLogger, group.Id) {
+			return
+		}
+
 		// Update the group
 		group.GroupIdentifier = strings.TrimSpace(updateReq.GroupIdentifier)
 		group.Description = strings.TrimSpace(updateReq.Description)
@@ -326,7 +331,9 @@ func HandleGroupDelete(
 		}
 
 		// The grant ceiling, after the request's 404 and before the write: only authserver:manage
-		// deletes a group holding an administrative permission (#402).
+		// deletes a group holding an administrative permission (#402). Such a group is an
+		// administrator, and the grant ceiling refuses exactly the groups the target ceiling would, so
+		// it is the one check here.
 		if !groupDeletionCeilingAllows(w, r, database, auditLogger, group.Id) {
 			return
 		}

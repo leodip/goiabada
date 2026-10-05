@@ -16,7 +16,9 @@ import (
 
 // userConsentsDatabase is what the administrator's user consent endpoints need: one user's
 // consents and the clients they name.
+// It embeds what the administrative policy reads to judge whether the user is an administrator.
 type userConsentsDatabase interface {
+	userTargetPolicyDatabase
 	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) error
 	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
@@ -102,6 +104,11 @@ func HandleUserConsentDelete(
 		}
 
 		// Delete the consent
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, consent.UserId) {
+			return
+		}
+
 		err = database.DeleteUserConsent(r.Context(), nil, consentId)
 		if err != nil {
 			writeInternalServerError(w, r, err)

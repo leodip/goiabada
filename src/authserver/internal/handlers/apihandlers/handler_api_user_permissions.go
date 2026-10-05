@@ -18,7 +18,7 @@ import (
 // userPermissionsDatabase is what the user permission endpoints need: the user's grants and the
 // catalogue they are granted from, and what the administrative policy reads to judge a save.
 type userPermissionsDatabase interface {
-	administrativePolicyDatabase
+	userTargetPolicyDatabase
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
 	DeleteUserPermission(ctx context.Context, tx *sql.Tx, userPermissionId int64) error
 	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
@@ -145,6 +145,11 @@ func HandleUserPermissionsPut(
 		// what the save's administrative_permission_changed records are written from (#402).
 		administrative, allowed := grantCeilingAllows(w, r, database, auditLogger, targetKindUser, user.Id, wanted, request.ExpectedPermissionIds)
 		if !allowed {
+			return
+		}
+
+		// The grant ceiling judged what the save changes; this judges whom it changes (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
 			return
 		}
 

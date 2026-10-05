@@ -42,7 +42,7 @@ func enabledRequest(t *testing.T, userId string, enabled bool) *http.Request {
 	req.Header.Set("Content-Type", "application/json")
 	req = setChiURLParam(req, "id", userId)
 	return setTokenContextWithClaims(req, map[string]interface{}{
-		"sub": adminSubject, "auth_time": float64(1),
+		"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1),
 	})
 }
 
@@ -236,7 +236,7 @@ func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 	req = setChiURLParam(req, "id", "42")
 	ctx := reqctx.WithSettings(req.Context(), &record.Settings{PasswordPolicy: record.PasswordPolicyLow})
 	req = setTokenContextWithClaims(req.WithContext(ctx),
-		map[string]interface{}{"sub": adminSubject, "auth_time": float64(1)})
+		map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1)})
 
 	rr := httptest.NewRecorder()
 	handler := HandleUserPasswordPut(database, passwordValidator, auditLogger)
@@ -297,7 +297,7 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req = setChiURLParam(req, "id", "42")
 	req = setTokenContextWithClaims(req, map[string]interface{}{
-		"sub": adminSubject, "auth_time": float64(1),
+		"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1),
 	})
 
 	rr := httptest.NewRecorder()

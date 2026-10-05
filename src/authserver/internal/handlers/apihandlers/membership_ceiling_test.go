@@ -369,6 +369,10 @@ func TestMembershipCeiling_AGranularTokenChangingAnOrdinaryGroupProceeds(t *test
 			change.expectReads(database, ordinaryGroupId, true)
 			expectGroupPermissions(database, ordinaryGroupId)
 			expectAuthServerPermissions(database)
+			if change.targetKind == targetKindUser {
+				// The target ceiling's reads of the user moved, who holds nothing of their own.
+				expectHoldsNothing(database, ceilingMemberId)
+			}
 			change.expectWrite(t, database, auditLogger, ordinaryGroupId)
 
 			rr := change.serve(database, auditLogger, ordinaryGroupId, "authserver:manage-users")
@@ -486,6 +490,7 @@ func TestMembershipCeiling_ARemovalTheUserDoesNotHoldIsLeftToTheSavesConflict(t 
 
 	expectMember(database)
 	database.On("GetUserGroupsByUserId", mock.Anything, (*sql.Tx)(nil), ceilingMemberId).Return([]record.UserGroup{}, nil).Once()
+	expectHoldsNothing(database, ceilingMemberId)
 	datamocks.ExpectRunInTransaction(database, userGroupsTx)
 	expectStoredMemberships(database)
 

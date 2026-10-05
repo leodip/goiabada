@@ -53,7 +53,7 @@ func adminEmailPutRequest(t *testing.T) *http.Request {
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/email", bytes.NewReader(body))
 	req = setChiURLParam(req, "id", "42")
-	return setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
+	return setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject})
 }
 
 // stubAdminEmailUpdate answers every read before the write, the validator's included, as an

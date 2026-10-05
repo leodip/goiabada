@@ -284,7 +284,7 @@ func TestHandleUserProfilePicturePost_CreateNew(t *testing.T) {
 	req, err := createMultipartRequest("POST", "/api/v1/admin/users/123/profile-picture", "picture", pictureData)
 	assert.NoError(t, err)
 	req = setChiURLParam(req, "id", "123")
-	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSub})
+	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
@@ -327,7 +327,7 @@ func TestHandleUserProfilePicturePost_UpdateExisting(t *testing.T) {
 	req, err := createMultipartRequest("POST", "/api/v1/admin/users/123/profile-picture", "picture", pictureData)
 	assert.NoError(t, err)
 	req = setChiURLParam(req, "id", "123")
-	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSub})
+	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
@@ -425,7 +425,7 @@ func TestHandleUserProfilePictureDelete_Success(t *testing.T) {
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/users/123/profile-picture", nil)
 	req = setChiURLParam(req, "id", "123")
-	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSub})
+	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
@@ -459,6 +459,8 @@ func TestHandleUserProfilePictureDelete_DatabaseError(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
+	// No token: the target ceiling reads what the user holds, and an ordinary user's write goes on.
+	expectHoldsNothing(database, 123)
 	database.On("DeleteUserProfilePicture", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(assert.AnError)
 
 	handler.ServeHTTP(rr, req)

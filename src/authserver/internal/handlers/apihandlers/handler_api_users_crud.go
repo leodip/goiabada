@@ -37,7 +37,9 @@ import (
 // It embeds the account OTP port because disabling a user's OTP runs through
 // otpcredential.Remove, and the revocation port because every credential write here revokes what
 // the old credential authorized.
+// It embeds what the administrative policy reads to judge whether the user is an administrator.
 type usersCrudDatabase interface {
+	userTargetPolicyDatabase
 	accountOTPDatabase
 	revocation.Database
 
@@ -149,6 +151,11 @@ func HandleUserPasswordPut(
 			return
 		}
 
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+			return
+		}
+
 		// Hash password
 		passwordHash, err := passwordhash.Hash(req.NewPassword)
 		if err != nil {
@@ -251,6 +258,11 @@ func HandleUserOTPPut(
 		// Only proceed if user currently has OTP enabled and we're disabling it
 		if !user.OTPEnabled {
 			writeJSONError(w, "User does not have OTP enabled", "OTP_NOT_ENABLED", http.StatusBadRequest)
+			return
+		}
+
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
 			return
 		}
 
@@ -574,6 +586,11 @@ func HandleUserEnabledPut(
 			return
 		}
 
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+			return
+		}
+
 		// Get logged in user from access token
 		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
@@ -699,6 +716,11 @@ func HandleUserDelete(
 
 		if user == nil {
 			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
+			return
+		}
+
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
 			return
 		}
 

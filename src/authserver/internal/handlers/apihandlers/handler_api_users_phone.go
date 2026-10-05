@@ -49,7 +49,9 @@ func HandlePhoneCountriesGet() http.HandlerFunc {
 }
 
 // usersPhoneDatabase is what the administrator's user phone endpoint needs: the user row.
+// It embeds what the administrative policy reads to judge whether the user is an administrator.
 type usersPhoneDatabase interface {
+	userTargetPolicyDatabase
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
@@ -111,6 +113,11 @@ func HandleUserPhonePut(
 		phoneCountry, found := phonecountries.ByUniqueID(input.PhoneCountryUniqueId)
 		if !found && len(input.PhoneCountryUniqueId) > 0 {
 			writeJSONError(w, "Phone country is invalid: "+input.PhoneCountryUniqueId, "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
 			return
 		}
 

@@ -58,6 +58,19 @@ func expectAuthServerPermissionsOn(database *datamocks.Database, tx *sql.Tx) {
 		}, nil).Once()
 }
 
+// expectOrdinaryOwner registers the target ceiling's reads of a save's owner for a caller without
+// authserver:manage, as an owner holding nothing: a user directly or through a group, or a group.
+// A client is not read here.
+func expectOrdinaryOwner(database *datamocks.Database, save grantSave) {
+	switch save.kind {
+	case targetKindUser:
+		expectHoldsNothing(database, grantOwnerId)
+	case targetKindGroup:
+		database.On("GetGroupPermissionsByGroupIds", mock.Anything, (*sql.Tx)(nil), []int64{grantOwnerId}).
+			Return([]record.GroupPermission{}, nil).Once()
+	}
+}
+
 // granularScopeOf is the granular write scope the route of each save admits.
 func granularScopeOf(save grantSave) string {
 	if save.kind == "client" {
@@ -196,6 +209,7 @@ func TestGrantCeiling_AGranularTokenChangingOrdinaryPermissionsProceeds(t *testi
 			save.expectOwner(database)
 			expectPermissionsExist(database, permManageAccount, permCustomOnAuthServer, 6)
 			expectAuthServerPermissions(database)
+			expectOrdinaryOwner(database, save)
 			datamocks.ExpectRunInTransaction(database, grantsTx)
 			save.expectStored(database, grantRow{id: 21, permissionId: 4})
 			database.On(save.deleteMethod, mock.Anything, grantsTx, int64(21)).Return(nil).Once()
@@ -214,8 +228,9 @@ func TestGrantCeiling_AGranularTokenChangingOrdinaryPermissionsProceeds(t *testi
 }
 
 // A save that changes nothing grants and revokes nothing, so the grant ceiling has nothing to judge
-// and reads nothing for it.
-func TestGrantCeiling_ASaveThatChangesNothingReadsNothingForThePolicy(t *testing.T) {
+// and reads nothing for it. The target ceiling still reads what the owner holds, which here is
+// nothing, so the administrative set is never read.
+func TestGrantCeiling_ASaveThatChangesNothingReadsNothingForTheGrantCeiling(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
@@ -223,6 +238,7 @@ func TestGrantCeiling_ASaveThatChangesNothingReadsNothingForThePolicy(t *testing
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 4)
+			expectOrdinaryOwner(database, save)
 			datamocks.ExpectRunInTransaction(database, grantsTx)
 			save.expectStored(database, grantRow{id: 21, permissionId: 4})
 			if save.consolidatedEvent != "" {

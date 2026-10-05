@@ -18,7 +18,9 @@ import (
 )
 
 // usersEmailDatabase is what the administrator's user email endpoint needs: the user row.
+// It embeds what the administrative policy reads to judge whether the user is an administrator.
 type usersEmailDatabase interface {
+	userTargetPolicyDatabase
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
@@ -80,6 +82,11 @@ func HandleUserEmailPut(
 		}
 
 		// Update user email fields
+		// Only authserver:manage writes to an administrator (#402 decision 1).
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+			return
+		}
+
 		user.Email = email
 		user.EmailVerified = req.EmailVerified
 		user.EmailVerificationCodeEncrypted = nil
