@@ -339,8 +339,10 @@ func (tr tokenResponder) writeTokenResponse(w http.ResponseWriter, r *http.Reque
 }
 
 // refuse answers a token request with err, as RFC 6749 section 5.2's error response, counting it as
-// refused under grantType and the error code err is answered with. Every refusal this endpoint
-// writes goes through here, so none is answered uncounted.
+// refused under grantType and the error code err is answered with. Every refusal this handler
+// writes goes through here, so none is answered uncounted; one written before the handler runs, by
+// the token branch's faults or by LimitROPC, is counted by the tokenmetrics.RefusalWriter it is
+// written through.
 func (tr tokenResponder) refuse(w http.ResponseWriter, r *http.Request, grantType oidc.GrantType, err error) {
 	tr.metrics.Refused(grantType, err)
 	tr.jsonWriter.JSONError(w, r, err)

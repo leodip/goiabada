@@ -18,21 +18,65 @@ import (
 // The rate limiter's refusals on the metrics listener (#400 decision 5): every 429 a tier answers
 // is counted under that tier's name, read the way a scraper reads it.
 
-// refusalSamples answers the sample lines of goiabada_rate_limit_refusals_total in reg's exposition.
-func refusalSamples(t *testing.T, reg *metrics.Registry) []string {
+// refusalCounts answers the value of every goiabada_rate_limit_refusals_total series in reg's
+// exposition, by its limiter label.
+func refusalCounts(t *testing.T, reg *metrics.Registry) map[string]string {
 	t.Helper()
 
 	rec := httptest.NewRecorder()
 	reg.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 	require.Equal(t, http.StatusOK, rec.Code)
 
-	var samples []string
+	counts := map[string]string{}
 	for _, line := range strings.Split(rec.Body.String(), "\n") {
-		if strings.HasPrefix(line, "goiabada_rate_limit_refusals_total") {
-			samples = append(samples, line)
+		rest, ok := strings.CutPrefix(line, `goiabada_rate_limit_refusals_total{limiter="`)
+		if !ok {
+			continue
+		}
+		limiter, value, ok := strings.Cut(rest, `"} `)
+		require.True(t, ok, "an unexpected sample line: %s", line)
+		counts[limiter] = value
+	}
+	return counts
+}
+
+// everyLimiterAtZeroBut is what a scrape of reg reads when the limiters refused only what refused
+// counts: every limiter the family declares at 0, but those named.
+func everyLimiterAtZeroBut(t *testing.T, reg *metrics.Registry, refused map[string]string) map[string]string {
+	t.Helper()
+
+	want := map[string]string{}
+	for _, family := range reg.Families() {
+		if family.Name == "goiabada_rate_limit_refusals_total" {
+			for _, limiter := range family.Labels[0].Values() {
+				want[limiter] = "0"
+			}
 		}
 	}
-	return samples
+	require.Len(t, want, 15, "every tier the constructor builds")
+	for limiter, value := range refused {
+		require.Contains(t, want, limiter)
+		want[limiter] = value
+	}
+	return want
+}
+
+// Every limiter reads 0 from the first scrape, before it refuses anything. A labelled series
+// appears only when it is first recorded, and increase() reads nothing over a window in which a
+// series first appears, so a limiter whose series was absent until its first burst raised no
+// GoiabadaRateLimitRefusals alert for that burst, even on a pod scraped since it started.
+func TestRateLimiter_EveryLimiterReadsZeroBeforeItsFirstRefusal(t *testing.T) {
+	m, _, reg := newMeteredTestMiddleware(nil, true)
+
+	before := refusalCounts(t, reg)
+	assert.Equal(t, everyLimiterAtZeroBut(t, reg, nil), before)
+
+	for i := 0; i < 31; i++ {
+		runPwd(m, fmt.Sprintf("user%d@example.com", i), "198.51.100.7:5000", false)
+	}
+
+	assert.Equal(t, everyLimiterAtZeroBut(t, reg, map[string]string{"pwd_ip": "1"}), refusalCounts(t, reg),
+		"the first refusal moves the series the scrape before it read at 0")
 }
 
 func TestRateLimiter_CountsEveryRefusalUnderItsLimiter(t *testing.T) {
@@ -44,7 +88,7 @@ func TestRateLimiter_CountsEveryRefusalUnderItsLimiter(t *testing.T) {
 			runPwd(m, fmt.Sprintf("user%d@example.com", i), "198.51.100.7:5000", false)
 		}
 
-		assert.Equal(t, []string{`goiabada_rate_limit_refusals_total{limiter="pwd_ip"} 2`}, refusalSamples(t, reg))
+		assert.Equal(t, everyLimiterAtZeroBut(t, reg, map[string]string{"pwd_ip": "2"}), refusalCounts(t, reg))
 	})
 
 	// The failures-only tier refuses from its own gate, without a request limiter: ten failed
@@ -54,20 +98,21 @@ func TestRateLimiter_CountsEveryRefusalUnderItsLimiter(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			runPwd(m, "victim@example.com", "198.51.100.7:5000", true)
 		}
-		require.Empty(t, refusalSamples(t, reg), "ten failures spend the budget and are refused nothing")
+		require.Equal(t, everyLimiterAtZeroBut(t, reg, nil), refusalCounts(t, reg),
+			"ten failures spend the budget and are refused nothing")
 
 		code, reached, _ := runPwd(m, "victim@example.com", "198.51.100.7:5000", false)
 		require.Equal(t, http.StatusTooManyRequests, code)
 		require.False(t, reached)
 
-		assert.Equal(t, []string{`goiabada_rate_limit_refusals_total{limiter="pwd_account_net"} 1`}, refusalSamples(t, reg))
+		assert.Equal(t, everyLimiterAtZeroBut(t, reg, map[string]string{"pwd_account_net": "1"}), refusalCounts(t, reg))
 	})
 
 	t.Run("a request within budget is no refusal", func(t *testing.T) {
 		m, _, reg := newMeteredTestMiddleware(nil, true)
 		runPwd(m, "user@example.com", "198.51.100.7:5000", false)
 
-		assert.Empty(t, refusalSamples(t, reg))
+		assert.Equal(t, everyLimiterAtZeroBut(t, reg, nil), refusalCounts(t, reg))
 	})
 
 	t.Run("a disabled limiter refuses nothing", func(t *testing.T) {
@@ -76,7 +121,7 @@ func TestRateLimiter_CountsEveryRefusalUnderItsLimiter(t *testing.T) {
 			runPwd(m, "x@example.com", "203.0.113.1:5000", true)
 		}
 
-		assert.Empty(t, refusalSamples(t, reg))
+		assert.Equal(t, everyLimiterAtZeroBut(t, reg, nil), refusalCounts(t, reg))
 	})
 }
 

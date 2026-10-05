@@ -8,7 +8,9 @@ package metrics_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -111,26 +113,49 @@ func TestHTTPRequests_RecordsDurationByRouteAndMethod(t *testing.T) {
 	}, lines(body, "goiabada_http_request_duration_seconds_count{"))
 
 	// The buckets are Prometheus's defaults plus 30 and 60 seconds, because the slowest handlers
-	// send mail synchronously for up to 40 seconds under a 60-second write timeout.
-	les := lines(body, `goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le=`)
+	// send mail synchronously for up to 40 seconds under a 60-second write timeout. Only the
+	// boundaries are read here: which bucket a fast request lands in is the scheduler's, and the
+	// test below times a request it controls.
+	var les []string
+	for _, line := range lines(body, `goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le=`) {
+		le, _, _ := strings.Cut(strings.TrimPrefix(line, `goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le=`), "}")
+		les = append(les, le)
+	}
 	assert.Equal(t, []string{
-		`goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le="0.005"} 2`,
-		`goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le="0.01"} 2`,
-		`goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le="0.025"} 2`,
-		`goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le="0.05"} 2`,
-		`goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le="0.1"} 2`,
-		`goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le="0.25"} 2`,
-		`goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le="0.5"} 2`,
-		`goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le="1"} 2`,
-		`goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le="2.5"} 2`,
-		`goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le="5"} 2`,
-		`goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le="10"} 2`,
-		`goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le="30"} 2`,
-		`goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le="60"} 2`,
-		`goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le="+Inf"} 2`,
+		`"0.005"`, `"0.01"`, `"0.025"`, `"0.05"`, `"0.1"`, `"0.25"`, `"0.5"`, `"1"`, `"2.5"`, `"5"`, `"10"`, `"30"`, `"60"`, `"+Inf"`,
 	}, les)
+	assert.Contains(t, body, `goiabada_http_request_duration_seconds_bucket{route="/users/{id}",method="GET",le="+Inf"} 2`+"\n")
 
 	assert.Equal(t, []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60}, metrics.DurationBuckets())
+}
+
+// slowHandlerDelay is how long the slow route below takes. Long enough that no fast-path bucket can
+// hold it, short enough that a loaded test machine still finishes it inside the one-second bucket.
+const slowHandlerDelay = 100 * time.Millisecond
+
+// A request's duration is the time its handler took, in seconds: a handler sleeping 100 ms is
+// observed above the 0.05 bucket and inside the one-second one, and the sum is at least the sleep.
+// An observation of zero, or one in milliseconds, fails both.
+func TestHTTPRequests_RecordsTheElapsedTimeInSeconds(t *testing.T) {
+	reg := metrics.NewRegistry()
+	r := chi.NewRouter()
+	r.Use(metrics.HTTPRequests(reg, r))
+	r.Get("/slow", func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(slowHandlerDelay)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	require.Equal(t, http.StatusOK, serve(t, r, http.MethodGet, "/slow"))
+
+	body := scrape(t, reg)
+	const series = `goiabada_http_request_duration_seconds`
+	const labels = `{route="/slow",method="GET"`
+	sum := sampleValue(t, body, series+"_sum"+labels+"}")
+	assert.GreaterOrEqual(t, sum, slowHandlerDelay.Seconds())
+	assert.Less(t, sum, 1.0, "a 100 ms handler observed in seconds, with a generous margin for the scheduler")
+	assert.Contains(t, body, series+"_bucket"+labels+`,le="0.05"} 0`+"\n")
+	assert.Contains(t, body, series+"_bucket"+labels+`,le="1"} 1`+"\n")
+	assert.Contains(t, body, series+"_count"+labels+"} 1\n")
 }
 
 // DurationBuckets hands out a copy, so a caller appending to or editing its slice cannot change

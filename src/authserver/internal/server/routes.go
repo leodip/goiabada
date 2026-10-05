@@ -18,7 +18,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
-	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/builtin"
@@ -32,7 +31,7 @@ import (
 // protocol endpoints and the APIs answer a settings or session failure, or a panic, as JSON
 // (see appBranches, #435).
 func (s *Server) initRoutes(branches appBranches) {
-	pages, protocol, api := branches.pages, branches.protocol, branches.api
+	pages, protocol, api, token := branches.pages, branches.protocol, branches.api, branches.token
 
 	auditLogger := audit.NewLogger(s.database, middleware.NewAuditSwitches(s.database))
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
@@ -52,7 +51,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	tokenIssuer := issuance.NewTokenIssuer(s.database, s.cfg.AuthServer.BaseURL, s.dataCipher, userSessionManager)
 	// The tokens the token endpoint and /auth/issue answer with, and the token requests refused,
 	// counted on the metrics listener (#400 decision 5).
-	tokenMetrics := tokenmetrics.Register(s.metrics)
+	tokenMetrics := s.tokenMetrics
 	userCreator := usercreation.New(s.database)
 	emailSender := emaildelivery.NewSender(s.dataCipher)
 
@@ -75,7 +74,10 @@ func (s *Server) initRoutes(branches appBranches) {
 	rateLimiter := middleware.NewRateLimiter(
 		ceremonyStore,
 		httpHelper,
-		httpHelper,
+		// The token endpoint's error writer, through which LimitROPC answers a body that does not
+		// parse and a credential count it could not read: a token request refused before the
+		// handler, and counted as one.
+		tokenMetrics.Refusals(httpHelper),
 		auditLogger,
 		authServerConfig.RateLimiterEnabled,
 		sharedCredentialCounts(s.cfg.Database.Type, s.database),
@@ -143,9 +145,10 @@ func (s *Server) initRoutes(branches appBranches) {
 	})
 	// Token endpoint with ROPC rate limiting (RFC 6749 §4.3.2 MUST protect against brute force).
 	// Outside the /auth group, which is mounted on the page branch whole, because it answers on the
-	// protocol branch. chi routes POST /auth/token here ahead of the group's catch-all; a GET falls
-	// through to the group, which answers it 405 as it did when the route was its own (#435).
-	protocol.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics))
+	// token branch, the protocol branch counting its faults as refusals. chi routes POST /auth/token
+	// here ahead of the group's catch-all; a GET falls through to the group, which answers it 405 as
+	// it did when the route was its own (#435).
+	token.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics))
 
 	pages.Route("/account", func(r chi.Router) {
 		r.Get("/register", accounthandlers.HandleRegisterGet(httpHelper))

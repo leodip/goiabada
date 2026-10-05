@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
@@ -128,8 +129,9 @@ func noticeTestServer(t *testing.T, database *datamocks.Database) *Server {
 		cfg:          &config.Config{},
 		jobs:         afterresponse.New(registry),
 		metrics:      registry,
+		tokenMetrics: tokenmetrics.Register(registry),
 	}
-	s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router})
+	s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router, token: s.router})
 	return s
 }
 

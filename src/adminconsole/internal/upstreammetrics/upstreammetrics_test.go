@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -38,6 +39,42 @@ func get(t *testing.T, client *http.Client, url string) error {
 		_ = resp.Body.Close()
 	}
 	return err
+}
+
+// sampleValue returns the value of the one sample whose name and labels are series.
+func sampleValue(t *testing.T, exposition, series string) float64 {
+	t.Helper()
+
+	var found []string
+	for _, line := range strings.Split(exposition, "\n") {
+		if strings.HasPrefix(line, series+" ") {
+			found = append(found, strings.TrimPrefix(line, series+" "))
+		}
+	}
+	require.Len(t, found, 1, "one %s sample", series)
+	v, err := strconv.ParseFloat(found[0], 64)
+	require.NoError(t, err)
+	return v
+}
+
+// peerDelay is how long the slow peers below take to answer. Long enough that no fast-path bucket
+// can hold the call, short enough that a loaded test machine still finishes it inside one second.
+const peerDelay = 100 * time.Millisecond
+
+// assertTimedInSeconds checks that target's one call was observed as taking at least atLeast, in
+// seconds: above the 0.05 bucket, inside the one-second one, and with a sum no smaller than atLeast.
+// An observation of zero, or one in milliseconds, fails it.
+func assertTimedInSeconds(t *testing.T, exposition, target string, atLeast time.Duration) {
+	t.Helper()
+
+	const series = "goiabada_upstream_request_duration_seconds"
+	labels := `{target="` + target + `"`
+	sum := sampleValue(t, exposition, series+"_sum"+labels+"}")
+	assert.GreaterOrEqual(t, sum, atLeast.Seconds())
+	assert.Less(t, sum, 1.0, "a call of about %s observed in seconds, with a generous margin for the scheduler", atLeast)
+	assert.Contains(t, exposition, series+"_bucket"+labels+`,le="0.05"} 0`+"\n")
+	assert.Contains(t, exposition, series+"_bucket"+labels+`,le="1"} 1`+"\n")
+	assert.Contains(t, exposition, series+"_count"+labels+"} 1\n")
 }
 
 // Each call is counted under the client's target and the exact status the peer answered with, and
@@ -102,11 +139,33 @@ func TestRecorder_TheClientsTimeoutStillHoldsAndIsAnError(t *testing.T) {
 	defer close(release)
 
 	reg := metrics.NewRegistry()
-	sessions := upstreammetrics.Register(reg).Client(upstreammetrics.Sessions, &http.Client{Timeout: 50 * time.Millisecond})
+	sessions := upstreammetrics.Register(reg).Client(upstreammetrics.Sessions, &http.Client{Timeout: 2 * peerDelay})
 
 	require.Error(t, get(t, sessions, peer.URL+"/api/v1/session/load"))
 
-	assert.Contains(t, scrape(t, reg), `goiabada_upstream_requests_total{target="sessions",status="error"} 1`+"\n")
+	exposition := scrape(t, reg)
+	assert.Contains(t, exposition, `goiabada_upstream_requests_total{target="sessions",status="error"} 1`+"\n")
+	// Timed to the moment the client gave up, its timeout. The deadline is set before the round trip
+	// starts, so the call is held to the smaller peerDelay rather than to the whole timeout.
+	assertTimedInSeconds(t, exposition, "sessions", peerDelay)
+}
+
+// A call's duration is the time to the peer's response headers, in seconds: a peer that waits
+// 100 ms before answering is observed as at least that.
+func TestRecorder_TimesTheCallInSeconds(t *testing.T) {
+	peer := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		time.Sleep(peerDelay)
+	}))
+	defer peer.Close()
+
+	reg := metrics.NewRegistry()
+	jwks := upstreammetrics.Register(reg).Client(upstreammetrics.JWKS, &http.Client{Timeout: 5 * time.Second})
+
+	require.NoError(t, get(t, jwks, peer.URL+"/certs"))
+
+	exposition := scrape(t, reg)
+	assert.Contains(t, exposition, `goiabada_upstream_requests_total{target="jwks",status="200"} 1`+"\n")
+	assertTimedInSeconds(t, exposition, "jwks", peerDelay)
 }
 
 // The recorded client is a copy: the one it was made from records nothing and keeps its transport,

@@ -1429,11 +1429,14 @@ ports:
 
 With the NetworkPolicies on, the wizard also asks which namespace the scraper runs in
 (`--metrics-namespace`, `monitoring` by default), and each policy gains a second ingress rule
-admitting that namespace to its server's metrics port alone. The first rule, for Envoy and the admin
-console, is unchanged and does not open the metrics port. To admit a scraper in another namespace,
-add its `namespaceSelector` to that second rule's `from`. Without the NetworkPolicies, any pod in the
-cluster can read the metrics; they hold no user data, but see [Who can reach
-Goiabada](#who-can-reach-goiabada).
+admitting that namespace to its server's metrics port alone. Give it the namespace your scraper
+actually runs in: for Google Managed Prometheus that is `gmp-system` on a Standard cluster and
+`gke-gmp-system` on an Autopilot cluster, and [Google Managed
+Prometheus](/production-deployment/monitoring/#google-managed-prometheus) shows how to check. The
+first rule, for Envoy and the admin console, is unchanged and does not open the metrics port. To
+admit a scraper in another namespace, add its `namespaceSelector` to that second rule's `from`.
+Without the NetworkPolicies, any pod in the cluster can read the metrics; they hold no user data, but
+see [Who can reach Goiabada](#who-can-reach-goiabada).
 
 Every generated manifest also turns request logging on, `GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS` and
 `GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS` set to `"true"` in the two ConfigMaps, so each request

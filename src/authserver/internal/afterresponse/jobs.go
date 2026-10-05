@@ -91,6 +91,13 @@ func New(reg *metrics.Registry) *Jobs {
 	j.dropped = reg.Counter("goiabada_after_response_jobs_dropped_total",
 		"Jobs handed off to run after their responses that were dropped because their class was at its cap, by class.",
 		metrics.Enum("class", names...))
+	// Every class's dropped series exists at zero from the first scrape. A labelled series appears
+	// only when it is first recorded, and increase() reads nothing over a window in which a series
+	// first appears, so without these the first drop a pod ever made would raise no alert even on a
+	// pod scraped since it started.
+	for _, name := range names {
+		j.dropped.Add(0, name)
+	}
 	return j
 }
 

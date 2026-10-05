@@ -38,9 +38,14 @@ func TestJobs_TheScrapeReportsTheJobsInFlightAndDroppedByClass(t *testing.T) {
 	reg := metrics.NewRegistry()
 	jobs := New(reg)
 
-	// Before any job, every class reads zero in flight and nothing is dropped. Series are written in
-	// the order of their label values.
+	// Before any job, every class reads zero in flight and zero dropped. Series are written in the
+	// order of their label values. The dropped series exist before the first drop, because
+	// increase() reads nothing over a window in which a series first appears, so a class whose
+	// series appeared only at its first drop raised no GoiabadaAfterResponseJobsDropped alert for it.
 	assert.Equal(t, []string{
+		`goiabada_after_response_jobs_dropped_total{class="account_notice"} 0`,
+		`goiabada_after_response_jobs_dropped_total{class="recovery"} 0`,
+		`goiabada_after_response_jobs_dropped_total{class="registration"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="account_notice"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="recovery"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="registration"} 0`,
@@ -60,7 +65,9 @@ func TestJobs_TheScrapeReportsTheJobsInFlightAndDroppedByClass(t *testing.T) {
 	}
 
 	assert.Equal(t, []string{
+		`goiabada_after_response_jobs_dropped_total{class="account_notice"} 0`,
 		`goiabada_after_response_jobs_dropped_total{class="recovery"} 2`,
+		`goiabada_after_response_jobs_dropped_total{class="registration"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="account_notice"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="recovery"} 64`,
 		`goiabada_after_response_jobs_in_flight{class="registration"} 1`,
@@ -70,7 +77,9 @@ func TestJobs_TheScrapeReportsTheJobsInFlightAndDroppedByClass(t *testing.T) {
 	close(release)
 	require.True(t, jobs.Wait(5*time.Second))
 	assert.Equal(t, []string{
+		`goiabada_after_response_jobs_dropped_total{class="account_notice"} 0`,
 		`goiabada_after_response_jobs_dropped_total{class="recovery"} 2`,
+		`goiabada_after_response_jobs_dropped_total{class="registration"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="account_notice"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="recovery"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="registration"} 0`,

@@ -712,10 +712,11 @@ func TestSummary_ReportsTheMetricsAnswer(t *testing.T) {
 	})
 }
 
-// The completion message says what was chosen and what it needs: with metrics off nothing; with pod
-// annotations, which scrapers honor them and that kube-prometheus-stack does not; with a PodMonitor,
-// that it needs the Operator's CRDs and is selected only by a matching Prometheus; and with the
-// NetworkPolicies on, the namespace they admit (#400 decisions 7 and 8).
+// The Kubernetes completion message says what was chosen and what it needs: with metrics off, that
+// they are off and how to turn them on; with pod annotations, which scrapers honor them and that
+// kube-prometheus-stack does not; with a PodMonitor, that it needs the Operator's CRDs and is
+// selected only by a matching Prometheus; and with the NetworkPolicies on, the namespace they admit.
+// The other deployments' completion messages say nothing of metrics (#400 decisions 7 and 8).
 func TestKubernetesInstructions_SayWhatTheMetricsAnswerNeeds(t *testing.T) {
 	const monitoringDocs = "https://goiabada.dev/production-deployment/monitoring/"
 	cases := map[string]struct {
@@ -745,8 +746,27 @@ func TestKubernetesInstructions_SayWhatTheMetricsAnswerNeeds(t *testing.T) {
 	t.Run("none", func(t *testing.T) {
 		var buf bytes.Buffer
 		printKubernetesInstructions(&console{w: &buf}, kubernetesConfig(), outputPaths{"goiabada-k8s.yaml", "goiabada-secrets.yaml"})
-		if strings.Contains(strings.ToLower(buf.String()), "metrics") {
-			t.Errorf("the message speaks of metrics with them off:\n%s", buf.String())
+		said := strings.Join(strings.Fields(buf.String()), " ")
+		for _, want := range []string{"Prometheus metrics are off", "--metrics=annotations", "--metrics=podmonitor", monitoringDocs} {
+			if !strings.Contains(said, want) {
+				t.Errorf("the message does not say %q:\n%s", want, buf.String())
+			}
+		}
+		for _, unwanted := range []string{"9190", "9191", "prometheus.io/scrape", "PodMonitor goiabada", "metrics ports alone"} {
+			if strings.Contains(said, unwanted) {
+				t.Errorf("the message says %q with metrics off:\n%s", unwanted, buf.String())
+			}
 		}
 	})
+	// The question is asked for Kubernetes alone, so the other completion messages say nothing of it.
+	for _, kind := range []deploymentType{deploymentLocal, deploymentProduction, deploymentNative} {
+		t.Run("not Kubernetes "+deployments[kind].name, func(t *testing.T) {
+			config := goldenConfig(kind, "postgres")
+			var buf bytes.Buffer
+			printCompletionMessage(&console{w: &buf}, config, deployments[kind].defaultPaths())
+			if strings.Contains(strings.ToLower(buf.String()), "metrics") {
+				t.Errorf("the %s completion message speaks of metrics:\n%s", deployments[kind].name, buf.String())
+			}
+		})
+	}
 }

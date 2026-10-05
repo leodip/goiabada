@@ -25,7 +25,7 @@ import (
 // serves the listener beside the others, a scrape reaches it, and on SIGTERM it drains with them.
 // The child is the real main over a fresh SQLite file it migrates and seeds.
 
-// metricsChild is a running main with the metrics listener enabled.
+// metricsChild is a running main configured for the metrics listener.
 type metricsChild struct {
 	cmd     *exec.Cmd
 	records chan map[string]any
@@ -33,12 +33,12 @@ type metricsChild struct {
 }
 
 // startMetricsChild starts main with the http listener and the metrics listener on loopback, the
-// latter on metricsPort, and delivers each record it writes as it writes it.
-func startMetricsChild(t *testing.T, ctx context.Context, httpPort, metricsPort int) *metricsChild {
+// latter on metricsPort, and delivers each record it writes as it writes it. enabled is the value
+// of the metrics setting, and an empty one leaves the setting out of the environment.
+func startMetricsChild(t *testing.T, ctx context.Context, httpPort, metricsPort int, enabled string) *metricsChild {
 	t.Helper()
 
-	cmd := exec.CommandContext(ctx, os.Args[0])
-	cmd.Env = append([]string{
+	env := []string{
 		runMainMarker + "=1",
 		"GOIABADA_DB_TYPE=sqlite",
 		"GOIABADA_DB_DSN=file:" + filepath.Join(t.TempDir(), "m.db"),
@@ -48,10 +48,14 @@ func startMetricsChild(t *testing.T, ctx context.Context, httpPort, metricsPort 
 		"GOIABADA_ADMIN_PASSWORD=a-long-enough-password-for-the-seed",
 		"GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=127.0.0.1",
 		"GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=" + strconv.Itoa(httpPort),
-		"GOIABADA_AUTHSERVER_METRICS_ENABLED=true",
 		"GOIABADA_AUTHSERVER_LISTEN_HOST_METRICS=127.0.0.1",
 		"GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS=" + strconv.Itoa(metricsPort),
-	}, singleStepEnv...)
+	}
+	if enabled != "" {
+		env = append(env, "GOIABADA_AUTHSERVER_METRICS_ENABLED="+enabled)
+	}
+	cmd := exec.CommandContext(ctx, os.Args[0])
+	cmd.Env = append(env, singleStepEnv...)
 	stderr, err := cmd.StderrPipe()
 	require.NoError(t, err)
 	require.NoError(t, cmd.Start())
@@ -123,7 +127,7 @@ func TestMain_ServesMetricsOnTheirOwnListenerAndDrainsIt(t *testing.T) {
 	defer cancel()
 
 	httpPort, metricsPort := freePort(t), freePort(t)
-	child := startMetricsChild(t, ctx, httpPort, metricsPort)
+	child := startMetricsChild(t, ctx, httpPort, metricsPort, "true")
 
 	status, contentType, body := getWhenUp(t, ctx, "http://127.0.0.1:"+strconv.Itoa(metricsPort)+"/metrics")
 	require.Equal(t, http.StatusOK, status, body)
@@ -161,11 +165,67 @@ func TestMain_AMetricsPortItCannotBindStopsTheServer(t *testing.T) {
 	defer func() { _ = taken.Close() }()
 	takenPort := taken.Addr().(*net.TCPAddr).Port
 
-	child := startMetricsChild(t, ctx, freePort(t), takenPort)
+	child := startMetricsChild(t, ctx, freePort(t), takenPort, "true")
 	code, records := child.wait(t, ctx)
 
 	require.Equalf(t, 1, code, "\n%s", dump(records))
 	stopped := recordNamed(records, "the auth server stopped on an error")
 	require.NotNilf(t, stopped, "\n%s", dump(records))
 	assert.Contains(t, stopped["error"], "127.0.0.1:"+strconv.Itoa(takenPort), "the failure names the metrics listener's address")
+}
+
+// Off unless enabled (#400 decision 3): with the setting left out, or set to false, the process
+// starts no metrics listener at all. The configured metrics port is held by a server of this
+// test's own, so a process that tried to bind it would stop on the error above, and a scrape of
+// that port reaches this test's server rather than the process's registry.
+func TestMain_MetricsOffLeavesTheMetricsPortAlone(t *testing.T) {
+	for name, enabled := range map[string]string{"omitted": "", "false": "false"} {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), mainProcessBound)
+			defer cancel()
+
+			taken, err := net.Listen("tcp", "127.0.0.1:0")
+			require.NoError(t, err)
+			holder := &http.Server{
+				Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.WriteHeader(http.StatusTeapot)
+				}),
+				ReadHeaderTimeout: time.Second,
+			}
+			go func() { _ = holder.Serve(taken) }()
+			defer func() { _ = holder.Close() }()
+			takenPort := taken.Addr().(*net.TCPAddr).Port
+
+			httpPort := freePort(t)
+			child := startMetricsChild(t, ctx, httpPort, takenPort, enabled)
+
+			// A process that exits, as one that tried to bind the held port does, ends the wait at
+			// once rather than at the bound.
+			up, upCancel := context.WithCancel(ctx)
+			defer upCancel()
+			go func() {
+				select {
+				case <-child.done:
+				case <-up.Done():
+				}
+				upCancel()
+			}()
+
+			status, _, body := getWhenUp(t, up, "http://127.0.0.1:"+strconv.Itoa(httpPort)+"/health")
+			require.Equal(t, http.StatusOK, status, "the main listener answers: %s", body)
+
+			status, _, body = getWhenUp(t, up, "http://127.0.0.1:"+strconv.Itoa(takenPort)+"/metrics")
+			assert.Equal(t, http.StatusTeapot, status, "the metrics port is still this test's")
+			assert.NotContains(t, body, "goiabada_build_info")
+
+			require.NoError(t, child.cmd.Process.Signal(syscall.SIGTERM))
+			code, records := child.wait(t, ctx)
+
+			require.Equalf(t, 0, code, "a process that never binds the metrics port stops cleanly\n%s", dump(records))
+			configured := recordNamed(records, "metrics listener configuration")
+			require.NotNilf(t, configured, "\n%s", dump(records))
+			assert.Equal(t, false, configured["enabled"])
+			assert.Nilf(t, recordNamed(records, "starting the metrics listener"), "\n%s", dump(records))
+		})
+	}
 }
