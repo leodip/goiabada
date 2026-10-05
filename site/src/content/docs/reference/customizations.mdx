@@ -17,67 +17,119 @@ You can also modify any HTML template of Goiabada if you wish, provided you don'
 Be careful when modifying templates. Incorrect changes can break authentication flows or the admin console functionality.
 </Aside>
 
+The templates and static files are compiled into each server's binary, and the images hold the
+binary alone, so there is no `web` folder inside a container to copy out. Each server reads its own
+set from a directory instead when you name one: `GOIABADA_AUTHSERVER_TEMPLATEDIR` and
+`GOIABADA_AUTHSERVER_STATICDIR` for the auth server, `GOIABADA_ADMINCONSOLE_TEMPLATEDIR` and
+`GOIABADA_ADMINCONSOLE_STATICDIR` for the admin console. A directory replaces the built-in set whole,
+so it must hold every file of that set, not only the ones you change.
+
 ### Customization strategy
 
 <Steps>
 
-1. **Copy the web folder from container to host**
+1. **Copy the web files of the release you run**
+
+   Copy them from the source of the same release as your images: a template from another release
+   may use data the server no longer passes to it, or leave out data it now needs. The release is in
+   the image tag (`leodip/goiabada:authserver-1.6.0` is `v1.6.0`) and in the `build information`
+   line each server logs when it starts.
 
    ```bash
-   # For auth server templates
-   docker cp goiabada-authserver:/app/web ./authserver-web
+   git clone --depth 1 --branch v1.6.0 https://github.com/leodip/goiabada.git goiabada-source
 
-   # For admin console templates
-   docker cp goiabada-adminconsole:/app/web ./adminconsole-web
+   mkdir authserver-web adminconsole-web
+   cp -r goiabada-source/src/authserver/web/{template,static,tailwindcss} authserver-web/
+   cp -r goiabada-source/src/adminconsole/web/{template,static,tailwindcss} adminconsole-web/
    ```
+
+   `tailwindcss` is not served; it is what [regenerating the CSS](#regenerating-css) reads.
 
 2. **Make your modifications**
 
-   Edit the HTML/CSS files as needed. The templates use Go's `html/template` package.
+   Edit the HTML/CSS files as needed. The templates use Go's `html/template` package. If you add a
+   Tailwind class, regenerate `main.css` as described [below](#regenerating-css).
 
-3. **Relaunch with volume mount**
+3. **Make the files readable by the containers**
 
-   Update your `docker-compose.yml` to mount the modified templates:
+   Both images run as uid 10001 and gid 10001 (see [the user the images run
+   as](/production-deployment/#the-user-the-images-run-as)), so every file must be readable by that
+   user and every directory searchable by it. Files copied under a restrictive umask are not, and a
+   page whose template the server cannot read fails with a 500:
+
+   ```bash
+   chmod -R a+rX authserver-web adminconsole-web
+   ```
+
+4. **Mount the directories and point the servers at them**
+
+   Mount each directory read-only and set the variables to where it is mounted, which works under
+   the read-only root filesystem the generated configurations give both servers. In the generated
+   `docker-compose.yml`:
 
    ```yaml
    goiabada-authserver:
      volumes:
-       - ./authserver-web/template:/app/web/template
-       - ./authserver-web/static:/app/web/static
+       - sqlite-data:/data   # keep the volumes the service already has
+       - ./authserver-web/template:/app/web/template:ro
+       - ./authserver-web/static:/app/web/static:ro
      environment:
-       - GOIABADA_AUTHSERVER_TEMPLATEDIR=/app/web/template
        - GOIABADA_AUTHSERVER_STATICDIR=/app/web/static
+       - GOIABADA_AUTHSERVER_TEMPLATEDIR=/app/web/template
+
+   goiabada-adminconsole:
+     volumes:
+       - ./adminconsole-web/template:/app/web/template:ro
+       - ./adminconsole-web/static:/app/web/static:ro
+     environment:
+       - GOIABADA_ADMINCONSOLE_STATICDIR=/app/web/static
+       - GOIABADA_ADMINCONSOLE_TEMPLATEDIR=/app/web/template
    ```
 
-4. **Set environment variables**
+   The generated file already lists the four variables, empty: set them there rather than adding a
+   second line for each. Leave a server's pair empty if you have not customized it. Then run
+   `docker compose up -d`.
 
-   - `GOIABADA_AUTHSERVER_TEMPLATEDIR` - Path to custom templates for auth server
-   - `GOIABADA_AUTHSERVER_STATICDIR` - Path to custom static files for auth server
-   - `GOIABADA_ADMINCONSOLE_TEMPLATEDIR` - Path to custom templates for admin console
-   - `GOIABADA_ADMINCONSOLE_STATICDIR` - Path to custom static files for admin console
+   With the native binaries, add the same variables to the env file, naming the directories, which
+   must be readable by the user the binaries run as.
 
 </Steps>
+
+A server reads a template each time it renders the page, so an edit to a mounted file shows on the
+next request without a restart, and a mistake in a template shows only when its page is rendered:
+open every page you changed. When you upgrade Goiabada, copy the new release's files again and redo
+your changes on them.
 
 ## Tailwind CSS
 
 Goiabada uses [Tailwind CSS](https://tailwindcss.com/) for styling. When customizing templates, you can add or change Tailwind CSS classes.
 
-If you modify Tailwind classes, you need to regenerate the `main.css` file using the **Tailwind CLI tool**.
+`main.css` holds only the classes the templates used when it was generated, so a class you add has
+no effect until you regenerate it with the **Tailwind CLI tool**.
 
 ### Regenerating CSS
 
-1. Download the Tailwind CLI tool from [https://tailwindcss.com/blog/standalone-cli](https://tailwindcss.com/blog/standalone-cli)
+<Steps>
 
-2. Run the following command from the directory containing the `web` folder:
+1. Download the standalone Tailwind CLI for your platform from [Tailwind's
+   releases](https://github.com/tailwindlabs/tailwindcss/releases), at the version the release you
+   copied pins: `tools.tailwind` in `goiabada-source/src/authserver/versions.yaml`. Rename it to
+   `tailwindcss` and make it executable.
+
+2. Run it in each web directory whose templates you changed:
 
    ```bash
-   tailwindcss \
-     -c ./web/tailwindcss/tailwind.config.js \
-     -i ./web/tailwindcss/input.css \
-     -o ./web/static/main.css
+   cd authserver-web
+   tailwindcss -i ./tailwindcss/input.css -o ./static/main.css
    ```
 
-3. Mount the updated `main.css` file when running the container
+   `input.css` names `../template` and the JavaScript in `../static` as the only places to look for
+   class names, so keep the three folders side by side.
+
+3. The new `main.css` is in the static directory you mounted, so the server serves it at once.
+   Browsers may keep the previous one for up to five minutes: reload without the cache to check.
+
+</Steps>
 
 <Aside type="tip">
 For production customizations, consider running Tailwind with the `--minify` flag to reduce the CSS file size.
