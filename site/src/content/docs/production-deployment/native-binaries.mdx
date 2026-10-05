@@ -172,9 +172,60 @@ once the first has re-encrypted, and what it encrypted would stay unreadable.
    again. Until then it is harmless: at each start the auth server finds the database under the
    current key and re-encrypts nothing.
 
-The other secrets are not Goiabada's to rotate. `GOIABADA_ADMIN_PASSWORD` is read only by the first
-start: change the administrator's password in the admin console. The OAuth client secret must match
-the admin console client's secret in the database, and the database password the database user's.
+**The database password.** `GOIABADA_DB_PASSWORD` is the password of the database user the auth
+server signs in as, `GOIABADA_DB_USERNAME`. The database checks a password only when a connection
+opens, so the running auth server keeps the connections it holds through a change.
+
+- **MySQL 8.0.14 and later** accept two passwords for one user, so the change costs nothing beyond
+  the restart. As an account with the `CREATE USER` privilege, or as the user itself with
+  `APPLICATION_PASSWORD_ADMIN`, give the user its new password while keeping the current one:
+
+  ```sql
+  ALTER USER 'goiabada'@'%' IDENTIFIED BY '<new password>' RETAIN CURRENT PASSWORD;
+  ```
+
+  Then set `GOIABADA_DB_PASSWORD` to it in the env file, restart the auth server with `sudo systemctl
+  restart goiabada-authserver`, and once it is back, `ALTER USER 'goiabada'@'%' DISCARD OLD
+  PASSWORD;`.
+- **PostgreSQL and SQL Server** hold one password per user. Set the new password in the env file
+  first, which no running process reads, then change it in the database: on PostgreSQL with `psql`'s
+  `\password goiabada`, which asks for it without echoing it and keeps it out of the server log and
+  `psql`'s history; on SQL Server with `ALTER LOGIN goiabada WITH PASSWORD = '<new password>'`, as a
+  login with `ALTER ANY LOGIN`, or as `goiabada` itself with `OLD_PASSWORD = '<current password>'`
+  added. Then restart the auth server at once. Until it restarts it cannot open a connection, and a
+  request that needs a new one fails with a 500; it opens one as traffic grows, and replaces each
+  after 5 idle minutes (`GOIABADA_DB_CONN_MAX_IDLE_TIME`) or 30 minutes of life
+  (`GOIABADA_DB_CONN_MAX_LIFETIME`).
+
+If the auth server then stops on `Access denied`, `password authentication failed` or `Login failed`
+in `sudo journalctl -u goiabada-authserver`, the env file and the database disagree: set the
+database user's password to the env file's.
+
+**The admin console's client secret.** `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` is the secret of
+the admin console's OAuth client, `admin-console-client`, which the auth server keeps, encrypted, in
+its database. The auth server reads it only at its first start, to create that client, and needs no
+restart. The admin console presents it on every sign-in, on every refresh of an administrator's
+access token, and for the token it asks for to reach its own sessions.
+
+1. In the admin console, open **Clients**, then `admin-console-client`, then its **Authentication**
+   tab, click **Generate new secret**, then **Copy**. Do not save yet.
+2. Paste it as `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` in the env file. Nothing reads it before a
+   restart, and it is now stored before the database depends on it.
+3. **Save** the page, and confirm the warning about a system-level client.
+4. Restart the admin console alone, at once, with `sudo systemctl restart goiabada-adminconsole`, and
+   check by signing in from a private window.
+
+Between steps 3 and 4 the auth server refuses the secret the running admin console presents: a
+sign-in fails at its last step, an administrator whose access token falls due is signed out, and once
+the token the admin console holds for its sessions expires, within 5 minutes unless you changed the
+access token lifetime, every page behind the sign-in answers 500. Administrators signed in before
+step 3 stay signed in through the restart, and the auth server and every other client work
+throughout. If the admin console can no longer sign you in, set a secret you know through the admin
+API, as [the Kubernetes page shows](/production-deployment/kubernetes/#the-admin-consoles-client-secret)
+with the env file in place of the Secret.
+
+`GOIABADA_ADMIN_PASSWORD` is read only by the first start, which creates the administrator: change the
+administrator's password in the admin console.
 
 ### Upgrading a configuration from an earlier release
 

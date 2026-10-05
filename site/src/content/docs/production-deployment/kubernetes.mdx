@@ -1088,13 +1088,167 @@ console's requests to it fail until it is back.
 
 Keep the old key as long as you keep a database backup taken before the rotation.
 
-#### The other secrets
+#### The database password
 
-The rest are not Goiabada's to rotate. `admin-password` is read only by the first start: change the
-administrator's password in the admin console. `oauth-client-secret` must match the admin console
-client's secret in the database, and `db-password` the database user's password. Each changes in
-both places, the Secret followed by a rollout, and the server that uses it fails to authenticate
-between the two changes.
+`db-password` is the password of the database user the auth server signs in as, the
+`GOIABADA_DB_USERNAME` of `goiabada-authserver-config`, and only the auth server reads it. The
+database checks a password only when a connection opens: a pod keeps the connections it holds
+through a change, and opens every new one with the password it started with. What a rotation costs
+depends on whether the database can accept two passwords for one user at once.
+
+**MySQL 8.0.14 and later** can, so nothing fails:
+
+1. Give the user its new password, keeping the current one as a second password that is still
+   accepted:
+
+   ```sql
+   ALTER USER 'goiabada'@'%' IDENTIFIED BY '<new password>' RETAIN CURRENT PASSWORD;
+   ```
+
+   Name the user and host your deployment signs in as. Run it as an account with the `CREATE USER`
+   privilege; the user itself can run it on its own account only with `APPLICATION_PASSWORD_ADMIN`.
+2. Put the new password in the Secret, and restart the auth server:
+
+   ```bash
+   read -rsp 'New database password: ' DB_PASSWORD; echo
+   kubectl patch secret goiabada-secrets -n goiabada --type=merge --patch-file=/dev/stdin <<EOF
+   {"data": {"db-password": "$(printf %s "$DB_PASSWORD" | base64 | tr -d '\n')"}}
+   EOF
+   unset DB_PASSWORD
+   kubectl rollout restart deployment/goiabada-authserver -n goiabada
+   kubectl rollout status deployment/goiabada-authserver -n goiabada
+   ```
+
+   The value goes in base64, under `data`, so no character of the password needs escaping. During
+   the rollout old pods sign in with the old password and new pods with the new, and both are
+   accepted.
+
+   When this step ends, `db-password` holds the new password.
+3. Discard the old password once the rollout is done:
+
+   ```sql
+   ALTER USER 'goiabada'@'%' DISCARD OLD PASSWORD;
+   ```
+
+**PostgreSQL and SQL Server** hold one password per user, which a change replaces at once:
+
+1. Put the new password in the Secret, with the `kubectl patch` of the MySQL step 2 and without the
+   restart. It is then stored before the database depends on it. No running pod reads it; a pod
+   that starts before step 2 cannot sign in, stops, and is restarted until step 2 is done.
+
+   When this step ends, `db-password` holds the new password.
+2. Change the user's password to the same value. On PostgreSQL, in `psql`:
+
+   ```sql
+   \password goiabada
+   ```
+
+   run as the user itself or as a role allowed to change its password. `\password` asks for the new
+   password twice without echoing it, and sends it hashed, so it reaches neither the server log nor
+   `psql`'s history. On SQL Server:
+
+   ```sql
+   ALTER LOGIN goiabada WITH PASSWORD = '<new password>';
+   ```
+
+   run as a login with the `ALTER ANY LOGIN` permission, or as `goiabada` itself with
+   `OLD_PASSWORD = '<current password>'` added. SQL Server's password policy asks for three of
+   upper case, lower case, digits and symbols, which a hex string lacks.
+3. Restart the auth server at once:
+
+   ```bash
+   kubectl rollout restart deployment/goiabada-authserver -n goiabada
+   kubectl rollout status deployment/goiabada-authserver -n goiabada
+   ```
+
+Between steps 2 and 3, every pod still running keeps the connections it holds, but each one it
+opens is refused, and the request that needed it fails with a 500. A pod opens connections as its
+traffic grows, and replaces each after 5 idle minutes (`GOIABADA_DB_CONN_MAX_IDLE_TIME`) or 30
+minutes of life (`GOIABADA_DB_CONN_MAX_LIFETIME`), so the shorter the gap, the fewer requests fail.
+
+If the new pods do not become ready and their logs say `Access denied`, `password authentication
+failed` or `Login failed`, the Secret and the database disagree. Read what the Secret holds,
+`kubectl get secret goiabada-secrets -n goiabada -o jsonpath='{.data.db-password}' | base64 -d`, and
+set the database user's password to it.
+
+#### The admin console's client secret
+
+`oauth-client-secret` is the secret of the admin console's OAuth client, `admin-console-client`,
+which the auth server keeps, encrypted, in its database. The auth server reads the Secret's copy only
+at its first start, to create that client, and needs no restart. The admin console presents it on
+every sign-in, on every refresh of an administrator's access token, and for the token it asks for to
+reach its own sessions, which the auth server stores. So a rotation changes the client's secret in
+the database and the admin console's copy, and restarts the admin console:
+
+1. In the admin console, open **Clients**, then `admin-console-client`, then its **Authentication**
+   tab, click **Generate new secret**, then **Copy**. Do not save yet.
+2. Put the copied secret in the Secret:
+
+   ```bash
+   read -rsp 'New client secret: ' CLIENT_SECRET; echo
+   kubectl patch secret goiabada-secrets -n goiabada --type=merge --patch-file=/dev/stdin <<EOF
+   {"stringData": {"oauth-client-secret": "$CLIENT_SECRET"}}
+   EOF
+   unset CLIENT_SECRET
+   ```
+
+   A generated secret holds letters, digits, `-`, `_` and `.` alone, so it needs no escaping. It is
+   now stored before the database depends on it. No running pod reads it; an admin console pod that
+   starts before step 3 cannot sign anybody in until step 3 is done.
+
+   When this step ends, `oauth-client-secret` holds the new secret.
+3. **Save** the page, and confirm the warning about a system-level client. The database now holds
+   the new secret.
+4. Restart the admin console at once:
+
+   ```bash
+   kubectl rollout restart deployment/goiabada-adminconsole -n goiabada
+   kubectl rollout status deployment/goiabada-adminconsole -n goiabada
+   ```
+
+   The rollout completes whatever secret the pods hold, since the admin console's health endpoint
+   does not reach the auth server: check by signing in from a private window.
+
+Between steps 3 and 4, the auth server refuses the old secret, which the admin console's running
+pods present. A sign-in fails at its last step with an error page, an administrator whose access
+token falls due is signed out, and once the token the admin console holds for its sessions expires,
+within the access token lifetime, 5 minutes unless you changed it, every page behind the sign-in
+answers 500. Administrators signed in before step 3 stay signed in through the restart. The auth
+server and every other client work throughout.
+
+If the admin console can no longer sign you in, because the database holds a secret its Secret does
+not, set a secret you know through the [admin API](/integration/rest-api/), with a client of your
+own allowed `authserver:manage-clients`. Have that client before you rotate: once the admin console
+is locked out, it is the only way back in.
+
+```bash
+read -rsp 'API client secret: ' API_CLIENT_SECRET; echo
+TOKEN=$(printf %s "$API_CLIENT_SECRET" | curl -s https://auth.example.com/auth/token \
+  -d grant_type=client_credentials -d client_id=<your API client> \
+  --data-urlencode client_secret@- -d scope=authserver:manage-clients | jq -r .access_token)
+unset API_CLIENT_SECRET
+CLIENT_ID=$(curl -s https://auth.example.com/api/v1/admin/clients -H "Authorization: Bearer $TOKEN" \
+  | jq '.clients[] | select(.clientIdentifier == "admin-console-client") | .id')
+CLIENT_SECRET=$(openssl rand -hex 32)
+kubectl patch secret goiabada-secrets -n goiabada --type=merge --patch-file=/dev/stdin <<EOF
+{"stringData": {"oauth-client-secret": "$CLIENT_SECRET"}}
+EOF
+curl -s -X PUT "https://auth.example.com/api/v1/admin/clients/$CLIENT_ID/authentication" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data-binary @- <<EOF
+{"isPublic": false, "clientSecret": "$CLIENT_SECRET"}
+EOF
+unset CLIENT_SECRET TOKEN
+kubectl rollout restart deployment/goiabada-adminconsole -n goiabada
+```
+
+The new secret goes into the Secret before the auth server holds it, and neither secret reaches the
+process list. The admin API accepts a secret of 60 to 255 letters, digits, `-`, `_` and `.`, which
+`openssl rand -hex 32`, 64 hex characters, is.
+
+#### The admin password
+
+`admin-password` is read only by the first start, which creates the administrator. Change the
+administrator's password in the admin console; changing the Secret changes nothing.
 
 #### Rotating Secrets something else owns
 
