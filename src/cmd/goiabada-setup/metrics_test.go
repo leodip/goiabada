@@ -759,13 +759,18 @@ func TestKubernetesInstructions_SayWhatTheMetricsAnswerNeeds(t *testing.T) {
 		}
 	})
 	// The question is asked for Kubernetes alone, so the other completion messages say nothing of it.
+	// They are matched on what printMetricsNotes says rather than on the word "metrics", because a
+	// local completion message prints the working directory, which may hold that word.
 	for _, kind := range []deploymentType{deploymentLocal, deploymentProduction, deploymentNative} {
 		t.Run("not Kubernetes "+deployments[kind].name, func(t *testing.T) {
 			config := goldenConfig(kind, "postgres")
 			var buf bytes.Buffer
 			printCompletionMessage(&console{w: &buf}, config, deployments[kind].defaultPaths())
-			if strings.Contains(strings.ToLower(buf.String()), "metrics") {
-				t.Errorf("the %s completion message speaks of metrics:\n%s", deployments[kind].name, buf.String())
+			said := strings.Join(strings.Fields(buf.String()), " ")
+			for _, unwanted := range []string{"Prometheus", "9190", "9191", "--metrics", "PodMonitor", "prometheus.io/scrape", monitoringDocs} {
+				if strings.Contains(said, unwanted) {
+					t.Errorf("the %s completion message says %q:\n%s", deployments[kind].name, unwanted, buf.String())
+				}
 			}
 		})
 	}
