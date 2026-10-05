@@ -100,6 +100,37 @@ func TestSeed_TheAuthServerPermissionsAreTheBuiltIns(t *testing.T) {
 	assert.Len(t, identifiers, 7)
 }
 
+// TestSeed_TheAdministrativeDescriptionsStateTheBoundary holds a fresh deployment's built-in
+// permission descriptions to the wording #402 decision 3 sets, which the console shows where an
+// operator picks a permission to grant: manage, manage-users, manage-clients and manage-settings
+// say what reaches an administrator and what does not, and the other three keep theirs. Migration
+// 000058 writes the same wording on an installation seeded before it, and the two must not drift,
+// which is why the expected map is the migration test's own.
+func TestSeed_TheAdministrativeDescriptionsStateTheBoundary(t *testing.T) {
+	h := migratedIsolatedDB(t)
+	ctx := context.Background()
+
+	outcome, err := bootstrap.Run(ctx, h.DB, dataCipher, seedConfig("admin@example.com"))
+	require.NoError(t, err)
+	require.Equal(t, bootstrap.Continue, outcome)
+
+	resource, err := h.DB.GetResourceByResourceIdentifier(ctx, nil, builtin.AuthServerResourceIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, resource)
+	permissions, err := h.DB.GetPermissionsByResourceId(ctx, nil, resource.Id)
+	require.NoError(t, err)
+	descriptions := map[string]string{}
+	for _, p := range permissions {
+		descriptions[p.PermissionIdentifier] = p.Description
+	}
+	assert.Equalf(t, boundaryDescriptions000058, descriptions,
+		"the seed must write the built-in permissions with the descriptions that state the boundary on %s", dbType())
+	for identifier, description := range descriptions {
+		assert.LessOrEqualf(t, len(description), 100,
+			"%s's description must fit the API's 100-character limit, so the console can save it back unchanged", identifier)
+	}
+}
+
 var errSeedFault = errors.New("injected seed failure")
 
 // seedFaultDB fails the seed on a real engine at the two points that matter to #424 decision 14:
