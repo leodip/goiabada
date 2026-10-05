@@ -151,8 +151,10 @@ func HandleGroupMemberAddPost(
 		}
 
 		// The grant ceiling, after the request's 400 and 404 answers and before the write: only
-		// authserver:manage moves a user into a group holding an administrative permission (#402).
-		if !membershipCeilingAllows(w, r, database, auditLogger, user.Id, []int64{group.Id}) {
+		// authserver:manage moves a user into a group holding an administrative permission.
+		// What it read is what the administrative_permission_changed record is written from (#402).
+		administrative, allowed := membershipCeilingAllows(w, r, database, auditLogger, user.Id, []int64{group.Id})
+		if !allowed {
 			return
 		}
 
@@ -172,6 +174,7 @@ func HandleGroupMemberAddPost(
 			"groupId":      group.Id,
 			"loggedInUser": callerSubject(r),
 		})
+		recordMembershipChanges(r, auditLogger, user.Id, changeGranted, administrative)
 
 		// Return success response
 		response := api.SuccessResponse{
@@ -247,8 +250,10 @@ func HandleGroupMemberDelete(
 		}
 
 		// The grant ceiling, after the request's 400 and 404 answers and before the write: only
-		// authserver:manage moves a user out of a group holding an administrative permission (#402).
-		if !membershipCeilingAllows(w, r, database, auditLogger, user.Id, []int64{group.Id}) {
+		// authserver:manage moves a user out of a group holding an administrative permission.
+		// What it read is what the administrative_permission_changed record is written from (#402).
+		administrative, allowed := membershipCeilingAllows(w, r, database, auditLogger, user.Id, []int64{group.Id})
+		if !allowed {
 			return
 		}
 
@@ -265,6 +270,7 @@ func HandleGroupMemberDelete(
 			"groupId":      group.Id,
 			"loggedInUser": callerSubject(r),
 		})
+		recordMembershipChanges(r, auditLogger, user.Id, changeRevoked, administrative)
 
 		// Return success response
 		response := api.SuccessResponse{

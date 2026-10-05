@@ -141,8 +141,10 @@ func HandleUserPermissionsPut(
 		}
 
 		// The grant ceiling, after the request's 400 and 404 answers and before the transaction:
-		// only authserver:manage grants or revokes an administrative permission (#402).
-		if !grantCeilingAllows(w, r, database, auditLogger, targetKindUser, user.Id, wanted, request.ExpectedPermissionIds) {
+		// only authserver:manage grants or revokes an administrative permission. What it read is
+		// what the save's administrative_permission_changed records are written from (#402).
+		administrative, allowed := grantCeilingAllows(w, r, database, auditLogger, targetKindUser, user.Id, wanted, request.ExpectedPermissionIds)
+		if !allowed {
 			return
 		}
 
@@ -211,6 +213,7 @@ func HandleUserPermissionsPut(
 				"loggedInUser": callerSubject(r),
 			})
 		}
+		recordAdministrativePermissionChanges(r, auditLogger, administrative, targetKindUser, user.Id, granted, revoked)
 
 		// Return success response
 		response := api.SuccessResponse{Success: true}

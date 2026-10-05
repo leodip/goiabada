@@ -396,6 +396,22 @@ const (
 	// permission); targetKind and targetId, where the request has a target; and, for a grant
 	// refusal, permissionIds, the administrative permissions whose change caused it.
 	EventAdministratorChangeRefused = "administrator_change_refused"
+
+	// EventAdministrativePermissionChanged records a committed change to who is an administrator:
+	// an administrative permission granted to or revoked from a user, a group or a client, or a
+	// user joining or leaving a group that holds one. It is written after the write's own records
+	// (added_user_permission and its siblings, updated_client_permissions, user_added_to_group and
+	// user_removed_from_group), never instead of them, so one filter or one alert rule sees every
+	// such change and a filter on those still sees every grant. Deleting an administrator or an
+	// administrative group keeps its own deletion record and writes none of these (#402 decision
+	// 6).
+	//
+	// Payload: change, granted or revoked; targetKind and targetId, the user, group or client
+	// whose permissions changed, the user for a membership change; permissionIdentifiers, the
+	// administrative permissions granted or revoked, as resource:permission; groupId, for a
+	// membership change, the group joined or left; and loggedInUser. A permission save writes at
+	// most one per direction, a membership change one per administrative group.
+	EventAdministrativePermissionChanged = "administrative_permission_changed"
 )
 
 // EventTypes returns the canonical list of audit event names, which the admin console's
@@ -412,6 +428,7 @@ var auditEventTypes = []string{
 	EventAddedGroupPermission,
 	EventAddedUserAttribute,
 	EventAddedUserPermission,
+	EventAdministrativePermissionChanged,
 	EventAdministratorChangeRefused,
 	EventAuthCeremonyMismatch,
 	EventAuthCodeReuseDetected,
