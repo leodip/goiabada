@@ -16,8 +16,9 @@ import (
 )
 
 // userPermissionsDatabase is what the user permission endpoints need: the user's grants and the
-// catalogue they are granted from.
+// catalogue they are granted from, and what the administrative policy reads to judge a save.
 type userPermissionsDatabase interface {
+	administrativePolicyDatabase
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
 	DeleteUserPermission(ctx context.Context, tx *sql.Tx, userPermissionId int64) error
 	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
@@ -137,6 +138,12 @@ func HandleUserPermissionsPut(
 				writeJSONError(w, "Permission not found", "NOT_FOUND", http.StatusNotFound)
 				return
 			}
+		}
+
+		// The grant ceiling, after the request's 400 and 404 answers and before the transaction:
+		// only authserver:manage grants or revokes an administrative permission (#402).
+		if !grantCeilingAllows(w, r, database, auditLogger, targetKindUser, user.Id, wanted, request.ExpectedPermissionIds) {
+			return
 		}
 
 		grantKey := func(up record.UserPermission) int64 { return up.PermissionId }

@@ -16,8 +16,9 @@ import (
 )
 
 // clientPermissionsDatabase is what the client permission endpoints need: the client's grants and
-// the catalogue they are granted from.
+// the catalogue they are granted from, and what the administrative policy reads to judge a save.
 type clientPermissionsDatabase interface {
+	administrativePolicyDatabase
 	ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error
 	DeleteClientPermission(ctx context.Context, tx *sql.Tx, clientPermissionId int64) error
@@ -138,6 +139,12 @@ func HandleClientPermissionsPut(
 				writeJSONError(w, "Permission not found", "NOT_FOUND", http.StatusNotFound)
 				return
 			}
+		}
+
+		// The grant ceiling, after the request's 400 and 404 answers and before the transaction:
+		// only authserver:manage grants or revokes an administrative permission (#402).
+		if !grantCeilingAllows(w, r, database, auditLogger, targetKindClient, client.Id, wanted, request.ExpectedPermissionIds) {
+			return
 		}
 
 		grantKey := func(cp record.ClientPermission) int64 { return cp.PermissionId }

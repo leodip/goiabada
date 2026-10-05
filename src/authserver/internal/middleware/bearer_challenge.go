@@ -39,3 +39,14 @@ func BearerChallenge(errorCode, description string) string {
 	}
 	return challenge
 }
+
+// InsufficientScopeChallenge is the insufficient_scope challenge with RFC 6750 section 3's scope
+// attribute, naming the scope that would be enough. It is for a refusal whose remedy is one
+// particular scope rather than whichever of a route's scopes: the administrative policy's
+// MANAGE_SCOPE_REQUIRED, which no granular scope will ever satisfy (#402 decision 4).
+//
+// scope is chosen by this server, never by a request, and section 3's scope-token is
+// %x21 / %x23-5B / %x5D-7E, which every scope this server names is spelled in.
+func InsufficientScopeChallenge(description, scope string) string {
+	return BearerChallenge("insufficient_scope", description) + `, scope="` + scope + `"`
+}

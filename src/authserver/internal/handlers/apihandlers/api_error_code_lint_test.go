@@ -101,6 +101,7 @@ var apiErrorCodes = map[string]string{
 	"UNAUTHORIZED":          "401: the caller may not act on this resource.",
 	"INSUFFICIENT_SCOPE":    "403: the token's scopes do not cover the route.",
 	"FORBIDDEN":             "403: the caller may not act on this resource.",
+	"MANAGE_SCOPE_REQUIRED": "403 from the administrative policy: the request acts on an administrator or an administrative permission, which only authserver:manage may do, so no granular scope will ever be enough (#402).",
 
 	// Key rotation, kept by decision 7 where every other 500-adjacent code went: a caller acts on
 	// both, and openapi.yaml documents them.
