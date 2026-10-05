@@ -59,9 +59,8 @@ Which way your scraper finds the pods depends on what runs it:
 
 | Scraper | Finds Goiabada by | Setup wizard answer |
 |---------|-------------------|---------------------|
-| The prometheus-community `prometheus` Helm chart, Datadog with Prometheus scraping on | [Pod annotations](#pod-annotations) | Pod annotations |
+| The prometheus-community `prometheus` Helm chart | [Pod annotations](#pod-annotations) | Pod annotations |
 | kube-prometheus-stack, or any Prometheus the Prometheus Operator runs | [A PodMonitor](#a-podmonitor) | PodMonitor |
-| Google Managed Prometheus | [A PodMonitoring](#google-managed-prometheus) | Pod annotations, then apply a PodMonitoring |
 | Grafana Alloy, the OpenTelemetry Collector | [The `metrics` container port](#grafana-alloy) | Pod annotations |
 | A Prometheus outside Kubernetes | [A static target](#outside-kubernetes) | Not asked |
 
@@ -86,9 +85,8 @@ annotations:
 ```
 
 They are a convention, not part of Kubernetes or Prometheus. The prometheus-community `prometheus`
-chart's default configuration reads them, and so does the Datadog Agent once its Prometheus scraping
-is turned on (`datadog.prometheusScrape.enabled=true` in its Helm chart). kube-prometheus-stack
-ignores them. For the NetworkPolicy, the namespace is the one the chart or the Agent runs in.
+chart's default configuration reads them, and kube-prometheus-stack ignores them. For the
+NetworkPolicy, the namespace is the one the chart's Prometheus runs in.
 
 ### A PodMonitor
 
@@ -130,44 +128,6 @@ A PodMonitor no Prometheus selects is accepted and scraped by nothing. PodMonito
 Operator's CRDs: on a cluster without them, `kubectl apply` exits 1 after applying everything else in
 the file. For the NetworkPolicy, the namespace is the one Prometheus runs in, `monitoring` in the
 usual kube-prometheus-stack install.
-
-### Google Managed Prometheus
-
-On GKE with managed collection, apply a `PodMonitoring` in Goiabada's namespace, after answering pod
-annotations to the wizard:
-
-```yaml
-apiVersion: monitoring.googleapis.com/v1
-kind: PodMonitoring
-metadata:
-  name: goiabada
-  namespace: goiabada
-spec:
-  selector:
-    matchExpressions:
-    - key: app
-      operator: In
-      values:
-      - goiabada-authserver
-      - goiabada-adminconsole
-  endpoints:
-  - port: metrics
-    path: /metrics
-    interval: 30s
-```
-
-The managed collectors run in a namespace GKE chooses, and it differs by cluster mode: `gmp-system` on
-a Standard cluster and `gke-gmp-system` on an Autopilot cluster. That namespace is the one to give the
-wizard for the NetworkPolicy, or to `--metrics-namespace`, and the policy admits it to the metrics
-ports alone. Check which one your cluster has before answering, by listing the collector pods in each:
-
-```bash
-kubectl get pods -n gmp-system      # Standard
-kubectl get pods -n gke-gmp-system  # Autopilot
-```
-
-The namespace whose list shows the `collector` pods is the one to enter. A policy naming the other
-admits nothing, and every scrape is refused.
 
 ### Grafana Alloy
 

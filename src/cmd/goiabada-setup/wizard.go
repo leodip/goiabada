@@ -512,11 +512,10 @@ func (w *wizard) askMetrics() error {
 	w.out.println("pods by one of:")
 	w.out.println("  1. None: the metrics listeners stay off.")
 	w.out.println("  2. Pod annotations, prometheus.io/scrape, port and path: read by the prometheus-community")
-	w.out.println("     prometheus chart's default configuration, and by Datadog once its Prometheus scraping")
-	w.out.println("     is on. kube-prometheus-stack ignores them.")
+	w.out.println("     prometheus chart's default configuration. kube-prometheus-stack ignores them.")
 	w.out.println("  3. A PodMonitor for the Prometheus Operator, which kube-prometheus-stack runs. On a cluster")
 	w.out.println("     without the Operator's CRDs, kubectl apply exits 1 after applying everything else.")
-	w.out.printf("Google Managed Prometheus, Alloy and the OpenTelemetry collector: %s\n", monitoringDocsURL)
+	w.out.printf("Grafana Alloy, the OpenTelemetry Collector and other scrapers: %s\n", monitoringDocsURL)
 	w.out.println()
 	choice, err := w.choice("Expose Prometheus metrics? [1-3]", []string{"1", "2", "3"})
 	if err != nil {
