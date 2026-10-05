@@ -48,6 +48,23 @@ Groups are useful for:
 - Department-based permissions
 - Feature flags for specific user segments
 
+A group holding one of the [administrative permissions](/concepts/resources-permissions/#administrators) makes every member an administrator. Adding a user to such a group, removing one from it, or deleting it therefore needs `authserver:manage`, just as granting the permission directly does.
+
+## The last administrator
+
+Goiabada refuses a change that would leave nobody able to administer it. An administrator remains while at least one **enabled** user holds `authserver:manage`, directly or through a group. Six changes can end that, and each is refused when it would bring the number of such users to zero:
+
+- revoking `manage` from a user;
+- revoking `manage` from a group;
+- removing a user from a group that gives them `manage`, from the group's members or from the user's groups;
+- deleting a group that gives `manage`;
+- disabling a user;
+- deleting a user.
+
+The refusal changes nothing and answers `409` with the error code `LAST_ADMINISTRATOR`, and the admin console shows its sentence on the page you made the change from: "This change would leave no enabled user holding authserver:manage. Grant it to another user first." Grant `manage` to another user, then repeat the change. Removing one of several administrators works as before.
+
+A client holding `manage` does not count, because what has to survive is a person who can sign in to the admin console and repair things; neither does a disabled user. The check reads permissions, not whether the person can still sign in: a sole administrator who has lost their authenticator, forgotten their password with no SMTP configured, or lost their mailbox still counts, and nothing in Goiabada gives them their access back. Keep `manage` on at least two people you trust, so that one can always restore the other.
+
 ## User self-registration
 
 When the **User self-registration** setting is activated, end-users gain the ability to independently register their user accounts using a link on the login form.

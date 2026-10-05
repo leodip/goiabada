@@ -48,19 +48,35 @@ The `authserver` resource is a **system-level resource** used internally by Goia
 - New permissions **can be added** to it
 - Its **built-in permission identifiers cannot be renamed or deleted**
 
-The built-in permissions under the `authserver` resource are:
+The built-in permissions under the `authserver` resource, with the description each is seeded with:
 
-| Permission identifier | Purpose |
-|----------------------|---------|
-| `manage-account` | Self-service account management (Account API) |
-| `manage` | Full admin access to all Admin API endpoints |
-| `admin-read` | Read-only access to all Admin API endpoints |
-| `manage-users` | Full access to user, group, and permission endpoints |
-| `manage-clients` | Full access to client endpoints |
-| `manage-settings` | Full access to settings and key endpoints |
-| `browser-sessions` | The admin console's access to its own browser sessions |
+| Permission identifier | Description | Administrative |
+|----------------------|-------------|----------------|
+| `manage-account` | View and update user account data for the current user | No |
+| `manage` | Full administration, including administrators and administrative permissions | Yes |
+| `admin-read` | Read-only access to all admin API endpoints | Yes |
+| `manage-users` | Manage users and groups that are not administrators, and their non-administrative permissions | Yes |
+| `manage-clients` | Manage OAuth2 clients that are not administrators | Yes |
+| `manage-settings` | Manage system settings, except email and audit logging, and signing keys | Yes |
+| `browser-sessions` | Read and write admin console browser sessions | Yes |
 
 You can create additional custom permissions on the `authserver` resource if needed, but the built-in ones listed above are protected.
+
+An installation upgraded from an earlier version gets these descriptions too, except where an operator had already edited one: an edited description is kept as it is.
+
+### Administrators
+
+The six permissions marked **Administrative** confer power over this server. A user, group or client holding any of them is an **administrator**: a user directly or through any of its groups. The admin console's own client is always an administrator, whatever it holds. `manage-account`, which every user receives at creation, and any custom permission you add to the `authserver` resource confer no power here and make nobody an administrator.
+
+**Only `authserver:manage` creates an administrator, changes one, or changes what reaches one.** The granular scopes `manage-users`, `manage-clients` and `manage-settings` keep full control of everyone else, and every scope that reads still reads administrators, but none of them can:
+
+- grant or revoke an administrative permission, add a user to or remove one from a group holding one, or delete such a group;
+- write to an administrator in any way, or read an administrator client's secret;
+- change the email or the audit-log settings.
+
+So `manage-users` can still grant and revoke `manage-account` and your own custom permissions, to anyone who is not an administrator, and `manage-settings` can still add custom permissions to the `authserver` resource. A refused request changes nothing, answers `403` with the error code `MANAGE_SCOPE_REQUIRED`, and leaves an `administrator_change_refused` entry in the [audit log](/concepts/audit-log/#events-to-alert-on). See [REST API › Granular Admin API scopes](/integration/rest-api/#granular-admin-api-scopes) for each scope in detail.
+
+Granting an administrative permission is how an administrator is made, so grant one as deliberately as you would hand out the admin console's password. Every grant or revocation of one, and every user joining or leaving a group that holds one, leaves an `administrative_permission_changed` entry an operator can alert on. Goiabada also refuses any change that would leave no enabled user holding `manage`: see [the last administrator](/concepts/users-groups/#the-last-administrator).
 
 ## How to use scopes
 

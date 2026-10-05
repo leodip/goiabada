@@ -18,24 +18,48 @@ The auth server exposes two main API groups:
 
 ### Granular Admin API scopes
 
-Instead of granting full admin access with `authserver:manage`, you can use granular scopes to limit access to specific API domains:
+Instead of granting full admin access with `authserver:manage`, you can give an integration a granular scope that reaches one API domain only. Each one stops short of administrators, as [the next section](#administrators-and-authservermanage) explains:
 
-| Scope | Access Level | Endpoints |
-|-------|--------------|-----------|
-| <span style="white-space: nowrap;">`authserver:admin-read`</span> | Read-only | GET requests across all admin endpoints |
-| <span style="white-space: nowrap;">`authserver:manage-users`</span> | Full | Users, groups, permissions, sessions, consents |
-| <span style="white-space: nowrap;">`authserver:manage-clients`</span> | Full | OAuth2 clients and their configurations |
-| <span style="white-space: nowrap;">`authserver:manage-settings`</span> | Full | System settings, resources, and signing keys |
-| <span style="white-space: nowrap;">`authserver:manage`</span> | Full | All admin endpoints (backwards compatible) |
+| Scope | Can | Cannot |
+|-------|-----|--------|
+| <span style="white-space: nowrap;">`authserver:admin-read`</span> | Read every Admin API endpoint, administrators included | Write anything, or read a client's secret |
+| <span style="white-space: nowrap;">`authserver:manage-users`</span> | Read and write users and groups, with their attributes, sessions, consents, memberships and non-administrative permissions | Act on an administrator, or grant or revoke an administrative permission, directly or through a group |
+| <span style="white-space: nowrap;">`authserver:manage-clients`</span> | Read and write OAuth2 clients, and read their secrets | Act on an administrator client, read its secret, or grant or revoke an administrative permission |
+| <span style="white-space: nowrap;">`authserver:manage-settings`</span> | Read every setting; change the general, session, token and UI theme settings; manage resources and their permissions, and the signing keys | Change the email or the audit-log settings |
+| <span style="white-space: nowrap;">`authserver:manage`</span> | Everything, administrators and administrative permissions included | |
+
+#### Administrators and authserver:manage
+
+An **administrator** is a user, group or client holding any of the six administrative permissions on the `authserver` resource: `manage`, `admin-read`, `manage-users`, `manage-clients`, `manage-settings` and `browser-sessions`. A user is one when they hold one directly or through any of their groups, and the admin console's own client is always one, whatever it holds. `manage-account` and the custom permissions you add to the `authserver` resource are not administrative (see [Resources and permissions › Administrators](/concepts/resources-permissions/#administrators)).
+
+**Only `authserver:manage` creates an administrator, changes one, or changes what reaches one.** A granular scope keeps full control of everyone else, and still reads administrators, but it cannot:
+
+- **Grant or revoke an administrative permission**, to a user, a group or a client; add a user to a group holding one or remove one from it, through either route (`POST` or `DELETE /groups/{id}/members`, or `PUT /users/{id}/groups`); or delete such a group.
+- **Write to an administrator**: any change to an administrator user (enabled, profile, address, email, verification code, phone, password, OTP, picture, attributes, sessions, consents, groups, permissions, deletion), to an administrative group (settings, attributes, members, permissions, deletion), or to an administrator client (settings, authentication, flows, redirect URIs, web origins, token settings, permissions, logo, deletion). Nor can it read an administrator client's secret.
+- **Change the email or the audit-log settings.** The email settings decide where password reset links are sent, and the audit-log settings decide what is recorded. Every other setting stays with `authserver:manage-settings`.
+
+Creating a user, group or client is not restricted: none of the three requests carries a permission or a group, and a new user is granted only `manage-account`, so a new principal is never an administrator.
+
+A refused request changes nothing. It is answered after the request's own `400` and `404`, before anything is written, with `403`, the error code `MANAGE_SCOPE_REQUIRED`, and a challenge naming the one scope that would do:
+
+```
+WWW-Authenticate: Bearer realm="goiabada", error="insufficient_scope", error_description="Only a token with the authserver:manage scope may act on administrators or administrative permissions.", scope="authserver:manage"
+```
+
+It also leaves one `administrator_change_refused` entry in the [audit log](/concepts/audit-log/#events-to-alert-on), naming the caller, the route, the target and which rule refused it. Its remedy is not the one for `INSUFFICIENT_SCOPE`: that code means the token lacks the route's scope, and requesting it fixes the call, while `MANAGE_SCOPE_REQUIRED` means no granular scope will ever be enough. Either use a token with `authserver:manage` or leave the administrator alone.
+
+A token with `authserver:manage` is never refused by these rules, but it meets one more: a change that would leave no enabled user holding `authserver:manage` is answered `409` with the error code `LAST_ADMINISTRATOR`, and changes nothing. Seven operations can meet it: setting a user's permissions, setting a group's permissions, removing a group member, setting a user's groups, deleting a group, disabling a user and deleting a user. Grant `authserver:manage` to another user first, then repeat the request (see [Users and groups › The last administrator](/concepts/users-groups/#the-last-administrator)).
+
+Every change to who is an administrator, an administrative permission granted or revoked, or a user joining or leaving a group holding one, leaves an `administrative_permission_changed` entry beside the change's own entry, so one alert rule sees them all.
 
 <Aside type="tip">
-Use granular scopes to follow the principle of least privilege. For example, a user provisioning service only needs `authserver:manage-users`, not full admin access.
+Use granular scopes to follow the principle of least privilege. A user provisioning service needs only `authserver:manage-users`: it can create, update, disable and delete users, put them in groups and grant them `manage-account` and your own permissions. It cannot act on an administrator, the administrator created at installation included, or make anyone an administrator. That stays with `authserver:manage`.
 </Aside>
 
 #### Scope hierarchy
 
-- **Read operations (GET)**: Allowed by `authserver:admin-read`, the domain-specific scope, or `authserver:manage`
-- **Write operations (POST, PUT, DELETE)**: Require the domain-specific scope or `authserver:manage`
+- **Read operations (GET)**: Allowed by `authserver:admin-read`, the domain-specific scope, or `authserver:manage`. Reading a client's secret is the exception: it needs `authserver:manage-clients` or `authserver:manage`
+- **Write operations (POST, PUT, DELETE)**: Require the domain-specific scope or `authserver:manage`, and the rules [above](#administrators-and-authservermanage) still apply
 
 For example, to read user data you need any of:
 - `authserver:admin-read`
@@ -43,8 +67,8 @@ For example, to read user data you need any of:
 - `authserver:manage`
 
 But to create or update a user, you need:
-- `authserver:manage-users`
-- `authserver:manage`
+- `authserver:manage-users`, for a user who is not an administrator
+- `authserver:manage`, for any user
 
 ## Authentication
 
@@ -77,18 +101,20 @@ After creating the client, assign the required resource permissions:
 2. For **Admin API** access:
    - Select the `authserver` resource
    - Assign the appropriate permission(s):
-     - `manage` - Full access to all Admin API endpoints
-     - `admin-read` - Read-only access to all Admin API endpoints
-     - `manage-users` - Full access to user, group, and permission endpoints
-     - `manage-clients` - Full access to client endpoints
-     - `manage-settings` - Full access to settings and key endpoints
+     - `manage` - Full administration, including administrators and administrative permissions
+     - `admin-read` - Read-only access to all Admin API endpoints, client secrets excepted
+     - `manage-users` - Users and groups that are not administrators, and their non-administrative permissions
+     - `manage-clients` - OAuth2 clients that are not administrators
+     - `manage-settings` - Settings, except email and audit logging; resources; signing keys
+
+   Each of these makes the client an [administrator](#administrators-and-authservermanage), so only an `authserver:manage` holder, such as the admin console, can assign one.
 3. For **Account API** access (self-service endpoints):
    - Select the `authserver` resource
    - Assign the `manage-account` permission
    - This allows users to manage their own accounts
 
 <Aside type="note">
-The **Admin API** scope (`authserver:manage`) provides full administrative control over your Goiabada instance. Only assign this to trusted applications. Consider using granular scopes like `authserver:manage-users` to limit access to specific domains. For user self-service operations, use the **Account API** scope (`authserver:manage-account`) instead.
+The **Admin API** scope (`authserver:manage`) provides full administrative control over your Goiabada instance, including creating other administrators. Only assign this to trusted applications. Consider using granular scopes like `authserver:manage-users` to limit access to specific domains and keep administrators out of reach. For user self-service operations, use the **Account API** scope (`authserver:manage-account`) instead.
 </Aside>
 
 ### Obtaining an access token
@@ -110,7 +136,7 @@ For granular access, request only the scopes you need:
 # Read-only access to all admin endpoints
 -d "scope=authserver:admin-read"
 
-# Full access to user management only
+# User management, administrators excepted
 -d "scope=authserver:manage-users"
 
 # Multiple scopes (space-separated)
@@ -181,7 +207,12 @@ Common `error_code` categories:
 - `INVALID_REQUEST_BODY` - Malformed JSON in request
 - `VALIDATION_ERROR` - Input validation failed
 - `NOT_FOUND` - Resource not found
+- `INSUFFICIENT_SCOPE` - The token carries none of the scopes the route accepts; the `WWW-Authenticate` header says `error="insufficient_scope"`
+- `USER_CONTEXT_REQUIRED` - An Account API call made with a token not issued for a user, such as a client credentials token
 - `FORBIDDEN` - The token is valid but the resource belongs to another user
+- `MANAGE_SCOPE_REQUIRED` - The request acts on an administrator or an administrative permission, which only `authserver:manage` may do, so no granular scope will ever be enough; see [Administrators and authserver:manage](#administrators-and-authservermanage)
+- `CONCURRENT_UPDATE` - A list save was sent with a list that is no longer the stored one (see below)
+- `LAST_ADMINISTRATOR` - The change would leave no enabled user holding `authserver:manage`; grant it to another user first
 - `TOO_MANY_REQUESTS` - Rate limit reached; the response carries a `Retry-After` header
 - `INTERNAL_SERVER_ERROR` - Server-side error
 
@@ -203,7 +234,7 @@ The Admin API provides administrative control over your Goiabada instance. Endpo
 | Clients | `authserver:admin-read` or `authserver:manage-clients` | `authserver:manage-clients` |
 | Settings, Resources, Keys | `authserver:admin-read` or `authserver:manage-settings` | `authserver:manage-settings` |
 
-The `authserver:manage` scope grants full access to all domains (backwards compatible).
+The `authserver:manage` scope grants full access to all domains (backwards compatible). A granular write scope reaches its domain's routes, but not an administrator on them, and `authserver:manage-settings` does not change the email or audit-log settings: see [Administrators and authserver:manage](#administrators-and-authservermanage). A client's secret is read with `authserver:manage-clients` or `authserver:manage` only.
 
 ### Users
 
@@ -401,6 +432,8 @@ PUT /api/v1/admin/users/{id}/enabled
 }
 ```
 
+Answers `409` `LAST_ADMINISTRATOR`, changing nothing, when it would leave no enabled user holding `authserver:manage`.
+
 #### Disable user OTP
 
 ```
@@ -422,6 +455,8 @@ OTP can only be disabled through the Admin API, not enabled. Users must enroll i
 ```
 DELETE /api/v1/admin/users/{id}
 ```
+
+Answers `409` `LAST_ADMINISTRATOR`, changing nothing, when it would leave no enabled user holding `authserver:manage`.
 
 #### Get user profile picture status
 
@@ -640,6 +675,8 @@ PUT /api/v1/admin/groups/{id}
 DELETE /api/v1/admin/groups/{id}
 ```
 
+Answers `409` `LAST_ADMINISTRATOR`, changing nothing, when it would leave no enabled user holding `authserver:manage`.
+
 ---
 
 ### Group members
@@ -668,6 +705,8 @@ POST /api/v1/admin/groups/{id}/members
 DELETE /api/v1/admin/groups/{id}/members/{userId}
 ```
 
+Answers `409` `LAST_ADMINISTRATOR`, changing nothing, when it would leave no enabled user holding `authserver:manage`.
+
 ---
 
 ### User groups
@@ -690,6 +729,8 @@ PUT /api/v1/admin/users/{id}/groups
   "expectedGroupIds": [1, 2]
 }
 ```
+
+Answers `409` `LAST_ADMINISTRATOR`, changing nothing, when it would leave no enabled user holding `authserver:manage`.
 
 ---
 
@@ -838,6 +879,8 @@ PUT /api/v1/admin/users/{id}/permissions
 }
 ```
 
+Answers `409` `LAST_ADMINISTRATOR`, changing nothing, when it would leave no enabled user holding `authserver:manage`.
+
 #### Get group permissions
 
 ```
@@ -856,6 +899,8 @@ PUT /api/v1/admin/groups/{id}/permissions
   "expectedPermissionIds": [1, 2]
 }
 ```
+
+Answers `409` `LAST_ADMINISTRATOR`, changing nothing, when it would leave no enabled user holding `authserver:manage`.
 
 #### Get users with permission
 
@@ -896,6 +941,28 @@ POST /api/v1/admin/clients
 ```
 GET /api/v1/admin/clients/{id}
 ```
+
+The response carries no client secret: read it from [Get client secret](#get-client-secret).
+
+<Aside type="caution" title="Breaking change">
+Earlier versions answered a confidential client's decrypted secret here, in `clientSecret`, to every scope that reads clients, `authserver:admin-read` included. That field is gone from this response, not left empty. An integration reading it must call `GET /api/v1/admin/clients/{id}/secret` instead, with `authserver:manage-clients` or `authserver:manage`.
+</Aside>
+
+#### Get client secret
+
+```
+GET /api/v1/admin/clients/{id}/secret
+```
+
+```json
+{
+  "clientSecret": "the-decrypted-secret"
+}
+```
+
+The one operation that answers a client secret, decrypted. It needs `authserver:manage-clients` or `authserver:manage`: `authserver:admin-read` is refused with `INSUFFICIENT_SCOPE`. The secret of an [administrator](#administrators-and-authservermanage) client, the admin console's own included, needs `authserver:manage`, and `authserver:manage-clients` is refused with `MANAGE_SCOPE_REQUIRED`. A public client, which holds no secret, is answered an empty `clientSecret`.
+
+Every read that answers a secret leaves a `viewed_client_secret` entry in the [audit log](/concepts/audit-log/#events-to-alert-on), naming the client and the caller. Do not cache the response.
 
 #### Update client settings
 
@@ -1116,6 +1183,8 @@ GET /api/v1/admin/settings/email
 PUT /api/v1/admin/settings/email
 ```
 
+Changing these needs `authserver:manage`: they decide where password reset links are sent, so `authserver:manage-settings` reads them but is refused a change with `MANAGE_SCOPE_REQUIRED`. The SMTP password is never answered, only whether one is set.
+
 ```json
 {
   "smtpEnabled": true,
@@ -1195,6 +1264,8 @@ PUT /api/v1/admin/settings/tokens
 GET /api/v1/admin/settings/audit-logs
 PUT /api/v1/admin/settings/audit-logs
 ```
+
+Changing these needs `authserver:manage`: they decide what is recorded, so `authserver:manage-settings` reads them but is refused a change with `MANAGE_SCOPE_REQUIRED`.
 
 ```json
 {
