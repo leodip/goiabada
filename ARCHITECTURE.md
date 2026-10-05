@@ -110,6 +110,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/locales` | kernel | — |
 | `core/localzone` | kernel | — |
 | `core/logging` | kernel | — |
+| `core/metrics` | kernel | — |
 | `core/oauth` | kernel | — |
 | `core/securerandom` | kernel | — |
 | `core/sessionstore` | kernel | — |
@@ -137,6 +138,10 @@ Notes on rows that are not self-evident:
   it: `core/testutil/fake` imported `core/uuidutil` under an exception rather than a waiver, so the
   edge was noticed when `uuidutil` moved, and `fake` moved with it to the auth server, where it is
   `authserver/internal/fake` since #442. No admin console file ever imported it.
+- `core/metrics` is kernel because both servers expose their metrics through it: the registry whose
+  labels take only declared values, the Prometheus text exposition and the request middleware. It is
+  written here rather than taken from `prometheus/client_golang`, which would add eight modules and
+  link `expvar` into both binaries, and which takes any string as a label value (#400).
 - `core/api` is declarations and nothing else. The model-aware `ToResponse` mapping left for
   `authserver/internal/apimapping` in #350, the model-typed fields became DTOs of its own, and the
   reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites are
