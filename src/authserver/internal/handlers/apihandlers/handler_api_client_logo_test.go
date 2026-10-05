@@ -266,7 +266,7 @@ func TestHandleClientLogoPost_CreateNew(t *testing.T) {
 	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", pictureData)
 	assert.NoError(t, err)
 	req = setChiURLParam(req, "id", "123")
-	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSub})
+	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
@@ -308,7 +308,7 @@ func TestHandleClientLogoPost_UpdateExisting(t *testing.T) {
 	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", pictureData)
 	assert.NoError(t, err)
 	req = setChiURLParam(req, "id", "123")
-	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSub})
+	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
@@ -409,7 +409,7 @@ func TestHandleClientLogoDelete_Success(t *testing.T) {
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/clients/123/logo", nil)
 	req = setChiURLParam(req, "id", "123")
-	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSub})
+	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
@@ -442,6 +442,8 @@ func TestHandleClientLogoDelete_DatabaseError(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	// No token: the target ceiling reads what the client holds, and an ordinary client's write goes on.
+	database.On("GetClientPermissionsByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return([]record.ClientPermission{}, nil).Once()
 	database.On("DeleteClientLogo", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(assert.AnError)
 
 	handler.ServeHTTP(rr, req)

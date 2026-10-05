@@ -18,7 +18,7 @@ import (
 // clientPermissionsDatabase is what the client permission endpoints need: the client's grants and
 // the catalogue they are granted from, and what the administrative policy reads to judge a save.
 type clientPermissionsDatabase interface {
-	administrativePolicyDatabase
+	clientTargetPolicyDatabase
 	ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error
 	DeleteClientPermission(ctx context.Context, tx *sql.Tx, clientPermissionId int64) error
@@ -146,6 +146,11 @@ func HandleClientPermissionsPut(
 		// what the save's administrative_permission_changed records are written from (#402).
 		administrative, allowed := grantCeilingAllows(w, r, database, auditLogger, targetKindClient, client.Id, wanted, request.ExpectedPermissionIds)
 		if !allowed {
+			return
+		}
+
+		// The grant ceiling judged what the save changes; this judges whom it changes (#402 decision 1).
+		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
 			return
 		}
 
