@@ -72,6 +72,11 @@ func HandleSettingsEmailPut(
 
 		// When disabled, reset fields to defaults
 		if !req.SMTPEnabled {
+			// Reserved to authserver:manage: switching SMTP off is a change of where mail goes.
+			if !settingsCeilingAllows(w, r, auditLogger) {
+				return
+			}
+
 			currentSettings.SMTPEnabled = false
 			currentSettings.SMTPHost = ""
 			currentSettings.SMTPPort = 0
@@ -169,6 +174,12 @@ func HandleSettingsEmailPut(
 
 		if validateEmailAddressErr := emailValidator.ValidateEmailAddress(req.SMTPFromEmail); validateEmailAddressErr != nil {
 			writeValidationError(w, r, validateEmailAddressErr)
+			return
+		}
+
+		// Reserved to authserver:manage, refused after the request's own 400 answers and before
+		// the dial, so a refused caller reaches no server through this one.
+		if !settingsCeilingAllows(w, r, auditLogger) {
 			return
 		}
 
