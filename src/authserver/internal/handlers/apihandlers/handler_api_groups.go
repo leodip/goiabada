@@ -20,8 +20,9 @@ import (
 )
 
 // groupsDatabase is what the group endpoints need: the group row and the member count that
-// decides whether it can go.
+// decides whether it can go, and what the administrative policy reads to judge a deletion.
 type groupsDatabase interface {
+	administrativeGroupPolicyDatabase
 	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
 	CreateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error
 	DeleteGroup(ctx context.Context, tx *sql.Tx, groupId int64) error
@@ -321,6 +322,12 @@ func HandleGroupDelete(
 		}
 		if group == nil {
 			writeJSONError(w, "Group not found", "NOT_FOUND", http.StatusNotFound)
+			return
+		}
+
+		// The grant ceiling, after the request's 404 and before the write: only authserver:manage
+		// deletes a group holding an administrative permission (#402).
+		if !groupDeletionCeilingAllows(w, r, database, auditLogger, group.Id) {
 			return
 		}
 

@@ -3645,7 +3645,9 @@ components:
         administrators or administrative permissions, so a granular scope
         granting or revoking one of the six administrative permissions
         (`manage`, `admin-read`, `manage-users`, `manage-clients`,
-        `manage-settings`, `browser-sessions`) is refused here. No granular
+        `manage-settings`, `browser-sessions`), directly or by moving a user
+        into or out of a group that holds one, or deleting such a group, is
+        refused here. No granular
         scope will ever be enough. It is answered after the request's 400 and
         404, writes nothing, carries `WWW-Authenticate: Bearer
         error="insufficient_scope", scope="authserver:manage"`, and leaves an

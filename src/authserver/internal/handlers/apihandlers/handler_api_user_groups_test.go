@@ -74,6 +74,7 @@ func TestHandleUserGroupsPut_AFailedCountAnswers500(t *testing.T) {
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/groups", bytes.NewReader(body))
 	req = setChiURLParam(req, "id", "42")
+	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": "the-calling-client"})
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
@@ -107,10 +108,12 @@ func serveUserGroupsSave(t *testing.T, database *datamocks.Database, auditLogger
 	return serveUserGroupsBody(database, auditLogger, string(body))
 }
 
-// serveUserGroupsBody runs the save on a PUT carrying body as written.
+// serveUserGroupsBody runs the save on a PUT carrying body as written, as an authserver:manage
+// caller, whom the administrative policy reads nothing to admit (#402).
 func serveUserGroupsBody(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/groups", strings.NewReader(body))
 	req = setChiURLParam(req, "id", "42")
+	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": "the-calling-client"})
 	rr := httptest.NewRecorder()
 	HandleUserGroupsPut(database, auditLogger).ServeHTTP(rr, req)
 	return rr

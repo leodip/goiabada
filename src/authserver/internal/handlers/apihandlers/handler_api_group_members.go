@@ -16,8 +16,9 @@ import (
 )
 
 // groupMembersDatabase is what the group membership endpoints need: the group, its members, and
-// the rows that join them.
+// the rows that join them, and what the administrative policy reads to judge a change.
 type groupMembersDatabase interface {
+	administrativeGroupPolicyDatabase
 	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *record.UserGroup) error
 	DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupId int64) error
 	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
@@ -149,6 +150,12 @@ func HandleGroupMemberAddPost(
 			return
 		}
 
+		// The grant ceiling, after the request's 400 and 404 answers and before the write: only
+		// authserver:manage moves a user into a group holding an administrative permission (#402).
+		if !membershipCeilingAllows(w, r, database, auditLogger, user.Id, []int64{group.Id}) {
+			return
+		}
+
 		// Add user to group
 		err = database.CreateUserGroup(r.Context(), nil, &record.UserGroup{
 			UserId:  user.Id,
@@ -236,6 +243,12 @@ func HandleGroupMemberDelete(
 		}
 		if userGroup == nil {
 			writeJSONError(w, "User is not a member of this group", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		// The grant ceiling, after the request's 400 and 404 answers and before the write: only
+		// authserver:manage moves a user out of a group holding an administrative permission (#402).
+		if !membershipCeilingAllows(w, r, database, auditLogger, user.Id, []int64{group.Id}) {
 			return
 		}
 
