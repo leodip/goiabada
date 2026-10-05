@@ -39,7 +39,8 @@
 #
 # alpine is pinned to a minor rather than a patch: the alpine:X.Y tag receives
 # Alpine's patch releases, security fixes included, at the next image build, so
-# only the six-monthly minor release is a bump made here. It replaced
+# only the six-monthly minor release is a bump made here, and
+# `./version-manager.sh check` reports it from alpinelinux.org. It replaced
 # alpine:latest, which moved the release images to a new minor with no change
 # on our side (#396).
 tools:
