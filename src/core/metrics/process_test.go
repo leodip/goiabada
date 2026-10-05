@@ -39,6 +39,26 @@ func TestRegisterBuildInfo_ReportsThisBinarysStamp(t *testing.T) {
 	assert.Equal(t, []string{"353810a8"}, families[0].Labels[1].Values())
 }
 
+// A docker build without its build arguments stamps the empty string, which the registry refuses
+// with a panic, so an empty stamp reads unknown rather than stopping the server at start.
+func TestRegisterBuildInfo_AnEmptyStampReadsUnknown(t *testing.T) {
+	version, commit := buildinfo.Version, buildinfo.GitCommit
+	t.Cleanup(func() { buildinfo.Version, buildinfo.GitCommit = version, commit })
+
+	for name, stamp := range map[string]struct{ version, commit, want string }{
+		"commit":  {"1.4.0", "", `goiabada_build_info{version="1.4.0",commit="unknown"} 1`},
+		"version": {"", "353810a8", `goiabada_build_info{version="unknown",commit="353810a8"} 1`},
+		"both":    {"", "", `goiabada_build_info{version="unknown",commit="unknown"} 1`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			buildinfo.Version, buildinfo.GitCommit = stamp.version, stamp.commit
+			reg := metrics.NewRegistry()
+			require.NotPanics(t, func() { metrics.RegisterBuildInfo(reg) })
+			assert.Contains(t, scrape(t, reg), stamp.want+"\n")
+		})
+	}
+}
+
 // The two runtime gauges carry the names Go dashboards already read, and are read at scrape time.
 func TestRegisterRuntime_ReportsGoroutinesAndHeapInUse(t *testing.T) {
 	reg := metrics.NewRegistry()
