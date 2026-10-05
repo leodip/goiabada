@@ -3,7 +3,6 @@ package accounthandlers
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
@@ -88,9 +87,12 @@ func HandleChangePasswordPost(
 			return
 		}
 
+		// Sent as typed: surrounding whitespace is part of a password (#472). TrimSpace
+		// here refused a valid current password and stored a different new one than the
+		// confirmation compared, matching the email page's rule (#404).
 		req := &api.UpdateAccountPasswordRequest{
-			CurrentPassword: strings.TrimSpace(currentPassword),
-			NewPassword:     strings.TrimSpace(newPassword),
+			CurrentPassword: currentPassword,
+			NewPassword:     newPassword,
 		}
 
 		_, err := apiClient.UpdateAccountPassword(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
