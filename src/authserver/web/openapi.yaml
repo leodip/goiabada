@@ -3611,7 +3611,22 @@ components:
 
         Admin API: any one of `authserver:admin-read`, the domain scope for the operation
         (`authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings`)
-        or `authserver:manage`. A client credentials token is accepted.
+        or `authserver:manage`. A client credentials token is accepted. Reads accept
+        `authserver:admin-read`, except `getClientSecret`; writes need the domain scope.
+
+        The granular scopes stop short of administrators. An administrator is a user, group or
+        client holding any of the six administrative permissions on the `authserver` resource
+        (`manage`, `admin-read`, `manage-users`, `manage-clients`, `manage-settings`,
+        `browser-sessions`), a user directly or through any of its groups, and the admin
+        console's own client whatever it holds. Only `authserver:manage` creates an
+        administrator, changes one, or changes what reaches one: a granular scope reaching an
+        operation is still refused, with 403 MANAGE_SCOPE_REQUIRED, when the request grants or
+        revokes an administrative permission (directly, or by moving a user into or out of a
+        group holding one, or by deleting such a group), writes to an administrator, reads an
+        administrator client's secret, or changes the email or audit-log settings. It keeps
+        full control of everyone else, and still reads administrators. `authserver:manage`
+        alone meets 409 LAST_ADMINISTRATOR, on the operations that could leave no enabled user
+        holding it.
 
         Account API: scope `authserver:manage-account`, on a token issued for a user. A client
         credentials token carries no `auth_time` claim and is refused with 403
@@ -3719,25 +3734,31 @@ components:
         a valid token for the wrong user reaches this rather than a 404.
 
         MANAGE_SCOPE_REQUIRED comes from the handler, on the Admin operations
-        the administrative policy guards: only `authserver:manage` may act on
-        administrators or administrative permissions, so a granular scope
-        granting or revoking one of the six administrative permissions
-        (`manage`, `admin-read`, `manage-users`, `manage-clients`,
-        `manage-settings`, `browser-sessions`), directly or by moving a user
-        into or out of a group that holds one, or deleting such a group, is
-        refused here. So is any write on an administrator: a user holding one
-        of the six, directly or through any of its groups, or a group holding
-        one, whether its profile, credentials, sessions, consents, attributes,
-        memberships or permissions; or a client holding one, and the admin
-        console's own client whatever it holds, whether its settings,
-        authentication, flows, redirect URIs, web origins, token settings,
-        permissions, logo or its deletion. A granular scope still reads them,
-        except an administrator client's secret, which only `authserver:manage`
-        reads. So is changing the email or the audit-log settings, which only
-        `authserver:manage` may change. No granular
-        scope will ever be enough. It is answered after the request's 400 and
-        404, writes nothing, carries `WWW-Authenticate: Bearer
-        error="insufficient_scope", scope="authserver:manage"`, and leaves an
+        the administrative policy guards. Only `authserver:manage` creates an
+        administrator, changes one, or changes what reaches one, so no
+        granular scope will ever be enough: the remedy is a token holding
+        `authserver:manage`, not requesting the route's scope as for
+        INSUFFICIENT_SCOPE. An administrator is a user, group or client
+        holding any of the six administrative permissions (`manage`,
+        `admin-read`, `manage-users`, `manage-clients`, `manage-settings`,
+        `browser-sessions`), a user directly or through any of its groups,
+        and the admin console's own client whatever it holds. A granular
+        scope is refused here when it:
+          - grants or revokes an administrative permission, directly or by
+            moving a user into or out of a group that holds one, or deletes
+            such a group;
+          - writes to an administrator user (profile, credentials, enabled,
+            sessions, consents, attributes, memberships, permissions,
+            deletion), an administrative group (settings, attributes,
+            members, permissions, deletion), or an administrator client
+            (settings, authentication, flows, redirect URIs, web origins,
+            token settings, permissions, logo, deletion);
+          - reads an administrator client's secret;
+          - changes the email or the audit-log settings.
+        Granular scopes still read administrators. The refusal is answered
+        after the request's 400 and 404, writes nothing, carries
+        `WWW-Authenticate: Bearer realm="goiabada", error="insufficient_scope",
+        error_description="...", scope="authserver:manage"`, and leaves an
         `administrator_change_refused` audit record.
 
         Every operation this document secures declares a 403. The public
