@@ -22,13 +22,17 @@ type CLIFlags struct {
 	Namespace       string
 	AdminEmail      string
 	AdminPassword   string
-	DBHost          string
-	DBPort          string
-	DBName          string
-	DBUsername      string
-	DBPassword      string
-	SkipDBTest      bool
-	NoColor         bool
+	// AdminPasswordFile and DBPasswordFile name a file holding the password, - for standard input,
+	// so automation can give one with nothing secret on the command line.
+	AdminPasswordFile string
+	DBHost            string
+	DBPort            string
+	DBName            string
+	DBUsername        string
+	DBPassword        string
+	DBPasswordFile    string
+	SkipDBTest        bool
+	NoColor           bool
 	// LocalProxy is --local-proxy, read by native binaries alone.
 	LocalProxy optionalBool
 	// GatewayTrafficPolicy is --gateway-traffic-policy and NetworkPolicy --network-policy, read by
@@ -113,11 +117,13 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 	fs.StringVar(&flags.Namespace, "namespace", "", "Kubernetes namespace")
 	fs.StringVar(&flags.AdminEmail, "admin-email", "", "Admin email address")
 	fs.StringVar(&flags.AdminPassword, "admin-password", "", "Admin password")
+	fs.StringVar(&flags.AdminPasswordFile, "admin-password-file", "", "Read the admin password from a file, - for standard input")
 	fs.StringVar(&flags.DBHost, "db-host", "", "Database host")
 	fs.StringVar(&flags.DBPort, "db-port", "", "Database port")
 	fs.StringVar(&flags.DBName, "db-name", "", "Database name")
 	fs.StringVar(&flags.DBUsername, "db-user", "", "Database username")
 	fs.StringVar(&flags.DBPassword, "db-password", "", "Database password")
+	fs.StringVar(&flags.DBPasswordFile, "db-password-file", "", "Read the database password from a file, - for standard input")
 	fs.BoolVar(&flags.SkipDBTest, "skip-db-test", false, "Skip database connection test")
 	fs.BoolVar(&flags.NoColor, "no-color", false, "Disable colored output")
 	fs.Var(&flags.GatewayTrafficPolicy, "gateway-traffic-policy", "Kubernetes: the traffic policy of Envoy Gateway's load balancer Service: cluster or local (default: cluster)")
@@ -147,7 +153,10 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 		p("Admin Credentials:\n")
 		p("  --admin-email EMAIL    Admin email address\n")
 		p("  --admin-password PASS  Admin password (generated if not provided; one given here\n")
-		p("                         reaches shell history and the process list)\n\n")
+		p("                         reaches shell history and the process list)\n")
+		p("  --admin-password-file FILE\n")
+		p("                         Read the admin password from FILE, - for standard input,\n")
+		p("                         one trailing line break dropped\n\n")
 		p("Database Options (for Kubernetes/native):\n")
 		p("  --db-host HOST         Database hostname\n")
 		p("  --db-port PORT         Database port (default: auto-detected)\n")
@@ -155,6 +164,9 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 		p("  --db-user USER         Database username (default: auto-detected)\n")
 		p("  --db-password PASS     Database password (generated if not provided; one given here\n")
 		p("                         reaches shell history and the process list)\n")
+		p("  --db-password-file FILE\n")
+		p("                         Read the database password from FILE, - for standard input,\n")
+		p("                         one trailing line break dropped\n")
 		p("  --skip-db-test         Skip database connection test\n\n")
 		p("Rate Limiter Options (for production/kubernetes/native):\n")
 		p("  --rate-limiter=BOOL    Turn on the auth server's built-in rate limiter (default: true, but\n")
@@ -183,13 +195,13 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 		p("      --auth-url=https://auth.example.com \\\n")
 		p("      --admin-email=admin@example.com \\\n")
 		p("      --db-host=postgres.default.svc \\\n")
-		p("      --db-password=secretpass\n\n")
+		p("      --db-password-file=/run/secrets/db-password\n\n")
 		p("  Native binaries with PostgreSQL:\n")
 		p("    %s --type=native --db=postgres \\\n", name)
 		p("      --auth-url=https://auth.example.com \\\n")
 		p("      --admin-url=https://admin.example.com \\\n")
 		p("      --admin-email=admin@example.com \\\n")
-		p("      --db-host=localhost --db-password=secretpass\n\n")
+		p("      --db-host=localhost --db-password-file=/run/secrets/db-password\n\n")
 		p("For more information, visit: https://goiabada.dev\n")
 	}
 
@@ -220,6 +232,62 @@ func (f *CLIFlags) checkWritable() error {
 		}
 	}
 	return nil
+}
+
+// checkPasswordSources refuses a password given both as a flag and as a file, rather than letting
+// one silently win, and standard input named for both passwords, which can be read only once.
+func (f *CLIFlags) checkPasswordSources() error {
+	for _, source := range []struct{ flag, value, fileFlag, file string }{
+		{"--admin-password", f.AdminPassword, "--admin-password-file", f.AdminPasswordFile},
+		{"--db-password", f.DBPassword, "--db-password-file", f.DBPasswordFile},
+	} {
+		if source.value != "" && source.file != "" {
+			return errs.Errorf("give %s or %s, not both", source.flag, source.fileFlag)
+		}
+	}
+	if f.AdminPasswordFile == "-" && f.DBPasswordFile == "-" {
+		return errs.New("--admin-password-file and --db-password-file cannot both read standard input")
+	}
+	return nil
+}
+
+// passwordFileMax bounds what a password file is read to: a password is far shorter, and a name
+// such as /dev/zero would otherwise be read until memory ran out.
+const passwordFileMax = 4096
+
+// readPasswordFile reads the password the flag named fileFlag gives, from path or, for -, from
+// stdin. One trailing line break is dropped, since echo and most editors end a file with one. An
+// empty password is refused rather than read as "generate one", which leaving the flag out says.
+func readPasswordFile(fileFlag, path string, stdin io.Reader) (string, error) {
+	source := stdin
+	if path != "-" {
+		file, err := os.Open(path) //nolint:gosec // G304: the operator names the file to read the password from
+		if err != nil {
+			return "", errs.Wrapf(err, "unable to read %s", fileFlag)
+		}
+		defer func() { _ = file.Close() }()
+		source = file
+	}
+	content, err := io.ReadAll(io.LimitReader(source, passwordFileMax+1))
+	if err != nil {
+		return "", errs.Wrapf(err, "unable to read %s", fileFlag)
+	}
+	if len(content) > passwordFileMax {
+		return "", errs.Errorf("%s holds more than %d bytes, which no password needs", fileFlag, passwordFileMax)
+	}
+	password := string(content)
+	if strings.HasSuffix(password, "\r\n") {
+		password = password[:len(password)-2]
+	} else if strings.HasSuffix(password, "\n") {
+		password = password[:len(password)-1]
+	}
+	if password == "" {
+		return "", errs.Errorf("%s holds no password: leave it out to have one generated", fileFlag)
+	}
+	if err := checkWritable(password); err != nil {
+		return "", errs.Wrapf(err, "%s cannot be written to the configuration", fileFlag)
+	}
+	return password, nil
 }
 
 // checkOutput refuses an --output a generated file's header could not name. Each header names the

@@ -189,6 +189,23 @@ passed as a flag lands in your shell history and, while the wizard runs, in the 
 other accounts on the machine can usually read. In non-interactive mode, leave both flags out and the
 wizard generates the passwords into the secrets file.
 
+A database you run for Kubernetes or the native binaries already has a user and its password, which no
+generated password matches. Give it with `--db-password-file` instead, naming a file that holds it, or
+`-` for standard input; `--admin-password-file` does the same for the admin password. One trailing line
+break is dropped, an empty file is refused, and a password given both as a flag and as a file is
+refused rather than one of them winning:
+
+```bash
+# From a file your secret manager or CI system wrote
+./goiabada-setup --type=kubernetes --db=postgres --auth-url=https://auth.example.com \
+  --db-host=postgres.default.svc --db-password-file=/run/secrets/db-password
+
+# From a variable, through standard input: printf is built into the shell, so the
+# value reaches no process list
+printf '%s' "$DB_PASSWORD" | ./goiabada-setup --type=native --db=postgres \
+  --auth-url=https://auth.example.com --db-host=localhost --db-password-file=-
+```
+
 ## Next steps
 
 - [Quick local test](/getting-started/quick-local-test/) - Test Goiabada locally
