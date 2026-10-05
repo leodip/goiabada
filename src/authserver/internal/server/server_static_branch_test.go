@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/stretchr/testify/assert"
@@ -100,6 +101,7 @@ func newStaticBranchTestServer(database *datamocks.Database) *Server {
 		sessionStore: newTestSessionStore(),
 		staticFS:     fstest.MapFS{"probe.css": &fstest.MapFile{Data: []byte("body{}")}},
 		cfg:          cfg,
+		metrics:      metrics.NewRegistry(),
 	}
 }
 

@@ -118,8 +118,8 @@ func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, w
 	}
 }
 
-// configVariables is every live GOIABADA_* variable this process loads: 25 auth server, the 2
-// admin console values it reads, 8 database and 5 top-level, of which 32 have a flag. The one
+// configVariables is every live GOIABADA_* variable this process loads: 28 auth server, the 2
+// admin console values it reads, 12 database and 5 top-level, of which 39 have a flag. The one
 // name Load mentions that is not live configuration is in nonLiveEnvVars.
 var configVariables = []configVar{
 	// Auth server
@@ -189,6 +189,17 @@ var configVariables = []configVar{
 	boolVar("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED", "authserver-ratelimiter-enabled", false,
 		true, false,
 		func(c *Config) any { return c.AuthServer.RateLimiterEnabled }),
+	// The metrics listener, off unless enabled, on the host the other listeners default to and a
+	// port of its own (#400 decision 3).
+	boolVar("GOIABADA_AUTHSERVER_METRICS_ENABLED", "authserver-metrics-enabled", false,
+		true, false,
+		func(c *Config) any { return c.AuthServer.MetricsEnabled }),
+	strVar("GOIABADA_AUTHSERVER_LISTEN_HOST_METRICS", "authserver-listen-host-metrics", "0.0.0.0",
+		"10.0.2.1", "10.0.2.2",
+		func(c *Config) any { return c.AuthServer.ListenHostMetrics }),
+	intVar("GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS", "authserver-listen-port-metrics", 9190,
+		19190, 29190,
+		func(c *Config) any { return c.AuthServer.ListenPortMetrics }),
 	int64VarNoFlag("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", 3*1024*1024, 5*1024*1024,
 		func(c *Config) any { return c.AuthServer.ProfilePictureMaxSizeBytes }),
 	// No flag, and trimmed, which is what core/i18n did when it read the variable itself: the row
@@ -349,6 +360,10 @@ var malformedVariableRows = []struct {
 		`GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS is "Y", not a boolean (true or false)`},
 	{"GOIABADA_AUTHSERVER_RATELIMITER_ENABLED", "no", "-authserver-ratelimiter-enabled=false",
 		`GOIABADA_AUTHSERVER_RATELIMITER_ENABLED is "no", not a boolean (true or false)`},
+	{"GOIABADA_AUTHSERVER_METRICS_ENABLED", "1x", "-authserver-metrics-enabled=true",
+		`GOIABADA_AUTHSERVER_METRICS_ENABLED is "1x", not a boolean (true or false)`},
+	{"GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS", "9190/tcp", "-authserver-listen-port-metrics=9190",
+		`GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS is "9190/tcp", not an integer`},
 	{"GOIABADA_DB_CREATE", "yes", "-db-create=true",
 		`GOIABADA_DB_CREATE is "yes", not a boolean (true or false)`},
 	{"GOIABADA_DB_MAX_OPEN_CONNS", "twenty", "-db-max-open-conns=20",
@@ -657,9 +672,10 @@ func TestLoad_FlagBeatsTheEnvironment(t *testing.T) {
 // Seam 2: the registered flag set of this binary
 // -----------------------------------------------------------------------------
 
-// authServerFlags is the 36 flags the auth server registers: its own 19, the 12 database flags,
+// authServerFlags is the 39 flags the auth server registers: its own 22, the 12 database flags,
 // the 3 initial-setup flags, and the two admin console values it reads. 32 were what the split
-// left (#351); the four pool flags came after it (#394).
+// left (#351); the four pool flags came after it (#394), and the three metrics listener flags
+// after those (#400).
 //
 // It is written out rather than derived from configVariables, and that is the whole point. A
 // derived expectation cannot fail when a flag is dropped from the table and from config.go
@@ -680,12 +696,15 @@ var authServerFlags = []string{
 	"authserver-keyfile",
 	"authserver-listen-host-http",
 	"authserver-listen-host-https",
+	"authserver-listen-host-metrics",
 	"authserver-listen-port-http",
 	"authserver-listen-port-https",
+	"authserver-listen-port-metrics",
 	"authserver-log-format",
 	"authserver-log-http-requests",
 	"authserver-log-level",
 	"authserver-log-sql",
+	"authserver-metrics-enabled",
 	"authserver-ratelimiter-enabled",
 	"authserver-staticdir",
 	"authserver-templatedir",
@@ -708,6 +727,9 @@ var authServerFlags = []string{
 // flagsAddedAfterTheSplit are the auth server's flags that no binary registered before #351, so
 // they are outside the partition TestFlagLists_AgreeWithTheTable counts.
 var flagsAddedAfterTheSplit = []string{
+	"authserver-listen-host-metrics",
+	"authserver-listen-port-metrics",
+	"authserver-metrics-enabled",
 	"db-conn-max-idle-time",
 	"db-conn-max-lifetime",
 	"db-max-idle-conns",

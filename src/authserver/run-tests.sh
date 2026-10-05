@@ -84,6 +84,8 @@
 #     this script's comments keep returning to. Refused with --race, which it
 #     does not cover.
 #   * Rate limiter is disabled via GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=false.
+#   * The integration server runs with its metrics listener on, on port 19190,
+#     which the integration tier scrapes (#400). CI runs this script, so it does too.
 #   * Every data and integration run starts from an empty database: the SQLite
 #     files are removed, and goiabada_data / goiabada_integration are dropped on
 #     mysql, postgres and mssql by cmd/droptestdb, so the server or the data tier
@@ -420,7 +422,7 @@ stop_server() {
 
 # Function to kill processes on specified ports
 kill_processes_on_ports() {
-    local ports=("19090" "19091")
+    local ports=("19090" "19091" "19190")
 
     for port in "${ports[@]}"; do
         echo "Checking for processes on port $port..."
@@ -509,6 +511,12 @@ configure_database() {
 
     # Disable rate limiter for tests
     export GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=false
+
+    # The metrics listener, which the integration tier scrapes; beside the test ports, not on the
+    # default 9190 (#400).
+    export GOIABADA_AUTHSERVER_METRICS_ENABLED=true
+    export GOIABADA_AUTHSERVER_LISTEN_HOST_METRICS=0.0.0.0
+    export GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS=19190
 
     # Data-at-rest encryption key (issue #83). Required by the auth server and the
     # data/integration test harnesses. Honors the value from the devcontainer env
@@ -773,7 +781,7 @@ fi
 # ---- DB-matrix runs (data + integration) ------------------------------------
 
 if should_run_data || should_run_integration; then
-    # Kill any processes on ports 19090 and 19091 before starting tests
+    # Kill any processes on ports 19090, 19091 and 19190 before starting tests
     kill_processes_on_ports
 
     # Start from a clean slate. The EXIT trap also does this, but a run that was

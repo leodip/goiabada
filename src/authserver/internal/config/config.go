@@ -48,7 +48,12 @@ type AuthServerConfig struct {
 	SessionAuthenticationKeyPrevious string
 	SessionEncryptionKeyPrevious     string
 	RateLimiterEnabled               bool
-	ProfilePictureMaxSizeBytes       int64
+	// The metrics listener: a listener of its own serving GET /metrics and nothing else, off
+	// unless enabled, so no route the gateway publishes reaches it (#400 decision 3).
+	MetricsEnabled             bool
+	ListenHostMetrics          string
+	ListenPortMetrics          int
+	ProfilePictureMaxSizeBytes int64
 	// I18nOverridesDir is the directory whose catalogs/ main merges over the embedded message
 	// catalogs, or empty for none. It has no flag, like the admin console's, so the one variable
 	// configures both servers the same way (#431).
@@ -204,6 +209,9 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			SessionAuthenticationKeyPrevious: getEnv("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS", ""),
 			SessionEncryptionKeyPrevious:     getEnv("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS", ""),
 			RateLimiterEnabled:               getEnvAsBool("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED", &malformed),
+			MetricsEnabled:                   getEnvAsBool("GOIABADA_AUTHSERVER_METRICS_ENABLED", &malformed),
+			ListenHostMetrics:                getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_METRICS", "0.0.0.0"),
+			ListenPortMetrics:                getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS", 9190, &malformed),
 			ProfilePictureMaxSizeBytes:       getEnvAsUploadSize("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", defaultProfilePictureMaxSizeBytes, &malformed),
 			I18nOverridesDir:                 getEnv("GOIABADA_I18N_OVERRIDES_DIR", ""),
 		},
@@ -254,6 +262,9 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	fs.BoolVar(&c.AuthServer.DebugAPIRequests, "authserver-debug-api-requests", c.AuthServer.DebugAPIRequests, "Enable debug logging for API requests on auth server")
 	fs.StringVar(&c.AuthServer.BootstrapEnvOutFile, "authserver-bootstrap-env-outfile", c.AuthServer.BootstrapEnvOutFile, "If set, write initial admin console OAuth credentials to this file (0600) during DB seed")
 	fs.BoolVar(&c.AuthServer.RateLimiterEnabled, "authserver-ratelimiter-enabled", c.AuthServer.RateLimiterEnabled, "Enable rate limiting for security-sensitive endpoints on auth server")
+	fs.BoolVar(&c.AuthServer.MetricsEnabled, "authserver-metrics-enabled", c.AuthServer.MetricsEnabled, "Serve Prometheus metrics on the auth server's metrics listener")
+	fs.StringVar(&c.AuthServer.ListenHostMetrics, "authserver-listen-host-metrics", c.AuthServer.ListenHostMetrics, "Auth server metrics host")
+	fs.IntVar(&c.AuthServer.ListenPortMetrics, "authserver-listen-port-metrics", c.AuthServer.ListenPortMetrics, "Auth server metrics port")
 
 	// Admin console: the two values this process reads, and nothing else. A flag the binary
 	// cannot act on is a trap rather than a courtesy, because it reads as having configured

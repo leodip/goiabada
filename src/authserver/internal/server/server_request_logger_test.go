@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -57,6 +58,7 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 		database:     database,
 		sessionStore: newTestSessionStore(),
 		cfg:          cfg,
+		metrics:      metrics.NewRegistry(),
 	}
 	// The handler is registered on the branch initMiddleware returns, not on s.router,
 	// so this exercises the whole chain: the root's middleware plus the four the
