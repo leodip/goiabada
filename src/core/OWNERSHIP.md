@@ -232,8 +232,8 @@ command itself and fails on a tree it changed.
 | `core/boundedread` | `ErrResponseTooLarge` | own-package | — |
 | `core/boundedread` | `Read` | kernel | — |
 | `core/buildinfo` | `BuildDate` | both-apps | — |
-| `core/buildinfo` | `GitCommit` | both-apps | — |
-| `core/buildinfo` | `Version` | both-apps | — |
+| `core/buildinfo` | `GitCommit` | kernel | — |
+| `core/buildinfo` | `Version` | kernel | — |
 | `core/builtin` | `AdminConsoleClientIdentifier` | both-apps | — |
 | `core/builtin` | `AdminConsoleSessionName` | both-apps | — |
 | `core/builtin` | `AdminReadPermissionIdentifier` | own-package | — |
@@ -267,6 +267,7 @@ command itself and fails on a tree it changed.
 | `core/guard` | `AssertGeneratedMocksArePinned` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertGeneratedSourceTypeChecks` | test-support | Type-checks a generator's rendered output against its package; named only by the generators' render tests. |
 | `core/guard` | `AssertGofmted` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertMetricsCatalog` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNoAgreementPointers` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNoCredentialQueryFallback` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNoDeadInterfaces` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
@@ -421,6 +422,19 @@ command itself and fails on a tree it changed.
 | `core/logging/logtest` | `CaptureSlog` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
 | `core/logging/logtest` | `CapturedRecord` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
 | `core/logging/logtest` | `SlogCapture` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
+| `core/metrics` | `Counter` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
+| `core/metrics` | `Described` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
+| `core/metrics` | `DurationBuckets` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
+| `core/metrics` | `Enum` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
+| `core/metrics` | `Family` | kernel | — |
+| `core/metrics` | `Gauge` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
+| `core/metrics` | `HTTPRequests` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
+| `core/metrics` | `Histogram` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
+| `core/metrics` | `Label` | kernel | — |
+| `core/metrics` | `NewRegistry` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
+| `core/metrics` | `RegisterBuildInfo` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
+| `core/metrics` | `RegisterRuntime` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
+| `core/metrics` | `Registry` | contract | The Prometheus exposition both servers serve under shared metric names, so one dashboard query reads both (#400 decisions 2 and 6). No binary names it until the servers mount their metrics listeners, the auth server first and the admin console after, when this row becomes both-apps. |
 | `core/oauth` | `ConformErrorDescription` | both-apps | — |
 | `core/oauth` | `ErrorDetail` | both-apps | — |
 | `core/oauth` | `GeneratePKCECodeChallenge` | both-apps | — |

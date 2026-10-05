@@ -1,0 +1,18 @@
+---
+title: Monitoring
+---
+
+Every metric either server exposes.
+
+| metric | type | labels | server | meaning |
+|---|---|---|---|---|
+| `goiabada_http_requests_total` | counter | `route`: the route table, `unmatched`; `method`: `GET`, `POST` | both | Requests answered. |
+| `goiabada_tokens_issued_total` | counter | `grant_type`: `authorization_code`, `refresh_token` | auth server | Tokens issued. |
+| `goiabada_settings_cache_requests_total` | counter | `result`: `hit`, `miss` | admin console | Cache lookups. |
+| `go_goroutines` | gauge | none | both | Goroutines. |
+
+A table that is not the catalog is not read:
+
+| alert | expression |
+|---|---|
+| `goiabada_not_a_metric` | rate(x[5m]) |
