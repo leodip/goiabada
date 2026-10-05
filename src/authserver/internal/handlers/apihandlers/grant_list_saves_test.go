@@ -38,7 +38,9 @@ type grantRow struct {
 
 // grantSave describes one of the three saves to the shared cases.
 type grantSave struct {
-	name         string
+	name string
+	// kind is the target kind a refusal of this save names: user, group or client.
+	kind         string
 	path         string
 	ownerRead    string
 	owner        any
@@ -63,6 +65,7 @@ const grantOwnerId = int64(5)
 var grantSaves = []grantSave{
 	{
 		name:       "user permissions",
+		kind:       "user",
 		path:       "/api/v1/admin/users/5/permissions",
 		ownerRead:  "GetUserById",
 		owner:      &record.User{Id: grantOwnerId},
@@ -95,6 +98,7 @@ var grantSaves = []grantSave{
 	},
 	{
 		name:       "group permissions",
+		kind:       "group",
 		path:       "/api/v1/admin/groups/5/permissions",
 		ownerRead:  "GetGroupById",
 		owner:      &record.Group{Id: grantOwnerId, GroupIdentifier: "admins"},
@@ -127,6 +131,7 @@ var grantSaves = []grantSave{
 	},
 	{
 		name:      "client permissions",
+		kind:      "client",
 		path:      "/api/v1/admin/clients/5/permissions",
 		ownerRead: "GetClientById",
 		// Client permissions are configurable only with the client credentials flow enabled;
@@ -160,14 +165,28 @@ var grantSaves = []grantSave{
 	},
 }
 
-// serve runs the save on a PUT carrying body.
+// serve runs the save on a PUT carrying body, as a caller holding authserver:manage, which every
+// grant save admits whatever it changes: the cases here are about the save, not the policy in
+// front of it, which grant_ceiling_test.go covers (#402).
 func (s grantSave) serve(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, body string) *httptest.ResponseRecorder {
+	return s.serveWithScope(database, auditLogger, body, "authserver:manage")
+}
+
+// serveWithScope runs the save on a PUT carrying body, as a caller whose validated token carries
+// scope, or with no validated token at all when scope is empty.
+func (s grantSave) serveWithScope(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, body string, scope string) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(http.MethodPut, s.path, strings.NewReader(body))
 	r = setChiURLParam(r, "id", "5")
+	if scope != "" {
+		r = setTokenContextWithClaims(r, map[string]interface{}{"scope": scope, "sub": grantCaller})
+	}
 	rr := httptest.NewRecorder()
 	s.handler(database, auditLogger).ServeHTTP(rr, r)
 	return rr
 }
+
+// grantCaller is the subject of the token every grant save case is served under.
+const grantCaller = "the-calling-client"
 
 // expectOwner registers the owner read the save makes before it validates.
 func (s grantSave) expectOwner(database *datamocks.Database) {

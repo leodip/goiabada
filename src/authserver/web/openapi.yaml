@@ -3623,7 +3623,7 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     Forbidden:
       description: |
-        The token is valid but does not authorise this request. Three checks
+        The token is valid but does not authorise this request. Four checks
         answer here, and a caller distinguishes them by error_code.
 
         INSUFFICIENT_SCOPE comes from the route's authorisation middleware,
@@ -3639,6 +3639,17 @@ components:
         FORBIDDEN comes from the handler, on the account endpoints that
         resolve a resource by id and then check it belongs to the caller, so
         a valid token for the wrong user reaches this rather than a 404.
+
+        MANAGE_SCOPE_REQUIRED comes from the handler, on the Admin operations
+        the administrative policy guards: only `authserver:manage` may act on
+        administrators or administrative permissions, so a granular scope
+        granting or revoking one of the six administrative permissions
+        (`manage`, `admin-read`, `manage-users`, `manage-clients`,
+        `manage-settings`, `browser-sessions`) is refused here. No granular
+        scope will ever be enough. It is answered after the request's 400 and
+        404, writes nothing, carries `WWW-Authenticate: Bearer
+        error="insufficient_scope", scope="authserver:manage"`, and leaves an
+        `administrator_change_refused` audit record.
 
         Every operation this document secures declares a 403. The public
         client logo endpoint, which carries `security: []` and authorises

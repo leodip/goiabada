@@ -46,3 +46,11 @@ func TestBearerChallenge(t *testing.T) {
 		assert.True(t, strings.HasSuffix(challenge, `..."`))
 	})
 }
+
+// TestInsufficientScopeChallenge pins the challenge of a refusal naming the one scope that would
+// do: section 3's scope attribute after the description (#402 decision 4).
+func TestInsufficientScopeChallenge(t *testing.T) {
+	assert.Equal(t,
+		`Bearer realm="goiabada", error="insufficient_scope", error_description="Only manage.", scope="authserver:manage"`,
+		InsufficientScopeChallenge("Only manage.", "authserver:manage"))
+}

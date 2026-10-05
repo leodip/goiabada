@@ -383,6 +383,19 @@ const (
 	// rotating a callback inside the window or a grant being redeemed after its destination
 	// was deliberately pulled.
 	EventRedemptionRefusedRedirectURI = "redemption_refused_redirect_uri"
+
+	// EventAdministratorChangeRefused records an admin API request the administrative policy
+	// refused: a token without authserver:manage reaching for what only manage may do, which
+	// is creating an administrator, changing one, or changing what reaches one. One row per
+	// refused request, written before the 403 MANAGE_SCOPE_REQUIRED is answered, so an
+	// integration retrying writes one per attempt, which is right for an attempted administrative
+	// act. The route gate's own INSUFFICIENT_SCOPE refusals write none (#402 decision 5).
+	//
+	// Payload: loggedInUser, the token's sub; method and route, the route pattern rather than the
+	// path; ceiling, the one that refused it (grant is granting or revoking an administrative
+	// permission); targetKind and targetId, where the request has a target; and, for a grant
+	// refusal, permissionIds, the administrative permissions whose change caused it.
+	EventAdministratorChangeRefused = "administrator_change_refused"
 )
 
 // EventTypes returns the canonical list of audit event names, which the admin console's
@@ -399,6 +412,7 @@ var auditEventTypes = []string{
 	EventAddedGroupPermission,
 	EventAddedUserAttribute,
 	EventAddedUserPermission,
+	EventAdministratorChangeRefused,
 	EventAuthCeremonyMismatch,
 	EventAuthCodeReuseDetected,
 	EventAuthFailedOtp,

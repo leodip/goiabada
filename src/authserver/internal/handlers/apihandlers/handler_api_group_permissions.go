@@ -16,8 +16,9 @@ import (
 )
 
 // groupPermissionsDatabase is what the group permission endpoints need: the group's grants and
-// the catalogue they are granted from.
+// the catalogue they are granted from, and what the administrative policy reads to judge a save.
 type groupPermissionsDatabase interface {
+	administrativePolicyDatabase
 	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
 	CreateGroupPermission(ctx context.Context, tx *sql.Tx, groupPermission *record.GroupPermission) error
 	DeleteGroupPermission(ctx context.Context, tx *sql.Tx, groupPermissionId int64) error
@@ -142,6 +143,12 @@ func HandleGroupPermissionsPut(
 				writeJSONError(w, "Permission not found", "NOT_FOUND", http.StatusNotFound)
 				return
 			}
+		}
+
+		// The grant ceiling, after the request's 400 and 404 answers and before the transaction:
+		// only authserver:manage grants or revokes an administrative permission (#402).
+		if !grantCeilingAllows(w, r, database, auditLogger, targetKindGroup, group.Id, wanted, request.ExpectedPermissionIds) {
+			return
 		}
 
 		grantKey := func(gp record.GroupPermission) int64 { return gp.PermissionId }
