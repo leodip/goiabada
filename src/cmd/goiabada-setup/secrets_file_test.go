@@ -93,14 +93,15 @@ func TestEveryConfiguration_KeepsItsSecretsInAFileOfTheirOwn(t *testing.T) {
 
 // secretRef is a Secret's name and one of its keys.
 type secretRef struct {
-	secret, key string //nolint:unused // compared whole with ==, which the linter does not count as a read
+	secret, key string
 }
 
 // The secrets file holds two Secrets and nothing else: the AES key alone in goiabada-encryption-key,
 // so RBAC can restrict get on it by resourceNames and a secret manager can own it alone, and every
 // other secret in goiabada-secrets. Each container's secret references name a key one of them holds,
-// the admin console's none of the AES key's, and the manifest holds no Secret (#396 decisions 14
-// and 16).
+// the admin console's none of the AES key's, but for the previous keys a rotation fills, which are
+// optional, so a rotation edits the Secrets alone, and the manifest holds no Secret (#396 decisions
+// 14 and 16).
 func TestKubernetesSecretsFile_HoldsTheSecretsEachContainerReads(t *testing.T) {
 	config := kubernetesConfig()
 	description, secrets := generatedConfiguration(config)
@@ -165,11 +166,18 @@ func TestKubernetesSecretsFile_HoldsTheSecretsEachContainerReads(t *testing.T) {
 			"GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY":     {"goiabada-secrets", "auth-session-enc-key"},
 			"GOIABADA_AES_ENCRYPTION_KEY":                    {"goiabada-encryption-key", "aes-encryption-key"},
 			"GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET":      {"goiabada-secrets", "oauth-client-secret"},
+
+			"GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS": {"goiabada-secrets", "auth-session-auth-key-previous"},
+			"GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS":     {"goiabada-secrets", "auth-session-enc-key-previous"},
+			"GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS":                    {"goiabada-encryption-key", "aes-encryption-key-previous"},
 		},
 		"goiabada-adminconsole": {
 			"GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET":        {"goiabada-secrets", "oauth-client-secret"},
 			"GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY": {"goiabada-secrets", "admin-session-auth-key"},
 			"GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY":     {"goiabada-secrets", "admin-session-enc-key"},
+
+			"GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS": {"goiabada-secrets", "admin-session-auth-key-previous"},
+			"GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS":     {"goiabada-secrets", "admin-session-enc-key-previous"},
 		},
 	}
 	manifest := kubernetesDocuments(t, config)
@@ -177,18 +185,40 @@ func TestKubernetesSecretsFile_HoldsTheSecretsEachContainerReads(t *testing.T) {
 		t.Run(deployment, func(t *testing.T) {
 			podSpec := at[map[string]any](t, deploymentNamed(t, manifest, deployment), "spec", "template", "spec")
 			container := only[map[string]any](t, at[[]any](t, podSpec, "containers"), deployment+"'s containers")
-			got := map[string]secretRef{}
+			got, optional := map[string]secretRef{}, map[string]bool{}
 			for _, e := range at[[]any](t, container, "env") {
 				entry := e.(map[string]any)
 				ref := at[map[string]any](t, entry, "valueFrom", "secretKeyRef")
-				got[at[string](t, entry, "name")] = secretRef{at[string](t, ref, "name"), at[string](t, ref, "key")}
+				name := at[string](t, entry, "name")
+				got[name] = secretRef{at[string](t, ref, "name"), at[string](t, ref, "key")}
+				optional[name] = ref["optional"] == true
 			}
 			if !maps.Equal(got, want) {
 				t.Errorf("the container's secret references are %v, want %v", got, want)
 			}
 			for name, ref := range got {
-				if !held[ref] {
-					t.Errorf("%s reads %v, which the secrets file does not hold", name, ref)
+				current, previous := strings.CutSuffix(name, "_PREVIOUS")
+				if !previous {
+					if optional[name] {
+						t.Errorf("%s is optional, and a pod with it unset would start without it", name)
+					}
+					if !held[ref] {
+						t.Errorf("%s reads %v, which the secrets file does not hold", name, ref)
+					}
+					continue
+				}
+				// A previous key is read only while a rotation fills it, so it is optional and no
+				// generated file holds one. It sits in its current key's Secret, so the one change
+				// that adds both halves of a previous session pair reaches the pods whole, since a
+				// server refuses to start with one half (sessionstore.ParseKeys).
+				if !optional[name] {
+					t.Errorf("%s is not optional, so no pod starts until a rotation fills it", name)
+				}
+				if held[ref] {
+					t.Errorf("%s reads %v, which the secrets file holds, so a rotation is already under way", name, ref)
+				}
+				if wantRef := (secretRef{got[current].secret, got[current].key + "-previous"}); ref != wantRef {
+					t.Errorf("%s reads %v, want %v beside %s", name, ref, wantRef, current)
 				}
 			}
 		})
