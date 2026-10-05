@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -23,12 +24,14 @@ import (
 // decides whether it can go, and what the administrative policy reads to judge a deletion.
 type groupsDatabase interface {
 	administrativeGroupPolicyDatabase
+	lastAdministratorDatabase
 	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
 	CreateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error
 	DeleteGroup(ctx context.Context, tx *sql.Tx, groupId int64) error
 	GetAllGroups(ctx context.Context, tx *sql.Tx) ([]record.Group, error)
 	GetGroupByGroupIdentifier(ctx context.Context, tx *sql.Tx, groupIdentifier string) (*record.Group, error)
 	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UpdateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error
 }
 
@@ -338,10 +341,34 @@ func HandleGroupDelete(
 			return
 		}
 
-		// Delete the group
-		err = database.DeleteGroup(r.Context(), nil, group.Id)
+		// Delete the group. Deleting a group that gives manage takes it from every member at once
+		// and can remove the last administrator, so the deletion runs in a transaction that takes
+		// the administrators' lock first, decides from what the group holds as read under it, and
+		// is rolled back when it would leave no enabled user holding manage (#402 decisions 10 and
+		// 11).
+		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			administrators, lockErr := lockAdministrators(r.Context(), database, tx)
+			if lockErr != nil {
+				return lockErr
+			}
+			givesManage, readErr := administrators.groupsGiveManage(r.Context(), []int64{group.Id})
+			if readErr != nil {
+				return readErr
+			}
+			if decideErr := administrators.decide(r.Context(), givesManage); decideErr != nil {
+				return decideErr
+			}
+			if deleteErr := database.DeleteGroup(r.Context(), tx, group.Id); deleteErr != nil {
+				return errs.Wrap(deleteErr, "database error deleting group")
+			}
+			return administrators.leavesAnAdministrator(r.Context())
+		})
+		if errors.Is(err, errLastAdministrator) {
+			writeLastAdministrator(w)
+			return
+		}
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error deleting group"), "group_id", group.Id, "group_identifier", group.GroupIdentifier)
+			writeInternalServerError(w, r, err, "group_id", group.Id, "group_identifier", group.GroupIdentifier)
 			return
 		}
 

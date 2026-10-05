@@ -86,6 +86,7 @@ var apiErrorCodes = map[string]string{
 	"FILE_TOO_LARGE":       "400 on an upload: the caller re-encodes smaller.",
 	"NO_FILE":              "400 on an upload: the multipart part is missing.",
 	"CONCURRENT_UPDATE":    "409 on a list save: the stored list changed after it was loaded, or another save added the same value at the same moment, so the caller reads the list again and retries.",
+	"LAST_ADMINISTRATOR":   "409 on the six writes that can remove a holder of authserver:manage: the change would leave no enabled user holding it, so the caller grants it to another user first (#402).",
 
 	// Authentication and authorization. A caller distinguishes "send a token", "the token is not
 	// good enough" and "the session is gone", and retries differently for each.

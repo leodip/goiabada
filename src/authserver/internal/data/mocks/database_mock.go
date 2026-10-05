@@ -959,6 +959,78 @@ func (_c *Database_CommitTransaction_Call) RunAndReturn(run func(ctx context.Con
 	return _c
 }
 
+// CountEnabledUsersHoldingPermission provides a mock function for the type Database
+func (_mock *Database) CountEnabledUsersHoldingPermission(ctx context.Context, tx *sql.Tx, permissionId int64) (int, error) {
+	ret := _mock.Called(ctx, tx, permissionId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountEnabledUsersHoldingPermission")
+	}
+
+	var r0 int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) (int, error)); ok {
+		return returnFunc(ctx, tx, permissionId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) int); ok {
+		r0 = returnFunc(ctx, tx, permissionId)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, permissionId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_CountEnabledUsersHoldingPermission_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountEnabledUsersHoldingPermission'
+type Database_CountEnabledUsersHoldingPermission_Call struct {
+	*mock.Call
+}
+
+// CountEnabledUsersHoldingPermission is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - permissionId int64
+func (_e *Database_Expecter) CountEnabledUsersHoldingPermission(ctx any, tx any, permissionId any) *Database_CountEnabledUsersHoldingPermission_Call {
+	return &Database_CountEnabledUsersHoldingPermission_Call{Call: _e.mock.On("CountEnabledUsersHoldingPermission", ctx, tx, permissionId)}
+}
+
+func (_c *Database_CountEnabledUsersHoldingPermission_Call) Run(run func(ctx context.Context, tx *sql.Tx, permissionId int64)) *Database_CountEnabledUsersHoldingPermission_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_CountEnabledUsersHoldingPermission_Call) Return(n int, err error) *Database_CountEnabledUsersHoldingPermission_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *Database_CountEnabledUsersHoldingPermission_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, permissionId int64) (int, error)) *Database_CountEnabledUsersHoldingPermission_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CountGroupMembers provides a mock function for the type Database
 func (_mock *Database) CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error) {
 	ret := _mock.Called(ctx, tx, groupId)
