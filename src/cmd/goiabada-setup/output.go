@@ -137,7 +137,7 @@ func writePrivateFile(path, content string) error {
 }
 
 func isDirectory(path string) bool {
-	info, err := os.Stat(path) //nolint:gosec,nolintlint // G703: the path is the one the operator asked for with --output, on their own machine; nolintlint because golangci-lint 2.14.0 drops this gosec finding from a warm cache and then calls the directive unused
+	info, err := os.Stat(path) //nolint:gosec,nolintlint // G703: the path is the one the operator asked for with --output, on their own machine; nolintlint because gosec v2.29.0 finds this G703 on some runs only, leaving the directive unused on the others (securego/gosec#1712, #494)
 	if err != nil {
 		return false
 	}
