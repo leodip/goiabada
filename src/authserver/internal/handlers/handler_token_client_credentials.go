@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 )
@@ -15,7 +16,7 @@ func (tr tokenResponder) respondClientCredentials(w http.ResponseWriter, r *http
 
 	tokenResponse, err := tr.issuer.IssueClientCredentialsGrant(r.Context(), settings, grant.Client, grant.Scope)
 	if err != nil {
-		tr.jsonWriter.JSONError(w, r, err)
+		tr.refuse(w, r, oidc.GrantTypeClientCredentials, err)
 		return
 	}
 
@@ -27,5 +28,5 @@ func (tr tokenResponder) respondClientCredentials(w http.ResponseWriter, r *http
 		"scope": grant.Scope,
 	})
 
-	tr.writeTokenResponse(w, r, tokenResponse)
+	tr.writeTokenResponse(w, r, oidc.GrantTypeClientCredentials, tokenResponse)
 }

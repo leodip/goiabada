@@ -27,6 +27,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -99,9 +100,17 @@ func newTestMiddleware(ceremonyStore authContextGetter, enabled bool) *RateLimit
 }
 
 func newAuditedTestMiddleware(ceremonyStore authContextGetter, enabled bool) (*RateLimiter, *stubAuditLogger) {
+	m, auditLog, _ := newMeteredTestMiddleware(ceremonyStore, enabled)
+	return m, auditLog
+}
+
+// newMeteredTestMiddleware is newAuditedTestMiddleware with the registry its refusals are counted
+// on, for the cases that read the metrics.
+func newMeteredTestMiddleware(ceremonyStore authContextGetter, enabled bool) (*RateLimiter, *stubAuditLogger, *metrics.Registry) {
 	auditLog := &stubAuditLogger{}
 	httpHelper := render.New(testTemplateFS)
-	return NewRateLimiter(ceremonyStore, httpHelper, httpHelper, auditLog, enabled, nil), auditLog
+	reg := metrics.NewRegistry()
+	return NewRateLimiter(ceremonyStore, httpHelper, httpHelper, auditLog, enabled, nil, reg), auditLog, reg
 }
 
 // limiterRequest builds the request a limited route actually receives. Settings are on the

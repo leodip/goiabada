@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/cleanup"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -245,7 +246,7 @@ func TestStart_WithNoListenerRefusesBeforeStartingAnything(t *testing.T) {
 // listeners have drained, so a graceful stop loses no forgot-password record or mail (#404
 // decision 8). The job here is released only after stopBackgroundWork has been seen to wait.
 func TestStopBackgroundWork_WaitsForTheJobsInFlight(t *testing.T) {
-	s := &Server{jobs: afterresponse.New(), worker: cleanup.New(nil)}
+	s := &Server{jobs: afterresponse.New(metrics.NewRegistry()), worker: cleanup.New(nil, metrics.NewRegistry())}
 
 	release := make(chan struct{})
 	var finished atomic.Bool

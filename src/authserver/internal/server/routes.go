@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
+	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/builtin"
@@ -49,6 +50,9 @@ func (s *Server) initRoutes(branches appBranches) {
 	userSessionManager := usersession.NewManager(s.sessionStore, sessionkeys.AuthServerSessionName, s.database)
 	otpSecretGenerator := otp.NewKeyGenerator()
 	tokenIssuer := issuance.NewTokenIssuer(s.database, s.cfg.AuthServer.BaseURL, s.dataCipher, userSessionManager)
+	// The tokens the token endpoint and /auth/issue answer with, and the token requests refused,
+	// counted on the metrics listener (#400 decision 5).
+	tokenMetrics := tokenmetrics.Register(s.metrics)
 	userCreator := usercreation.New(s.database)
 	emailSender := emaildelivery.NewSender(s.dataCipher)
 
@@ -75,6 +79,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		auditLogger,
 		authServerConfig.RateLimiterEnabled,
 		sharedCredentialCounts(s.cfg.Database.Type, s.database),
+		s.metrics,
 	)
 	emitRateLimiterConfigWarnings(
 		authServerConfig.RateLimiterEnabled,
@@ -126,7 +131,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(httpHelper, ceremonyStore, userSessionManager, s.database, s.templateFS, auditLogger, baseURL, adminConsoleBaseURL))
 		r.Get("/level2", handlers.HandleAuthLevel2Get(httpHelper, ceremonyStore, s.database, auditLogger, baseURL, adminConsoleBaseURL))
 		r.Get("/completed", handlers.HandleAuthCompletedGet(httpHelper, ceremonyStore, userSessionManager, s.database, s.templateFS, auditLogger, permissionChecker, baseURL, adminConsoleBaseURL))
-		r.Get("/issue", handlers.HandleIssueGet(httpHelper, ceremonyStore, s.templateFS, codeIssuer, tokenIssuer, s.database, auditLogger, userSessionManager, permissionChecker, baseURL, adminConsoleBaseURL))
+		r.Get("/issue", handlers.HandleIssueGet(httpHelper, ceremonyStore, s.templateFS, codeIssuer, tokenIssuer, s.database, auditLogger, userSessionManager, permissionChecker, tokenMetrics, baseURL, adminConsoleBaseURL))
 		r.Get("/pwd", handlers.HandleAuthPwdGet(httpHelper, ceremonyStore, s.database, auditLogger, adminConsoleBaseURL))
 		r.With(rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(httpHelper, ceremonyStore, s.database, auditLogger, rateLimiter, baseURL, adminConsoleBaseURL))
 		r.Get("/otp", handlers.HandleAuthOtpGet(httpHelper, ceremonyStore, s.database, otpSecretGenerator, auditLogger, adminConsoleBaseURL))
@@ -140,7 +145,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	// Outside the /auth group, which is mounted on the page branch whole, because it answers on the
 	// protocol branch. chi routes POST /auth/token here ahead of the group's catch-all; a GET falls
 	// through to the group, which answers it 405 as it did when the route was its own (#435).
-	protocol.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter))
+	protocol.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics))
 
 	pages.Route("/account", func(r chi.Router) {
 		r.Get("/register", accounthandlers.HandleRegisterGet(httpHelper))

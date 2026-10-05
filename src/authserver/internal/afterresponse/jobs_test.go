@@ -10,6 +10,7 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +25,7 @@ func requestContext(requestId string) (context.Context, context.CancelFunc) {
 // request carried does, so its records and audit entries join the request that started it (#404
 // decision 8).
 func TestGo_TheJobRunsDetachedFromTheRequestsCancellationButKeepsItsValues(t *testing.T) {
-	jobs := New()
+	jobs := New(metrics.NewRegistry())
 	ctx, cancel := requestContext("req-detached")
 
 	release := make(chan struct{})
@@ -53,7 +54,7 @@ func TestGo_TheJobRunsDetachedFromTheRequestsCancellationButKeepsItsValues(t *te
 
 // Go returns at once, whatever the job does: the response is not held for it.
 func TestGo_ReturnsBeforeTheJobFinishes(t *testing.T) {
-	jobs := New()
+	jobs := New(metrics.NewRegistry())
 	release := make(chan struct{})
 	finished := make(chan struct{})
 
@@ -82,7 +83,7 @@ func TestGo_ReturnsBeforeTheJobFinishes(t *testing.T) {
 
 // Shutdown waits for a job in flight, and for no longer than it is given.
 func TestWait_WaitsForTheJobsInFlight(t *testing.T) {
-	jobs := New()
+	jobs := New(metrics.NewRegistry())
 	release := make(chan struct{})
 	finished := make(chan struct{})
 	jobs.Go(context.Background(), ClassRecovery, func(context.Context) {
@@ -118,7 +119,7 @@ func TestWait_WaitsForTheJobsInFlight(t *testing.T) {
 // any job has run and after every one has finished. It was a 1 ms timeout raced against a
 // goroutine, which a busy CI runner lost (#404).
 func TestWait_WithNothingInFlightReturnsAtOnce(t *testing.T) {
-	jobs := New()
+	jobs := New(metrics.NewRegistry())
 	assert.True(t, jobs.Wait(0), "no job has run")
 
 	done := make(chan struct{})
@@ -132,7 +133,7 @@ func TestWait_WithNothingInFlightReturnsAtOnce(t *testing.T) {
 // idle channel a first job opens serves every Wait until the last one closes it, and the next job
 // opens a fresh one.
 func TestWait_AJobStillRunningAtTheTimeoutIsReported(t *testing.T) {
-	jobs := New()
+	jobs := New(metrics.NewRegistry())
 	release := make(chan struct{})
 	jobs.Go(context.Background(), ClassRecovery, func(context.Context) { <-release })
 
@@ -153,7 +154,7 @@ func TestWait_AJobStillRunningAtTheTimeoutIsReported(t *testing.T) {
 // would end the process. It is an Error record on the request's id instead, and Wait still returns.
 func TestGo_APanickingJobIsAnErrorRecordAndNotTheEndOfTheProcess(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
-	jobs := New()
+	jobs := New(metrics.NewRegistry())
 	ctx, cancel := requestContext("req-panic")
 	defer cancel()
 
@@ -204,7 +205,7 @@ func warnings(capture *logtest.SlogCapture) []logtest.CapturedRecord {
 // #404 decisions 7 and 8).
 func TestGo_AJobPastTheCapIsDroppedWithOneWarnRecord(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
-	jobs := New()
+	jobs := New(metrics.NewRegistry())
 	release := make(chan struct{})
 	fillToTheCap(t, jobs, ClassRecovery, release)
 	require.Empty(t, warnings(capture), "the 64 jobs under the cap are all admitted")
@@ -243,7 +244,7 @@ func TestGo_AJobPastTheCapIsDroppedWithOneWarnRecord(t *testing.T) {
 // one dropped (#394 review).
 func TestGo_AFullClassTakesNoSlotFromAnotherClass(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
-	jobs := New()
+	jobs := New(metrics.NewRegistry())
 	release := make(chan struct{})
 	fillToTheCap(t, jobs, ClassRecovery, release)
 
@@ -274,7 +275,7 @@ func TestGo_AFullClassTakesNoSlotFromAnotherClass(t *testing.T) {
 
 // Wait waits for every class: with nothing of recovery's in flight, a notice still running holds it.
 func TestWait_WaitsForEveryClass(t *testing.T) {
-	jobs := New()
+	jobs := New(metrics.NewRegistry())
 	release := make(chan struct{})
 	jobs.Go(context.Background(), ClassAccountNotice, func(context.Context) { <-release })
 	assert.False(t, jobs.Wait(0), "the notice is still running")
@@ -286,7 +287,7 @@ func TestWait_WaitsForEveryClass(t *testing.T) {
 // when they have finished, though the dropped one never will.
 func TestWait_WaitsForAdmittedJobsOnly(t *testing.T) {
 	logtest.CaptureSlog(t)
-	jobs := New()
+	jobs := New(metrics.NewRegistry())
 	release := make(chan struct{})
 	fillToTheCap(t, jobs, ClassRecovery, release)
 
@@ -313,7 +314,7 @@ func TestWait_WaitsForAdmittedJobsOnly(t *testing.T) {
 // next is dropped.
 func TestGo_AFinishedJobReleasesItsSlot(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
-	jobs := New()
+	jobs := New(metrics.NewRegistry())
 	first := make(chan struct{})
 	fillToTheCap(t, jobs, ClassRecovery, first)
 	close(first)
@@ -333,7 +334,7 @@ func TestGo_AFinishedJobReleasesItsSlot(t *testing.T) {
 // later job is dropped.
 func TestGo_APanickingJobReleasesItsSlot(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
-	jobs := New()
+	jobs := New(metrics.NewRegistry())
 	for range 64 {
 		jobs.Go(context.Background(), ClassRecovery, func(context.Context) { panic("boom") })
 	}
@@ -350,7 +351,7 @@ func TestGo_APanickingJobReleasesItsSlot(t *testing.T) {
 // exactly 64 run and the other 136 are dropped, one Warn record each.
 func TestGo_ConcurrentCallsAdmitExactlyTheCap(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
-	jobs := New()
+	jobs := New(metrics.NewRegistry())
 	release := make(chan struct{})
 	var ran atomic.Int32
 

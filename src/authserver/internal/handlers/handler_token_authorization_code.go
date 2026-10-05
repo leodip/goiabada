@@ -6,6 +6,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
@@ -19,12 +20,12 @@ func (tr tokenResponder) respondAuthorizationCode(w http.ResponseWriter, r *http
 
 	tokenResponse, err := tr.issuer.IssueAuthorizationCodeGrant(r.Context(), settings, grant.Code)
 	if errors.Is(err, issuance.ErrCodeNotClaimed) {
-		tr.jsonWriter.JSONError(w, r, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+		tr.refuse(w, r, oidc.GrantTypeAuthorizationCode, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"Code is invalid.", http.StatusBadRequest))
 		return
 	}
 	if err != nil {
-		tr.jsonWriter.JSONError(w, r, err)
+		tr.refuse(w, r, oidc.GrantTypeAuthorizationCode, err)
 		return
 	}
 
@@ -32,5 +33,5 @@ func (tr tokenResponder) respondAuthorizationCode(w http.ResponseWriter, r *http
 		"codeId": grant.Code.Id,
 	})
 
-	tr.writeTokenResponse(w, r, tokenResponse)
+	tr.writeTokenResponse(w, r, oidc.GrantTypeAuthorizationCode, tokenResponse)
 }

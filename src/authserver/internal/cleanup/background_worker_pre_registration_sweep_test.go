@@ -8,6 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -22,7 +23,7 @@ import (
 // settings row is read, since it needs nothing from settings.
 func TestWorker_PerformTask_SweepsDeadPreRegistrationsTenMinutesBack(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	worker := New(mockDB)
+	worker := New(mockDB, metrics.NewRegistry())
 
 	var order []string
 	recordStep := func(step string) func(mock.Arguments) {
@@ -58,7 +59,7 @@ func TestWorker_PerformTask_SweepsDeadPreRegistrationsTenMinutesBack(t *testing.
 // sweeps and the audit log sweep.
 func TestWorker_PerformTask_ContinuesAfterThePreRegistrationSweepFails(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	worker := New(mockDB)
+	worker := New(mockDB, metrics.NewRegistry())
 
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Once()
@@ -83,7 +84,7 @@ func TestWorker_PerformTask_ContinuesAfterThePreRegistrationSweepFails(t *testin
 // A failing code sweep before it does not stop it either.
 func TestWorker_PerformTask_SweepsPreRegistrationsAfterTheCodeSweepFails(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	worker := New(mockDB)
+	worker := New(mockDB, metrics.NewRegistry())
 
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Once()
@@ -102,7 +103,7 @@ func TestWorker_PerformTask_SweepsPreRegistrationsAfterTheCodeSweepFails(t *test
 func TestWorker_PerformTask_StopsAroundThePreRegistrationSweepWhenCancelled(t *testing.T) {
 	t.Run("cancelled during the code sweep", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
-		worker := New(mockDB)
+		worker := New(mockDB, metrics.NewRegistry())
 		ctx, cancel := context.WithCancel(context.Background())
 
 		mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Once()
@@ -118,7 +119,7 @@ func TestWorker_PerformTask_StopsAroundThePreRegistrationSweepWhenCancelled(t *t
 
 	t.Run("cancelled during this sweep", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
-		worker := New(mockDB)
+		worker := New(mockDB, metrics.NewRegistry())
 		ctx, cancel := context.WithCancel(context.Background())
 
 		mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Once()

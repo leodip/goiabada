@@ -133,7 +133,7 @@ func newRecheckFixtureFor(t *testing.T, responseType string, prompt string, sess
 		Return(func(_ context.Context, scope string, _ *record.User) string { return scope }, nil).Maybe()
 
 	handler := HandleIssueGet(f.pageRenderer, f.ceremonyStore, fstest.MapFS{}, f.codeIssuer, f.implicitIssuer,
-		f.database, f.auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		f.database, f.auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 	f.serve = func() { handler.ServeHTTP(f.rr, f.req) }
 	return f
 }

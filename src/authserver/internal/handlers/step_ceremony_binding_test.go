@@ -93,7 +93,7 @@ func everyGatedStep() []stepUnderTest {
 				return HandleIssueGet(pr, cs, fstest.MapFS{}, handlersmocks.NewCodeIssuer(t),
 					handlersmocks.NewImplicitTokenIssuer(t), datamocks.NewDatabase(t), al,
 					handlersmocks.NewUserSessionManager(t), handlersmocks.NewPermissionChecker(t),
-					testBaseURL, testAdminConsoleBaseURL)
+					testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 			}},
 	}
 }

@@ -10,7 +10,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/authserver/web"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -294,8 +296,9 @@ func TestHandleIssueGet_ImplicitFlow_FormPost(t *testing.T) {
 	userSessionManager := handlersmocks.NewUserSessionManager(t)
 	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
+	registry := metrics.NewRegistry()
 	handler := HandleIssueGet(pageRenderer, ceremonyStore, web.TemplateFS(), codeIssuer, implicitTokenIssuer, database,
-		auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger, userSessionManager, permissionChecker, tokenmetrics.Register(registry), testBaseURL, testAdminConsoleBaseURL)
 
 	req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 	rr := httptest.NewRecorder()
@@ -341,6 +344,9 @@ func TestHandleIssueGet_ImplicitFlow_FormPost(t *testing.T) {
 	assert.Contains(t, body, `<input type="hidden" name="access_token" value="access-token-123" />`)
 	assert.Contains(t, body, `<input type="hidden" name="id_token" value="id-token-123" />`)
 	assert.Contains(t, body, `<input type="hidden" name="state" value="test-state" />`)
+	// The tokens the implicit grant signed are counted as issued, under implicit (#400 decision 5).
+	assert.Equal(t, []string{`goiabada_tokens_issued_total{grant_type="implicit"} 1`},
+		tokenSamples(t, registry))
 
 	pageRenderer.AssertExpectations(t)
 	ceremonyStore.AssertExpectations(t)

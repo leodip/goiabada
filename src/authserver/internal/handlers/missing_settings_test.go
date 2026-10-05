@@ -69,7 +69,7 @@ func TestMissingSettings_TheTokenEndpointAnswersItsOwn500(t *testing.T) {
 
 	HandleTokenPost(jsonWriter, datamocks.NewDatabase(t),
 		handlersmocks.NewTokenIssuer(t), tokenValidator, handlersmocks.NewAuditLogger(t),
-		noCredentialFailures{}).ServeHTTP(rr, req)
+		noCredentialFailures{}, testTokenMetrics()).ServeHTTP(rr, req)
 
 	jsonWriter.AssertExpectations(t)
 	tokenValidator.AssertNotCalled(t, "ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything)

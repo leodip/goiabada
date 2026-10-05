@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -40,7 +41,7 @@ func lifecycleContext() context.Context {
 // able to abandon when the process is shutting down.
 func TestWorker_Poll_ReapsUnderTheWorkersContext(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	worker := New(mockDB)
+	worker := New(mockDB, metrics.NewRegistry())
 
 	mockDB.On("DeleteExpiredBrowserSessions", theWorkersContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
@@ -60,7 +61,7 @@ func TestWorker_Poll_ReapsUnderTheWorkersContext(t *testing.T) {
 // pass on a worker that swept unconditionally.
 func TestWorker_Poll_LostClaimReachesNoSweepPort(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	worker := New(mockDB)
+	worker := New(mockDB, metrics.NewRegistry())
 
 	mockDB.On("DeleteExpiredBrowserSessions", theWorkersContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
@@ -85,7 +86,7 @@ func TestWorker_Poll_LostClaimReachesNoSweepPort(t *testing.T) {
 // cannot interrupt them waits for the slowest DELETE in the schema.
 func TestWorker_PerformTask_SweepsUnderTheWorkersContext(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	worker := New(mockDB)
+	worker := New(mockDB, metrics.NewRegistry())
 
 	mockDB.On("DeleteExpiredRefreshTokens", theWorkersContext(), mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", theWorkersContext(), mock.Anything).Return(nil).Once()
@@ -108,7 +109,7 @@ func TestWorker_PerformTask_SweepsUnderTheWorkersContext(t *testing.T) {
 // shutdown cancels rather than under one the loop invented.
 func TestWorker_DeleteOldAuditLogs_SweepsUnderTheWorkersContext(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	worker := New(mockDB)
+	worker := New(mockDB, metrics.NewRegistry())
 
 	// One short batch, which is what ends the loop after a single statement.
 	mockDB.On("DeleteOldAuditLogs", theWorkersContext(), mock.Anything, mock.Anything, auditLogDeleteBatchSize).

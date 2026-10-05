@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
+	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -22,6 +23,11 @@ import (
 //
 // database is the revocation port alone, because the one write this file makes is the cascade
 // that answers a reused authorization code; every other write of a grant is its issuer's.
+//
+// tokenMetrics counts every token response by its grant and every refusal this endpoint answers by
+// the grant asked for and the error code answered (#400 decision 5). The grant a refusal is counted
+// under is the request's grant_type parameter, mapped into the four this endpoint redeems, so a
+// request refused before it was parsed or validated is still counted under the grant it named.
 func HandleTokenPost(
 	jsonWriter JSONWriter,
 	database revocation.Database,
@@ -29,25 +35,26 @@ func HandleTokenPost(
 	tokenValidator TokenValidator,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
+	tokenMetrics *tokenmetrics.Recorder,
 ) http.HandlerFunc {
-	responder := tokenResponder{jsonWriter: jsonWriter, issuer: tokenIssuer, auditLogger: auditLogger}
+	responder := tokenResponder{jsonWriter: jsonWriter, issuer: tokenIssuer, auditLogger: auditLogger, metrics: tokenMetrics}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		input, err := parseTokenRequest(r)
 		if err != nil {
-			jsonWriter.JSONError(w, r, err)
+			responder.refuse(w, r, requestedGrantType(r), err)
 			return
 		}
 
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
-			jsonWriter.JSONError(w, r, reqctx.ErrNoSettings)
+			responder.refuse(w, r, input.GrantType, reqctx.ErrNoSettings)
 			return
 		}
 
 		grant, err := tokenValidator.ValidateTokenRequest(r.Context(), settings, input)
 		if err != nil {
-			jsonWriter.JSONError(w, r, auditTokenRefusal(r, database, auditLogger, credentialFailures, input, err))
+			responder.refuse(w, r, input.GrantType, auditTokenRefusal(r, database, auditLogger, credentialFailures, input, err))
 			return
 		}
 
@@ -62,9 +69,16 @@ func HandleTokenPost(
 			responder.respondPassword(w, r, settings, grant)
 		default:
 			// Reachable only if the validator returns a grant this endpoint has no responder for.
-			jsonWriter.JSONError(w, r, errs.Errorf("the token validator returned a grant (%T) the token endpoint does not answer", grant))
+			responder.refuse(w, r, input.GrantType, errs.Errorf("the token validator returned a grant (%T) the token endpoint does not answer", grant))
 		}
 	}
+}
+
+// requestedGrantType is the grant_type the request's body named, read for a request refused before
+// it was parsed into the validator's input. net/http keeps the pairs that parsed before a malformed
+// one, and an empty form names none.
+func requestedGrantType(r *http.Request) oidc.GrantType {
+	return oidc.GrantType(r.PostForm.Get("grant_type"))
 }
 
 // tokenRequestParameters are every form parameter the token endpoint reads, and so every one whose
@@ -309,14 +323,27 @@ type tokenResponder struct {
 	jsonWriter  JSONWriter
 	issuer      TokenIssuer
 	auditLogger AuditLogger
+	metrics     *tokenmetrics.Recorder
 }
 
-// writeTokenResponse answers a successful grant. The response carries tokens, so RFC 6749 section
-// 5.1 requires Cache-Control: no-store and Pragma: no-cache on it.
-func (tr tokenResponder) writeTokenResponse(w http.ResponseWriter, r *http.Request, tokenResponse *oauth.TokenResponse) {
+// writeTokenResponse answers a successful grant, counting it as tokens issued under grantType. The
+// response carries tokens, so RFC 6749 section 5.1 requires Cache-Control: no-store and Pragma:
+// no-cache on it.
+func (tr tokenResponder) writeTokenResponse(w http.ResponseWriter, r *http.Request, grantType oidc.GrantType,
+	tokenResponse *oauth.TokenResponse) {
+
+	tr.metrics.Issued(grantType)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")
 	tr.jsonWriter.EncodeJSON(w, r, tokenResponse)
+}
+
+// refuse answers a token request with err, as RFC 6749 section 5.2's error response, counting it as
+// refused under grantType and the error code err is answered with. Every refusal this endpoint
+// writes goes through here, so none is answered uncounted.
+func (tr tokenResponder) refuse(w http.ResponseWriter, r *http.Request, grantType oidc.GrantType, err error) {
+	tr.metrics.Refused(grantType, err)
+	tr.jsonWriter.JSONError(w, r, err)
 }
 
 // extractClientCredentials extracts client_id and client_secret from the request.
