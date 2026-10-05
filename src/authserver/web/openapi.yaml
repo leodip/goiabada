@@ -252,6 +252,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/LastAdministrator'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -483,6 +485,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/LastAdministrator'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -662,6 +666,10 @@ paths:
           description: |
             Another save changed the user's groups after expectedGroupIds was read.
             error_code is CONCURRENT_UPDATE; nothing was saved. Read them again and retry.
+
+            Or the save would leave no enabled user holding `authserver:manage`,
+            directly or through a group. error_code is LAST_ADMINISTRATOR; nothing
+            was saved. Grant `authserver:manage` to another user first.
           content:
             application/json:
               schema:
@@ -726,6 +734,10 @@ paths:
           description: |
             Another save changed the user's permissions after expectedPermissionIds was read.
             error_code is CONCURRENT_UPDATE; nothing was saved. Read them again and retry.
+
+            Or the save would leave no enabled user holding `authserver:manage`,
+            directly or through a group. error_code is LAST_ADMINISTRATOR; nothing
+            was saved. Grant `authserver:manage` to another user first.
           content:
             application/json:
               schema:
@@ -1210,6 +1222,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/LastAdministrator'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -1301,6 +1315,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/LastAdministrator'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -1361,6 +1377,10 @@ paths:
           description: |
             Another save changed the group's permissions after expectedPermissionIds was read.
             error_code is CONCURRENT_UPDATE; nothing was saved. Read them again and retry.
+
+            Or the save would leave no enabled user holding `authserver:manage`,
+            directly or through a group. error_code is LAST_ADMINISTRATOR; nothing
+            was saved. Grant `authserver:manage` to another user first.
           content:
             application/json:
               schema:
@@ -3650,6 +3670,17 @@ components:
         default: 10
 
   responses:
+    LastAdministrator:
+      description: |
+        The change would leave no enabled user holding `authserver:manage`,
+        directly or through a group. error_code is LAST_ADMINISTRATOR; nothing
+        was changed. Grant `authserver:manage` to another user first, then
+        repeat the request. A client holding the permission does not count, and
+        neither does a disabled user.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     Unauthorized:
       description: Missing or invalid bearer token
       content:

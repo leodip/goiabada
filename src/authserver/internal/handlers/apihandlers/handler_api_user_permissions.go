@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -19,6 +21,7 @@ import (
 // catalogue they are granted from, and what the administrative policy reads to judge a save.
 type userPermissionsDatabase interface {
 	userTargetPolicyDatabase
+	lastAdministratorDatabase
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
 	DeleteUserPermission(ctx context.Context, tx *sql.Tx, userPermissionId int64) error
 	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
@@ -170,8 +173,17 @@ func HandleUserPermissionsPut(
 		// A permission deleted after the validation above read it fails the insert's foreign key,
 		// which undoes the whole save as one 500; the second lookup the add loop made to catch it
 		// went with the loop (#406).
+		//
+		// Revoking manage can remove the last administrator, so the transaction takes the
+		// administrators' lock first and the save is refused, rolled back, when it would leave no
+		// enabled user holding manage (#402 decisions 10 and 11).
 		var granted, revoked []int64
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			administrators, lockErr := lockAdministrators(r.Context(), database, tx)
+			if lockErr != nil {
+				return lockErr
+			}
+
 			stored, loadErr := database.GetUserPermissionsByUserId(r.Context(), tx, user.Id)
 			if loadErr != nil {
 				return errs.Wrap(loadErr, "database error loading user permissions before update")
@@ -181,6 +193,10 @@ func HandleUserPermissionsPut(
 			}
 
 			insert, remove := replaceSet(stored, grantKey, grantId, wanted)
+			attemptRevoked := revokedKeys(stored, grantKey, wanted)
+			if decideErr := administrators.decide(r.Context(), slices.Contains(attemptRevoked, administrators.manageId)); decideErr != nil {
+				return decideErr
+			}
 			for _, rowId := range remove {
 				if deleteErr := database.DeleteUserPermission(r.Context(), tx, rowId); deleteErr != nil {
 					return errs.Wrapf(deleteErr, "database error deleting user permission %d", rowId)
@@ -194,9 +210,16 @@ func HandleUserPermissionsPut(
 					return errs.Wrapf(createErr, "database error granting permission %d", permissionId)
 				}
 			}
-			granted, revoked = insert, revokedKeys(stored, grantKey, wanted)
+			if guardErr := administrators.leavesAnAdministrator(r.Context()); guardErr != nil {
+				return guardErr
+			}
+			granted, revoked = insert, attemptRevoked
 			return nil
 		})
+		if errors.Is(err, errLastAdministrator) {
+			writeLastAdministrator(w)
+			return
+		}
 		if err != nil {
 			writeListSaveFailure(w, r, err, "user_id", user.Id)
 			return

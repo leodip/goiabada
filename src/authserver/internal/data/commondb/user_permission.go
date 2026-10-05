@@ -295,3 +295,60 @@ func (d *Database) DeleteUserPermission(ctx context.Context, tx *sql.Tx, userPer
 
 	return nil
 }
+
+// CountEnabledUsersHoldingPermission counts the enabled users holding the permission, directly or
+// through any of their groups. Each is counted once however many ways they hold it, since the two
+// routes are EXISTS tests on the user rather than joins that would repeat a user per grant. It is
+// what the last-administrator guard counts (#402 decision 10).
+func (d *Database) CountEnabledUsersHoldingPermission(ctx context.Context, tx *sql.Tx, permissionId int64) (int, error) {
+	if permissionId <= 0 {
+		return 0, errs.New("permission id must be greater than 0")
+	}
+
+	direct := d.Flavor.NewSelectBuilder()
+	direct.Select("1")
+	direct.From("users_permissions")
+	direct.Where(
+		"users_permissions.user_id = users.id",
+		direct.Equal("users_permissions.permission_id", permissionId),
+	)
+
+	throughGroup := d.Flavor.NewSelectBuilder()
+	throughGroup.Select("1")
+	throughGroup.From("users_groups")
+	throughGroup.JoinWithOption(sqlbuilder.InnerJoin, "groups_permissions", "groups_permissions.group_id = users_groups.group_id")
+	throughGroup.Where(
+		"users_groups.user_id = users.id",
+		throughGroup.Equal("groups_permissions.permission_id", permissionId),
+	)
+
+	count := d.Flavor.NewSelectBuilder()
+	count.Select("count(*)")
+	count.From("users")
+	count.Where(
+		count.Equal("users.enabled", true),
+		count.Or(
+			count.Exists(direct),
+			count.Exists(throughGroup),
+		),
+	)
+
+	query, args := count.BuildWithFlavor(d.Flavor)
+	rows, err := d.QuerySQL(ctx, tx, query, args...)
+	if err != nil {
+		return 0, errs.Wrap(err, "unable to count the enabled users holding the permission")
+	}
+	defer func() { _ = rows.Close() }()
+
+	var holders int
+	if rows.Next() {
+		if err := rows.Scan(&holders); err != nil {
+			return 0, errs.Wrap(err, "unable to scan the count of the enabled users holding the permission")
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, errs.Wrap(err, "unable to read query results")
+	}
+
+	return holders, nil
+}

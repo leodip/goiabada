@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"slices"
 	"strconv"
@@ -44,6 +45,7 @@ const maxGroupIdsPerRequest = 1000
 type userGroupsDatabase interface {
 	userTargetPolicyDatabase
 	userGroupsPolicyDatabase
+	lastAdministratorDatabase
 	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
 	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *record.UserGroup) error
 	DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupId int64) error
@@ -199,9 +201,18 @@ func HandleUserGroupsPut(
 		// so the administrative_permission_changed records are written from what the committed
 		// attempt saw; that read failing undoes the save, so a membership is never committed
 		// without the records it owes (#402).
+		//
+		// Leaving a group that gives manage can remove the last administrator, so the transaction
+		// takes the administrators' lock first and the save is refused, rolled back, when it would
+		// leave no enabled user holding manage (#402 decisions 10 and 11).
 		var added, removed []int64
 		var joined, left []administrativeGroup
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			administrators, lockErr := lockAdministrators(r.Context(), database, tx)
+			if lockErr != nil {
+				return lockErr
+			}
+
 			stored, loadErr := database.GetUserGroupsByUserId(r.Context(), tx, user.Id)
 			if loadErr != nil {
 				return errs.Wrap(loadErr, "database error loading user groups before update")
@@ -211,6 +222,15 @@ func HandleUserGroupsPut(
 			}
 
 			insert, remove := replaceSet(stored, membershipKey, membershipId, wanted)
+			attemptRemoved := revokedKeys(stored, membershipKey, wanted)
+			leavesManage, guardReadErr := administrators.groupsGiveManage(r.Context(), attemptRemoved)
+			if guardReadErr != nil {
+				return guardReadErr
+			}
+			if decideErr := administrators.decide(r.Context(), leavesManage); decideErr != nil {
+				return decideErr
+			}
+
 			for _, rowId := range remove {
 				if deleteErr := database.DeleteUserGroup(r.Context(), tx, rowId); deleteErr != nil {
 					return errs.Wrapf(deleteErr, "database error deleting user group membership %d", rowId)
@@ -224,7 +244,9 @@ func HandleUserGroupsPut(
 					return errs.Wrapf(createErr, "database error adding the user to group %d", groupId)
 				}
 			}
-			attemptRemoved := revokedKeys(stored, membershipKey, wanted)
+			if guardErr := administrators.leavesAnAdministrator(r.Context()); guardErr != nil {
+				return guardErr
+			}
 			var attemptJoined, attemptLeft []administrativeGroup
 			if changed := append(append([]int64{}, insert...), attemptRemoved...); len(changed) > 0 {
 				groups, readErr := administrativeGroups(r.Context(), database, tx, changed)
@@ -243,6 +265,10 @@ func HandleUserGroupsPut(
 			joined, left = attemptJoined, attemptLeft
 			return nil
 		})
+		if errors.Is(err, errLastAdministrator) {
+			writeLastAdministrator(w)
+			return
+		}
 		if err != nil {
 			writeListSaveFailure(w, r, err, "user_id", user.Id)
 			return

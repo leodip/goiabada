@@ -364,6 +364,11 @@ type Database interface {
 	GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserPermission, error)
 	GetUserPermissionsByUserIds(ctx context.Context, tx *sql.Tx, userIds []int64) ([]record.UserPermission, error)
 	DeleteUserPermission(ctx context.Context, tx *sql.Tx, userPermissionId int64) error
+	// CountEnabledUsersHoldingPermission counts the enabled users holding the permission, directly
+	// or through any of their groups, each once. Read on tx, it counts what the transaction itself
+	// has written. It is what the last-administrator guard counts, under AcquireManagePermissionRow,
+	// before and after a write that can remove a holder of authserver:manage (#402 decision 10).
+	CountEnabledUsersHoldingPermission(ctx context.Context, tx *sql.Tx, permissionId int64) (int, error)
 
 	CreateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error
 	UpdateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error

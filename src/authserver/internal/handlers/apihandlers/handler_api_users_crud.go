@@ -40,6 +40,7 @@ import (
 // It embeds what the administrative policy reads to judge whether the user is an administrator.
 type usersCrudDatabase interface {
 	userTargetPolicyDatabase
+	userRemovalDatabase
 	accountOTPDatabase
 	revocation.Database
 
@@ -616,7 +617,23 @@ func HandleUserEnabledPut(
 		// helper opens it through RunInTransaction, so a deadlock reruns the compare-and-set and
 		// the sweep together (#301); the compare-and-set asks the row again on every attempt.
 		disableWithRevocation := func() (revocation.UserAuthStateResult, bool, error) {
+			//
+			// Disabling a holder of manage can remove the last administrator, so the write takes
+			// the administrators' lock as the transaction's first statement, decides from the
+			// user's grants as read under it, and is rolled back, sweep and all, when it would
+			// leave no enabled user holding manage (#402 decisions 10 and 11).
 			result, txErr := revocation.RevokeUserAuthStateTx(r.Context(), database, userId, "", func(tx *sql.Tx) error {
+				administrators, lockErr := lockAdministrators(r.Context(), database, tx)
+				if lockErr != nil {
+					return lockErr
+				}
+				holdsManage, readErr := administrators.userHoldsManage(r.Context(), database, userId)
+				if readErr != nil {
+					return readErr
+				}
+				if decideErr := administrators.decide(r.Context(), holdsManage); decideErr != nil {
+					return decideErr
+				}
 				flipped, setErr := database.TrySetUserEnabled(r.Context(), tx, userId, true, false)
 				if setErr != nil {
 					return setErr
@@ -627,7 +644,7 @@ func HandleUserEnabledPut(
 					// the empty attempt back once and hands it straight back.
 					return errUserAlreadyDisabled
 				}
-				return nil
+				return administrators.leavesAnAdministrator(r.Context())
 			})
 			if errors.Is(txErr, errUserAlreadyDisabled) {
 				return revocation.UserAuthStateResult{}, false, nil
@@ -650,6 +667,10 @@ func HandleUserEnabledPut(
 			}
 		} else {
 			result, transitioned, err = disableWithRevocation()
+			if errors.Is(err, errLastAdministrator) {
+				writeLastAdministrator(w)
+				return
+			}
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return
@@ -724,8 +745,31 @@ func HandleUserDelete(
 			return
 		}
 
-		// Delete user from database
-		err = database.DeleteUser(r.Context(), nil, userId)
+		// Delete user from database. Deleting a holder of manage can remove the last
+		// administrator, so the deletion runs in a transaction that takes the administrators' lock
+		// first, decides from the user's grants as read under it, and is rolled back when it would
+		// leave no enabled user holding manage (#402 decisions 10 and 11).
+		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			administrators, lockErr := lockAdministrators(r.Context(), database, tx)
+			if lockErr != nil {
+				return lockErr
+			}
+			holdsManage, readErr := administrators.userHoldsManage(r.Context(), database, userId)
+			if readErr != nil {
+				return readErr
+			}
+			if decideErr := administrators.decide(r.Context(), holdsManage); decideErr != nil {
+				return decideErr
+			}
+			if deleteErr := database.DeleteUser(r.Context(), tx, userId); deleteErr != nil {
+				return errs.Wrap(deleteErr, "unable to delete the user")
+			}
+			return administrators.leavesAnAdministrator(r.Context())
+		})
+		if errors.Is(err, errLastAdministrator) {
+			writeLastAdministrator(w)
+			return
+		}
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

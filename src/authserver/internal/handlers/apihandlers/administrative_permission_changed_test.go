@@ -299,7 +299,9 @@ func TestAdministrativePermissionChanged_AUserGroupsSaveRecordsEachAdministrativ
 	database.On("GetGroupsByIds", mock.Anything, (*sql.Tx)(nil), []int64{ordinaryGroupId, administrativeGroupId}).
 		Return([]record.Group{{Id: ordinaryGroupId}, {Id: administrativeGroupId}}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, userGroupsTx)
+	expectAdministratorsLock(database, userGroupsTx)
 	expectStoredMemberships(database, membershipRow{id: ceilingMembershipRowId, groupId: adminReadGroupId})
+	expectGuardOfGroup(database, userGroupsTx, adminReadGroupId)
 	database.On("DeleteUserGroup", mock.Anything, userGroupsTx, ceilingMembershipRowId).Return(nil).Once()
 	database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.Anything).Return(nil).Twice()
 	expectGroupPermissionsOn(database, userGroupsTx, ordinaryGroupId, administrativeGroupId, adminReadGroupId)
@@ -348,6 +350,7 @@ func TestAdministrativePermissionChanged_AFailedReadInTheUserGroupsSaveCommitsNo
 	database.On("GetGroupsByIds", mock.Anything, (*sql.Tx)(nil), []int64{administrativeGroupId}).
 		Return([]record.Group{{Id: administrativeGroupId}}, nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, userGroupsTx)
+	expectAdministratorsLock(database, userGroupsTx)
 	expectStoredMemberships(database)
 	database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.Anything).Return(nil).Once()
 	readErr := errors.New("the read failed")

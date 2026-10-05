@@ -606,6 +606,12 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 					out[409] = true
 					out[500] = true
 				}
+				// writeLastAdministrator answers 409 LAST_ADMINISTRATOR for a write that would
+				// leave no enabled user holding authserver:manage, so the six writes the guard
+				// covers name no constant for it (#402 decision 12).
+				if f.Name == "writeLastAdministrator" {
+					out[409] = true
+				}
 			case *ast.SelectorExpr:
 				switch f.Sel.Name {
 				case "InternalServerError", "JSONError":

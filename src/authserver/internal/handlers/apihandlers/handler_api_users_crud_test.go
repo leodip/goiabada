@@ -105,6 +105,7 @@ func TestHandleUserEnabledPut_RevocationConditionality(t *testing.T) {
 					Return(tc.transitioned, nil).Once()
 			} else {
 				stub = datamocks.ExpectRunInTransaction(database, apiRevokeTx)
+				expectGuardOfOrdinaryUser(database, apiRevokeTx, userId)
 				database.On("TrySetUserEnabled", mock.Anything, apiRevokeTx, userId, true, false).
 					Return(tc.transitioned, nil).Once()
 				if tc.transitioned {
@@ -182,6 +183,7 @@ func TestHandleUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(&record.User{Id: userId}, nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, apiRevokeTx)
+	expectGuardOfOrdinaryUser(database, apiRevokeTx, userId)
 	database.On("TrySetUserEnabled", mock.Anything, apiRevokeTx, userId, true, false).Return(true, nil).Once()
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).
 		Return(int64(0), assert.AnError).Once()

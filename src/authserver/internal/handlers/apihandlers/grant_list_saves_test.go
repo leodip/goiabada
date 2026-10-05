@@ -55,9 +55,13 @@ type grantSave struct {
 	// consolidatedEvent, when set, is the one event the save emits for the whole save in place of
 	// addedEvent and deletedEvent.
 	consolidatedEvent string
-	ownerKey          string
-	handler           func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.HandlerFunc
-	body              func(t *testing.T, wanted, expected []int64) string
+	// locksAdministrators is a save that can revoke manage from a user, which takes the
+	// administrators' lock as its transaction's first statement (#402 decision 11). A client is
+	// never counted, so the client save takes none.
+	locksAdministrators bool
+	ownerKey            string
+	handler             func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.HandlerFunc
+	body                func(t *testing.T, wanted, expected []int64) string
 }
 
 const grantOwnerId = int64(5)
@@ -83,9 +87,10 @@ var grantSaves = []grantSave{
 			up := arg.(*record.UserPermission)
 			return up.UserId, up.PermissionId
 		},
-		addedEvent:   audit.EventAddedUserPermission,
-		deletedEvent: audit.EventDeletedUserPermission,
-		ownerKey:     "userId",
+		addedEvent:          audit.EventAddedUserPermission,
+		deletedEvent:        audit.EventDeletedUserPermission,
+		locksAdministrators: true,
+		ownerKey:            "userId",
 		handler: func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.HandlerFunc {
 			return HandleUserPermissionsPut(database, auditLogger)
 		},
@@ -116,9 +121,10 @@ var grantSaves = []grantSave{
 			gp := arg.(*record.GroupPermission)
 			return gp.GroupId, gp.PermissionId
 		},
-		addedEvent:   audit.EventAddedGroupPermission,
-		deletedEvent: audit.EventDeletedGroupPermission,
-		ownerKey:     "groupId",
+		addedEvent:          audit.EventAddedGroupPermission,
+		deletedEvent:        audit.EventDeletedGroupPermission,
+		locksAdministrators: true,
+		ownerKey:            "groupId",
 		handler: func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.HandlerFunc {
 			return HandleGroupPermissionsPut(database, auditLogger)
 		},
@@ -205,9 +211,19 @@ func expectPermissionsExist(database *datamocks.Database, permissionIds ...int64
 	}
 }
 
-// expectStored registers the read of the stored grants on the save's transaction.
+// expectStored registers the read of the stored grants on the save's transaction, after the
+// administrators' lock for a save that takes it. None of the permissions the cases here grant or
+// revoke is manage, so the guard counts nothing.
 func (s grantSave) expectStored(database *datamocks.Database, rows ...grantRow) {
+	s.expectLock(database)
 	database.On(s.readMethod, mock.Anything, grantsTx, grantOwnerId).Return(s.storedRows(rows), nil).Once()
+}
+
+// expectLock registers the administrators' lock on the save's transaction, for a save that takes it.
+func (s grantSave) expectLock(database *datamocks.Database) {
+	if s.locksAdministrators {
+		expectAdministratorsLock(database, grantsTx)
+	}
 }
 
 // auditRecord is one audit event as a case reads it, the event and the permission it names, in the
@@ -400,6 +416,7 @@ func TestGrantListSaves_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
 					expectAuthServerPermissions(database)
 				}
 				stub := datamocks.ExpectRunInTransaction(database, grantsTx)
+				save.expectLock(database)
 				loadErr := errors.New("the read failed")
 				database.On(save.readMethod, mock.Anything, grantsTx, grantOwnerId).Return(nil, loadErr).Once()
 
@@ -445,7 +462,11 @@ func TestGrantListSaves_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
 				}
 			}).Once()
 
-			// Both attempts read the grants afresh and withdraw permission 3.
+			// Both attempts take the administrators' lock, read the grants afresh and withdraw
+			// permission 3.
+			if save.locksAdministrators {
+				database.On("AcquireManagePermissionRow", mock.Anything, grantsTx).Return(permManage, nil).Twice()
+			}
 			database.On(save.readMethod, mock.Anything, grantsTx, grantOwnerId).
 				Return(save.storedRows([]grantRow{{id: 21, permissionId: 3}}), nil).Twice()
 			database.On(save.deleteMethod, mock.Anything, grantsTx, int64(21)).Return(nil).Twice()

@@ -348,8 +348,8 @@ var userTargetWrites = []targetWrite{
 			return rr
 		},
 		expectReads:      func(database *datamocks.Database, _ bool) { expectTargetUser(database, nil) },
-		writes:           []string{"DeleteUser"},
-		expectFirstWrite: failingWrite("DeleteUser", mock.Anything, (*sql.Tx)(nil), targetUserId),
+		writes:           []string{"RunInTransaction", "DeleteUser"},
+		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
 	},
 	{
 		name: "POST /user-attributes",
@@ -520,8 +520,8 @@ var userTargetWrites = []targetWrite{
 			expectGroupPermissions(database, ordinaryGroupId)
 			expectAuthServerPermissions(database)
 		},
-		writes:           []string{"DeleteUserGroup"},
-		expectFirstWrite: failingWrite("DeleteUserGroup", mock.Anything, (*sql.Tx)(nil), targetMembershipId),
+		writes:           []string{"RunInTransaction", "DeleteUserGroup"},
+		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
 	},
 }
 

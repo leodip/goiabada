@@ -106,9 +106,41 @@ func HandleDeletePost(
 			return
 		}
 
+		// A refusal the administrator can resolve, 409 LAST_ADMINISTRATOR when the user is the last
+		// one holding manage, is shown on the confirmation page again rather than as the 500 page
+		// (#402 decision 12).
+		renderError := func(message string) {
+			user, getErr := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+			if getErr != nil {
+				render.HandleAPIError(httpHelper, w, r, getErr)
+				return
+			}
+			if user == nil {
+				httpHelper.NotFound(w, r)
+				return
+			}
+			_, groups, getErr := apiClient.GetUserGroups(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+			if getErr != nil {
+				render.HandleAPIError(httpHelper, w, r, getErr)
+				return
+			}
+
+			bind := map[string]interface{}{
+				"user":         user,
+				"userFullName": render.UserFullName(user),
+				"groups":       groups,
+				"page":         r.URL.Query().Get("page"),
+				"query":        r.URL.Query().Get("query"),
+				"error":        message,
+			}
+			if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_delete.html", bind); renderErr != nil {
+				httpHelper.InternalServerError(w, r, renderErr)
+			}
+		}
+
 		err = apiClient.DeleteUser(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			render.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 
