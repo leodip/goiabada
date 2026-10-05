@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
@@ -49,8 +50,10 @@ type TokenClient struct {
 
 // NewTokenClient builds the token client. A nil HTTP client gets NewAuthServerHTTPClient's,
 // so the deadline holds however the composition root wires this; the composition root passes
-// its own so every call to the auth server shares one configured client (#338).
-func NewTokenClient(tokenURL, clientID, clientSecret string, httpClient *http.Client) *TokenClient {
+// its own so every call to the auth server shares one configured client (#338). Every grant it
+// posts is recorded by upstream under the token target, through a copy of that client, so the JWKS
+// fetch sharing it is not labelled as a grant (#400 decision 6).
+func NewTokenClient(tokenURL, clientID, clientSecret string, httpClient *http.Client, upstream *upstreammetrics.Recorder) *TokenClient {
 	if httpClient == nil {
 		httpClient = NewAuthServerHTTPClient()
 	}
@@ -58,7 +61,7 @@ func NewTokenClient(tokenURL, clientID, clientSecret string, httpClient *http.Cl
 		tokenURL:     tokenURL,
 		clientID:     clientID,
 		clientSecret: clientSecret,
-		httpClient:   httpClient,
+		httpClient:   upstream.Client(upstreammetrics.Token, httpClient),
 	}
 }
 

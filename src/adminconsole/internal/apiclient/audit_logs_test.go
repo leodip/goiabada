@@ -52,7 +52,7 @@ func TestGetAuditLogsPaginated_BothFiltersReachTheServerEscaped(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := NewAuthServerClient(server.URL)
+			client := NewAuthServerClient(server.URL, nil)
 			resp, err := client.GetAuditLogsPaginated(context.Background(), "an-access-token", 1, 20, tc.auditEvent, tc.requestId)
 			require.NoError(t, err)
 			require.NotNil(t, resp)
@@ -103,7 +103,7 @@ func TestGetAuditEventTypes_RequestsTheCatalogAndCarriesTheToken(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewAuthServerClient(server.URL)
+	client := NewAuthServerClient(server.URL, nil)
 	resp, err := client.GetAuditEventTypes(context.Background(), "an-access-token")
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -135,7 +135,7 @@ func TestGetAuditEventTypes_ARefusalIsAnError(t *testing.T) {
 			}))
 			defer server.Close()
 
-			resp, err := NewAuthServerClient(server.URL).GetAuditEventTypes(context.Background(), "an-access-token")
+			resp, err := NewAuthServerClient(server.URL, nil).GetAuditEventTypes(context.Background(), "an-access-token")
 			require.Error(t, err)
 			assert.Nil(t, resp, "a refused catalog must not come back as an empty one")
 

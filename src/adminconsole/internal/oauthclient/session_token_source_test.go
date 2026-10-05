@@ -76,7 +76,7 @@ func issues(expiresIn int64) func(http.ResponseWriter, int) {
 
 func newTestTokenSource(stub *tokenStub) *SessionTokenSource {
 	return NewSessionTokenSource(
-		NewTokenClient(stub.server.URL+"/auth/token", "admin-console-client", "the-secret", nil))
+		NewTokenClient(stub.server.URL+"/auth/token", "admin-console-client", "the-secret", nil, nil))
 }
 
 // TestSessionTokenSource_RequestsClientCredentialsWithTheNarrowScope is decision 16's shape

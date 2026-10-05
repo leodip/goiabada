@@ -54,7 +54,7 @@ func newIDTokenFixture(t *testing.T, issuer string) *idTokenFixture {
 		key:      key,
 		attacker: attacker,
 		server:   server.URL,
-		parser:   oauthclient.NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(issuer)),
+		parser:   oauthclient.NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(issuer)),
 	}
 }
 
@@ -64,7 +64,7 @@ func (f *idTokenFixture) parserExpecting(issuer string) *oauthclient.JWKSTokenPa
 }
 
 func (f *idTokenFixture) parserFor(clientID, issuer string) *oauthclient.JWKSTokenParser {
-	return oauthclient.NewJWKSTokenParser(f.server, nil, clientID, oauthclienttest.StaticIssuer(issuer))
+	return oauthclient.NewJWKSTokenParser(f.server, nil, nil, clientID, oauthclienttest.StaticIssuer(issuer))
 }
 
 func (f *idTokenFixture) sign(t *testing.T, claims jwt.MapClaims) string {

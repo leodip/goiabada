@@ -25,7 +25,7 @@ import (
 )
 
 func TestJWKSTokenParserRejectsNonRS256Token(t *testing.T) {
-	tp := NewJWKSTokenParser("https://auth.example.com", nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	claims := jwt.MapClaims{
 		"sub": "1234567890",
@@ -70,7 +70,7 @@ func TestNewJWKSTokenParser_BuildsCertsURL(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tp := NewJWKSTokenParser(tc.baseURL, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+			tp := NewJWKSTokenParser(tc.baseURL, nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 			assert.Equal(t, tc.want, tp.jwksURL)
 		})
@@ -78,7 +78,7 @@ func TestNewJWKSTokenParser_BuildsCertsURL(t *testing.T) {
 }
 
 func TestNewJWKSTokenParser_DefaultsHttpClient(t *testing.T) {
-	tp := NewJWKSTokenParser("https://auth.example.com", nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 	require.NotNil(t, tp.httpClient)
 	// The value, not merely a client: a nil client used to mean an unbounded one, and
 	// asserting non-nil alone leaves restoring `&http.Client{}` green. This is the same
@@ -88,7 +88,7 @@ func TestNewJWKSTokenParser_DefaultsHttpClient(t *testing.T) {
 		"a nil client gets the deadline rather than no deadline")
 
 	custom := &http.Client{Timeout: time.Second}
-	tp = NewJWKSTokenParser("https://auth.example.com", custom, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp = NewJWKSTokenParser("https://auth.example.com", custom, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 	assert.Same(t, custom, tp.httpClient)
 }
 
@@ -99,7 +99,7 @@ func TestNewJWKSTokenParser_DefaultsHttpClient(t *testing.T) {
 func TestJWKSTokenParser_AcceptsTokenSignedByPublishedKey(t *testing.T) {
 	key, _ := oauthclienttest.Keys(t)
 	server, hits := oauthclienttest.NewJwksServer(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
-	tp := NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	tokenString := oauthclienttest.SignRS256(t, key, "key-1", oauthclienttest.ValidClaims())
 
@@ -117,7 +117,7 @@ func TestJWKSTokenParser_AcceptsTokenSignedByPublishedKey(t *testing.T) {
 func TestJWKSTokenParser_CachesJwksAcrossCalls(t *testing.T) {
 	key, _ := oauthclienttest.Keys(t)
 	server, hits := oauthclienttest.NewJwksServer(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
-	tp := NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	for i := 0; i < 3; i++ {
 		_, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "key-1", oauthclienttest.ValidClaims()))
@@ -132,7 +132,7 @@ func TestJWKSTokenParser_CachesJwksAcrossCalls(t *testing.T) {
 func TestJWKSTokenParser_TokenWithoutKidUsesTheOnlyPublishedKey(t *testing.T) {
 	key, _ := oauthclienttest.Keys(t)
 	server, _ := oauthclienttest.NewJwksServer(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
-	tp := NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "", oauthclienttest.ValidClaims()))
 
@@ -147,7 +147,7 @@ func TestJWKSTokenParser_SelectsCorrectKeyWhenSeveralArePublished(t *testing.T) 
 		oauthclienttest.JwkFromPublicKey("key-1", &attacker.PublicKey),
 		oauthclienttest.JwkFromPublicKey("key-2", &key.PublicKey),
 	)
-	tp := NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "key-2", oauthclienttest.ValidClaims()))
 
@@ -169,7 +169,7 @@ func TestJWKSTokenParser_SelectsCorrectKeyWhenSeveralArePublished(t *testing.T) 
 func newWarmParser(t *testing.T, server *oauthclienttest.JwksServer, token string) (*JWKSTokenParser, *oauthclienttest.Clock) {
 	t.Helper()
 	clock := oauthclienttest.NewClock()
-	tp := NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID,
+	tp := NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID,
 		oauthclienttest.StaticIssuer(oauthclienttest.Issuer), WithClock(clock.Now))
 	_, err := tp.DecodeAndValidateStoredIDToken(context.Background(), token)
 	require.NoError(t, err, "the token verifies while its key is published")
@@ -332,7 +332,7 @@ func TestJWKSTokenParser_AnUnfamiliarKidRefetchesWithinTheAge(t *testing.T) {
 func TestRefreshJwksSince_UsesAFetchThatLandedWhileItWaited(t *testing.T) {
 	key, _ := oauthclienttest.Keys(t)
 	server := oauthclienttest.NewMutableJwksServer(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
-	tp := NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	require.NoError(t, tp.refreshJwksSince(context.Background(), 0))
 	assert.Equal(t, int32(1), server.Hits.Load(), "the caller's generation was current, so it fetched")
@@ -385,7 +385,7 @@ func TestJWKSTokenParser_ChecksThatFindTheCachePastItsAgeTogetherFetchOnce(t *te
 func TestJWKSTokenParser_RejectsTokenSignedByUnpublishedKey(t *testing.T) {
 	key, attacker := oauthclienttest.Keys(t)
 	server, _ := oauthclienttest.NewJwksServer(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
-	tp := NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	// Signed by the attacker but claiming to be key-1.
 	forged := oauthclienttest.SignRS256(t, attacker, "key-1", oauthclienttest.ValidClaims())
@@ -400,7 +400,7 @@ func TestJWKSTokenParser_RejectsTokenSignedByUnpublishedKey(t *testing.T) {
 func TestJWKSTokenParser_RejectsUnknownKid(t *testing.T) {
 	key, _ := oauthclienttest.Keys(t)
 	server, hits := oauthclienttest.NewJwksServer(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
-	tp := NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "key-does-not-exist", oauthclienttest.ValidClaims()))
 
@@ -418,7 +418,7 @@ func TestJWKSTokenParser_RejectsTokenWithoutKidWhenSeveralKeysArePublished(t *te
 		oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey),
 		oauthclienttest.JwkFromPublicKey("key-2", &attacker.PublicKey),
 	)
-	tp := NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "", oauthclienttest.ValidClaims()))
 
@@ -428,7 +428,7 @@ func TestJWKSTokenParser_RejectsTokenWithoutKidWhenSeveralKeysArePublished(t *te
 }
 
 func TestJWKSTokenParser_RejectsMalformedToken(t *testing.T) {
-	tp := NewJWKSTokenParser("https://auth.example.com", nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	for _, tokenString := range []string{"not-a-jwt", "a.b", "a.b.c", "...."} {
 		t.Run(tokenString, func(t *testing.T) {
@@ -453,7 +453,7 @@ func TestJWKSTokenParser_JwksEndpointReturnsNonOK(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	t.Cleanup(server.Close)
-	tp := NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "key-1", oauthclienttest.ValidClaims()))
 
@@ -468,7 +468,7 @@ func TestJWKSTokenParser_JwksEndpointReturnsInvalidJson(t *testing.T) {
 		_, _ = w.Write([]byte("this is not json"))
 	}))
 	t.Cleanup(server.Close)
-	tp := NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "key-1", oauthclienttest.ValidClaims()))
 
@@ -483,7 +483,7 @@ func TestJWKSTokenParser_JwksEndpointUnreachable(t *testing.T) {
 	serverURL := server.URL
 	server.Close() // nothing is listening any more
 
-	tp := NewJWKSTokenParser(serverURL, &http.Client{Timeout: 2 * time.Second}, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser(serverURL, &http.Client{Timeout: 2 * time.Second}, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), tokenString)
 
@@ -494,7 +494,7 @@ func TestJWKSTokenParser_JwksEndpointUnreachable(t *testing.T) {
 func TestJWKSTokenParser_JwksEndpointReturnsEmptyKeySet(t *testing.T) {
 	key, _ := oauthclienttest.Keys(t)
 	server, _ := oauthclienttest.NewJwksServer(t) // no keys
-	tp := NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "key-1", oauthclienttest.ValidClaims()))
 
@@ -506,7 +506,7 @@ func TestJWKSTokenParser_JwksEndpointReturnsEmptyKeySet(t *testing.T) {
 func TestJWKSTokenParser_RefreshJwksStoresKeys(t *testing.T) {
 	key, _ := oauthclienttest.Keys(t)
 	server, _ := oauthclienttest.NewJwksServer(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
-	tp := NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	assert.Empty(t, tp.cachedJwks.Keys)
 
@@ -519,7 +519,7 @@ func TestJWKSTokenParser_RefreshJwksStoresKeys(t *testing.T) {
 
 // A malformed jwksURL fails at request construction, before any network call.
 func TestJWKSTokenParser_RefreshJwksInvalidURL(t *testing.T) {
-	tp := NewJWKSTokenParser("http://\x7f-invalid", nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp := NewJWKSTokenParser("http://\x7f-invalid", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	err := tp.refreshJwks(context.Background())
 
@@ -603,14 +603,14 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 	key, attacker := oauthclienttest.Keys(t)
 
 	t.Run("empty cache returns nil", func(t *testing.T) {
-		tp := NewJWKSTokenParser("https://auth.example.com", nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 		assert.Nil(t, tp.getPublicKeyFromCache("key-1"))
 		assert.Nil(t, tp.getPublicKeyFromCache(""))
 	})
 
 	t.Run("matching kid returns the key", func(t *testing.T) {
-		tp := NewJWKSTokenParser("https://auth.example.com", nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey)}}
 
 		pub := tp.getPublicKeyFromCache("key-1")
@@ -620,14 +620,14 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 	})
 
 	t.Run("non-matching kid returns nil", func(t *testing.T) {
-		tp := NewJWKSTokenParser("https://auth.example.com", nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey)}}
 
 		assert.Nil(t, tp.getPublicKeyFromCache("key-2"))
 	})
 
 	t.Run("empty kid with a single key returns that key", func(t *testing.T) {
-		tp := NewJWKSTokenParser("https://auth.example.com", nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey)}}
 
 		pub := tp.getPublicKeyFromCache("")
@@ -637,7 +637,7 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 	})
 
 	t.Run("empty kid with several keys returns nil", func(t *testing.T) {
-		tp := NewJWKSTokenParser("https://auth.example.com", nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{
 			oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey),
 			oauthclienttest.JwkFromPublicKey("key-2", &attacker.PublicKey),
@@ -647,14 +647,14 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 	})
 
 	t.Run("empty kid with a single undecodable key returns nil", func(t *testing.T) {
-		tp := NewJWKSTokenParser("https://auth.example.com", nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{{Kty: "EC", Kid: "key-1"}}}
 
 		assert.Nil(t, tp.getPublicKeyFromCache(""))
 	})
 
 	t.Run("matching kid on an undecodable key returns nil", func(t *testing.T) {
-		tp := NewJWKSTokenParser("https://auth.example.com", nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{{Kty: "EC", Kid: "key-1"}}}
 
 		assert.Nil(t, tp.getPublicKeyFromCache("key-1"))
@@ -694,7 +694,8 @@ func TestRefreshJwks_RefusesADocumentOverTheCap(t *testing.T) {
 	body := oversizedJwks(t)
 
 	tp := NewJWKSTokenParser("https://auth.example.com",
-		clientReturning(http.StatusOK, body), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+		clientReturning(http.StatusOK, body), nil,
+		oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	err := tp.refreshJwks(context.Background())
 
@@ -725,7 +726,8 @@ func TestRefreshJwks_AcceptsADocumentOfExactlyTheCap(t *testing.T) {
 	require.Len(t, encoded, MaxTokenResponseBytes)
 
 	tp := NewJWKSTokenParser("https://auth.example.com",
-		clientReturning(http.StatusOK, io.NopCloser(bytes.NewReader(encoded))), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+		clientReturning(http.StatusOK, io.NopCloser(bytes.NewReader(encoded))), nil,
+		oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	require.NoError(t, tp.refreshJwks(context.Background()))
 	require.Len(t, tp.cachedJwks.Keys, 1)
@@ -743,7 +745,8 @@ func TestRefreshJwks_AcceptsADocumentUnderTheCap(t *testing.T) {
 	require.Less(t, len(encoded), MaxTokenResponseBytes)
 
 	tp := NewJWKSTokenParser("https://auth.example.com",
-		clientReturning(http.StatusOK, io.NopCloser(bytes.NewReader(encoded))), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+		clientReturning(http.StatusOK, io.NopCloser(bytes.NewReader(encoded))), nil,
+		oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	require.NoError(t, tp.refreshJwks(context.Background()))
 	require.Len(t, tp.cachedJwks.Keys, 1)

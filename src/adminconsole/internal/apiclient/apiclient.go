@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -59,11 +60,13 @@ func parseAPIError(resp *http.Response, body []byte) *APIError {
 	}
 }
 
-func NewAuthServerClient(authServerBaseURL string) *AuthServerClient {
+// NewAuthServerClient builds the client, every call its executor makes recorded by upstream under
+// the admin_api target, one target for all of its methods (#400 decision 6).
+func NewAuthServerClient(authServerBaseURL string, upstream *upstreammetrics.Recorder) *AuthServerClient {
 	return &AuthServerClient{
 		baseURL: authServerBaseURL,
-		httpClient: &http.Client{
+		httpClient: upstream.Client(upstreammetrics.AdminAPI, &http.Client{
 			Timeout: generalAPITimeout,
-		},
+		}),
 	}
 }

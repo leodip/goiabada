@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/metrics"
 )
 
 // TestInitMiddleware_RefusalsAreLocalized makes the claim no unit test of any one
@@ -36,8 +37,9 @@ func TestInitMiddleware_RefusalsAreLocalized(t *testing.T) {
 		s := &Server{
 			router:        chi.NewRouter(),
 			sessionStore:  newTestSessionStore(),
-			settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer), publicsettings.DefaultTTL),
+			settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 			cfg:           &config.Config{},
+			metrics:       metrics.NewRegistry(),
 		}
 		app := s.initMiddleware()
 		app.Get("/admin/clients", func(w http.ResponseWriter, _ *http.Request) {

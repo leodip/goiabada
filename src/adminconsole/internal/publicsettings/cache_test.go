@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -124,7 +125,7 @@ func appNameOf(t *testing.T, c *Cache) string {
 
 func TestCache_AHitWithinTheTTLDoesNotFetchAgain(t *testing.T) {
 	fetcher := newFakeFetcher(fetchAnswer{appName: "first"}, fetchAnswer{appName: "second"})
-	cache := NewCache(fetcher, time.Hour)
+	cache := NewCache(fetcher, time.Hour, metrics.NewRegistry())
 
 	assert.Equal(t, "first", appNameOf(t, cache))
 	assert.Equal(t, "first", appNameOf(t, cache), "the cached value, not a second fetch's")
@@ -135,7 +136,7 @@ func TestCache_AHitWithinTheTTLDoesNotFetchAgain(t *testing.T) {
 // says now.
 func TestCache_AnExpiredValueIsFetchedAgain(t *testing.T) {
 	fetcher := newFakeFetcher(fetchAnswer{appName: "first"}, fetchAnswer{appName: "second"})
-	cache := NewCache(fetcher, time.Millisecond)
+	cache := NewCache(fetcher, time.Millisecond, metrics.NewRegistry())
 
 	assert.Equal(t, "first", appNameOf(t, cache))
 	time.Sleep(10 * time.Millisecond)
@@ -145,7 +146,7 @@ func TestCache_AnExpiredValueIsFetchedAgain(t *testing.T) {
 
 func TestCache_InvalidateForcesAFetchOnTheNextGet(t *testing.T) {
 	fetcher := newFakeFetcher(fetchAnswer{appName: "before the save"}, fetchAnswer{appName: "after the save"})
-	cache := NewCache(fetcher, time.Hour)
+	cache := NewCache(fetcher, time.Hour, metrics.NewRegistry())
 
 	assert.Equal(t, "before the save", appNameOf(t, cache))
 	cache.Invalidate()
@@ -158,7 +159,7 @@ func TestCache_InvalidateForcesAFetchOnTheNextGet(t *testing.T) {
 func TestCache_AFailureIsNotCached(t *testing.T) {
 	refused := errors.New("the auth server is down")
 	fetcher := newFakeFetcher(fetchAnswer{err: refused}, fetchAnswer{appName: "back"})
-	cache := NewCache(fetcher, time.Hour)
+	cache := NewCache(fetcher, time.Hour, metrics.NewRegistry())
 
 	settings, err := cache.Get(context.Background())
 	assert.ErrorIs(t, err, refused)
@@ -174,7 +175,7 @@ func TestCache_AFailureIsNotCached(t *testing.T) {
 func TestCache_ConcurrentMissesShareOneFetch(t *testing.T) {
 	release := make(chan struct{})
 	fetcher := newFakeFetcher(fetchAnswer{appName: "shared", release: release})
-	cache := NewCache(fetcher, time.Hour)
+	cache := NewCache(fetcher, time.Hour, metrics.NewRegistry())
 
 	first := getAsync(cache, context.Background())
 	fetcher.awaitFetchStart(t)
@@ -201,7 +202,7 @@ func TestCache_ConcurrentMissesShareOneFailure(t *testing.T) {
 	release := make(chan struct{})
 	refused := errors.New("the auth server is down")
 	fetcher := newFakeFetcher(fetchAnswer{err: refused, release: release}, fetchAnswer{appName: "back"})
-	cache := NewCache(fetcher, time.Hour)
+	cache := NewCache(fetcher, time.Hour, metrics.NewRegistry())
 
 	first := getAsync(cache, context.Background())
 	fetcher.awaitFetchStart(t)
@@ -223,7 +224,7 @@ func TestCache_ConcurrentMissesShareOneFailure(t *testing.T) {
 func TestCache_AWaiterWhoseRequestEndsStopsWaitingWhileTheFetchServesTheOthers(t *testing.T) {
 	release := make(chan struct{})
 	fetcher := newFakeFetcher(fetchAnswer{appName: "served", release: release})
-	cache := NewCache(fetcher, time.Hour)
+	cache := NewCache(fetcher, time.Hour, metrics.NewRegistry())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	leaving := getAsync(cache, ctx)
@@ -262,7 +263,7 @@ func TestCache_AnInvalidateDuringAFetchIsNotUndoneByIt(t *testing.T) {
 		fetchAnswer{appName: "before the save", release: release},
 		fetchAnswer{appName: "after the save"},
 	)
-	cache := NewCache(fetcher, time.Hour)
+	cache := NewCache(fetcher, time.Hour, metrics.NewRegistry())
 
 	inFlight := getAsync(cache, context.Background())
 	fetcher.awaitFetchStart(t)
@@ -297,7 +298,7 @@ func TestCache_AGetAfterAnInvalidateDoesNotJoinTheEarlierFetch(t *testing.T) {
 		fetchAnswer{appName: "before the save", release: release},
 		fetchAnswer{appName: "after the save"},
 	)
-	cache := NewCache(fetcher, time.Hour)
+	cache := NewCache(fetcher, time.Hour, metrics.NewRegistry())
 
 	inFlight := getAsync(cache, context.Background())
 	fetcher.awaitFetchStart(t)
@@ -335,7 +336,7 @@ func TestCache_AnEarlierFetchEndingLeavesTheLaterOneShared(t *testing.T) {
 		fetchAnswer{appName: "after the save", release: releaseLater},
 		fetchAnswer{appName: "a third fetch"},
 	)
-	cache := NewCache(fetcher, time.Hour)
+	cache := NewCache(fetcher, time.Hour, metrics.NewRegistry())
 
 	earlier := getAsync(cache, context.Background())
 	fetcher.awaitFetchStart(t)

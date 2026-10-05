@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
@@ -77,14 +78,16 @@ func WithClock(now func() time.Time) ParserOption {
 // NewJWKSTokenParser creates a JWKS-based token parser. The baseURL should be the
 // reachable base URL for the auth server (InternalBaseURL if set, otherwise BaseURL).
 // clientID is the console's client identifier, the one audience an ID token may name, and
-// issuer answers the issuer an ID token must name.
-func NewJWKSTokenParser(baseURL string, httpClient *http.Client, clientID string, issuer issuerReader, opts ...ParserOption) *JWKSTokenParser {
+// issuer answers the issuer an ID token must name. Every fetch of /certs is recorded by upstream
+// under the jwks target, through a copy of httpClient, which the token client shares (#400
+// decision 6).
+func NewJWKSTokenParser(baseURL string, httpClient *http.Client, upstream *upstreammetrics.Recorder, clientID string, issuer issuerReader, opts ...ParserOption) *JWKSTokenParser {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: TokenExchangeTimeout}
 	}
 	tp := &JWKSTokenParser{
 		jwksURL:    strings.TrimRight(baseURL, "/") + "/certs",
-		httpClient: httpClient,
+		httpClient: upstream.Client(upstreammetrics.JWKS, httpClient),
 		clientID:   clientID,
 		issuer:     issuer,
 		now:        time.Now,

@@ -378,7 +378,7 @@ See [Customizations](/reference/customizations/) for details on how to customize
 
 ### Metrics
 
-The auth server can serve Prometheus metrics on a listener of its own, which answers `GET /metrics` and nothing else and has no authentication. Keep its port off the internet: publish it through no Service, route or proxy. See [Monitoring](/production-deployment/monitoring/) for what it reports.
+The auth server and the admin console can each serve Prometheus metrics on a listener of their own, which answers `GET /metrics` and nothing else and has no authentication. Keep their ports off the internet: publish them through no Service, route or proxy. See [Monitoring](/production-deployment/monitoring/) for what they report.
 
 <table>
   <thead>
@@ -403,6 +403,21 @@ The auth server can serve Prometheus metrics on a listener of its own, which ans
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS</code><br/><code>--authserver-listen-port-metrics</code></td>
       <td><code>9190</code></td>
       <td>Metrics listener port. A port the server cannot bind stops it at startup, as the other listeners' ports do.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_METRICS_ENABLED</code><br/><code>--adminconsole-metrics-enabled</code></td>
+      <td><code>false</code></td>
+      <td>Serve the admin console's metrics listener. Off, nothing listens on its port.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS</code><br/><code>--adminconsole-listen-host-metrics</code></td>
+      <td><code>0.0.0.0</code></td>
+      <td>Admin console metrics listener bind address, read as the other listen hosts are. The default matches theirs because a scraper in another container or pod arrives over the network; set <code>127.0.0.1</code> when the scraper runs on the same host. See <a href="#listen-addresses-and-ipv6">Listen addresses and IPv6</a></td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS</code><br/><code>--adminconsole-listen-port-metrics</code></td>
+      <td><code>9191</code></td>
+      <td>Admin console metrics listener port. A port the console cannot bind stops it at startup, as the other listeners' ports do.</td>
     </tr>
   </tbody>
 </table>

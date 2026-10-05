@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/stretchr/testify/assert"
@@ -90,8 +91,9 @@ func newStaticBranchTestServer(authServerBaseURL string, store *sessionstore.Ser
 	return &Server{
 		router:        chi.NewRouter(),
 		sessionStore:  store,
-		settingsCache: publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL), publicsettings.DefaultTTL),
+		settingsCache: publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 		cfg:           &config.Config{},
+		metrics:       metrics.NewRegistry(),
 		staticFS:      fstest.MapFS{"probe.css": &fstest.MapFile{Data: []byte("body{}")}},
 	}
 }

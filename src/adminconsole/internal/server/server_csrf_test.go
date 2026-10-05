@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/metrics"
 )
 
 // TestInitMiddleware_CsrfIsRegistered makes the claim the CSRF unit tables in
@@ -40,8 +41,9 @@ func TestInitMiddleware_CsrfIsRegistered(t *testing.T) {
 		s := &Server{
 			router:        chi.NewRouter(),
 			sessionStore:  newTestSessionStore(),
-			settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer), publicsettings.DefaultTTL),
+			settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 			cfg:           &config.Config{},
+			metrics:       metrics.NewRegistry(),
 		}
 		s.initMiddleware()
 		s.router.Post("/admin/clients", func(w http.ResponseWriter, _ *http.Request) {
@@ -199,8 +201,9 @@ func csrfProbe(t *testing.T, path string, headers map[string]string) *httptest.R
 	s := &Server{
 		router:        chi.NewRouter(),
 		sessionStore:  newTestSessionStore(),
-		settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer), publicsettings.DefaultTTL),
+		settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 		cfg:           &config.Config{},
+		metrics:       metrics.NewRegistry(),
 	}
 	s.initMiddleware()
 

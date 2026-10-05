@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/metrics"
 )
 
 // TestInitMiddleware_RequestLoggerIsRegistered makes the claim the unit table in
@@ -55,8 +56,9 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 	s := &Server{
 		router:        chi.NewRouter(),
 		sessionStore:  newTestSessionStore(),
-		settingsCache: publicsettings.NewCache(publicsettings.NewClient(authServer.URL), publicsettings.DefaultTTL),
+		settingsCache: publicsettings.NewCache(publicsettings.NewClient(authServer.URL, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 		cfg:           &config.Config{AdminConsole: config.AdminConsoleConfig{LogHttpRequests: logHttpRequests}},
+		metrics:       metrics.NewRegistry(),
 	}
 	s.initMiddleware()
 	s.router.Get("/admin/clients", func(w http.ResponseWriter, _ *http.Request) {

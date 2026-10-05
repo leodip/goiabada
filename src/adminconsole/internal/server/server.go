@@ -25,10 +25,12 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
+	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/metrics"
 )
 
 type Server struct {
@@ -55,11 +57,19 @@ type Server struct {
 	// shares the HTTP client (#441).
 	authServerHTTPClient *http.Client
 	tokenClient          *oauthclient.TokenClient
+
+	// The families this console exposes on its metrics listener (#400 decision 6). main creates the
+	// registry, because the clients it builds before the server, the session backend's, the token
+	// client's and the settings cache's, register and record on it; NewServer adds the build stamp
+	// and the runtime gauges, and initMiddleware the HTTP requests. upstream is the recorder main
+	// registered, which the route table hands the admin API client and the JWKS fetch.
+	metrics  *metrics.Registry
+	upstream *upstreammetrics.Recorder
 }
 
 func NewServer(router *chi.Mux, sessionStore *sessionstore.ServerSideStore, settingsCache *publicsettings.Cache,
 	trustedProxies []*net.IPNet, cfg *config.Config, authServerHTTPClient *http.Client,
-	tokenClient *oauthclient.TokenClient) *Server {
+	tokenClient *oauthclient.TokenClient, registry *metrics.Registry, upstream *upstreammetrics.Recorder) *Server {
 
 	s := Server{
 		router:        router,
@@ -72,7 +82,12 @@ func NewServer(router *chi.Mux, sessionStore *sessionstore.ServerSideStore, sett
 
 		authServerHTTPClient: authServerHTTPClient,
 		tokenClient:          tokenClient,
+
+		metrics:  registry,
+		upstream: upstream,
 	}
+	metrics.RegisterBuildInfo(s.metrics)
+	metrics.RegisterRuntime(s.metrics)
 
 	if envVar := cfg.AdminConsole.StaticDir; len(envVar) == 0 {
 		s.staticFS = web.StaticFS()
@@ -127,6 +142,17 @@ func (s *Server) Start(ctx context.Context) error {
 		logHttpWithoutTlsWarning()
 	}
 
+	// The metrics listener is enabled by its own setting rather than by a host and port, since its
+	// defaults are both set; it does not count as a listener below, because it answers no client.
+	metricsEnabled := s.cfg.AdminConsole.MetricsEnabled
+	metricsHost := s.cfg.AdminConsole.ListenHostMetrics
+	metricsPort := s.cfg.AdminConsole.ListenPortMetrics
+
+	slog.InfoContext(ctx, "metrics listener configuration",
+		"enabled", metricsEnabled,
+		"host", metricsHost,
+		"port", metricsPort)
+
 	// Refused before anything is built, so a process about to exit builds no routes first.
 	if !httpsEnabled && !httpEnabled {
 		return errs.New("no listener is enabled, so the admin console cannot start: configure at least one of the http and https listeners")
@@ -157,7 +183,31 @@ func (s *Server) Start(ctx context.Context) error {
 		slog.InfoContext(ctx, "starting the http listener", "host", httpHost, "port", httpPort)
 	}
 
+	// Built by the same constructor, so it carries the same bounds, and drained with the others, so
+	// a scrape in flight at shutdown is answered. A port it cannot bind stops the console as theirs
+	// does (#400 decision 3).
+	if metricsEnabled {
+		metricsServer := newHTTPServer(metricsHost, metricsPort, metricsHandler(s.metrics))
+		listeners = append(listeners, listener{
+			server: metricsServer,
+			serve:  metricsServer.ListenAndServe,
+		})
+		slog.InfoContext(ctx, "starting the metrics listener", "host", metricsHost, "port", metricsPort)
+	}
+
 	return serveAndDrain(ctx, listeners)
+}
+
+// metricsHandler is the metrics listener's whole handler, the auth server's copied rather than
+// shared because each binary owns its listener: a mux of its own answering GET /metrics with reg's
+// exposition and 404 for every other path. It is never Go's default mux, on which the
+// net/http/pprof and expvar packages chi's middleware links register /debug/pprof/ and /debug/vars
+// (#462), and nothing on it passes through the main router's chain, so a scrape is neither logged
+// by the request logger nor counted in the HTTP metrics (#400 decision 3).
+func metricsHandler(reg *metrics.Registry) http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("GET /metrics", reg.Handler())
+	return mux
 }
 
 // listener is one of Start's servers and the call that serves it, which is ListenAndServe or
@@ -365,6 +415,12 @@ func (s *Server) initMiddleware() chi.Router {
 	logHttpRequests := s.cfg.AdminConsole.LogHttpRequests
 	slog.Info("http request logging configured", "enabled", logHttpRequests)
 	s.router.Use(httpmw.RequestLogger(logHttpRequests))
+
+	// HTTP metrics: every request this router answers, by route, method and status. Beside the
+	// request logger and for the same reason, above Recoverer, so a panicking request is counted as
+	// the 500 its client received (#400). The route label's set is this router's own table, read
+	// once at the first request, by which time registerRoutes has registered every route.
+	s.router.Use(metrics.HTTPRequests(s.metrics, s.router))
 
 	// Recoverer, beneath the request logger so the 500 it writes reaches that logger's
 	// wrapped writer and lands in the record (#203).

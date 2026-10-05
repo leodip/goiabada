@@ -29,12 +29,12 @@ func (s *Server) initRoutes(root chi.Router) {
 	authBase := s.cfg.AuthServer.GetEffectiveBaseURL()
 
 	// Initialize all the service dependencies
-	apiClient := apiclient.NewAuthServerClient(authBase)
+	apiClient := apiclient.NewAuthServerClient(authBase, s.upstream)
 
 	// The HTTP client and the token client are main's, the same pair the session token source
 	// was built on, so the sign-in's exchange, the refresh and the client-credentials grant are one
 	// client with one token URL, and the JWKS fetch shares its HTTP client (#441).
-	tokenParser := oauthclient.NewJWKSTokenParser(authBase, s.authServerHTTPClient, builtin.AdminConsoleClientIdentifier, middleware.SettingsReader{})
+	tokenParser := oauthclient.NewJWKSTokenParser(authBase, s.authServerHTTPClient, s.upstream, builtin.AdminConsoleClientIdentifier, middleware.SettingsReader{})
 	tokenClient := s.tokenClient
 
 	identifierValidator := inputvalidation.NewIdentifierValidator()

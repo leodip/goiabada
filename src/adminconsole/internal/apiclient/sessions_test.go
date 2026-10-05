@@ -69,7 +69,7 @@ func servesSessions(t *testing.T, body string) (*AuthServerClient, func() (strin
 	}))
 	t.Cleanup(server.Close)
 
-	return NewAuthServerClient(server.URL), func() (string, string) { return gotURI, gotAuthorization }
+	return NewAuthServerClient(server.URL, nil), func() (string, string) { return gotURI, gotAuthorization }
 }
 
 type sessionListMethod struct {
@@ -266,7 +266,7 @@ func TestAuthServerClient_ASessionDeleteRefusesASuccessFalseBody(t *testing.T) {
 				}))
 				t.Cleanup(server.Close)
 
-				err := testCase.call(NewAuthServerClient(server.URL))
+				err := testCase.call(NewAuthServerClient(server.URL, nil))
 
 				require.Error(t, err, "a 200 the endpoint marked unsuccessful must not read as a deletion")
 				assert.Contains(t, err.Error(), "success=false")
@@ -280,7 +280,7 @@ func TestAuthServerClient_ASessionDeleteRefusesASuccessFalseBody(t *testing.T) {
 				}))
 				t.Cleanup(server.Close)
 
-				assert.NoError(t, testCase.call(NewAuthServerClient(server.URL)))
+				assert.NoError(t, testCase.call(NewAuthServerClient(server.URL, nil)))
 			})
 		})
 	}

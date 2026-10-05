@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -73,7 +74,7 @@ func runSettingsChainForRequest(t *testing.T, authServerBaseURL string, req *htt
 	// decision 2).
 	chimiddleware.RequestID(
 		i18n.Locale(nil)(
-			SettingsCache(publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL), publicsettings.DefaultTTL))(next),
+			SettingsCache(publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL, nil), publicsettings.DefaultTTL, metrics.NewRegistry()))(next),
 		),
 	).ServeHTTP(recorder, req)
 

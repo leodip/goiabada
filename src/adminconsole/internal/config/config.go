@@ -41,6 +41,11 @@ type AdminConsoleConfig struct {
 	// or neither: the store needs both halves to open anything sealed under the old pair.
 	SessionAuthenticationKeyPrevious string
 	SessionEncryptionKeyPrevious     string
+	// The metrics listener: a listener of its own serving GET /metrics and nothing else, off
+	// unless enabled, so no route the gateway publishes reaches it (#400 decision 3).
+	MetricsEnabled    bool
+	ListenHostMetrics string
+	ListenPortMetrics int
 	// I18nOverridesDir is the directory whose catalogs/ main merges over the embedded message
 	// catalogs, or empty for none. It has no flag, like the auth server's, so the one variable
 	// configures both servers the same way (#431).
@@ -134,6 +139,9 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			SessionEncryptionKey:             getEnv("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY", ""),
 			SessionAuthenticationKeyPrevious: getEnv("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS", ""),
 			SessionEncryptionKeyPrevious:     getEnv("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS", ""),
+			MetricsEnabled:                   getEnvAsBool("GOIABADA_ADMINCONSOLE_METRICS_ENABLED", &malformed),
+			ListenHostMetrics:                getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS", "0.0.0.0"),
+			ListenPortMetrics:                getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS", 9191, &malformed),
 			I18nOverridesDir:                 getEnv("GOIABADA_I18N_OVERRIDES_DIR", ""),
 		},
 		AuthServer: AuthServerConfig{
@@ -159,6 +167,9 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	fs.StringVar(&c.AdminConsole.StaticDir, "adminconsole-staticdir", c.AdminConsole.StaticDir, "Static files directory for admin console")
 	fs.StringVar(&c.AdminConsole.TemplateDir, "adminconsole-templatedir", c.AdminConsole.TemplateDir, "Template files directory for admin console")
 	fs.StringVar(&c.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", c.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
+	fs.BoolVar(&c.AdminConsole.MetricsEnabled, "adminconsole-metrics-enabled", c.AdminConsole.MetricsEnabled, "Serve Prometheus metrics on the admin console's metrics listener")
+	fs.StringVar(&c.AdminConsole.ListenHostMetrics, "adminconsole-listen-host-metrics", c.AdminConsole.ListenHostMetrics, "Admin console metrics host")
+	fs.IntVar(&c.AdminConsole.ListenPortMetrics, "adminconsole-listen-port-metrics", c.AdminConsole.ListenPortMetrics, "Admin console metrics port")
 
 	// Auth server: the two endpoints this process talks to, and nothing else. A flag the binary
 	// cannot act on is a trap rather than a courtesy, because it reads as having configured

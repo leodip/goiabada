@@ -118,7 +118,7 @@ func newCallbackHarness(t *testing.T) *callbackHarness {
 
 	signing, _ := oauthclienttest.Keys(t)
 	jwks, _ := oauthclienttest.NewJwksServer(t, oauthclienttest.JwkFromPublicKey(callbackKid, &signing.PublicKey))
-	parser := oauthclient.NewJWKSTokenParser(jwks.URL, jwks.Client(), oauthclienttest.ClientID,
+	parser := oauthclient.NewJWKSTokenParser(jwks.URL, jwks.Client(), nil, oauthclienttest.ClientID,
 		oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	return &callbackHarness{

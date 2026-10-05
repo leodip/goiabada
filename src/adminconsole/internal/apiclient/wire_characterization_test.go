@@ -112,7 +112,7 @@ func charServer(t *testing.T, status int, body string) (*AuthServerClient, *char
 	}))
 	t.Cleanup(server.Close)
 
-	return NewAuthServerClient(server.URL), &got
+	return NewAuthServerClient(server.URL, nil), &got
 }
 
 func mustMarshal(t *testing.T, v any) string {
@@ -317,7 +317,7 @@ func TestAuthServerClient_ThreeMethodsDiscardTheirBodyReadError(t *testing.T) {
 func clientOverTruncatedResponse(t *testing.T, status int, prefix string) *AuthServerClient {
 	t.Helper()
 
-	client := NewAuthServerClient("http://auth.example.com")
+	client := NewAuthServerClient("http://auth.example.com", nil)
 	client.httpClient = &http.Client{
 		Transport: roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 			return &http.Response{

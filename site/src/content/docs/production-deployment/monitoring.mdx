@@ -5,8 +5,9 @@ description: Watch a running Goiabada deployment through its Prometheus metrics.
 
 Goiabada can serve Prometheus metrics in the text exposition format, on a listener of its own that
 answers `GET /metrics` and nothing else. It is off unless you enable it, with
-`GOIABADA_AUTHSERVER_METRICS_ENABLED` for the auth server; see the
-[environment variables](/reference/environment-variables/) for the listener's host and port.
+`GOIABADA_AUTHSERVER_METRICS_ENABLED` for the auth server and `GOIABADA_ADMINCONSOLE_METRICS_ENABLED`
+for the admin console; see the [environment variables](/reference/environment-variables/) for each
+listener's host and port.
 
 ## Metrics catalog
 
@@ -19,12 +20,14 @@ database reaches a label: no user, client, session, email address, IP address, p
 agent or error description. The route label is the server's own route table, read at startup, and a
 request no route answered is recorded under `unmatched`.
 
-Prometheus adds the `job`, `instance` and, on Kubernetes, `pod` and `container` labels itself.
+Prometheus adds the `job`, `instance` and, on Kubernetes, `pod` and `container` labels itself. A
+metric both servers expose has the same name, labels and meaning on each, so one query covers
+both, and those labels tell them apart.
 
 | metric | type | labels | server | meaning |
 |---|---|---|---|---|
-| `goiabada_http_requests_total` | counter | `route`: the route table, `unmatched`; `method`: `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `CONNECT`, `OPTIONS`, `TRACE`; `status`: the response's status code | auth server | HTTP requests answered, by the route that answered them, the method and the exact status code. Every request the server's main listeners answer is counted, `/health` and the static files included; a scrape of the metrics listener is not. |
-| `goiabada_http_request_duration_seconds` | histogram | `route`: the route table, `unmatched`; `method`: `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `CONNECT`, `OPTIONS`, `TRACE` | auth server | How long requests took to answer, in seconds. The buckets are 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30 and 60: the slowest requests send mail and can take up to 40 seconds. |
+| `goiabada_http_requests_total` | counter | `route`: the route table, `unmatched`; `method`: `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `CONNECT`, `OPTIONS`, `TRACE`; `status`: the response's status code | both | HTTP requests answered, by the route that answered them, the method and the exact status code. Every request the server's main listeners answer is counted, `/health` and the static files included; a scrape of the metrics listener is not. |
+| `goiabada_http_request_duration_seconds` | histogram | `route`: the route table, `unmatched`; `method`: `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `CONNECT`, `OPTIONS`, `TRACE` | both | How long requests took to answer, in seconds. The buckets are 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30 and 60: the slowest requests send mail and can take up to 40 seconds. |
 | `goiabada_db_max_open_connections` | gauge | none | auth server | The most connections the database pool may hold open at once, `GOIABADA_DB_MAX_OPEN_CONNS` on PostgreSQL, MySQL and SQL Server, and 1 on SQLite. |
 | `goiabada_db_connections` | gauge | `state`: `in_use`, `idle` | auth server | Connections the database pool holds, by whether a request is using them or they are idle. `in_use` reaching the cap is the pool fully taken. |
 | `goiabada_db_wait_count_total` | counter | none | auth server | Requests that waited for a database connection because the pool was at its cap. Its rate rising is the pool becoming too small for the load. |
@@ -38,6 +41,9 @@ Prometheus adds the `job`, `instance` and, on Kubernetes, `pod` and `container` 
 | `goiabada_cleanup_last_success_timestamp_seconds` | gauge | none | auth server | When this instance's last cleanup run completed, as a Unix timestamp in seconds, or 0 when none has since it started. Across a deployment the latest success is the maximum over its pods. |
 | `goiabada_after_response_jobs_in_flight` | gauge | `class`: `recovery`, `registration`, `account_notice` | auth server | Work handed off to run after a response that is running now, by class: forgot-password's code and mail, self-registration's mail, and the notice of an email change. Each class runs at most 64 at once. |
 | `goiabada_after_response_jobs_dropped_total` | counter | `class`: `recovery`, `registration`, `account_notice` | auth server | Work handed off to run after a response that was dropped because its class already had 64 running, by class. A dropped job's mail is never sent. |
-| `goiabada_build_info` | gauge | `version`: this binary's version; `commit`: this binary's commit | auth server | Always 1. The labels say which release is running. |
-| `go_goroutines` | gauge | none | auth server | Goroutines that currently exist. |
-| `go_memstats_heap_inuse_bytes` | gauge | none | auth server | Heap bytes in use. |
+| `goiabada_upstream_requests_total` | counter | `target`: `admin_api`, `settings`, `token`, `jwks`, `sessions`; `status`: the response's status code, or `error` | admin console | Calls the admin console made to the auth server, by the client that made them and the status code the auth server answered, or `error` when no response arrived: a connection refused or reset, or a timeout. `admin_api` is every call to the admin and account APIs, `settings` the public settings, `token` the sign-in's code exchange, the refresh and the client credentials grant, `jwks` the signing keys, and `sessions` the administrators' browser sessions, which the auth server stores; a retry is a call of its own. A rising rate of `error` or 5xx is the auth server failing as the console sees it. |
+| `goiabada_upstream_request_duration_seconds` | histogram | `target`: `admin_api`, `settings`, `token`, `jwks`, `sessions` | admin console | How long the admin console's calls to the auth server took until the response headers arrived, in seconds, by the client that made them, with the buckets of `goiabada_http_request_duration_seconds`. |
+| `goiabada_settings_cache_requests_total` | counter | `result`: `hit`, `miss` | admin console | Lookups of the auth server's public settings, which every console page needs, by whether a cached value answered them. A miss found no fresh value, whether it started the call to the auth server or waited on one already under way; the value is kept 30 seconds. |
+| `goiabada_build_info` | gauge | `version`: this binary's version; `commit`: this binary's commit | both | Always 1. The labels say which release is running. |
+| `go_goroutines` | gauge | none | both | Goroutines that currently exist. |
+| `go_memstats_heap_inuse_bytes` | gauge | none | both | Heap bytes in use. |
