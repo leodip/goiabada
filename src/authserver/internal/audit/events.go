@@ -417,15 +417,16 @@ const (
 	// EventAdministrativeScopeRefused records an administrative authserver scope refused because
 	// the client asking for it on a user's behalf is not allowed to request one: neither the admin
 	// console's client nor a client an operator has allowed (#499 decision 9). It is written once
-	// someone has authenticated: at /auth/issue, at the token endpoint's refresh token and password
-	// grants once the client has authenticated, and at /auth/authorize when the browser holds a
-	// valid session, prompt=none included, which is the crafted link reaching a signed-in user. A
-	// refusal at /auth/authorize with no valid session, or parked behind the sign-in, writes a Warn
-	// record instead, because that endpoint is unauthenticated and not rate limited.
+	// someone has authenticated: at /auth/issue, at the token endpoint's authorization code, refresh
+	// token and password grants once the client has authenticated, and at /auth/authorize when the
+	// browser holds a valid session, prompt=none included, which is the crafted link reaching a
+	// signed-in user. A refusal at /auth/authorize with no valid session, or parked behind the
+	// sign-in, writes a Warn record instead, because that endpoint is unauthenticated and not rate
+	// limited.
 	//
 	// Payload: clientId and clientIdentifier, the client refused; scopes, the administrative scopes
-	// it asked for, as resource:permission; checkpoint, authorize, issue, refresh_token or password;
-	// and userId, the user the scope was asked for.
+	// it asked for, as resource:permission; checkpoint, authorize, issue, authorization_code,
+	// refresh_token or password; and userId, the user the scope was asked for.
 	EventAdministrativeScopeRefused = "administrative_scope_refused"
 
 	// EventUpdatedClientAdministrativeScopes records a client's allowance to request the

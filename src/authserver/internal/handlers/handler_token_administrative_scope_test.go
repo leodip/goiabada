@@ -35,6 +35,14 @@ func TestHandleTokenPost_AdministrativeScopeRefusalIsAudited(t *testing.T) {
 		scopeDenied bool
 	}{
 		{
+			name: "authorization code grant",
+			form: "grant_type=authorization_code&client_id=app&client_secret=s&code=c&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcb",
+			detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+				"The client is not allowed to request the administrative scope 'authserver:manage'.",
+				http.StatusBadRequest),
+			checkpoint: "authorization_code",
+		},
+		{
 			name: "refresh token grant",
 			form: "grant_type=refresh_token&client_id=app&client_secret=s&refresh_token=rt",
 			detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant",

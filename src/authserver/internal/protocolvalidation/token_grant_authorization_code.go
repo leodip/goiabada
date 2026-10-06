@@ -242,6 +242,28 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 		}
 	}
 
+	// Only a client allowed to request the administrative scopes may redeem a code carrying one,
+	// read now from the client loaded at the top of ValidateTokenRequest and not when the code was
+	// minted. /auth/issue is the last check before the code exists, so without this a code minted
+	// one second before an operator withdraws the allowance is redeemed for a fresh administrative
+	// token for the rest of its 60 second life, as the refresh token grant's check stops a renewal
+	// (#499 decision 6). invalid_grant, because this request names no scope to be invalid: the
+	// grant itself can no longer be honoured, and it carries the sentence every other checkpoint
+	// answers with (decision 7).
+	//
+	// Below the flat refusals above it for the reason the registration boundary below gives: a
+	// revoked, superseded or cross-bound code keeps "Code is invalid." rather than learning why the
+	// client would be refused. Ahead of that boundary because it reads nothing.
+	if refused := RefusedAdministrativeScopes(client, codeEntity.Scope); len(refused) > 0 {
+		return nil, &AdministrativeScopeRefusedError{
+			Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+				AdministrativeScopeRefusal(refused).Description(), http.StatusBadRequest),
+			Client: client,
+			Scopes: refused,
+			UserId: codeEntity.UserId,
+		}
+	}
+
 	// The registration boundary (#241 decision 5). The comparison near the top of this arm
 	// weighs the submitted redirect_uri against the one stored on the code, and the stored
 	// one is a copy taken at minting that nothing ever rematches against the client. So
@@ -268,8 +290,9 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 	// client authentication and PKCE for the #137 reason the group's opening comment gives: an
 	// unauthenticated presenter of a stolen code must not learn from the answer whether the
 	// grant's state moved. Last rather than merely late because this is the one refusal about
-	// the grant's state that says what happened; a revoked or cross-bound code must keep the
-	// flat "Code is invalid." it has today, and it would not if this ran first.
+	// the grant's state that says what happened, the administrative-scope refusal above being
+	// about the client's; a revoked or cross-bound code must keep the flat "Code is invalid." it
+	// has today, and it would not if this ran first.
 	//
 	// A failed load is PROPAGATED, not read as a refusal, matching the ownership lookup
 	// above: an unreachable database says nothing about whether the URI is registered.

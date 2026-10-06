@@ -213,9 +213,9 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 		})
 	}
 
-	// Administrative scopes refused on the refresh token or password grant to a client that may not
-	// request one (#499 decision 9). Matched by type, as a disabled user is: the refresh grant's
-	// answer is invalid_grant, which its other refusals share. The validator returns it only once
+	// Administrative scopes refused on the authorization code, refresh token or password grant to a
+	// client that may not request one (#499 decision 9). Matched by type, as a disabled user is: the
+	// code and refresh grants' answer is invalid_grant, which their other refusals share. The validator returns it only once
 	// the client has authenticated, so the client recorded is the one that called; the grant is the
 	// checkpoint.
 	var administrativeScopeRefused *protocolvalidation.AdministrativeScopeRefusedError
