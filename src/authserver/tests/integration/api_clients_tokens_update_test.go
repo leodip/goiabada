@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIClientTokensPut_Success verifies token settings update works and persists
@@ -147,8 +148,28 @@ func TestAPIClientTokensPut_SystemLevelClientAllowed(t *testing.T) {
 		t.Skip("system-level client not found")
 	}
 
+	// Every test in this tier shares the console client, and the values below would leave it issuing
+	// one-second tokens, so its settings go back as they were.
+	clientURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
+	getResp := makeAPIRequest(t, "GET", clientURL, accessToken, nil)
+	defer func() { _ = getResp.Body.Close() }()
+	require.Equal(t, http.StatusOK, getResp.StatusCode)
+	var seeded api.GetClientResponse
+	require.NoError(t, json.NewDecoder(getResp.Body).Decode(&seeded))
+	t.Cleanup(func() {
+		restore := makeAPIRequest(t, "PUT", clientURL+"/tokens", accessToken, api.UpdateClientTokensRequest{
+			TokenExpirationInSeconds:                seeded.Client.TokenExpirationInSeconds,
+			RefreshTokenOfflineIdleTimeoutInSeconds: seeded.Client.RefreshTokenOfflineIdleTimeoutInSeconds,
+			RefreshTokenOfflineMaxLifetimeInSeconds: seeded.Client.RefreshTokenOfflineMaxLifetimeInSeconds,
+			IncludeOpenIDConnectClaimsInAccessToken: seeded.Client.IncludeOpenIDConnectClaimsInAccessToken,
+			IncludeOpenIDConnectClaimsInIdToken:     seeded.Client.IncludeOpenIDConnectClaimsInIdToken,
+		})
+		defer func() { _ = restore.Body.Close() }()
+		assert.Equal(t, http.StatusOK, restore.StatusCode)
+	})
+
 	// Update token settings (should succeed)
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/tokens"
+	url := clientURL + "/tokens"
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIdToken: "default"})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)

@@ -283,7 +283,7 @@ func TestAuthorize_AdministrativeScope_AnAllowedClientGetsTheCode(t *testing.T) 
 func TestAuthorize_AdministrativeScope_TheAdminConsoleClientSignsInWithNoConsentScreen(t *testing.T) {
 	user, password := newSignInAdministrator(t)
 	browser := createHttpClient(t)
-	callback := ensureAdminConsoleCallbackRegistered(t)
+	callback := appConfig.AdminConsole.BaseURL + "/auth/callback"
 
 	// The admin console's request, as middleware_jwt.go's buildScopeString and auth_helper.go's
 	// RedirToAuthorize build it.
@@ -340,27 +340,4 @@ func TestAuthorize_AdministrativeScope_TheAdminConsoleClientSignsInWithNoConsent
 	assert.Equal(t, builtin.AdminConsoleClientIdentifier, code.Client.ClientIdentifier)
 	assert.Contains(t, strings.Fields(code.Scope), "authserver:manage")
 	assert.Equal(t, user.Id, code.User.Id)
-}
-
-// ensureAdminConsoleCallbackRegistered is the admin console's callback, registered on its client for
-// the test when it is not already: the seed registers it, and another test in this tier replaces
-// that client's redirect URIs without putting them back.
-func ensureAdminConsoleCallbackRegistered(t *testing.T) string {
-	t.Helper()
-
-	callback := appConfig.AdminConsole.BaseURL + "/auth/callback"
-	client, err := database.GetClientByClientIdentifier(context.Background(), nil, builtin.AdminConsoleClientIdentifier)
-	require.NoError(t, err)
-	require.NotNil(t, client)
-	registered, err := database.GetRedirectURIsByClientId(context.Background(), nil, client.Id)
-	require.NoError(t, err)
-	for _, uri := range registered {
-		if uri.URI == callback {
-			return callback
-		}
-	}
-	redirectURI := &record.RedirectURI{ClientId: client.Id, URI: callback}
-	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
-	t.Cleanup(func() { _ = database.DeleteRedirectURI(context.Background(), nil, redirectURI.Id) })
-	return callback
 }

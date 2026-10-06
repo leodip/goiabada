@@ -335,8 +335,19 @@ func TestAPIClientRedirectURIsPut_SystemLevelClientAllowed(t *testing.T) {
 
 	// Update redirect URIs (should succeed)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/redirect-uris"
+	seeded := readRedirectURIs(t, accessToken, sysId)
+
+	// Every test in this tier shares the console client, and the console signs in through the
+	// callback the seed registered, so the list goes back as it was.
+	t.Cleanup(func() {
+		restore := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientRedirectURIsRequest{RedirectURIs: seeded,
+			ExpectedRedirectURIs: readRedirectURIs(t, accessToken, sysId)})
+		defer func() { _ = restore.Body.Close() }()
+		assert.Equal(t, http.StatusOK, restore.StatusCode)
+	})
+
 	reqBody := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{"https://example.com/callback", "https://localhost:3000/cb"},
-		ExpectedRedirectURIs: readRedirectURIs(t, accessToken, sysId)}
+		ExpectedRedirectURIs: seeded}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
