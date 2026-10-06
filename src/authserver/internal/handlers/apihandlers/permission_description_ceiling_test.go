@@ -82,7 +82,7 @@ func TestPermissionDescriptionCeiling_EveryCallerBelowManageIsRefused(t *testing
 	}
 	stored := descriptionCeilingStored()
 
-	for identifier := range administrativePermissionIdentifiers {
+	for identifier := range administrativeIdentifiers() {
 		for _, caller := range callers {
 			t.Run(identifier+"/"+caller.name, func(t *testing.T) {
 				database := datamocks.NewDatabase(t)

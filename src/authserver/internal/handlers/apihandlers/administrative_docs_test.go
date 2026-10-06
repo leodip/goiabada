@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/guard"
 )
@@ -80,13 +81,25 @@ type docNames struct {
 	want []string
 }
 
+// administrativeIdentifiers is the built-in authserver permissions the administrative set names,
+// by permission identifier, as the policy reads it.
+func administrativeIdentifiers() map[string]bool {
+	administrative := make(map[string]bool)
+	for _, identifier := range builtin.AuthServerPermissionIdentifiers() {
+		if permissions.IsAdministrativeScope(builtin.AuthServerResourceIdentifier + ":" + identifier) {
+			administrative[identifier] = true
+		}
+	}
+	return administrative
+}
+
 // The built-in permission table says, for each built-in authserver permission, the description it
 // is seeded with and whether it is administrative, as the policy's set has it: an operator choosing
 // a permission to grant reads the boundary there (#402 decisions 2, 3 and 15).
 func TestAdministrativeDocs_TheBuiltInPermissionTableIsTheSeedAndThePolicy(t *testing.T) {
 	assertBuiltInPermissionTable(t, filepath.Dir(guard.SourceRoot(t)),
 		docSection{resourcesPermissionsPage, "## System-level resource"},
-		builtin.AuthServerPermissionIdentifiers(), seededPermissionDescriptions, administrativePermissionIdentifiers)
+		builtin.AuthServerPermissionIdentifiers(), seededPermissionDescriptions, administrativeIdentifiers())
 }
 
 // Every audit event, error code and authserver scope the administrative model's sections name is

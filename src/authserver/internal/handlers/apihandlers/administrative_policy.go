@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -26,19 +27,10 @@ import (
 // reached a handler with no validated token holds no authority here: the policy fails closed.
 // A refusal is decided before anything is written and before any transaction opens, after the
 // request's own 400 and 404 answers, against the rows as read then (#402 decision 4).
-
-// administrativePermissionIdentifiers is the named administrative set: the permissions on the
-// authserver resource that confer power in this server. A user, group or client holding any of them
-// is an administrator. manage-account, which every user receives at creation, and the custom
-// permissions an operator adds to the resource confer none and are not in it (#402 decision 2).
-var administrativePermissionIdentifiers = map[string]bool{
-	builtin.ManagePermissionIdentifier:          true,
-	builtin.AdminReadPermissionIdentifier:       true,
-	builtin.ManageUsersPermissionIdentifier:     true,
-	builtin.ManageClientsPermissionIdentifier:   true,
-	builtin.ManageSettingsPermissionIdentifier:  true,
-	builtin.BrowserSessionsPermissionIdentifier: true,
-}
+//
+// What is administrative is not decided here: the set, and its resolution to rows, are
+// permissions.IsAdministrativeScope and permissions.AdministrativePermissions, which the
+// authorization and token endpoints read too (#499 decision 2).
 
 // manageScope is the one scope the policy admits.
 const manageScope = builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier
@@ -65,8 +57,9 @@ const (
 	targetKindResource = "resource"
 )
 
-// administrativePolicyDatabase is what the policy reads to resolve the administrative set to rows.
-// Every handler a ceiling guards names it in its own port.
+// administrativePolicyDatabase is what the policy reads to resolve the administrative set to rows,
+// permissions.AdministrativePermissions's port. Every handler a ceiling guards names it in its own
+// port.
 type administrativePolicyDatabase interface {
 	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
@@ -98,31 +91,6 @@ type userTargetPolicyDatabase interface {
 func callerHoldsManage(r *http.Request) bool {
 	token, ok := reqctx.ValidatedTokenFrom(r.Context())
 	return ok && token.HasScope(manageScope)
-}
-
-// administrativePermissions is the administrative set's rows: the permissions on the authserver
-// resource whose identifiers it names, each id mapped to its identifier as resource:permission,
-// authserver:manage, the form an administrative_permission_changed record names it in. Read on tx,
-// or outside any transaction when tx is nil.
-func administrativePermissions(ctx context.Context, database administrativePolicyDatabase, tx *sql.Tx) (map[int64]string, error) {
-	resource, err := database.GetResourceByResourceIdentifier(ctx, tx, builtin.AuthServerResourceIdentifier)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to read the authserver resource for the administrative policy")
-	}
-	if resource == nil {
-		return nil, errs.New("the authserver resource does not exist")
-	}
-	permissions, err := database.GetPermissionsByResourceId(ctx, tx, resource.Id)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to read the authserver permissions for the administrative policy")
-	}
-	administrative := make(map[int64]string, len(administrativePermissionIdentifiers))
-	for _, permission := range permissions {
-		if administrativePermissionIdentifiers[permission.PermissionIdentifier] {
-			administrative[permission.Id] = resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
-		}
-	}
-	return administrative, nil
 }
 
 // administratorChangeRefusal is what one refusal records beside the caller and the route.
@@ -200,7 +168,7 @@ func grantCeilingAllows(w http.ResponseWriter, r *http.Request, database adminis
 		return nil, true
 	}
 
-	administrative, err := administrativePermissions(r.Context(), database, nil)
+	administrative, err := permissions.AdministrativePermissions(r.Context(), database, nil)
 	if err != nil {
 		writeInternalServerError(w, r, err, "target_kind", targetKind, "target_id", targetId)
 		return nil, false
@@ -313,7 +281,7 @@ func administrativeGroups(ctx context.Context, database administrativeGroupPolic
 	if len(grants) == 0 {
 		return nil, nil
 	}
-	administrative, err := administrativePermissions(ctx, database, tx)
+	administrative, err := permissions.AdministrativePermissions(ctx, database, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -518,7 +486,7 @@ func userIsAdministrator(ctx context.Context, database userTargetPolicyDatabase,
 		return false, nil
 	}
 
-	administrative, err := administrativePermissions(ctx, database, tx)
+	administrative, err := permissions.AdministrativePermissions(ctx, database, tx)
 	if err != nil {
 		return false, err
 	}
@@ -621,7 +589,7 @@ func clientIsAdministrator(ctx context.Context, database clientTargetPolicyDatab
 		return false, nil
 	}
 
-	administrative, err := administrativePermissions(ctx, database, nil)
+	administrative, err := permissions.AdministrativePermissions(ctx, database, nil)
 	if err != nil {
 		return false, err
 	}
@@ -687,9 +655,9 @@ func permissionDescriptionCeilingAllows(w http.ResponseWriter, r *http.Request, 
 		return true
 	}
 
-	administrative := make(map[int64]bool, len(administrativePermissionIdentifiers))
+	administrative := make(map[int64]bool)
 	for _, permission := range stored {
-		if administrativePermissionIdentifiers[permission.PermissionIdentifier] {
+		if permissions.IsAdministrativeScope(resource.ResourceIdentifier + ":" + permission.PermissionIdentifier) {
 			administrative[permission.Id] = true
 		}
 	}
