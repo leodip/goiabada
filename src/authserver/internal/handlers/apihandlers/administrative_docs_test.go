@@ -367,22 +367,30 @@ func assertDocNames(r guard.Reporter, root string, checks []docNames) {
 			r.Fatalf("%v", err)
 			return
 		}
-		named := make(map[string]bool)
-		for _, match := range check.pattern.FindAllStringSubmatch(text, -1) {
-			name := match[1]
-			if named[name] {
-				continue
-			}
-			named[name] = true
-			if !check.live[name] {
-				r.Errorf("%s: %s names the %s %s, which the code does not hold",
-					check.section.page, check.section.heading, check.kind, name)
-			}
+		assertNamesIn(r, text, check)
+	}
+}
+
+// assertNamesIn is one of assertDocNames' checks over text, read from check's section by its
+// caller: a text that is no Markdown section, such as an openapi.yaml description, is checked the
+// same way.
+func assertNamesIn(r guard.Reporter, text string, check docNames) {
+	r.Helper()
+	named := make(map[string]bool)
+	for _, match := range check.pattern.FindAllStringSubmatch(text, -1) {
+		name := match[1]
+		if named[name] {
+			continue
 		}
-		for _, name := range check.want {
-			if !named[name] {
-				r.Errorf("%s: %s does not name the %s %s", check.section.page, check.section.heading, check.kind, name)
-			}
+		named[name] = true
+		if !check.live[name] {
+			r.Errorf("%s: %s names the %s %s, which the code does not hold",
+				check.section.page, check.section.heading, check.kind, name)
+		}
+	}
+	for _, name := range check.want {
+		if !named[name] {
+			r.Errorf("%s: %s does not name the %s %s", check.section.page, check.section.heading, check.kind, name)
 		}
 	}
 }
