@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -825,4 +826,63 @@ func TestAPIAccountOTPPut_Enable_EnrolsTheIssuedSeedAndClearsThePending(t *testi
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+// TestAPIOTPPut_EachChangeMatchesTheAuthenticatorItRead drives the authenticator through both APIs in
+// a row, enable, disable, enable, then the administrator's disable, and holds each to landing (#471
+// decision 2). Every establish and removal is now a compare-and-set expecting the
+// otp_config_generation its own request read, so a change only lands when each loader, the account
+// API's by subject and the administrator's by id, reads the generation the previous change left.
+// A loader that dropped the column, or a request comparing against a generation of its own making,
+// answers the second change with 409 and this case fails there. Each change also advances the
+// generation by exactly one and leaves the account's enabled flag and password where they were.
+func TestAPIOTPPut_EachChangeMatchesTheAuthenticatorItRead(t *testing.T) {
+	accessToken, user := getUserAccessTokenWithAccountScope(t)
+	setUserPasswordForOTP(t, user.Id, "Correct1!")
+	resetOTPStateForTest(t, user.Id)
+
+	before, err := database.GetUserById(context.Background(), nil, user.Id)
+	assert.NoError(t, err)
+
+	enable := func(step string) {
+		t.Helper()
+		assert.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, user.Id))
+		secret := getOTPEnrollment(t, accessToken).SecretKey
+		code, codeErr := totp.GenerateCode(secret, time.Now())
+		assert.NoError(t, codeErr)
+		status, body := putAccountOTP(t, accessToken,
+			api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: code})
+		if status != http.StatusOK {
+			t.Fatalf("%s: expected 200, got %d. body: %s", step, status, body)
+		}
+	}
+	disable := func(step string) {
+		t.Helper()
+		status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{Enabled: false, Password: "Correct1!"})
+		if status != http.StatusOK {
+			t.Fatalf("%s: expected 200, got %d. body: %s", step, status, body)
+		}
+	}
+
+	enable("the first enable")
+	disable("the account's disable")
+	enable("the second enable")
+
+	adminToken, _ := createAdminClientWithToken(t)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/otp"
+	resp := makeAPIRequest(t, "PUT", url, adminToken, api.UpdateUserOTPRequest{Enabled: false})
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("the administrator's disable: expected 200, got %d. body: %s", resp.StatusCode, string(body))
+	}
+
+	after, err := database.GetUserById(context.Background(), nil, user.Id)
+	assert.NoError(t, err)
+	assert.False(t, after.OTPEnabled)
+	assert.Empty(t, after.OTPSecretEncrypted)
+	assert.Equal(t, before.OtpConfigGeneration+4, after.OtpConfigGeneration,
+		"four changes, each advancing the generation by exactly one")
+	assert.Equal(t, before.Enabled, after.Enabled)
+	assert.Equal(t, before.PasswordHash, after.PasswordHash)
 }

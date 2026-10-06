@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -356,12 +357,18 @@ func HandleAuthOtpPost(
 		// user was already enrolled.
 		var enrolledGeneration *int64
 		if !user.OTPEnabled {
-			// is enrolling to TOTP now. The seed is encrypted at rest, the user written and the
-			// OTP configuration generation's advance committed together, so there is no state in
-			// which the authenticator is on and no session knows (#242 decision 2).
-			generation, establishErr := otpcredential.Establish(r.Context(), database, dataCipher, user, secretKey)
+			// is enrolling to TOTP now. The seed is encrypted at rest, the authenticator written and
+			// the OTP configuration generation's advance committed together, so there is no state in
+			// which the authenticator is on and no session knows (#242 decision 2). The write lands
+			// only while OTP is still off at the generation read above; when it does not, the sign-in
+			// ends rather than claiming a second factor that was never stored (#471 decision 2).
+			generation, established, establishErr := otpcredential.Establish(r.Context(), database, dataCipher, user, secretKey)
 			if establishErr != nil {
 				pageRenderer.InternalServerError(w, r, establishErr)
+				return
+			}
+			if !established {
+				endLostEnrolment(pageRenderer, ceremonyStore, w, r, user.Id)
 				return
 			}
 			enrolledGeneration = &generation
@@ -406,5 +413,40 @@ func HandleAuthOtpPost(
 			return
 		}
 		http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/completed", authContext), http.StatusFound)
+	}
+}
+
+// endLostEnrolment ends a sign-in whose enrolment lost its compare-and-set (#471 decision 2, #144).
+// The passcode matched the seed this ceremony rendered, but the account's authenticator was no
+// longer as the request read it: another enrolment, or an enable and a disable, landed in between.
+// Nothing was stored, so the ceremony has no second factor to claim and cannot continue.
+//
+// It ends on a page of its own, at 409 because the request conflicted with the account's current
+// state (RFC 9110 section 15.5.10), in the visitor's language. Not the enrolment form again, whose
+// QR code is for an authenticator that was never stored, and not the "no longer active" page, whose
+// text says another sign-in was started in this browser. The ceremony is cleared first, the order
+// handler_auth_issue's refusals use, because the render commits the response and the clear's
+// Set-Cookie must reach the browser before it (#141); its failure does not change the page, since a
+// replay of the context left behind meets this same refusal or a state gate. Nothing is audited as
+// an enable or a successful second factor, and the passcode's step stays spent, as #111 already
+// accepts for a failed enable.
+func endLostEnrolment(pageRenderer PageRenderer, ceremonyStore CeremonyStore, w http.ResponseWriter,
+	r *http.Request, userId int64) {
+
+	slog.WarnContext(r.Context(), "the account's authenticator changed during the enrolment, so nothing was stored and the sign-in ends",
+		"user_id", userId)
+
+	if err := ceremonyStore.ClearAuthContext(w, r); err != nil {
+		slog.ErrorContext(r.Context(), "unable to clear the auth context while ending a lost enrolment, rendering the page anyway",
+			"error", err)
+	}
+
+	bind := map[string]interface{}{
+		"title":       i18n.T(r.Context(), "auth_error.otp_changed.title"),
+		"error":       i18n.T(r.Context(), "auth_error.otp_changed.message"),
+		"_httpStatus": http.StatusConflict,
+	}
+	if err := pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind); err != nil {
+		pageRenderer.InternalServerError(w, r, err)
 	}
 }

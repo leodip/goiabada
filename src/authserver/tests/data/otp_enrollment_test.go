@@ -258,7 +258,7 @@ func TestPendingOTPEnrollment_EnlistsInTheCallersTransaction(t *testing.T) {
 // installed, and a failed enable never discards one.
 func TestOtpCredentialEstablish_ClearsThePendingEnrollment(t *testing.T) {
 	// The seed the authenticator is established with. Establish encrypts it at rest, so the
-	// failing arm below encrypts one too and still writes nothing: the refusal is UpdateUser's.
+	// failing arm below encrypts one too and still writes nothing: the refusal is TryEstablishUserOTP's.
 	const enrolledSeed = "ZP2Z5KXRBAPPHWXEHH65PY5H7EKLVHRZ"
 
 	user := createEnrollableUser(t)
@@ -271,11 +271,11 @@ func TestOtpCredentialEstablish_ClearsThePendingEnrollment(t *testing.T) {
 	require.True(t, installed)
 
 	// The failing arm first, so the success below is not passing on a row that was already clear.
-	// Id 0 is what makes UpdateUser fail without touching the database, and the whole transaction
+	// Id 0 is what makes the establishing write fail without touching the database, and the whole transaction
 	// including the clear must roll back with it.
 	broken := reloadUser(t, user.Id)
 	broken.Id = 0
-	_, err = otpcredential.Establish(context.Background(), database, dataCipher, broken, enrolledSeed)
+	_, _, err = otpcredential.Establish(context.Background(), database, dataCipher, broken, enrolledSeed)
 	require.Error(t, err, "Establish must fail on a user with id 0")
 
 	assert.Equal(t, ciphertext, reloadUser(t, user.Id).OtpEnrollmentSecretEncrypted,
@@ -283,8 +283,9 @@ func TestOtpCredentialEstablish_ClearsThePendingEnrollment(t *testing.T) {
 			"code and is about to retry with the next passcode")
 
 	enrolling := reloadUser(t, user.Id)
-	generation, err := otpcredential.Establish(context.Background(), database, dataCipher, enrolling, enrolledSeed)
+	generation, established, err := otpcredential.Establish(context.Background(), database, dataCipher, enrolling, enrolledSeed)
 	require.NoError(t, err, "Establish")
+	require.True(t, established, "Establish from a fresh read must land")
 	assert.EqualValues(t, 1, generation, "the counter advance still happens")
 
 	after := reloadUser(t, user.Id)

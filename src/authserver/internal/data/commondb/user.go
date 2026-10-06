@@ -1623,3 +1623,103 @@ func (d *Database) ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, us
 
 	return nil
 }
+
+// TryEstablishUserOTP installs an authenticator: it stores secretEncrypted and turns otp_enabled
+// on, and writes no other column but updated_at, only while OTP is still off at
+// expectedGeneration, the otp_config_generation the caller read. It reports whether it did.
+//
+// Narrow rather than going through UpdateUser, for SetUserProfile's reason: the enrolment reads the
+// user at the start of the request, and writing that read back would re-enable an account an
+// administrator disabled under it or put back a password hash a concurrent change replaced (#471).
+//
+// Compare-and-set on the authenticator rather than on the flag (#471 decision 2, #144): of two
+// enrolments from one read exactly one lands, so the second no longer replaces the first's secret,
+// and the generation term refuses an enrolment read before an enable and a disable landed in
+// between, which leave otp_enabled where it was and move the generation twice. The generation
+// advance itself stays IncrementUserOtpConfigGeneration's, in the caller's transaction, and runs
+// only when this reports true.
+//
+// otp_enabled flips from false to true on every matched row, so a matched row is a changed row on
+// all four engines and MySQL's changed-rows accounting agrees with matched rows.
+func (d *Database) TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64,
+	secretEncrypted []byte) (bool, error) {
+
+	if userId == 0 {
+		return false, errs.New("can't establish OTP for user with id 0")
+	}
+	if len(secretEncrypted) == 0 {
+		return false, errs.New("can't establish OTP with an empty secret")
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(
+		ub.Assign("otp_secret_encrypted", secretEncrypted),
+		ub.Assign("otp_enabled", true),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("id", userId),
+		ub.Equal("otp_enabled", false),
+		ub.Equal("otp_config_generation", expectedGeneration),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to establish user OTP")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errs.Wrap(err, "unable to get rows affected when establishing user OTP")
+	}
+
+	return rowsAffected == 1, nil
+}
+
+// TryRemoveUserOTP removes an authenticator: it clears the seed and turns otp_enabled off, and
+// writes no other column but updated_at, only while OTP is still on at expectedGeneration, the
+// otp_config_generation the caller read. It reports whether it did.
+//
+// Narrow and conditional for TryEstablishUserOTP's reasons (#471 decision 2): it cannot undo a
+// disable or a password change made since the read, and a removal read before the authenticator
+// was removed and another established in its place matches nothing rather than removing the
+// replacement. The consumed-step reset and the generation advance stay the caller's, in the same
+// transaction, and run only when this reports true.
+//
+// The seed clears to a literal NULL rather than Assign(..., nil), for the reason
+// SetUserPasswordHash gives. otp_enabled flips on every matched row, so a matched row is a changed
+// row on all four engines.
+func (d *Database) TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error) {
+
+	if userId == 0 {
+		return false, errs.New("can't remove OTP for user with id 0")
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(
+		"otp_secret_encrypted = NULL",
+		ub.Assign("otp_enabled", false),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("id", userId),
+		ub.Equal("otp_enabled", true),
+		ub.Equal("otp_config_generation", expectedGeneration),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to remove user OTP")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errs.Wrap(err, "unable to get rows affected when removing user OTP")
+	}
+
+	return rowsAffected == 1, nil
+}

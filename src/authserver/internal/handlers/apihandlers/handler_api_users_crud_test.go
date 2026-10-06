@@ -279,8 +279,8 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 
 	var calls []string
 	datamocks.ExpectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
-	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).
-		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
+	database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, userId, user.OtpConfigGeneration).
+		Return(true, nil).Run(func(mock.Arguments) { calls = append(calls, "remove") }).Once()
 	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, userId).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "reset") }).Once()
 	// The counter joins the same transaction here for free, because both disable sites share
@@ -307,10 +307,69 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	HandleUserOTPPut(database, auditLogger).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, []string{"begin", "update", "reset", "increment", "commit"}, calls,
+	assert.Equal(t, []string{"begin", "remove", "reset", "increment", "commit"}, calls,
 		"all three writes belong inside one transaction, otp_enabled first per #111 decision 10, "+
 			"the counter advance last before the commit per #242 decision 2")
 	assert.False(t, user.OTPEnabled)
+}
+
+// TestHandleUserOTPPut_ALostCompareAndSetIsAnsweredFromARead is the administrator's disable losing
+// its compare-and-set (#471 decision 2): OTP already off is the existing 400, and an authenticator
+// replaced under the request is a 409 that removes nothing. The console sends either through
+// HandleAPIError, as it does today's 400.
+func TestHandleUserOTPPut_ALostCompareAndSetIsAnsweredFromARead(t *testing.T) {
+	const userId = int64(42)
+
+	testCases := []struct {
+		name       string
+		reread     *record.User
+		wantStatus int
+		wantCode   string
+	}{
+		{
+			name:       "another removal landed",
+			reread:     &record.User{Id: userId, Enabled: true, OTPEnabled: false, OtpConfigGeneration: 8},
+			wantStatus: http.StatusBadRequest,
+			wantCode:   "OTP_NOT_ENABLED",
+		},
+		{
+			name:       "the authenticator was replaced",
+			reread:     &record.User{Id: userId, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 9},
+			wantStatus: http.StatusConflict,
+			wantCode:   "CONCURRENT_UPDATE",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			user := &record.User{Id: userId, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 7}
+			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(user, nil).Once()
+			datamocks.ExpectRunInTransaction(database, otpDisableTx)
+			database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, userId, int64(7)).Return(false, nil).Once()
+			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(tc.reread, nil).Once()
+
+			body, err := json.Marshal(map[string]bool{"enabled": false})
+			require.NoError(t, err)
+			req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/otp", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			req = setChiURLParam(req, "id", "42")
+			req = setTokenContextWithClaims(req, map[string]interface{}{
+				"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1),
+			})
+
+			rr := httptest.NewRecorder()
+			HandleUserOTPPut(database, auditLogger).ServeHTTP(rr, req)
+
+			assert.Equal(t, tc.wantStatus, rr.Code, rr.Body.String())
+			assert.Equal(t, tc.wantCode, errorCodeOf(t, rr))
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "ResetUserOTPStep", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
 }
 
 // TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode covers the admin user-create path,

@@ -13833,6 +13833,90 @@ func (_c *Database_TryConsumeUserOTPStep_Call) RunAndReturn(run func(ctx context
 	return _c
 }
 
+// TryEstablishUserOTP provides a mock function for the type Database
+func (_mock *Database) TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64, secretEncrypted []byte) (bool, error) {
+	ret := _mock.Called(ctx, tx, userId, expectedGeneration, secretEncrypted)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TryEstablishUserOTP")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64, []byte) (bool, error)); ok {
+		return returnFunc(ctx, tx, userId, expectedGeneration, secretEncrypted)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64, []byte) bool); ok {
+		r0 = returnFunc(ctx, tx, userId, expectedGeneration, secretEncrypted)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, int64, []byte) error); ok {
+		r1 = returnFunc(ctx, tx, userId, expectedGeneration, secretEncrypted)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_TryEstablishUserOTP_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TryEstablishUserOTP'
+type Database_TryEstablishUserOTP_Call struct {
+	*mock.Call
+}
+
+// TryEstablishUserOTP is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+//   - expectedGeneration int64
+//   - secretEncrypted []byte
+func (_e *Database_Expecter) TryEstablishUserOTP(ctx any, tx any, userId any, expectedGeneration any, secretEncrypted any) *Database_TryEstablishUserOTP_Call {
+	return &Database_TryEstablishUserOTP_Call{Call: _e.mock.On("TryEstablishUserOTP", ctx, tx, userId, expectedGeneration, secretEncrypted)}
+}
+
+func (_c *Database_TryEstablishUserOTP_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64, secretEncrypted []byte)) *Database_TryEstablishUserOTP_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 int64
+		if args[3] != nil {
+			arg3 = args[3].(int64)
+		}
+		var arg4 []byte
+		if args[4] != nil {
+			arg4 = args[4].([]byte)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_TryEstablishUserOTP_Call) Return(b bool, err error) *Database_TryEstablishUserOTP_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_TryEstablishUserOTP_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64, secretEncrypted []byte) (bool, error)) *Database_TryEstablishUserOTP_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // TryInstallPendingOTPEnrollment provides a mock function for the type Database
 func (_mock *Database) TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64, secretEncrypted []byte, issuedAt time.Time, staleBefore time.Time) (bool, error) {
 	ret := _mock.Called(ctx, tx, userId, secretEncrypted, issuedAt, staleBefore)
@@ -14009,6 +14093,84 @@ func (_c *Database_TryIssueEmailVerificationCode_Call) Return(b bool, err error)
 }
 
 func (_c *Database_TryIssueEmailVerificationCode_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte, issuedAt time.Time) (bool, error)) *Database_TryIssueEmailVerificationCode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// TryRemoveUserOTP provides a mock function for the type Database
+func (_mock *Database) TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error) {
+	ret := _mock.Called(ctx, tx, userId, expectedGeneration)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TryRemoveUserOTP")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) (bool, error)); ok {
+		return returnFunc(ctx, tx, userId, expectedGeneration)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) bool); ok {
+		r0 = returnFunc(ctx, tx, userId, expectedGeneration)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userId, expectedGeneration)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_TryRemoveUserOTP_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TryRemoveUserOTP'
+type Database_TryRemoveUserOTP_Call struct {
+	*mock.Call
+}
+
+// TryRemoveUserOTP is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+//   - expectedGeneration int64
+func (_e *Database_Expecter) TryRemoveUserOTP(ctx any, tx any, userId any, expectedGeneration any) *Database_TryRemoveUserOTP_Call {
+	return &Database_TryRemoveUserOTP_Call{Call: _e.mock.On("TryRemoveUserOTP", ctx, tx, userId, expectedGeneration)}
+}
+
+func (_c *Database_TryRemoveUserOTP_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64)) *Database_TryRemoveUserOTP_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 int64
+		if args[3] != nil {
+			arg3 = args[3].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_TryRemoveUserOTP_Call) Return(b bool, err error) *Database_TryRemoveUserOTP_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_TryRemoveUserOTP_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error)) *Database_TryRemoveUserOTP_Call {
 	_c.Call.Return(run)
 	return _c
 }

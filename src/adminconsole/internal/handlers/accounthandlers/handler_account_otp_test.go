@@ -227,3 +227,40 @@ func TestHandleOtpPost_EnableSendsOnlyThePasswordAndTheCode(t *testing.T) {
 	assert.NotContains(t, mustJSON(t, client.updateReq), "secretKey",
 		"the wire form must carry no secret, which is the whole of the console's half of #247")
 }
+
+// A 409 CONCURRENT_UPDATE from the API is an account changed under the request: another tab or
+// client enabled and disabled OTP, or replaced the authenticator, between the API's read and its
+// write, and nothing was saved (#471 decision 2). It is something the user can act on by trying
+// again, so the page shows the API's sentence on the form rather than sending it to the generic
+// error page, on both the disable form and the enrolment form.
+func TestHandleOtpPost_AConcurrentUpdateIsShownOnTheForm(t *testing.T) {
+	const message = "The account was changed by another request after it was loaded. Nothing was saved: reload it and make the change again."
+	concurrentUpdate := &apiclient.APIError{Code: "CONCURRENT_UPDATE", Message: message, StatusCode: http.StatusConflict}
+
+	testCases := []struct {
+		name       string
+		otpEnabled bool
+		form       url.Values
+	}{
+		{name: "disabling", otpEnabled: true, form: url.Values{"password": {"P4ss!word"}}},
+		{name: "enabling", otpEnabled: false, form: url.Values{"password": {"P4ss!word"}, "otp": {"123456"}}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
+
+			client := newStubApiClient(tc.otpEnabled)
+			client.updateErr = concurrentUpdate
+
+			rr := httptest.NewRecorder()
+			HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
+
+			bind := handlertest.Bind(t, httpHelper)
+			assert.Equal(t, message, bind["error"])
+			assert.Equal(t, tc.otpEnabled, bind["otpEnabled"])
+			httpHelper.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}

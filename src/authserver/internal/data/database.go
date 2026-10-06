@@ -247,6 +247,21 @@ type Database interface {
 	// staleBefore, which keeps the lifetime itself in the handler (#247).
 	TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64, secretEncrypted []byte,
 		issuedAt time.Time, staleBefore time.Time) (bool, error)
+	// TryEstablishUserOTP installs an authenticator: it stores the encrypted seed and turns
+	// otp_enabled on, and writes no other column but updated_at, only while OTP is still off at
+	// expectedGeneration, the otp_config_generation the request read. It reports whether it did,
+	// so of two enrolments from one read exactly one lands, and an enrolment read before an
+	// enable and a disable landed in between is refused rather than installed over them. Narrow
+	// rather than a full-row update, so it cannot undo a concurrent disable or password change
+	// (#144, #471).
+	TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64,
+		secretEncrypted []byte) (bool, error)
+	// TryRemoveUserOTP removes an authenticator: it clears the seed and turns otp_enabled off,
+	// and writes no other column but updated_at, only while OTP is still on at
+	// expectedGeneration, the otp_config_generation the request read. It reports whether it did,
+	// so a removal read before the authenticator was replaced does not remove the replacement
+	// (#471).
+	TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error)
 	// ClearPendingOTPEnrollment returns the pending enrollment pair to NULL. Called
 	// inside the transaction that establishes the authenticator, so no committed
 	// state has OTP enabled with a live pending seed still installed (#247).

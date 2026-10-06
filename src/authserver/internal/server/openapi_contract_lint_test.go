@@ -612,6 +612,15 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 				if f.Name == "writeLastAdministrator" {
 					out[409] = true
 				}
+				// writeLostOTPChange answers an OTP enable or disable whose compare-and-set
+				// matched nothing from a re-read: 400 when OTP is already as asked, 409
+				// CONCURRENT_UPDATE otherwise, and 500 when the re-read fails, so the account and
+				// administrator OTP PUTs name no constant for the 409 (#471 decision 2).
+				if f.Name == "writeLostOTPChange" {
+					out[400] = true
+					out[409] = true
+					out[500] = true
+				}
 			case *ast.SelectorExpr:
 				switch f.Sel.Name {
 				case "InternalServerError", "JSONError":
