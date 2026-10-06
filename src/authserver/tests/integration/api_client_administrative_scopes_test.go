@@ -306,5 +306,68 @@ func TestClientAdministrativeScopes_TheSwitchDecidesTheAuthorizationEndpointsAns
 	assert.NotContains(t, location, "code=")
 }
 
+// An allowance switched off through the route while a sign-in is under way takes effect at
+// /auth/issue, the last hop before a code or a token is minted: the client is answered invalid_scope
+// with nothing issued, and the refusal is recorded at the issue checkpoint (#499 decisions 6, 7 and
+// 9). Consent is switched on so the ceremony parks on its consent screen, one hop from issuing, which
+// is where the allowance is withdrawn; both flows run, because they reach different issuers behind the
+// same check.
+func TestClientAdministrativeScopes_AnAllowanceWithdrawnDuringTheSignInRefusesItAtIssue(t *testing.T) {
+	for _, flow := range recheckFlows {
+		t.Run(flow.name, func(t *testing.T) {
+			requireDatabaseAuditLogs(t)
+			manageToken, _ := createAdminClientWithToken(t)
+			f := newAdministrativeScopeFixture(t, false)
+			switchedClient(t, first(putAdministrativeScopes(t, manageToken, f.client.Id, map[string]any{"allowed": true})))
+			f.client.ConsentRequired = true
+			f.client.AdministrativeScopesAllowed = true
+			require.NoError(t, database.UpdateClient(context.Background(), nil, f.client))
+
+			resp := f.get(t, f.craftedLink(flow.responseType, ""))
+			location := assertRedirect(t, resp, "/auth/level1")
+			_ = resp.Body.Close()
+			resp = loadPage(t, f.browser, location)
+			location = assertRedirect(t, resp, "/auth/pwd")
+			_ = resp.Body.Close()
+			passwordPage := loadPage(t, f.browser, location)
+			resp = authenticateWithPassword(t, f.browser, location, passwordPage, f.user.Email, f.password)
+			_ = passwordPage.Body.Close()
+			location = assertRedirect(t, resp, "/auth/level1completed")
+			_ = resp.Body.Close()
+			resp = loadPage(t, f.browser, location)
+			location = assertRedirect(t, resp, "/auth/completed")
+			_ = resp.Body.Close()
+			resp = loadPage(t, f.browser, location)
+			consentURL := assertRedirect(t, resp, "/auth/consent")
+			_ = resp.Body.Close()
+			consentPage := loadPage(t, f.browser, consentURL)
+			require.Equal(t, http.StatusOK, consentPage.StatusCode)
+			resp = postConsent(t, f.browser, consentURL, consentPage, []int{0, 1})
+			_ = consentPage.Body.Close()
+			issueURL := assertRedirect(t, resp, "/auth/issue")
+			_ = resp.Body.Close()
+
+			switchedClient(t, first(putAdministrativeScopes(t, manageToken, f.client.Id, map[string]any{"allowed": false})))
+
+			resp = loadPage(t, f.browser, issueURL)
+			defer func() { _ = resp.Body.Close() }()
+			destination, params := clientAnswer(t, resp, flow.responseType)
+			assert.Equal(t, administrativeScopeRedirectURI, destination)
+			assert.Equal(t, "invalid_scope", params.Get("error"))
+			assert.Equal(t, administrativeScopeRefusal, params.Get("error_description"))
+			assert.Equal(t, administrativeScopeState, params.Get("state"))
+			for _, field := range []string{"code", "access_token", "id_token"} {
+				assert.Empty(t, params.Get(field), "no %s is issued", field)
+			}
+
+			rows := administrativeScopeRefusedRows(t, f.client.ClientIdentifier)
+			require.Len(t, rows, 1)
+			assert.Equal(t, "issue", rows[0]["checkpoint"])
+			assert.Equal(t, float64(f.user.Id), rows[0]["userId"])
+			assert.Equal(t, []any{"authserver:manage"}, rows[0]["scopes"])
+		})
+	}
+}
+
 // first is a request's response, its request id dropped.
 func first(resp *http.Response, _ string) *http.Response { return resp }

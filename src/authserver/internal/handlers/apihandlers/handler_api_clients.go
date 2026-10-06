@@ -795,7 +795,8 @@ func HandleClientAuthenticationPut(
 // The admin console's client is always allowed, whatever its row holds, so switching it off is
 // refused 400, as renaming it is, rather than stored as a value the server would not apply. The
 // request's own 400s and 404 are answered before the ceiling, and the switch is recorded as
-// updated_client_administrative_scopes once it is written (#499 decision 9).
+// updated_client_administrative_scopes as soon as it is written, before the reads answering it can
+// fail (#499 decision 9).
 func HandleClientAdministrativeScopesPut(
 	database clientsDatabase,
 	auditLogger AuditLogger,
@@ -845,6 +846,15 @@ func HandleClientAdministrativeScopesPut(
 			return
 		}
 
+		// The write ran outside any transaction, so it has committed: it is recorded now, before the
+		// reads building the answer, whose failure answers 500 but does not undo the switch.
+		auditLogger.Log(r.Context(), audit.EventUpdatedClientAdministrativeScopes, map[string]interface{}{
+			"clientId":         client.Id,
+			"clientIdentifier": client.ClientIdentifier,
+			"allowed":          allowed,
+			"loggedInUser":     callerSubject(r),
+		})
+
 		// The answer is the row as stored, read back after the write.
 		client, err = database.GetClientById(r.Context(), nil, id)
 		if err != nil {
@@ -863,13 +873,6 @@ func HandleClientAdministrativeScopesPut(
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after administrative scopes update"), "client_id", client.Id)
 			return
 		}
-
-		auditLogger.Log(r.Context(), audit.EventUpdatedClientAdministrativeScopes, map[string]interface{}{
-			"clientId":         client.Id,
-			"clientIdentifier": client.ClientIdentifier,
-			"allowed":          allowed,
-			"loggedInUser":     callerSubject(r),
-		})
 
 		writeJSON(w, r, http.StatusOK, api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)})
 	}
