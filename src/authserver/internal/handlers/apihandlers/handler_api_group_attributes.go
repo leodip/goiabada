@@ -359,12 +359,12 @@ func HandleGroupAttributeDelete(
 			return
 		}
 
-		// Get group for audit log
 		// Only authserver:manage writes to an administrative group (#402 decision 1).
 		if !groupTargetCeilingAllows(w, r, database, auditLogger, attribute.GroupId) {
 			return
 		}
 
+		// Get group for audit log
 		group, err := database.GetGroupById(r.Context(), nil, attribute.GroupId)
 		if err != nil {
 			writeInternalServerError(w, r, err)

@@ -103,12 +103,12 @@ func HandleUserConsentDelete(
 			return
 		}
 
-		// Delete the consent
 		// Only authserver:manage writes to an administrator (#402 decision 1).
 		if !userTargetCeilingAllows(w, r, database, auditLogger, consent.UserId) {
 			return
 		}
 
+		// Delete the consent
 		err = database.DeleteUserConsent(r.Context(), nil, consentId)
 		if err != nil {
 			writeInternalServerError(w, r, err)

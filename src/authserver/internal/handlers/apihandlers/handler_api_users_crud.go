@@ -617,7 +617,6 @@ func HandleUserEnabledPut(
 		// helper opens it through RunInTransaction, so a deadlock reruns the compare-and-set and
 		// the sweep together (#301); the compare-and-set asks the row again on every attempt.
 		disableWithRevocation := func() (revocation.UserAuthStateResult, bool, error) {
-			//
 			// Disabling a holder of manage can remove the last administrator, so the write takes
 			// the administrators' lock as the transaction's first statement, decides from the
 			// user's grants as read under it, and is rolled back, sweep and all, when it would

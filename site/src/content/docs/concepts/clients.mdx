@@ -132,7 +132,7 @@ The `admin-console-client` is a **system-level client** used internally by the a
 
 - Its **client identifier cannot be changed** (renaming is blocked)
 - It **cannot be deleted**
-- All other settings (description, display name, redirect URIs, etc.) can be modified normally
+- All other settings (description, display name, redirect URIs, etc.) can be modified normally, though through the admin API only a token with `authserver:manage` changes them, since this client is an [administrator](/concepts/resources-permissions/#administrators)
 
 The API response for this client includes `"isSystemLevelClient": true` to indicate its protected status.
 

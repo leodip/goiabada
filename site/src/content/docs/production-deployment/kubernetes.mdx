@@ -1228,14 +1228,18 @@ server and every other client work throughout.
 
 If the admin console can no longer sign you in, because the database holds a secret its Secret does
 not, set a secret you know through the [admin API](/integration/rest-api/), with a client of your
-own allowed `authserver:manage-clients`. Have that client before you rotate: once the admin console
-is locked out, it is the only way back in.
+own allowed `authserver:manage`. It has to be `manage`: the admin console's client is an
+[administrator](/concepts/resources-permissions/#administrators), and only a token with
+`authserver:manage` writes to one, so a `manage-clients` token is refused `403
+MANAGE_SCOPE_REQUIRED`. Holding `manage` makes your client an administrator too, so keep its secret
+with the care you give the admin console's own. Have that client before you rotate: once the admin
+console is locked out, it is the only way back in.
 
 ```bash
 read -rsp 'API client secret: ' API_CLIENT_SECRET; echo
 TOKEN=$(printf %s "$API_CLIENT_SECRET" | curl -s https://auth.example.com/auth/token \
   -d grant_type=client_credentials -d client_id=<your API client> \
-  --data-urlencode client_secret@- -d scope=authserver:manage-clients | jq -r .access_token)
+  --data-urlencode client_secret@- -d scope=authserver:manage | jq -r .access_token)
 unset API_CLIENT_SECRET
 CLIENT_ID=$(curl -s https://auth.example.com/api/v1/admin/clients -H "Authorization: Bearer $TOKEN" \
   | jq '.clients[] | select(.clientIdentifier == "admin-console-client") | .id')

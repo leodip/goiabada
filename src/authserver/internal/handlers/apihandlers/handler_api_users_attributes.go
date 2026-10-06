@@ -288,12 +288,12 @@ func HandleUserAttributeUpdatePut(
 		attribute.IncludeInAccessToken = req.IncludeInAccessToken
 		attribute.IncludeInIdToken = req.IncludeInIdToken
 
-		// Update attribute in database
 		// Only authserver:manage writes to an administrator (#402 decision 1).
 		if !userTargetCeilingAllows(w, r, database, auditLogger, attribute.UserId) {
 			return
 		}
 
+		// Update attribute in database
 		err = database.UpdateUserAttribute(r.Context(), nil, attribute)
 		if err != nil {
 			writeInternalServerError(w, r, err)
@@ -356,12 +356,12 @@ func HandleUserAttributeDelete(
 			return
 		}
 
-		// Delete attribute from database
 		// Only authserver:manage writes to an administrator (#402 decision 1).
 		if !userTargetCeilingAllows(w, r, database, auditLogger, attribute.UserId) {
 			return
 		}
 
+		// Delete attribute from database
 		err = database.DeleteUserAttribute(r.Context(), nil, attributeId)
 		if err != nil {
 			writeInternalServerError(w, r, err)

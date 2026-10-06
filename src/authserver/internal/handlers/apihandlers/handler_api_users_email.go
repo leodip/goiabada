@@ -81,12 +81,12 @@ func HandleUserEmailPut(
 			return
 		}
 
-		// Update user email fields
 		// Only authserver:manage writes to an administrator (#402 decision 1).
 		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
 			return
 		}
 
+		// Update user email fields
 		user.Email = email
 		user.EmailVerified = req.EmailVerified
 		user.EmailVerificationCodeEncrypted = nil

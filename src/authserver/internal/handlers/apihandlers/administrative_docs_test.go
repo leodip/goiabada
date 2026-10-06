@@ -33,6 +33,7 @@ const (
 	resourcesPermissionsPage = "site/src/content/docs/concepts/resources-permissions.mdx"
 	usersGroupsPage          = "site/src/content/docs/concepts/users-groups.mdx"
 	auditLogPage             = "site/src/content/docs/concepts/audit-log.mdx"
+	kubernetesPage           = "site/src/content/docs/production-deployment/kubernetes.mdx"
 )
 
 // docSection is one section of a page: from its heading line to the next heading of the same level
@@ -61,6 +62,9 @@ var (
 	// docErrorCodeItem is an error code leading a list item, the shape of the REST API page's list
 	// of codes, which also names the UPPER_SNAKE convention itself in backticks.
 	docErrorCodeItem = regexp.MustCompile("(?m)^- `([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)`")
+	// docScopeRequest is a token request's scope parameter on the authserver resource, as a curl
+	// example spells it.
+	docScopeRequest = regexp.MustCompile(`scope=(` + builtin.AuthServerResourceIdentifier + `:[a-z][a-z0-9-]*)`)
 	// docAuthServerScope is a backticked scope on the authserver resource.
 	docAuthServerScope = regexp.MustCompile("`(" + builtin.AuthServerResourceIdentifier + ":[a-z][a-z0-9-]*)`")
 )
@@ -138,6 +142,49 @@ func TestAdministrativeDocs_NameWhatTheModelRestsOn(t *testing.T) {
 			want: []string{"LAST_ADMINISTRATOR"},
 		},
 	})
+}
+
+// The deployment guides' way back into a locked-out admin console sets the admin console's client
+// secret through the admin API. That client is an administrator, so only a token with
+// authserver:manage writes to it, and a procedure requesting any other scope ends in 403
+// MANAGE_SCOPE_REQUIRED at the moment an operator has no other way in (#402 decisions 1 and 15).
+// The Docker and native-binaries pages link to this one rather than repeat it.
+func TestAdministrativeDocs_TheConsoleLockoutRecoveryRequestsManage(t *testing.T) {
+	assertScopeRequests(t, filepath.Dir(guard.SourceRoot(t)),
+		docSection{kubernetesPage, "#### The admin console's client secret"},
+		builtin.AuthServerResourceIdentifier+":"+builtin.ManagePermissionIdentifier)
+}
+
+func TestAdministrativeDocs_ARecoveryRequestingAGranularScopeFails(t *testing.T) {
+	root := t.TempDir()
+	writeDocFixture(t, root, "site/deploy.mdx", "#### Client secret\n\n"+
+		"```bash\ncurl -d scope=authserver:manage-clients\ncurl -d scope=authserver:manage\n```\n\n"+
+		"#### Next\n\n-d scope=authserver:admin-read\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertScopeRequests(r, root, docSection{"site/deploy.mdx", "#### Client secret"}, "authserver:manage")
+	})
+
+	if report.Stopped {
+		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
+	}
+	want := []string{"site/deploy.mdx: #### Client secret requests scope=authserver:manage-clients, want authserver:manage"}
+	if !slices.Equal(report.Errors, want) {
+		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
+	}
+}
+
+func TestAdministrativeDocs_ARecoveryRequestingNoScopeStops(t *testing.T) {
+	root := t.TempDir()
+	writeDocFixture(t, root, "site/deploy.mdx", "#### Client secret\n\nUse the admin console.\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertScopeRequests(r, root, docSection{"site/deploy.mdx", "#### Client secret"}, "authserver:manage")
+	})
+
+	if !report.Stopped || !strings.Contains(report.Fatal, "requests no authserver scope") {
+		t.Errorf("a section requesting no scope did not stop the check: %+v", report)
+	}
 }
 
 func TestAdministrativeDocs_ATableDisagreeingWithTheCodeFails(t *testing.T) {
@@ -283,6 +330,28 @@ func assertBuiltInPermissionTable(r guard.Reporter, root string, section docSect
 	for _, identifier := range builtIn {
 		if !listed[identifier] {
 			r.Errorf("%s: %s does not list %s", section.page, section.heading, identifier)
+		}
+	}
+}
+
+// assertScopeRequests is the reporting half of the recovery procedure's check: one failure per
+// token request in the section naming an authserver scope other than want; a stop for a section not
+// found or requesting no authserver scope, since a check that read no request proves nothing.
+func assertScopeRequests(r guard.Reporter, root string, section docSection, want string) {
+	r.Helper()
+	text, err := docSectionText(root, section)
+	if err != nil {
+		r.Fatalf("%v", err)
+		return
+	}
+	matches := docScopeRequest.FindAllStringSubmatch(text, -1)
+	if len(matches) == 0 {
+		r.Fatalf("%s: %s requests no authserver scope", section.page, section.heading)
+		return
+	}
+	for _, match := range matches {
+		if match[1] != want {
+			r.Errorf("%s: %s requests scope=%s, want %s", section.page, section.heading, match[1], want)
 		}
 	}
 }
