@@ -213,6 +213,18 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 		})
 	}
 
+	// Administrative scopes refused on the refresh token or password grant to a client that may not
+	// request one (#499 decision 9). Matched by type, as a disabled user is: the refresh grant's
+	// answer is invalid_grant, which its other refusals share. The validator returns it only once
+	// the client has authenticated, so the client recorded is the one that called; the grant is the
+	// checkpoint.
+	var administrativeScopeRefused *protocolvalidation.AdministrativeScopeRefusedError
+	if errors.As(err, &administrativeScopeRefused) {
+		auditLogger.Log(r.Context(), audit.EventAdministrativeScopeRefused,
+			administrativeScopeRefusedDetails(administrativeScopeRefused.Client, administrativeScopeRefused.Scopes,
+				input.GrantType.String(), administrativeScopeRefused.UserId))
+	}
+
 	// The redemption half of #241's registration boundary. The validator refuses an
 	// authorization code whose own redirect URI has been deregistered since it was
 	// minted, and this is what makes that refusal answerable from the admin console

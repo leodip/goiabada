@@ -6,11 +6,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -376,13 +378,19 @@ func userAccessTokenViaROPC(t *testing.T) (string, *record.User, string) {
 // and chooses the scope. It turns ROPC on for the test, creates a confidential ROPC client and a
 // user, runs beforeGrant on the user when set, then makes the password grant. The refresh token's
 // client is recorded for refreshROPCToken and refreshROPCTokenResponse.
+//
+// The client is allowed to request the administrative scopes when the scope names one, as an
+// operator allows a client that legitimately needs them: the tests minting an administrative user
+// token through this fixture are about what the token does, not about which client may obtain one
+// (#499).
 func ropcTokenResponse(t *testing.T, scope string, beforeGrant func(user *record.User)) (map[string]interface{}, *record.User) {
 	t.Helper()
 
 	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	clientSecret := fake.Password(32)
-	client := createROPCClient(t, clientSecret, false)
+	client := createROPCClientAllowing(t, clientSecret, false,
+		slices.ContainsFunc(strings.Split(scope, " "), permissions.IsAdministrativeScope))
 
 	password := fake.Password(12)
 	user, _ := createUserWithSubject(t, fake.UUID())

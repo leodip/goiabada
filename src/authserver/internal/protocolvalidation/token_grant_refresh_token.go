@@ -377,6 +377,25 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	}
 	inputScopes := oidc.SplitScope(scopes)
 
+	// Only a client allowed to request the administrative scopes may renew one on a user's behalf,
+	// read now and not when the token was issued, so a token issued before the upgrade or before an
+	// operator withdrew the allowance is not renewed with it (#499 decision 6). Judged on the scope
+	// this refresh would issue, so a request that leaves the administrative scope out is not
+	// refused: RFC 6749 section 6 lets it narrow the grant. invalid_grant in the shape of the
+	// per-scope re-checks below, and before the token is spent, as they are (decision 7). Ahead of
+	// them because it is the client's to answer and reads nothing; the scope is in the grant, so the
+	// comparison above has passed it.
+	if refused := RefusedAdministrativeScopes(client, scopes); len(refused) > 0 {
+		return nil, &AdministrativeScopeRefusedError{
+			Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+				fmt.Sprintf("Scope '%v' is not recognized. %v", refused[0], AdministrativeScopeRefusal(refused).Description()),
+				http.StatusBadRequest),
+			Client: client,
+			Scopes: refused,
+			UserId: tokenUserId,
+		}
+	}
+
 	sub := refreshTokenInfo.StringClaim("sub")
 	user, err := val.database.GetUserBySubject(ctx, nil, sub)
 	if err != nil {
