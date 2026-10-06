@@ -30,7 +30,7 @@ Instead of granting full admin access with `authserver:manage`, you can give an 
 
 #### Administrators and authserver:manage
 
-An **administrator** is a user, group or client holding any of the six administrative permissions on the `authserver` resource: `manage`, `admin-read`, `manage-users`, `manage-clients`, `manage-settings` and `browser-sessions`. A user is one when they hold one directly or through any of their groups, and the admin console's own client is always one, whatever it holds. `manage-account` and the custom permissions you add to the `authserver` resource are not administrative (see [Resources and permissions › Administrators](/concepts/resources-permissions/#administrators)).
+An **administrator** is a user, group or client holding any of the six administrative permissions on the `authserver` resource: `manage`, `admin-read`, `manage-users`, `manage-clients`, `manage-settings` and `browser-sessions`. A user is one when they hold one directly or through any of their groups, the admin console's own client is always one, whatever it holds, and so is a client [allowed to request the administrative scopes](#clients-that-may-request-the-administrative-scopes). `manage-account` and the custom permissions you add to the `authserver` resource are not administrative (see [Resources and permissions › Administrators](/concepts/resources-permissions/#administrators)).
 
 **Only `authserver:manage` creates an administrator, changes one, or changes what reaches one.** A granular scope keeps full control of everyone else, and still reads administrators, but it cannot:
 
@@ -83,7 +83,7 @@ Authorization: Bearer <access_token>
 
 ### Setting up API access
 
-Before you can call the REST APIs, you need to create a dedicated client and assign the appropriate permissions:
+To call the Admin API with a client's own permissions, through the client credentials flow, create a dedicated client and assign it the appropriate permissions. The Account API takes a signed-in user's token instead: see [Account API access](#account-api-access).
 
 #### Step 1: Create a new client
 
@@ -111,13 +111,9 @@ After creating the client, assign the required resource permissions:
      - `manage-settings` - Settings, except email and audit logging; resources; signing keys
 
    Each of these makes the client an [administrator](#administrators-and-authservermanage), so only an `authserver:manage` holder, such as the admin console, can assign one.
-3. For **Account API** access (self-service endpoints):
-   - Select the `authserver` resource
-   - Assign the `manage-account` permission
-   - This allows users to manage their own accounts
 
 <Aside type="note">
-The **Admin API** scope (`authserver:manage`) provides full administrative control over your Goiabada instance, including creating other administrators. Only assign this to trusted applications. Consider using granular scopes like `authserver:manage-users` to limit access to specific domains and keep administrators out of reach. For user self-service operations, use the **Account API** scope (`authserver:manage-account`) instead.
+The **Admin API** scope (`authserver:manage`) provides full administrative control over your Goiabada instance, including creating other administrators. Only assign this to trusted applications. Consider using granular scopes like `authserver:manage-users` to limit access to specific domains and keep administrators out of reach.
 </Aside>
 
 ### Obtaining an access token
@@ -157,6 +153,53 @@ For granular access, request only the scopes you need:
 ```
 
 Use the `access_token` in the `Authorization` header for subsequent API calls.
+
+### Clients that may request the administrative scopes
+
+A token from the client credentials flow carries the client's own permissions. An application can instead act for a signed-in user, through the authorization code flow, and receive a token carrying the scopes that user holds. For the six administrative scopes, `authserver:manage`, `authserver:admin-read`, `authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings` and `authserver:browser-sessions`, such a token reaches the Admin API with the user's administrative authority, so **only a client allowed to request the administrative scopes may obtain one on a user's behalf**:
+
+- the admin console's own client, always, and
+- any other client an operator has allowed, through the client's **May request administrative scopes** switch in the admin console or [`PUT /api/v1/admin/clients/{id}/administrative-scopes`](#switch-the-administrative-scopes-allowance). Only `authserver:manage` switches it.
+
+A new client starts not allowed, including one created through dynamic client registration. The rule holds on the authorization code flow, `prompt=none` included, the implicit flow, the refresh token grant and the password grant. Any other client asking for one of these scopes is refused, never handed a narrower token: `invalid_scope` from the authorization endpoint and the password grant, `invalid_grant` on a refresh (see [the authorization endpoint's](/integration/endpoints/#administrative-scopes) and [the token endpoint's](/integration/endpoints/#a-client-not-allowed-the-administrative-scopes) exact answers). The client credentials flow is unaffected: a client holding an administrative permission of its own keeps requesting it there, and only `authserver:manage` grants it one.
+
+An allowed client is an [administrator](#administrators-and-authservermanage) client, so every write to it, and reading its secret, needs `authserver:manage`. See [Clients › Administrative scopes](/concepts/clients/#administrative-scopes) for the whole rule.
+
+<Aside type="caution" title="Upgrading">
+After upgrading to a version with this allowance, only the admin console's client is allowed. A client of yours that signs users in and requests an administrative scope for them is answered `invalid_scope` until an operator switches its allowance on.
+</Aside>
+
+### Account API access
+
+The Account API acts on the signed-in user's own account, so it takes a token issued for a user, never one issued to a client: a client credentials token is refused `403` with the error code `USER_CONTEXT_REQUIRED`. Obtain the token with the [authorization code flow](/oauth2-flows/authorization-code/), requesting `authserver:manage-account`. Every user holds `manage-account` from creation, so the client needs no permission of its own for it, and it is not an administrative scope, so the client needs no allowance either.
+
+Send the user to the authorization endpoint:
+
+```
+GET /auth/authorize?
+  client_id=my-app&
+  redirect_uri=https://my-app.com/callback&
+  response_type=code&
+  scope=openid authserver:manage-account&
+  code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&
+  code_challenge_method=S256&
+  state=abc123
+```
+
+Then exchange the code the user returns with for the token:
+
+```bash
+curl -X POST https://auth.example.com/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code" \
+  -d "client_id=my-app" \
+  -d "client_secret=my-secret" \
+  -d "code=SplxlOBeZQQYbYS6WxSbIA" \
+  -d "redirect_uri=https://my-app.com/callback" \
+  -d "code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+```
+
+The `access_token` in the response acts for that user, on that user's account only, until it expires.
 
 ## OpenAPI Specification
 
@@ -951,7 +994,7 @@ POST /api/v1/admin/clients
 GET /api/v1/admin/clients/{id}
 ```
 
-The response carries no client secret: read it from [Get client secret](#get-client-secret).
+The response carries no client secret: read it from [Get client secret](#get-client-secret). It carries `administrativeScopesAllowed`, read-only, which says whether the client may request the administrative scopes on a user's behalf: see [Switch the administrative scopes allowance](#switch-the-administrative-scopes-allowance).
 
 <Aside type="caution" title="Breaking change">
 Earlier versions answered a confidential client's decrypted secret here, in `clientSecret`, to every scope that reads clients, `authserver:admin-read` included. That field is gone from this response, not left empty. An integration reading it must call `GET /api/v1/admin/clients/{id}/secret` instead, with `authserver:manage-clients` or `authserver:manage`.
@@ -1090,6 +1133,26 @@ PUT /api/v1/admin/clients/{id}/permissions
   "expectedPermissionIds": [1, 2]
 }
 ```
+
+#### Switch the administrative scopes allowance
+
+```
+PUT /api/v1/admin/clients/{id}/administrative-scopes
+```
+
+```json
+{
+  "allowed": true
+}
+```
+
+Switches whether the client may request the six administrative scopes on a signed-in user's behalf (see [Clients that may request the administrative scopes](#clients-that-may-request-the-administrative-scopes)). `allowed` is required: a body without it, or with `null`, is refused `400` with `VALIDATION_ERROR` rather than read as `false`. The answer is the client as it now is, in `client`, with `administrativeScopesAllowed` holding the new value. That field is read-only everywhere else: the create request and [Update client settings](#update-client-settings) take no such field, so no other call sets or clears it.
+
+The route admits `authserver:manage-clients` and `authserver:manage`, but only `authserver:manage` switches the allowance, on or off and on any client, because an allowed client is an [administrator](#administrators-and-authservermanage) client. A token with `authserver:manage-clients` is refused `403` with `MANAGE_SCOPE_REQUIRED` and leaves an `administrator_change_refused` entry in the audit log.
+
+The admin console's own client is always allowed, whatever its row holds, so switching it off is refused `400` with `VALIDATION_ERROR`, as renaming it is.
+
+Every switch, including one to the value already stored, leaves an `updated_client_administrative_scopes` entry in the [audit log](/concepts/audit-log/#events-to-alert-on), naming the client, the new value and the caller.
 
 #### Get client sessions
 
@@ -1417,7 +1480,7 @@ Returns list of countries with calling codes for phone number validation.
 
 ## Account API
 
-The Account API provides self-service endpoints for authenticated users to manage their own account. All endpoints require the `authserver:manage-account` scope.
+The Account API provides self-service endpoints for authenticated users to manage their own account. All endpoints require a signed-in user's token carrying the `authserver:manage-account` scope, obtained through the authorization code flow: see [Account API access](#account-api-access).
 
 ### Profile
 

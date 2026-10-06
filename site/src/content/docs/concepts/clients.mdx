@@ -45,6 +45,27 @@ However, for clients from third-party organizations, configure the client to req
 
 **The default differs by how the client was created.** A client an administrator creates, through the admin console or the admin API, starts with consent off: an administrator vouched for it. A client that registered itself through [dynamic client registration](#dynamic-client-registration-rfc-7591) starts with consent **on**, because nobody has reviewed it. You can untick it on that client's settings page once you have reviewed it.
 
+## Administrative scopes
+
+Six permissions on the `authserver` resource are [administrative](/concepts/resources-permissions/#administrators): `authserver:manage`, `authserver:admin-read`, `authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings` and `authserver:browser-sessions`. A token carrying one of them on a signed-in user's behalf acts at the Admin API with that user's administrative authority, so **only a client allowed to request the administrative scopes may obtain one**:
+
+- **The admin console's own client**, always. Its allowance is on and cannot be switched off.
+- **Any other client an operator has allowed.** Switch **May request administrative scopes** on, on the client's **Settings** tab under **Consent required**, and save it with that switch's own **Save** button, or call [`PUT /api/v1/admin/clients/{id}/administrative-scopes`](/integration/rest-api/#switch-the-administrative-scopes-allowance). Only a token with `authserver:manage` switches it, on or off.
+
+A new client starts not allowed, whether an administrator creates it or it registers itself through [dynamic client registration](#dynamic-client-registration-rfc-7591), which offers no way to ask for the allowance. A self-registered client can be allowed once you have reviewed it, as it can have **Consent required** unticked.
+
+The rule holds on every grant where a client acts for a user: the authorization code flow, [`prompt=none`](/concepts/prompt-parameter/) included, the implicit flow, the refresh token grant and the password grant. A client that is not allowed and asks for an administrative scope is refused, never handed the rest of what it asked for: `invalid_scope` at the authorization endpoint and on the password grant, and `invalid_grant` on a refresh, which it can retry with a `scope` that leaves the administrative scope out (see [Endpoints](/integration/endpoints/#administrative-scopes) and [the token endpoint's answers](/integration/endpoints/#a-client-not-allowed-the-administrative-scopes)). The allowance is read again when the authorization code or the implicit tokens are issued and at every refresh, so switching it off stops a sign-in under way and stops a refresh token being renewed with an administrative scope. Access tokens already issued stay valid until they expire. The client credentials flow is not affected: there the client receives only the permissions granted to the client itself, and granting it an administrative one already needs `authserver:manage`.
+
+Allowing a client changes nothing else about how it signs users in. Whether it shows a consent screen is still decided by **Consent required**, `prompt=consent` and `offline_access`, and a token still carries only the scopes the signed-in user holds.
+
+**An allowed client is an administrator client.** It can obtain a signed-in administrator's whole authority, so, like the admin console's client and a client holding an administrative permission, every change to it (settings, authentication, flows, redirect URIs, web origins, token settings, permissions, logo, deletion) and reading its secret need `authserver:manage` (see [Administrators and authserver:manage](/integration/rest-api/#administrators-and-authservermanage)). Allow a client as deliberately as you would grant `authserver:manage`.
+
+Every switch of the allowance leaves an `updated_client_administrative_scopes` entry in the [audit log](/concepts/audit-log/#events-to-alert-on), and a refusal reaching a signed-in user or an authenticated client leaves an `administrative_scope_refused` entry.
+
+<Aside type="caution" title="Upgrading">
+After upgrading to a version with this allowance, **only the admin console's client is allowed.** Every other existing client starts not allowed, so a client of yours that legitimately requests one of these scopes on a user's behalf, such as a tool that signs administrators in and then calls the Admin API, is answered `invalid_scope` until you switch its allowance on. A client calling the Admin API with its own permissions, through client credentials, needs nothing.
+</Aside>
+
 ## Default ACR level
 
 ACR stands for "Authentication Context Class Reference." It specifies the level of authentication assurance or the strength of the authentication method used to authenticate the end-user.
@@ -132,6 +153,7 @@ The `admin-console-client` is a **system-level client** used internally by the a
 
 - Its **client identifier cannot be changed** (renaming is blocked)
 - It **cannot be deleted**
+- It is always allowed to request the [administrative scopes](#administrative-scopes), and its allowance cannot be switched off
 - All other settings (description, display name, redirect URIs, etc.) can be modified normally, though through the admin API only a token with `authserver:manage` changes them, since this client is an [administrator](/concepts/resources-permissions/#administrators)
 
 The API response for this client includes `"isSystemLevelClient": true` to indicate its protected status.

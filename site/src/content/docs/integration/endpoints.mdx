@@ -128,6 +128,23 @@ GET /auth/authorize?
   nonce=xyz789
 ```
 
+### Administrative scopes
+
+Only a client [allowed to request the administrative scopes](/concepts/clients/#administrative-scopes), the admin console's own client or one an operator has allowed, may ask for `authserver:manage`, `authserver:admin-read`, `authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings` or `authserver:browser-sessions`. Any other client asking for one is refused with `invalid_scope`, naming the first such scope it asked for, and receives no code and no token. The request is refused, never narrowed to the scopes that remain:
+
+```
+error=invalid_scope
+error_description=The client is not allowed to request the administrative scope 'authserver:manage'.
+```
+
+It is delivered as every other invalid authorization request is, in the response mode the request asked for, the implicit flow's fragment included:
+
+- **A browser holding a valid session**, and any `prompt=none` request, is answered at once, with no page shown. When the session is valid, the refusal also leaves an `administrative_scope_refused` entry in the [audit log](/concepts/audit-log/#events-to-alert-on).
+- **A signed-out browser** is answered only after the user has entered their password, so the error reveals nothing to someone who has not signed in. That sign-in creates no session, and the refusal leaves a log record but no audit entry.
+- **A [self-registered client](/concepts/clients/#security-considerations)** is never redirected to: the user sees the refusal page instead.
+
+The allowance is read again just before the code or the implicit tokens are issued, so a sign-in under way when an operator switches a client's allowance off ends with the same answer.
+
 ## /auth/token (POST)
 
 The token endpoint serves the purpose of requesting tokens. This can happen either through the authorization code flow (exchanging an authorization code for tokens), the client credentials flow (client directly requests tokens), or using a refresh token.
@@ -195,7 +212,7 @@ Per [RFC 6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.3), clien
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>scope</code></td>
-      <td>For <code>client_credentials</code>: required, one or more <code>resource:permission</code> scopes. For <code>refresh_token</code>: optional, to restrict the original scope. A value the original grant does not hold is refused with <code>invalid_scope</code>.</td>
+      <td>For <code>client_credentials</code>: required, one or more <code>resource:permission</code> scopes. For <code>refresh_token</code>: optional, to restrict the original scope. A value the original grant does not hold is refused with <code>invalid_scope</code>. On the <code>refresh_token</code> and <code>password</code> grants, an <a href="#administrative-scopes">administrative scope</a> is refused unless the client is allowed to request one.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>refresh_token</code></td>
@@ -342,10 +359,34 @@ The response body contains error details:
     <tr>
       <td style="white-space: nowrap;"><code>invalid_scope</code></td>
       <td>400</td>
-      <td>The requested scope is invalid, unknown, or exceeds the scope granted.</td>
+      <td>The requested scope is invalid, unknown, or exceeds the scope granted, or it is an administrative scope the client is not allowed to request on the password grant.</td>
     </tr>
   </tbody>
 </table>
+
+#### A client not allowed the administrative scopes
+
+On the grants where a client acts for a user, a client that is not [allowed to request the administrative scopes](/concepts/clients/#administrative-scopes) is refused one, never handed a narrower token, and the refusal leaves an `administrative_scope_refused` entry in the [audit log](/concepts/audit-log/#events-to-alert-on). The client credentials grant is not affected.
+
+The **password grant** answers `invalid_scope`, as it answers a scope the user does not hold:
+
+```json
+{
+  "error": "invalid_scope",
+  "error_description": "The client is not allowed to request the administrative scope 'authserver:manage'."
+}
+```
+
+The **refresh token grant** answers `invalid_grant`, in the shape of its other per-scope checks. It judges the scope the refresh would issue, read now rather than when the token was issued, so a refresh token issued before an upgrade, or before an operator switched the client's allowance off, is not renewed with an administrative scope:
+
+```json
+{
+  "error": "invalid_grant",
+  "error_description": "Scope 'authserver:manage' is not recognized. The client is not allowed to request the administrative scope 'authserver:manage'."
+}
+```
+
+The refresh token is not spent: refresh again with a `scope` that leaves every administrative scope out, which [RFC 6749 section 6](https://datatracker.ietf.org/doc/html/rfc6749#section-6) allows as a narrower request.
 
 ## /auth/logout (GET or POST)
 
