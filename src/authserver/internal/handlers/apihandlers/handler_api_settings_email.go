@@ -177,6 +177,22 @@ func HandleSettingsEmailPut(
 			return
 		}
 
+		// The password is kept, replaced or removed (#410 decision 1). The API never answers it, so
+		// an absent or empty one keeps what is stored, and only the flag removes it.
+		if req.SMTPPassword != "" && req.ClearSMTPPassword {
+			writeJSONError(w, "Send either a new SMTP password or clearSmtpPassword, not both.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+		// A stored password reaches only the host it was entered for: pointing it elsewhere needs
+		// the password again, or its removal, or the next send would log in to the new host with a
+		// password its caller cannot read (#410 decision 2). Both hosts are compared normalised.
+		storedHost := hostport.Unbracket(strings.TrimSpace(currentSettings.SMTPHost))
+		if len(currentSettings.SMTPPasswordEncrypted) > 0 && req.SMTPPassword == "" && !req.ClearSMTPPassword &&
+			!strings.EqualFold(smtpHost, storedHost) {
+			writeJSONError(w, "The SMTP host has changed: enter the SMTP password again, or remove it.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
 		// Reserved to authserver:manage, refused after the request's own 400 answers and before
 		// the dial, so a refused caller reaches no server through this one.
 		if !settingsCeilingAllows(w, r, auditLogger) {
@@ -201,15 +217,16 @@ func HandleSettingsEmailPut(
 		currentSettings.SMTPEncryption = smtpEncryption.String()
 		currentSettings.SMTPUsername = strings.TrimSpace(req.SMTPUsername)
 
-		if len(req.SMTPPassword) > 0 {
+		switch {
+		case req.ClearSMTPPassword:
+			currentSettings.SMTPPasswordEncrypted = nil
+		case len(req.SMTPPassword) > 0:
 			encrypted, err := dataCipher.Encrypt(req.SMTPPassword)
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return
 			}
 			currentSettings.SMTPPasswordEncrypted = encrypted
-		} else {
-			currentSettings.SMTPPasswordEncrypted = nil
 		}
 
 		currentSettings.SMTPFromName = strings.TrimSpace(req.SMTPFromName)

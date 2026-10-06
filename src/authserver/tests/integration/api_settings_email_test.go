@@ -353,55 +353,81 @@ func TestAPISettingsEmailPut_HostIsStoredBare(t *testing.T) {
 	}
 }
 
-// PUT: password set and clear lifecycle
+// PUT: the stored password's lifecycle through the stored row. A password set is kept by a save that
+// omits it or sends it empty, since the API never answers it and a client sending the form back has
+// nothing to put there; a host change with neither a new password nor its removal is refused and
+// writes nothing; clearSmtpPassword removes it (#410 decisions 1 and 2).
 func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
 
-	// Set password
-	req1 := api.UpdateSettingsEmailRequest{
-		SMTPEnabled:    true,
-		SMTPHost:       "mailpit",
-		SMTPPort:       1025,
-		SMTPFromEmail:  "noreply@goiabada.dev",
-		SMTPEncryption: "none",
-		SMTPPassword:   "abc123",
+	// save sends an enabled save to mailpit's relay, or to host, with extra beside the fields every
+	// save sends; a password, or its removal, is sent only when extra names it.
+	save := func(t *testing.T, host string, extra map[string]interface{}) *http.Response {
+		t.Helper()
+		body := map[string]interface{}{
+			"smtpEnabled":    true,
+			"smtpHost":       host,
+			"smtpPort":       1025,
+			"smtpFromEmail":  "noreply@goiabada.dev",
+			"smtpEncryption": "none",
+		}
+		for key, value := range extra {
+			body[key] = value
+		}
+		resp := makeAPIRequest(t, "PUT", url, accessToken, body)
+		t.Cleanup(func() { _ = resp.Body.Close() })
+		return resp
 	}
-	resp1 := makeAPIRequest(t, "PUT", url, accessToken, req1)
-	defer func() { _ = resp1.Body.Close() }()
-	assert.Equal(t, http.StatusOK, resp1.StatusCode)
-	// GET should show has password true
-	respGet := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer func() { _ = respGet.Body.Close() }()
-	var body api.SettingsEmailResponse
-	_ = json.NewDecoder(respGet.Body).Decode(&body)
-	assert.Equal(t, true, body.HasSMTPPassword)
-
-	// Clear password (send empty)
-	req2 := api.UpdateSettingsEmailRequest{
-		SMTPEnabled:    true,
-		SMTPHost:       "mailpit",
-		SMTPPort:       1025,
-		SMTPFromEmail:  "noreply@goiabada.dev",
-		SMTPEncryption: "none",
-		SMTPPassword:   "",
+	hasPassword := func(t *testing.T) bool {
+		t.Helper()
+		resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+		defer func() { _ = resp.Body.Close() }()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		var body api.SettingsEmailResponse
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+		return body.HasSMTPPassword
 	}
-	resp2 := makeAPIRequest(t, "PUT", url, accessToken, req2)
-	defer func() { _ = resp2.Body.Close() }()
-	assert.Equal(t, http.StatusOK, resp2.StatusCode)
+	storedCiphertext := func(t *testing.T) []byte {
+		t.Helper()
+		settings, err := database.GetSettingsById(context.Background(), nil, 1)
+		require.NoError(t, err)
+		return settings.SMTPPasswordEncrypted
+	}
 
-	// DB should have password cleared
+	// Set
+	require.Equal(t, http.StatusOK, save(t, "mailpit", map[string]interface{}{"smtpPassword": "abc123"}).StatusCode)
+	assert.True(t, hasPassword(t))
+	set := storedCiphertext(t)
+	plaintext, err := dataCipher.Decrypt(set)
+	require.NoError(t, err)
+	assert.Equal(t, "abc123", plaintext)
+
+	// Kept by a save that omits it, and by one that sends it empty
+	require.Equal(t, http.StatusOK, save(t, "mailpit", nil).StatusCode)
+	assert.Equal(t, set, storedCiphertext(t), "an omitted password keeps the stored ciphertext")
+	assert.True(t, hasPassword(t))
+	require.Equal(t, http.StatusOK, save(t, "mailpit", map[string]interface{}{"smtpPassword": ""}).StatusCode)
+	assert.Equal(t, set, storedCiphertext(t), "an empty password keeps the stored ciphertext")
+	assert.True(t, hasPassword(t))
+
+	// A host change without the password again is refused, and writes nothing
+	refused := save(t, "smtp.elsewhere.test", map[string]interface{}{"smtpPassword": ""})
+	require.Equal(t, http.StatusBadRequest, refused.StatusCode)
+	var errBody api.ErrorResponse
+	require.NoError(t, json.NewDecoder(refused.Body).Decode(&errBody))
+	assert.Equal(t, "VALIDATION_ERROR", errBody.ErrorCode)
+	assert.Equal(t, "The SMTP host has changed: enter the SMTP password again, or remove it.", errBody.ErrorDescription)
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, len(settings.SMTPPasswordEncrypted))
+	require.NoError(t, err)
+	assert.Equal(t, "mailpit", settings.SMTPHost)
+	assert.Equal(t, set, settings.SMTPPasswordEncrypted)
 
-	// GET should show has password false
-	respGet2 := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer func() { _ = respGet2.Body.Close() }()
-	var body2 api.SettingsEmailResponse
-	_ = json.NewDecoder(respGet2.Body).Decode(&body2)
-	assert.Equal(t, false, body2.HasSMTPPassword)
+	// Cleared
+	require.Equal(t, http.StatusOK, save(t, "mailpit", map[string]interface{}{"clearSmtpPassword": true}).StatusCode)
+	assert.Empty(t, storedCiphertext(t))
+	assert.False(t, hasPassword(t))
 }
 
 // POST /api/v1/admin/settings/email/send-test
