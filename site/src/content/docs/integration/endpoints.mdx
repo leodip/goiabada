@@ -147,7 +147,7 @@ The allowance is read again just before the code or the implicit tokens are issu
 
 ## /auth/token (POST)
 
-The token endpoint serves the purpose of requesting tokens. This can happen either through the authorization code flow (exchanging an authorization code for tokens), the client credentials flow (client directly requests tokens), or using a refresh token.
+The token endpoint serves the purpose of requesting tokens. This can happen either through the authorization code flow (exchanging an authorization code for tokens), the client credentials flow (client directly requests tokens), using a refresh token, or, where it is enabled, the deprecated [resource owner password credentials](/oauth2-flows/resource-owner-password/) flow (exchanging a user's username and password for tokens).
 
 ### Client authentication
 
@@ -188,7 +188,7 @@ Per [RFC 6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.3), clien
   <tbody>
     <tr>
       <td style="white-space: nowrap;"><code>grant_type</code></td>
-      <td><code>authorization_code</code>, <code>client_credentials</code>, or <code>refresh_token</code></td>
+      <td><code>authorization_code</code>, <code>client_credentials</code>, <code>refresh_token</code>, or <code>password</code>. The <code>password</code> grant is disabled by default and accepted only when it is enabled globally or for the client; see <a href="/oauth2-flows/resource-owner-password/">Resource Owner Password Credentials</a>.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>client_id</code></td>
@@ -212,11 +212,19 @@ Per [RFC 6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.3), clien
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>scope</code></td>
-      <td>For <code>client_credentials</code>: required, one or more <code>resource:permission</code> scopes. For <code>refresh_token</code>: optional, to restrict the original scope. A value the original grant does not hold is refused with <code>invalid_scope</code>. On the <code>refresh_token</code> and <code>password</code> grants, an <a href="#administrative-scopes">administrative scope</a> is refused unless the client is allowed to request one.</td>
+      <td>For <code>client_credentials</code>: required, one or more <code>resource:permission</code> scopes. For <code>refresh_token</code>: optional, to restrict the original scope. A value the original grant does not hold is refused with <code>invalid_scope</code>. For <code>password</code>: optional, <code>openid</code> when omitted; OpenID Connect scopes and <code>offline_access</code> are granted as asked, and a <code>resource:permission</code> scope only when the user holds that permission, directly or through a group, else the request is refused with <code>invalid_scope</code>. On the <code>refresh_token</code> and <code>password</code> grants, an <a href="#administrative-scopes">administrative scope</a> is refused unless the client is allowed to request one.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>refresh_token</code></td>
       <td>Required for the <code>refresh_token</code> grant type.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>username</code></td>
+      <td>The user's email address. Required for the <code>password</code> grant type.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>password</code></td>
+      <td>The user's password. Required for the <code>password</code> grant type.</td>
     </tr>
   </tbody>
 </table>
