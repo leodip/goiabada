@@ -81,6 +81,34 @@ func TestUpdateClient_LeavesTheAdministrativeScopesAllowanceAlone(t *testing.T) 
 	}
 }
 
+// TestSetClientAdministrativeScopesAllowed_SwitchesTheOneClient holds the allowance's one writer to
+// switching it both ways on the client it names and on no other, leaving the client's other columns
+// as they were (#499 decision 5).
+func TestSetClientAdministrativeScopesAllowed_SwitchesTheOneClient(t *testing.T) {
+	ctx := context.Background()
+
+	target := createAllowanceTestClient(t, false)
+	bystander := createAllowanceTestClient(t, false)
+	allowedBystander := createAllowanceTestClient(t, true)
+
+	for _, allowed := range []bool{true, false, false, true} {
+		require.NoError(t, database.SetClientAdministrativeScopesAllowed(ctx, nil, target.Id, allowed))
+
+		got, err := database.GetClientById(ctx, nil, target.Id)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equalf(t, allowed, got.AdministrativeScopesAllowed, "the target after switching to %v", allowed)
+		assert.Equal(t, target.ClientIdentifier, got.ClientIdentifier)
+		assert.Equal(t, target.Description, got.Description)
+
+		for want, other := range map[bool]*record.Client{false: bystander, true: allowedBystander} {
+			stored, err := database.GetClientById(ctx, nil, other.Id)
+			require.NoError(t, err)
+			assert.Equalf(t, want, stored.AdministrativeScopesAllowed, "client %d is not the one switched", other.Id)
+		}
+	}
+}
+
 func createAllowanceTestClient(t *testing.T, allowed bool) *record.Client {
 	t.Helper()
 	client := &record.Client{

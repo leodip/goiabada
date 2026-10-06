@@ -76,6 +76,9 @@ type Database interface {
 	// the write after it can straddle another writer's commit, and a classification
 	// taken from the stale side leaves the grants alive.
 	SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
+	// SetClientAdministrativeScopesAllowed writes whether a client may request the administrative
+	// authserver scopes. It is that column's one writer: UpdateClient never writes it (#499).
+	SetClientAdministrativeScopesAllowed(ctx context.Context, tx *sql.Tx, clientId int64, allowed bool) error
 	// AcquireClientRow takes the client's row inside the caller's transaction and holds it
 	// until that transaction ends, so a read taken afterwards cannot be invalidated by
 	// another writer before the caller writes it back (see #245).

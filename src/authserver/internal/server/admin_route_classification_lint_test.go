@@ -52,6 +52,7 @@ var adminPolicyCeilings = map[string]string{
 	"userTargetCeilingAllows":            adminCeilingTarget,
 	"groupTargetCeilingAllows":           adminCeilingTarget,
 	"clientTargetCeilingAllows":          adminCeilingTarget,
+	"allowanceCeilingAllows":             adminCeilingTarget,
 	"permissionDescriptionCeilingAllows": adminCeilingTarget,
 	"settingsCeilingAllows":              adminCeilingSettings,
 }
@@ -138,9 +139,12 @@ var adminRouteClassification = map[string]adminRouteClass{
 	"PUT /api/v1/admin/clients/{id}/web-origins":    appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/tokens":         appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/permissions":    appliesCeilings(adminCeilingGrant, adminCeilingTarget),
-	"DELETE /api/v1/admin/clients/{id}":             appliesCeilings(adminCeilingTarget),
-	"POST /api/v1/admin/clients/{id}/logo":          appliesCeilings(adminCeilingTarget),
-	"DELETE /api/v1/admin/clients/{id}/logo":        appliesCeilings(adminCeilingTarget),
+	// Switching a client's allowance to request the administrative scopes makes an administrator
+	// client or changes one, so every caller below authserver:manage is refused it (#499 decision 4).
+	"PUT /api/v1/admin/clients/{id}/administrative-scopes": appliesCeilings(adminCeilingTarget),
+	"DELETE /api/v1/admin/clients/{id}":                    appliesCeilings(adminCeilingTarget),
+	"POST /api/v1/admin/clients/{id}/logo":                 appliesCeilings(adminCeilingTarget),
+	"DELETE /api/v1/admin/clients/{id}/logo":               appliesCeilings(adminCeilingTarget),
 	"POST /api/v1/admin/clients": outsideCeilings("creates a client, which holds no permission: a new client is " +
 		"never an administrator"),
 

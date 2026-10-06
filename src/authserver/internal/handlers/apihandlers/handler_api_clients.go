@@ -49,6 +49,7 @@ type clientsDatabase interface {
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
+	SetClientAdministrativeScopesAllowed(ctx context.Context, tx *sql.Tx, clientId int64, allowed bool) error
 	SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
 	UpdateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
 }
@@ -781,6 +782,96 @@ func HandleClientAuthenticationPut(
 
 		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
 		writeJSON(w, r, http.StatusOK, resp)
+	}
+}
+
+// HandleClientAdministrativeScopesPut - PUT /api/v1/admin/clients/{id}/administrative-scopes
+//
+// Switches whether the client may request the administrative authserver scopes on a user's behalf,
+// and answers the client as it now is. The route admits the clients scopes, and the handler reserves
+// the switch to authserver:manage, either way and on any client, because an allowed client is an
+// administrator client (#499 decisions 4 and 5).
+//
+// The admin console's client is always allowed, whatever its row holds, so switching it off is
+// refused 400, as renaming it is, rather than stored as a value the server would not apply. The
+// request's own 400s and 404 are answered before the ceiling, and the switch is recorded as
+// updated_client_administrative_scopes once it is written (#499 decision 9).
+func HandleClientAdministrativeScopesPut(
+	database clientsDatabase,
+	auditLogger AuditLogger,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		client, err := database.GetClientById(r.Context(), nil, id)
+		if err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for administrative scopes update"), "client_id", id)
+			return
+		}
+		if client == nil {
+			writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
+			return
+		}
+
+		var req api.UpdateClientAdministrativeScopesRequest
+		if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
+			return
+		}
+		// Absent or null is refused rather than read as false: a body that says nothing must not
+		// switch the allowance off.
+		if req.Allowed == nil {
+			writeJSONError(w, "allowed is required.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+		allowed := *req.Allowed
+
+		if client.IsSystemLevelClient() && !allowed {
+			writeJSONError(w, "The admin console's client is always allowed to request the administrative scopes.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		// Only authserver:manage switches the allowance (#499 decision 4).
+		if !allowanceCeilingAllows(w, r, auditLogger, client) {
+			return
+		}
+
+		if err = database.SetClientAdministrativeScopesAllowed(r.Context(), nil, client.Id, allowed); err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client administrative scopes allowance"), "client_id", client.Id)
+			return
+		}
+
+		// The answer is the row as stored, read back after the write.
+		client, err = database.GetClientById(r.Context(), nil, id)
+		if err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client after administrative scopes update"), "client_id", id)
+			return
+		}
+		if client == nil {
+			writeJSONError(w, "Client not found", "NOT_FOUND", http.StatusNotFound)
+			return
+		}
+		if err = database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after administrative scopes update"), "client_id", client.Id)
+			return
+		}
+		if err = database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after administrative scopes update"), "client_id", client.Id)
+			return
+		}
+
+		auditLogger.Log(r.Context(), audit.EventUpdatedClientAdministrativeScopes, map[string]interface{}{
+			"clientId":         client.Id,
+			"clientIdentifier": client.ClientIdentifier,
+			"allowed":          allowed,
+			"loggedInUser":     callerSubject(r),
+		})
+
+		writeJSON(w, r, http.StatusOK, api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)})
 	}
 }
 

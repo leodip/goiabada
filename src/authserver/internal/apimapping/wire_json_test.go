@@ -584,18 +584,20 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 
 	// clientScalars is everything between the identifier and the two collections.
 	// Split out so the nil-collection row below can reuse it with a different
-	// clientIdentifier without restating twenty-odd keys.
+	// clientIdentifier without restating twenty-odd keys. The system-level client
+	// reads administrativeScopesAllowed true with its row's column left false: the
+	// admin console's client is always allowed (#499).
 	clientScalars := func(identifier string, systemLevel bool) string {
-		scalars := `"clientIdentifier":"` + identifier + `","description":"the web app",` +
-			`"websiteUrl":"https://app.example","displayName":"Web App","enabled":true,` +
-			`"consentRequired":true,"createdViaDcr":false,"showLogo":true,"showDisplayName":true,` +
-			`"showDescription":false,"showWebsiteUrl":true,"isPublic":false,"isSystemLevelClient":`
+		flag := `false`
 		if systemLevel {
-			scalars += `true`
-		} else {
-			scalars += `false`
+			flag = `true`
 		}
-		return scalars + `,"authorizationCodeEnabled":true,"clientCredentialsEnabled":false,` +
+		return `"clientIdentifier":"` + identifier + `","description":"the web app",` +
+			`"websiteUrl":"https://app.example","displayName":"Web App","enabled":true,` +
+			`"consentRequired":true,"createdViaDcr":false,"administrativeScopesAllowed":` + flag +
+			`,"showLogo":true,"showDisplayName":true,` +
+			`"showDescription":false,"showWebsiteUrl":true,"isPublic":false,"isSystemLevelClient":` + flag +
+			`,"authorizationCodeEnabled":true,"clientCredentialsEnabled":false,` +
 			`"pkceRequired":true,"implicitGrantEnabled":null,` +
 			`"resourceOwnerPasswordCredentialsEnabled":false,"tokenExpirationInSeconds":300,` +
 			`"refreshTokenOfflineIdleTimeoutInSeconds":3600,` +

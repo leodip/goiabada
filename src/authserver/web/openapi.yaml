@@ -2222,6 +2222,56 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/admin/clients/{id}/administrative-scopes:
+    put:
+      tags: [Clients]
+      summary: Switch whether a client may request the administrative scopes
+      description: |
+        Switch whether the client may request the six administrative `authserver`
+        scopes (`manage`, `admin-read`, `manage-users`, `manage-clients`,
+        `manage-settings` and `browser-sessions`) on a user's behalf, through the
+        authorization code, implicit, refresh token and password grants. A client
+        that is not allowed is answered `invalid_scope` (`invalid_grant` on a
+        refresh) when it asks for one. A new client starts not allowed; the admin
+        console's own client is always allowed.
+
+        The route admits `authserver:manage-clients` and `authserver:manage`, and
+        the switch itself is reserved to `authserver:manage`, either way and on any
+        client: `authserver:manage-clients` is refused with MANAGE_SCOPE_REQUIRED.
+        An allowed client is an administrator client, so every other write to it,
+        and reading its secret, is reserved to `authserver:manage` too.
+
+        Switching the admin console's own client off is refused with
+        VALIDATION_ERROR. Every switch leaves an
+        `updated_client_administrative_scopes` audit record naming the client, the
+        new value and the caller. The answer is the client as it now is.
+      operationId: updateClientAdministrativeScopes
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientAdministrativeScopesRequest'
+      responses:
+        '200':
+          description: Allowance switched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateClientResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/admin/clients/{id}/sessions:
     get:
       tags: [Clients]
@@ -5283,6 +5333,9 @@ components:
         createdViaDcr:
           type: boolean
           description: Read-only. True when the client registered itself through /connect/register
+        administrativeScopesAllowed:
+          type: boolean
+          description: Read-only. True when the client may request the administrative authserver scopes on a user's behalf; always true for the admin console's own client. Switched through PUT /api/v1/admin/clients/{id}/administrative-scopes, with authserver:manage alone
         showLogo:
           type: boolean
           description: When true, the client logo is displayed on login and consent screens
@@ -5346,6 +5399,7 @@ components:
         - enabled
         - consentRequired
         - createdViaDcr
+        - administrativeScopesAllowed
         - showLogo
         - showDisplayName
         - showDescription
@@ -5540,6 +5594,14 @@ components:
           type: string
         includeOpenIDConnectClaimsInIdToken:
           type: string
+
+    UpdateClientAdministrativeScopesRequest:
+      type: object
+      required: [allowed]
+      properties:
+        allowed:
+          type: boolean
+          description: Whether the client may request the administrative authserver scopes. Required; false on the admin console's own client is refused
 
     UpdateClientPermissionsRequest:
       type: object
