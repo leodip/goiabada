@@ -207,7 +207,7 @@ func HandleSettingsEmailPut(
 		conn, err := net.DialTimeout("tcp", hostport.Join(smtpHost, req.SMTPPort), 3*time.Second)
 		if err != nil {
 			slog.WarnContext(r.Context(), "unable to connect to the smtp server", "error", err)
-			writeJSONError(w, connectionFailureMessage("Unable to connect to the SMTP server",
+			writeJSONError(w, connectionFailureMessage(smtpDialFailure,
 				emaildelivery.ClassifyConnectionError(err)), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -315,6 +315,10 @@ func HandleSettingsEmailSendTestPost(
 		writeJSON(w, r, http.StatusOK, api.SuccessResponse{Success: true})
 	}
 }
+
+// smtpDialFailure is what a failed connectivity dial on save answers, before
+// connectionFailureMessage adds its cause.
+const smtpDialFailure = "Unable to connect to the SMTP server"
 
 // connectionFailureMessage is message, a fixed sentence with no end stop, followed by the words the
 // cause adds, or by its end stop alone when the classification names no cause. It is the only text

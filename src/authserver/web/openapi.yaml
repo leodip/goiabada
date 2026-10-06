@@ -2455,6 +2455,11 @@ paths:
         The hosts are compared with surrounding space trimmed, one pair of brackets taken off
         an IPv6 literal, and without regard to case. A change of port, username, encryption or
         sender keeps the stored password.
+
+        Once every other check has passed, a save with `smtpEnabled: true` opens a TCP
+        connection to `smtpHost` on `smtpPort`, with a 3-second timeout. It only checks that
+        something answers there: it does not speak SMTP, negotiate TLS or log in, which is what
+        the send-test operation is for. A connection that fails is a 400; see that response.
       operationId: updateSettingsEmail
       requestBody:
         required: true
@@ -2470,7 +2475,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/SettingsEmailResponse'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: |
+            error_code is INVALID_REQUEST_BODY for a body that will not parse; a refused field
+            answers VALIDATION_ERROR, or its catalog key, such as
+            validator.email.invalid_format, when the refusal is localized; and a connection that
+            fails answers VALIDATION_ERROR. Nothing is written.
+
+            A failed connection answers one of these fixed messages, naming at most its coarse
+            cause:
+
+              - "Unable to connect to the SMTP server: host name not found."
+              - "Unable to connect to the SMTP server: connection timed out."
+              - "Unable to connect to the SMTP server: connection refused."
+              - "Unable to connect to the SMTP server."
+
+            The last is every failure the other three do not name, such as a network the auth
+            server has no route to. No address, port or operating-system error is answered; the
+            full error goes to the auth server's log, at Warn, as "unable to connect to the smtp
+            server" under the request's request_id.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2482,7 +2508,14 @@ paths:
     post:
       tags: [Settings]
       summary: Send test email
-      description: Send a test email to verify SMTP settings
+      description: |
+        Send a short message to `to` through the stored SMTP settings, the stored password
+        included, to check what a save's connection does not: the encryption, the certificate,
+        the credentials and the sender. Answers 200 once the SMTP server has accepted the
+        message.
+
+        The send waits up to 10 seconds to connect, including the TLS handshake for SSL/TLS,
+        and up to 30 seconds for the rest of the conversation.
       operationId: sendTestEmail
       requestBody:
         required: true
@@ -2498,7 +2531,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: |
+            error_code is SMTP_NOT_ENABLED while SMTP is disabled, INVALID_REQUEST_BODY for a
+            body that will not parse, VALIDATION_ERROR when `to` is missing,
+            validator.email.invalid_format when it is not an email address, and SEND_FAILED when
+            the send fails.
+
+            A SEND_FAILED answers one of these fixed messages, chosen by what failed:
+
+              - "Unable to send the test email: host name not found."
+              - "Unable to send the test email: connection timed out."
+              - "Unable to send the test email: connection refused."
+              - "The SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS."
+              - "The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS."
+              - "SMTP credentials are configured but the server offers no authentication."
+              - "The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5."
+              - "The TLS connection failed; check the encryption setting and the server's certificate."
+              - "The SMTP server rejected the username or password."
+              - "The SMTP server refused the message."
+              - "Unable to send the test email."
+
+            The last is every failure the others do not name, such as a connection that dropped
+            partway through the conversation or a stored password the auth server cannot
+            decrypt. The REST API documentation says what to check for each. Nothing from the
+            error itself is answered, no address, operating-system error or server reply; the
+            full error goes to the auth server's log, at Warn, as "unable to send the test
+            email" under the request's request_id.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

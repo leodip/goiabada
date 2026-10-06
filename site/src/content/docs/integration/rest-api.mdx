@@ -216,6 +216,8 @@ Common `error_code` categories:
 - `MANAGE_SCOPE_REQUIRED` - The request acts on an administrator or an administrative permission, which only `authserver:manage` may do, so no granular scope will ever be enough; see [Administrators and authserver:manage](#administrators-and-authservermanage)
 - `CONCURRENT_UPDATE` - A list save was sent with a list that is no longer the stored one (see below)
 - `LAST_ADMINISTRATOR` - The change would leave no enabled user holding `authserver:manage`; grant it to another user first
+- `SMTP_NOT_ENABLED` - A test email was asked for while SMTP is disabled
+- `SEND_FAILED` - The test email could not be sent; the description says what failed, see [Send test email](#send-test-email)
 - `TOO_MANY_REQUESTS` - Rate limit reached; the response carries a `Retry-After` header
 - `INTERNAL_SERVER_ERROR` - Server-side error
 
@@ -1212,6 +1214,17 @@ A save keeps, replaces or removes the stored password:
 
 A non-empty `smtpPassword` together with `clearSmtpPassword: true` is refused with `VALIDATION_ERROR`, and so is a save that changes `smtpHost` while a password is stored without sending either: a stored password only ever reaches the host it was entered for, so a new host needs the password again, or its removal. The hosts are compared with surrounding space and the brackets of an IPv6 literal taken off, and without regard to case; a change of port, username, encryption or sender keeps the password. Neither refusal writes anything. Saving with `smtpEnabled: false` clears every SMTP field, the password included.
 
+Once every other check has passed, a save with `smtpEnabled: true` opens a TCP connection to `smtpHost` on `smtpPort`, with a 3-second timeout. It only checks that something answers there: it does not speak SMTP, negotiate TLS or log in, which is what [Send test email](#send-test-email) is for. A connection that fails is refused with `400 VALIDATION_ERROR`, writes nothing, and answers one of these fixed messages:
+
+| `error_description` | What to check |
+|---|---|
+| "Unable to connect to the SMTP server: host name not found." | The host name: it is misspelt, or the auth server cannot resolve it, or its resolver did not answer in time. The auth server's resolver may not be the one your own machine uses |
+| "Unable to connect to the SMTP server: connection timed out." | Nothing answered within 3 seconds: the port, and any firewall between the auth server and the SMTP server |
+| "Unable to connect to the SMTP server: connection refused." | The host answered but nothing listens on that port: the port |
+| "Unable to connect to the SMTP server." | Any other failure, such as a network the auth server has no route to |
+
+The message names no address, port or operating-system error, so a save cannot be used to probe the network the auth server sits on. The full error goes to the auth server's log, at Warn, as `unable to connect to the smtp server` under the request's `request_id`.
+
 #### Send test email
 
 ```
@@ -1223,6 +1236,26 @@ POST /api/v1/admin/settings/email/send-test
   "to": "test@example.com"
 }
 ```
+
+Sends a short message to `to` through the stored settings, the stored password included, and answers `200` with `{"success": true}` once the SMTP server has accepted it. Use it after a save, to check what the save's connection does not: the encryption, the certificate, the credentials and the sender. It is refused with `400 SMTP_NOT_ENABLED` while SMTP is disabled, with `400 VALIDATION_ERROR` when `to` is missing, and with `400 validator.email.invalid_format` when it is not an email address.
+
+The send waits up to 10 seconds to connect, including the TLS handshake for SSL/TLS, and up to 30 seconds for the rest of the conversation. A send that fails answers `400 SEND_FAILED` with one of these fixed messages, chosen by what failed:
+
+| `error_description` | What to check |
+|---|---|
+| "Unable to send the test email: host name not found." | The host name, as for a save |
+| "Unable to send the test email: connection timed out." | The port and any firewall, as for a save. A server that accepted the connection and then went quiet also ends here, which is what STARTTLS or None against an SSL/TLS port such as 465 looks like |
+| "Unable to send the test email: connection refused." | The port |
+| "The SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS." | The encryption is STARTTLS and the server does not offer it. Goiabada does not continue unencrypted |
+| "The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS." | The encryption is None, a username is set, and the server would be sent the password in the clear by PLAIN or LOGIN. Only a server on `localhost`, `127.0.0.1` or `::1` is exempt |
+| "SMTP credentials are configured but the server offers no authentication." | A username is set and the server offers no `AUTH`: the wrong host or port, or a server that offers authentication only after STARTTLS reached with the encryption set to None |
+| "The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5." | The server only offers mechanisms Goiabada does not implement, such as XOAUTH2: use a password the server accepts through one of these three, often called an app password or an SMTP key |
+| "The TLS connection failed; check the encryption setting and the server's certificate." | SSL/TLS against a port that expects STARTTLS, such as 587; a certificate the auth server does not trust, has expired, or names a host other than `smtpHost`; or a server that refused the STARTTLS command. Certificates are always verified |
+| "The SMTP server rejected the username or password." | The username and password |
+| "The SMTP server refused the message." | The server refused the sender, the recipient or the message itself, most often because the account may not send from `smtpFromEmail` |
+| "Unable to send the test email." | Any other failure: a connection that dropped partway through the conversation, a network the auth server has no route to, or a stored password the auth server cannot decrypt, such as one encrypted under a `GOIABADA_AES_ENCRYPTION_KEY` it no longer has |
+
+The message carries nothing from the error itself: no address, no operating-system error, and none of the server's replies. The full error goes to the auth server's log, at Warn, as `unable to send the test email` under the request's `request_id`.
 
 #### Session settings
 
