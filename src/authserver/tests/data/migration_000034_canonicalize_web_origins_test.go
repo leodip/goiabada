@@ -321,15 +321,12 @@ func assertWebOriginsIndex000034(t *testing.T, h *isolatedDB, clientAId, clientB
 	require.NoErrorf(t, h.DB.DeleteWebOrigin(context.Background(), nil, spare.Id), "[%s] clean up the spare row", phase)
 }
 
+// seedClient000034 writes the client in SQL rather than through the ORM: the database is at 000033,
+// and the record names columns later migrations add, clients.administrative_scopes_allowed (000060)
+// among them.
 func seedClient000034(t *testing.T, h *isolatedDB, identifier string) *record.Client {
 	t.Helper()
-
-	client := &record.Client{
-		ClientIdentifier: identifier,
-		Description:      "Migration 000034 test client",
-	}
-	require.NoErrorf(t, h.DB.CreateClient(context.Background(), nil, client), "seed client %s", identifier)
-	return client
+	return &record.Client{Id: seedClient000035(t, h, identifier), ClientIdentifier: identifier}
 }
 
 // seedWebOrigin000034 stores raw verbatim and returns its id. It goes through the
