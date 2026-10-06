@@ -58,16 +58,16 @@ func TestMigration000051_RefreshTokenAuthenticatedAt(t *testing.T) {
 }
 
 // seedPreMigration000051ROPCRefreshToken inserts an ROPC refresh token as a release before 000051
-// wrote it: user_id and client_id set, no code. The client and the user go through the ORM, whose
-// models match the 000050 schema for both tables; the token row is literal SQL, because the Go
-// model already names authenticated_at. Literals rather than placeholders because the four
+// wrote it: user_id and client_id set, no code. The user goes through the ORM, whose model matches
+// the 000050 schema for users; the client and the token row are literal SQL, because the Go models
+// already name columns 000050 does not have: clients.administrative_scopes_allowed (000060) and
+// refresh_tokens.authenticated_at. Literals rather than placeholders because the four
 // dialects disagree on placeholder syntax, and every value here is test-controlled.
 func seedPreMigration000051ROPCRefreshToken(t *testing.T, h *isolatedDB) string {
 	t.Helper()
 	random := fake.LetterN(6)
 
-	client := &record.Client{ClientIdentifier: "mig51_client_" + random, Description: "Migration 000051 test client"}
-	require.NoError(t, h.DB.CreateClient(context.Background(), nil, client), "seed client")
+	clientId := seedClient000035(t, h, "mig51_client_"+random)
 	user := &record.User{Enabled: true, Subject: fake.UUID(), Username: "mig51_" + random}
 	require.NoError(t, h.DB.CreateUser(context.Background(), nil, user), "seed user")
 
@@ -77,7 +77,7 @@ func seedPreMigration000051ROPCRefreshToken(t *testing.T, h *isolatedDB) string 
 		(user_id, client_id, refresh_token_jti, previous_refresh_token_jti, first_refresh_token_jti,
 		 session_identifier, refresh_token_type, scope, revoked)
 		VALUES (%d, %d, '%s', '', '%s', '', 'Offline', 'openid', %s)`,
-		user.Id, client.Id, jti, jti, falseLit)
+		user.Id, clientId, jti, jti, falseLit)
 	_, err := h.SQL.Exec(q)
 	require.NoError(t, err, "seed a pre-000051 ROPC refresh token")
 	return jti

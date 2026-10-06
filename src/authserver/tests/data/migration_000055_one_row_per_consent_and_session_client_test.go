@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -142,15 +143,22 @@ type seeded000055 struct {
 	session1Client1Kept, session1Client2Only, session2Client1Kept int64
 }
 
+// seedClient000055 writes a client in SQL rather than through the ORM: the database is at 000054
+// or 000055, and the record already names clients.administrative_scopes_allowed, which 000060 adds.
+func seedClient000055(t *testing.T, h *isolatedDB) int64 {
+	t.Helper()
+	return seedClient000035(t, h, "mig55_client_"+fake.LetterN(8))
+}
+
 func seedDuplicates000055(t *testing.T, h *isolatedDB) *seeded000055 {
 	t.Helper()
 
 	s := &seeded000055{
 		userA:   createTestUserOn(t, h.DB).Id,
 		userB:   createTestUserOn(t, h.DB).Id,
-		client1: createTestClientOn(t, h.DB).Id,
-		client2: createTestClientOn(t, h.DB).Id,
-		client3: createTestClientOn(t, h.DB).Id,
+		client1: seedClient000055(t, h),
+		client2: seedClient000055(t, h),
+		client3: seedClient000055(t, h),
 	}
 
 	// The user who narrowed a consent: two rows, the lower id saved later with the narrower scope.
@@ -321,8 +329,8 @@ func (s *seeded000055) assertTheKeysRefuseADuplicate(t *testing.T, h *isolatedDB
 	assert.ErrorIsf(t, err, data.ErrUniqueViolation, "a second consent for a pair is refused by the key %s", when)
 	assert.Lenf(t, consentRows000055(t, h, s.userA, s.client1), 1, "and writes nothing %s", when)
 
-	other := createTestClientOn(t, h.DB)
-	assert.NoErrorf(t, h.DB.CreateUserConsent(ctx, nil, &record.UserConsent{UserId: s.userA, ClientId: other.Id, Scope: "openid"}),
+	other := seedClient000055(t, h)
+	assert.NoErrorf(t, h.DB.CreateUserConsent(ctx, nil, &record.UserConsent{UserId: s.userA, ClientId: other, Scope: "openid"}),
 		"a consent for another pair is accepted %s", when)
 
 	now := time.Now().UTC().Truncate(time.Microsecond)

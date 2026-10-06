@@ -20,14 +20,21 @@ type Client struct {
 	// CreatedViaDCR records that this client registered itself through /connect/register rather
 	// than being created by an administrator. It is the enforced form of what the dcr_ identifier
 	// prefix only suggests, and it is what the consent screen's unverified marking reads (#108).
-	CreatedViaDCR            bool `db:"created_via_dcr"`
-	ShowLogo                 bool `db:"show_logo"`
-	ShowDisplayName          bool `db:"show_display_name"`
-	ShowDescription          bool `db:"show_description"`
-	ShowWebsiteURL           bool `db:"show_website_url"`
-	IsPublic                 bool `db:"is_public"`
-	AuthorizationCodeEnabled bool `db:"authorization_code_enabled"`
-	ClientCredentialsEnabled bool `db:"client_credentials_enabled"`
+	CreatedViaDCR bool `db:"created_via_dcr"`
+	// AdministrativeScopesAllowed is the stored half of a client's allowance to request the
+	// administrative authserver scopes on a user's behalf (#499). A decision goes through
+	// MayRequestAdministrativeScopes rather than this field: the admin console's client is allowed
+	// whatever this holds. Tagged dont-update so the whole-row UpdateClient never writes it: every
+	// client save reads the row earlier in its request and a manage-clients token can make each
+	// one, so a save racing an operator's switch would otherwise write back the value it read.
+	AdministrativeScopesAllowed bool `db:"administrative_scopes_allowed" fieldtag:"dont-update"`
+	ShowLogo                    bool `db:"show_logo"`
+	ShowDisplayName             bool `db:"show_display_name"`
+	ShowDescription             bool `db:"show_description"`
+	ShowWebsiteURL              bool `db:"show_website_url"`
+	IsPublic                    bool `db:"is_public"`
+	AuthorizationCodeEnabled    bool `db:"authorization_code_enabled"`
+	ClientCredentialsEnabled    bool `db:"client_credentials_enabled"`
 	// PKCERequired overrides global setting if set.
 	// nil = use global setting, true = PKCE required, false = PKCE optional
 	PKCERequired *bool `db:"pkce_required"`
@@ -61,6 +68,16 @@ func (c *Client) IsSystemLevelClient() bool {
 		}
 	}
 	return false
+}
+
+// MayRequestAdministrativeScopes reports whether this client may obtain one of the administrative
+// authserver scopes on a user's behalf: the admin console's client, by its built-in identifier, or
+// a client whose stored allowance says yes (#499 decision 5). The identifier arm is what keeps a
+// hand-edited row from locking administrators out of the admin console; the stored value is still
+// set for that client, on upgrade and in the first-run seed, so what the API answers and the
+// console shows agree with what the server does.
+func (c *Client) MayRequestAdministrativeScopes() bool {
+	return c.ClientIdentifier == builtin.AdminConsoleClientIdentifier || c.AdministrativeScopesAllowed
 }
 
 // IsPKCERequired returns whether PKCE is required for this client.

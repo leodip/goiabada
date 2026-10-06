@@ -368,18 +368,16 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 // here: the point of the row-value case is that every column arrives where the Go model
 // says it should, and hand-written INSERTs per dialect would be asserting the test's own
 // column list rather than the migration's.
+//
+// The client is the exception. 000039 rebuilds codes and refresh_tokens, not clients, and only
+// the client's id is read here; the record names columns later migrations add to clients,
+// administrative_scopes_allowed (000060) among them, so the ORM's insert no longer fits the
+// schema before 000039.
 
 func seedClient000039(t *testing.T, h *isolatedDB) *record.Client {
 	t.Helper()
-	client := &record.Client{
-		ClientIdentifier:         "c-" + fake.UUID()[:8],
-		Description:              "seeded by migration 000039's test",
-		Enabled:                  true,
-		AuthorizationCodeEnabled: true,
-		DefaultAcrLevel:          "urn:goiabada:level1",
-	}
-	require.NoError(t, h.DB.CreateClient(context.Background(), nil, client), "seed client")
-	return client
+	identifier := "c-" + fake.UUID()[:8]
+	return &record.Client{Id: seedClient000035(t, h, identifier), ClientIdentifier: identifier}
 }
 
 func seedUser000039(t *testing.T, h *isolatedDB) *record.User {

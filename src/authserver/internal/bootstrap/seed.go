@@ -235,6 +235,10 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
 		IncludeOpenIDConnectClaimsInIdToken:     record.ThreeStateSettingDefault.String(),
 		ShowDisplayName:                         true,
+		// Allowed to request the administrative scopes, as migration 000060 sets it on an
+		// upgraded installation. The server allows this client whatever the row says, so this is
+		// what keeps the API's answer and the console's switch agreeing with it (#499).
+		AdministrativeScopesAllowed: true,
 	}
 	if err := r.db.CreateClient(ctx, tx, client); err != nil {
 		return err

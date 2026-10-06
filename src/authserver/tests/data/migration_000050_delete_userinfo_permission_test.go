@@ -68,8 +68,9 @@ func seedUserinfoFixture000050(t *testing.T, h *isolatedDB) *userinfoFixture0000
 	require.NoError(t, h.DB.CreateUser(ctx, nil, f.user))
 	f.group = &record.Group{GroupIdentifier: "mig50-group", Description: "Migration 000050 test group"}
 	require.NoError(t, h.DB.CreateGroup(ctx, nil, f.group))
-	f.client = &record.Client{ClientIdentifier: "mig50-client", Description: "Migration 000050 test client"}
-	require.NoError(t, h.DB.CreateClient(ctx, nil, f.client))
+	// In SQL rather than through the ORM, whose record names clients columns later migrations add,
+	// administrative_scopes_allowed (000060) among them.
+	f.client = &record.Client{Id: seedClient000035(t, h, "mig50-client"), ClientIdentifier: "mig50-client"}
 
 	for _, permission := range []*record.Permission{f.userinfo, f.control} {
 		require.NoError(t, h.DB.CreateUserPermission(ctx, nil, &record.UserPermission{UserId: f.user.Id, PermissionId: permission.Id}))

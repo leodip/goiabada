@@ -279,3 +279,32 @@ func TestIsResourceOwnerPasswordCredentialsEnabled_ClientNilUsesGlobalFalse(t *t
 		t.Errorf("IsResourceOwnerPasswordCredentialsEnabled(false) = %v, want false (global setting)", got)
 	}
 }
+
+// TestMayRequestAdministrativeScopes holds the allowance's rule to the admin console's client, or
+// the stored yes (#499 decision 5). The admin console's client is allowed whatever its row says,
+// so a hand-edited row cannot lock administrators out of the admin console; every other client is
+// allowed only by its stored value, and a near miss of the built-in identifier is another client.
+func TestMayRequestAdministrativeScopes(t *testing.T) {
+	cases := []struct {
+		identifier string
+		stored     bool
+		want       bool
+	}{
+		{"admin-console-client", true, true},
+		{"admin-console-client", false, true},
+		{"my-reporting-tool", true, true},
+		{"my-reporting-tool", false, false},
+		{"Admin-Console-Client", false, false},
+		{"admin-console-client-2", false, false},
+		{"admin-console-client ", false, false},
+		{"", false, false},
+	}
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("%q stored %v", c.identifier, c.stored), func(t *testing.T) {
+			client := &Client{ClientIdentifier: c.identifier, AdministrativeScopesAllowed: c.stored}
+			if got := client.MayRequestAdministrativeScopes(); got != c.want {
+				t.Errorf("MayRequestAdministrativeScopes() = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
