@@ -47,6 +47,7 @@ The `authserver` resource is a **system-level resource** used internally by Goia
 - Its **description can be modified**
 - New permissions **can be added** to it
 - Its **built-in permission identifiers cannot be renamed or deleted**
+- The **descriptions of its six administrative permissions** are changed only by `authserver:manage` (see [Administrators](#administrators))
 
 The built-in permissions under the `authserver` resource, with the description each is seeded with:
 
@@ -71,10 +72,11 @@ The six permissions marked **Administrative** confer power over this server. A u
 **Only `authserver:manage` creates an administrator, changes one, or changes what reaches one.** The granular scopes `manage-users`, `manage-clients` and `manage-settings` keep full control of everyone else, and every scope that reads still reads administrators, but none of them can:
 
 - grant or revoke an administrative permission, add a user to or remove one from a group holding one, or delete such a group;
-- write to an administrator in any way, or read an administrator client's secret;
+- write to an administrator, or read an administrator client's secret;
+- change the description of an administrative permission, which is what an operator reads before granting it;
 - change the email or the audit-log settings.
 
-So `manage-users` can still grant and revoke `manage-account` and your own custom permissions, to anyone who is not an administrator, and `manage-settings` can still add custom permissions to the `authserver` resource. A refused request changes nothing, answers `403` with the error code `MANAGE_SCOPE_REQUIRED`, and leaves an `administrator_change_refused` entry in the [audit log](/concepts/audit-log/#events-to-alert-on). See [REST API › Granular Admin API scopes](/integration/rest-api/#granular-admin-api-scopes) for each scope in detail.
+So `manage-users` can still grant and revoke `manage-account` and your own custom permissions, to anyone who is not an administrator, and `manage-settings` can still add custom permissions to the `authserver` resource and change the description of `manage-account` and of your own permissions. These rules judge the object a request writes: a change to an ordinary group or resource still reaches an administrator who is a member of the group or holds one of the resource's permissions, but it cannot make or unmake an administrator, because neither holds an administrative permission. A refused request changes nothing, answers `403` with the error code `MANAGE_SCOPE_REQUIRED`, and leaves an `administrator_change_refused` entry in the [audit log](/concepts/audit-log/#events-to-alert-on). See [REST API › Granular Admin API scopes](/integration/rest-api/#granular-admin-api-scopes) for each scope in detail.
 
 Granting an administrative permission is how an administrator is made, so grant one as deliberately as you would hand out the admin console's password. Every grant or revocation of one, and every user joining or leaving a group that holds one, leaves an `administrative_permission_changed` entry an operator can alert on. Goiabada also refuses any change that would leave no enabled user holding `manage`: see [the last administrator](/concepts/users-groups/#the-last-administrator).
 

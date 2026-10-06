@@ -223,7 +223,7 @@ func HandleResourcePermissionsPut(
 					return
 				}
 
-				// Description changes are allowed (no check needed)
+				// A description change is the policy's to judge, below, after the save's own answers.
 			}
 		}
 
@@ -245,6 +245,11 @@ func HandleResourcePermissionsPut(
 				writeJSONError(w, fmt.Sprintf("Permission identifier %s is already in use.", p.PermissionIdentifier), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
+		}
+
+		// Only authserver:manage rewrites what an administrative permission says it confers (#402).
+		if !permissionDescriptionCeilingAllows(w, r, auditLogger, resource, existing, req.Permissions, req.ExpectedPermissions) {
+			return
 		}
 
 		// One transaction, so a failure part way through commits nothing and the 500 is true, where

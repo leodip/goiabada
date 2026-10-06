@@ -45,14 +45,15 @@ const (
 // a function of its own package. A function that answers a refusal and is not listed here fails the
 // guard, so a new ceiling is added here rather than going uncounted.
 var adminPolicyCeilings = map[string]string{
-	"grantCeilingAllows":         adminCeilingGrant,
-	"membershipCeilingAllows":    adminCeilingGrant,
-	"userGroupsCeilingAllows":    adminCeilingGrant,
-	"groupDeletionCeilingAllows": adminCeilingGrant,
-	"userTargetCeilingAllows":    adminCeilingTarget,
-	"groupTargetCeilingAllows":   adminCeilingTarget,
-	"clientTargetCeilingAllows":  adminCeilingTarget,
-	"settingsCeilingAllows":      adminCeilingSettings,
+	"grantCeilingAllows":                 adminCeilingGrant,
+	"membershipCeilingAllows":            adminCeilingGrant,
+	"userGroupsCeilingAllows":            adminCeilingGrant,
+	"groupDeletionCeilingAllows":         adminCeilingGrant,
+	"userTargetCeilingAllows":            adminCeilingTarget,
+	"groupTargetCeilingAllows":           adminCeilingTarget,
+	"clientTargetCeilingAllows":          adminCeilingTarget,
+	"permissionDescriptionCeilingAllows": adminCeilingTarget,
+	"settingsCeilingAllows":              adminCeilingSettings,
 }
 
 // adminPolicyRefusal is the function every ceiling answers a refusal through.
@@ -150,9 +151,7 @@ var adminRouteClassification = map[string]adminRouteClass{
 		"and no other resource's permissions confer power in this server"),
 	"DELETE /api/v1/admin/resources/{id}": outsideCeilings("the authserver resource cannot be deleted, and no " +
 		"other resource's permissions confer power in this server"),
-	"PUT /api/v1/admin/resources/{resourceId}/permissions": outsideCeilings("the built-in authserver permissions " +
-		"cannot be renamed or deleted, and a permission added beside them confers no power in this server " +
-		"(#402 decision 2)"),
+	"PUT /api/v1/admin/resources/{resourceId}/permissions": appliesCeilings(adminCeilingTarget),
 
 	// Settings.
 	"PUT /api/v1/admin/settings/email":      appliesCeilings(adminCeilingSettings),

@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -47,8 +48,9 @@ const manageScopeRequiredDescription = "Only a token with the authserver:manage 
 
 // The ceiling a refusal names. The grant ceiling is granting or revoking an administrative
 // permission, directly or by moving a user into or out of a group that holds one, and deleting such
-// a group; the target ceiling is any other write on an administrator; the settings ceiling is
-// changing the email or the audit-log settings (#402 decisions 1, 5 and 7).
+// a group; the target ceiling is any other write on an administrator, and changing the description
+// of an administrative permission; the settings ceiling is changing the email or the audit-log
+// settings (#402 decisions 1, 5 and 7).
 const (
 	ceilingGrant    = "grant"
 	ceilingTarget   = "target"
@@ -57,9 +59,10 @@ const (
 
 // The kind of target a refusal names.
 const (
-	targetKindUser   = "user"
-	targetKindGroup  = "group"
-	targetKindClient = "client"
+	targetKindUser     = "user"
+	targetKindGroup    = "group"
+	targetKindClient   = "client"
+	targetKindResource = "resource"
 )
 
 // administrativePolicyDatabase is what the policy reads to resolve the administrative set to rows.
@@ -125,11 +128,12 @@ func administrativePermissions(ctx context.Context, database administrativePolic
 // administratorChangeRefusal is what one refusal records beside the caller and the route.
 type administratorChangeRefusal struct {
 	ceiling string
-	// targetKind and targetId name the user, group or client the request acts on. A request with
-	// no target, a settings write, leaves targetKind empty and the record names neither.
+	// targetKind and targetId name the user, group, client or resource the request acts on. A
+	// request with no target, a settings write, leaves targetKind empty and the record names neither.
 	targetKind string
 	targetId   int64
-	// permissionIds is the administrative permissions whose change caused a grant refusal.
+	// permissionIds is the administrative permissions whose change caused a grant refusal, or
+	// whose description a target refusal of a resource's permissions save would have changed.
 	permissionIds []int64
 	// groupIds is the administrative groups whose membership change caused a grant refusal, when
 	// the target is the user moved into or out of them.
@@ -659,6 +663,59 @@ func clientTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database 
 		ceiling:    ceilingTarget,
 		targetKind: targetKindClient,
 		targetId:   client.Id,
+	})
+	return false
+}
+
+// permissionDescriptionCeilingAllows applies the target ceiling to a save of a resource's
+// permissions. The description of an administrative permission is what the admin console shows an
+// operator choosing a permission to grant, and #402 decision 3 rewrote the seeded ones to state the
+// boundary, so a token that could rewrite one could relabel authserver:manage as something harmless
+// for the next operator holding it to hand out. Only an authserver:manage token changes one. The
+// identifiers need no ceiling: the save refuses renaming or deleting any built-in authserver
+// permission to every caller.
+//
+// The change is judged as grantCeilingAllows judges a grant, each wanted entry against the entry
+// the caller loaded, because that is exactly what the save commits or nothing: its transaction
+// refuses with 409 unless the stored rows are the loaded list. An administrative row the loaded
+// list leaves out counts as changed. stored is the resource's rows as read before the transaction,
+// which name the administrative ones by identifier; no other resource holds one. It reports whether
+// the save may go on, and when it may not it has answered the request (#402 decisions 1 and 3).
+func permissionDescriptionCeilingAllows(w http.ResponseWriter, r *http.Request, auditLogger AuditLogger,
+	resource *record.Resource, stored []record.Permission, wanted, expected []api.ResourcePermissionUpsert) bool {
+	if resource.ResourceIdentifier != builtin.AuthServerResourceIdentifier {
+		return true
+	}
+
+	administrative := make(map[int64]bool, len(administrativePermissionIdentifiers))
+	for _, permission := range stored {
+		if administrativePermissionIdentifiers[permission.PermissionIdentifier] {
+			administrative[permission.Id] = true
+		}
+	}
+	loaded := make(map[int64]string, len(expected))
+	for _, entry := range expected {
+		loaded[entry.Id] = entry.Description
+	}
+	var causes []int64
+	for _, entry := range wanted {
+		if !administrative[entry.Id] {
+			continue
+		}
+		if description, ok := loaded[entry.Id]; ok && description == entry.Description {
+			continue
+		}
+		causes = append(causes, entry.Id)
+	}
+	if len(causes) == 0 || callerHoldsManage(r) {
+		return true
+	}
+
+	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
+		ceiling:       ceilingTarget,
+		targetKind:    targetKindResource,
+		targetId:      resource.Id,
+		permissionIds: causes,
 	})
 	return false
 }
