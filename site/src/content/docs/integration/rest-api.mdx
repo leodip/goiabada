@@ -453,6 +453,8 @@ PUT /api/v1/admin/users/{id}/otp
 }
 ```
 
+If another request removed the user's OTP first, the answer is `400 OTP_NOT_ENABLED`; if it replaced the user's authenticator after this request read it, the answer is `409 CONCURRENT_UPDATE` and nothing is removed.
+
 <Aside type="note">
 OTP can only be disabled through the Admin API, not enabled. Users must enroll in OTP themselves through the Account API or web interface.
 </Aside>
@@ -1673,6 +1675,8 @@ Call the enrollment endpoint first: the code is verified against the secret it i
   "password": "CurrentPassword123!"
 }
 ```
+
+Either change lands only while the account's authenticator is still as the request read it. If another request changed it in between, from another tab or client, the answer is `400 OTP_ALREADY_ENABLED` or `400 OTP_NOT_ENABLED` when OTP is already in the state asked for, and otherwise `409 CONCURRENT_UPDATE` with nothing saved: read the account again and retry. The code sent with an enable is spent either way.
 
 ---
 

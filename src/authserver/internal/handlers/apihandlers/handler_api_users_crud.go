@@ -269,9 +269,15 @@ func HandleUserOTPPut(
 		// Disable OTP. Clearing the secret, turning otp_enabled off and resetting the
 		// consumed-step marker are one atomic operation, shared with the account API's disable
 		// branch (#111 decisions 4 and 13); otpcredential.Remove carries the reasoning.
-		err = otpcredential.Remove(r.Context(), database, user)
+		removed, err := otpcredential.Remove(r.Context(), database, user)
 		if err != nil {
 			writeInternalServerError(w, r, err)
+			return
+		}
+		if !removed {
+			// The authenticator is no longer as this request read it: answered from a re-read,
+			// with nothing written and nothing audited (#471 decision 2).
+			writeLostOTPChange(w, r, database, user.Id, false)
 			return
 		}
 

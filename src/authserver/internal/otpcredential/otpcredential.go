@@ -36,8 +36,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
-// Database is what the OTP credential lifecycle needs: the user row, the generation counter every
-// session compares itself against, the pending enrolment an establish clears, the consumed-step
+// Database is what the OTP credential lifecycle needs: the authenticator's two compare-and-sets on
+// the user row, the generation counter every session compares itself against, the pending enrolment an establish clears, the consumed-step
 // marker a verification claims and a removal resets, and the transaction they share.
 //
 // Exported, unlike the per-file ports #386 left in the handler packages, because it is this
@@ -53,7 +53,9 @@ type Database interface {
 	ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
+	TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64,
+		secretEncrypted []byte) (bool, error)
+	TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error)
 }
 
 // VerifyOutcome is what a passcode check concluded. The three values are the three arms every
@@ -86,9 +88,19 @@ type VerifyResult struct {
 	Step    int64
 }
 
-// Establish installs a user's authenticator: it encrypts the seed at rest, turns otp_enabled on,
-// writes the user, advances the OTP configuration generation and discards any pending enrolment,
-// returning the generation that landed.
+// Establish installs a user's authenticator: it encrypts the seed at rest and, only while OTP is
+// still off at the otp_config_generation user was read with, stores it and turns otp_enabled on,
+// advances the generation and discards any pending enrolment. It reports whether it did and, when
+// it did, the generation that landed.
+//
+// **A compare-and-set on the authenticator, not on the flag** (#471 decision 2). The write names
+// only the seed and otp_enabled, so it cannot undo a disable or a password change made since the
+// read, and it lands only while the row still holds the authenticator state the request read: of two
+// overlapping enrolments the second is refused rather than replacing the first's secret, and an
+// enable and a disable landing entirely between the read and the write, which leave otp_enabled
+// where it was, still move the generation and refuse it (#144). When it matches nothing, nothing
+// else runs either: the generation does not advance and the pending enrolment stays, and the caller
+// gets false with no error and answers from what the row now shows.
 //
 // **The writes commit together, and that is the point of this function**, exactly as for Remove
 // below and for the reason #242 decision 2 gives. A separate increment whose error is merely
@@ -99,8 +111,8 @@ type VerifyResult struct {
 // With the transaction the enrollment rolls back and the retry is clean.
 //
 // The TOTP code is spent either way, which is not new: #111 claims the time step before the
-// enable write precisely so a failed enable cannot leave OTP switched on, so a rolled back
-// transaction behaves exactly as a failed UpdateUser does today and the user types the next code.
+// enable write precisely so a failed enable cannot leave OTP switched on, so a rolled back or lost
+// establish behaves exactly as a failed write always has and the user types the next code.
 //
 // Shared by the two enable sites decision 2 names, HandleAuthOtpPost's enrollment branch and
 // HandleAccountOTPPut's enable branch. There is no third. The encryption and the two field
@@ -110,24 +122,30 @@ type VerifyResult struct {
 // The browser caller needs the returned value: it captured the pre-enrollment generation at
 // /auth/level2, and promoting that at /auth/completed would leave a session that just enrolled
 // and verified owing another second-factor prompt at once.
-func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCipher, user *record.User, seed string) (int64, error) {
-	if err := setSecret(dataCipher, user, seed); err != nil {
-		return 0, err
+func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCipher, user *record.User,
+	seed string) (generation int64, established bool, err error) {
+
+	encrypted, err := encryptSecret(dataCipher, seed)
+	if err != nil {
+		return 0, false, err
 	}
-	user.OTPEnabled = true
 
 	// Opened through RunInTransaction, so a deadlock reruns the three writes together (#301).
-	// Safe to rerun: the user model was set above, before this opened, and is written
-	// unchanged on every attempt, and generation is the committing attempt's.
-	var generation int64
-	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		if err := db.UpdateUser(ctx, tx, user); err != nil {
-			return err
+	// Safe to rerun: the ciphertext and the generation compared are fixed above, before this
+	// opened, and established and generation are the committing attempt's.
+	err = db.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		generation = 0
+		var writeErr error
+		established, writeErr = db.TryEstablishUserOTP(ctx, tx, user.Id, user.OtpConfigGeneration, encrypted)
+		if writeErr != nil {
+			return writeErr
 		}
-		var err error
-		generation, err = db.IncrementUserOtpConfigGeneration(ctx, tx, user.Id)
-		if err != nil {
-			return err
+		if !established {
+			return nil
+		}
+		generation, writeErr = db.IncrementUserOtpConfigGeneration(ctx, tx, user.Id)
+		if writeErr != nil {
+			return writeErr
 		}
 		// The pending enrollment this user may have staged is discarded in the same transaction that
 		// establishes the authenticator, so no committed state has OTP enabled with a live seed still
@@ -139,25 +157,37 @@ func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCiph
 		// enrollment and whose clear is therefore a no-op. Putting it here rather than at the account
 		// API's own enable branch is what makes "an enabled authenticator has no pending seed behind
 		// it" a property of the transaction rather than of one caller (#247).
-		if err := db.ClearPendingOTPEnrollment(ctx, tx, user.Id); err != nil {
-			return err
-		}
-		return nil
+		return db.ClearPendingOTPEnrollment(ctx, tx, user.Id)
 	})
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
-	return generation, nil
+	if !established {
+		return 0, false, nil
+	}
+
+	user.OTPSecretEncrypted = encrypted
+	user.OTPEnabled = true
+	user.OtpConfigGeneration = generation
+	return generation, true, nil
 }
 
-// Remove removes a user's authenticator: it clears the secret, turns otp_enabled off and returns
-// the consumed-step marker to 0. The marker belongs to the authenticator being removed, and
-// UpdateUser cannot carry it because the column is dont-update, which is why it takes a second write
-// (#111 decision 4). The reset is also the only in-product remedy if a clock jump strands a user's
-// marker in the future: without it, disabling OTP and re-enrolling would claim against the same
-// poisoned marker and fail too.
+// Remove removes a user's authenticator: only while OTP is still on at the otp_config_generation
+// user was read with, it clears the secret, turns otp_enabled off, returns the consumed-step marker
+// to 0 and advances the generation. It reports whether it did.
 //
-// **The two writes commit together, and that is the point of this function** (#111 decision 13).
+// A compare-and-set on the authenticator, for Establish's reason (#471 decision 2): the write names
+// only the seed and otp_enabled, so it cannot undo a disable or a password change made since the
+// read, and a removal read before the authenticator was removed and another established in its
+// place does not remove the replacement. When it matches nothing, nothing else runs: the marker and
+// the generation stay as they are, and the caller gets false with no error.
+//
+// The marker belongs to the authenticator being removed, and the column is dont-update, which is
+// why it takes a second write (#111 decision 4). The reset is also the only in-product remedy if a
+// clock jump strands a user's marker in the future: without it, disabling OTP and re-enrolling
+// would claim against the same poisoned marker and fail too.
+//
+// **The writes commit together, and that is the point of this function** (#111 decision 13).
 // Committed separately, which is how they were written before that decision, they leave a window in
 // which the row reads otp_enabled = false with the old marker still standing. The window is between
 // two committed statements, not inside one: no engine this server supports exposes an uncommitted
@@ -178,19 +208,21 @@ func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCiph
 //
 // Shared by the two sites decision 4 names, HandleAccountOTPPut's disable branch and
 // HandleUserOTPPut. There is no third: the browser flow enrolls but never disables.
-func Remove(ctx context.Context, db Database, user *record.User) error {
-	clearSecret(user)
-	user.OTPEnabled = false
-
+func Remove(ctx context.Context, db Database, user *record.User) (removed bool, err error) {
 	// Opened through RunInTransaction, so a deadlock reruns the three writes together (#301).
-	// Safe to rerun: the model was cleared above, before the helper opened, and is written
-	// unchanged on every attempt; the reset and the increment carry no state between attempts.
-	return db.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		if err := db.UpdateUser(ctx, tx, user); err != nil {
-			return err
+	// Safe to rerun: the generation compared is the request's read, and removed is the committing
+	// attempt's; the reset and the increment carry no state between attempts.
+	err = db.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		var writeErr error
+		removed, writeErr = db.TryRemoveUserOTP(ctx, tx, user.Id, user.OtpConfigGeneration)
+		if writeErr != nil {
+			return writeErr
 		}
-		if err := db.ResetUserOTPStep(ctx, tx, user.Id); err != nil {
-			return err
+		if !removed {
+			return nil
+		}
+		if writeErr = db.ResetUserOTPStep(ctx, tx, user.Id); writeErr != nil {
+			return writeErr
 		}
 		// The counter that tells every one of this user's sessions they owe a second factor
 		// again, advanced inside the same transaction as the removal itself. Being per user is
@@ -202,11 +234,19 @@ func Remove(ctx context.Context, db Database, user *record.User) error {
 		// Its error is returned rather than discarded, and that is the other half of decision 2:
 		// a removal that commits without the counter moving is precisely the state the re-prompt
 		// exists to prevent.
-		if _, err := db.IncrementUserOtpConfigGeneration(ctx, tx, user.Id); err != nil {
-			return err
-		}
-		return nil
+		_, writeErr = db.IncrementUserOtpConfigGeneration(ctx, tx, user.Id)
+		return writeErr
 	})
+	if err != nil {
+		return false, err
+	}
+	if !removed {
+		return false, nil
+	}
+
+	user.OTPSecretEncrypted = nil
+	user.OTPEnabled = false
+	return true, nil
 }
 
 // VerifyStored checks a passcode against the authenticator the user has enrolled, and claims the
@@ -267,19 +307,15 @@ func verify(ctx context.Context, db Database, user *record.User, secret string, 
 	return VerifyResult{Outcome: OutcomeMatched, Step: step}, nil
 }
 
-// setSecret encrypts the TOTP seed at rest (AES-256-GCM, under the data cipher it is given) into
-// OTPSecretEncrypted. See issue #82: TOTP secrets must not be stored in plaintext.
+// encryptSecret encrypts the TOTP seed at rest (AES-256-GCM, under the data cipher it is given),
+// which is the form OTPSecretEncrypted stores. See issue #82: TOTP secrets must not be stored in
+// plaintext.
 //
 // Unexported, where this was record.User.SetOTPSecret: the only way to store a seed is to establish
 // an authenticator with it, which is what keeps the cipher and the generation advance from coming
 // apart (#387).
-func setSecret(dataCipher *encryption.DataCipher, u *record.User, secret string) error {
-	encrypted, err := dataCipher.Encrypt(secret)
-	if err != nil {
-		return err
-	}
-	u.OTPSecretEncrypted = encrypted
-	return nil
+func encryptSecret(dataCipher *encryption.DataCipher, secret string) ([]byte, error) {
+	return dataCipher.Encrypt(secret)
 }
 
 // storedSecret returns the decrypted TOTP seed, or an empty string if the user has no encrypted
@@ -293,9 +329,4 @@ func storedSecret(dataCipher *encryption.DataCipher, u *record.User) (string, er
 		return "", nil
 	}
 	return dataCipher.Decrypt(u.OTPSecretEncrypted)
-}
-
-// clearSecret removes any stored TOTP seed.
-func clearSecret(u *record.User) {
-	u.OTPSecretEncrypted = nil
 }

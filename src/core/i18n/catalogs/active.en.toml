@@ -114,6 +114,10 @@
 "auth_error.ceremony_mismatch.message" = "This page belongs to a sign-in request that is no longer the one in progress. Another one was started in this browser, so this one can no longer continue. Go back to the application you were signing in to and start again."
 "auth_error.state_mismatch.title" = "This step is no longer available"
 "auth_error.state_mismatch.message" = "This page belongs to a step of the sign-in you have already moved past, so it can no longer be used. Going back in the browser reaches a page the server has finished with. Go back to the application you were signing in to and start again."
+# An enrolment at /auth/otp that lost to another change of the account's authenticator ends the
+# sign-in here: nothing was stored, so it has no second factor to continue with (#471).
+"auth_error.otp_changed.title" = "Your two-factor settings changed"
+"auth_error.otp_changed.message" = "The two-factor authentication settings of this account changed while you were signing in, so this sign-in cannot continue. Go back to the application you were signing in to and sign in again."
 "auth_error.rate_limited.title" = "Too many attempts"
 "auth_error.rate_limited.message" = "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again."
 "auth_error.unable_to_authorize.title" = "Unable to authorize"

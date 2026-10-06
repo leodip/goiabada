@@ -36,11 +36,7 @@ import (
 // known defect left listed until the change that converts it to a narrow write deletes its row,
 // and an entry whose file no longer calls UpdateUser fails the guard, so none outlives its site.
 // The list is not the place for a new site.
-var wholeRowUserSaveExemptions = map[string]string{
-	"authserver/internal/otpcredential/otpcredential.go": "establishing and removing an " +
-		"authenticator, not yet converted: each writes back the whole row and can undo a " +
-		"concurrent disable, password change or the other OTP change (#471)",
-}
+var wholeRowUserSaveExemptions = map[string]string{}
 
 // updateUserCall is one call expression selecting UpdateUser.
 type updateUserCall struct {

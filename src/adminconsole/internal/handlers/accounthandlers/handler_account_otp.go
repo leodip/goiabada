@@ -198,10 +198,14 @@ func HandleOtpPost(
 	}
 }
 
-// isHandledAccountOTPError says whether a 400 from PUT /api/v1/account/otp is one this page can
-// explain to the user by redrawing the form with the API's message. Anything else is a fault
+// isHandledAccountOTPError says whether a 400 or 409 from PUT /api/v1/account/otp is one this page
+// can explain to the user by redrawing the form with the API's message. Anything else is a fault
 // rather than something they did, and HandleAPIError sends it to the log and shows a generic
 // error page.
+//
+// CONCURRENT_UPDATE is the 409 the API answers when the account's authenticator changed under the
+// request, from another tab or client, and nothing was saved: the user acts on it by trying again,
+// so it belongs on the form (#471 decision 2).
 //
 // The list is kept complete against the endpoint's own codes rather than trimmed to the ones this
 // client can currently provoke, which is why SECRET_KEY_NOT_ACCEPTED is here: the console no
@@ -216,7 +220,8 @@ func isHandledAccountOTPError(code string) bool {
 		"OTP_ENROLLMENT_NOT_PENDING",
 		"SECRET_KEY_NOT_ACCEPTED",
 		"OTP_ALREADY_ENABLED",
-		"OTP_NOT_ENABLED":
+		"OTP_NOT_ENABLED",
+		"CONCURRENT_UPDATE":
 		return true
 	}
 	return false

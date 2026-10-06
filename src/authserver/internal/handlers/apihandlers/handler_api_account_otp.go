@@ -64,6 +64,40 @@ func livePendingEnrollmentKeyURL(dataCipher *encryption.DataCipher, user *record
 	return dataCipher.Decrypt(user.OtpEnrollmentSecretEncrypted)
 }
 
+// writeLostOTPChange answers an enable or a disable whose compare-and-set matched nothing, from what
+// the user's row shows now (#471 decision 2). The authenticator was no longer as the request read
+// it, so nothing was written. OTP now in the state the request wanted is the 400 a request arriving
+// a moment later would have got, OTP_ALREADY_ENABLED or OTP_NOT_ENABLED; anything else, an enable
+// and a disable landing in between, an authenticator replaced under a disable, or the account gone,
+// is 409 CONCURRENT_UPDATE. Nothing is audited: no enable or disable happened.
+//
+// Shared by the account API's two branches and the administrator's disable, which is why it takes
+// the narrow reader rather than either handler's port.
+func writeLostOTPChange(w http.ResponseWriter, r *http.Request, database userByIdReader, userId int64,
+	wantEnabled bool) {
+
+	current, err := database.GetUserById(r.Context(), nil, userId)
+	if err != nil {
+		writeInternalServerError(w, r, err)
+		return
+	}
+	if current != nil && current.OTPEnabled == wantEnabled {
+		if wantEnabled {
+			writeJSONError(w, "OTP is already enabled", "OTP_ALREADY_ENABLED", http.StatusBadRequest)
+		} else {
+			writeJSONError(w, "User does not have OTP enabled", "OTP_NOT_ENABLED", http.StatusBadRequest)
+		}
+		return
+	}
+	writeJSONError(w, "The account was changed by another request after it was loaded. Nothing was saved: reload it and make the change again.",
+		"CONCURRENT_UPDATE", http.StatusConflict)
+}
+
+// userByIdReader is the one read writeLostOTPChange makes.
+type userByIdReader interface {
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+}
+
 // accountOTPDatabase is what the account OTP endpoints need: the caller's user row, the pending
 // enrolment this file issues and installs, and the OTP credential lifecycle it hands them to.
 //
@@ -404,13 +438,20 @@ func HandleAccountOTPPut(
 				return
 			}
 
-			// The seed's encryption at rest, the user write and the OTP configuration
+			// The seed's encryption at rest, the authenticator's write and the OTP configuration
 			// generation's advance commit together, so there is no state in which the
 			// authenticator is on and no session knows (#242 decision 2). The returned
 			// generation is discarded here: only the browser ceremony, which captured the
 			// pre-enrollment value earlier in the same ceremony, has a use for it.
-			if _, establishErr := otpcredential.Establish(r.Context(), database, dataCipher, user, pendingSecret); establishErr != nil {
+			_, established, establishErr := otpcredential.Establish(r.Context(), database, dataCipher, user, pendingSecret)
+			if establishErr != nil {
 				writeInternalServerError(w, r, establishErr)
+				return
+			}
+			if !established {
+				// The authenticator is no longer as this request read it, so nothing was
+				// stored; the passcode's step stays spent, as for a failed enable (#111).
+				writeLostOTPChange(w, r, database, user.Id, true)
 				return
 			}
 
@@ -424,8 +465,13 @@ func HandleAccountOTPPut(
 				return
 			}
 
-			if removeErr := otpcredential.Remove(r.Context(), database, user); removeErr != nil {
+			removed, removeErr := otpcredential.Remove(r.Context(), database, user)
+			if removeErr != nil {
 				writeInternalServerError(w, r, removeErr)
+				return
+			}
+			if !removed {
+				writeLostOTPChange(w, r, database, user.Id, false)
 				return
 			}
 

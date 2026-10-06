@@ -1090,16 +1090,19 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// carrying a nil tx and fail as an unexpected call.
 		var calls []string
 		datamocks.ExpectRunInTransaction(database, otpEnrolTx, func(edge string) { calls = append(calls, edge) })
-		database.On("UpdateUser", mock.Anything, otpEnrolTx, mock.MatchedBy(func(u *record.User) bool {
-			// The secret must be stored encrypted. There is no plaintext column any more: migration
-			// 000048 dropped users.otp_secret (#98).
-			if u.Id != 1 || !u.OTPEnabled || len(u.OTPSecretEncrypted) == 0 {
-				return false
-			}
-			decrypted, err := testDataCipher.Decrypt(u.OTPSecretEncrypted)
-			return err == nil && decrypted == otpSecret
-		})).Return(nil).
-			Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
+		// A compare-and-set expecting OTP off at the generation this request read, 0 here (#471
+		// decision 2).
+		database.On("TryEstablishUserOTP", mock.Anything, otpEnrolTx, int64(1), int64(0),
+			mock.MatchedBy(func(secretEncrypted []byte) bool {
+				// The secret must be stored encrypted. There is no plaintext column any more:
+				// migration 000048 dropped users.otp_secret (#98).
+				if len(secretEncrypted) == 0 {
+					return false
+				}
+				decrypted, err := testDataCipher.Decrypt(secretEncrypted)
+				return err == nil && decrypted == otpSecret
+			})).Return(true, nil).
+			Run(func(mock.Arguments) { calls = append(calls, "establish") }).Once()
 		database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpEnrolTx, int64(1)).Return(int64(6), nil).
 			Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 		database.On("ClearPendingOTPEnrollment", mock.Anything, otpEnrolTx, int64(1)).Return(nil).
@@ -1141,7 +1144,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
-		assert.Equal(t, []string{"begin", "update", "increment", "clear", "commit", "rotate", "save"}, calls,
+		assert.Equal(t, []string{"begin", "establish", "increment", "clear", "commit", "rotate", "save"}, calls,
 			"the enable write, the counter advance and the pending-enrolment clear belong inside "+
 				"one transaction, commit last. The clear is handed otpEnrolTx rather than nil: on "+
 				"a nil transaction it would commit on its own, and a rolled back enrolment would "+
@@ -1213,7 +1216,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		updateError := errors.New("failed to update user")
 		stub := datamocks.ExpectRunInTransaction(database, otpEnrolTx)
-		database.On("UpdateUser", mock.Anything, otpEnrolTx, mock.Anything).Return(updateError).Once()
+		database.On("TryEstablishUserOTP", mock.Anything, otpEnrolTx, int64(1), int64(0), mock.Anything).
+			Return(false, updateError).Once()
 
 		pageRenderer.On("InternalServerError", rr, req, updateError).Return()
 
@@ -1281,7 +1285,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		incrementError := errors.New("the database is unwell")
 		stub := datamocks.ExpectRunInTransaction(database, otpEnrolTx)
-		database.On("UpdateUser", mock.Anything, otpEnrolTx, mock.Anything).Return(nil).Once()
+		database.On("TryEstablishUserOTP", mock.Anything, otpEnrolTx, int64(1), int64(0), mock.Anything).
+			Return(true, nil).Once()
 		database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpEnrolTx, int64(1)).
 			Return(int64(0), incrementError).Once()
 
@@ -1481,7 +1486,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		// Nothing is written and no transaction opens, so the authenticator is not
 		// established and neither success event can be raised.
-		database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "TryEstablishUserOTP",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventEnabledOTP, mock.Anything)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything)
@@ -1609,6 +1615,103 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
+}
+
+// TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn is the browser half of #471 decision 2 and
+// #144's enrolment half. The passcode matched the seed this ceremony rendered, and the establish
+// then found the account's authenticator no longer as this request read it: another enrolment, or
+// an enable and a disable, landed in between. Nothing is stored, so the sign-in cannot claim a
+// second factor it never installed. It ends on a page of its own saying so, at 409, in the
+// visitor's language: not the enrolment form again, whose QR code is for an authenticator that was
+// never stored, and not the "no longer active" page, which says another sign-in was started in this
+// browser. The ceremony is cleared first, so nothing can continue it, and nothing is audited as an
+// enable or as a successful second factor.
+func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
+	testCases := []struct {
+		locale  string
+		title   string
+		message string
+	}{
+		{
+			locale:  "en",
+			title:   "Your two-factor settings changed",
+			message: "The two-factor authentication settings of this account changed while you were signing in, so this sign-in cannot continue. Go back to the application you were signing in to and sign in again.",
+		},
+		{
+			locale:  "pt-BR",
+			title:   "Suas configurações de dois fatores mudaram",
+			message: "As configurações de autenticação de dois fatores desta conta mudaram enquanto você entrava, portanto este acesso não pode continuar. Volte para o aplicativo em que você estava entrando e entre novamente.",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.locale, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{},
+				testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+
+			key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
+			assert.Nil(t, err)
+			otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
+			assert.Nil(t, err)
+
+			form := url.Values{}
+			form.Add(ceremonyIdField, testCeremonyId)
+			form.Add("otp", otpCode)
+			req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			req = req.WithContext(i18n.WithLocale(req.Context(), true, tc.locale))
+			rr := httptest.NewRecorder()
+
+			authContext := &ceremony.AuthContext{
+				AuthState:  ceremony.AuthStateLevel2OTP,
+				CeremonyId: testCeremonyId,
+				UserId:     1,
+				ClientId:   "test-client",
+				OTPKeyURL:  otpTestKeyURL(key.Secret()),
+			}
+			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+			user := &record.User{Id: 1, Enabled: true, OTPEnabled: false, OtpConfigGeneration: 3}
+			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
+				Return(&record.Client{ClientIdentifier: "test-client"}, nil)
+			database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, false).
+				Return(true, nil)
+
+			var calls []string
+			datamocks.ExpectRunInTransaction(database, otpEnrolTx, func(edge string) { calls = append(calls, edge) })
+			// The generation this request read, 3, is what the compare-and-set expects.
+			database.On("TryEstablishUserOTP", mock.Anything, otpEnrolTx, int64(1), int64(3), mock.Anything).
+				Return(false, nil).Run(func(mock.Arguments) { calls = append(calls, "establish") }).Once()
+
+			ceremonyStore.On("ClearAuthContext", rr, req).Return(nil).
+				Run(func(mock.Arguments) { calls = append(calls, "clear-ceremony") }).Once()
+			pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
+				mock.MatchedBy(func(data map[string]interface{}) bool {
+					return data["_httpStatus"] == http.StatusConflict &&
+						data["title"] == tc.title &&
+						data["error"] == tc.message
+				})).Return(nil).Run(func(mock.Arguments) { calls = append(calls, "render") }).Once()
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Equal(t, []string{"begin", "establish", "commit", "clear-ceremony", "render"}, calls,
+				"the ceremony is cleared before the page commits the response, so its Set-Cookie still "+
+					"reaches the browser (#141)")
+			database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "ClearPendingOTPEnrollment", mock.Anything, mock.Anything, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			pageRenderer.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
+				"/auth_otp_enrollment.html", mock.Anything)
+		})
+	}
 }
 
 // TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly is seam 2 for the OTP form,

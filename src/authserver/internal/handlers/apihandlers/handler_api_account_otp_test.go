@@ -165,9 +165,11 @@ func TestHandleAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 	assert.Equal(t, claimedStep, payload["step"],
 		"the replay event carries the step that was replayed, so an operator can see which code it was")
 
-	// No enable write. UpdateUser is not registered on the mock, so reaching it would fail the test as
-	// an unexpected call; asserting it explicitly says that is the point rather than an accident.
-	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
+	// No enable write. TryEstablishUserOTP is not registered on the mock, so reaching it would fail
+	// the test as an unexpected call; asserting it explicitly says that is the point rather than an
+	// accident.
+	database.AssertNotCalled(t, "TryEstablishUserOTP",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	assert.False(t, user.OTPEnabled)
 }
 
@@ -194,7 +196,8 @@ func TestHandleAccountOTPPut_Enable_ClaimErrorIs500(t *testing.T) {
 
 	// Nothing enabled and nothing audited. An error must not read as a successful enrollment, and it
 	// must not read as a replay either: the event names an attack and a fault is not one.
-	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "TryEstablishUserOTP",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	assert.False(t, user.OTPEnabled)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -250,8 +253,8 @@ func TestHandleAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T) {
 
 	var calls []string
 	datamocks.ExpectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
-	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).
-		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
+	database.On("TryEstablishUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration, mock.Anything).
+		Return(true, nil).Run(func(mock.Arguments) { calls = append(calls, "establish") }).Once()
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).Return(int64(1), nil).
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 	database.On("ClearPendingOTPEnrollment", mock.Anything, otpDisableTx, user.Id).Return(nil).
@@ -265,7 +268,7 @@ func TestHandleAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T) {
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, []string{"begin", "update", "increment", "clear", "commit"}, calls,
+	assert.Equal(t, []string{"begin", "establish", "increment", "clear", "commit"}, calls,
 		"the enable write, the counter advance and the pending-enrolment clear belong inside one "+
 			"transaction, commit last. The clear is handed otpDisableTx rather than nil: committed "+
 			"on its own it would discard the pending seed even when the enable rolls back, and the "+
@@ -297,7 +300,8 @@ func TestHandleAccountOTPPut_Enable_CounterFailureRollsBack(t *testing.T) {
 		Return(true, nil).Once()
 
 	stub := datamocks.ExpectRunInTransaction(database, otpDisableTx)
-	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).Once()
+	database.On("TryEstablishUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration, mock.Anything).
+		Return(true, nil).Once()
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).
 		Return(int64(0), errors.New("the database is unwell")).Once()
 
@@ -359,8 +363,8 @@ func TestHandleAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T) {
 
 	var calls []string
 	datamocks.ExpectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
-	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).
-		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
+	database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration).
+		Return(true, nil).Run(func(mock.Arguments) { calls = append(calls, "remove") }).Once()
 	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.Id).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "reset") }).Once()
 	// The counter that tells every session of this user they owe a second factor again, inside the
@@ -378,7 +382,7 @@ func TestHandleAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T) {
 		ServeHTTP(rr, accountOTPDisableRequest(t, subject, password))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, []string{"begin", "update", "reset", "increment", "commit"}, calls,
+	assert.Equal(t, []string{"begin", "remove", "reset", "increment", "commit"}, calls,
 		"all three writes belong inside one transaction, otp_enabled first per #111 decision 10, "+
 			"the counter advance last before the commit per #242 decision 2")
 	assert.False(t, user.OTPEnabled)
@@ -400,7 +404,8 @@ func TestHandleAccountOTPPut_Disable_ResetFailureRollsBack(t *testing.T) {
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, otpDisableTx)
-	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).Once()
+	database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration).
+		Return(true, nil).Once()
 	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.Id).
 		Return(errors.New("the database is unwell")).Once()
 
@@ -826,7 +831,8 @@ func TestHandleAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 
 	tx := &sql.Tx{}
 	datamocks.ExpectRunInTransaction(database, tx)
-	database.On("UpdateUser", mock.Anything, tx, user).Return(nil).Once()
+	database.On("TryEstablishUserOTP", mock.Anything, tx, user.Id, user.OtpConfigGeneration, mock.Anything).
+		Return(true, nil).Once()
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, tx, user.Id).Return(int64(4), nil).Once()
 	// The clear rides in the enable's own transaction, so no committed state has OTP on with a
 	// live seed still installed behind it.
@@ -865,4 +871,124 @@ func TestHandleAccountOTPPut_Enable_BlankCodeIsRefusedByName(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Equal(t, "OTP_CODE_REQUIRED", errorCodeOf(t, rr))
+}
+
+// A lost compare-and-set is answered from what the row shows now (#471 decision 2). The establish
+// matched nothing because the account's authenticator is no longer as this request read it, so the
+// handler reads the row again: OTP now on means the request wanted what is already there, and gets
+// the 400 a request arriving a moment later would have got; OTP still off means an enable and a
+// disable landed in between, and the request is told the account changed under it, with nothing
+// stored. Either way nothing is audited as an enable, the generation does not advance and the
+// pending enrolment is not cleared.
+func TestHandleAccountOTPPut_Enable_ALostCompareAndSetIsAnsweredFromARead(t *testing.T) {
+	testCases := []struct {
+		name       string
+		reread     *record.User
+		wantStatus int
+		wantCode   string
+	}{
+		{
+			name:       "another enrolment landed",
+			reread:     &record.User{Id: 77, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 3},
+			wantStatus: http.StatusBadRequest,
+			wantCode:   "OTP_ALREADY_ENABLED",
+		},
+		{
+			name:       "an enable and a disable landed",
+			reread:     &record.User{Id: 77, Enabled: true, OTPEnabled: false, OtpConfigGeneration: 4},
+			wantStatus: http.StatusConflict,
+			wantCode:   "CONCURRENT_UPDATE",
+		},
+		{
+			name:       "the account is gone",
+			reread:     nil,
+			wantStatus: http.StatusConflict,
+			wantCode:   "CONCURRENT_UPDATE",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			const subject = "the-subject"
+			const password = "P4ss!word"
+			user := otpTestUser(t, password)
+			user.OtpConfigGeneration = 2
+
+			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
+			database.On("TryConsumeUserOTPStep", mock.Anything, (*sql.Tx)(nil), user.Id, mock.Anything, false).
+				Return(true, nil).Once()
+			datamocks.ExpectRunInTransaction(database, otpDisableTx)
+			database.On("TryEstablishUserOTP", mock.Anything, otpDisableTx, user.Id, int64(2), mock.Anything).
+				Return(false, nil).Once()
+			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(tc.reread, nil).Once()
+
+			rr := httptest.NewRecorder()
+			HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+				ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+
+			assert.Equal(t, tc.wantStatus, rr.Code, rr.Body.String())
+			assert.Equal(t, tc.wantCode, errorCodeOf(t, rr))
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "ClearPendingOTPEnrollment", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// The disable's twin: OTP now off is the 400 a request a moment later would have got; OTP still on
+// at another generation means the authenticator was replaced under the request, and the
+// replacement is not removed.
+func TestHandleAccountOTPPut_Disable_ALostCompareAndSetIsAnsweredFromARead(t *testing.T) {
+	testCases := []struct {
+		name       string
+		reread     *record.User
+		wantStatus int
+		wantCode   string
+	}{
+		{
+			name:       "another removal landed",
+			reread:     &record.User{Id: 77, Enabled: true, OTPEnabled: false, OtpConfigGeneration: 3},
+			wantStatus: http.StatusBadRequest,
+			wantCode:   "OTP_NOT_ENABLED",
+		},
+		{
+			name:       "the authenticator was replaced",
+			reread:     &record.User{Id: 77, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4},
+			wantStatus: http.StatusConflict,
+			wantCode:   "CONCURRENT_UPDATE",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			const subject = "the-subject"
+			const password = "P4ss!word"
+			user := otpTestUser(t, password)
+			user.OTPEnabled = true
+			user.OtpConfigGeneration = 2
+
+			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
+			datamocks.ExpectRunInTransaction(database, otpDisableTx)
+			database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.Id, int64(2)).Return(false, nil).Once()
+			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(tc.reread, nil).Once()
+
+			rr := httptest.NewRecorder()
+			HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+				ServeHTTP(rr, accountOTPDisableRequest(t, subject, password))
+
+			assert.Equal(t, tc.wantStatus, rr.Code, rr.Body.String())
+			assert.Equal(t, tc.wantCode, errorCodeOf(t, rr))
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "ResetUserOTPStep", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
 }

@@ -506,7 +506,11 @@ paths:
     put:
       tags: [Users]
       summary: Disable user OTP
-      description: Disable OTP (two-factor authentication) for a user. OTP can only be disabled via Admin API, not enabled.
+      description: |
+        Disable OTP (two-factor authentication) for a user. OTP can only be disabled via Admin API,
+        not enabled. The removal lands only while the user still has the authenticator this request
+        read; when another request removed it first, the answer is 400 OTP_NOT_ENABLED, and when it
+        was replaced, 409 CONCURRENT_UPDATE with nothing removed.
       operationId: updateUserOtp
       parameters:
         - $ref: '#/components/parameters/UserIdParam'
@@ -531,6 +535,15 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Another request changed the user's authenticator after this one read
+            it. error_code is CONCURRENT_UPDATE; nothing was saved. Read the
+            user again and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -3263,6 +3276,12 @@ paths:
         This request must not carry a `secretKey`. One that does is refused with 400
         (`SECRET_KEY_NOT_ACCEPTED`) rather than having the field ignored, because a caller sending
         one believes it is choosing which authenticator is installed, and it is not.
+
+        The change lands only while the authenticator is still as this request read it. When
+        another request changed it in between, the answer is read from the account as it is now:
+        400 (`OTP_ALREADY_ENABLED` or `OTP_NOT_ENABLED`) when OTP is already in the state asked
+        for, otherwise 409 (`CONCURRENT_UPDATE`) with nothing saved. The code submitted with an
+        enable is spent either way.
       operationId: updateAccountOTP
       requestBody:
         required: true
@@ -3285,6 +3304,15 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Another request changed the account's authenticator after this one read
+            it. error_code is CONCURRENT_UPDATE; nothing was saved. Read the
+            account again and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
