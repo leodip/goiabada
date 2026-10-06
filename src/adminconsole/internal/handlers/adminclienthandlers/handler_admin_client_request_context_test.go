@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -89,6 +90,10 @@ func (s *ctxRecordingApiClient) GetAllResources(ctx context.Context, _ string) (
 }
 
 func (s *ctxRecordingApiClient) UpdateClient(ctx context.Context, _ string, _ int64, _ *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
+	return nil, s.record(ctx)
+}
+
+func (s *ctxRecordingApiClient) UpdateClientAdministrativeScopes(ctx context.Context, _ string, _ int64, _ *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
 	return nil, s.record(ctx)
 }
 
@@ -206,6 +211,15 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3"),
 				handlertest.WithBody(strings.NewReader(`{"userSessionId":31}`)),
 				handlertest.WithContentType("application/json")),
+		},
+		{
+			name: "HandleAdministrativeScopesPost",
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+				return HandleAdministrativeScopesPost(h, newTestSessionStore(), c, consoleBaseURL)
+			},
+			request: handlertest.Request(http.MethodPost, "/admin/clients/3/settings/administrative-scopes",
+				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3"),
+				handlertest.WithForm(url.Values{"administrativeScopesAllowed": {"on"}})),
 		},
 	}
 

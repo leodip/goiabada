@@ -166,6 +166,23 @@ func (c *AuthServerClient) GetClientSecret(ctx context.Context, accessToken stri
 	return response.ClientSecret, nil
 }
 
+// UpdateClientAdministrativeScopes switches whether a client may request the administrative
+// authserver scopes, on the one route that changes it, and answers the client as it now is (#499
+// decision 5). It accepts 200 alone, as GetClientSecret above does.
+func (c *AuthServerClient) UpdateClientAdministrativeScopes(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
+	response, err := execute[api.UpdateClientResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/administrative-scopes",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &response.Client, nil
+}
+
 // The three logo methods are the exception in this file: each accepts 200 alone, as it was
 // written.
 

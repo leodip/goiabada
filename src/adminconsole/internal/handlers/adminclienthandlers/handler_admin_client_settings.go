@@ -21,6 +21,48 @@ type clientSettingsAPI interface {
 	UpdateClient(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientSettingsRequest) (*api.ClientResponse, error)
 }
 
+// ClientSettings is what the Settings tab is drawn from. AdministrativeScopesAllowed is shown
+// beside the settings, under Consent required, but saved by a form of its own on a route of its
+// own, so the settings save never carries it (#499 decision 5).
+type ClientSettings struct {
+	ClientId                    int64
+	ClientIdentifier            string
+	Description                 string
+	WebsiteURL                  string
+	DisplayName                 string
+	Enabled                     bool
+	ConsentRequired             bool
+	AdministrativeScopesAllowed bool
+	ShowLogo                    bool
+	ShowDisplayName             bool
+	ShowDescription             bool
+	ShowWebsiteURL              bool
+	AuthorizationCodeEnabled    bool
+	DefaultAcrLevel             string
+	IsSystemLevelClient         bool
+}
+
+// clientSettingsFrom draws the Settings tab from the client as the auth server answers it.
+func clientSettingsFrom(c *api.ClientResponse) ClientSettings {
+	return ClientSettings{
+		ClientId:                    c.Id,
+		ClientIdentifier:            c.ClientIdentifier,
+		Description:                 c.Description,
+		WebsiteURL:                  c.WebsiteURL,
+		DisplayName:                 c.DisplayName,
+		Enabled:                     c.Enabled,
+		ConsentRequired:             c.ConsentRequired,
+		AdministrativeScopesAllowed: c.AdministrativeScopesAllowed,
+		ShowLogo:                    c.ShowLogo,
+		ShowDisplayName:             c.ShowDisplayName,
+		ShowDescription:             c.ShowDescription,
+		ShowWebsiteURL:              c.ShowWebsiteURL,
+		AuthorizationCodeEnabled:    c.AuthorizationCodeEnabled,
+		DefaultAcrLevel:             c.DefaultAcrLevel,
+		IsSystemLevelClient:         c.IsSystemLevelClient,
+	}
+}
+
 func HandleSettingsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
@@ -57,37 +99,7 @@ func HandleSettingsGet(
 			return
 		}
 
-		adminClientSettings := struct {
-			ClientId                 int64
-			ClientIdentifier         string
-			Description              string
-			WebsiteURL               string
-			DisplayName              string
-			Enabled                  bool
-			ConsentRequired          bool
-			ShowLogo                 bool
-			ShowDisplayName          bool
-			ShowDescription          bool
-			ShowWebsiteURL           bool
-			AuthorizationCodeEnabled bool
-			DefaultAcrLevel          string
-			IsSystemLevelClient      bool
-		}{
-			ClientId:                 clientResp.Id,
-			ClientIdentifier:         clientResp.ClientIdentifier,
-			Description:              clientResp.Description,
-			WebsiteURL:               clientResp.WebsiteURL,
-			DisplayName:              clientResp.DisplayName,
-			Enabled:                  clientResp.Enabled,
-			ConsentRequired:          clientResp.ConsentRequired,
-			ShowLogo:                 clientResp.ShowLogo,
-			ShowDisplayName:          clientResp.ShowDisplayName,
-			ShowDescription:          clientResp.ShowDescription,
-			ShowWebsiteURL:           clientResp.ShowWebsiteURL,
-			AuthorizationCodeEnabled: clientResp.AuthorizationCodeEnabled,
-			DefaultAcrLevel:          clientResp.DefaultAcrLevel,
-			IsSystemLevelClient:      clientResp.IsSystemLevelClient,
-		}
+		adminClientSettings := clientSettingsFrom(clientResp)
 
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
@@ -96,7 +108,8 @@ func HandleSettingsGet(
 		}
 
 		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
-		if savedSuccessfully {
+		_, administrativeScopesSaved := sess.TakeFlash(administrativeScopesSavedFlash)
+		if savedSuccessfully || administrativeScopesSaved {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -105,8 +118,9 @@ func HandleSettingsGet(
 		}
 
 		bind := map[string]interface{}{
-			"client":            adminClientSettings,
-			"savedSuccessfully": savedSuccessfully,
+			"client":                    adminClientSettings,
+			"savedSuccessfully":         savedSuccessfully,
+			"administrativeScopesSaved": administrativeScopesSaved,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind)
@@ -163,36 +177,22 @@ func HandleSettingsPost(
 
 		isSystemLevelClient := clientResp.IsSystemLevelClient
 
-		adminClientSettings := struct {
-			ClientId                 int64
-			ClientIdentifier         string
-			Description              string
-			WebsiteURL               string
-			DisplayName              string
-			Enabled                  bool
-			ConsentRequired          bool
-			ShowLogo                 bool
-			ShowDisplayName          bool
-			ShowDescription          bool
-			ShowWebsiteURL           bool
-			AuthorizationCodeEnabled bool
-			DefaultAcrLevel          string
-			IsSystemLevelClient      bool
-		}{
-			ClientId:                 id,
-			ClientIdentifier:         r.FormValue("clientIdentifier"),
-			Description:              r.FormValue("description"),
-			WebsiteURL:               r.FormValue("websiteUrl"),
-			DisplayName:              r.FormValue("displayName"),
-			Enabled:                  enabled,
-			ConsentRequired:          consentRequired,
-			ShowLogo:                 showLogo,
-			ShowDisplayName:          showDisplayName,
-			ShowDescription:          showDescription,
-			ShowWebsiteURL:           showWebsiteURL,
-			AuthorizationCodeEnabled: clientResp.AuthorizationCodeEnabled,
-			DefaultAcrLevel:          r.FormValue("defaultAcrLevel"),
-			IsSystemLevelClient:      isSystemLevelClient,
+		adminClientSettings := ClientSettings{
+			ClientId:                    id,
+			ClientIdentifier:            r.FormValue("clientIdentifier"),
+			Description:                 r.FormValue("description"),
+			WebsiteURL:                  r.FormValue("websiteUrl"),
+			DisplayName:                 r.FormValue("displayName"),
+			Enabled:                     enabled,
+			ConsentRequired:             consentRequired,
+			AdministrativeScopesAllowed: clientResp.AdministrativeScopesAllowed,
+			ShowLogo:                    showLogo,
+			ShowDisplayName:             showDisplayName,
+			ShowDescription:             showDescription,
+			ShowWebsiteURL:              showWebsiteURL,
+			AuthorizationCodeEnabled:    clientResp.AuthorizationCodeEnabled,
+			DefaultAcrLevel:             r.FormValue("defaultAcrLevel"),
+			IsSystemLevelClient:         isSystemLevelClient,
 		}
 
 		renderError := func(message string) {

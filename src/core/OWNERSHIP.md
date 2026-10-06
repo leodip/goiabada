@@ -187,7 +187,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `UpdateAccountOTPRequest` | both-apps | — |
 | `core/api` | `UpdateAccountPasswordRequest` | both-apps | — |
 | `core/api` | `UpdateAccountPhoneRequest` | both-apps | — |
-| `core/api` | `UpdateClientAdministrativeScopesRequest` | contract | Admin API request DTO, which is what `core/api` is for. The auth server reads it and no admin console file sends it yet; #385 exempts this package by name. |
+| `core/api` | `UpdateClientAdministrativeScopesRequest` | both-apps | — |
 | `core/api` | `UpdateClientAuthenticationRequest` | both-apps | — |
 | `core/api` | `UpdateClientOAuth2FlowsRequest` | both-apps | — |
 | `core/api` | `UpdateClientPermissionsRequest` | both-apps | — |
