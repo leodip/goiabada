@@ -940,7 +940,7 @@ func TestTrySetUserEmail_AConcurrentDisableAndPasswordChangeSurvive(t *testing.T
 
 // createEnrolledTestUser returns a saved user with OTP on, which the consumed-step
 // tests need explicitly: createTestUser randomises OTPEnabled, so a test relying on
-// it would pass or fail by coin toss once requireOTPEnabled is in the predicate.
+// it would pass or fail by coin toss, otp_enabled being in the verification claim.
 func createEnrolledTestUser(t *testing.T) *record.User {
 	t.Helper()
 	user := createTestUser(t)
@@ -963,14 +963,14 @@ func nowStep() int64 {
 // TestTryConsumeUserOTPStep is the claim table for #111: a TOTP code accepted once is
 // never accepted again, because the accept and the record are one conditional UPDATE.
 //
-// The flag is false throughout, which is the enrollment sites' predicate;
-// TestTryConsumeUserOTPStep_RequireOTPEnabled covers the verification sites' one.
+// This is the enrollment sites' claim; TestTryConsumeEnrolledUserOTPStep_RequiresOTPEnabled
+// and TestTryConsumeEnrolledUserOTPStep cover the verification sites' one.
 func TestTryConsumeUserOTPStep(t *testing.T) {
 	user := createEnrolledTestUser(t)
 	step := nowStep()
 
 	// A fresh row starts at 0, so the first claim of any real step transitions it.
-	claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step, false)
+	claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
 	if err != nil {
 		t.Fatalf("first claim failed: %v", err)
 	}
@@ -987,7 +987,7 @@ func TestTryConsumeUserOTPStep(t *testing.T) {
 	}
 
 	// The same step again is the replay this whole issue exists to refuse.
-	again, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step, false)
+	again, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
 	if err != nil {
 		t.Fatalf("replayed claim errored instead of being refused: %v", err)
 	}
@@ -998,7 +998,7 @@ func TestTryConsumeUserOTPStep(t *testing.T) {
 	// A lower step is refused too. The marker is a high-water mark, so it also refuses
 	// codes below it that were never used: decision 1 accepts that imprecision because
 	// it only spans the 90 second acceptance window.
-	lower, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step-1, false)
+	lower, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step-1)
 	if err != nil {
 		t.Fatalf("lower claim errored: %v", err)
 	}
@@ -1007,7 +1007,7 @@ func TestTryConsumeUserOTPStep(t *testing.T) {
 	}
 
 	// The next step is a different code and is accepted.
-	higher, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step+1, false)
+	higher, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step+1)
 	if err != nil {
 		t.Fatalf("higher claim failed: %v", err)
 	}
@@ -1018,7 +1018,7 @@ func TestTryConsumeUserOTPStep(t *testing.T) {
 	// An unknown user is a refusal, not an error: no row transitioned, which is the
 	// only thing the method reports. The caller cannot tell it from a replay, and the
 	// doc comment says so.
-	unknown, err := database.TryConsumeUserOTPStep(context.Background(), nil, 999999999, step, false)
+	unknown, err := database.TryConsumeUserOTPStep(context.Background(), nil, 999999999, step)
 	if err != nil {
 		t.Errorf("an unknown user id must not error, got %v", err)
 	}
@@ -1026,7 +1026,7 @@ func TestTryConsumeUserOTPStep(t *testing.T) {
 		t.Error("an unknown user id must report false")
 	}
 
-	if _, err := database.TryConsumeUserOTPStep(context.Background(), nil, 0, step, false); err == nil {
+	if _, err := database.TryConsumeUserOTPStep(context.Background(), nil, 0, step); err == nil {
 		t.Error("expected an error consuming an OTP step for user id 0")
 	}
 }
@@ -1038,7 +1038,7 @@ func TestResetUserOTPStep(t *testing.T) {
 	user := createEnrolledTestUser(t)
 	step := nowStep()
 
-	claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step, false)
+	claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
 	if err != nil || !claimed {
 		t.Fatalf("seeding a consumed step failed: claimed=%v err=%v", claimed, err)
 	}
@@ -1056,7 +1056,7 @@ func TestResetUserOTPStep(t *testing.T) {
 	}
 
 	// The consumed step is claimable again, which is the observable half of the reset.
-	reclaimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step, false)
+	reclaimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
 	if err != nil {
 		t.Fatalf("claim after reset failed: %v", err)
 	}
@@ -1075,8 +1075,8 @@ func TestResetUserOTPStep(t *testing.T) {
 	}
 }
 
-// TestTryConsumeUserOTPStep_RequireOTPEnabled pins both directions of decision 10's
-// flag.
+// TestTryConsumeEnrolledUserOTPStep_RequiresOTPEnabled pins both directions of decision
+// 10's term, now the difference between the verification and the enrolment claim.
 //
 // A verification claim asserts a factor, and that assertion is only true of an
 // enrolled authenticator. Without the otp_enabled term, a browser request that loaded
@@ -1084,16 +1084,18 @@ func TestResetUserOTPStep(t *testing.T) {
 // token naming amr "otp" for an authenticator that had just been removed. Enrollment
 // claims must not carry the term, because they run before the enable write.
 //
-// Keep this test. It is the only place either direction of the flag is observable:
+// Keep this test. It is the only place either direction of the term is observable:
 // the interleaving it pins needs a request holding state loaded before a disable, so
-// no endpoint can reach it, and hard-wiring the flag either way leaves every other
-// case in the suite green.
-func TestTryConsumeUserOTPStep_RequireOTPEnabled(t *testing.T) {
+// no endpoint can reach it, and putting the term on both claims or on neither leaves
+// every other case in the suite green. The generation term beside it is held by
+// TestTryConsumeEnrolledUserOTPStep (#471).
+func TestTryConsumeEnrolledUserOTPStep_RequiresOTPEnabled(t *testing.T) {
 	user := createEnrolledTestUser(t)
+	generation := reloadUser(t, user.Id).OtpConfigGeneration
 	step := nowStep()
 
 	// Enrolled: a verification claim transitions the row.
-	claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step, true)
+	claimed, err := database.TryConsumeEnrolledUserOTPStep(context.Background(), nil, user.Id, step, generation)
 	if err != nil {
 		t.Fatalf("verification claim against an enrolled user failed: %v", err)
 	}
@@ -1111,7 +1113,7 @@ func TestTryConsumeUserOTPStep_RequireOTPEnabled(t *testing.T) {
 
 	// A verification claim is now refused, with no error: the step is newer than the
 	// stored one, so only the otp_enabled term can be refusing it.
-	afterDisable, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step+1, true)
+	afterDisable, err := database.TryConsumeEnrolledUserOTPStep(context.Background(), nil, user.Id, step+1, generation)
 	if err != nil {
 		t.Fatalf("verification claim after a disable errored instead of being refused: %v", err)
 	}
@@ -1119,14 +1121,14 @@ func TestTryConsumeUserOTPStep_RequireOTPEnabled(t *testing.T) {
 		t.Error("a verification claim must be refused once OTP is disabled (is the otp_enabled term missing?)")
 	}
 
-	// The same claim without the flag succeeds, which is what the enrollment sites
-	// need: they claim while otp_enabled is still false.
-	enrolling, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step+1, false)
+	// The enrolment claim succeeds, which is what the enrollment sites need: they
+	// claim while otp_enabled is still false.
+	enrolling, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step+1)
 	if err != nil {
 		t.Fatalf("enrollment claim failed: %v", err)
 	}
 	if !enrolling {
-		t.Error("an enrollment claim must succeed with OTP disabled (is the flag hard-wired on?)")
+		t.Error("an enrollment claim must succeed with OTP disabled (does it carry the otp_enabled term?)")
 	}
 }
 
@@ -1135,13 +1137,14 @@ func TestTryConsumeUserOTPStep_RequireOTPEnabled(t *testing.T) {
 //
 // The reset makes a consumed step claimable again, which is exactly what an in-flight
 // verification request holding pre-disable state would exploit if the claim did not
-// bind to enrolment state. The flag is what closes it: after the disable the
-// verification claim is refused even though the marker is back at 0.
+// bind to enrolment state. The otp_enabled term is what closes it: after the disable
+// the verification claim is refused even though the marker is back at 0.
 func TestResetUserOTPStep_DoesNotReopenConsumedStepToVerification(t *testing.T) {
 	user := createEnrolledTestUser(t)
+	generation := reloadUser(t, user.Id).OtpConfigGeneration
 	step := nowStep()
 
-	consumed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step, true)
+	consumed, err := database.TryConsumeEnrolledUserOTPStep(context.Background(), nil, user.Id, step, generation)
 	if err != nil || !consumed {
 		t.Fatalf("seeding a consumed step failed: consumed=%v err=%v", consumed, err)
 	}
@@ -1157,7 +1160,7 @@ func TestResetUserOTPStep_DoesNotReopenConsumedStepToVerification(t *testing.T) 
 		t.Fatalf("ResetUserOTPStep failed: %v", resetUserOTPStepErr)
 	}
 
-	replayed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step, true)
+	replayed, err := database.TryConsumeEnrolledUserOTPStep(context.Background(), nil, user.Id, step, generation)
 	if err != nil {
 		t.Fatalf("verification claim after reset errored instead of being refused: %v", err)
 	}
@@ -1166,7 +1169,7 @@ func TestResetUserOTPStep_DoesNotReopenConsumedStepToVerification(t *testing.T) 
 	}
 
 	// Re-enrolment, which is the point of the reset, still works with that same step.
-	reenrolling, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step, false)
+	reenrolling, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
 	if err != nil {
 		t.Fatalf("re-enrolment claim failed: %v", err)
 	}
@@ -1196,7 +1199,7 @@ func TestTryConsumeUserOTPStep_EnlistsInTransactionAndFailsClosed(t *testing.T) 
 	step := nowStep()
 
 	tx := beginTx(t)
-	claimed, err := database.TryConsumeUserOTPStep(context.Background(), tx, user.Id, step, false)
+	claimed, err := database.TryConsumeUserOTPStep(context.Background(), tx, user.Id, step)
 	if err != nil {
 		t.Fatalf("claim inside a transaction failed: %v", err)
 	}
@@ -1218,7 +1221,7 @@ func TestTryConsumeUserOTPStep_EnlistsInTransactionAndFailsClosed(t *testing.T) 
 	}
 
 	// The step is free again, which is the same fact from the other side.
-	afterRollback, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step, false)
+	afterRollback, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
 	if err != nil {
 		t.Fatalf("claim after rollback failed: %v", err)
 	}
@@ -1227,7 +1230,7 @@ func TestTryConsumeUserOTPStep_EnlistsInTransactionAndFailsClosed(t *testing.T) 
 	}
 
 	// The finished transaction is the forced fault.
-	failed, err := database.TryConsumeUserOTPStep(context.Background(), tx, user.Id, step+1, false)
+	failed, err := database.TryConsumeUserOTPStep(context.Background(), tx, user.Id, step+1)
 	if err == nil {
 		t.Error("a claim through a finished transaction must return an error, not a benign false")
 	}
@@ -1285,7 +1288,7 @@ func TestTryConsumeUserOTPStep_ConcurrentCallersProduceOneWinner(t *testing.T) {
 			go func(i int) {
 				defer wg.Done()
 				<-start
-				claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step, false)
+				claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
 				outcomes[i] = outcome{claimed: claimed, err: err}
 			}(i)
 		}
@@ -1352,7 +1355,7 @@ func TestUpdateUser_DoesNotClobberLastOTPStep(t *testing.T) {
 		t.Fatalf("expected a fresh user to start at step 0, got %d", stale.LastOTPStep)
 	}
 
-	claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step, false)
+	claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
 	if err != nil || !claimed {
 		t.Fatalf("seeding a consumed step failed: claimed=%v err=%v", claimed, err)
 	}

@@ -13665,6 +13665,90 @@ func (_c *Database_TryClaimCleanupRun_Call) RunAndReturn(run func(ctx context.Co
 	return _c
 }
 
+// TryConsumeEnrolledUserOTPStep provides a mock function for the type Database
+func (_mock *Database) TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64, expectedGeneration int64) (bool, error) {
+	ret := _mock.Called(ctx, tx, userId, step, expectedGeneration)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TryConsumeEnrolledUserOTPStep")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64, int64) (bool, error)); ok {
+		return returnFunc(ctx, tx, userId, step, expectedGeneration)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64, int64) bool); ok {
+		r0 = returnFunc(ctx, tx, userId, step, expectedGeneration)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, int64, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userId, step, expectedGeneration)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_TryConsumeEnrolledUserOTPStep_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TryConsumeEnrolledUserOTPStep'
+type Database_TryConsumeEnrolledUserOTPStep_Call struct {
+	*mock.Call
+}
+
+// TryConsumeEnrolledUserOTPStep is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+//   - step int64
+//   - expectedGeneration int64
+func (_e *Database_Expecter) TryConsumeEnrolledUserOTPStep(ctx any, tx any, userId any, step any, expectedGeneration any) *Database_TryConsumeEnrolledUserOTPStep_Call {
+	return &Database_TryConsumeEnrolledUserOTPStep_Call{Call: _e.mock.On("TryConsumeEnrolledUserOTPStep", ctx, tx, userId, step, expectedGeneration)}
+}
+
+func (_c *Database_TryConsumeEnrolledUserOTPStep_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, step int64, expectedGeneration int64)) *Database_TryConsumeEnrolledUserOTPStep_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 int64
+		if args[3] != nil {
+			arg3 = args[3].(int64)
+		}
+		var arg4 int64
+		if args[4] != nil {
+			arg4 = args[4].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_TryConsumeEnrolledUserOTPStep_Call) Return(b bool, err error) *Database_TryConsumeEnrolledUserOTPStep_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_TryConsumeEnrolledUserOTPStep_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, step int64, expectedGeneration int64) (bool, error)) *Database_TryConsumeEnrolledUserOTPStep_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // TryConsumeForgotPasswordCode provides a mock function for the type Database
 func (_mock *Database) TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string, passwordHash string) (bool, error) {
 	ret := _mock.Called(ctx, tx, userId, codeHash, passwordHash)
@@ -13750,8 +13834,8 @@ func (_c *Database_TryConsumeForgotPasswordCode_Call) RunAndReturn(run func(ctx 
 }
 
 // TryConsumeUserOTPStep provides a mock function for the type Database
-func (_mock *Database) TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error) {
-	ret := _mock.Called(ctx, tx, userId, step, requireOTPEnabled)
+func (_mock *Database) TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64) (bool, error) {
+	ret := _mock.Called(ctx, tx, userId, step)
 
 	if len(ret) == 0 {
 		panic("no return value specified for TryConsumeUserOTPStep")
@@ -13759,16 +13843,16 @@ func (_mock *Database) TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, us
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64, bool) (bool, error)); ok {
-		return returnFunc(ctx, tx, userId, step, requireOTPEnabled)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) (bool, error)); ok {
+		return returnFunc(ctx, tx, userId, step)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64, bool) bool); ok {
-		r0 = returnFunc(ctx, tx, userId, step, requireOTPEnabled)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) bool); ok {
+		r0 = returnFunc(ctx, tx, userId, step)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, int64, bool) error); ok {
-		r1 = returnFunc(ctx, tx, userId, step, requireOTPEnabled)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userId, step)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -13785,12 +13869,11 @@ type Database_TryConsumeUserOTPStep_Call struct {
 //   - tx *sql.Tx
 //   - userId int64
 //   - step int64
-//   - requireOTPEnabled bool
-func (_e *Database_Expecter) TryConsumeUserOTPStep(ctx any, tx any, userId any, step any, requireOTPEnabled any) *Database_TryConsumeUserOTPStep_Call {
-	return &Database_TryConsumeUserOTPStep_Call{Call: _e.mock.On("TryConsumeUserOTPStep", ctx, tx, userId, step, requireOTPEnabled)}
+func (_e *Database_Expecter) TryConsumeUserOTPStep(ctx any, tx any, userId any, step any) *Database_TryConsumeUserOTPStep_Call {
+	return &Database_TryConsumeUserOTPStep_Call{Call: _e.mock.On("TryConsumeUserOTPStep", ctx, tx, userId, step)}
 }
 
-func (_c *Database_TryConsumeUserOTPStep_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool)) *Database_TryConsumeUserOTPStep_Call {
+func (_c *Database_TryConsumeUserOTPStep_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, step int64)) *Database_TryConsumeUserOTPStep_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -13808,16 +13891,11 @@ func (_c *Database_TryConsumeUserOTPStep_Call) Run(run func(ctx context.Context,
 		if args[3] != nil {
 			arg3 = args[3].(int64)
 		}
-		var arg4 bool
-		if args[4] != nil {
-			arg4 = args[4].(bool)
-		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
-			arg4,
 		)
 	})
 	return _c
@@ -13828,7 +13906,7 @@ func (_c *Database_TryConsumeUserOTPStep_Call) Return(b bool, err error) *Databa
 	return _c
 }
 
-func (_c *Database_TryConsumeUserOTPStep_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)) *Database_TryConsumeUserOTPStep_Call {
+func (_c *Database_TryConsumeUserOTPStep_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, step int64) (bool, error)) *Database_TryConsumeUserOTPStep_Call {
 	_c.Call.Return(run)
 	return _c
 }

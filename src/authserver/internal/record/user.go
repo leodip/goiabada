@@ -66,7 +66,7 @@ type User struct {
 	// more direct here: the OTP enrollment handler loads the whole user, claims a step
 	// and then writes the user back, so leaving the column in the ordinary update set
 	// would let it write the pre-claim value over its own claim. It moves only through
-	// TryConsumeUserOTPStep and ResetUserOTPStep.
+	// TryConsumeUserOTPStep, TryConsumeEnrolledUserOTPStep and ResetUserOTPStep.
 	LastOTPStep int64 `db:"last_otp_step" fieldtag:"dont-update"`
 	// OtpConfigGeneration is the authoritative per-user counter of authenticator
 	// changes: it advances by one every time OTP is enabled or disabled, and never

@@ -1386,19 +1386,16 @@ func (d *Database) TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int
 // or two concurrent submissions of one code both pass. The single conditional UPDATE
 // is the claim and the replay check at once (#111).
 //
-// requireOTPEnabled adds `otp_enabled = true` to the predicate. Verification sites
-// pass true, because a verification claim asserts a factor and that assertion is only
-// true of an enrolled authenticator: without the term, a request that loaded the user
-// before a concurrent disable could still claim a step and be issued a token naming
-// amr "otp" for an authenticator that had just been removed. Enrollment sites pass
-// false, because they claim before the enable write and otp_enabled is still off
-// there (#111 decision 10).
+// This is the enrolment claim, and it names no authenticator state: enrolment claims
+// before the establish, while otp_enabled is still off, and the establish is itself the
+// compare-and-set on the authenticator the request read (#111 decision 10, #471
+// decision 2). Verification claims go through TryConsumeEnrolledUserOTPStep.
 //
 // **A false return is not proof of replay.** It means no row transitioned, and the
 // causes are not distinguishable here: the step is at or below the stored one, the
-// user row is gone, or, at a verification site, the authenticator was removed under
-// this request. The caller loaded the user moments earlier, so replay is
-// overwhelmingly the cause, and the response is identical either way. This is the
+// user row is gone, or, at a verification site, the authenticator was removed or
+// replaced under this request. The caller loaded the user moments earlier, so replay
+// is overwhelmingly the cause, and the response is identical either way. This is the
 // same imprecision MarkCodeAsUsed documents about its own three-way false.
 //
 // **A query error is not benign.** It returns (false, err) and the caller responds
@@ -1409,11 +1406,39 @@ func (d *Database) TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int
 // back, so the transaction requirement IncrementUserAuthStateGeneration documents
 // does not apply.
 //
-// Deliberately not part of UpdateUser. last_otp_step is tagged dont-update because
-// the OTP enrollment handler claims a step and then writes the whole user back, so an
-// ordinary update would write the pre-claim value over the claim.
-func (d *Database) TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
-	requireOTPEnabled bool) (bool, error) {
+// Deliberately not part of UpdateUser. last_otp_step is tagged dont-update because a
+// whole-row write from a snapshot read before the claim would write the pre-claim value
+// over it.
+func (d *Database) TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64) (bool, error) {
+	return d.consumeUserOTPStep(ctx, tx, userId, step, nil)
+}
+
+// TryConsumeEnrolledUserOTPStep is the verification claim: TryConsumeUserOTPStep's
+// claim, with the authenticator the passcode was checked against added to the
+// predicate. A verification claim asserts a factor, and that assertion is only true of
+// the authenticator the passcode matched.
+//
+// `otp_enabled = true` refuses a request that loaded the user before a concurrent
+// removal, which would otherwise be issued a token naming amr "otp" for an
+// authenticator that had just been removed (#111 decision 10). `otp_config_generation =
+// expectedGeneration`, the generation read with the secret, refuses one that loaded the
+// user before the authenticator was removed and another established in its place: the
+// row reads enabled again and the removal returned the marker to 0, so the enabled term
+// alone lets the stale passcode claim a step and assert otp for a secret that no longer
+// exists. Every establish and every remove advances the generation in its own
+// transaction, so a matching generation is the authenticator the request read (#144,
+// #471 decision 3).
+//
+// Everything else, the false and the error, is as TryConsumeUserOTPStep documents.
+func (d *Database) TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
+	expectedGeneration int64) (bool, error) {
+	return d.consumeUserOTPStep(ctx, tx, userId, step, &expectedGeneration)
+}
+
+// consumeUserOTPStep is the one conditional UPDATE both claims run. enrolledAt is nil for
+// the enrolment claim and the generation read with the secret for the verification claim.
+func (d *Database) consumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
+	enrolledAt *int64) (bool, error) {
 
 	if userId == 0 {
 		return false, errs.New("can't consume an OTP step for user with id 0")
@@ -1435,11 +1460,14 @@ func (d *Database) TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId
 		ub.Equal("id", userId),
 		ub.LessThan("last_otp_step", step),
 	}
-	if requireOTPEnabled {
+	if enrolledAt != nil {
 		// A bound Go bool, as TrySetUserEnabled does against users.enabled. The two
 		// columns carry the same type on every engine, so nothing here is dialect
 		// specific.
-		predicates = append(predicates, ub.Equal("otp_enabled", true))
+		predicates = append(predicates,
+			ub.Equal("otp_enabled", true),
+			ub.Equal("otp_config_generation", *enrolledAt),
+		)
 	}
 	ub.Where(predicates...)
 
@@ -1467,7 +1495,7 @@ func (d *Database) TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId
 // order needs a transaction, but reversed there is a window in which the marker reads
 // 0 while the authenticator still reads enabled, and a verification request that
 // loaded the old state claims an already-consumed step through it, which is precisely
-// the hole TryConsumeUserOTPStep's requireOTPEnabled term closes.
+// the hole TryConsumeEnrolledUserOTPStep's otp_enabled term closes.
 //
 // Not a bypass: self-service disable verifies the password first, admin disable
 // requires authserver:manage, and re-enrolling requires possession of a fresh secret.

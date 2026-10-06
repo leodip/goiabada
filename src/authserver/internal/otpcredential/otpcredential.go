@@ -52,7 +52,9 @@ type Database interface {
 	IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
 	ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)
+	TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
+		expectedGeneration int64) (bool, error)
+	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64) (bool, error)
 	TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64,
 		secretEncrypted []byte) (bool, error)
 	TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error)
@@ -197,7 +199,7 @@ func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCiph
 // otp_enabled = 1 with last_otp_step = 0 and a code already consumed, so that code is claimable
 // again at the browser prompt for the rest of its acceptance window. A concurrent enrollment sees
 // either the pre-disable state, where OTP_ALREADY_ENABLED refuses it at the account API and decision
-// 10's requireOTPEnabled refuses it at the browser verification branch, or the fully disabled state
+// 10's otp_enabled term refuses it at the browser verification branch, or the fully disabled state
 // including the reset, where its claim stands. Neither method needed a transaction on its own; the
 // pair does.
 //
@@ -250,10 +252,14 @@ func Remove(ctx context.Context, db Database, user *record.User) (removed bool, 
 }
 
 // VerifyStored checks a passcode against the authenticator the user has enrolled, and claims the
-// step it matched. This is the assertion of a second factor, so requireOTPEnabled is true: without
-// that term a request that loaded the user before a concurrent Remove could still claim a step and
-// be issued a token naming amr "otp" for an authenticator that had just been removed (#111
-// decision 10).
+// step it matched. This is the assertion of a second factor, so the claim is bound to the
+// authenticator the passcode was checked against: it matches only while otp_enabled is on at the
+// otp_config_generation user was read with, the one read with the secret. Without the first term a
+// request that loaded the user before a concurrent Remove could still claim a step and be issued a
+// token naming amr "otp" for an authenticator that had just been removed (#111 decision 10);
+// without the second, one that loaded the user before a Remove and an Establish replaced the
+// authenticator could, since the row reads enabled again with the marker reset (#144, #471
+// decision 3). A claim refused this way is OutcomeReplayed, answered as every refused claim is.
 //
 // The stored seed is decrypted here and goes no further: it is the read that used to travel out to
 // the browser handler as record.User.GetOTPSecret, which is what #387's rule about a plaintext seed
@@ -265,13 +271,16 @@ func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataC
 	if err != nil {
 		return VerifyResult{}, err
 	}
-	return verify(ctx, db, user, secret, code, now, true)
+	return verify(secret, code, now, func(step int64) (bool, error) {
+		return db.TryConsumeEnrolledUserOTPStep(ctx, nil, user.Id, step, user.OtpConfigGeneration)
+	})
 }
 
 // VerifySupplied checks a passcode against a seed the caller holds rather than one the user has
 // enrolled, and claims the step it matched. This is enrolment establishing an authenticator rather
-// than a verification asserting one, so requireOTPEnabled is false: otp_enabled is still off until
-// Establish writes it (#111 decision 10).
+// than a verification asserting one, so the claim names no authenticator state: otp_enabled is
+// still off until Establish writes it, and Establish is itself the compare-and-set on the
+// authenticator the request read (#111 decision 10, #471 decision 2).
 //
 // The claim comes before the establish deliberately, at both callers: if the write then fails, a
 // code is burned and the user retries with the next one, whereas the reverse order would leave OTP
@@ -282,22 +291,24 @@ func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataC
 // and recorded. Neither seed is ever one the requester named.
 func VerifySupplied(ctx context.Context, db Database, user *record.User, seed string, code string,
 	now time.Time) (VerifyResult, error) {
-	return verify(ctx, db, user, seed, code, now, false)
+	return verify(seed, code, now, func(step int64) (bool, error) {
+		return db.TryConsumeUserOTPStep(ctx, nil, user.Id, step)
+	})
 }
 
 // verify is the arm both entry points run: match the passcode against a seed inside the acceptance
-// window, then claim the step it matched, so a passcode is accepted at most once (#111).
+// window, then claim the step it matched through the entry point's claim, so a passcode is
+// accepted at most once (#111).
 //
 // It reports rather than decides. The caller keeps the audit records, the rate-limit accounting and
 // the response, because those three genuinely differ between the sites and must keep differing.
-func verify(ctx context.Context, db Database, user *record.User, secret string, code string,
-	now time.Time, requireOTPEnabled bool) (VerifyResult, error) {
+func verify(secret string, code string, now time.Time, claim func(step int64) (bool, error)) (VerifyResult, error) {
 	step, matched := otp.MatchStep(code, secret, now)
 	if !matched {
 		return VerifyResult{Outcome: OutcomeWrong}, nil
 	}
 
-	consumed, err := db.TryConsumeUserOTPStep(ctx, nil, user.Id, step, requireOTPEnabled)
+	consumed, err := claim(step)
 	if err != nil {
 		return VerifyResult{}, err
 	}
