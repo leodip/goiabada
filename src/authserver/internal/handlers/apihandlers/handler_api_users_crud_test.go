@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -312,15 +313,16 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	assert.False(t, user.OTPEnabled)
 }
 
-// TestHandleUserCreatePost_StoresResetCodeHash covers the admin user-create path, which
-// is one of the three places Goiabada issues a password-reset link and the only one with
-// no unit coverage of the email branch before this.
+// TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode covers the admin user-create path,
+// which is one of the three places Goiabada issues a password-reset link.
 //
-// The property: the hash stored beside the encrypted code is the hash of the code that
-// actually went into the link. It is the only thing that will find this row when the link
-// comes back, since the link carries the code and no email address (#112), so a hash of
-// anything else leaves the new user unable to set a password at all.
-func TestHandleUserCreatePost_StoresResetCodeHash(t *testing.T) {
+// Two properties. The hash inserted beside the encrypted code is the hash of the code that actually
+// went into the link: it is the only thing that will find this row when the link comes back, since
+// the link carries the code and no email address (#112), so a hash of anything else leaves the new
+// user unable to set a password at all. And the code reaches the row through the insert, with no
+// write after it: a whole-row save of the user it had just created could undo whatever another
+// request changed in between, a disable or a password set (#471 decision 4).
+func TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	database := datamocks.NewDatabase(t)
 	userCreator := accounthandlersmocks.NewUserCreator(t)
@@ -344,13 +346,13 @@ func TestHandleUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "TestApp", SMTPEnabled: true, SMTPHost: "smtp.example.com", SMTPFromName: "Acme"}))
 
-	// The handler mutates this model in place before writing it, so it is what the
-	// assertions below read.
 	createdUser := &record.User{Id: 7, Email: "newuser@example.com"}
 
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "newuser@example.com").Return(nil, nil)
-	userCreator.On("CreateUser", mock.Anything, mock.Anything).Return(createdUser, nil)
-	database.On("UpdateUser", mock.Anything, mock.Anything, createdUser).Return(nil)
+	var input *usercreation.Input
+	userCreator.On("CreateUser", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) { input = args.Get(1).(*usercreation.Input) }).
+		Return(createdUser, nil)
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return()
 	var emailedLink string
 	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
@@ -362,18 +364,26 @@ func TestHandleUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	emailSender.On("SendEmail", mock.Anything,
 		emaildelivery.SMTPConfig{Host: "smtp.example.com", FromName: "Acme"}, mock.Anything).Return(nil)
 
+	before := time.Now().UTC()
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
+	after := time.Now().UTC()
 
 	require.Equal(t, http.StatusCreated, rr.Code, rr.Body.String())
+	require.NotNil(t, input)
 
-	// Derived from the code the handler issued, decrypted out of the column it wrote,
+	// Derived from the code the handler issued, decrypted out of what it handed the insert,
 	// rather than from a value this test chose.
-	issuedCode, err := testDataCipher.Decrypt(createdUser.ForgotPasswordCodeEncrypted)
+	issuedCode, err := testDataCipher.Decrypt(input.ForgotPasswordCodeEncrypted)
 	require.NoError(t, err)
-	expectedHash := hashutil.HashString(issuedCode)
-	assert.Equal(t, expectedHash, createdUser.ForgotPasswordCodeHash,
-		"the stored hash must be the hash of the code that was issued")
+	require.NotEmpty(t, issuedCode)
+	assert.Equal(t, hashutil.HashString(issuedCode), input.ForgotPasswordCodeHash,
+		"the inserted hash must be the hash of the code that was issued")
+	require.True(t, input.ForgotPasswordCodeIssuedAt.Valid,
+		"a code with no issued-at is refused by the reset page as expired")
+	assert.False(t, input.ForgotPasswordCodeIssuedAt.Time.Before(before),
+		"the code is issued by this request")
+	assert.False(t, input.ForgotPasswordCodeIssuedAt.Time.After(after))
 
 	// This site's only job is to hand the issued code to the shared builder; the link's shape
 	// and the absence of an address in it belong to ResetPasswordLink's own tests (#112
@@ -381,9 +391,54 @@ func TestHandleUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode), emailedLink,
 		"the emailed link must be the shared builder's output for the code that was issued")
 
+	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
 	pageRenderer.AssertExpectations(t)
 	database.AssertExpectations(t)
 	emailSender.AssertExpectations(t)
+}
+
+// The password arm issues no code: the account is reachable through the password it was created
+// with, and a code beside it would be a second, unasked-for way in for whoever reads the mailbox.
+func TestHandleUserCreatePost_APasswordCreateInsertsNoResetCode(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
+	userCreator := accounthandlersmocks.NewUserCreator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	emailSender := accounthandlersmocks.NewEmailSender(t)
+
+	handler := HandleUserCreatePost(pageRenderer, database, userCreator,
+		accountvalidation.NewEmailValidator(database),
+		accountvalidation.NewProfileValidator(database),
+		accountvalidation.NewPasswordValidator(),
+		auditLogger, emailSender, testDataCipher, testBaseURL)
+
+	body, err := json.Marshal(map[string]interface{}{
+		"email":           "newuser@example.com",
+		"setPasswordType": "now",
+		"password":        "a-long-enough-password-1",
+	})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "TestApp", SMTPEnabled: true}))
+
+	database.On("GetUserByEmail", mock.Anything, mock.Anything, "newuser@example.com").Return(nil, nil)
+	var input *usercreation.Input
+	userCreator.On("CreateUser", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) { input = args.Get(1).(*usercreation.Input) }).
+		Return(&record.User{Id: 7, Email: "newuser@example.com"}, nil)
+	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return()
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusCreated, rr.Code, rr.Body.String())
+	require.NotNil(t, input)
+	assert.Empty(t, input.ForgotPasswordCodeEncrypted)
+	assert.Empty(t, input.ForgotPasswordCodeHash)
+	assert.False(t, input.ForgotPasswordCodeIssuedAt.Valid)
 }
 
 // TestHandleUserCreatePost_LostRaceOnTheEmailAnswers409 covers the branch decision 15 built the
@@ -609,20 +664,20 @@ func TestHandleUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 
 			database.On("GetUserByEmail", mock.Anything, mock.Anything, "newuser@example.com").Return(nil, nil)
 
-			// createdUser is what the handler mutates on the email arm, so the assertions below
-			// read the hash off the input the handler actually passed rather than off a value
-			// this test chose.
+			// The assertions below read the hash and the code off the input the handler actually
+			// passed rather than off a value this test chose.
 			createdUser := &record.User{Id: 7, Email: "newuser@example.com"}
-			var gotPasswordHash string
+			var gotPasswordHash, gotResetCodeHash string
 			if tc.wantCreated {
 				userCreator.On("CreateUser", mock.Anything, mock.Anything).
 					Run(func(args mock.Arguments) {
-						gotPasswordHash = args.Get(1).(*usercreation.Input).PasswordHash
+						input := args.Get(1).(*usercreation.Input)
+						gotPasswordHash = input.PasswordHash
+						gotResetCodeHash = input.ForgotPasswordCodeHash
 					}).Return(createdUser, nil)
 				auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return()
 			}
 			if tc.wantEmail {
-				database.On("UpdateUser", mock.Anything, mock.Anything, createdUser).Return(nil)
 				pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 					"/emails/email_newuser_set_password.html", mock.Anything).
 					Return(&bytes.Buffer{}, nil)
@@ -649,7 +704,7 @@ func TestHandleUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 				// The email arm legitimately creates the row with no hash: the setup link is how
 				// the account becomes reachable, and the row carries the code that answers it.
 				assert.Empty(t, gotPasswordHash)
-				assert.NotEmpty(t, createdUser.ForgotPasswordCodeHash,
+				assert.NotEmpty(t, gotResetCodeHash,
 					"a setup email is only meaningful beside the code that answers its link")
 			}
 

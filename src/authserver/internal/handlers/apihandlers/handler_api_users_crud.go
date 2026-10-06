@@ -49,7 +49,6 @@ type usersCrudDatabase interface {
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
 	TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 // HandleUserGet - GET /api/v1/admin/users/{id}
@@ -434,15 +433,37 @@ func HandleUserCreatePost(
 		req.MiddleName = strings.TrimSpace(req.MiddleName)
 		req.FamilyName = strings.TrimSpace(req.FamilyName)
 
-		// Create user using UserCreator
-		createdUser, err := userCreator.CreateUser(r.Context(), &usercreation.Input{
+		input := &usercreation.Input{
 			Email:         req.Email,
 			EmailVerified: req.EmailVerified,
 			PasswordHash:  passwordHash,
 			GivenName:     req.GivenName,
 			MiddleName:    req.MiddleName,
 			FamilyName:    req.FamilyName,
-		})
+		}
+
+		// The setup email's code is issued before the create and inserted with the row, so nothing
+		// writes the user after the insert: a save of the row as created could undo whatever
+		// another request changed in between (#471 decision 4). A create that loses its address
+		// below discards the code with the row.
+		var verificationCode string
+		if sendSetupEmail {
+			verificationCode = securerandom.String(32)
+			input.ForgotPasswordCodeEncrypted, err = dataCipher.Encrypt(verificationCode)
+			if err != nil {
+				writeInternalServerError(w, r, err)
+				return
+			}
+
+			// The hash is how the reset link finds this row again, since the link carries
+			// the code and no email address (#112). The encryption above stays: it is what
+			// proves a submitted code matches, where the hash only locates the row.
+			input.ForgotPasswordCodeHash = hashutil.HashString(verificationCode)
+			input.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+		}
+
+		// Create user using UserCreator
+		createdUser, err := userCreator.CreateUser(r.Context(), input)
 		if err != nil {
 			// The address check above answers the ordinary case; this is the race it cannot
 			// close, where a concurrent create takes the address between that read and this
@@ -475,29 +496,6 @@ func HandleUserCreatePost(
 
 		// Handle email flow if needed
 		if sendSetupEmail {
-			verificationCode := securerandom.String(32)
-			verificationCodeEncrypted, err := dataCipher.Encrypt(verificationCode)
-			if err != nil {
-				writeInternalServerError(w, r, err)
-				return
-			}
-
-			// The hash is how the reset link finds this row again, since the link carries
-			// the code and no email address (#112). The encryption above stays: it is what
-			// proves a submitted code matches, where the hash only locates the row.
-			verificationCodeHash := hashutil.HashString(verificationCode)
-
-			// Update user with reset code
-			createdUser.ForgotPasswordCodeEncrypted = verificationCodeEncrypted
-			createdUser.ForgotPasswordCodeHash = verificationCodeHash
-			utcNow := time.Now().UTC()
-			createdUser.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
-			err = database.UpdateUser(r.Context(), nil, createdUser)
-			if err != nil {
-				writeInternalServerError(w, r, err)
-				return
-			}
-
 			// Prepare and send email
 			name := createdUser.FullName()
 			if len(name) == 0 {

@@ -41,6 +41,14 @@ type Input struct {
 	GivenName     string
 	MiddleName    string
 	FamilyName    string
+
+	// The password-reset code a user the administrator creates with a set-password email is
+	// inserted holding, the code the emailed link carries: its ciphertext, the hash the link finds
+	// the row by, and when it was issued. Zero for every other create. Carried into the insert so
+	// nothing writes the row after it (#471 decision 4).
+	ForgotPasswordCodeEncrypted []byte
+	ForgotPasswordCodeHash      string
+	ForgotPasswordCodeIssuedAt  sql.NullTime
 }
 
 func (uc *Creator) CreateUser(ctx context.Context, input *Input) (*record.User, error) {
@@ -101,6 +109,10 @@ func (uc *Creator) newUser(ctx context.Context, tx *sql.Tx, input *Input) (*reco
 		MiddleName:    input.MiddleName,
 		FamilyName:    input.FamilyName,
 		PasswordHash:  input.PasswordHash,
+
+		ForgotPasswordCodeEncrypted: input.ForgotPasswordCodeEncrypted,
+		ForgotPasswordCodeHash:      input.ForgotPasswordCodeHash,
+		ForgotPasswordCodeIssuedAt:  input.ForgotPasswordCodeIssuedAt,
 	}
 
 	authServerResource, err := uc.database.GetResourceByResourceIdentifier(ctx, tx, builtin.AuthServerResourceIdentifier)
