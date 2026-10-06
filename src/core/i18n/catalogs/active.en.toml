@@ -1414,6 +1414,13 @@
 "adminconsole.admin_settings.email.field.password" = "Password"
 "adminconsole.admin_settings.email.field.from_name" = "From name"
 "adminconsole.admin_settings.email.field.from_email" = "From email"
+"adminconsole.admin_settings.email.password_saved" = "Saved"
+"adminconsole.admin_settings.email.password_not_set" = "Not set"
+"adminconsole.admin_settings.email.password_tooltip" = "The saved password is never shown. Leave this box empty to keep it, type a new one to replace it, or tick Remove saved password to delete it."
+"adminconsole.admin_settings.email.password_keep_placeholder" = "Leave empty to keep the saved password"
+"adminconsole.admin_settings.email.clear_password" = "Remove saved password"
+"adminconsole.admin_settings.email.clear_password_notice" = "The saved password will be deleted when you save."
+"adminconsole.admin_settings.email.host_change_warning" = "The SMTP host has changed: enter the password again, or remove the saved password."
 
 "adminconsole.admin_settings.email_sendtest.field.destination" = "Destination email"
 "adminconsole.admin_settings.email_sendtest.smtp_disabled_prefix" = "SMTP is currently "

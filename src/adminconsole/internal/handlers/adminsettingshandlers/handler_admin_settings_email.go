@@ -54,6 +54,10 @@ func HandleEmailGet(
 			SMTPEncryption: apiResp.SMTPEncryption,
 			SMTPFromName:   apiResp.SMTPFromName,
 			SMTPFromEmail:  apiResp.SMTPFromEmail,
+			// The password never comes back from the API, only whether one is stored, and the
+			// host it is stored for is the one the page warns about leaving (#410).
+			HasSMTPPassword: apiResp.HasSMTPPassword,
+			SavedSMTPHost:   apiResp.SMTPHost,
 		}
 
 		if apiResp.SMTPPort == 0 {
@@ -111,15 +115,23 @@ func HandleEmailPost(
 		// POST-only with a separate GET handler rendering the form, so the query was never a
 		// submission. The other fields here are configuration rather than credentials and keep the
 		// accessor they had (#202).
+		//
+		// An empty box keeps the stored password and the ticked checkbox removes it (#410).
+		// hasSmtpPassword and savedHostOrIP are hidden fields carrying the state the page was
+		// loaded with, which only a refused save's redraw reads: the auth server decides what the
+		// save does to the password from the row it holds, not from them.
 		settingsInfo := SettingsEmailPost{
-			SMTPEnabled:    r.FormValue("smtpEnabled") == "on",
-			SMTPHost:       r.FormValue("hostOrIP"),
-			SMTPPort:       r.FormValue("port"),
-			SMTPUsername:   r.FormValue("username"),
-			SMTPPassword:   r.PostFormValue("password"),
-			SMTPEncryption: r.FormValue("smtpEncryption"),
-			SMTPFromName:   r.FormValue("fromName"),
-			SMTPFromEmail:  r.FormValue("fromEmail"),
+			SMTPEnabled:       r.FormValue("smtpEnabled") == "on",
+			SMTPHost:          r.FormValue("hostOrIP"),
+			SMTPPort:          r.FormValue("port"),
+			SMTPUsername:      r.FormValue("username"),
+			SMTPPassword:      r.PostFormValue("password"),
+			ClearSMTPPassword: r.FormValue("clearSmtpPassword") == "on",
+			SMTPEncryption:    r.FormValue("smtpEncryption"),
+			SMTPFromName:      r.FormValue("fromName"),
+			SMTPFromEmail:     r.FormValue("fromEmail"),
+			HasSMTPPassword:   r.FormValue("hasSmtpPassword") == "true",
+			SavedSMTPHost:     r.FormValue("savedHostOrIP"),
 		}
 
 		renderError := func(message string) {
@@ -143,14 +155,15 @@ func HandleEmailPost(
 		}
 
 		updateReq := &api.UpdateSettingsEmailRequest{
-			SMTPEnabled:    settingsInfo.SMTPEnabled,
-			SMTPHost:       strings.TrimSpace(settingsInfo.SMTPHost),
-			SMTPPort:       smtpPortInt,
-			SMTPUsername:   strings.TrimSpace(settingsInfo.SMTPUsername),
-			SMTPPassword:   settingsInfo.SMTPPassword,
-			SMTPEncryption: strings.TrimSpace(settingsInfo.SMTPEncryption),
-			SMTPFromName:   strings.TrimSpace(settingsInfo.SMTPFromName),
-			SMTPFromEmail:  strings.TrimSpace(settingsInfo.SMTPFromEmail),
+			SMTPEnabled:       settingsInfo.SMTPEnabled,
+			SMTPHost:          strings.TrimSpace(settingsInfo.SMTPHost),
+			SMTPPort:          smtpPortInt,
+			SMTPUsername:      strings.TrimSpace(settingsInfo.SMTPUsername),
+			SMTPPassword:      settingsInfo.SMTPPassword,
+			ClearSMTPPassword: settingsInfo.ClearSMTPPassword,
+			SMTPEncryption:    strings.TrimSpace(settingsInfo.SMTPEncryption),
+			SMTPFromName:      strings.TrimSpace(settingsInfo.SMTPFromName),
+			SMTPFromEmail:     strings.TrimSpace(settingsInfo.SMTPFromEmail),
 		}
 
 		_, err := apiClient.UpdateSettingsEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)

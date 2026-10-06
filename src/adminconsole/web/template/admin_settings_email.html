@@ -14,42 +14,105 @@
     document.addEventListener('DOMContentLoaded', function () {
         const smtpEnabled = document.getElementById('smtpEnabled');
         smtpEnabled.addEventListener('change', function () {
-            refreshVisibility();
+            refreshVisibility(true);
         });
-        refreshVisibility();
+
+        const clearSmtpPassword = document.getElementById('clearSmtpPassword');
+        if (clearSmtpPassword) {
+            clearSmtpPassword.addEventListener('change', function () {
+                refreshVisibility(false);
+            });
+        }
+
+        document.getElementById('hostOrIP').addEventListener('input', refreshHostChangeWarning);
+        document.getElementById('password').addEventListener('input', refreshHostChangeWarning);
+
+        refreshVisibility(true);
     });
 
-    function refreshVisibility() {
+    function refreshVisibility(focusHost) {
         const smtpEnabled = document.getElementById('smtpEnabled');
 
         const hostOrIP = document.getElementById('hostOrIP');
         const port = document.getElementById('port');
         const username = document.getElementById('username');
         const password = document.getElementById('password');
+        const clearSmtpPassword = document.getElementById('clearSmtpPassword');
         const smtpEncryption = document.getElementById('smtpEncryption');
         const fromName = document.getElementById('fromName');
         const fromEmail = document.getElementById('fromEmail');
+
+        // Ticking the removal disables the box, so a new password and a removal are never sent
+        // together; the box keeps what was typed, should the removal be unticked again.
+        const removing = clearSmtpPassword !== null && clearSmtpPassword.checked;
 
         if (smtpEnabled.checked) {
             hostOrIP.removeAttribute('disabled');
             port.removeAttribute('disabled');
             username.removeAttribute('disabled');
-            password.removeAttribute('disabled');
+            if (removing) {
+                password.setAttribute('disabled', 'disabled');
+            } else {
+                password.removeAttribute('disabled');
+            }
+            if (clearSmtpPassword) {
+                clearSmtpPassword.removeAttribute('disabled');
+            }
             smtpEncryption.removeAttribute('disabled');
             fromName.removeAttribute('disabled');
             fromEmail.removeAttribute('disabled');
-            setTimeout(function () {
-                hostOrIP.focus();
-            }, 100);
+            if (focusHost) {
+                setTimeout(function () {
+                    hostOrIP.focus();
+                }, 100);
+            }
         } else {
             hostOrIP.setAttribute('disabled', 'disabled');
             port.setAttribute('disabled', 'disabled');
             username.setAttribute('disabled', 'disabled');
             password.setAttribute('disabled', 'disabled');
+            if (clearSmtpPassword) {
+                clearSmtpPassword.setAttribute('disabled', 'disabled');
+            }
             smtpEncryption.setAttribute('disabled', 'disabled');
             fromName.setAttribute('disabled', 'disabled');
             fromEmail.setAttribute('disabled', 'disabled');
         }
+
+        const clearNotice = document.getElementById('clearSmtpPasswordNotice');
+        if (clearNotice) {
+            clearNotice.classList.toggle('hidden', !(smtpEnabled.checked && removing));
+        }
+
+        refreshHostChangeWarning();
+    }
+
+    // The host in the form the auth server compares it in: surrounding space trimmed, one pair of
+    // brackets taken off an IPv6 literal, and without regard to case.
+    function normalizeHost(host) {
+        host = host.trim();
+        if (host.length >= 2 && host.charAt(0) === '[' && host.charAt(host.length - 1) === ']') {
+            host = host.substring(1, host.length - 1);
+        }
+        return host.toLowerCase();
+    }
+
+    // A saved password reaches only the host it was saved for, so editing the host away from that
+    // one needs the password again or its removal. The auth server refuses the save otherwise;
+    // this says so before the save is sent.
+    function refreshHostChangeWarning() {
+        const warning = document.getElementById('hostChangeWarning');
+        const hasSmtpPassword = document.getElementById('hasSmtpPassword').value === 'true';
+        const savedHostOrIP = document.getElementById('savedHostOrIP').value;
+        const smtpEnabled = document.getElementById('smtpEnabled');
+        const hostOrIP = document.getElementById('hostOrIP');
+        const password = document.getElementById('password');
+        const clearSmtpPassword = document.getElementById('clearSmtpPassword');
+
+        const hostChanged = normalizeHost(hostOrIP.value) !== normalizeHost(savedHostOrIP);
+        const answered = password.value !== '' || (clearSmtpPassword !== null && clearSmtpPassword.checked);
+
+        warning.classList.toggle('hidden', !(hasSmtpPassword && smtpEnabled.checked && hostChanged && !answered));
     }
 </script>
 
@@ -92,6 +155,10 @@
                 </label>
                 <input id="hostOrIP" type="text" name="hostOrIP" value="{{.settings.SMTPHost}}"
                     class="w-full input input-bordered" autocomplete="off" autofocus />
+                <input id="savedHostOrIP" type="hidden" name="savedHostOrIP" value="{{.settings.SavedSMTPHost}}" />
+                <p id="hostChangeWarning" class="hidden mt-2 text-sm text-warning">
+                    {{ T $.ctx "adminconsole.admin_settings.email.host_change_warning" }}
+                </p>
             </div>
 
             <div class="w-full form-control">
@@ -136,11 +203,37 @@
             <div class="w-full form-control">
                 <label class="label">
                     <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_settings.email.field.password" }}
+                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.email.field.password" }}</span>
+                        {{if .settings.HasSMTPPassword}}
+                            <span class="ml-1 align-middle badge badge-success badge-sm">{{ T $.ctx "adminconsole.admin_settings.email.password_saved" }}</span>
+                        {{else}}
+                            <span class="ml-1 align-middle badge badge-ghost badge-sm">{{ T $.ctx "adminconsole.admin_settings.email.password_not_set" }}</span>
+                        {{end}}
+                        <div class="tooltip tooltip-top"
+                            data-tip="{{ T $.ctx "adminconsole.admin_settings.email.password_tooltip" }}">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
                     </span>
                 </label>
                 <input id="password" type="password" name="password" value="{{.settings.SMTPPassword}}"
+                    {{if .settings.HasSMTPPassword}}placeholder="{{ T $.ctx "adminconsole.admin_settings.email.password_keep_placeholder" }}"{{end}}
                     class="w-full input input-bordered" autocomplete="off" />
+                <input id="hasSmtpPassword" type="hidden" name="hasSmtpPassword" value="{{if .settings.HasSMTPPassword}}true{{end}}" />
+                {{if .settings.HasSMTPPassword}}
+                    <label class="justify-start cursor-pointer label">
+                        <input id="clearSmtpPassword" type="checkbox" name="clearSmtpPassword"
+                            class="checkbox checkbox-sm" {{if .settings.ClearSMTPPassword}}checked{{end}} />
+                        <span class="ml-2 label-text">{{ T $.ctx "adminconsole.admin_settings.email.clear_password" }}</span>
+                    </label>
+                    <p id="clearSmtpPasswordNotice" class="text-sm text-warning {{if not .settings.ClearSMTPPassword}}hidden{{end}}">
+                        {{ T $.ctx "adminconsole.admin_settings.email.clear_password_notice" }}
+                    </p>
+                {{end}}
             </div>
         </div>
     </div>
