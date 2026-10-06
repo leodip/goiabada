@@ -197,14 +197,34 @@ func runMainSignalledAtWith(t *testing.T, path, at string, mode []string) (int, 
 	}
 }
 
-// freePort answers a loopback port nothing is listening on.
+// freePorts is n distinct loopback ports nothing listens on as it returns. All n are held open
+// until every one is chosen and only then released, because the kernel hands a bind to port 0 any
+// free port, the one released a moment ago included: about once in 10,000 pairs on Linux, enough
+// to fail a CI run now and then. For the same reason a listener the test keeps, such as a stub
+// server or a held port, is opened before this is called, never between it and the child's bind.
+func freePorts(t *testing.T, n int) []int {
+	t.Helper()
+
+	listeners := make([]net.Listener, 0, n)
+	defer func() {
+		for _, l := range listeners {
+			_ = l.Close()
+		}
+	}()
+	ports := make([]int, 0, n)
+	for range n {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		require.NoError(t, err)
+		listeners = append(listeners, l)
+		ports = append(ports, l.Addr().(*net.TCPAddr).Port)
+	}
+	return ports
+}
+
+// freePort is one port of freePorts.
 func freePort(t *testing.T) int {
 	t.Helper()
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	port := l.Addr().(*net.TCPAddr).Port
-	require.NoError(t, l.Close())
-	return port
+	return freePorts(t, 1)[0]
 }
 
 // schemaVersion reads the version the SQLite file at path records, and whether it is dirty.

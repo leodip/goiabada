@@ -126,7 +126,8 @@ func TestMain_ServesMetricsOnTheirOwnListenerAndDrainsIt(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), mainProcessBound)
 	defer cancel()
 
-	httpPort, metricsPort := freePort(t), freePort(t)
+	ports := freePorts(t, 2)
+	httpPort, metricsPort := ports[0], ports[1]
 	child := startMetricsChild(t, ctx, httpPort, metricsPort, "true")
 
 	status, contentType, body := getWhenUp(t, ctx, "http://127.0.0.1:"+strconv.Itoa(metricsPort)+"/metrics")
