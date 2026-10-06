@@ -87,9 +87,9 @@ func HandleChangePasswordPost(
 			return
 		}
 
-		// Sent as typed: surrounding whitespace is part of a password (#472). TrimSpace
-		// here refused a valid current password and stored a different new one than the
-		// confirmation compared, matching the email page's rule (#404).
+		// Sent as typed: surrounding whitespace is part of a password, and the auth server compares
+		// and hashes the one it was given, so trimming would refuse the right current password, charging
+		// the account's failure budget, and store a new one other than the one confirmed above (#472).
 		req := &api.UpdateAccountPasswordRequest{
 			CurrentPassword: currentPassword,
 			NewPassword:     newPassword,
