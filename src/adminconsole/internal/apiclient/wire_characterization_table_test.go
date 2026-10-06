@@ -35,6 +35,8 @@ var (
 		ExpectedWebOrigins: []string{"https://old.example.com"}}
 	charUpdateClientToken = &api.UpdateClientTokensRequest{TokenExpirationInSeconds: 300}
 	charUpdateClientPerms = &api.UpdateClientPermissionsRequest{PermissionIds: []int64{8}, ExpectedPermissionIds: []int64{3}}
+	charAllowed           = true
+	charUpdateClientAdmin = &api.UpdateClientAdministrativeScopesRequest{Allowed: &charAllowed}
 
 	charCreateGroupAttr = &api.CreateGroupAttributeRequest{Key: "department", Value: "sales"}
 	charUpdateGroupAttr = &api.UpdateGroupAttributeRequest{Key: "department", Value: "support"}
@@ -481,6 +483,21 @@ func wireCharacterization() []wireCase {
 			verb: "PUT", path: "/api/v1/admin/clients/3/tokens", contentType: charJSON,
 			bodyOf: charUpdateClientToken, anySuccess2xx: true,
 			reply: `{"client":{"id":3}}`, want: int64(3),
+		},
+		{
+			name: "UpdateClientAdministrativeScopes",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.UpdateClientAdministrativeScopes(ctx, charAccessToken, 3, charUpdateClientAdmin)
+				if err != nil {
+					return nil, err
+				}
+				return got.AdministrativeScopesAllowed, nil
+			},
+			verb: "PUT", path: "/api/v1/admin/clients/3/administrative-scopes", contentType: charJSON,
+			// The literal, not the struct marshalled: the auth server refuses a body without
+			// "allowed", so the field's spelling is the contract (#499 decision 5).
+			body: `{"allowed":true}`, successStatus: 200,
+			reply: `{"client":{"id":3,"administrativeScopesAllowed":true}}`, want: true,
 		},
 		{
 			name: "GetClientLogo",

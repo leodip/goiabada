@@ -12,11 +12,12 @@
     var originalClientIdentifier = "{{.client.ClientIdentifier}}";
     var originallyEnabled = {{if .client.Enabled}}true{{else}}false{{end}};
     var isSystemLevel = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
+    var originallyAllowedAdministrativeScopes = {{if .client.AdministrativeScopesAllowed}}true{{else}}false{{end}};
 
     document.addEventListener("DOMContentLoaded", function() {
         const btnSave = document.getElementById("btnSave");
         const clientIdentifier = document.getElementById("clientIdentifier");
-        const formClientSettings = document.getElementsByTagName("form")[0];
+        const formClientSettings = document.getElementById("formClientSettings");
         const enabledDisabled = document.getElementById("enabledDisabled");
 
         function submitForm() {
@@ -29,6 +30,24 @@
             } else {
                 formClientSettings.submit();
             }
+        }
+
+        // Allowing a client makes it an administrator client, so switching the allowance on asks
+        // first; switching it off does not.
+        const btnSaveAdministrativeScopes = document.getElementById("btnSaveAdministrativeScopes");
+        const administrativeScopesAllowed = document.getElementById("administrativeScopesAllowed");
+        const formAdministrativeScopes = document.getElementById("formAdministrativeScopes");
+        if (btnSaveAdministrativeScopes) {
+            btnSaveAdministrativeScopes.addEventListener("click", function(event) {
+                if (!originallyAllowedAdministrativeScopes && administrativeScopesAllowed.checked) {
+                    event.preventDefault();
+                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
+                        "{{ T $.ctx "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" }}",
+                        function() { /* cancel */ },
+                        function() { formAdministrativeScopes.submit(); }
+                    );
+                }
+            });
         }
 
         if(btnSave) {
@@ -65,7 +84,7 @@
 
 {{template "manage_clients_tabs" (args "settings" .client.ClientId $.ctx) }}
 
-<form method="post">
+<form id="formClientSettings" method="post">
 
     {{if .client.IsSystemLevelClient}}
 
@@ -209,6 +228,42 @@
                 </label>
             </div>
 
+            <!-- The allowance belongs to formAdministrativeScopes, below the settings form, through
+                 the form attribute: it is saved on its own route by its own Save, never by the
+                 settings form's (#499 decision 5). -->
+            <div class="w-full mt-6 form-control">
+                <label class="cursor-pointer label">
+                    <span class="label-text">
+                        {{ T $.ctx "adminconsole.admin_clients.settings.field.administrative_scopes_allowed" }}
+                        <div class="tooltip tooltip-top"
+                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.administrative_scopes_allowed_tooltip" }}">
+                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </div>
+                    </span>
+                    <input id="administrativeScopesAllowed" type="checkbox" name="administrativeScopesAllowed"
+                        form="formAdministrativeScopes" class="ml-2 toggle"
+                        {{if .client.AdministrativeScopesAllowed}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                </label>
+                {{if .client.IsSystemLevelClient}}
+                <p class="mt-1 text-sm">{{ T $.ctx "adminconsole.admin_clients.settings.administrative_scopes_always_allowed" }}</p>
+                {{end}}
+                {{if .administrativeScopesError}}
+                <p class="mt-2 text-right text-error">{{.administrativeScopesError}}</p>
+                {{end}}
+                {{if .administrativeScopesSaved}}
+                <p class="mt-2 text-right text-success">&#10004; {{ T $.ctx "adminconsole.admin_clients.settings.administrative_scopes_saved" }}</p>
+                {{end}}
+                <div class="mt-2 text-right">
+                    <button id="btnSaveAdministrativeScopes" type="submit" form="formAdministrativeScopes"
+                        class="btn btn-primary" {{if .client.IsSystemLevelClient}}disabled{{end}}>{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
+                </div>
+            </div>
+
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
@@ -314,6 +369,8 @@
     </div>
 
 </form>
+
+<form id="formAdministrativeScopes" method="post" action="/admin/clients/{{.client.ClientId}}/settings/administrative-scopes"></form>
 
 {{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
 

@@ -379,9 +379,10 @@ func HandleAuthorizeGet(
 				// has not read when it answered for silence or a withheld redirect; read here, and
 				// only for this refusal, so every other refusal reads what it always did.
 				if facts.sessionValid == nil {
-					userSession, err = database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
-					if err != nil {
-						pageRenderer.InternalServerError(w, r, err)
+					var sessionErr error
+					userSession, sessionErr = database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
+					if sessionErr != nil {
+						pageRenderer.InternalServerError(w, r, sessionErr)
 						return
 					}
 					valid := userSessionManager.HasValidUserSession(userSession,

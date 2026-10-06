@@ -664,6 +664,10 @@
 "adminconsole.admin_clients.settings.field.enabled" = "Enabled"
 "adminconsole.admin_clients.settings.field.consent_required" = "Consent required"
 "adminconsole.admin_clients.settings.field.consent_required_tooltip" = "If consent is required, following the authentication process, the user will be presented with the option to grant or deny access to specific scopes for the client."
+"adminconsole.admin_clients.settings.field.administrative_scopes_allowed" = "May request administrative scopes"
+"adminconsole.admin_clients.settings.field.administrative_scopes_allowed_tooltip" = "When enabled, the client may request the administrative scopes (authserver:manage, authserver:admin-read, authserver:manage-users, authserver:manage-clients, authserver:manage-settings and authserver:browser-sessions) on behalf of a signed-in user. A client that is not allowed is refused them. An allowed client is an administrator client, which only authserver:manage can change. Saved with its own Save button."
+"adminconsole.admin_clients.settings.administrative_scopes_always_allowed" = "The admin console's client may always request the administrative scopes."
+"adminconsole.admin_clients.settings.administrative_scopes_saved" = "Administrative scopes allowance saved successfully"
 "adminconsole.admin_clients.settings.field.show_logo" = "Show logo"
 "adminconsole.admin_clients.settings.field.show_logo_tooltip" = "When enabled, the client logo is displayed on login and consent screens (requires a logo to be uploaded in the Logo tab)."
 "adminconsole.admin_clients.settings.field.show_display_name" = "Show display name"
@@ -675,6 +679,7 @@
 "adminconsole.admin_clients.settings.saved_successfully" = "Client settings saved successfully"
 "adminconsole.admin_clients.settings.modal.identifier_change" = "<span class='text-accent'>You've modified the client identifier</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?"
 "adminconsole.admin_clients.settings.modal.disabled_warning" = "<span class='text-accent'>You've disabled the client</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?"
+"adminconsole.admin_clients.settings.modal.administrative_scopes_warning" = "<span class='text-accent'>You are allowing this client to request the administrative scopes</span>. It will be able to obtain a token carrying a signed-in administrator's authority, and it becomes an administrator client.<br /><br />Are you certain you want to save?"
 
 # --- Client tokens ---------------------------------------------------------
 

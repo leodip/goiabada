@@ -96,6 +96,10 @@ func TestAdminClientHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testin
 			return HandleSettingsPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/settings", routed,
 			handlertest.WithForm(url.Values{}))},
+		{"HandleAdministrativeScopesPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleAdministrativeScopesPost(h, nil, c, consoleBaseURL)
+		}, handlertest.Request(http.MethodPost, "/admin/clients/3/settings/administrative-scopes", routed,
+			handlertest.WithForm(url.Values{"administrativeScopesAllowed": {"on"}}))},
 		{"HandleTokensGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleTokensGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/tokens", routed)},
