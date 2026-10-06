@@ -116,7 +116,7 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 		return nil, err
 	}
 
-	validatedScope, err := val.validateROPCScopes(ctx, input.Scope, user)
+	validatedScope, err := val.validateROPCScopes(ctx, input.Scope, client, user)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,9 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 // OIDC scopes (openid, profile, email, etc.) and offline_access are allowed.
 // Resource scopes (resource:permission) require the user to have the permission.
 // Note: consent_required is BYPASSED for ROPC - user providing credentials = implicit consent.
-func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string, user *record.User) (string, error) {
+// An administrative scope is refused first unless the client may request one.
+func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string, client *record.Client,
+	user *record.User) (string, error) {
 	if len(scope) == 0 {
 		// Default to openid scope if none provided
 		return "openid", nil
@@ -146,6 +148,20 @@ func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string,
 	// still charged to the rate limiter (#137, #219, #437).
 	if err := scopeBound.check(scope); err != nil {
 		return "", err
+	}
+
+	// Only a client allowed to request the administrative scopes may obtain one on a user's behalf,
+	// on this grant as at the authorization endpoint (#499 decision 6): invalid_scope, as a scope
+	// the user does not hold is answered below, with the authorization endpoint's sentence
+	// (decision 7). Before any scope is resolved or the user's permissions are asked about, because
+	// it is the client's to answer whatever the user holds.
+	if refused := RefusedAdministrativeScopes(client, scope); len(refused) > 0 {
+		return "", &AdministrativeScopeRefusedError{
+			Detail: AdministrativeScopeRefusal(refused),
+			Client: client,
+			Scopes: refused,
+			UserId: user.Id,
+		}
 	}
 
 	validatedScopes := []string{}

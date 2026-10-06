@@ -1572,6 +1572,9 @@ type storedGrant struct {
 	// consentScope, when set, makes the client require consent and is the consent row's scope.
 	// Authorization code grants only: the arm skips consent for ROPC.
 	consentScope string
+	// administrativeScopesAllowed is the client's stored allowance to request the administrative
+	// scopes (#499).
+	administrativeScopesAllowed bool
 }
 
 // newStoredGrantRefresh wires a validator over strict mocks for one refresh of g, and hands back the
@@ -1668,6 +1671,8 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 		Return(refreshTokenJwt, nil).Once()
 	mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "stored_grant_jti").Return(refreshToken, nil).Once()
 	mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
+
+	client.AdministrativeScopesAllowed = g.administrativeScopesAllowed
 
 	if reachesUser {
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&user, nil).Once()

@@ -16,6 +16,12 @@ import (
 
 // Helper function to create a client with ROPC enabled
 func createROPCClient(t *testing.T, clientSecret string, isPublic bool) *record.Client {
+	return createROPCClientAllowing(t, clientSecret, isPublic, false)
+}
+
+// createROPCClientAllowing is createROPCClient for a client allowed to request the administrative
+// scopes, or not (#499).
+func createROPCClientAllowing(t *testing.T, clientSecret string, isPublic bool, administrativeScopesAllowed bool) *record.Client {
 	ropcEnabled := true
 	client := &record.Client{
 		ClientIdentifier: "ropc-client-" + fake.LetterN(8),
@@ -30,6 +36,7 @@ func createROPCClient(t *testing.T, clientSecret string, isPublic bool) *record.
 		AuthorizationCodeEnabled:                false,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
 		DefaultAcrLevel:                         record.AcrLevel1,
+		AdministrativeScopesAllowed:             administrativeScopesAllowed,
 	}
 
 	if !isPublic && clientSecret != "" {
