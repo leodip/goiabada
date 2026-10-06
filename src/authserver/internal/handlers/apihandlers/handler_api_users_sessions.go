@@ -139,16 +139,16 @@ func HandleUserSessionDelete(
 			return
 		}
 
-		// Terminate the session rather than merely deleting it: this is the explicit
-		// administrative "end this session" action, so it also marks the codes issued through the
-		// session revoked and sweeps the refresh tokens those grants produced, all in one
-		// transaction (#129 decision 5). The 404 above answers first, so a missing session never
-		// opens one.
 		// Only authserver:manage writes to an administrator (#402 decision 1).
 		if !userTargetCeilingAllows(w, r, database, auditLogger, userSession.UserId) {
 			return
 		}
 
+		// Terminate the session rather than merely deleting it: this is the explicit
+		// administrative "end this session" action, so it also marks the codes issued through the
+		// session revoked and sweeps the refresh tokens those grants produced, all in one
+		// transaction (#129 decision 5). The 404 above answers first, so a missing session never
+		// opens one.
 		result, err := revocation.TerminateUserSessionTx(r.Context(), database, userSession)
 		if err != nil {
 			writeInternalServerError(w, r, err)

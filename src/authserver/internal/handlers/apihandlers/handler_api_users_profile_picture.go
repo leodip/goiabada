@@ -157,12 +157,12 @@ func HandleUserProfilePictureDelete(
 			return
 		}
 
-		// Delete the profile picture
 		// Only authserver:manage writes to an administrator (#402 decision 1).
 		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
 			return
 		}
 
+		// Delete the profile picture
 		err = database.DeleteUserProfilePicture(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)

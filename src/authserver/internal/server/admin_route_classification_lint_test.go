@@ -175,7 +175,8 @@ var adminRouteClassification = map[string]adminRouteClass{
 
 // adminRouteFinding is one way the classification and the code disagree.
 type adminRouteFinding struct {
-	// route is METHOD pattern, or the function's name for an unlisted ceiling.
+	// route is METHOD pattern, or the function's name for an unlisted ceiling or a ceiling it
+	// does not refuse on or applies after a write.
 	route  string
 	reason string
 }
@@ -199,7 +200,7 @@ func findAdminRouteClassificationGaps(
 	var registered []routeRegistration
 	collectRoutes(fset, routesSource, "", false, &registered)
 
-	applied, unlisted, files, err := adminHandlerCeilings(filepath.Join(root, filepath.FromSlash(adminHandlersDir)), ceilings)
+	applied, unlisted, misapplied, files, err := adminHandlerCeilings(filepath.Join(root, filepath.FromSlash(adminHandlersDir)), ceilings)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -207,6 +208,7 @@ func findAdminRouteClassificationGaps(
 		found = append(found, adminRouteFinding{route: name, reason: "answers a refusal through " + adminPolicyRefusal +
 			", but adminPolicyCeilings does not list it as a ceiling"})
 	}
+	found = append(found, misapplied...)
 
 	seen := map[string]bool{}
 	for _, registration := range registered {
@@ -279,18 +281,35 @@ func adminRouteRowDisagrees(class adminRouteClass, applied []string) string {
 }
 
 // adminHandlerCeilings reads the production files of the handler package in dir and returns, for
-// every package-level function it declares, the ceilings it applies, sorted and each once: those it
-// calls, and those every function of the package it calls applies. A call to a ceiling counts as
-// that ceiling and is not followed further. It also returns, sorted, every function calling the
-// refusal that ceilings does not list, and how many files it read.
-func adminHandlerCeilings(dir string, ceilings map[string]string) (applied map[string][]string, unlisted []string, files int, err error) {
+// every package-level function it declares, the ceilings it applies, sorted and each once. A
+// function applies a ceiling only by refusing on its answer, in one of two shapes: the call is the
+// whole condition of `if !ceiling(...) { ...; return }`, or its last result is assigned to a
+// variable that the very next statement refuses on, `if !allowed { ...; return }`. A call in any
+// other place, its answer ignored, discarded or merely stored, applies nothing, so the row naming
+// that ceiling fails. A function of the package whose one result is a bool passes the ceilings it
+// returns, `return grantCeilingAllows(...) && userTargetCeilingAllows(...)`, to every caller
+// refusing on it in the same two shapes. A call to a ceiling counts as that ceiling and is not
+// followed further.
+//
+// It also returns, sorted, every function calling the refusal that ceilings does not list, every
+// call to a ceiling or to a function returning one that refuses on nothing, and every ceiling
+// applied after a write that runs before it; and how many files it read. A write is a call through
+// a parameter whose type is named ...Database, its method not a Get, or a call handing that
+// parameter to anything but a ceiling: the handlers read their target before deciding, so a
+// refusal answers 404 first, and write nothing before it. A write runs before a ceiling when it is
+// earlier in the source and not in a block that ends in a return without holding the ceiling, so
+// a branch that refuses, writes and answers does not count against the next branch's ceiling. A
+// ceiling missing from one branch of a handler is beyond this walk, and stays the per-route tests'
+// to catch.
+func adminHandlerCeilings(dir string, ceilings map[string]string) (
+	applied map[string][]string, unlisted []string, misapplied []adminRouteFinding, files int, err error,
+) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, nil, nil, 0, err
 	}
 
-	// calls is, for each function, the package-level names it calls by bare identifier.
-	calls := map[string]map[string]bool{}
+	var functions []*ast.FuncDecl
 	fset := token.NewFileSet()
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
@@ -298,25 +317,33 @@ func adminHandlerCeilings(dir string, ceilings map[string]string) (applied map[s
 		}
 		file, parseErr := parser.ParseFile(fset, filepath.Join(dir, entry.Name()), nil, parser.SkipObjectResolution)
 		if parseErr != nil {
-			return nil, nil, 0, parseErr
+			return nil, nil, nil, 0, parseErr
 		}
 		files++
 		for _, decl := range file.Decls {
-			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Recv != nil || fn.Body == nil {
-				continue
+			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Recv == nil && fn.Body != nil {
+				functions = append(functions, fn)
 			}
-			called := map[string]bool{}
-			ast.Inspect(fn.Body, func(n ast.Node) bool {
-				if call, isCall := n.(*ast.CallExpr); isCall {
-					if ident, isIdent := call.Fun.(*ast.Ident); isIdent {
-						called[ident.Name] = true
-					}
-				}
-				return true
-			})
-			calls[fn.Name.Name] = called
 		}
+	}
+
+	// calls is, for each function, the package-level names it calls by bare identifier; gates, the
+	// calls it refuses on, by name and position; passes, the names a bool function returns.
+	calls := map[string]map[string]bool{}
+	gates := map[string][]adminGate{}
+	passes := map[string]map[string]bool{}
+	for _, fn := range functions {
+		calls[fn.Name.Name] = map[string]bool{}
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			if call, isCall := n.(*ast.CallExpr); isCall {
+				if ident, isIdent := call.Fun.(*ast.Ident); isIdent {
+					calls[fn.Name.Name][ident.Name] = true
+				}
+			}
+			return true
+		})
+		gates[fn.Name.Name] = adminGatesIn(fn.Body)
+		passes[fn.Name.Name] = adminPassedCalls(fn)
 	}
 
 	for name, called := range calls {
@@ -326,32 +353,314 @@ func adminHandlerCeilings(dir string, ceilings map[string]string) (applied map[s
 	}
 	sort.Strings(unlisted)
 
-	applied = make(map[string][]string, len(calls))
-	for name := range calls {
+	// reach is the ceilings a call to name applies when refused on: a ceiling itself, or what a
+	// function of the package refuses on and returns.
+	var reach func(name string, visited map[string]bool) map[string]bool
+	reach = func(name string, visited map[string]bool) map[string]bool {
+		if ceiling := ceilings[name]; ceiling != "" {
+			return map[string]bool{ceiling: true}
+		}
 		reached := map[string]bool{}
-		visited := map[string]bool{name: true}
-		pending := []string{name}
-		for len(pending) > 0 {
-			current := pending[len(pending)-1]
-			pending = pending[:len(pending)-1]
-			for callee := range calls[current] {
-				if ceiling := ceilings[callee]; ceiling != "" {
-					reached[ceiling] = true
-					continue
-				}
-				if _, local := calls[callee]; local && !visited[callee] {
-					visited[callee] = true
-					pending = append(pending, callee)
-				}
+		if visited[name] {
+			return reached
+		}
+		visited[name] = true
+		for _, gate := range gates[name] {
+			for ceiling := range reach(gate.callee, visited) {
+				reached[ceiling] = true
 			}
 		}
-		found := make([]string, 0, len(reached))
-		for ceiling := range reached {
+		for callee := range passes[name] {
+			for ceiling := range reach(callee, visited) {
+				reached[ceiling] = true
+			}
+		}
+		return reached
+	}
+
+	applied = make(map[string][]string, len(calls))
+	for name := range calls {
+		found := make([]string, 0)
+		for ceiling := range reach(name, map[string]bool{}) {
 			found = append(found, ceiling)
 		}
 		applied[name] = sortedCeilings(found)
 	}
-	return applied, unlisted, files, nil
+
+	// A call that applies a ceiling when refused on, and is not, is reported where it sits. The
+	// ceilings' own bodies are the policy and are not held to it.
+	for _, fn := range functions {
+		name := fn.Name.Name
+		if ceilings[name] != "" {
+			continue
+		}
+		gated := map[token.Pos]bool{}
+		for _, gate := range gates[name] {
+			gated[gate.pos] = true
+		}
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			call, isCall := n.(*ast.CallExpr)
+			if !isCall {
+				return true
+			}
+			ident, isIdent := call.Fun.(*ast.Ident)
+			if !isIdent || gated[call.Pos()] || passes[name][ident.Name] ||
+				len(reach(ident.Name, map[string]bool{name: true})) == 0 {
+				return true
+			}
+			misapplied = append(misapplied, adminRouteFinding{route: name, reason: "calls " + ident.Name +
+				" without refusing on its answer: a ceiling applies only as `if !" + ident.Name +
+				"(...) { return }`, or assigned to a variable the next statement refuses on"})
+			return true
+		})
+
+		writes := adminWrites(fn, ceilings)
+		returning := adminReturningBlocks(fn.Body)
+		for _, gate := range gates[name] {
+			if len(reach(gate.callee, map[string]bool{name: true})) == 0 {
+				continue
+			}
+			if write := adminWriteReaching(writes, returning, gate.pos); write != "" {
+				misapplied = append(misapplied, adminRouteFinding{route: name, reason: "applies " + gate.callee +
+					" after its write " + write + ", so a refusal would answer a request that already wrote"})
+			}
+		}
+	}
+	sort.SliceStable(misapplied, func(i, j int) bool { return misapplied[i].route < misapplied[j].route })
+	return applied, unlisted, misapplied, files, nil
+}
+
+// adminGate is a call a function refuses on: the name it calls and where the call is.
+type adminGate struct {
+	callee string
+	pos    token.Pos
+}
+
+// adminGatesIn is every call in body refused on in one of the two shapes adminHandlerCeilings
+// accepts, closures included.
+func adminGatesIn(body *ast.BlockStmt) []adminGate {
+	var gates []adminGate
+	ast.Inspect(body, func(n ast.Node) bool {
+		var list []ast.Stmt
+		switch block := n.(type) {
+		case *ast.BlockStmt:
+			list = block.List
+		case *ast.CaseClause:
+			list = block.Body
+		case *ast.CommClause:
+			list = block.Body
+		default:
+			return true
+		}
+		for i, stmt := range list {
+			// if !ceiling(...) { ...; return }
+			if refusal, isIf := stmt.(*ast.IfStmt); isIf {
+				if call := adminRefusedCall(refusal); call != nil {
+					gates = append(gates, adminGate{callee: call.Fun.(*ast.Ident).Name, pos: call.Pos()})
+				}
+				continue
+			}
+			// _, allowed := ceiling(...) followed by if !allowed { ...; return }
+			assign, isAssign := stmt.(*ast.AssignStmt)
+			if !isAssign || len(assign.Rhs) != 1 || i+1 == len(list) {
+				continue
+			}
+			call, isCall := assign.Rhs[0].(*ast.CallExpr)
+			if !isCall {
+				continue
+			}
+			callee, isIdent := call.Fun.(*ast.Ident)
+			result, isVariable := assign.Lhs[len(assign.Lhs)-1].(*ast.Ident)
+			if !isIdent || !isVariable || result.Name == "_" {
+				continue
+			}
+			next, isIf := list[i+1].(*ast.IfStmt)
+			if !isIf {
+				continue
+			}
+			if refused := adminRefusedIdent(next); refused != nil && refused.Name == result.Name {
+				gates = append(gates, adminGate{callee: callee.Name, pos: call.Pos()})
+			}
+		}
+		return true
+	})
+	return gates
+}
+
+// adminRefusal is the negated condition of an if statement that has no init and no else and whose
+// body ends in a return, or nil for any other if statement.
+func adminRefusal(stmt *ast.IfStmt) ast.Expr {
+	if stmt.Init != nil || stmt.Else != nil || len(stmt.Body.List) == 0 {
+		return nil
+	}
+	if _, returns := stmt.Body.List[len(stmt.Body.List)-1].(*ast.ReturnStmt); !returns {
+		return nil
+	}
+	not, isNot := stmt.Cond.(*ast.UnaryExpr)
+	if !isNot || not.Op != token.NOT {
+		return nil
+	}
+	return ast.Unparen(not.X)
+}
+
+// adminRefusedCall is the call to a package-level function an if statement refuses on, or nil.
+func adminRefusedCall(stmt *ast.IfStmt) *ast.CallExpr {
+	call, isCall := adminRefusal(stmt).(*ast.CallExpr)
+	if !isCall {
+		return nil
+	}
+	if _, isIdent := call.Fun.(*ast.Ident); !isIdent {
+		return nil
+	}
+	return call
+}
+
+// adminRefusedIdent is the variable an if statement refuses on, or nil.
+func adminRefusedIdent(stmt *ast.IfStmt) *ast.Ident {
+	ident, _ := adminRefusal(stmt).(*ast.Ident)
+	return ident
+}
+
+// adminPassedCalls is, for a function whose one result is a bool, the package-level functions its
+// return statements call as operands of &&, whose refusal is therefore the function's own.
+func adminPassedCalls(fn *ast.FuncDecl) map[string]bool {
+	passed := map[string]bool{}
+	results := fn.Type.Results
+	if results == nil || len(results.List) != 1 || len(results.List[0].Names) > 1 {
+		return passed
+	}
+	if result, isIdent := results.List[0].Type.(*ast.Ident); !isIdent || result.Name != "bool" {
+		return passed
+	}
+	var operands func(expr ast.Expr)
+	operands = func(expr ast.Expr) {
+		switch e := ast.Unparen(expr).(type) {
+		case *ast.BinaryExpr:
+			if e.Op == token.LAND {
+				operands(e.X)
+				operands(e.Y)
+			}
+		case *ast.CallExpr:
+			if ident, isIdent := e.Fun.(*ast.Ident); isIdent {
+				passed[ident.Name] = true
+			}
+		}
+	}
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		if _, isClosure := n.(*ast.FuncLit); isClosure {
+			return false
+		}
+		if ret, isReturn := n.(*ast.ReturnStmt); isReturn && len(ret.Results) == 1 {
+			operands(ret.Results[0])
+		}
+		return true
+	})
+	return passed
+}
+
+// adminWrite is a write a function makes through a database port, spelled as written, and where.
+type adminWrite struct {
+	call string
+	pos  token.Pos
+}
+
+// adminWrites is every write fn makes through a database port parameter, in source order.
+func adminWrites(fn *ast.FuncDecl, ceilings map[string]string) []adminWrite {
+	ports := map[string]bool{}
+	for _, field := range fn.Type.Params.List {
+		var typeName string
+		switch t := field.Type.(type) {
+		case *ast.Ident:
+			typeName = t.Name
+		case *ast.SelectorExpr:
+			typeName = t.Sel.Name
+		}
+		if strings.HasSuffix(strings.ToLower(typeName), "database") {
+			for _, name := range field.Names {
+				ports[name.Name] = true
+			}
+		}
+	}
+	if len(ports) == 0 {
+		return nil
+	}
+
+	var writes []adminWrite
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		call, isCall := n.(*ast.CallExpr)
+		if !isCall {
+			return true
+		}
+		if selector, isSelector := call.Fun.(*ast.SelectorExpr); isSelector {
+			if port, isIdent := selector.X.(*ast.Ident); isIdent && ports[port.Name] {
+				if !strings.HasPrefix(selector.Sel.Name, "Get") {
+					writes = append(writes, adminWrite{call: port.Name + "." + selector.Sel.Name, pos: call.Pos()})
+				}
+				return true
+			}
+		}
+		if callee, isIdent := call.Fun.(*ast.Ident); isIdent && ceilings[callee.Name] != "" {
+			return true
+		}
+		for _, arg := range call.Args {
+			if port, isIdent := arg.(*ast.Ident); isIdent && ports[port.Name] {
+				writes = append(writes, adminWrite{call: adminCallName(call.Fun) + "(..., " + port.Name + ", ...)", pos: call.Pos()})
+				break
+			}
+		}
+		return true
+	})
+	return writes
+}
+
+// adminReturningBlocks is every block in body whose last statement is a return: what runs in one
+// ends the function there, so a write in it never precedes anything after the block.
+func adminReturningBlocks(body *ast.BlockStmt) []*ast.BlockStmt {
+	var blocks []*ast.BlockStmt
+	ast.Inspect(body, func(n ast.Node) bool {
+		if block, isBlock := n.(*ast.BlockStmt); isBlock && len(block.List) > 0 {
+			if _, returns := block.List[len(block.List)-1].(*ast.ReturnStmt); returns {
+				blocks = append(blocks, block)
+			}
+		}
+		return true
+	})
+	return blocks
+}
+
+// adminWriteReaching is the first write that runs before a ceiling at pos can: one earlier in the
+// source and not inside a block ending in a return that does not also hold the ceiling, as a
+// branch that writes and answers is. Empty when there is none.
+func adminWriteReaching(writes []adminWrite, returning []*ast.BlockStmt, pos token.Pos) string {
+	for _, write := range writes {
+		if write.pos >= pos {
+			break
+		}
+		ended := false
+		for _, block := range returning {
+			holdsWrite := block.Pos() <= write.pos && write.pos < block.End()
+			holdsCeiling := block.Pos() <= pos && pos < block.End()
+			if holdsWrite && !holdsCeiling {
+				ended = true
+				break
+			}
+		}
+		if !ended {
+			return write.call
+		}
+	}
+	return ""
+}
+
+// adminCallName spells the function a call names, for a finding.
+func adminCallName(fun ast.Expr) string {
+	switch f := fun.(type) {
+	case *ast.Ident:
+		return f.Name
+	case *ast.SelectorExpr:
+		return adminCallName(f.X) + "." + f.Sel.Name
+	}
+	return "a call"
 }
 
 // adminCeilingOrder is the order ceilings are named in: grant, target, settings.
@@ -461,8 +770,11 @@ func clientTargetCeilingAllows(w http.ResponseWriter, r *http.Request) bool {
 }
 `
 
-// adminRouteFixtureHandlers is the handlers the fixture routes name. The permissions save reaches
-// the grant ceiling through a helper of its own package, which is a ceiling it applies.
+// adminRouteFixtureHandlers is the handlers the fixture routes name, each refusing on its ceilings
+// before it writes, in every shape the guard accepts. The permissions save reaches the grant
+// ceiling through a helper of its own package returning it, which is a ceiling it applies, and
+// gates each of two branches before the write in that branch; the secret read refuses on a
+// variable its ceiling's answer was assigned to.
 const adminRouteFixtureHandlers = `package apihandlers
 
 func HandleUserGet(database Database) http.HandlerFunc {
@@ -471,17 +783,27 @@ func HandleUserGet(database Database) http.HandlerFunc {
 
 func HandleUserEnabledPut(database Database, auditLogger AuditLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user := database.GetUserById(r)
 		if !userTargetCeilingAllows(w, r) {
 			return
 		}
+		database.UpdateUserEnabled(user)
 	}
 }
 
 func HandleUserPermissionsPut(database Database, auditLogger AuditLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.ContentLength == 0 {
+			if !permissionsAllowed(w, r) {
+				return
+			}
+			database.DeleteUserPermissions(r)
+			return
+		}
 		if !permissionsAllowed(w, r) {
 			return
 		}
+		database.SaveUserPermissions(r)
 	}
 }
 
@@ -495,7 +817,9 @@ func HandleUserCreatePost(database Database, auditLogger AuditLogger) http.Handl
 
 func HandleClientSecretGet(database Database, auditLogger AuditLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !clientTargetCeilingAllows(w, r) {
+		allowed := clientTargetCeilingAllows(w, r)
+		if !allowed {
+			auditLogger.Log(r)
 			return
 		}
 	}
@@ -590,8 +914,8 @@ func TestAdminRouteClassification_Guard_FailsOnAnUnclassifiedReadApplyingACeilin
 func TestAdminRouteClassification_Guard_FailsOnAWriteRouteWhoseHandlerAppliesNoCeilingItsRowNames(t *testing.T) {
 	// The handler that was guarded calls no ceiling any more: the row still says target.
 	handlers := strings.Replace(adminRouteFixtureHandlers,
-		"\t\tif !userTargetCeilingAllows(w, r) {\n\t\t\treturn\n\t\t}\n\t}\n}\n\nfunc HandleUserPermissionsPut",
-		"\t}\n}\n\nfunc HandleUserPermissionsPut", 1)
+		"\t\tif !userTargetCeilingAllows(w, r) {\n\t\t\treturn\n\t\t}\n\t\tdatabase.UpdateUserEnabled(user)\n",
+		"\t\tdatabase.UpdateUserEnabled(user)\n", 1)
 	require.NotEqual(t, adminRouteFixtureHandlers, handlers, "the fixture edit must apply")
 	root := writeAdminRouteFixture(t, handlers)
 
@@ -600,6 +924,65 @@ func TestAdminRouteClassification_Guard_FailsOnAWriteRouteWhoseHandlerAppliesNoC
 	require.Len(t, report.Errors, 1)
 	assert.Contains(t, report.Errors[0], "1 admin route(s)")
 	assert.Contains(t, report.Errors[0], "PUT /api/v1/admin/users/{id}/enabled: classified as applying the target ceiling, but its handler applies no ceiling")
+}
+
+// The enabled toggle's gate, as the fixture writes it, for the cases below to replace.
+const adminRouteFixtureEnabledGate = "\t\tif !userTargetCeilingAllows(w, r) {\n\t\t\treturn\n\t\t}\n" +
+	"\t\tdatabase.UpdateUserEnabled(user)\n"
+
+func TestAdminRouteClassification_Guard_FailsOnACeilingWhoseAnswerIsNotRefusedOn(t *testing.T) {
+	// A ceiling called and then not refused on answers the refusal and lets the write go on: it
+	// applies nothing, whatever the call's shape.
+	for name, gate := range map[string]string{
+		"its result ignored":   "\t\tuserTargetCeilingAllows(w, r)\n",
+		"its result discarded": "\t\t_ = userTargetCeilingAllows(w, r)\n",
+		"its result stored":    "\t\tallowed := userTargetCeilingAllows(w, r)\n\t\tlogAllowed(allowed)\n",
+		"refused on without returning": "\t\tif !userTargetCeilingAllows(w, r) {\n" +
+			"\t\t\tauditLogger.Log(r)\n\t\t}\n",
+		"refused on a statement later": "\t\tallowed := userTargetCeilingAllows(w, r)\n\t\tlogAllowed(allowed)\n" +
+			"\t\tif !allowed {\n\t\t\treturn\n\t\t}\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			handlers := strings.Replace(adminRouteFixtureHandlers, adminRouteFixtureEnabledGate,
+				gate+"\t\tdatabase.UpdateUserEnabled(user)\n", 1)
+			require.NotEqual(t, adminRouteFixtureHandlers, handlers, "the fixture edit must apply")
+			root := writeAdminRouteFixture(t, handlers)
+
+			report := runAdminRouteGuard(root, adminRouteFixtureClassification(), adminRouteFixtureCeilings)
+
+			require.Len(t, report.Errors, 1)
+			assert.Contains(t, report.Errors[0], "2 admin route(s)")
+			assert.Contains(t, report.Errors[0], "HandleUserEnabledPut: calls userTargetCeilingAllows without refusing on its answer")
+			assert.Contains(t, report.Errors[0], "PUT /api/v1/admin/users/{id}/enabled: classified as applying the target ceiling, but its handler applies no ceiling")
+		})
+	}
+}
+
+func TestAdminRouteClassification_Guard_FailsOnACeilingAppliedAfterAWrite(t *testing.T) {
+	// A refusal after the write answers a request that already changed the administrator.
+	for name, tc := range map[string]struct{ write, finding string }{
+		"through the port": {
+			write:   "\t\tdatabase.UpdateUserEnabled(user)\n",
+			finding: "HandleUserEnabledPut: applies userTargetCeilingAllows after its write database.UpdateUserEnabled",
+		},
+		"handing the port on": {
+			write:   "\t\trevocation.RevokeUser(r.Context(), database, user)\n",
+			finding: "HandleUserEnabledPut: applies userTargetCeilingAllows after its write revocation.RevokeUser(..., database, ...)",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			handlers := strings.Replace(adminRouteFixtureHandlers, adminRouteFixtureEnabledGate,
+				tc.write+"\t\tif !userTargetCeilingAllows(w, r) {\n\t\t\treturn\n\t\t}\n", 1)
+			require.NotEqual(t, adminRouteFixtureHandlers, handlers, "the fixture edit must apply")
+			root := writeAdminRouteFixture(t, handlers)
+
+			report := runAdminRouteGuard(root, adminRouteFixtureClassification(), adminRouteFixtureCeilings)
+
+			require.Len(t, report.Errors, 1)
+			assert.Contains(t, report.Errors[0], "1 admin route(s)")
+			assert.Contains(t, report.Errors[0], tc.finding+", so a refusal would answer a request that already wrote")
+		})
+	}
 }
 
 func TestAdminRouteClassification_Guard_FailsOnARowNamingOtherCeilingsThanTheHandlerApplies(t *testing.T) {
