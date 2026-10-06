@@ -47,6 +47,8 @@ type fakeSMTP struct {
 	// rejectAfterData answers the DATA terminator with a 550 instead of a 250, which is the relay
 	// deciding it does not want the finished message.
 	rejectAfterData bool
+	// rejectRcpt answers RCPT TO with a 550, which is the relay refusing the recipient.
+	rejectRcpt bool
 
 	// loginChallenges are the two AUTH LOGIN prompts, defaulting to the conventional words. A row
 	// sets them to something else to reach loginAuth's answer-by-position path.
@@ -309,6 +311,9 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 				continue
 			}
 			say("250 2.0.0 queued")
+
+		case f.rejectRcpt && strings.HasPrefix(up, "RCPT TO:"):
+			say("550 5.1.1 no such user here")
 
 		case strings.HasPrefix(up, "QUIT"):
 			say("221 2.0.0 bye")

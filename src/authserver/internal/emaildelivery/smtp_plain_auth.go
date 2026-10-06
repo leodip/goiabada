@@ -20,10 +20,11 @@ func plainResponse(username, password string) []byte {
 // plainInitialResponseFits reports whether the credentials still fit on the AUTH command line.
 // smtp.PlainAuth always writes them there, as `AUTH PLAIN <base64>`, and RFC 4954 section 4 says
 // that "if use of the initial response argument would cause the AUTH command to exceed this
-// length, the client MUST NOT use the initial response parameter". Nothing bounds the SMTP
-// password on the way into the settings -- apihandlers.HandleSettingsEmailPut bounds the host,
-// username, from-name and from-address and not the password -- so a password an admin can save
-// today is enough to overrun the line against a server that enforces it (#274).
+// length, the client MUST NOT use the initial response parameter". apihandlers.HandleSettingsEmailPut
+// refuses a password over 256 bytes and a username over 60, so the longest AUTH line a save can
+// lead to is 437 octets and fits; a row written some other way, such as one saved before the
+// password was bounded, can still overrun the line against a server that enforces it, and the MUST
+// holds whatever wrote the row (#274, #410).
 func plainInitialResponseFits(username, password string) bool {
 	encoded := base64.StdEncoding.EncodedLen(len(plainResponse(username, password)))
 	return len("AUTH PLAIN ")+encoded+len("\r\n") <= smtpCommandLineLimit
