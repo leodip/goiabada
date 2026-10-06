@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -266,16 +267,23 @@ func TestAPISettingsEmailPut_PasswordAtBoundIsAccepted(t *testing.T) {
 	assert.Equal(t, strings.Repeat("p", 256), stored)
 }
 
-// PUT: TCP connectivity failure
+// PUT: a refused dial answers the fixed message and its coarse cause, and names neither the address
+// nor the port it dialled (#410 decision 4). The server under test runs on this machine, so a port
+// closed here is closed to its dial.
 func TestAPISettingsEmailPut_TCPConnectionFailure(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
 
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	port := ln.Addr().(*net.TCPAddr).Port
+	require.NoError(t, ln.Close())
+
 	req := api.UpdateSettingsEmailRequest{
 		SMTPEnabled:    true,
 		SMTPHost:       "127.0.0.1",
-		SMTPPort:       65534, // likely closed
+		SMTPPort:       port,
 		SMTPFromEmail:  "noreply@goiabada.dev",
 		SMTPEncryption: "none",
 	}
@@ -283,9 +291,15 @@ func TestAPISettingsEmailPut_TCPConnectionFailure(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.NotContains(t, string(raw), "127.0.0.1", "the answer names no address")
+	assert.NotContains(t, string(raw), strconv.Itoa(port), "the answer names no port")
+
 	var errBody api.ErrorResponse
-	_ = json.NewDecoder(resp.Body).Decode(&errBody)
-	assert.True(t, strings.HasPrefix(errBody.ErrorDescription, "Unable to connect to the SMTP server:"))
+	require.NoError(t, json.Unmarshal(raw, &errBody))
+	assert.Equal(t, "VALIDATION_ERROR", errBody.ErrorCode)
+	assert.Equal(t, "Unable to connect to the SMTP server: connection refused.", errBody.ErrorDescription)
 }
 
 // PUT: the host is dialled, bounded and stored in one normalised form: surrounding space trimmed,

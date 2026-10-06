@@ -2,14 +2,19 @@ package apihandlers
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -19,6 +24,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -140,6 +146,10 @@ func emailSaveBody(t *testing.T, host string, port int, extra map[string]interfa
 	return string(encoded)
 }
 
+// emailSaveRequestId is the request id every email save case carries, as the request id middleware
+// would have put it on the request.
+const emailSaveRequestId = "req-email-save"
+
 // serveEmailSave runs PUT /api/v1/admin/settings/email as an authserver:manage caller, starting from
 // settings, and answers what the save wrote, or nil when it wrote nothing.
 func serveEmailSave(t *testing.T, settings *record.Settings, body string) (*httptest.ResponseRecorder, *record.Settings) {
@@ -156,7 +166,7 @@ func serveEmailSave(t *testing.T, settings *record.Settings, body string) (*http
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedSMTPSettings, mock.Anything).Return().Maybe()
 
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/email", strings.NewReader(body))
-	r = r.WithContext(reqctx.WithSettings(r.Context(), settings))
+	r = r.WithContext(context.WithValue(reqctx.WithSettings(r.Context(), settings), middleware.RequestIDKey, emailSaveRequestId))
 	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage", "sub": grantCaller})
 	rr := httptest.NewRecorder()
 	HandleSettingsEmailPut(database, accountvalidation.NewEmailValidator(nil), auditLogger, testDataCipher).ServeHTTP(rr, r)
@@ -350,6 +360,54 @@ func TestHandleSettingsEmailPut_TheSameHostSpelledAnotherWayKeepsThePassword(t *
 			require.NotNil(t, written)
 			assert.Equal(t, stored, written.SMTPPasswordEncrypted, "the stored ciphertext, byte for byte")
 			assert.True(t, hasSMTPPasswordIn(t, rr))
+		})
+	}
+}
+
+// A refused dial answers the fixed message and its coarse cause, naming neither the address nor the
+// port it dialled, and the whole error goes to the log at Warn, on the request's id (#410 decision 4).
+func TestHandleSettingsEmailPut_ARefusedDialAnswersItsCauseAndLogsTheError(t *testing.T) {
+	capture := logtest.CaptureSlog(t)
+	port := unreachableSMTPPort(t)
+
+	rr, written := serveEmailSave(t, emailSaveSettings(t, "127.0.0.1", false), emailSaveBody(t, "127.0.0.1", port, nil))
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
+	assert.NotContains(t, rr.Body.String(), "127.0.0.1", "the answer names no address")
+	assert.NotContains(t, rr.Body.String(), strconv.Itoa(port), "the answer names no port")
+	code, description := decodeErrorEnvelope(t, rr)
+	assert.Equal(t, "VALIDATION_ERROR", code)
+	assert.Equal(t, "Unable to connect to the SMTP server: connection refused.", description)
+	assert.Nil(t, written)
+
+	records := capture.Records()
+	require.Len(t, records, 1, "one refused dial writes one record")
+	assert.Equal(t, slog.LevelWarn, records[0].Level)
+	assert.Equal(t, "unable to connect to the smtp server", records[0].Message)
+	assert.Equal(t, emailSaveRequestId, records[0].Attrs["request_id"], "logged through the request's context")
+	logged, ok := records[0].Attrs["error"].(error)
+	require.True(t, ok, "the error attribute is the error itself")
+	assert.ErrorIs(t, logged, syscall.ECONNREFUSED)
+	assert.Contains(t, logged.Error(), "127.0.0.1:"+strconv.Itoa(port), "the log keeps what the answer leaves out")
+}
+
+// Each coarse cause adds its own words to a failed connection's answer, and a failure with no cause
+// the classification names ends at the fixed message (#410 decision 4). The dial's other failures
+// cannot be produced on every machine alike, so the words are pinned here, from the cause.
+func TestConnectionFailureMessage(t *testing.T) {
+	testCases := []struct {
+		cause emaildelivery.ConnectionCause
+		want  string
+	}{
+		{emaildelivery.ConnectionCauseHostNotFound, "Unable to connect to the SMTP server: host name not found."},
+		{emaildelivery.ConnectionCauseTimedOut, "Unable to connect to the SMTP server: connection timed out."},
+		{emaildelivery.ConnectionCauseRefused, "Unable to connect to the SMTP server: connection refused."},
+		{emaildelivery.ConnectionCauseNone, "Unable to connect to the SMTP server."},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.want, func(t *testing.T) {
+			assert.Equal(t, tc.want, connectionFailureMessage("Unable to connect to the SMTP server", tc.cause))
 		})
 	}
 }
