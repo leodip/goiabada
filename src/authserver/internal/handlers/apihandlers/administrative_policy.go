@@ -40,9 +40,10 @@ const manageScopeRequiredDescription = "Only a token with the authserver:manage 
 
 // The ceiling a refusal names. The grant ceiling is granting or revoking an administrative
 // permission, directly or by moving a user into or out of a group that holds one, and deleting such
-// a group; the target ceiling is any other write on an administrator, and changing the description
-// of an administrative permission; the settings ceiling is changing the email or the audit-log
-// settings (#402 decisions 1, 5 and 7).
+// a group; the target ceiling is any other write on an administrator, switching a client's
+// allowance to request the administrative scopes, and changing the description of an administrative
+// permission; the settings ceiling is changing the email or the audit-log settings (#402 decisions
+// 1, 5 and 7, #499 decision 4).
 const (
 	ceilingGrant    = "grant"
 	ceilingTarget   = "target"
@@ -572,13 +573,16 @@ type clientTargetPolicyDatabase interface {
 }
 
 // clientIsAdministrator reports whether the client is an administrator: the admin console's own
-// client, whatever it holds, or a client holding an administrative permission. The admin console's
-// client is one by what it is, the client every administrator signs in through, so that editing its
-// redirect URIs, its flows or its secret stays authserver:manage's however its grants are changed.
-// Read outside any transaction; the admin console's client and a client holding no grant read
-// nothing more.
+// client, whatever it holds, a client allowed to request the administrative scopes, or a client
+// holding an administrative permission. The admin console's client is one by what it is, the client
+// every administrator signs in through, so that editing its redirect URIs, its flows or its secret
+// stays authserver:manage's however its grants are changed. An allowed client is one by what it can
+// obtain: an administrator's token for itself, with one link, at any redirect URI it is given, so
+// a token that could add one or read its secret could take that authority (#499 decision 4).
+// Read outside any transaction; the admin console's client, an allowed client and a client holding
+// no grant read nothing more.
 func clientIsAdministrator(ctx context.Context, database clientTargetPolicyDatabase, client *record.Client) (bool, error) {
-	if client.IsSystemLevelClient() {
+	if client.IsSystemLevelClient() || client.MayRequestAdministrativeScopes() {
 		return true, nil
 	}
 	grants, err := database.GetClientPermissionsByClientId(ctx, nil, client.Id)
@@ -627,6 +631,23 @@ func clientTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database 
 		return true
 	}
 
+	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
+		ceiling:    ceilingTarget,
+		targetKind: targetKindClient,
+		targetId:   client.Id,
+	})
+	return false
+}
+
+// allowanceCeilingAllows applies the target ceiling to switching a client's allowance to request
+// the administrative scopes, either way: switching it on makes the client an administrator, and
+// switching it off changes one, so only an authserver:manage token does either, whatever the client
+// is now. It reports whether the switch may go on, and when it may not it has answered the request.
+// The ceiling reads nothing: the route is the whole of what it judges (#499 decision 4).
+func allowanceCeilingAllows(w http.ResponseWriter, r *http.Request, auditLogger AuditLogger, client *record.Client) bool {
+	if callerHoldsManage(r) {
+		return true
+	}
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:    ceilingTarget,
 		targetKind: targetKindClient,

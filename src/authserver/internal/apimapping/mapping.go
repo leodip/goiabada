@@ -455,6 +455,7 @@ func ToClientResponse(client *record.Client) *api.ClientResponse {
 		Enabled:                                 client.Enabled,
 		ConsentRequired:                         client.ConsentRequired,
 		CreatedViaDCR:                           client.CreatedViaDCR,
+		AdministrativeScopesAllowed:             client.MayRequestAdministrativeScopes(),
 		ShowLogo:                                client.ShowLogo,
 		ShowDisplayName:                         client.ShowDisplayName,
 		ShowDescription:                         client.ShowDescription,

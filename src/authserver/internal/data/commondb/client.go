@@ -60,6 +60,35 @@ func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *record.
 	return nil
 }
 
+// SetClientAdministrativeScopesAllowed writes a client's allowance to request the administrative
+// authserver scopes, and nothing else but updated_at. It is the column's one writer: UpdateClient
+// leaves it out (dont-update), so a whole-row save made from a copy read earlier cannot write back
+// an allowance an operator has switched since (#499 decisions 4 and 5).
+//
+// A client that is not there affects no rows and is not reported here, for the reason
+// AcquireClientRow gives: its caller reads the row back to answer, and that read is the one place
+// that decides whether the client still exists.
+func (d *Database) SetClientAdministrativeScopesAllowed(ctx context.Context, tx *sql.Tx, clientId int64, allowed bool) error {
+
+	if clientId == 0 {
+		return errs.New("can't set the administrative scopes allowance of a client with an id of 0")
+	}
+
+	update := sqlbuilder.NewUpdateBuilder()
+	update.Update("clients")
+	update.Set(
+		update.Assign("administrative_scopes_allowed", allowed),
+		update.Assign("updated_at", time.Now().UTC()),
+	)
+	update.Where(update.Equal("id", clientId))
+
+	query, args := update.BuildWithFlavor(d.Flavor)
+	if _, err := d.ExecSQL(ctx, tx, query, args...); err != nil {
+		return errs.Wrap(err, "unable to set the client's administrative scopes allowance")
+	}
+	return nil
+}
+
 // AcquireClientRow takes the client's row and holds it for the rest of the caller's
 // transaction. It is one unconditional UPDATE that writes nothing a reader can observe: the row's
 // updated_at, which every caller of this overwrites moments later with its own write.

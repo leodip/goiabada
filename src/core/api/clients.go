@@ -45,16 +45,22 @@ type ClientResponse struct {
 	// UpdateClientSettingsRequest deliberately does not carry it and neither an administrator nor the
 	// client itself can clear the marking. The setting an administrator does get is ConsentRequired
 	// (#108).
-	CreatedViaDCR            bool  `json:"createdViaDcr"`
-	ShowLogo                 bool  `json:"showLogo"`
-	ShowDisplayName          bool  `json:"showDisplayName"`
-	ShowDescription          bool  `json:"showDescription"`
-	ShowWebsiteURL           bool  `json:"showWebsiteUrl"`
-	IsPublic                 bool  `json:"isPublic"`
-	IsSystemLevelClient      bool  `json:"isSystemLevelClient"`
-	AuthorizationCodeEnabled bool  `json:"authorizationCodeEnabled"`
-	ClientCredentialsEnabled bool  `json:"clientCredentialsEnabled"`
-	PKCERequired             *bool `json:"pkceRequired"`
+	CreatedViaDCR bool `json:"createdViaDcr"`
+	// AdministrativeScopesAllowed is read-only here too: whether the client may request the
+	// administrative authserver scopes on a user's behalf, true for the admin console's client
+	// whatever its row holds. Only UpdateClientAdministrativeScopesRequest, on its own route
+	// reserved to authserver:manage, changes it; the create request and the settings save carry no
+	// such field, so no caller sets or clears it by accident (#499 decisions 4 and 5).
+	AdministrativeScopesAllowed bool  `json:"administrativeScopesAllowed"`
+	ShowLogo                    bool  `json:"showLogo"`
+	ShowDisplayName             bool  `json:"showDisplayName"`
+	ShowDescription             bool  `json:"showDescription"`
+	ShowWebsiteURL              bool  `json:"showWebsiteUrl"`
+	IsPublic                    bool  `json:"isPublic"`
+	IsSystemLevelClient         bool  `json:"isSystemLevelClient"`
+	AuthorizationCodeEnabled    bool  `json:"authorizationCodeEnabled"`
+	ClientCredentialsEnabled    bool  `json:"clientCredentialsEnabled"`
+	PKCERequired                *bool `json:"pkceRequired"`
 	// ImplicitGrantEnabled: nil = use global setting, true = enabled, false = disabled
 	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
 	ImplicitGrantEnabled *bool `json:"implicitGrantEnabled"`
@@ -171,6 +177,14 @@ type UpdateClientTokensRequest struct {
 	RefreshTokenOfflineMaxLifetimeInSeconds int    `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
 	IncludeOpenIDConnectClaimsInAccessToken string `json:"includeOpenIDConnectClaimsInAccessToken"`
 	IncludeOpenIDConnectClaimsInIdToken     string `json:"includeOpenIDConnectClaimsInIdToken"`
+}
+
+// UpdateClientAdministrativeScopesRequest switches whether a client may request the administrative
+// authserver scopes, on PUT /clients/{id}/administrative-scopes. Allowed is a pointer so that a body
+// without it, or with null, is refused rather than read as switching the allowance off (#499
+// decision 5).
+type UpdateClientAdministrativeScopesRequest struct {
+	Allowed *bool `json:"allowed"`
 }
 
 type UpdateClientResponse struct {

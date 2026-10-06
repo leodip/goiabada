@@ -41,6 +41,8 @@ type clientHolding struct {
 	administrator bool
 	// readsNothing says the policy decides this client without reading its grants.
 	readsNothing bool
+	// allowed is the client's stored allowance to request the administrative scopes.
+	allowed bool
 }
 
 var (
@@ -64,6 +66,16 @@ var (
 		administrator: true,
 		readsNothing:  true,
 	}
+	// A client allowed to request the administrative scopes is an administrator by that alone:
+	// manage-clients could otherwise add its own redirect URI to it, or read its secret, and send one
+	// link (#499 decision 4).
+	theAllowedClient = clientHolding{
+		name:          "a client allowed to request the administrative scopes, holding nothing",
+		identifier:    "target-client",
+		allowed:       true,
+		administrator: true,
+		readsNothing:  true,
+	}
 	ordinaryClient = clientHolding{
 		name:       "an ordinary client",
 		identifier: "target-client",
@@ -84,6 +96,8 @@ func targetClient(t *testing.T, holding clientHolding) *record.Client {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
 		ClientSecretEncrypted:    sealed,
+
+		AdministrativeScopesAllowed: holding.allowed,
 	}
 }
 
@@ -313,8 +327,8 @@ func (c clientTargetCase) name() string { return c.write.name + "/" + c.holding.
 func administratorClientTargets() []clientTargetCase {
 	var cases []clientTargetCase
 	for _, write := range clientTargetWrites {
-		for _, holding := range []clientHolding{clientHoldingManage, clientHoldingBrowserSessions, theConsoleClient} {
-			if holding.readsNothing && write.refusedEarlierForTheConsoleClient {
+		for _, holding := range []clientHolding{clientHoldingManage, clientHoldingBrowserSessions, theConsoleClient, theAllowedClient} {
+			if holding.identifier == theConsoleClient.identifier && write.refusedEarlierForTheConsoleClient {
 				continue
 			}
 			cases = append(cases, clientTargetCase{write, holding})

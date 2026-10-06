@@ -428,6 +428,17 @@ const (
 	// and userId, the user the scope was asked for.
 	EventAdministrativeScopeRefused = "administrative_scope_refused"
 
+	// EventUpdatedClientAdministrativeScopes records a client's allowance to request the
+	// administrative authserver scopes switched through PUT
+	// /api/v1/admin/clients/{id}/administrative-scopes, which only authserver:manage may do. It is
+	// written after the write, once per switch, including a switch to the value already stored. An
+	// allowed client is an administrator client, so an alert on who is an administrator watches
+	// this beside administrative_permission_changed (#499 decision 9).
+	//
+	// Payload: clientId and clientIdentifier, the client switched; allowed, the new value; and
+	// loggedInUser.
+	EventUpdatedClientAdministrativeScopes = "updated_client_administrative_scopes"
+
 	// EventViewedClientSecret records a read of a client's secret through GET
 	// /api/v1/admin/clients/{id}/secret, the one route that answers one, decrypted. Only a read
 	// that disclosed a secret writes it: a client holding none is answered an empty one and
@@ -517,6 +528,7 @@ var auditEventTypes = []string{
 	EventTokenIssuedROPCResponse,
 	EventTokenScopeDenied,
 	EventUpdatedAuditLogsSettings,
+	EventUpdatedClientAdministrativeScopes,
 	EventUpdatedClientAuthentication,
 	EventUpdatedClientLogo,
 	EventUpdatedClientOAuth2Flows,

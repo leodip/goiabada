@@ -918,6 +918,29 @@ func TestToClientResponse_CreatedViaDCRIsCopiedNotAssumed(t *testing.T) {
 	assert.False(t, resp.CreatedViaDCR)
 }
 
+// TestToClientResponse_AdministrativeScopesAllowedIsWhatTheServerApplies pins the allowance the
+// client response carries to the rule the authorization and token endpoints apply: the admin
+// console's client, whatever its row holds, or the stored yes. So what the API answers and the
+// console shows agree with what the server does, even for a hand-edited row (#499 decision 5).
+func TestToClientResponse_AdministrativeScopesAllowedIsWhatTheServerApplies(t *testing.T) {
+	for _, c := range []struct {
+		name       string
+		identifier string
+		stored     bool
+		want       bool
+	}{
+		{"an ordinary client stored allowed", "web-app", true, true},
+		{"an ordinary client stored not allowed", "web-app", false, false},
+		{"the admin console's client stored allowed", "admin-console-client", true, true},
+		{"the admin console's client with its row edited to not allowed", "admin-console-client", false, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			resp := ToClientResponse(&record.Client{ClientIdentifier: c.identifier, AdministrativeScopesAllowed: c.stored})
+			assert.Equal(t, c.want, resp.AdministrativeScopesAllowed)
+		})
+	}
+}
+
 // =============================================================================
 // Audit timestamps
 //
