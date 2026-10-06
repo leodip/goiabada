@@ -628,6 +628,13 @@ func HandleClientUpdatePut(
 			return
 		}
 
+		// The write's transaction has committed: it is recorded now, before the reads building the
+		// answer, whose failure answers 500 but does not undo the change.
+		auditLogger.Log(r.Context(), audit.EventUpdatedClientSettings, map[string]interface{}{
+			"clientId":     client.Id,
+			"loggedInUser": callerSubject(r),
+		})
+
 		// Load related fields for response consistency
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after update"), "client_id", client.Id)
@@ -637,12 +644,6 @@ func HandleClientUpdatePut(
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after update"), "client_id", client.Id)
 			return
 		}
-
-		// Audit log
-		auditLogger.Log(r.Context(), audit.EventUpdatedClientSettings, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": callerSubject(r),
-		})
 
 		response := api.UpdateClientResponse{
 			Client: *apimapping.ToClientResponse(client),
@@ -764,6 +765,13 @@ func HandleClientAuthenticationPut(
 			return
 		}
 
+		// Either branch has committed its write by here: it is recorded now, before the reads
+		// building the answer, whose failure answers 500 but does not undo the change.
+		auditLogger.Log(r.Context(), audit.EventUpdatedClientAuthentication, map[string]interface{}{
+			"clientId":     client.Id,
+			"loggedInUser": callerSubject(r),
+		})
+
 		// Load related fields for response consistency
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after auth update"), "client_id", client.Id)
@@ -773,12 +781,6 @@ func HandleClientAuthenticationPut(
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after auth update"), "client_id", client.Id)
 			return
 		}
-
-		// Audit
-		auditLogger.Log(r.Context(), audit.EventUpdatedClientAuthentication, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": callerSubject(r),
-		})
 
 		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
 		writeJSON(w, r, http.StatusOK, resp)
@@ -953,6 +955,13 @@ func HandleClientOAuth2FlowsPut(
 			return
 		}
 
+		// The write's transaction has committed: it is recorded now, before the reads building the
+		// answer, whose failure answers 500 but does not undo the change.
+		auditLogger.Log(r.Context(), audit.EventUpdatedClientOAuth2Flows, map[string]interface{}{
+			"clientId":     client.Id,
+			"loggedInUser": callerSubject(r),
+		})
+
 		// Load related fields for response consistency
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after oauth2 flows update"), "client_id", client.Id)
@@ -962,12 +971,6 @@ func HandleClientOAuth2FlowsPut(
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after oauth2 flows update"), "client_id", client.Id)
 			return
 		}
-
-		// Audit
-		auditLogger.Log(r.Context(), audit.EventUpdatedClientOAuth2Flows, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": callerSubject(r),
-		})
 
 		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
 		writeJSON(w, r, http.StatusOK, resp)
@@ -1429,6 +1432,13 @@ func HandleClientTokensPut(
 			return
 		}
 
+		// The write's transaction has committed: it is recorded now, before the reads building the
+		// answer, whose failure answers 500 but does not undo the change.
+		auditLogger.Log(r.Context(), audit.EventUpdatedClientTokens, map[string]interface{}{
+			"clientId":     client.Id,
+			"loggedInUser": callerSubject(r),
+		})
+
 		// Reload related fields for response consistency
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after tokens update"), "client_id", client.Id)
@@ -1438,12 +1448,6 @@ func HandleClientTokensPut(
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after tokens update"), "client_id", client.Id)
 			return
 		}
-
-		// Audit
-		auditLogger.Log(r.Context(), audit.EventUpdatedClientTokens, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": callerSubject(r),
-		})
 
 		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
 		writeJSON(w, r, http.StatusOK, resp)
