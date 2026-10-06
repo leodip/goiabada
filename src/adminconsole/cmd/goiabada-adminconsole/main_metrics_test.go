@@ -130,15 +130,34 @@ func indexOfRecord(records []map[string]any, msg string) int {
 	return -1
 }
 
-// freePort is a loopback port nothing listens on as it returns.
-func freePort(t *testing.T) int {
+// freePorts is n distinct loopback ports nothing listens on as it returns. All n are held open
+// until every one is chosen and only then released, because the kernel hands a bind to port 0 any
+// free port, the one released a moment ago included: about once in 10,000 pairs on Linux, enough
+// to fail a CI run now and then. For the same reason a listener the test keeps, such as a stub
+// server or a held port, is opened before this is called, never between it and the child's bind.
+func freePorts(t *testing.T, n int) []int {
 	t.Helper()
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	port := ln.Addr().(*net.TCPAddr).Port
-	require.NoError(t, ln.Close())
-	return port
+	listeners := make([]net.Listener, 0, n)
+	defer func() {
+		for _, l := range listeners {
+			_ = l.Close()
+		}
+	}()
+	ports := make([]int, 0, n)
+	for range n {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		require.NoError(t, err)
+		listeners = append(listeners, l)
+		ports = append(ports, l.Addr().(*net.TCPAddr).Port)
+	}
+	return ports
+}
+
+// freePort is one port of freePorts.
+func freePort(t *testing.T) int {
+	t.Helper()
+	return freePorts(t, 1)[0]
 }
 
 // getWhenUp sends a GET to url until something answers it, for as long as ctx allows, following no
@@ -189,7 +208,8 @@ func TestMain_ServesMetricsOnTheirOwnListenerAndDrainsIt(t *testing.T) {
 	defer cancel()
 
 	authServer := stubAuthServer(t)
-	httpPort, metricsPort := freePort(t), freePort(t)
+	ports := freePorts(t, 2)
+	httpPort, metricsPort := ports[0], ports[1]
 	child := startMetricsChild(t, ctx, authServer.URL, httpPort, metricsPort, "true")
 	metricsURL := "http://127.0.0.1:" + strconv.Itoa(metricsPort) + "/metrics"
 
@@ -285,8 +305,11 @@ func TestMain_MetricsOffLeavesTheMetricsPortAlone(t *testing.T) {
 			defer func() { _ = holder.Close() }()
 			takenPort := taken.Addr().(*net.TCPAddr).Port
 
+			// The stub binds before the console's port is chosen, so it cannot be handed that port
+			// and answer the console's health check with its own 503.
+			authServerURL := stubAuthServer(t).URL
 			httpPort := freePort(t)
-			child := startMetricsChild(t, ctx, stubAuthServer(t).URL, httpPort, takenPort, enabled)
+			child := startMetricsChild(t, ctx, authServerURL, httpPort, takenPort, enabled)
 
 			// A process that exits, as one that tried to bind the held port does, ends the wait at
 			// once rather than at the bound.
