@@ -311,6 +311,7 @@ func TestValidateAuthorizeRequest(t *testing.T) {
 	testCases := []struct {
 		name            string
 		hint            string
+		scope           string
 		requestErr      error
 		scopesErr       error
 		wantRefusalCode string
@@ -337,6 +338,13 @@ func TestValidateAuthorizeRequest(t *testing.T) {
 			wantCalls: []string{"ValidateUnsupportedRequestParameters", "ValidateRequest", "ValidateScopes"},
 		},
 		{
+			// After the scopes, which establish that it exists, and before the prompt (#499).
+			name:            "an administrative scope the client may not request is refused after the scopes",
+			scope:           "openid authserver:manage",
+			wantRefusalCode: "invalid_scope",
+			wantCalls:       []string{"ValidateUnsupportedRequestParameters", "ValidateRequest", "ValidateScopes"},
+		},
+		{
 			name:            "a refused hint keeps the accepted prompt",
 			hint:            "not-a-token",
 			wantRefusalCode: "invalid_request",
@@ -358,7 +366,11 @@ func TestValidateAuthorizeRequest(t *testing.T) {
 				Run(recordCall("ValidateUnsupportedRequestParameters")).Return(nil).Maybe()
 			authorizeValidator.On("ValidateRequest", mock.Anything).
 				Run(recordCall("ValidateRequest")).Return(tc.requestErr).Maybe()
-			authorizeValidator.On("ValidateScopes", mock.Anything, "openid").
+			scope := "openid"
+			if tc.scope != "" {
+				scope = tc.scope
+			}
+			authorizeValidator.On("ValidateScopes", mock.Anything, scope).
 				Run(recordCall("ValidateScopes")).Return(tc.scopesErr).Maybe()
 			authorizeValidator.On("ValidatePrompt", "login").
 				Run(recordCall("ValidatePrompt")).Return("login", nil).Maybe()
@@ -368,14 +380,20 @@ func TestValidateAuthorizeRequest(t *testing.T) {
 			// ValidateScopes is handed the scope as sent, never the request's normalized copy, whose
 			// spaces would hide a malformed one (#244): the copy below differs, so a call with it
 			// matches no expectation.
-			params := url.Values{"prompt": {"login"}, "scope": {"openid"}}
+			params := url.Values{"prompt": {"login"}, "scope": {scope}}
 			if tc.hint != "" {
 				params.Set("id_token_hint", tc.hint)
 			}
 
+			// The administrative check reads the request's normalized copy, which here is the scope
+			// as sent, so a row asking for an administrative scope is judged on it.
+			normalized := "the normalized copy"
+			if tc.scope != "" {
+				normalized = tc.scope
+			}
 			validation, err := validateAuthorizeRequest(context.Background(), authorizeValidator, tokenParser,
-				&record.Settings{Issuer: "https://test-issuer.com"}, params,
-				&protocolvalidation.ValidateRequestInput{Scope: "the normalized copy"})
+				&record.Settings{Issuer: "https://test-issuer.com"}, &record.Client{ClientIdentifier: "test-client"}, params,
+				&protocolvalidation.ValidateRequestInput{Scope: normalized})
 
 			assert.Equal(t, tc.wantCalls, calls)
 			if tc.wantFault {
@@ -389,6 +407,11 @@ func TestValidateAuthorizeRequest(t *testing.T) {
 			} else {
 				require.NotNil(t, validation.refusal)
 				assert.Equal(t, tc.wantRefusalCode, validation.refusal.Code())
+			}
+			if tc.scope != "" {
+				assert.Equal(t, []string{"authserver:manage"}, validation.refusedAdministrativeScopes)
+			} else {
+				assert.Nil(t, validation.refusedAdministrativeScopes)
 			}
 			assert.Equal(t, tc.wantPrompt, validation.prompt)
 			assert.Equal(t, tc.wantHint, validation.hintSubject)

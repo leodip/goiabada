@@ -124,6 +124,15 @@ func HandleIssueGet(
 				facts.registrationLoaded = true
 				facts.registeredRedirectURIs = registered
 				facts.clientEnabled = client != nil && client.Enabled
+				if client != nil {
+					// The scope the issuer will read, ConsentedScope when the consent screen wrote
+					// one, as the effective scope below reads it.
+					issuerScope := authContext.Scope
+					if authContext.ConsentedScope != "" {
+						issuerScope = authContext.ConsentedScope
+					}
+					facts.refusedAdministrativeScopes = protocolvalidation.RefusedAdministrativeScopes(client, issuerScope)
+				}
 
 			case issuanceFactFlows:
 				// Only reached for a registered client, which the registration gate has already
@@ -206,6 +215,16 @@ func HandleIssueGet(
 		case issuanceRefuseCodeDisabled:
 			refuseIssuanceFlowDisabled(w, r, protocolvalidation.AuthorizationCodeNotSupportedErrorMsg, authContext, issuingClient,
 				database, pageRenderer, ceremonyStore, templateFS)
+
+		case issuanceRefuseAdministrativeScope:
+			// The answer /auth/authorize gives the same condition, arriving later: the client's
+			// allowance was withdrawn while the ceremony sat on a step. Somebody has authenticated by
+			// now, so it is recorded against the ceremony's user (#499 decisions 7 and 9).
+			auditLogger.Log(r.Context(), audit.EventAdministrativeScopeRefused,
+				administrativeScopeRefusedDetails(issuingClient, facts.refusedAdministrativeScopes, "issue", authContext.UserId))
+			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+				redirectErrorFromAuthContext(authContext, issuingClient, "invalid_scope",
+					protocolvalidation.AdministrativeScopeRefusal(facts.refusedAdministrativeScopes).Description()))
 
 		case issuanceRefuseUserDisabled:
 			// The same event and the same answer as /auth/completed gives the same condition, arriving
@@ -308,6 +327,9 @@ const (
 	// issuanceRefuseCodeDisabled answers unauthorized_client: the ceremony is a code one and the client
 	// may no longer use the authorization code flow.
 	issuanceRefuseCodeDisabled
+	// issuanceRefuseAdministrativeScope answers invalid_scope: the scope to be issued names an
+	// administrative scope the client may no longer request.
+	issuanceRefuseAdministrativeScope
 	// issuanceRefuseHintMismatch answers login_required: the user is not the id_token_hint's.
 	issuanceRefuseHintMismatch
 	// issuanceRefuseUnusableSession is refuseIssuanceUnusableSession, for sessionShape.
@@ -356,6 +378,9 @@ type issuanceFacts struct {
 	// clientEnabled is the client's enabled flag, false for a missing client, and is known with the
 	// registration.
 	clientEnabled bool
+	// refusedAdministrativeScopes is the administrative scopes in the scope the issuer would read
+	// that the client may not request, none when it may, and is known with the registration (#499).
+	refusedAdministrativeScopes []string
 	// flows is nil until the client's flows have been loaded.
 	flows *clientFlows
 	// userLoaded is set once the user has been looked up; user is nil when there is none.
@@ -394,7 +419,11 @@ type issuanceFacts struct {
 //     client is the page /auth/authorize renders for one and never a redirect, because it is the
 //     client itself that is refused; a flow switched off is unauthorized_client by redirect, as the
 //     token endpoint answers it. The implicit grant is read through the client's override and else
-//     the global switch, as everywhere it is asked.
+//     the global switch, as everywhere it is asked. Last of the client's checks, the scope to be
+//     issued names no administrative scope the client may not request: /auth/authorize refused one,
+//     and this is where an allowance an operator withdrew while the ceremony sat on a step takes
+//     effect, answered invalid_scope by redirect as there (#499 decision 6). It is judged on the
+//     scope as the ceremony holds it, so a refusal reads nothing past the client's.
 //  3. An id_token_hint names the ceremony's user. OIDC Core 3.1.2.2: "The Authorization Server MUST
 //     NOT reply with an ID Token or Access Token for a different user, even if they have an active
 //     session with the Authorization Server." A user who no longer exists is not the hint's either.
@@ -460,6 +489,9 @@ func decideIssuance(f issuanceFacts) (issuanceAnswer, issuanceFact) {
 	}
 	if !isImplicitFlow && !f.flows.code {
 		return decided(issuanceRefuseCodeDisabled)
+	}
+	if len(f.refusedAdministrativeScopes) > 0 {
+		return decided(issuanceRefuseAdministrativeScope)
 	}
 
 	if f.hintSubject != "" {

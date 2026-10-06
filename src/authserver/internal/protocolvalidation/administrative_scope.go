@@ -1,0 +1,43 @@
+package protocolvalidation
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/permissions"
+	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/oauth"
+)
+
+// RefusedAdministrativeScopes is the administrative scopes in scope that client may not request on
+// a user's behalf, in the order scope names them: none for a client that may
+// (record.Client.MayRequestAdministrativeScopes), and for any other client every scope of the
+// administrative set, which permissions.IsAdministrativeScope defines once for this check and the
+// Admin API's policy alike (#499 decisions 2 and 5). scope is space delimited, as a request and a
+// ceremony carry it.
+func RefusedAdministrativeScopes(client *record.Client, scope string) []string {
+	if client.MayRequestAdministrativeScopes() {
+		return nil
+	}
+	var refused []string
+	for _, s := range oidc.SplitScope(scope) {
+		if permissions.IsAdministrativeScope(s) {
+			refused = append(refused, s)
+		}
+	}
+	return refused
+}
+
+// AdministrativeScopeRefusal is the answer to a client asking for administrative scopes it may not
+// request, naming the first of them: invalid_scope, which RFC 6749 4.1.2.1 and 4.2.2.1 name for a
+// requested scope the server will not grant. It refuses rather than narrows, so a misconfigured tool
+// is told why instead of receiving a token the Admin API then refuses (#499 decision 7). The
+// authorization endpoint and /auth/issue both answer with it, so one condition gets one sentence
+// wherever it is met. English, as every error_description is: the scope is a validated identifier
+// of the administrative set, so the sentence stays within RFC 6749's character set.
+func AdministrativeScopeRefusal(refused []string) *oauth.ErrorDetail {
+	return oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
+		fmt.Sprintf("The client is not allowed to request the administrative scope '%v'.", refused[0]),
+		http.StatusBadRequest)
+}
