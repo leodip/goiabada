@@ -1,7 +1,15 @@
 # Reviewing Goiabada
 
+- **What this is:** Goiabada is its owner's open-source OAuth 2.0 and OpenID
+  Connect authorization server, and you review a change to it at the owner's
+  request, before they merge it. It is defensive work: its issues name the
+  weaknesses being closed (privilege escalation, token misuse, and so on) so they
+  can be fixed and tested, and the stack you run against is this issue's own,
+  isolated, with throwaway data.
 - **Goiabada is a security product:** a flaw here becomes a flaw in every
-  application that relies on it. Treat security findings with the highest care.
+  application that relies on it. Treat security findings with the highest care, and
+  show each with a test through the commands in your prompt: a request the server
+  must refuse, a check a path skips.
 - **Standards:** on the Spec axis, also check the change against the published
   standards it touches (see "Standards" in AGENTS.md), reading the sections rather
   than recalling them. Breaking a MUST is a blocking finding; ignoring a SHOULD
