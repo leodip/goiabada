@@ -37,22 +37,6 @@ import (
 // and an entry whose file no longer calls UpdateUser fails the guard, so none outlives its site.
 // The list is not the place for a new site.
 var wholeRowUserSaveExemptions = map[string]string{
-	"authserver/internal/handlers/apihandlers/handler_api_account_profile.go": "the self-service " +
-		"profile save, not yet converted: it writes back the whole row and can undo a concurrent " +
-		"disable, password change or OTP change (#471)",
-	"authserver/internal/handlers/apihandlers/handler_api_account_address.go": "the self-service " +
-		"address save, not yet converted: it writes back the whole row and can undo a concurrent " +
-		"disable, password change or OTP change (#471)",
-	"authserver/internal/handlers/apihandlers/handler_api_account_phone.go": "the self-service " +
-		"phone save, not yet converted: it writes back the whole row and can undo a concurrent " +
-		"disable, password change or OTP change (#471)",
-	"authserver/internal/handlers/apihandlers/handler_api_users_profile.go": "the administrator's " +
-		"profile and address saves, not yet converted: they write back the whole row and can undo " +
-		"a concurrent disable, password change or OTP change, and the profile save can write " +
-		"enabled = false back past the last-administrator guard (#471)",
-	"authserver/internal/handlers/apihandlers/handler_api_users_phone.go": "the administrator's " +
-		"phone save, not yet converted: it writes back the whole row and can undo a concurrent " +
-		"disable, password change or OTP change (#471)",
 	"authserver/internal/handlers/apihandlers/handler_api_users_email.go": "the administrator's " +
 		"email save, not yet converted: it writes back the whole row and can undo a concurrent " +
 		"disable, password change or OTP change (#471)",

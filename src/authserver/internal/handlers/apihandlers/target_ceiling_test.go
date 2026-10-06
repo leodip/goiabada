@@ -213,8 +213,8 @@ var userTargetWrites = []targetWrite{
 			return rr
 		},
 		expectReads:      func(database *datamocks.Database, _ bool) { expectTargetUser(database, nil) },
-		writes:           []string{"UpdateUser"},
-		expectFirstWrite: failingWrite("UpdateUser", mock.Anything, (*sql.Tx)(nil), mock.Anything),
+		writes:           []string{"SetUserProfile"},
+		expectFirstWrite: failingWrite("SetUserProfile", mock.Anything, (*sql.Tx)(nil), mock.Anything),
 	},
 	{
 		name: "PUT /users/{id}/address",
@@ -226,8 +226,8 @@ var userTargetWrites = []targetWrite{
 			return rr
 		},
 		expectReads:      func(database *datamocks.Database, _ bool) { expectTargetUser(database, nil) },
-		writes:           []string{"UpdateUser"},
-		expectFirstWrite: failingWrite("UpdateUser", mock.Anything, (*sql.Tx)(nil), mock.Anything),
+		writes:           []string{"SetUserAddress"},
+		expectFirstWrite: failingWrite("SetUserAddress", mock.Anything, (*sql.Tx)(nil), mock.Anything),
 	},
 	{
 		name: "PUT /users/{id}/email",
@@ -272,8 +272,8 @@ var userTargetWrites = []targetWrite{
 			return rr
 		},
 		expectReads:      func(database *datamocks.Database, _ bool) { expectTargetUser(database, nil) },
-		writes:           []string{"UpdateUser"},
-		expectFirstWrite: failingWrite("UpdateUser", mock.Anything, (*sql.Tx)(nil), mock.Anything),
+		writes:           []string{"SetUserPhone"},
+		expectFirstWrite: failingWrite("SetUserPhone", mock.Anything, (*sql.Tx)(nil), mock.Anything),
 	},
 	{
 		name: "PUT /users/{id}/password",

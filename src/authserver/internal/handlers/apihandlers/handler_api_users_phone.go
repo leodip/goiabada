@@ -48,12 +48,13 @@ func HandlePhoneCountriesGet() http.HandlerFunc {
 	}
 }
 
-// usersPhoneDatabase is what the administrator's user phone endpoint needs: the user row.
-// It embeds what the administrative policy reads to judge whether the user is an administrator.
+// usersPhoneDatabase is what the administrator's user phone endpoint needs: the user row, and
+// the narrow write of its phone columns. It embeds what the administrative policy reads to judge
+// whether the user is an administrator.
 type usersPhoneDatabase interface {
 	userTargetPolicyDatabase
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
+	SetUserPhone(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 // HandleUserPhonePut - PUT /api/v1/admin/users/{id}/phone
@@ -138,8 +139,9 @@ func HandleUserPhonePut(
 			user.PhoneNumberVerified = false
 		}
 
-		// Update user in database
-		err = database.UpdateUser(r.Context(), nil, user)
+		// Only the phone columns: writing back the row read above would undo a disable, a
+		// password change or an OTP change made since (#471).
+		err = database.SetUserPhone(r.Context(), nil, user)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

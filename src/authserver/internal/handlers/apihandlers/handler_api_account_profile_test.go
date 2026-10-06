@@ -40,7 +40,7 @@ func TestHandleAccountProfilePut_StoresTheGenderWordForEitherSpelling(t *testing
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, profileTestSubject).
 				Return(&record.User{Id: profileTestUserId, Subject: profileTestSubject, Gender: "other"}, nil).Once()
 			var stored *record.User
-			database.On("UpdateUser", mock.Anything, mock.Anything, mock.Anything).
+			database.On("SetUserProfile", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) { stored = args.Get(2).(*record.User) }).
 				Return(nil).Once()
 			auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnProfile, mock.Anything).Return().Once()
@@ -66,7 +66,7 @@ func TestHandleAccountProfilePut_RefusesAnyOtherGender(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			// No UpdateUser and no audit record are stubbed: the mocks fail the test on either.
+			// No write and no audit record are stubbed: the mocks fail the test on either.
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, profileTestSubject).
 				Return(&record.User{Id: profileTestUserId, Subject: profileTestSubject, Gender: "other"}, nil).Once()
 
