@@ -6,43 +6,41 @@ import (
 )
 
 type User struct {
-	Id                                   int64        `db:"id" fieldtag:"pk"`
-	CreatedAt                            sql.NullTime `db:"created_at" fieldtag:"dont-update"`
-	UpdatedAt                            sql.NullTime `db:"updated_at"`
-	Enabled                              bool         `db:"enabled"`
-	Subject                              string       `db:"subject"`
-	Username                             string       `db:"username"`
-	GivenName                            string       `db:"given_name"`
-	MiddleName                           string       `db:"middle_name"`
-	FamilyName                           string       `db:"family_name"`
-	Nickname                             string       `db:"nickname"`
-	Website                              string       `db:"website"`
-	Gender                               string       `db:"gender"`
-	Email                                string       `db:"email"`
-	EmailVerified                        bool         `db:"email_verified"`
-	EmailVerificationCodeEncrypted       []byte       `db:"email_verification_code_encrypted"`
-	EmailVerificationCodeIssuedAt        sql.NullTime `db:"email_verification_code_issued_at"`
-	ZoneInfoCountryName                  string       `db:"zone_info_country_name"`
-	ZoneInfo                             string       `db:"zone_info"`
-	Locale                               string       `db:"locale"`
-	BirthDate                            sql.NullTime `db:"birth_date"`
-	PhoneNumberCountryUniqueId           string       `db:"phone_number_country_uniqueid"`
-	PhoneNumberCountryCallingCode        string       `db:"phone_number_country_callingcode"`
-	PhoneNumber                          string       `db:"phone_number"`
-	PhoneNumberVerified                  bool         `db:"phone_number_verified"`
-	PhoneNumberVerificationCodeEncrypted []byte       `db:"phone_number_verification_code_encrypted"`
-	PhoneNumberVerificationCodeIssuedAt  sql.NullTime `db:"phone_number_verification_code_issued_at"`
-	AddressLine1                         string       `db:"address_line1"`
-	AddressLine2                         string       `db:"address_line2"`
-	AddressLocality                      string       `db:"address_locality"`
-	AddressRegion                        string       `db:"address_region"`
-	AddressPostalCode                    string       `db:"address_postal_code"`
-	AddressCountry                       string       `db:"address_country"`
-	PasswordHash                         string       `db:"password_hash"`
-	OTPSecretEncrypted                   []byte       `db:"otp_secret_encrypted"`
-	OTPEnabled                           bool         `db:"otp_enabled"`
-	ForgotPasswordCodeEncrypted          []byte       `db:"forgot_password_code_encrypted"`
-	ForgotPasswordCodeIssuedAt           sql.NullTime `db:"forgot_password_code_issued_at"`
+	Id                             int64        `db:"id" fieldtag:"pk"`
+	CreatedAt                      sql.NullTime `db:"created_at" fieldtag:"dont-update"`
+	UpdatedAt                      sql.NullTime `db:"updated_at"`
+	Enabled                        bool         `db:"enabled"`
+	Subject                        string       `db:"subject"`
+	Username                       string       `db:"username"`
+	GivenName                      string       `db:"given_name"`
+	MiddleName                     string       `db:"middle_name"`
+	FamilyName                     string       `db:"family_name"`
+	Nickname                       string       `db:"nickname"`
+	Website                        string       `db:"website"`
+	Gender                         string       `db:"gender"`
+	Email                          string       `db:"email"`
+	EmailVerified                  bool         `db:"email_verified"`
+	EmailVerificationCodeEncrypted []byte       `db:"email_verification_code_encrypted"`
+	EmailVerificationCodeIssuedAt  sql.NullTime `db:"email_verification_code_issued_at"`
+	ZoneInfoCountryName            string       `db:"zone_info_country_name"`
+	ZoneInfo                       string       `db:"zone_info"`
+	Locale                         string       `db:"locale"`
+	BirthDate                      sql.NullTime `db:"birth_date"`
+	PhoneNumberCountryUniqueId     string       `db:"phone_number_country_uniqueid"`
+	PhoneNumberCountryCallingCode  string       `db:"phone_number_country_callingcode"`
+	PhoneNumber                    string       `db:"phone_number"`
+	PhoneNumberVerified            bool         `db:"phone_number_verified"`
+	AddressLine1                   string       `db:"address_line1"`
+	AddressLine2                   string       `db:"address_line2"`
+	AddressLocality                string       `db:"address_locality"`
+	AddressRegion                  string       `db:"address_region"`
+	AddressPostalCode              string       `db:"address_postal_code"`
+	AddressCountry                 string       `db:"address_country"`
+	PasswordHash                   string       `db:"password_hash"`
+	OTPSecretEncrypted             []byte       `db:"otp_secret_encrypted"`
+	OTPEnabled                     bool         `db:"otp_enabled"`
+	ForgotPasswordCodeEncrypted    []byte       `db:"forgot_password_code_encrypted"`
+	ForgotPasswordCodeIssuedAt     sql.NullTime `db:"forgot_password_code_issued_at"`
 	// ForgotPasswordCodeHash is an unsalted SHA-256 of the outstanding reset code, and
 	// the only way the reset link finds this row: the link carries the code and nothing
 	// else, so no email address travels in it and no part of it needs percent-encoding
@@ -83,9 +81,9 @@ type User struct {
 	// OtpEnrollmentSecretEncrypted is the AES-GCM ciphertext of a TOTP enrolment the server
 	// has issued but the user has not yet confirmed, and OtpEnrollmentIssuedAt is when it was
 	// issued. NULL in both means no enrolment is pending, which is the state of every user who
-	// is not part way through one. They are the fourth pending-credential pair on this table,
-	// in the same shape as email verification, phone verification and forgot password, and
-	// they are cleared the moment the authenticator is established.
+	// is not part way through one. They are the third pending-credential pair on this table,
+	// in the same shape as email verification and forgot password, and they are cleared the
+	// moment the authenticator is established.
 	//
 	// **The ciphertext is the whole otpauth:// URL, not the base32 seed the column is named
 	// for.** The enrolment endpoint has to answer a repeat call with the same QR image, and

@@ -60,7 +60,6 @@ func TestReencryptToKey(t *testing.T) {
 		smtpPass   = "smtp-password"
 		clientSec  = "client-secret"
 		emailCode  = "email-verif-code"
-		phoneCode  = "phone-verif-code"
 		otpSeed    = "JBSWY3DPEHPK3PXP"
 		forgotCode = "forgot-password-code"
 		preRegCode = "prereg-verif-code"
@@ -83,15 +82,14 @@ func TestReencryptToKey(t *testing.T) {
 	}
 	require.NoError(t, db.CreateClient(ctx, nil, client))
 	user := &record.User{
-		Subject:                              fake.UUID(),
-		Username:                             fake.Username(),
-		Email:                                fake.Email(),
-		PasswordHash:                         "x",
-		EmailVerificationCodeEncrypted:       rekeyEncrypt(t, emailCode, rekeyKeyA),
-		PhoneNumberVerificationCodeEncrypted: rekeyEncrypt(t, phoneCode, rekeyKeyA),
-		OTPSecretEncrypted:                   rekeyEncrypt(t, otpSeed, rekeyKeyA),
-		ForgotPasswordCodeEncrypted:          rekeyEncrypt(t, forgotCode, rekeyKeyA),
-		OtpEnrollmentSecretEncrypted:         rekeyEncrypt(t, otpEnrolment, rekeyKeyA),
+		Subject:                        fake.UUID(),
+		Username:                       fake.Username(),
+		Email:                          fake.Email(),
+		PasswordHash:                   "x",
+		EmailVerificationCodeEncrypted: rekeyEncrypt(t, emailCode, rekeyKeyA),
+		OTPSecretEncrypted:             rekeyEncrypt(t, otpSeed, rekeyKeyA),
+		ForgotPasswordCodeEncrypted:    rekeyEncrypt(t, forgotCode, rekeyKeyA),
+		OtpEnrollmentSecretEncrypted:   rekeyEncrypt(t, otpEnrolment, rekeyKeyA),
 	}
 	require.NoError(t, db.CreateUser(ctx, nil, user))
 	preReg := &record.PreRegistration{
@@ -134,7 +132,6 @@ func TestReencryptToKey(t *testing.T) {
 	gotUser, err := db.GetUserById(ctx, nil, user.Id)
 	require.NoError(t, err)
 	rekeyed("users.email_verification_code_encrypted", gotUser.EmailVerificationCodeEncrypted, emailCode)
-	rekeyed("users.phone_number_verification_code_encrypted", gotUser.PhoneNumberVerificationCodeEncrypted, phoneCode)
 	rekeyed("users.otp_secret_encrypted", gotUser.OTPSecretEncrypted, otpSeed)
 	rekeyed("users.forgot_password_code_encrypted", gotUser.ForgotPasswordCodeEncrypted, forgotCode)
 	rekeyed("users.otp_enrollment_secret_encrypted", gotUser.OtpEnrollmentSecretEncrypted, otpEnrolment)
