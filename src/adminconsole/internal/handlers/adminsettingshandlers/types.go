@@ -6,26 +6,40 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
+// SettingsEmailGet is the email settings page as loaded. SMTPPassword is always empty: the API never
+// returns the stored password, only HasSMTPPassword, which draws the Saved or Not set badge and
+// offers the removal. SavedSMTPHost is the host that password was saved for, which the page's
+// host-change warning compares the host box against (#410).
 type SettingsEmailGet struct {
-	SMTPEnabled    bool
-	SMTPHost       string
-	SMTPPort       int
-	SMTPUsername   string
-	SMTPPassword   string
-	SMTPEncryption string
-	SMTPFromName   string
-	SMTPFromEmail  string
+	SMTPEnabled       bool
+	SMTPHost          string
+	SMTPPort          int
+	SMTPUsername      string
+	SMTPPassword      string
+	SMTPEncryption    string
+	SMTPFromName      string
+	SMTPFromEmail     string
+	HasSMTPPassword   bool
+	SavedSMTPHost     string
+	ClearSMTPPassword bool
 }
 
+// SettingsEmailPost is the email settings form as submitted, which a refused save is redrawn from:
+// the typed password goes back in its box, and HasSMTPPassword and SavedSMTPHost come back from the
+// hidden fields the page was loaded with, so the badge, the removal checkbox and the host-change
+// warning stay as they were (#410).
 type SettingsEmailPost struct {
-	SMTPEnabled    bool
-	SMTPHost       string
-	SMTPPort       string
-	SMTPUsername   string
-	SMTPPassword   string
-	SMTPEncryption string
-	SMTPFromName   string
-	SMTPFromEmail  string
+	SMTPEnabled       bool
+	SMTPHost          string
+	SMTPPort          string
+	SMTPUsername      string
+	SMTPPassword      string
+	SMTPEncryption    string
+	SMTPFromName      string
+	SMTPFromEmail     string
+	HasSMTPPassword   bool
+	SavedSMTPHost     string
+	ClearSMTPPassword bool
 }
 
 type SettingsGeneral struct {

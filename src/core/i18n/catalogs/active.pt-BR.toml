@@ -1355,6 +1355,13 @@
 "adminconsole.admin_settings.email.field.password" = "Senha"
 "adminconsole.admin_settings.email.field.from_name" = "Nome do remetente"
 "adminconsole.admin_settings.email.field.from_email" = "E-mail do remetente"
+"adminconsole.admin_settings.email.password_saved" = "Salva"
+"adminconsole.admin_settings.email.password_not_set" = "Não definida"
+"adminconsole.admin_settings.email.password_tooltip" = "A senha salva nunca é exibida. Deixe este campo vazio para mantê-la, digite uma nova para substituí-la ou marque Remover senha salva para excluí-la."
+"adminconsole.admin_settings.email.password_keep_placeholder" = "Deixe vazio para manter a senha salva"
+"adminconsole.admin_settings.email.clear_password" = "Remover senha salva"
+"adminconsole.admin_settings.email.clear_password_notice" = "A senha salva será excluída ao salvar."
+"adminconsole.admin_settings.email.host_change_warning" = "O host SMTP foi alterado: digite a senha novamente ou remova a senha salva."
 
 "adminconsole.admin_settings.email_sendtest.field.destination" = "E-mail de destino"
 "adminconsole.admin_settings.email_sendtest.smtp_disabled_prefix" = "O SMTP está atualmente "
