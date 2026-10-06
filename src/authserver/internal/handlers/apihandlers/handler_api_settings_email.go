@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -200,10 +201,14 @@ func HandleSettingsEmailPut(
 		}
 
 		// TCP connectivity test with 3s timeout. Every check that needs no network runs
-		// above, so a bad field is answered without waiting on the dial.
+		// above, so a bad field is answered without waiting on the dial. A failure answers at most
+		// its coarse cause and the error goes to the log, so the answer is no probe of the network
+		// the server sits on (#410 decision 4).
 		conn, err := net.DialTimeout("tcp", hostport.Join(smtpHost, req.SMTPPort), 3*time.Second)
 		if err != nil {
-			writeJSONError(w, "Unable to connect to the SMTP server: "+err.Error(), "VALIDATION_ERROR", http.StatusBadRequest)
+			slog.WarnContext(r.Context(), "unable to connect to the smtp server", "error", err)
+			writeJSONError(w, connectionFailureMessage("Unable to connect to the SMTP server",
+				emaildelivery.ClassifyConnectionError(err)), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if conn != nil {
@@ -304,5 +309,22 @@ func HandleSettingsEmailSendTestPost(
 		})
 
 		writeJSON(w, r, http.StatusOK, api.SuccessResponse{Success: true})
+	}
+}
+
+// connectionFailureMessage is message, a fixed sentence with no end stop, followed by the words the
+// cause adds, or by its end stop alone when the classification names no cause. It is the only text
+// a failed connection answers: no address, port, resolver or operating-system string (#410
+// decision 4).
+func connectionFailureMessage(message string, cause emaildelivery.ConnectionCause) string {
+	switch cause {
+	case emaildelivery.ConnectionCauseHostNotFound:
+		return message + ": host name not found."
+	case emaildelivery.ConnectionCauseTimedOut:
+		return message + ": connection timed out."
+	case emaildelivery.ConnectionCauseRefused:
+		return message + ": connection refused."
+	default:
+		return message + "."
 	}
 }
