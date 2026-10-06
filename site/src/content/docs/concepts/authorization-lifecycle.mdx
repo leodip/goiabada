@@ -162,6 +162,8 @@ If level 2 is needed, the behavior depends on the target ACR:
 | `level2_mandatory` | Yes | Prompt for OTP code |
 | `level2_mandatory` | No | Prompt user to enroll in OTP, then enter code |
 
+An enrolment is stored only while the account's two-factor settings are still the ones the sign-in read. If they change while the user is enrolling, for example because the same account finished enrolling an authenticator in another tab or from its account page, the new secret is not stored and the sign-in ends on a page saying the account's two-factor settings changed during the sign-in. That sign-in cannot be continued: the user goes back to the application and signs in again, which starts from the account's current settings.
+
 ## Stage 4: Post-authentication checks
 
 After authentication completes (or is skipped via SSO), the following checks run:
