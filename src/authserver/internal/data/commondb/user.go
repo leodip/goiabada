@@ -915,7 +915,7 @@ func (d *Database) SetUserPhone(ctx context.Context, tx *sql.Tx, user *record.Us
 	})
 }
 
-// setUserColumns is the one statement the three column-group writes share: the assignments
+// setUserColumns is the one statement the column-group writes share: the assignments
 // columns builds, updated_at, keyed on the user's id. It sets user.UpdatedAt to what it stored
 // once the statement succeeds, as UpdateUser did, so a response built from user reports it.
 func (d *Database) setUserColumns(ctx context.Context, tx *sql.Tx, user *record.User, group string,
@@ -936,10 +936,43 @@ func (d *Database) setUserColumns(ctx context.Context, tx *sql.Tx, user *record.
 	return nil
 }
 
+// SetUserEmail writes the administrator's email change: the address and the verified flag from
+// user, a cleared verification code and issued-at, a cleared reset code, and updated_at, and no
+// other column. It sets user.UpdatedAt to what it stored, as SetUserProfile does.
+//
+// Narrow rather than going through UpdateUser, for SetUserProfile's reason (#471). Unconditional,
+// unlike TrySetUserEmail: the administrator sends the verified flag rather than having it cleared,
+// notifies nobody, and nothing it writes depends on what it read, so the last change wins, as it
+// always has. A taken address arrives as ErrUniqueViolation through ExecSQL.
+//
+// The reset code goes with the address, as it does in TrySetUserEmail: a code belongs to the
+// address it was mailed to, so a link mailed to the previous address, an administrator's setup
+// email sent to a mistyped one included, must stop setting the account's password (#471 decision
+// 6).
+func (d *Database) SetUserEmail(ctx context.Context, tx *sql.Tx, user *record.User) error {
+	if user.Id == 0 {
+		return errs.New("can't set the email of user with id 0")
+	}
+	return d.setUserColumns(ctx, tx, user, "email", func(ub *sqlbuilder.UpdateBuilder) []string {
+		// The clears are raw SQL rather than Assign(..., nil), for the reason SetUserPasswordHash
+		// gives, and the reset code's hash clears to its dormant '' for the same reason there.
+		return []string{
+			ub.Assign("email", user.Email),
+			ub.Assign("email_verified", user.EmailVerified),
+			"email_verification_code_encrypted = NULL",
+			"email_verification_code_issued_at = NULL",
+			"forgot_password_code_encrypted = NULL",
+			"forgot_password_code_issued_at = NULL",
+			"forgot_password_code_hash = ''",
+		}
+	})
+}
+
 // TrySetUserEmail moves a user's address from fromEmail to toEmail and, in the same
-// statement, clears the verified flag and any pending verification code: the new address has
-// not been verified, and a code issued for the previous one must not verify it. It reports
-// whether it made the change.
+// statement, clears the verified flag, any pending verification code and any outstanding reset
+// code: the new address has not been verified, a code issued for the previous one must not verify
+// it, and a reset link mailed to the previous one must not set the account's password (#471
+// decision 6). It reports whether it made the change.
 //
 // Compare-and-set on the address and the verified flag the caller read, for the reason
 // TrySetUserEnabled gives. The self-service email change reads the user, checks the password,
@@ -982,6 +1015,9 @@ func (d *Database) TrySetUserEmail(ctx context.Context, tx *sql.Tx, userId int64
 		ub.Assign("email", toEmail),
 		ub.Assign("email_verified", false),
 		"email_verification_code_encrypted = NULL",
+		"forgot_password_code_encrypted = NULL",
+		"forgot_password_code_issued_at = NULL",
+		"forgot_password_code_hash = ''",
 		ub.Assign("updated_at", time.Now().UTC()),
 	)
 	ub.Where(
@@ -1056,6 +1092,56 @@ func (d *Database) TryStoreEmailVerificationCode(ctx context.Context, tx *sql.Tx
 
 	// A fresh ciphertext always differs from whatever the row carried, so a matched row is a
 	// changed row on all four engines, as in TryStoreForgotPasswordCode.
+	return rowsAffected == 1, nil
+}
+
+// TryIssueEmailVerificationCode stores the code the administrator generates, encrypted, and when
+// it was issued, and unverifies the address, only while the account still holds email, the
+// address the request read. It reports whether it did.
+//
+// Conditional because the generation reports the address, in its response and its audit record,
+// as the one the code was issued for: a code stored after a concurrent change had moved the
+// account to another address would be answered with an address it was never stored for (#471
+// decision 1). There is no cooldown in the predicate, unlike TryStoreEmailVerificationCode's: an
+// administrator reads the code from the response rather than having it mailed, and generating a
+// second one replaces the first, as it always has. Narrow rather than writing back the row the
+// request loaded, for SetUserProfile's reason.
+func (d *Database) TryIssueEmailVerificationCode(ctx context.Context, tx *sql.Tx, userId int64, email string,
+	codeEncrypted []byte, issuedAt time.Time) (bool, error) {
+
+	if userId == 0 {
+		return false, errs.New("can't issue an email verification code for user with id 0")
+	}
+	if len(codeEncrypted) == 0 {
+		return false, errs.New("can't issue an empty email verification code")
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(
+		ub.Assign("email_verified", false),
+		ub.Assign("email_verification_code_encrypted", codeEncrypted),
+		ub.Assign("email_verification_code_issued_at", issuedAt),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("id", userId),
+		ub.Equal("email", email),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to issue email verification code")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errs.Wrap(err, "unable to get rows affected when issuing email verification code")
+	}
+
+	// A fresh ciphertext always differs from whatever the row carried, so a matched row is a
+	// changed row on all four engines, as in TryStoreEmailVerificationCode.
 	return rowsAffected == 1, nil
 }
 

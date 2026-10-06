@@ -245,8 +245,8 @@ var userTargetWrites = []targetWrite{
 				Return(&record.User{Id: targetUserId, Subject: "sub-52"}, nil).Once()
 			database.On("GetUserByEmail", mock.Anything, mock.Anything, "taken-over@example.com").Return(nil, nil).Once()
 		},
-		writes:           []string{"UpdateUser"},
-		expectFirstWrite: failingWrite("UpdateUser", mock.Anything, (*sql.Tx)(nil), mock.Anything),
+		writes:           []string{"SetUserEmail"},
+		expectFirstWrite: failingWrite("SetUserEmail", mock.Anything, (*sql.Tx)(nil), mock.Anything),
 	},
 	{
 		name: "POST /users/{id}/email/verification-code",
@@ -257,9 +257,12 @@ var userTargetWrites = []targetWrite{
 			HandleUserEmailVerificationCodePost(database, auditLogger, testDataCipher).ServeHTTP(rr, r)
 			return rr
 		},
-		expectReads:      func(database *datamocks.Database, _ bool) { expectTargetUser(database, nil) },
-		writes:           []string{"UpdateUser"},
-		expectFirstWrite: failingWrite("UpdateUser", mock.Anything, (*sql.Tx)(nil), mock.Anything),
+		expectReads: func(database *datamocks.Database, _ bool) { expectTargetUser(database, nil) },
+		writes:      []string{"TryIssueEmailVerificationCode"},
+		expectFirstWrite: func(database *datamocks.Database) {
+			database.On("TryIssueEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), targetUserId, "target@example.com",
+				mock.Anything, mock.Anything).Return(false, errFirstWriteFails).Once()
+		},
 	},
 	{
 		name: "PUT /users/{id}/phone",

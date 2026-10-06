@@ -823,9 +823,10 @@ func TestTrySetUserEnabled(t *testing.T) {
 }
 
 // TestTrySetUserEmail pins the self-service email change's write: the address is set, the
-// verified flag and the pending verification code are cleared, and no other column moves
-// (#404 decision 4). The code's issued-at is one of those that do not: the resend cooldown
-// reads it, and clearing it with the address let any address be mailed a code on demand.
+// verified flag, the pending verification code and any reset code are cleared (#471 decision
+// 6), and no other column moves (#404 decision 4). The verification code's issued-at is one of
+// those that do not: the resend cooldown reads it, and clearing it with the address let any
+// address be mailed a code on demand.
 func TestTrySetUserEmail(t *testing.T) {
 	user := createTestUser(t)
 	user.EmailVerified = true
@@ -866,11 +867,14 @@ func TestTrySetUserEmail(t *testing.T) {
 		t.Error("the verification code's issued-at must survive the change: the resend cooldown reads it")
 	}
 
-	// Every other column is as it was.
+	// Every other column is as it was, but the reset code: it was mailed to the previous address,
+	// so the change clears it too (#471 decision 6).
 	expected := *before
 	expected.Email = newEmail
 	expected.EmailVerified = false
 	expected.EmailVerificationCodeEncrypted = nil
+	expected.ForgotPasswordCodeEncrypted = nil
+	expected.ForgotPasswordCodeIssuedAt = sql.NullTime{}
 	compareUsers(t, &expected, after)
 
 	if _, err := database.TrySetUserEmail(context.Background(), nil, 0, "a@example.com", true, "x@example.com"); err == nil {

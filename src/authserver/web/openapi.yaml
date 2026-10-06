@@ -293,7 +293,10 @@ paths:
     put:
       tags: [Users]
       summary: Update user email
-      description: Update user email address and verification status
+      description: |
+        Update user email address and verification status. Clears any pending
+        verification code, and any outstanding password reset code, so a reset
+        link mailed to the previous address stops working.
       operationId: updateUserEmail
       parameters:
         - $ref: '#/components/parameters/UserIdParam'
@@ -357,6 +360,15 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Another request changed the user's address while the code was
+            being generated. error_code is CONCURRENT_UPDATE; nothing was
+            stored. Retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
