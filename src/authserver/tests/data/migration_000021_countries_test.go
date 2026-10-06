@@ -2,12 +2,11 @@ package datatests
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
@@ -17,14 +16,17 @@ import (
 // TestMigration000021_CountryData exercises the data migration that moves stored
 // user phone-country and address-country values from the biter777 dataset to the
 // datahub dataset. It runs against an ISOLATED database of the configured dialect
-// (see migration_testdb_helper_test.go): bring the schema to head, force the version
+// (see migration_testdb_helper_test.go): bring the schema to 000058, force the version
 // marker back to 000020, seed pre-migration rows covering every branch of the state
 // hierarchy, run 000021 against them, and assert. Then it re-runs 000021 (forcing the
 // marker back again) to prove idempotency / restart-safety.
 //
-// Note the schema is at HEAD throughout; only the version marker moves. 000021 is
-// data-only, so the schema it runs against is irrelevant to what it transforms, and
-// seeding through the models requires columns that later migrations added.
+// Note the schema is at 000058 throughout; only the version marker moves. 000021 is
+// data-only, so the schema it runs against is irrelevant to what it transforms, as long
+// as it still has the columns 000021 writes, and seeding through the models requires
+// columns that later migrations added. 000058 is the last version that has both: 000059
+// drops the two phone verification code columns 000021 clears (#471), which the models
+// no longer name, so those two are seeded and read with SQL.
 //
 // Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
 //
@@ -32,7 +34,7 @@ import (
 func TestMigration000021_CountryData(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	// Bring the schema all the way up, then move only the version MARKER back to
+	// Bring the schema up to 000058, then move only the version MARKER back to
 	// 000020 so 000021 re-runs against seeded data.
 	//
 	// This used to be a plain Migrate(20). That worked while the pre-000021 schema
@@ -42,7 +44,8 @@ func TestMigration000021_CountryData(t *testing.T) {
 	// "Unknown column". Force changes the marker without touching the schema, which
 	// is exactly the trick the idempotency check at the end of this test already
 	// used, so 000021's data transformation is still applied to pre-migration data.
-	require.NoError(t, h.Migrator.Up(context.Background()), "migrate to head")
+	// It stops at 000058 rather than head since 000059 dropped two columns 000021 writes.
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 58), "migrate to 000058")
 	require.NoError(t, h.Migrator.Force(context.Background(), 20), "force marker to 000020")
 
 	fixtures := migration000021Fixtures()
@@ -253,14 +256,16 @@ func seedMigrationFixture(t *testing.T, h *isolatedDB, f migFixture) int64 {
 		PhoneNumberVerified:           f.verified,
 		AddressCountry:                f.addr,
 	}
-	if f.pending {
-		u.PhoneNumberVerificationCodeEncrypted = []byte("PENDINGCODE12345")
-		u.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Second), Valid: true}
-	}
 	require.NoErrorf(t, h.DB.CreateUser(context.Background(), nil, u), "%s: CreateUser", f.label)
 
-	// Apply NULL injections that CreateUser (Go string -> '') cannot produce.
+	// Apply what CreateUser cannot produce: the NULL injections (Go string -> ''), and the
+	// pending phone verification code, whose two columns the model no longer names (#471).
 	var sets []string
+	if f.pending {
+		sets = append(sets,
+			"phone_number_verification_code_encrypted = "+pendingCodeLiteral000021(),
+			"phone_number_verification_code_issued_at = CURRENT_TIMESTAMP")
+	}
 	if f.nullPhone {
 		sets = append(sets, "phone_number = NULL")
 	}
@@ -297,7 +302,27 @@ func assertMigration000021(t *testing.T, h *isolatedDB, fixtures []migFixture, i
 		assert.Equalf(t, f.wVerified, u.PhoneNumberVerified, "%s [%s]: verified", f.label, phase)
 		assert.Equalf(t, f.wAddr, u.AddressCountry, "%s [%s]: address_country", f.label, phase)
 
-		hasPending := len(u.PhoneNumberVerificationCodeEncrypted) > 0 && u.PhoneNumberVerificationCodeIssuedAt.Valid
-		assert.Equalf(t, f.wPending, hasPending, "%s [%s]: pending verification present", f.label, phase)
+		var hasPending int
+		q := fmt.Sprintf(`SELECT CASE WHEN phone_number_verification_code_encrypted IS NOT NULL
+			AND phone_number_verification_code_issued_at IS NOT NULL THEN 1 ELSE 0 END
+			FROM users WHERE id = %d`, ids[f.label])
+		require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&hasPending), "%s [%s]: read the pending verification", f.label, phase)
+		assert.Equalf(t, f.wPending, hasPending == 1, "%s [%s]: pending verification present", f.label, phase)
+	}
+}
+
+// pendingCodeLiteral000021 is a non-empty binary value in the configured engine's spelling:
+// SQLite's and MySQL's blob columns take a text literal as it stands, while PostgreSQL's
+// bytea and SQL Server's varbinary want it cast. A literal rather than a placeholder
+// because the four dialects disagree on placeholder syntax, and the value is
+// test-controlled.
+func pendingCodeLiteral000021() string {
+	switch dbType() {
+	case data.Postgres:
+		return `'PENDINGCODE12345'::bytea`
+	case data.MSSQL:
+		return `CAST('PENDINGCODE12345' AS VARBINARY(MAX))`
+	default:
+		return `'PENDINGCODE12345'`
 	}
 }

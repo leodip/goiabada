@@ -64,8 +64,6 @@ func TestUpdateUser(t *testing.T) {
 	user.PhoneNumberCountryCallingCode = fmt.Sprintf("+%s", fake.DigitN(2))
 	user.PhoneNumber = fake.DigitN(10)
 	user.PhoneNumberVerified = !user.PhoneNumberVerified
-	user.PhoneNumberVerificationCodeEncrypted = []byte(fake.Password(32))
-	user.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 	user.AddressLine1 = "Street " + fake.LetterN(8)
 	user.AddressLine2 = fake.DigitN(3)
 	user.AddressLocality = "City" + fake.LetterN(6)
@@ -439,40 +437,38 @@ func createTestUser(t *testing.T) *record.User {
 
 func createTestUserOn(t *testing.T, db data.Database) *record.User {
 	user := &record.User{
-		Enabled:                              fake.Bool(),
-		Subject:                              fake.UUID(),
-		Username:                             fake.Username(),
-		GivenName:                            fake.FirstName(),
-		MiddleName:                           fake.MiddleName(),
-		FamilyName:                           fake.LastName(),
-		Nickname:                             fake.FirstName(),
-		Website:                              fake.URL(),
-		Gender:                               gender.Other.String(),
-		Email:                                fake.Email(),
-		EmailVerified:                        fake.Bool(),
-		EmailVerificationCodeEncrypted:       []byte(fake.Password(32)),
-		EmailVerificationCodeIssuedAt:        sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
-		ZoneInfoCountryName:                  "Country" + fake.LetterN(6),
-		ZoneInfo:                             "tz" + fake.LetterN(6),
-		Locale:                               "lang" + fake.LetterN(4),
-		BirthDate:                            sql.NullTime{Time: fake.Date().Truncate(time.Microsecond), Valid: true},
-		PhoneNumberCountryUniqueId:           strings.ToUpper(fake.LetterN(2)),
-		PhoneNumberCountryCallingCode:        fmt.Sprintf("+%s", fake.DigitN(2)),
-		PhoneNumber:                          fake.DigitN(10),
-		PhoneNumberVerified:                  fake.Bool(),
-		PhoneNumberVerificationCodeEncrypted: []byte(fake.Password(32)),
-		PhoneNumberVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
-		AddressLine1:                         "Street " + fake.LetterN(8),
-		AddressLine2:                         fake.DigitN(3),
-		AddressLocality:                      "City" + fake.LetterN(6),
-		AddressRegion:                        "State" + fake.LetterN(6),
-		AddressPostalCode:                    fake.DigitN(5),
-		AddressCountry:                       strings.ToUpper(fake.LetterN(2)),
-		PasswordHash:                         fake.Password(64),
-		OTPSecretEncrypted:                   []byte(fake.Password(32)),
-		OTPEnabled:                           fake.Bool(),
-		ForgotPasswordCodeEncrypted:          []byte(fake.Password(32)),
-		ForgotPasswordCodeIssuedAt:           sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
+		Enabled:                        fake.Bool(),
+		Subject:                        fake.UUID(),
+		Username:                       fake.Username(),
+		GivenName:                      fake.FirstName(),
+		MiddleName:                     fake.MiddleName(),
+		FamilyName:                     fake.LastName(),
+		Nickname:                       fake.FirstName(),
+		Website:                        fake.URL(),
+		Gender:                         gender.Other.String(),
+		Email:                          fake.Email(),
+		EmailVerified:                  fake.Bool(),
+		EmailVerificationCodeEncrypted: []byte(fake.Password(32)),
+		EmailVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
+		ZoneInfoCountryName:            "Country" + fake.LetterN(6),
+		ZoneInfo:                       "tz" + fake.LetterN(6),
+		Locale:                         "lang" + fake.LetterN(4),
+		BirthDate:                      sql.NullTime{Time: fake.Date().Truncate(time.Microsecond), Valid: true},
+		PhoneNumberCountryUniqueId:     strings.ToUpper(fake.LetterN(2)),
+		PhoneNumberCountryCallingCode:  fmt.Sprintf("+%s", fake.DigitN(2)),
+		PhoneNumber:                    fake.DigitN(10),
+		PhoneNumberVerified:            fake.Bool(),
+		AddressLine1:                   "Street " + fake.LetterN(8),
+		AddressLine2:                   fake.DigitN(3),
+		AddressLocality:                "City" + fake.LetterN(6),
+		AddressRegion:                  "State" + fake.LetterN(6),
+		AddressPostalCode:              fake.DigitN(5),
+		AddressCountry:                 strings.ToUpper(fake.LetterN(2)),
+		PasswordHash:                   fake.Password(64),
+		OTPSecretEncrypted:             []byte(fake.Password(32)),
+		OTPEnabled:                     fake.Bool(),
+		ForgotPasswordCodeEncrypted:    []byte(fake.Password(32)),
+		ForgotPasswordCodeIssuedAt:     sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 	}
 
 	err := db.CreateUser(context.Background(), nil, user)
@@ -548,12 +544,6 @@ func compareUsers(t *testing.T, expected, actual *record.User) {
 	}
 	if actual.PhoneNumberVerified != expected.PhoneNumberVerified {
 		t.Errorf("PhoneNumberVerified mismatch: expected %v, got %v", expected.PhoneNumberVerified, actual.PhoneNumberVerified)
-	}
-	if string(actual.PhoneNumberVerificationCodeEncrypted) != string(expected.PhoneNumberVerificationCodeEncrypted) {
-		t.Errorf("PhoneNumberVerificationCodeEncrypted mismatch")
-	}
-	if !actual.PhoneNumberVerificationCodeIssuedAt.Time.Equal(expected.PhoneNumberVerificationCodeIssuedAt.Time) {
-		t.Errorf("PhoneNumberVerificationCodeIssuedAt mismatch: expected %v, got %v", expected.PhoneNumberVerificationCodeIssuedAt, actual.PhoneNumberVerificationCodeIssuedAt)
 	}
 	if actual.AddressLine1 != expected.AddressLine1 {
 		t.Errorf("AddressLine1 mismatch: expected %s, got %s", expected.AddressLine1, actual.AddressLine1)

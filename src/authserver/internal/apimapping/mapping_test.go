@@ -30,7 +30,8 @@ import (
 // through api.UserResponse, by field name or by JSON key.
 // OTPSecret is still listed though record.User no longer declares it: migration 000048 dropped
 // the column (#98), and the claim here is about the RESPONSE, which must never grow a key by that
-// name either.
+// name either. The two phone verification fields stay listed on the same reasoning, though 000059
+// dropped their columns (#471).
 var sensitiveUserFields = []string{
 	"PasswordHash",
 	"OTPSecret",
@@ -68,23 +69,20 @@ func TestUserResponse_StructHasNoSensitiveFields(t *testing.T) {
 func TestToUserResponse_DoesNotLeakSecrets(t *testing.T) {
 	otpSecretEncrypted := []byte("SENTINEL-otp-secret-encrypted")
 	emailCodeEncrypted := []byte("SENTINEL-email-verification-code")
-	phoneCodeEncrypted := []byte("SENTINEL-phone-verification-code")
 	forgotCodeEncrypted := []byte("SENTINEL-forgot-password-code")
 	otpEnrollmentEncrypted := []byte("SENTINEL-otp-enrollment-key-url")
 
 	user := &record.User{
-		Id:                                   1,
-		Email:                                "user@example.com",
-		PasswordHash:                         "SENTINEL-password-hash",
-		OTPSecretEncrypted:                   otpSecretEncrypted,
-		EmailVerificationCodeEncrypted:       emailCodeEncrypted,
-		EmailVerificationCodeIssuedAt:        sql.NullTime{Time: time.Now(), Valid: true},
-		PhoneNumberVerificationCodeEncrypted: phoneCodeEncrypted,
-		PhoneNumberVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now(), Valid: true},
-		ForgotPasswordCodeEncrypted:          forgotCodeEncrypted,
-		ForgotPasswordCodeIssuedAt:           sql.NullTime{Time: time.Now(), Valid: true},
-		OtpEnrollmentSecretEncrypted:         otpEnrollmentEncrypted,
-		OtpEnrollmentIssuedAt:                sql.NullTime{Time: time.Now(), Valid: true},
+		Id:                             1,
+		Email:                          "user@example.com",
+		PasswordHash:                   "SENTINEL-password-hash",
+		OTPSecretEncrypted:             otpSecretEncrypted,
+		EmailVerificationCodeEncrypted: emailCodeEncrypted,
+		EmailVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now(), Valid: true},
+		ForgotPasswordCodeEncrypted:    forgotCodeEncrypted,
+		ForgotPasswordCodeIssuedAt:     sql.NullTime{Time: time.Now(), Valid: true},
+		OtpEnrollmentSecretEncrypted:   otpEnrollmentEncrypted,
+		OtpEnrollmentIssuedAt:          sql.NullTime{Time: time.Now(), Valid: true},
 	}
 
 	resp := ToUserResponse(user)
@@ -98,8 +96,8 @@ func TestToUserResponse_DoesNotLeakSecrets(t *testing.T) {
 	assert.NotContains(t, payload, "SENTINEL-password-hash")
 
 	// Byte-slice secrets would serialize as base64, so check that encoding too.
-	for _, secret := range [][]byte{otpSecretEncrypted, emailCodeEncrypted, phoneCodeEncrypted,
-		forgotCodeEncrypted, otpEnrollmentEncrypted} {
+	for _, secret := range [][]byte{otpSecretEncrypted, emailCodeEncrypted, forgotCodeEncrypted,
+		otpEnrollmentEncrypted} {
 		assert.NotContains(t, payload, string(secret))
 		assert.NotContains(t, payload, base64.StdEncoding.EncodeToString(secret))
 	}

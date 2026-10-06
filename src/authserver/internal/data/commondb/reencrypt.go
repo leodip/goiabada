@@ -17,7 +17,6 @@ var aesProtectedColumns = []struct{ table, column string }{
 	{"settings", "smtp_password_encrypted"},
 	{"clients", "client_secret_encrypted"},
 	{"users", "email_verification_code_encrypted"},
-	{"users", "phone_number_verification_code_encrypted"},
 	{"users", "otp_secret_encrypted"},
 	{"users", "forgot_password_code_encrypted"},
 	{"users", "otp_enrollment_secret_encrypted"},
