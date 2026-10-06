@@ -16,10 +16,11 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// accountPhoneDatabase is what the account phone endpoints need: the caller's own user row.
+// accountPhoneDatabase is what the account phone endpoints need: the caller's own user row, and
+// the narrow write of its phone columns.
 type accountPhoneDatabase interface {
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
+	SetUserPhone(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 // HandleAccountPhonePut - PUT /api/v1/account/phone
@@ -94,8 +95,9 @@ func HandleAccountPhonePut(
 			user.PhoneNumberVerified = false
 		}
 
-		// Persist
-		if err := database.UpdateUser(r.Context(), nil, user); err != nil {
+		// Persist only the phone columns: writing back the row read above would undo a disable,
+		// a password change or an OTP change made since (#471).
+		if err := database.SetUserPhone(r.Context(), nil, user); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

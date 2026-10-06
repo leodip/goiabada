@@ -19,12 +19,14 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// usersProfileDatabase is what the administrator's user profile endpoint needs: the user row.
-// It embeds what the administrative policy reads to judge whether the user is an administrator.
+// usersProfileDatabase is what the administrator's user profile and address endpoints need: the
+// user row, and the narrow writes of its profile and its address columns. It embeds what the
+// administrative policy reads to judge whether the user is an administrator.
 type usersProfileDatabase interface {
 	userTargetPolicyDatabase
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
+	SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User) error
+	SetUserAddress(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 // HandleUserProfilePut - PUT /api/v1/admin/users/{id}/profile
@@ -131,8 +133,10 @@ func HandleUserProfilePut(
 		user.ZoneInfo = input.ZoneInfo
 		user.Locale = input.Locale
 
-		// Update user in database
-		err = database.UpdateUser(r.Context(), nil, user)
+		// Only the profile columns: writing back the row read above would undo a disable, a
+		// password change or an OTP change made since, and could write enabled back past the
+		// last-administrator guard (#471).
+		err = database.SetUserProfile(r.Context(), nil, user)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -231,8 +235,8 @@ func HandleUserAddressPut(
 		user.AddressPostalCode = input.AddressPostalCode
 		user.AddressCountry = input.AddressCountry
 
-		// Update user in database
-		err = database.UpdateUser(r.Context(), nil, user)
+		// Only the address columns, for the profile save's reason (#471).
+		err = database.SetUserAddress(r.Context(), nil, user)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

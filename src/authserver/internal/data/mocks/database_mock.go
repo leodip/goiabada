@@ -13176,6 +13176,69 @@ func (_c *Database_SetClientPublic_Call) RunAndReturn(run func(ctx context.Conte
 	return _c
 }
 
+// SetUserAddress provides a mock function for the type Database
+func (_mock *Database) SetUserAddress(ctx context.Context, tx *sql.Tx, user *record.User) error {
+	ret := _mock.Called(ctx, tx, user)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetUserAddress")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *record.User) error); ok {
+		r0 = returnFunc(ctx, tx, user)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_SetUserAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetUserAddress'
+type Database_SetUserAddress_Call struct {
+	*mock.Call
+}
+
+// SetUserAddress is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - user *record.User
+func (_e *Database_Expecter) SetUserAddress(ctx any, tx any, user any) *Database_SetUserAddress_Call {
+	return &Database_SetUserAddress_Call{Call: _e.mock.On("SetUserAddress", ctx, tx, user)}
+}
+
+func (_c *Database_SetUserAddress_Call) Run(run func(ctx context.Context, tx *sql.Tx, user *record.User)) *Database_SetUserAddress_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *record.User
+		if args[2] != nil {
+			arg2 = args[2].(*record.User)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_SetUserAddress_Call) Return(err error) *Database_SetUserAddress_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_SetUserAddress_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, user *record.User) error) *Database_SetUserAddress_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetUserPasswordHash provides a mock function for the type Database
 func (_mock *Database) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error {
 	ret := _mock.Called(ctx, tx, userId, passwordHash)
@@ -13241,6 +13304,132 @@ func (_c *Database_SetUserPasswordHash_Call) Return(err error) *Database_SetUser
 }
 
 func (_c *Database_SetUserPasswordHash_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error) *Database_SetUserPasswordHash_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetUserPhone provides a mock function for the type Database
+func (_mock *Database) SetUserPhone(ctx context.Context, tx *sql.Tx, user *record.User) error {
+	ret := _mock.Called(ctx, tx, user)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetUserPhone")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *record.User) error); ok {
+		r0 = returnFunc(ctx, tx, user)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_SetUserPhone_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetUserPhone'
+type Database_SetUserPhone_Call struct {
+	*mock.Call
+}
+
+// SetUserPhone is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - user *record.User
+func (_e *Database_Expecter) SetUserPhone(ctx any, tx any, user any) *Database_SetUserPhone_Call {
+	return &Database_SetUserPhone_Call{Call: _e.mock.On("SetUserPhone", ctx, tx, user)}
+}
+
+func (_c *Database_SetUserPhone_Call) Run(run func(ctx context.Context, tx *sql.Tx, user *record.User)) *Database_SetUserPhone_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *record.User
+		if args[2] != nil {
+			arg2 = args[2].(*record.User)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_SetUserPhone_Call) Return(err error) *Database_SetUserPhone_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_SetUserPhone_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, user *record.User) error) *Database_SetUserPhone_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetUserProfile provides a mock function for the type Database
+func (_mock *Database) SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User) error {
+	ret := _mock.Called(ctx, tx, user)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetUserProfile")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *record.User) error); ok {
+		r0 = returnFunc(ctx, tx, user)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_SetUserProfile_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetUserProfile'
+type Database_SetUserProfile_Call struct {
+	*mock.Call
+}
+
+// SetUserProfile is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - user *record.User
+func (_e *Database_Expecter) SetUserProfile(ctx any, tx any, user any) *Database_SetUserProfile_Call {
+	return &Database_SetUserProfile_Call{Call: _e.mock.On("SetUserProfile", ctx, tx, user)}
+}
+
+func (_c *Database_SetUserProfile_Call) Run(run func(ctx context.Context, tx *sql.Tx, user *record.User)) *Database_SetUserProfile_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *record.User
+		if args[2] != nil {
+			arg2 = args[2].(*record.User)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_SetUserProfile_Call) Return(err error) *Database_SetUserProfile_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_SetUserProfile_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, user *record.User) error) *Database_SetUserProfile_Call {
 	_c.Call.Return(run)
 	return _c
 }

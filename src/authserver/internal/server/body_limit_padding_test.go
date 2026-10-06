@@ -201,7 +201,7 @@ func TestBodyLimitPadding_ABearerJSONHandler(t *testing.T) {
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).
 		Return(&record.User{Id: 1, Enabled: true, Subject: routesTestSubject}, nil)
-	database.On("UpdateUser", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	database.On("SetUserPhone", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	server, counts := newPaddingTestServer(t, database)
 
 	assertReadNoFurtherThanTheValue(t, server, counts, paddedRequest{

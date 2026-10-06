@@ -15,10 +15,11 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// accountAddressDatabase is what the account address endpoints need: the caller's own user row.
+// accountAddressDatabase is what the account address endpoints need: the caller's own user row,
+// and the narrow write of its address columns.
 type accountAddressDatabase interface {
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
+	SetUserAddress(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 // HandleAccountAddressPut - PUT /api/v1/account/address
@@ -81,7 +82,9 @@ func HandleAccountAddressPut(
 		user.AddressPostalCode = input.AddressPostalCode
 		user.AddressCountry = input.AddressCountry
 
-		if err := database.UpdateUser(r.Context(), nil, user); err != nil {
+		// Only the address columns: writing back the row read above would undo a disable, a
+		// password change or an OTP change made since (#471).
+		if err := database.SetUserAddress(r.Context(), nil, user); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

@@ -16,10 +16,11 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// accountProfileDatabase is what the account profile endpoints need: the caller's own user row.
+// accountProfileDatabase is what the account profile endpoints need: the caller's own user row,
+// and the narrow write of its profile columns.
 type accountProfileDatabase interface {
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
+	SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 // HandleAccountProfileGet - GET /api/v1/account/profile
@@ -143,7 +144,9 @@ func HandleAccountProfilePut(
 		user.ZoneInfo = input.ZoneInfo
 		user.Locale = input.Locale
 
-		if err := database.UpdateUser(r.Context(), nil, user); err != nil {
+		// Only the profile columns: writing back the row read above would undo a disable, a
+		// password change or an OTP change made since (#471).
+		if err := database.SetUserProfile(r.Context(), nil, user); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

@@ -848,6 +848,94 @@ func (d *Database) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId i
 	return nil
 }
 
+// SetUserProfile writes the user's eleven profile columns from user, and updated_at, and no
+// other column. SetUserAddress and SetUserPhone below are its twins for the address and the
+// phone. Each serves the self-service and the administrator's save of its group alike.
+//
+// Narrow rather than going through UpdateUser, for SetUserPasswordHash's reason: the saves
+// load the user at the start of the request, and writing that read back would re-enable an
+// account an administrator disabled under it, put back a password hash a concurrent change or
+// reset replaced after its revocation had run, or undo a concurrent OTP change (#471). They are
+// unconditional, so the last save of a group wins, as it always has: none of them depends on
+// anything it read.
+func (d *Database) SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User) error {
+	if user.Id == 0 {
+		return errs.New("can't set the profile of user with id 0")
+	}
+	return d.setUserColumns(ctx, tx, user, "profile", func(ub *sqlbuilder.UpdateBuilder) []string {
+		return []string{
+			ub.Assign("username", user.Username),
+			ub.Assign("given_name", user.GivenName),
+			ub.Assign("middle_name", user.MiddleName),
+			ub.Assign("family_name", user.FamilyName),
+			ub.Assign("nickname", user.Nickname),
+			ub.Assign("website", user.Website),
+			ub.Assign("gender", user.Gender),
+			ub.Assign("birth_date", user.BirthDate),
+			ub.Assign("zone_info_country_name", user.ZoneInfoCountryName),
+			ub.Assign("zone_info", user.ZoneInfo),
+			ub.Assign("locale", user.Locale),
+		}
+	})
+}
+
+// SetUserAddress writes the user's six address columns from user, and updated_at, and no other
+// column, for SetUserProfile's reason.
+func (d *Database) SetUserAddress(ctx context.Context, tx *sql.Tx, user *record.User) error {
+	if user.Id == 0 {
+		return errs.New("can't set the address of user with id 0")
+	}
+	return d.setUserColumns(ctx, tx, user, "address", func(ub *sqlbuilder.UpdateBuilder) []string {
+		return []string{
+			ub.Assign("address_line1", user.AddressLine1),
+			ub.Assign("address_line2", user.AddressLine2),
+			ub.Assign("address_locality", user.AddressLocality),
+			ub.Assign("address_region", user.AddressRegion),
+			ub.Assign("address_postal_code", user.AddressPostalCode),
+			ub.Assign("address_country", user.AddressCountry),
+		}
+	})
+}
+
+// SetUserPhone writes the user's phone country, calling code, number and verified flag from
+// user, and updated_at, and no other column, for SetUserProfile's reason. Whether the number
+// is verified is the caller's to decide: the self-service save always clears it, and the
+// administrator's keeps what the administrator sent.
+func (d *Database) SetUserPhone(ctx context.Context, tx *sql.Tx, user *record.User) error {
+	if user.Id == 0 {
+		return errs.New("can't set the phone of user with id 0")
+	}
+	return d.setUserColumns(ctx, tx, user, "phone", func(ub *sqlbuilder.UpdateBuilder) []string {
+		return []string{
+			ub.Assign("phone_number_country_uniqueid", user.PhoneNumberCountryUniqueId),
+			ub.Assign("phone_number_country_callingcode", user.PhoneNumberCountryCallingCode),
+			ub.Assign("phone_number", user.PhoneNumber),
+			ub.Assign("phone_number_verified", user.PhoneNumberVerified),
+		}
+	})
+}
+
+// setUserColumns is the one statement the three column-group writes share: the assignments
+// columns builds, updated_at, keyed on the user's id. It sets user.UpdatedAt to what it stored
+// once the statement succeeds, as UpdateUser did, so a response built from user reports it.
+func (d *Database) setUserColumns(ctx context.Context, tx *sql.Tx, user *record.User, group string,
+	columns func(ub *sqlbuilder.UpdateBuilder) []string) error {
+
+	now := time.Now().UTC()
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(append(columns(ub), ub.Assign("updated_at", now))...)
+	ub.Where(ub.Equal("id", user.Id))
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	if _, err := d.ExecSQL(ctx, tx, query, args...); err != nil {
+		return errs.Wrapf(err, "unable to set user %s", group)
+	}
+
+	user.UpdatedAt = sql.NullTime{Time: now, Valid: true}
+	return nil
+}
+
 // TrySetUserEmail moves a user's address from fromEmail to toEmail and, in the same
 // statement, clears the verified flag and any pending verification code: the new address has
 // not been verified, and a code issued for the previous one must not verify it. It reports
