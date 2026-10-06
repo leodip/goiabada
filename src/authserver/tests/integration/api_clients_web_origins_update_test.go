@@ -213,8 +213,18 @@ func TestAPIClientWebOriginsPut_SystemLevelClientAllowed(t *testing.T) {
 
 	// Update web origins (should succeed)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/web-origins"
+	seeded := getClientWebOrigins(t, accessToken, sysId)
+
+	// Every test in this tier shares the console client, so its origins go back as they were.
+	t.Cleanup(func() {
+		restore := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: seeded,
+			ExpectedWebOrigins: getClientWebOrigins(t, accessToken, sysId)})
+		defer func() { _ = restore.Body.Close() }()
+		assert.Equal(t, http.StatusOK, restore.StatusCode)
+	})
+
 	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com", "https://localhost:3000"},
-		ExpectedWebOrigins: getClientWebOrigins(t, accessToken, sysId)}
+		ExpectedWebOrigins: seeded}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
