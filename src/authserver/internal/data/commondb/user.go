@@ -677,9 +677,11 @@ func (d *Database) AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64)
 // the revocation sweep are one atomic unit by design.
 //
 // Deliberately not part of UpdateUser. auth_state_generation is tagged dont-update
-// because every credential handler loads the whole user and writes it back, so leaving
-// it in the ordinary update set would let a request holding a stale model silently
-// regress the boundary.
+// because credential handlers used to load the whole user and write it back, and leaving
+// it in the ordinary update set would have let a request holding a stale model silently
+// regress the boundary. No production code saves the whole row any more, and
+// TestNoWholeRowUserSave holds it (#471); the tag stays because the data and integration
+// tiers still seed fixtures through UpdateUser.
 func (d *Database) IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error) {
 
 	if userId == 0 {
@@ -937,8 +939,8 @@ func (d *Database) setUserColumns(ctx context.Context, tx *sql.Tx, user *record.
 }
 
 // SetUserEmail writes the administrator's email change: the address and the verified flag from
-// user, a cleared verification code and issued-at, a cleared reset code, and updated_at, and no
-// other column. It sets user.UpdatedAt to what it stored, as SetUserProfile does.
+// user, a cleared verification code and issued-at, a reset code cleared when the address changes,
+// and updated_at, and no other column. It sets user.UpdatedAt to what it stored, as SetUserProfile does.
 //
 // Narrow rather than going through UpdateUser, for SetUserProfile's reason (#471). Unconditional,
 // unlike TrySetUserEmail: the administrator sends the verified flag rather than having it cleared,
@@ -948,7 +950,9 @@ func (d *Database) setUserColumns(ctx context.Context, tx *sql.Tx, user *record.
 // The reset code goes with the address, as it does in TrySetUserEmail: a code belongs to the
 // address it was mailed to, so a link mailed to the previous address, an administrator's setup
 // email sent to a mistyped one included, must stop setting the account's password (#471 decision
-// 6).
+// 6). It stays when the row already holds the address written: the console sends the address with
+// the verified flag, and marking verified the address a setup email was just mailed to, or saving
+// the form unchanged, changes no address and must leave that link working.
 func (d *Database) SetUserEmail(ctx context.Context, tx *sql.Tx, user *record.User) error {
 	if user.Id == 0 {
 		return errs.New("can't set the email of user with id 0")
@@ -956,14 +960,24 @@ func (d *Database) SetUserEmail(ctx context.Context, tx *sql.Tx, user *record.Us
 	return d.setUserColumns(ctx, tx, user, "email", func(ub *sqlbuilder.UpdateBuilder) []string {
 		// The clears are raw SQL rather than Assign(..., nil), for the reason SetUserPasswordHash
 		// gives, and the reset code's hash clears to its dormant '' for the same reason there.
+		//
+		// The reset code keeps its value when the row already holds the address being written, so
+		// it is compared against the row's email as the statement finds it, not the request's read.
+		// The three CASEs come before the email assignment because MySQL evaluates a single-table
+		// UPDATE's assignments left to right, each seeing the ones before it; every other engine
+		// reads the row as it was before the statement whatever the order.
+		sameEmail := "email = " + ub.Var(user.Email)
 		return []string{
+			"forgot_password_code_encrypted = CASE WHEN " + sameEmail +
+				" THEN forgot_password_code_encrypted ELSE NULL END",
+			"forgot_password_code_issued_at = CASE WHEN " + sameEmail +
+				" THEN forgot_password_code_issued_at ELSE NULL END",
+			"forgot_password_code_hash = CASE WHEN " + sameEmail +
+				" THEN forgot_password_code_hash ELSE '' END",
 			ub.Assign("email", user.Email),
 			ub.Assign("email_verified", user.EmailVerified),
 			"email_verification_code_encrypted = NULL",
 			"email_verification_code_issued_at = NULL",
-			"forgot_password_code_encrypted = NULL",
-			"forgot_password_code_issued_at = NULL",
-			"forgot_password_code_hash = ''",
 		}
 	})
 }

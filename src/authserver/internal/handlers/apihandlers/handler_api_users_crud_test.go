@@ -456,6 +456,65 @@ func TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode(t *testing.T) {
 	emailSender.AssertExpectations(t)
 }
 
+// TestHandleUserCreatePost_ASetupEmailThatFailsToSendKeepsTheUserAndItsCode is the send failure
+// #471 decision 4 keeps as it was: the user and its reset code are already stored by the insert
+// when the mail is refused, the answer is 500, and nothing is written or deleted after the create,
+// so an administrator can send the link again from the stored account.
+func TestHandleUserCreatePost_ASetupEmailThatFailsToSendKeepsTheUserAndItsCode(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
+	userCreator := accounthandlersmocks.NewUserCreator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	emailSender := accounthandlersmocks.NewEmailSender(t)
+
+	handler := HandleUserCreatePost(pageRenderer, database, userCreator,
+		accountvalidation.NewEmailValidator(database),
+		accountvalidation.NewProfileValidator(database),
+		accountvalidation.NewPasswordValidator(),
+		auditLogger, emailSender, testDataCipher, testBaseURL)
+
+	body, err := json.Marshal(map[string]interface{}{
+		"email":           "newuser@example.com",
+		"setPasswordType": "email",
+	})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "TestApp", SMTPEnabled: true}))
+
+	database.On("GetUserByEmail", mock.Anything, mock.Anything, "newuser@example.com").Return(nil, nil).Once()
+	var input *usercreation.Input
+	userCreator.On("CreateUser", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) { input = args.Get(1).(*usercreation.Input) }).
+		Return(&record.User{Id: 7, Email: "newuser@example.com"}, nil).Once()
+	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return().Once()
+	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
+		"/emails/email_newuser_set_password.html", mock.Anything).Return(&bytes.Buffer{}, nil).Once()
+	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(mock.Arguments) { require.NotNil(t, input, "the create must finish before the mail is sent") }).
+		Return(errs.New("the relay refused the message")).Once()
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
+	assert.Equal(t, "INTERNAL_SERVER_ERROR", errorCodeOf(t, rr))
+
+	// The code the insert stored is a usable one: its hash finds the row the link points at, and
+	// its issued-at keeps the reset page from refusing it as expired.
+	require.NotNil(t, input)
+	issuedCode, err := testDataCipher.Decrypt(input.ForgotPasswordCodeEncrypted)
+	require.NoError(t, err)
+	require.NotEmpty(t, issuedCode)
+	assert.Equal(t, hashutil.HashString(issuedCode), input.ForgotPasswordCodeHash)
+	assert.True(t, input.ForgotPasswordCodeIssuedAt.Valid)
+
+	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "DeleteUser", mock.Anything, mock.Anything, mock.Anything)
+}
+
 // The password arm issues no code: the account is reachable through the password it was created
 // with, and a code beside it would be a second, unasked-for way in for whoever reads the mailbox.
 func TestHandleUserCreatePost_APasswordCreateInsertsNoResetCode(t *testing.T) {

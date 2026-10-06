@@ -202,6 +202,64 @@ func TestEmailChanges_ClearAnOutstandingResetCode(t *testing.T) {
 	}
 }
 
+// TestSetUserEmail_KeepsTheResetCodeOfAnUnchangedAddress is the other half of decision 6: the code
+// goes only when the address changes. The console's email page sends the address with the
+// verified flag, so an administrator marking the address a setup email was just mailed to verified,
+// or saving the form unchanged, must leave that link working. The statement compares the address
+// against the one the row holds; that it reads the address from before the assignment, which on
+// MySQL depends on the assignments' order, is TestEmailChanges_ClearAnOutstandingResetCode's to show.
+func TestSetUserEmail_KeepsTheResetCodeOfAnUnchangedAddress(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		flipVerified bool
+	}{
+		{"an unchanged form", false},
+		{"the verified flag alone", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			user, hash := createUserWithResetCode(t)
+			defer func() { _ = database.DeleteUser(ctx, nil, user.Id) }()
+			read, err := database.GetUserById(ctx, nil, user.Id)
+			if err != nil || read == nil {
+				t.Fatalf("Failed to read the user: user=%v err=%v", read, err)
+			}
+			if tc.flipVerified {
+				read.EmailVerified = !read.EmailVerified
+			}
+			if err = database.SetUserEmail(ctx, nil, read); err != nil {
+				t.Fatalf("SetUserEmail failed: %v", err)
+			}
+
+			after, err := database.GetUserById(ctx, nil, user.Id)
+			if err != nil || after == nil {
+				t.Fatalf("Failed to reload the user: user=%v err=%v", after, err)
+			}
+			if after.Email != user.Email || after.EmailVerified != read.EmailVerified {
+				t.Fatalf("the save must land: email=%q verified=%v, want %q %v",
+					after.Email, after.EmailVerified, user.Email, read.EmailVerified)
+			}
+			if string(after.ForgotPasswordCodeEncrypted) != string(user.ForgotPasswordCodeEncrypted) {
+				t.Errorf("the reset code of an unchanged address was cleared: ciphertext length %d", len(after.ForgotPasswordCodeEncrypted))
+			}
+			if !after.ForgotPasswordCodeIssuedAt.Valid ||
+				!after.ForgotPasswordCodeIssuedAt.Time.Equal(user.ForgotPasswordCodeIssuedAt.Time) {
+				t.Errorf("ForgotPasswordCodeIssuedAt = %v, want %v", after.ForgotPasswordCodeIssuedAt, user.ForgotPasswordCodeIssuedAt)
+			}
+			if after.ForgotPasswordCodeHash != hash {
+				t.Errorf("ForgotPasswordCodeHash = %q, want %q", after.ForgotPasswordCodeHash, hash)
+			}
+			found, err := database.GetUserByForgotPasswordCodeHash(ctx, nil, hash)
+			if err != nil {
+				t.Fatalf("lookup by the mailed link's hash failed: %v", err)
+			}
+			if found == nil || found.Id != user.Id {
+				t.Error("the link mailed to the unchanged address no longer finds its account")
+			}
+		})
+	}
+}
+
 func TestSetUserEmail_Refusals(t *testing.T) {
 	t.Run("user id 0", func(t *testing.T) {
 		if err := database.SetUserEmail(context.Background(), nil, &record.User{Email: fake.Email()}); err == nil {

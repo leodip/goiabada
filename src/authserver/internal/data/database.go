@@ -129,8 +129,9 @@ type Database interface {
 	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
 	// IncrementUserAuthStateGeneration advances the user's authentication generation
 	// and returns the new value. Separate from UpdateUser because the column is tagged
-	// dont-update: every credential handler writes the whole user back, so an ordinary
-	// update would let a stale model regress the boundary (#106).
+	// dont-update: credential handlers used to write the whole user back, so an ordinary
+	// update would have let a stale model regress the boundary (#106). None does now, and
+	// TestNoWholeRowUserSave holds it, but fixtures still seed through UpdateUser (#471).
 	//
 	// tx is REQUIRED and a nil transaction is rejected. The increment and the read-back
 	// cannot be one statement portably across the four engines, so outside a
@@ -177,8 +178,8 @@ type Database interface {
 	// (#404). The reset code goes because it belongs to the address it was mailed to (#471).
 	TrySetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, fromEmail string, fromVerified bool, toEmail string) (bool, error)
 	// SetUserEmail writes the administrator's email change: the address and verified flag from
-	// user, a cleared verification code and issued-at, a cleared reset code, and updated_at,
-	// and no other column; it sets user.UpdatedAt to what it stored. Unconditional, so the last
+	// user, a cleared verification code and issued-at, a reset code cleared when the row held
+	// another address, and updated_at, and no other column; it sets user.UpdatedAt to what it stored. Unconditional, so the last
 	// change wins; narrow rather than a full-row update, so it cannot undo a concurrent disable,
 	// password change or OTP change. A taken address is ErrUniqueViolation (#471).
 	SetUserEmail(ctx context.Context, tx *sql.Tx, user *record.User) error
