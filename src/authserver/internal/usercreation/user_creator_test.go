@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"testing"
+	"time"
 
 	"errors"
 
@@ -252,4 +253,32 @@ func TestCreator_CreateUserInTransaction_RefusesANilTransaction(t *testing.T) {
 	db.AssertNotCalled(t, "GetResourceByResourceIdentifier", mock.Anything, mock.Anything, mock.Anything)
 	db.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything, mock.Anything)
 	db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+}
+
+// A user the administrator creates with a set-password email is inserted already holding the code
+// that answers the emailed link, so no write after the insert stores it (#471 decision 4).
+func TestCreator_CreateUser_InsertsTheResetCodeTheInputCarries(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+	expectAccountPermissionLookup(db, accountPermissions())
+
+	issuedAt := time.Date(2026, 10, 6, 12, 30, 0, 0, time.UTC)
+	var inserted record.User
+	datamocks.ExpectRunInTransaction(db, txSentinel)
+	db.On("CreateUser", mock.Anything, txSentinel, mock.Anything).Run(func(args mock.Arguments) {
+		inserted = *args.Get(2).(*record.User)
+	}).Return(nil).Once()
+	db.On("CreateUserPermission", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
+
+	user, err := New(db).CreateUser(context.Background(), &Input{
+		Email:                       "ada@example.com",
+		ForgotPasswordCodeEncrypted: []byte("ciphertext"),
+		ForgotPasswordCodeHash:      "the-code-hash",
+		ForgotPasswordCodeIssuedAt:  sql.NullTime{Time: issuedAt, Valid: true},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, []byte("ciphertext"), inserted.ForgotPasswordCodeEncrypted)
+	assert.Equal(t, "the-code-hash", inserted.ForgotPasswordCodeHash)
+	assert.Equal(t, sql.NullTime{Time: issuedAt, Valid: true}, inserted.ForgotPasswordCodeIssuedAt)
+	assert.Equal(t, "the-code-hash", user.ForgotPasswordCodeHash, "the returned user is the row inserted")
 }
