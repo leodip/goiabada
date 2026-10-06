@@ -1195,11 +1195,22 @@ Changing these needs `authserver:manage`: they decide where password reset links
   "smtpPort": 587,
   "smtpUsername": "noreply@example.com",
   "smtpPassword": "password",
+  "clearSmtpPassword": false,
   "smtpEncryption": "starttls",
   "smtpFromName": "My App",
   "smtpFromEmail": "noreply@example.com"
 }
 ```
+
+A save keeps, replaces or removes the stored password:
+
+| Request | Stored password |
+|---|---|
+| `smtpPassword` absent or `""` | kept |
+| `smtpPassword` non-empty | replaced |
+| `clearSmtpPassword: true` | removed (a no-op when none is stored) |
+
+A non-empty `smtpPassword` together with `clearSmtpPassword: true` is refused with `VALIDATION_ERROR`, and so is a save that changes `smtpHost` while a password is stored without sending either: a stored password only ever reaches the host it was entered for, so a new host needs the password again, or its removal. The hosts are compared with surrounding space and the brackets of an IPv6 literal taken off, and without regard to case; a change of port, username, encryption or sender keeps the password. Neither refusal writes anything. Saving with `smtpEnabled: false` clears every SMTP field, the password included.
 
 #### Send test email
 

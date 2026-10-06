@@ -2443,7 +2443,18 @@ paths:
     put:
       tags: [Settings]
       summary: Update email settings
-      description: Update SMTP/email settings
+      description: |
+        Update SMTP/email settings. The stored SMTP password is kept, replaced or removed:
+        an absent or empty `smtpPassword` keeps it, a non-empty one replaces it, and
+        `clearSmtpPassword: true` removes it. The two together are refused with 400
+        `VALIDATION_ERROR`.
+
+        A stored password reaches only the host it was entered for: a save that changes
+        `smtpHost` while a password is stored, carrying neither a new `smtpPassword` nor
+        `clearSmtpPassword: true`, is refused with 400 `VALIDATION_ERROR` and writes nothing.
+        The hosts are compared with surrounding space trimmed, one pair of brackets taken off
+        an IPv6 literal, and without regard to case. A change of port, username, encryption or
+        sender keeps the stored password.
       operationId: updateSettingsEmail
       requestBody:
         required: true
@@ -5611,6 +5622,19 @@ components:
           type: string
         smtpPassword:
           type: string
+          maxLength: 256
+          description: |
+            A new SMTP password, at most 256 bytes. The stored password is never returned, only
+            `hasSmtpPassword`, so an absent or empty value keeps the stored password; a non-empty
+            value replaces it. Sending one together with `clearSmtpPassword: true` is refused with
+            400 `VALIDATION_ERROR` and nothing is written.
+        clearSmtpPassword:
+          type: boolean
+          default: false
+          description: |
+            `true` removes the stored SMTP password. Removing it when none is stored is an ordinary
+            save. Refused with 400 `VALIDATION_ERROR` together with a non-empty `smtpPassword`.
+            Ignored when `smtpEnabled` is false, which clears every SMTP field, the password included.
         smtpEncryption:
           type: string
         smtpFromName:

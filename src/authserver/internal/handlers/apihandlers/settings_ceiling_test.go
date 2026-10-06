@@ -185,6 +185,9 @@ func TestSettingsCeiling_AMalformedRequestIsAnsweredFirst(t *testing.T) {
 		{name: "email settings, a body that does not decode", save: settingsCeilingSaves[0], body: "{"},
 		{name: "email settings, no host", save: settingsCeilingSaves[0],
 			body: `{"smtpEnabled":true,"smtpHost":"","smtpPort":25,"smtpEncryption":"none","smtpFromEmail":"a@b.test"}`},
+		{name: "email settings, a password together with its removal", save: settingsCeilingSaves[0],
+			body: `{"smtpEnabled":true,"smtpHost":"127.0.0.1","smtpPort":25,"smtpEncryption":"none","smtpFromEmail":"a@b.test",` +
+				`"smtpPassword":"secret","clearSmtpPassword":true}`},
 		{name: "audit-log settings, a body that does not decode", save: settingsCeilingSaves[2], body: "{"},
 		{name: "audit-log settings, negative retention", save: settingsCeilingSaves[2],
 			body: `{"auditLogsInConsoleEnabled":true,"auditLogsInDatabaseEnabled":true,"auditLogRetentionDays":-1}`},

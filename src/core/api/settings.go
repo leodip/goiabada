@@ -76,16 +76,20 @@ type SettingsEmailResponse struct {
 	HasSMTPPassword bool   `json:"hasSmtpPassword"`
 }
 
-// UpdateSettingsEmailRequest contains SMTP/email settings fields for update
+// UpdateSettingsEmailRequest contains SMTP/email settings fields for update. An absent or empty
+// SMTPPassword keeps the stored password, a non-empty one replaces it, and ClearSMTPPassword removes
+// it; the two together are refused, and so is a host change while a password is stored that carries
+// neither (#410).
 type UpdateSettingsEmailRequest struct {
-	SMTPEnabled    bool   `json:"smtpEnabled"`
-	SMTPHost       string `json:"smtpHost"`
-	SMTPPort       int    `json:"smtpPort"`
-	SMTPUsername   string `json:"smtpUsername"`
-	SMTPPassword   string `json:"smtpPassword"`
-	SMTPEncryption string `json:"smtpEncryption"`
-	SMTPFromName   string `json:"smtpFromName"`
-	SMTPFromEmail  string `json:"smtpFromEmail"`
+	SMTPEnabled       bool   `json:"smtpEnabled"`
+	SMTPHost          string `json:"smtpHost"`
+	SMTPPort          int    `json:"smtpPort"`
+	SMTPUsername      string `json:"smtpUsername"`
+	SMTPPassword      string `json:"smtpPassword"`
+	ClearSMTPPassword bool   `json:"clearSmtpPassword"`
+	SMTPEncryption    string `json:"smtpEncryption"`
+	SMTPFromName      string `json:"smtpFromName"`
+	SMTPFromEmail     string `json:"smtpFromEmail"`
 }
 
 // SendTestEmailRequest is used by the admin API to trigger a test email
