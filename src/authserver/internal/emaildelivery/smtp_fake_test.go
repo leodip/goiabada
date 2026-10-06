@@ -50,6 +50,12 @@ type fakeSMTP struct {
 	// rejectRcpt answers RCPT TO with a 550, which is the relay refusing the recipient.
 	rejectRcpt bool
 
+	// breakOn names the first command, EHLO or STARTTLS, the fake answers by breaking the
+	// connection the way breakHow says, rather than with a reply. Nothing reaches TLS first, so
+	// what the client sees is the TCP connection failing, never a handshake.
+	breakOn  string
+	breakHow connectionBreak
+
 	// loginChallenges are the two AUTH LOGIN prompts, defaulting to the conventional words. A row
 	// sets them to something else to reach loginAuth's answer-by-position path.
 	loginChallenges []string
@@ -78,6 +84,18 @@ type fakeSMTP struct {
 	connected bool
 	conn      net.Conn
 }
+
+// connectionBreak is how the fake breaks a connection at breakOn.
+type connectionBreak int
+
+const (
+	// breakClose closes the connection cleanly, so the client reads EOF.
+	breakClose connectionBreak = iota
+	// breakReset closes it with no linger, so the client reads a TCP reset.
+	breakReset
+	// breakStall reads and answers nothing until the client gives up at its own deadline.
+	breakStall
+)
 
 func (f *fakeSMTP) record(line string) {
 	f.mu.Lock()
@@ -138,6 +156,7 @@ func (f *fakeSMTP) serverTLSConfig() *tls.Config {
 
 func (f *fakeSMTP) serve(conn net.Conn) {
 	defer func() { _ = conn.Close() }()
+	raw := conn
 
 	ext := f.ext
 	if f.tlsFromStart {
@@ -163,6 +182,18 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 		line = strings.TrimRight(line, "\r\n")
 		f.record(line)
 		up := strings.ToUpper(line)
+
+		if f.breakOn != "" && strings.HasPrefix(up, f.breakOn) {
+			switch f.breakHow {
+			case breakReset:
+				if tcp, ok := raw.(*net.TCPConn); ok {
+					_ = tcp.SetLinger(0)
+				}
+			case breakStall:
+				_, _ = io.Copy(io.Discard, raw)
+			}
+			return
+		}
 
 		if f.maxCommandLine > 0 && len(line)+len("\r\n") > f.maxCommandLine {
 			say("500 5.5.6 line too long")
