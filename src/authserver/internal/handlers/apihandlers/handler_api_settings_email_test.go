@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"syscall"
@@ -81,24 +83,113 @@ func TestHandleSettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *testing
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 }
 
-// A failed send answers the administrator with the sender's own error after the fixed prefix, which
-// is the wording the admin console shows. Moving the decryption into SendEmail's caller would have
-// moved this text; keeping it in SendEmail keeps it (#433 decision 10).
-func TestHandleSettingsEmailSendTestPost_AFailedSendNamesTheCause(t *testing.T) {
-	emailSender := accounthandlersmocks.NewEmailSender(t)
-	auditLogger := handlersmocks.NewAuditLogger(t)
+// sendTestRequestId is the request id every failed test send case carries, as the request id
+// middleware would have put it on the request.
+const sendTestRequestId = "req-send-test"
 
-	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).
-		Return(errs.New("unable to decrypt the SMTP password")).Once()
+// leakyRelayError is a send failure carrying everything the answer must not: an address and port, an
+// operating-system string, and text the server sent.
+func leakyRelayError(cause error) error {
+	return errs.Wrap(&net.OpError{
+		Op:   "dial",
+		Net:  "tcp",
+		Addr: &net.TCPAddr{IP: net.IPv4(192, 0, 2, 25), Port: 2587},
+		Err:  cause,
+	}, "220 internal-banner.corp.example ready")
+}
 
-	rr := httptest.NewRecorder()
-	HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, auditLogger).
-		ServeHTTP(rr, sendTestEmailRequest(t, &record.Settings{SMTPEnabled: true}))
+// A failed test send answers 400 SEND_FAILED with the fixed message of the kind the sender labelled
+// it with, and the connection's coarse cause for a connection failure, naming no address, port,
+// operating-system string or server text; the whole error goes to the log at Warn, on the request's
+// id (#410 decision 5).
+func TestHandleSettingsEmailSendTestPost_AFailedSendAnswersTheFixedMessageOfItsKind(t *testing.T) {
+	labelled := func(kind emaildelivery.SendFailureKind, err error) error {
+		return errs.WithStack(&emaildelivery.SendError{Kind: kind, Err: err})
+	}
+	refused := &os.SyscallError{Syscall: "connect", Err: syscall.ECONNREFUSED}
+	serverText := errs.New("535 5.7.8 internal-banner.corp.example says no to 192.0.2.25:2587")
 
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	assert.Contains(t, rr.Body.String(), "Unable to send email: unable to decrypt the SMTP password")
-	assert.Contains(t, rr.Body.String(), "SEND_FAILED")
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	testCases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"a host name not found",
+			labelled(emaildelivery.SendFailureConnection, leakyRelayError(&net.DNSError{Err: "no such host", Name: "internal-banner.corp.example", IsNotFound: true})),
+			"Unable to send the test email: host name not found."},
+		{"a connection that timed out",
+			labelled(emaildelivery.SendFailureConnection, leakyRelayError(os.ErrDeadlineExceeded)),
+			"Unable to send the test email: connection timed out."},
+		{"a refused connection",
+			labelled(emaildelivery.SendFailureConnection, leakyRelayError(refused)),
+			"Unable to send the test email: connection refused."},
+		{"a connection failure with no cause the classification names",
+			labelled(emaildelivery.SendFailureConnection, leakyRelayError(&os.SyscallError{Syscall: "connect", Err: syscall.ENETUNREACH})),
+			"Unable to send the test email."},
+		{"STARTTLS not offered",
+			labelled(emaildelivery.SendFailureSTARTTLSNotOffered, serverText),
+			"The SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS."},
+		{"a password that would go unencrypted",
+			labelled(emaildelivery.SendFailureUnencryptedPassword, serverText),
+			"The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS."},
+		{"credentials configured and no authentication offered",
+			labelled(emaildelivery.SendFailureNoAuthentication, serverText),
+			"SMTP credentials are configured but the server offers no authentication."},
+		// The sender's error lists the mechanisms the server offered; the answer leaves them out.
+		{"no supported mechanism",
+			labelled(emaildelivery.SendFailureNoSupportedMechanism,
+				errs.New("the SMTP server offers none of PLAIN, LOGIN or CRAM-MD5 (offered: XOAUTH2 internal-banner.corp.example)")),
+			"The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5."},
+		// The TLS kind answers its own message even when the chain also reads as a refused
+		// connection: the kind decides, not the classification.
+		{"a failed TLS handshake",
+			labelled(emaildelivery.SendFailureTLS, leakyRelayError(refused)),
+			"The TLS connection failed; check the encryption setting and the server's certificate."},
+		{"rejected credentials",
+			labelled(emaildelivery.SendFailureAuthenticationRejected, serverText),
+			"The SMTP server rejected the username or password."},
+		{"a refused message",
+			labelled(emaildelivery.SendFailureMessageRefused, serverText),
+			"The SMTP server refused the message."},
+		{"anything else",
+			labelled(emaildelivery.SendFailureOther, errs.New("unable to decrypt the SMTP password")),
+			"Unable to send the test email."},
+		{"an error carrying no kind",
+			leakyRelayError(refused),
+			"Unable to send the test email."},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			capture := logtest.CaptureSlog(t)
+			emailSender := accounthandlersmocks.NewEmailSender(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(tc.err).Once()
+
+			r := sendTestEmailRequest(t, &record.Settings{SMTPEnabled: true})
+			r = r.WithContext(context.WithValue(r.Context(), middleware.RequestIDKey, sendTestRequestId))
+			rr := httptest.NewRecorder()
+			HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, auditLogger).ServeHTTP(rr, r)
+
+			assert.Equal(t, http.StatusBadRequest, rr.Code)
+			for _, leak := range []string{"192.0.2.25", "2587", "internal-banner", "535", "XOAUTH2", "connect:"} {
+				assert.NotContains(t, rr.Body.String(), leak, "the answer carries none of the error's own text")
+			}
+			code, description := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, "SEND_FAILED", code)
+			assert.Equal(t, tc.want, description)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+
+			records := capture.Records()
+			require.Len(t, records, 1, "one failed send writes one record")
+			assert.Equal(t, slog.LevelWarn, records[0].Level)
+			assert.Equal(t, "unable to send the test email", records[0].Message)
+			assert.Equal(t, sendTestRequestId, records[0].Attrs["request_id"], "logged through the request's context")
+			logged, ok := records[0].Attrs["error"].(error)
+			require.True(t, ok, "the error attribute is the error itself")
+			assert.Equal(t, tc.err, logged, "the log keeps what the answer leaves out")
+		})
+	}
 }
 
 // storedSMTPPassword is the password the email save cases start with stored, when they start with one.

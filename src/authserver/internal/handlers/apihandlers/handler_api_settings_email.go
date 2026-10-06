@@ -298,8 +298,12 @@ func HandleSettingsEmailSendTestPost(
 			Subject:  "Test email",
 			HtmlBody: simpleBody,
 		}
+		// A failure answers the fixed message of its kind and the error goes to the log: the error
+		// carries addresses, operating-system strings and the server's own replies, and anyone who
+		// can point the host somewhere would read them back here (#410 decision 5).
 		if err := emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input); err != nil {
-			writeJSONError(w, "Unable to send email: "+err.Error(), "SEND_FAILED", http.StatusBadRequest)
+			slog.WarnContext(r.Context(), "unable to send the test email", "error", err)
+			writeJSONError(w, sendFailureMessage(err), "SEND_FAILED", http.StatusBadRequest)
 			return
 		}
 
@@ -326,5 +330,32 @@ func connectionFailureMessage(message string, cause emaildelivery.ConnectionCaus
 		return message + ": connection refused."
 	default:
 		return message + "."
+	}
+}
+
+// sendFailureMessage is the one message a failed test send answers, chosen by the kind the sender
+// labelled the failure with and, for a connection failure, by its coarse cause; nothing in it is read
+// from the error's text. The four refusals the sender composes itself keep its wording, without the
+// part that quotes the server (#410 decision 5).
+func sendFailureMessage(err error) string {
+	switch emaildelivery.SendFailureKindOf(err) {
+	case emaildelivery.SendFailureConnection:
+		return connectionFailureMessage("Unable to send the test email", emaildelivery.ClassifyConnectionError(err))
+	case emaildelivery.SendFailureSTARTTLSNotOffered:
+		return "The SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS."
+	case emaildelivery.SendFailureUnencryptedPassword:
+		return "The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS."
+	case emaildelivery.SendFailureNoAuthentication:
+		return "SMTP credentials are configured but the server offers no authentication."
+	case emaildelivery.SendFailureNoSupportedMechanism:
+		return "The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5."
+	case emaildelivery.SendFailureTLS:
+		return "The TLS connection failed; check the encryption setting and the server's certificate."
+	case emaildelivery.SendFailureAuthenticationRejected:
+		return "The SMTP server rejected the username or password."
+	case emaildelivery.SendFailureMessageRefused:
+		return "The SMTP server refused the message."
+	default:
+		return "Unable to send the test email."
 	}
 }

@@ -272,6 +272,7 @@ func TestSendEmail_MechanismChoice(t *testing.T) {
 		wantLine  string
 		wantPass  string
 		wantError string
+		wantKind  SendFailureKind
 	}{
 		{
 			name:     "all three offered picks PLAIN",
@@ -314,6 +315,7 @@ func TestSendEmail_MechanismChoice(t *testing.T) {
 			name:      "only XOAUTH2 offered is refused",
 			authExt:   "AUTH XOAUTH2",
 			wantError: "the SMTP server offers none of PLAIN, LOGIN or CRAM-MD5 (offered: XOAUTH2)",
+			wantKind:  SendFailureNoSupportedMechanism,
 		},
 	}
 
@@ -334,6 +336,7 @@ func TestSendEmail_MechanismChoice(t *testing.T) {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), test.wantError)
 				assert.Contains(t, err.Error(), "unable to send SMTP message")
+				assertSendFailure(t, err, test.wantKind)
 				assert.False(t, f.hasLinePrefix("AUTH"), "no mechanism was usable, so no AUTH may have been attempted")
 				assert.False(t, f.hasLinePrefix("MAIL FROM:"))
 				return
@@ -442,6 +445,7 @@ func TestSendEmail_DecryptsWithTheCipherItWasGiven(t *testing.T) {
 		err = NewSender(otherCipher).SendEmail(context.Background(), smtpConfig, input)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to decrypt the SMTP password")
+		assertSendFailure(t, err, SendFailureOther)
 		assert.False(t, f.hasLinePrefix("EHLO"), "the relay was reached with a password that did not open")
 	})
 }
@@ -451,8 +455,8 @@ func TestSendEmail_DecryptsWithTheCipherItWasGiven(t *testing.T) {
 // 4.5.3.1.4's 512 octets, the client omits it and answers the empty 334 challenge instead. The two
 // rows are one password octet apart, so what they measure is the boundary rather than the two
 // shapes in general, and the fake enforces the 512 itself: an inline response one octet over is
-// answered 500 and the send fails. Nothing bounds the SMTP password on the way into the settings,
-// so a password this long is one an admin can save today.
+// answered 500 and the send fails. The settings save bounds the password and the username, which
+// keeps a password this long out of a row it writes; one written some other way can still carry it.
 //
 // The inline form for an ordinary password is pinned by the mechanism table's `AUTH PLAIN ` rows.
 func TestSendEmail_PlainInitialResponseBoundary(t *testing.T) {
@@ -574,6 +578,9 @@ func TestSendEmail_PlainRepeatedChallenge(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "unexpected server challenge")
+	// The mechanism refusing a challenge the server should not have sent is neither a reply nor a
+	// broken connection.
+	assertSendFailure(t, err, SendFailureOther)
 
 	answered := 0
 	for _, line := range f.lines() {
@@ -600,6 +607,7 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 		ext        []string
 		tlsExt     []string
 		wantError  string
+		wantKind   SendFailureKind
 	}{
 		{
 			name:       "starttls offered, delivers",
@@ -615,6 +623,7 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			host:       "127.0.0.1",
 			ext:        []string{"AUTH PLAIN", "8BITMIME"},
 			wantError:  "the SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS",
+			wantKind:   SendFailureSTARTTLSNotOffered,
 		},
 		{
 			name:       "none with credentials to a loopback host, PLAIN offered",
@@ -629,6 +638,7 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			host:       hostname,
 			ext:        []string{"AUTH PLAIN", "8BITMIME"},
 			wantError:  "the SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS",
+			wantKind:   SendFailureUnencryptedPassword,
 		},
 		{
 			// The same refusal with PLAIN off the table, so net/smtp.PlainAuth's own guard
@@ -638,6 +648,7 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			host:       hostname,
 			ext:        []string{"AUTH LOGIN", "8BITMIME"},
 			wantError:  "the SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS",
+			wantKind:   SendFailureUnencryptedPassword,
 		},
 		{
 			// Decision 3's cleartext exception: CRAM-MD5 never sends the password, so the same
@@ -655,6 +666,7 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			host:       "127.0.0.1",
 			ext:        []string{"8BITMIME"},
 			wantError:  "SMTP credentials are configured but the server offers no authentication",
+			wantKind:   SendFailureNoAuthentication,
 		},
 	}
 
@@ -687,6 +699,7 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), test.wantError)
 			assert.Contains(t, err.Error(), "unable to send SMTP message")
+			assertSendFailure(t, err, test.wantKind)
 			assert.False(t, f.hasLinePrefix("MAIL FROM:"), "the refusal has to precede the message")
 			assert.False(t, f.hasLinePrefix("AUTH"), "every gate has to precede any AUTH command")
 		})
@@ -783,6 +796,7 @@ func TestSendEmail_CertificateVerification(t *testing.T) {
 			for _, want := range test.wantInError {
 				assert.Contains(t, err.Error(), want)
 			}
+			assertSendFailure(t, err, SendFailureTLS)
 
 			assert.False(t, f.hasLinePrefix("AUTH"), "a failed handshake may not be followed by credentials")
 			assert.False(t, f.hasLinePrefix("MAIL FROM:"))
@@ -1034,6 +1048,7 @@ func TestSendEmail_SubjectHardLineLimit(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "998-byte line limit")
+		assertSendFailure(t, err, SendFailureOther)
 		assert.False(t, f.sawConnection(), "the message is built before the dial, so nothing should have connected")
 	})
 }
@@ -1055,7 +1070,8 @@ func TestSendEmail_FinalDataRejection(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to send SMTP message")
-	assert.Contains(t, err.Error(), "550", "the relay's own refusal is what reaches the admin")
+	assert.Contains(t, err.Error(), "550", "the relay's own refusal is what reaches the log")
+	assertSendFailure(t, err, SendFailureMessageRefused)
 	assert.NotEmpty(t, f.data(), "the whole message arrived; only the verdict on it was a refusal")
 }
 
@@ -1108,6 +1124,7 @@ func TestSendEmail_MessageID(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to generate a Message-ID")
+		assertSendFailure(t, err, SendFailureOther)
 		assert.False(t, f.sawConnection(), "the message is built before the dial, so nothing should have connected")
 	})
 }
@@ -1195,6 +1212,7 @@ func TestSendEmail_InvalidRecipient(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid recipient address")
+	assertSendFailure(t, err, SendFailureOther)
 	assert.False(t, f.sawConnection(), "the address is parsed before the dial, so nothing should have connected")
 }
 
@@ -1218,6 +1236,8 @@ func TestSendEmail_DialTimeout(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to connect to SMTP server")
+	assertSendFailure(t, err, SendFailureConnection)
+	assert.Equal(t, ConnectionCauseTimedOut, ClassifyConnectionError(err))
 	assert.Empty(t, f.data(), "nothing may be delivered once the dial has timed out")
 }
 
@@ -1241,5 +1261,8 @@ func TestSendEmail_ConversationTimeout(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to send SMTP message")
+	// A connection that stalls after the dial is a connection failure too, with the same cause.
+	assertSendFailure(t, err, SendFailureConnection)
+	assert.Equal(t, ConnectionCauseTimedOut, ClassifyConnectionError(err))
 	assert.Less(t, elapsed, 2*time.Second, "the deadline was one second, so the send must not outlive it")
 }

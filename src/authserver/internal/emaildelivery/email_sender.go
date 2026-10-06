@@ -11,12 +11,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
+	"errors"
 	"io"
 	"mime"
 	"mime/quotedprintable"
 	"net"
 	"net/mail"
 	"net/smtp"
+	"net/textproto"
 	"slices"
 	"strconv"
 	"strings"
@@ -92,7 +94,22 @@ type SendEmailInput struct {
 	HtmlBody string
 }
 
+// SendEmail sends one message through the relay smtpConfig names. Every failure it returns carries
+// a *SendError labelling its kind, which SendFailureKindOf reads: the steps that can tell label their
+// own, and anything else is SendFailureOther (#410 decision 5).
 func (e *Sender) SendEmail(ctx context.Context, smtpConfig SMTPConfig, input *SendEmailInput) error {
+	err := e.send(ctx, smtpConfig, input)
+	if err == nil {
+		return nil
+	}
+	var sendErr *SendError
+	if errors.As(err, &sendErr) {
+		return err
+	}
+	return labelled(SendFailureOther, err)
+}
+
+func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEmailInput) error {
 
 	var password string
 	if len(smtpConfig.PasswordEncrypted) > 0 {
@@ -136,31 +153,38 @@ func (e *Sender) SendEmail(ctx context.Context, smtpConfig SMTPConfig, input *Se
 		convTimeout = defaultConversationTimeout
 	}
 
-	netDialer := &net.Dialer{Timeout: dialTimeout}
 	// One config for both TLS paths. Certificate and hostname verification are never disabled:
 	// RFC 8314 section 3.3 requires the implicit-TLS client to validate, and a STARTTLS session
 	// that does not verify buys nothing over cleartext (#274).
 	tlsConfig := &tls.Config{ServerName: host, RootCAs: e.rootCAs}
 
-	var conn net.Conn
-	if smtpEnc == SMTPEncryptionSSLTLS {
-		conn, err = (&tls.Dialer{NetDialer: netDialer, Config: tlsConfig}).DialContext(ctx, "tcp", addr)
-	} else {
-		conn, err = netDialer.DialContext(ctx, "tcp", addr)
-	}
+	// The dial timeout bounds the connect and, for implicit TLS, the handshake after it, as
+	// tls.Dialer bounds both with its NetDialer's timeout. The two are separate steps so that a
+	// failed handshake is told from a failed connect (#410 decision 5).
+	dialCtx, cancelDial := context.WithTimeout(ctx, dialTimeout)
+	defer cancelDial()
+	conn, err := (&net.Dialer{}).DialContext(dialCtx, "tcp", addr)
 	if err != nil {
-		return errs.Wrap(err, "unable to connect to SMTP server")
+		return labelled(SendFailureConnection, errs.Wrap(err, "unable to connect to SMTP server"))
+	}
+	if smtpEnc == SMTPEncryptionSSLTLS {
+		tlsConn := tls.Client(conn, tlsConfig)
+		if handshakeErr := tlsConn.HandshakeContext(dialCtx); handshakeErr != nil {
+			_ = conn.Close()
+			return tlsFailure(errs.Wrap(handshakeErr, "unable to connect to SMTP server"))
+		}
+		conn = tlsConn
 	}
 
 	if setDeadlineErr := conn.SetDeadline(time.Now().Add(convTimeout)); setDeadlineErr != nil {
 		_ = conn.Close()
-		return errs.Wrap(setDeadlineErr, "unable to connect to SMTP server")
+		return labelled(SendFailureConnection, errs.Wrap(setDeadlineErr, "unable to connect to SMTP server"))
 	}
 
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
 		_ = conn.Close()
-		return errs.Wrap(err, "unable to connect to SMTP server")
+		return replyFailure(errs.Wrap(err, "unable to connect to SMTP server"), SendFailureOther)
 	}
 	defer func() { _ = client.Close() }()
 
@@ -170,13 +194,14 @@ func (e *Sender) SendEmail(ctx context.Context, smtpConfig SMTPConfig, input *Se
 		// and a silent downgrade here is indistinguishable from a STARTTLS-stripping attacker
 		// (#274).
 		if ok, _ := client.Extension("STARTTLS"); !ok {
-			return errs.Wrap(errs.New("the SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS"),
-				"unable to send SMTP message")
+			return labelled(SendFailureSTARTTLSNotOffered, errs.Wrap(
+				errs.New("the SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS"),
+				"unable to send SMTP message"))
 		}
 		// StartTLS re-issues EHLO, per RFC 3207 section 4.2: everything learned before the
 		// handshake has to be discarded.
 		if startTLSErr := client.StartTLS(tlsConfig); startTLSErr != nil {
-			return errs.Wrap(startTLSErr, "unable to send SMTP message")
+			return tlsFailure(errs.Wrap(startTLSErr, "unable to send SMTP message"))
 		}
 	}
 
@@ -187,26 +212,59 @@ func (e *Sender) SendEmail(ctx context.Context, smtpConfig SMTPConfig, input *Se
 	}
 
 	if mailErr := client.Mail(from.Address); mailErr != nil {
-		return errs.Wrap(mailErr, "unable to send SMTP message")
+		return replyFailure(errs.Wrap(mailErr, "unable to send SMTP message"), SendFailureMessageRefused)
 	}
 	if rcptErr := client.Rcpt(to.Address); rcptErr != nil {
-		return errs.Wrap(rcptErr, "unable to send SMTP message")
+		return replyFailure(errs.Wrap(rcptErr, "unable to send SMTP message"), SendFailureMessageRefused)
 	}
 	w, err := client.Data()
 	if err != nil {
-		return errs.Wrap(err, "unable to send SMTP message")
+		return replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
 	}
 	if _, err := w.Write(message); err != nil {
-		return errs.Wrap(err, "unable to send SMTP message")
+		return replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
 	}
 	if err := w.Close(); err != nil {
-		return errs.Wrap(err, "unable to send SMTP message")
+		return replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
 	}
 	if err := client.Quit(); err != nil {
-		return errs.Wrap(err, "unable to send SMTP message")
+		return replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureOther)
 	}
 
 	return nil
+}
+
+// labelled is err labelled with kind. The label sits under a frameless errs wrapper, so %+v still
+// reaches err's stack.
+func labelled(kind SendFailureKind, err error) error {
+	return errs.WithStack(&SendError{Kind: kind, Err: err})
+}
+
+// replyFailure labels a failed exchange after the connection is up. A reply the server sent is
+// refused, the step's own kind; a connection that broke or stalled is a connection failure; and
+// anything else, a reply that was no SMTP reply at all or a mechanism's own refusal, is other.
+func replyFailure(err error, refused SendFailureKind) error {
+	var reply *textproto.Error
+	var netErr net.Error
+	switch {
+	case errors.As(err, &reply):
+		return labelled(refused, err)
+	case errors.As(err, &netErr), errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		return labelled(SendFailureConnection, err)
+	default:
+		return labelled(SendFailureOther, err)
+	}
+}
+
+// tlsFailure labels a failed STARTTLS or handshake. Every failure there is the TLS connection's,
+// whatever shape it reaches the client in -- a certificate that did not verify, a server that does
+// not speak TLS, an alert, a refused STARTTLS command -- except one whose connection cause
+// ClassifyConnectionError names, such as a handshake that timed out.
+func tlsFailure(err error) error {
+	if ClassifyConnectionError(err) != ConnectionCauseNone {
+		return labelled(SendFailureConnection, err)
+	}
+	return labelled(SendFailureTLS, err)
 }
 
 // authenticate picks a mechanism and runs it. The password is only put on the wire when the
@@ -218,7 +276,7 @@ func authenticate(client *smtp.Client, host string, smtpEnc SMTPEncryption, user
 		// The operator configured credentials, so a server offering no authentication is the
 		// wrong host, the wrong port, or a STARTTLS-only server reached as None. Sending
 		// unauthenticated instead would hide all three (#274).
-		return errs.New("SMTP credentials are configured but the server offers no authentication")
+		return labelled(SendFailureNoAuthentication, errs.New("SMTP credentials are configured but the server offers no authentication"))
 	}
 	offered := strings.Fields(strings.ToUpper(mechs))
 
@@ -240,7 +298,8 @@ func authenticate(client *smtp.Client, host string, smtpEnc SMTPEncryption, user
 	// no counterpart to and whose message names no setting (#274).
 	secure := smtpEnc != SMTPEncryptionNone || isLocalHost(host)
 	if (mechanism == "PLAIN" || mechanism == "LOGIN") && !secure {
-		return errs.New("the SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS")
+		return labelled(SendFailureUnencryptedPassword,
+			errs.New("the SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS"))
 	}
 
 	var auth smtp.Auth
@@ -261,10 +320,16 @@ func authenticate(client *smtp.Client, host string, smtpEnc SMTPEncryption, user
 		// legitimately offers a login, so it is not gated above.
 		auth = smtp.CRAMMD5Auth(username, password)
 	default:
-		return errs.New("the SMTP server offers none of PLAIN, LOGIN or CRAM-MD5 (offered: " + strings.TrimSpace(mechs) + ")")
+		// What the server offered is its own text, so it rides in the error, for the log, and the
+		// kind is what a caller answers with.
+		return labelled(SendFailureNoSupportedMechanism,
+			errs.New("the SMTP server offers none of PLAIN, LOGIN or CRAM-MD5 (offered: "+strings.TrimSpace(mechs)+")"))
 	}
 
-	return errs.WithStack(client.Auth(auth))
+	if err := client.Auth(auth); err != nil {
+		return replyFailure(errs.WithStack(err), SendFailureAuthenticationRejected)
+	}
+	return nil
 }
 
 // isLocalHost reports whether the password would stay on this machine. The three names are
