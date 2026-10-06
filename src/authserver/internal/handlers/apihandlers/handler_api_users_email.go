@@ -17,12 +17,13 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// usersEmailDatabase is what the administrator's user email endpoint needs: the user row.
+// usersEmailDatabase is what the administrator's user email endpoint needs: the user row, and
+// the narrow write of its address.
 // It embeds what the administrative policy reads to judge whether the user is an administrator.
 type usersEmailDatabase interface {
 	userTargetPolicyDatabase
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
+	SetUserEmail(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 // usersEmailValidator is the administrator's update check: the address rules, and that no other
@@ -86,14 +87,19 @@ func HandleUserEmailPut(
 			return
 		}
 
-		// Update user email fields
+		// The address group alone, never the row as read: writing that back would undo a disable, a
+		// password change or an OTP change made while this request was in flight (#471). The write
+		// also clears the pending verification code and any reset code, which belong to the previous
+		// address.
 		user.Email = email
 		user.EmailVerified = req.EmailVerified
 		user.EmailVerificationCodeEncrypted = nil
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
+		user.ForgotPasswordCodeEncrypted = nil
+		user.ForgotPasswordCodeIssuedAt = sql.NullTime{Valid: false}
+		user.ForgotPasswordCodeHash = ""
 
-		// Update user in database
-		err = database.UpdateUser(r.Context(), nil, user)
+		err = database.SetUserEmail(r.Context(), nil, user)
 		if err != nil {
 			writeEmailTakenOrInternalServerError(w, r, err)
 			return

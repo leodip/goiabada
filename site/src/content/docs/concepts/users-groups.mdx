@@ -24,7 +24,7 @@ You also have the capability to:
 
 A user who forgot their password can ask for a reset link from the login form. The link is sent only when the account is **enabled** and its email address is **verified**. For any other account (one whose address was never verified, or one an administrator disabled) nothing is sent and no code is stored, and the page says exactly what it says for an address with no account, so it cannot be used to find out which addresses are registered.
 
-A reset link stops working as soon as its account is disabled: following it, opening the form and submitting it are each refused with the same "invalid or expired" message any other dead link gets. Sending a reset link also needs SMTP to be configured in the admin console.
+A reset link stops working as soon as its account is disabled, or as soon as the account's email address is changed, by the user or by an administrator, since the link belongs to the address it was mailed to: following it, opening the form and submitting it are each refused with the same "invalid or expired" message any other dead link gets. Correcting a mistyped address after sending a new user the email to set a password therefore retires the link sent to the mistyped address; send the email again. Sending a reset link also needs SMTP to be configured in the admin console.
 
 <Aside type="caution">
 On the default settings, self-registration does not require email verification, and a user an administrator creates starts with the address unverified. Those users cannot recover a password on their own until they verify their address while signed in (offered in the account pages whenever SMTP is configured), or until an administrator marks the address verified or sets a new password for them.

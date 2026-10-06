@@ -37,12 +37,6 @@ import (
 // and an entry whose file no longer calls UpdateUser fails the guard, so none outlives its site.
 // The list is not the place for a new site.
 var wholeRowUserSaveExemptions = map[string]string{
-	"authserver/internal/handlers/apihandlers/handler_api_users_email.go": "the administrator's " +
-		"email save, not yet converted: it writes back the whole row and can undo a concurrent " +
-		"disable, password change or OTP change (#471)",
-	"authserver/internal/handlers/apihandlers/handler_api_user_email_verification_code.go": "the " +
-		"administrator's email verification code generation, not yet converted: it writes back " +
-		"the whole row and can undo a concurrent disable, password change or OTP change (#471)",
 	"authserver/internal/handlers/apihandlers/handler_api_users_crud.go": "the reset code stamped " +
 		"on a user the administrator just created with a set-password email, not yet converted: " +
 		"it writes back the whole row after the insert and can undo a change made in between (#471)",

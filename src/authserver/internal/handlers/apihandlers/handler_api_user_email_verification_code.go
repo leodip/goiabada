@@ -17,12 +17,13 @@ import (
 )
 
 // userEmailVerificationCodeDatabase is what the user email verification code endpoint needs: the
-// user row it stamps.
+// user row, and the conditional write that stamps the code on it.
 // It embeds what the administrative policy reads to judge whether the user is an administrator.
 type userEmailVerificationCodeDatabase interface {
 	userTargetPolicyDatabase
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
+	TryIssueEmailVerificationCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte,
+		issuedAt time.Time) (bool, error)
 }
 
 // HandleUserEmailVerificationCodePost - POST /api/v1/admin/users/{id}/email/verification-code
@@ -68,12 +69,17 @@ func HandleUserEmailVerificationCodePost(
 			return
 		}
 
+		// The response and the audit record name the address the code was issued for, so the code is
+		// stored only while the account still holds the address read above. Writing back the row as
+		// read also undid a disable, a password change or an OTP change made in between (#471).
 		issuedAt := time.Now().UTC()
-		user.EmailVerified = false
-		user.EmailVerificationCodeEncrypted = encrypted
-		user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: issuedAt, Valid: true}
-		if err := database.UpdateUser(r.Context(), nil, user); err != nil {
+		stored, err := database.TryIssueEmailVerificationCode(r.Context(), nil, user.Id, user.Email, encrypted, issuedAt)
+		if err != nil {
 			writeInternalServerError(w, r, err)
+			return
+		}
+		if !stored {
+			writeJSONError(w, "The account was changed by another request while the code was being sent. Nothing was sent: try again.", "CONCURRENT_UPDATE", http.StatusConflict)
 			return
 		}
 

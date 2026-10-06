@@ -357,6 +357,8 @@ PUT /api/v1/admin/users/{id}/email
 }
 ```
 
+Changing the address clears any pending verification code, and any password reset link already sent stops working, since it was mailed to the previous address.
+
 #### Generate email verification code
 
 ```
@@ -375,7 +377,7 @@ No request body required. Returns:
 ```
 
 <Aside type="note">
-This call always generates a new code, and it sets <code>emailVerified</code> to <code>false</code>.
+This call always generates a new code, and it sets <code>emailVerified</code> to <code>false</code>. If the user's address changes while the code is being generated, nothing is stored and the answer is <code>409 CONCURRENT_UPDATE</code>: try again.
 </Aside>
 
 The verification code is 8 characters (4 letters + 4 numbers) and expires after 5 minutes.
@@ -1467,7 +1469,7 @@ PUT /api/v1/account/email
 ```
 
 <Aside type="note">
-Requires the current password, which is checked before anything else about the request: a blank one is refused with `400 VALIDATION_ERROR`, and a wrong one with `400 AUTHENTICATION_FAILED`. A wrong password counts against the same failure limit as [Change password](#change-password) and the OTP change. Changing email marks it as unverified. Use the verification endpoints to verify the new email. Submitting the address the account already has changes nothing and keeps it verified. If another request changed the account's address or its verification after this one read it, nothing is saved and the answer is `409 CONCURRENT_UPDATE`: read the account again and retry. When SMTP is enabled and the previous address was verified, it is sent a notice that the address was changed, in the user's language; it does not name the new address, and a notice that cannot be sent does not fail the change.
+Requires the current password, which is checked before anything else about the request: a blank one is refused with `400 VALIDATION_ERROR`, and a wrong one with `400 AUTHENTICATION_FAILED`. A wrong password counts against the same failure limit as [Change password](#change-password) and the OTP change. Changing email marks it as unverified, and any password reset link already sent stops working, since it was mailed to the previous address. Use the verification endpoints to verify the new email. Submitting the address the account already has changes nothing and keeps it verified. If another request changed the account's address or its verification after this one read it, nothing is saved and the answer is `409 CONCURRENT_UPDATE`: read the account again and retry. When SMTP is enabled and the previous address was verified, it is sent a notice that the address was changed, in the user's language; it does not name the new address, and a notice that cannot be sent does not fail the change.
 </Aside>
 
 #### Send verification email

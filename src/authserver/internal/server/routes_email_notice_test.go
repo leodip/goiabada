@@ -95,7 +95,7 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 			Email:   previousEmail,
 		}, nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, newEmail).Return((*record.User)(nil), nil)
-		database.On("UpdateUser", mock.Anything, mock.Anything, mock.MatchedBy(func(user *record.User) bool {
+		database.On("SetUserEmail", mock.Anything, mock.Anything, mock.MatchedBy(func(user *record.User) bool {
 			return user.Id == 1 && user.Email == newEmail
 		})).Return(nil).Once()
 		s := newServer(t, database)

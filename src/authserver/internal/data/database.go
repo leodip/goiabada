@@ -167,14 +167,26 @@ type Database interface {
 	SetUserAddress(ctx context.Context, tx *sql.Tx, user *record.User) error
 	SetUserPhone(ctx context.Context, tx *sql.Tx, user *record.User) error
 	// TrySetUserEmail moves a user's address from fromEmail to toEmail, clears the verified
-	// flag and any pending verification code in the same statement, and writes no other
-	// column; the code's issued-at stays, because the resend cooldown reads it. It matches
-	// only while the row still carries fromEmail with fromVerified, and reports whether it
-	// did, so of two concurrent changes from one read exactly one is made and only that one
-	// notifies the previous address. Narrow rather than a full-row update, so the
-	// self-service email change cannot undo a concurrent admin disable, password change or
-	// OTP change. A taken address is ErrUniqueViolation, as on UpdateUser (#404).
+	// flag, any pending verification code and any outstanding reset code in the same
+	// statement, and writes no other column; the verification code's issued-at stays, because
+	// the resend cooldown reads it. It matches only while the row still carries fromEmail with
+	// fromVerified, and reports whether it did, so of two concurrent changes from one read
+	// exactly one is made and only that one notifies the previous address. Narrow rather than a
+	// full-row update, so the self-service email change cannot undo a concurrent admin disable,
+	// password change or OTP change. A taken address is ErrUniqueViolation, as on UpdateUser
+	// (#404). The reset code goes because it belongs to the address it was mailed to (#471).
 	TrySetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, fromEmail string, fromVerified bool, toEmail string) (bool, error)
+	// SetUserEmail writes the administrator's email change: the address and verified flag from
+	// user, a cleared verification code and issued-at, a cleared reset code, and updated_at,
+	// and no other column; it sets user.UpdatedAt to what it stored. Unconditional, so the last
+	// change wins; narrow rather than a full-row update, so it cannot undo a concurrent disable,
+	// password change or OTP change. A taken address is ErrUniqueViolation (#471).
+	SetUserEmail(ctx context.Context, tx *sql.Tx, user *record.User) error
+	// TryIssueEmailVerificationCode stores the code the administrator generates, encrypted,
+	// issued at issuedAt, and unverifies the address, only while the account still holds email,
+	// the address the request read and reports, and reports whether it did (#471).
+	TryIssueEmailVerificationCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte,
+		issuedAt time.Time) (bool, error)
 	// TryStoreEmailVerificationCode stores a verification code, encrypted, issued at
 	// issuedAt, only while the account still holds email, unverified, and no code was
 	// issued after issuedNotAfter, and reports whether it did. It is the resend cooldown
