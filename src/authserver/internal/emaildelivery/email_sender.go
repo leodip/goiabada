@@ -19,6 +19,7 @@ import (
 	"net/mail"
 	"net/smtp"
 	"net/textproto"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -188,6 +189,14 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 	}
 	defer func() { _ = client.Close() }()
 
+	// The hello every command below would send first, sent here so its failure is seen: Extension
+	// swallows a failed hello and answers false, which would read a relay that broke or stalled at
+	// EHLO as one offering no STARTTLS or no authentication, and lose the error. "localhost" is
+	// the name net/smtp says by default (#410 decision 5).
+	if helloErr := client.Hello("localhost"); helloErr != nil {
+		return replyFailure(errs.Wrap(helloErr, "unable to send SMTP message"), SendFailureOther)
+	}
+
 	if smtpEnc == SMTPEncryptionSTARTTLS {
 		// The operator asked for STARTTLS, so a server that does not offer it is refused rather
 		// than continued with in the clear. RFC 3207 section 4 leaves the choice to the client,
@@ -258,13 +267,23 @@ func replyFailure(err error, refused SendFailureKind) error {
 
 // tlsFailure labels a failed STARTTLS or handshake. Every failure there is the TLS connection's,
 // whatever shape it reaches the client in -- a certificate that did not verify, a server that does
-// not speak TLS, an alert, a refused STARTTLS command -- except one whose connection cause
-// ClassifyConnectionError names, such as a handshake that timed out.
+// not speak TLS, an alert, a refused STARTTLS command -- except the TCP connection itself failing:
+// one whose connection cause ClassifyConnectionError names, such as a handshake that timed out, and
+// one closed or reset under it, which is no TLS failure whether or not a handshake had begun.
 func tlsFailure(err error) error {
-	if ClassifyConnectionError(err) != ConnectionCauseNone {
+	if ClassifyConnectionError(err) != ConnectionCauseNone || connectionBroke(err) {
 		return labelled(SendFailureConnection, err)
 	}
 	return labelled(SendFailureTLS, err)
+}
+
+// connectionBroke reports whether err is the TCP connection closing or failing under the
+// conversation: an EOF, or an error the socket's own system call returned, such as a reset. A TLS
+// alert reaches the client as a *net.OpError too, but carries no system call error, so it is not
+// one.
+func connectionBroke(err error) bool {
+	var syscallErr *os.SyscallError
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.As(err, &syscallErr)
 }
 
 // authenticate picks a mechanism and runs it. The password is only put on the wire when the

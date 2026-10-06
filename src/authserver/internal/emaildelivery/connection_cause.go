@@ -3,7 +3,6 @@ package emaildelivery
 import (
 	"errors"
 	"net"
-	"syscall"
 )
 
 // ConnectionCause is the coarse cause of a failed connection to an SMTP server, the one part of the
@@ -33,7 +32,7 @@ func ClassifyConnectionError(err error) ConnectionCause {
 	if errors.As(err, &netErr) && netErr.Timeout() {
 		return ConnectionCauseTimedOut
 	}
-	if errors.Is(err, syscall.ECONNREFUSED) {
+	if isConnectionRefused(err) {
 		return ConnectionCauseRefused
 	}
 	return ConnectionCauseNone
