@@ -30,12 +30,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// wholeRowUserSaveExemptions are the files still allowed to call UpdateUser, each with its reason,
-// relative to the source root, forward slashes. A legitimate reason says why no concurrent writer
-// of that user can exist. The entries below are not that: they are the sites #471 found, each a
-// known defect left listed until the change that converts it to a narrow write deletes its row,
-// and an entry whose file no longer calls UpdateUser fails the guard, so none outlives its site.
-// The list is not the place for a new site.
+// wholeRowUserSaveExemptions are the files allowed to call UpdateUser, each with its reason,
+// relative to the source root, forward slashes. It is empty and meant to stay so: #471 converted
+// every production whole-row save of a user to a narrow write or a compare-and-set, and none
+// remains. A row would have to say why no concurrent writer of that user can exist, which no
+// request-handling site can say, since another request can always change the row between its
+// read and its write; a new save is a narrow write instead, and the guard's message names them.
+// TestNoWholeRowUserSave_TheExemptionListStaysEmpty fails on a row added here, and an entry whose
+// file no longer calls UpdateUser fails the guard too, so none could outlive its site anyway.
 var wholeRowUserSaveExemptions = map[string]string{}
 
 // updateUserCall is one call expression selecting UpdateUser.
@@ -98,6 +100,15 @@ func findUpdateUserCalls(root string) ([]updateUserCall, int, error) {
 // TestNoWholeRowUserSave holds the real tree to the rule.
 func TestNoWholeRowUserSave(t *testing.T) {
 	assertNoWholeRowUserSave(t, guard.SourceRoot(t), wholeRowUserSaveExemptions)
+}
+
+// TestNoWholeRowUserSave_TheExemptionListStaysEmpty holds the list itself: the exemption mechanism
+// stays for the rule tests below, but the real tree is held to no exemption at all, so a row added
+// to admit a new whole-row save fails here even with a reason beside it.
+func TestNoWholeRowUserSave_TheExemptionListStaysEmpty(t *testing.T) {
+	assert.Empty(t, wholeRowUserSaveExemptions,
+		"no production file may call UpdateUser, exempted or not: save a user through a narrow "+
+			"write that names only the columns the save changes (#471)")
 }
 
 // assertNoWholeRowUserSave is the reporting half, taking the root and the exemptions as

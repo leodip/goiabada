@@ -51,20 +51,22 @@ type User struct {
 	ForgotPasswordCodeHash string `db:"forgot_password_code_hash"`
 	// AuthStateGeneration is the authoritative per-user authentication generation:
 	// credentials authenticated under generation N cannot create or use
-	// authentication state once the user advances to N+1. Tagged dont-update because
-	// every credential handler loads the whole user and writes it back, so leaving it
-	// in the ordinary update set would let a stale model regress it. It advances only
-	// through IncrementUserAuthStateGeneration (#106).
+	// authentication state once the user advances to N+1. Tagged dont-update so that
+	// UpdateUser, which writes every other column from the model it is handed, can never
+	// regress it from a stale model. No production code calls UpdateUser any more, and
+	// TestNoWholeRowUserSave in internal/data holds it, but the data and integration tiers
+	// seed fixtures through it (#471). It advances only through
+	// IncrementUserAuthStateGeneration (#106).
 	AuthStateGeneration int64 `db:"auth_state_generation" fieldtag:"dont-update"`
 	// LastOTPStep is the most recently consumed TOTP time step, 0 meaning none has
 	// been consumed: a step is Unix seconds divided by 30, so any real one is around
 	// 6e7, and the column default is unambiguous. It is what makes a code one-time-use
 	// (#111, RFC 6238 5.2). Tagged
-	// dont-update for the same reason AuthStateGeneration is, and the hazard is even
-	// more direct here: the OTP enrollment handler loads the whole user, claims a step
-	// and then writes the user back, so leaving the column in the ordinary update set
-	// would let it write the pre-claim value over its own claim. It moves only through
-	// TryConsumeUserOTPStep, TryConsumeEnrolledUserOTPStep and ResetUserOTPStep.
+	// dont-update for the same reason AuthStateGeneration is: a whole-row write from a
+	// model read before a claim would write the pre-claim value over it. The OTP
+	// enrolment used to do exactly that to its own claim, before #471 made it a narrow
+	// compare-and-set. It moves only through TryConsumeUserOTPStep,
+	// TryConsumeEnrolledUserOTPStep and ResetUserOTPStep.
 	LastOTPStep int64 `db:"last_otp_step" fieldtag:"dont-update"`
 	// OtpConfigGeneration is the authoritative per-user counter of authenticator
 	// changes: it advances by one every time OTP is enabled or disabled, and never
@@ -72,10 +74,9 @@ type User struct {
 	// Being per user rather than per session is what makes "every session of this user"
 	// one statement, which the boolean it replaced could never do (#242).
 	//
-	// Tagged dont-update for the same reason AuthStateGeneration and LastOTPStep are:
-	// the OTP handlers load the whole user, change it and write it back, so leaving the
-	// column in the ordinary update set would let a stale model regress the counter and
-	// silently discharge every session's obligation. It advances only through
+	// Tagged dont-update for the same reason AuthStateGeneration and LastOTPStep are: in
+	// the ordinary update set, a whole-row write from a stale model would regress the
+	// counter and silently discharge every session's obligation. It advances only through
 	// IncrementUserOtpConfigGeneration.
 	OtpConfigGeneration int64 `db:"otp_config_generation" fieldtag:"dont-update"`
 	// OtpEnrollmentSecretEncrypted is the AES-GCM ciphertext of a TOTP enrolment the server
@@ -94,12 +95,14 @@ type User struct {
 	//
 	// Both are tagged dont-update for the reason AuthStateGeneration, LastOTPStep and
 	// OtpConfigGeneration are, and the hazard is the pair's whole purpose. UpdateUser writes
-	// every field not tagged pk or dont-update, and fourteen production sites load a user and
-	// later write it back, otpcredential.Establish among them. In the ordinary update set, two
-	// concurrent enrolment requests would each see no pending value, issue different seeds and
-	// leave only the last one usable, which is exactly the reload bug these columns exist to
-	// close; and any later full-row write from a model loaded before issuance would erase or
-	// resurrect the pending seed. They move only through TryInstallPendingOTPEnrollment and
+	// every field not tagged pk or dont-update, from the model it is handed. In the ordinary
+	// update set, two concurrent enrolment requests would each see no pending value, issue
+	// different seeds and leave only the last one usable, which is exactly the reload bug these
+	// columns exist to close; and any full-row write from a model loaded before issuance would
+	// erase or resurrect the pending seed. No production code writes a user's whole row any
+	// more: every save names its own columns, and TestNoWholeRowUserSave in internal/data
+	// refuses a production call to UpdateUser, which stays for the data and integration tiers'
+	// fixtures (#471). They move only through TryInstallPendingOTPEnrollment and
 	// ClearPendingOTPEnrollment.
 	OtpEnrollmentSecretEncrypted []byte       `db:"otp_enrollment_secret_encrypted" fieldtag:"dont-update"`
 	OtpEnrollmentIssuedAt        sql.NullTime `db:"otp_enrollment_issued_at" fieldtag:"dont-update"`
