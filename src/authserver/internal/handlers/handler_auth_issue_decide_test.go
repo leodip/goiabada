@@ -25,6 +25,9 @@ type issuanceWorld struct {
 	clientDisabled bool
 	implicitOff    bool
 	codeOff        bool
+	// administrativeRefused says the scope to be issued names an administrative scope the client may
+	// no longer request, which is known with the registration (#499).
+	administrativeRefused bool
 	// userSubject is the ceremony user's subject; noUser makes the user missing; userDisabled disables
 	// them; generationDrift is how far the user's authentication generation has moved from the one the
 	// ceremony authenticated at, 0 for current.
@@ -67,6 +70,9 @@ func driveIssuance(t *testing.T, world issuanceWorld) (issuanceAnswer, []issuanc
 			facts.registrationLoaded = true
 			facts.registeredRedirectURIs = world.registered
 			facts.clientEnabled = !world.clientDisabled
+			if world.administrativeRefused {
+				facts.refusedAdministrativeScopes = []string{"authserver:manage"}
+			}
 		case issuanceFactFlows:
 			facts.flows = &clientFlows{implicit: !world.implicitOff, code: !world.codeOff}
 		case issuanceFactUser:
@@ -250,6 +256,44 @@ func TestDecideIssuance(t *testing.T) {
 			world:     with(func(w *issuanceWorld) { w.implicitOff = true }),
 			want:      issuanceAnswer{outcome: issuanceIssueCode},
 			wantReads: []issuanceFact{registration, flows, session, validity, user, scope},
+		},
+
+		// 2, continued. An administrative scope the client may no longer request (#499 decision 6):
+		// the allowance withdrawn while the ceremony sat on a step takes effect here. It is about the
+		// client, so it sits with the client's checks and reads nothing past them.
+		{
+			name:      "an administrative scope the client may not request is refused, reading nothing past the flows",
+			world:     with(func(w *issuanceWorld) { w.administrativeRefused = true }),
+			want:      issuanceAnswer{outcome: issuanceRefuseAdministrativeScope},
+			wantReads: []issuanceFact{registration, flows},
+		},
+		{
+			name:      "it is refused for an implicit ceremony too",
+			world:     with(func(w *issuanceWorld) { w.administrativeRefused = true; w.responseType = "id_token token" }),
+			want:      issuanceAnswer{outcome: issuanceRefuseAdministrativeScope},
+			wantReads: []issuanceFact{registration, flows},
+		},
+		{
+			name: "it outranks a hint naming another user and a session that is gone",
+			world: with(func(w *issuanceWorld) {
+				w.administrativeRefused = true
+				w.hint = "subject-b"
+				w.session = false
+			}),
+			want:      issuanceAnswer{outcome: issuanceRefuseAdministrativeScope},
+			wantReads: []issuanceFact{registration, flows},
+		},
+		{
+			name:      "a disabled client outranks it",
+			world:     with(func(w *issuanceWorld) { w.administrativeRefused = true; w.clientDisabled = true }),
+			want:      issuanceAnswer{outcome: issuanceRefuseClientDisabled},
+			wantReads: []issuanceFact{registration},
+		},
+		{
+			name:      "the flow switched off outranks it",
+			world:     with(func(w *issuanceWorld) { w.administrativeRefused = true; w.codeOff = true }),
+			want:      issuanceAnswer{outcome: issuanceRefuseCodeDisabled},
+			wantReads: []issuanceFact{registration, flows},
 		},
 		{
 			name:      "the code flow switched off does not refuse an implicit ceremony",

@@ -253,6 +253,9 @@ func HandleAuthorizeGet(
 		var (
 			userSession *record.UserSession
 			refusal     *oauth.ErrorDetail
+			// refusedAdministrativeScopes is set when the refusal is for administrative scopes this
+			// client may not request, which is recorded where it is answered (#499).
+			refusedAdministrativeScopes []string
 		)
 
 		// The loads. decideAuthorizeRoute names the next fact it needs, or the route once it needs
@@ -287,7 +290,7 @@ func HandleAuthorizeGet(
 
 			case authorizeFactValidation:
 				validation, validationErr := validateAuthorizeRequest(r.Context(), authorizeValidator, tokenParser,
-					settings, params, &protocolvalidation.ValidateRequestInput{
+					settings, client, params, &protocolvalidation.ValidateRequestInput{
 						ResponseType:         authContext.ResponseType,
 						CodeChallengeMethod:  authContext.CodeChallengeMethod,
 						CodeChallenge:        authContext.CodeChallenge,
@@ -304,6 +307,7 @@ func HandleAuthorizeGet(
 					return
 				}
 				refusal = validation.refusal
+				refusedAdministrativeScopes = validation.refusedAdministrativeScopes
 				authContext.Prompt = validation.prompt
 				authContext.IdTokenHintSub = validation.hintSubject
 				if refusal == nil {
@@ -370,9 +374,33 @@ func HandleAuthorizeGet(
 
 		switch route {
 		case authorizeRouteAnswerNow:
+			if len(refusedAdministrativeScopes) > 0 {
+				// Recorded against the user when the browser holds a valid session, which this route
+				// has not read when it answered for silence or a withheld redirect; read here, and
+				// only for this refusal, so every other refusal reads what it always did.
+				if facts.sessionValid == nil {
+					userSession, err = database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
+					if err != nil {
+						pageRenderer.InternalServerError(w, r, err)
+						return
+					}
+					valid := userSessionManager.HasValidUserSession(userSession,
+						settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, requestedMaxAge)
+					facts.sessionValid = &valid
+				}
+				if *facts.sessionValid {
+					auditLogger.Log(r.Context(), audit.EventAdministrativeScopeRefused,
+						administrativeScopeRefusedDetails(client, refusedAdministrativeScopes, "authorize", userSession.UserId))
+				} else {
+					warnAdministrativeScopeRefused(r.Context(), client, refusedAdministrativeScopes)
+				}
+			}
 			answerClientImmediately(refusal)
 
 		case authorizeRoutePark:
+			if len(refusedAdministrativeScopes) > 0 {
+				warnAdministrativeScopeRefused(r.Context(), client, refusedAdministrativeScopes)
+			}
 			// Park the error and go and authenticate. It is carried on the auth context, which the
 			// session store seals with an AEAD, so it is not a value the visitor can choose, and it
 			// is delivered at /auth/level1completed once level 1 credentials are verified.
@@ -557,11 +585,15 @@ type authorizeValidation struct {
 	prompt string
 	// hintSubject is the id_token_hint's sub once the hint has been accepted, "" without a hint.
 	hintSubject string
+	// refusedAdministrativeScopes is the administrative scopes the refusal is for, when the client
+	// may not request them, and nil for every other refusal.
+	refusedAdministrativeScopes []string
 }
 
 // validateAuthorizeRequest runs the validations that answer by redirect, in the order the client is
 // told about them: repeated parameters, unsupported request parameters, the
-// request itself, the scopes, the prompt, the id_token_hint. The first refusal stops the rest. An error that is not an ErrorDetail
+// request itself, the scopes, whether the client may request the administrative scopes among them,
+// the prompt, the id_token_hint. The first refusal stops the rest. An error that is not an ErrorDetail
 // is a fault inside a validator and is returned for the 500.
 //
 // These five descriptions stay English and are deliberately NOT localized, unlike the refusal page
@@ -573,7 +605,8 @@ type authorizeValidation struct {
 // site and the emitter, so an accented sentence would reach the client as a row of question marks
 // instead. That is the failure a translation here buys (#213 decision 9).
 func validateAuthorizeRequest(ctx context.Context, authorizeValidator AuthorizeValidator, tokenParser TokenParser,
-	settings *record.Settings, params url.Values, request *protocolvalidation.ValidateRequestInput) (authorizeValidation, error) {
+	settings *record.Settings, client *record.Client, params url.Values,
+	request *protocolvalidation.ValidateRequestInput) (authorizeValidation, error) {
 
 	var validation authorizeValidation
 
@@ -616,6 +649,18 @@ func validateAuthorizeRequest(ctx context.Context, authorizeValidator AuthorizeV
 		return stop(err)
 	}
 
+	// Once the scopes are known to exist, who asked for them: only a client allowed to request the
+	// administrative scopes may obtain one on a user's behalf. A validation like the others, so the
+	// refusal reaches the client the way theirs does, at once to a signed-in browser and to
+	// prompt=none, after the sign-in to a signed-out one, which covers the interactive, silent and
+	// implicit paths in one place (#499 decisions 1 and 7). request.Scope is the scope as asked for,
+	// normalized.
+	if refused := protocolvalidation.RefusedAdministrativeScopes(client, request.Scope); len(refused) > 0 {
+		validation.refusal = protocolvalidation.AdministrativeScopeRefusal(refused)
+		validation.refusedAdministrativeScopes = refused
+		return validation, nil
+	}
+
 	normalizedPrompt, err := authorizeValidator.ValidatePrompt(params.Get("prompt"))
 	if err != nil {
 		return stop(err)
@@ -631,6 +676,29 @@ func validateAuthorizeRequest(ctx context.Context, authorizeValidator AuthorizeV
 	validation.hintSubject = hintSubject
 
 	return validation, nil
+}
+
+// administrativeScopeRefusedDetails is an administrative_scope_refused record's payload: the
+// client refused, the administrative scopes it asked for, the checkpoint that refused them, and the
+// user they were asked for (#499 decision 9).
+func administrativeScopeRefusedDetails(client *record.Client, scopes []string, checkpoint string, userId int64) map[string]interface{} {
+	return map[string]interface{}{
+		"clientId":         client.Id,
+		"clientIdentifier": client.ClientIdentifier,
+		"scopes":           scopes,
+		"checkpoint":       checkpoint,
+		"userId":           userId,
+	}
+}
+
+// warnAdministrativeScopeRefused is what a refusal at /auth/authorize leaves when no valid session
+// names a user, signed out or parked behind the sign-in: a Warn record and no audit row, because
+// that endpoint is unauthenticated and not rate limited, so a row per request would be audit rows
+// anyone can write at will (#499 decision 9). The client identifier and the scopes are bounded
+// stored values, safe to log.
+func warnAdministrativeScopeRefused(ctx context.Context, client *record.Client, scopes []string) {
+	slog.WarnContext(ctx, "refused an administrative scope the client may not request, with no signed-in user to record it against",
+		"client_identifier", client.ClientIdentifier, "scopes", scopes)
 }
 
 // authorizeFact is a fact decideAuthorizeRoute needs and has not been given. HandleAuthorizeGet

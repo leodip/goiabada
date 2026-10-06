@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
@@ -624,14 +626,19 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
+	// Allowed to request the administrative scopes when the scope names one, as an operator allows a
+	// client that legitimately needs them: the tests minting an administrative user token through
+	// this fixture are about what the token does, not about which client may obtain one (#499).
+	administrative := slices.ContainsFunc(strings.Split(scope, " "), permissions.IsAdministrativeScope)
 	client := &record.Client{
-		ClientIdentifier:         "acctscope-client-" + fake.LetterN(8),
-		Enabled:                  true,
-		AuthorizationCodeEnabled: true,
-		IsPublic:                 false,
-		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
-		ClientSecretEncrypted:    clientSecretEncrypted,
+		ClientIdentifier:            "acctscope-client-" + fake.LetterN(8),
+		Enabled:                     true,
+		AuthorizationCodeEnabled:    true,
+		IsPublic:                    false,
+		ConsentRequired:             false,
+		DefaultAcrLevel:             record.AcrLevel2Optional,
+		ClientSecretEncrypted:       clientSecretEncrypted,
+		AdministrativeScopesAllowed: administrative,
 	}
 
 	err = database.CreateClient(context.Background(), nil, client)
