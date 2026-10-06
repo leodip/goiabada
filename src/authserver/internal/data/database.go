@@ -228,11 +228,20 @@ type Database interface {
 	// time step, only if it is strictly newer than what is stored, and reports whether
 	// this call made the transition. Compare-and-set for the same reason MarkCodeAsUsed
 	// is: accepting a code and recording it as used must not be separable, or two
-	// concurrent submissions of one code both pass (#111). requireOTPEnabled adds
-	// otp_enabled to the predicate, which verification sites set and enrollment sites
-	// do not. False means no row transitioned, which is a replay in all but a rare
-	// interleaving, never specifically proof of one.
-	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)
+	// concurrent submissions of one code both pass (#111). The enrolment claim: it names
+	// no authenticator state, because it runs while otp_enabled is still off and the
+	// establish that follows is the compare-and-set on the authenticator (#471). False
+	// means no row transitioned, which is a replay in all but a rare interleaving, never
+	// specifically proof of one.
+	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64) (bool, error)
+	// TryConsumeEnrolledUserOTPStep is the verification claim: TryConsumeUserOTPStep's
+	// claim, matching only while otp_enabled is on at expectedGeneration, the
+	// otp_config_generation read with the secret the passcode was checked against. A
+	// passcode checked against an authenticator removed, or removed and replaced, under
+	// the request is refused rather than asserting otp for one that no longer exists
+	// (#111, #144, #471). False carries the same imprecision as TryConsumeUserOTPStep's.
+	TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
+		expectedGeneration int64) (bool, error)
 	// ResetUserOTPStep returns the consumed-step marker to 0. Called when OTP is
 	// disabled: the marker belongs to the enrolled authenticator, and it is the only
 	// remedy if a clock jump strands the marker in the future (#111).

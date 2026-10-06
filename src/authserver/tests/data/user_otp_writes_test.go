@@ -322,7 +322,7 @@ func TestOtpCredential_ALostCompareAndSetWritesNothing(t *testing.T) {
 
 	t.Run("remove", func(t *testing.T) {
 		read := otpStateUser(t, true)
-		consumed, err := database.TryConsumeUserOTPStep(ctx, nil, read.Id, 1000, true)
+		consumed, err := database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.Id, 1000, read.OtpConfigGeneration)
 		if err != nil || !consumed {
 			t.Fatalf("the step claim must land: consumed=%v err=%v", consumed, err)
 		}

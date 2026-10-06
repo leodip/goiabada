@@ -105,8 +105,9 @@ const (
 	// It does NOT assert malicious intent, and it is not proof of replay. The claim is a
 	// compare-and-set, so a false return only says no row transitioned, which is either
 	// an already-consumed step, a user row that vanished, or an authenticator disabled
-	// under this very request. The caller loaded the user moments earlier, so replay is
-	// overwhelmingly the cause. See TryConsumeUserOTPStep for the full accounting.
+	// or replaced under this very request. The caller loaded the user moments earlier,
+	// so replay is overwhelmingly the cause. See TryConsumeUserOTPStep for the full
+	// accounting.
 	//
 	// Payload: userId and the matched time step, so an operator can see which code was
 	// replayed. Never the code itself. The caller learns nothing either way: a replay

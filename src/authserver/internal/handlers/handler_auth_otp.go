@@ -310,8 +310,9 @@ func HandleAuthOtpPost(
 		// One verification call on both arms, and which one is the difference the two arms have
 		// always had: an enrolled user's passcode is checked against the authenticator stored on
 		// their row, an enrolling one's against the seed this ceremony rendered. The step claim
-		// that makes a passcode single-use rides inside either, with requireOTPEnabled set from
-		// the entry point rather than from here (#111 decision 10, #387).
+		// that makes a passcode single-use rides inside either, bound to the authenticator the
+		// passcode was checked against by the entry point rather than from here (#111 decision 10,
+		// #387, #471 decision 3).
 		var verified otpcredential.VerifyResult
 		if user.OTPEnabled {
 			verified, err = otpcredential.VerifyStored(r.Context(), database, dataCipher, user, otpCode, time.Now().UTC())

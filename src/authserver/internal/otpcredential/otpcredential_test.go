@@ -282,16 +282,17 @@ func TestRemove_AFailedGenerationAdvanceFailsTheRemoval(t *testing.T) {
 	assert.ErrorIs(t, stub.BodyErr, incrementErr)
 }
 
-// Seam 3, the three-arm table, against the authenticator the user has enrolled. requireOTPEnabled
-// is true on every call from here: this claim asserts a factor, and that assertion is only true of
-// an enrolled authenticator (#111 decision 10).
+// Seam 3, the three-arm table, against the authenticator the user has enrolled. Every claim from
+// here is the verification claim at the generation the user was read with: it asserts a factor,
+// and that assertion is only true of the authenticator the passcode was checked against (#111
+// decision 10, #471 decision 3).
 func TestVerifyStored(t *testing.T) {
 	now := time.Now().UTC()
 
 	t.Run("a code the enrolled seed produces matches and claims its step", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.EXPECT().
-			TryConsumeUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, true).
+			TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, otpReadGeneration).
 			Return(true, nil).Once()
 
 		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), codeFor(t, otpSeed, now), now)
@@ -312,14 +313,14 @@ func TestVerifyStored(t *testing.T) {
 		assert.Zero(t, result.Step, "nothing matched, so there is no step to name")
 		// One matcher per parameter, or testify compares argument lists that can never be equal
 		// and the assertion passes whatever happened (#421).
-		database.AssertNotCalled(t, "TryConsumeUserOTPStep",
+		database.AssertNotCalled(t, "TryConsumeEnrolledUserOTPStep",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("a step already spent is reported as a replay, with the step", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.EXPECT().
-			TryConsumeUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, true).
+			TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, otpReadGeneration).
 			Return(false, nil).Once()
 
 		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), codeFor(t, otpSeed, now), now)
@@ -335,7 +336,7 @@ func TestVerifyStored(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		claimErr := errors.New("claim refused")
 		database.EXPECT().
-			TryConsumeUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, true).
+			TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, otpReadGeneration).
 			Return(false, claimErr).Once()
 
 		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), codeFor(t, otpSeed, now), now)
@@ -358,9 +359,9 @@ func TestVerifyStored(t *testing.T) {
 }
 
 // Seam 3 again, against a seed the caller holds: the browser's off AuthContext.OTPKeyURL, the
-// account API's off the pending enrolment the server issued. requireOTPEnabled is false on every
-// call from here, because enrolment establishes the authenticator rather than asserts it and
-// otp_enabled is still off until Establish writes it (#111 decision 10).
+// account API's off the pending enrolment the server issued. Every claim from here is the enrolment
+// claim, naming no authenticator state, because enrolment establishes the authenticator rather than
+// asserts it and otp_enabled is still off until Establish writes it (#111 decision 10).
 func TestVerifySupplied(t *testing.T) {
 	now := time.Now().UTC()
 	const suppliedSeed = "ZP2Z5KXRBAPPHWXEHH65PY5H7EKLVHRZ"
@@ -368,7 +369,7 @@ func TestVerifySupplied(t *testing.T) {
 	t.Run("a code the supplied seed produces matches, and the stored seed is not consulted", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.EXPECT().
-			TryConsumeUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, false).
+			TryConsumeUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything).
 			Return(true, nil).Once()
 
 		// Enrolled with a different seed on purpose: the supplied one is what decides this, which
@@ -389,13 +390,13 @@ func TestVerifySupplied(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, OutcomeWrong, result.Outcome)
 		database.AssertNotCalled(t, "TryConsumeUserOTPStep",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("a step already spent is reported as a replay", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.EXPECT().
-			TryConsumeUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, false).
+			TryConsumeUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything).
 			Return(false, nil).Once()
 
 		result, err := VerifySupplied(context.Background(), database, enrollableUser(), suppliedSeed,

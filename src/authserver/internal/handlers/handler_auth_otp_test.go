@@ -976,10 +976,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		otpSecret := key.Secret()
 		user := &record.User{
-			Id:                 1,
-			Enabled:            true,
-			OTPEnabled:         true,
-			OTPSecretEncrypted: encryptOTPForTest(t, otpSecret),
+			Id:                  1,
+			Enabled:             true,
+			OTPEnabled:          true,
+			OTPSecretEncrypted:  encryptOTPForTest(t, otpSecret),
+			OtpConfigGeneration: 3,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
@@ -988,10 +989,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		// requireOTPEnabled is matched exactly rather than with mock.Anything: true is what
-		// makes a verification claim assert an enrolled authenticator (#111 decision 10),
-		// and passing false here would go unnoticed otherwise.
-		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, true).
+		// The verification claim, at the generation the user was read with, matched exactly
+		// rather than with mock.Anything: it is what binds the claim to the authenticator the
+		// passcode was checked against (#111 decision 10, #471 decision 3).
+		database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
 			Return(true, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything).Return()
@@ -1081,7 +1082,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// false, because enrollment claims before the enable write and otp_enabled is
 		// still off at that point (#111 decision 10). Matched exactly for the reason the
 		// verification subtest above matches true.
-		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, false).
+		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything).
 			Return(true, nil)
 
 		// The enable write and the counter advance commit together, so there is no state in
@@ -1211,7 +1212,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		// The claim succeeds and the enable write then fails, which is the ordering §4
 		// asks for: a burned code and a retry beats OTP left enabled on a refused request.
-		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, false).
+		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything).
 			Return(true, nil)
 
 		updateError := errors.New("failed to update user")
@@ -1280,7 +1281,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		client := &record.Client{ClientIdentifier: "test-client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, false).
+		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything).
 			Return(true, nil)
 
 		incrementError := errors.New("the database is unwell")
@@ -1345,10 +1346,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		user := &record.User{
-			Id:                 1,
-			Enabled:            true,
-			OTPEnabled:         true,
-			OTPSecretEncrypted: encryptOTPForTest(t, key.Secret()),
+			Id:                  1,
+			Enabled:             true,
+			OTPEnabled:          true,
+			OTPSecretEncrypted:  encryptOTPForTest(t, key.Secret()),
+			OtpConfigGeneration: 3,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
@@ -1361,7 +1363,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// what refuses it. That is the whole point of the case: without the claim this is
 		// an ordinary successful authentication.
 		expectedStep := time.Now().UTC().Unix() / otp.StepSeconds
-		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, true).
+		database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
 			Return(false, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventOTPCodeReplayDetected,
@@ -1446,11 +1448,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 
-		// requireOTPEnabled is false on this arm, for the reason #111 decision 10 gives:
+		// The enrolment claim on this arm, for the reason #111 decision 10 gives:
 		// enrollment establishes the authenticator rather than asserting it. The code
 		// matches the seed, so the claim is what refuses the submission.
 		expectedStep := time.Now().UTC().Unix() / otp.StepSeconds
-		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, false).
+		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything).
 			Return(false, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventOTPCodeReplayDetected,
@@ -1531,10 +1533,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		user := &record.User{
-			Id:                 1,
-			Enabled:            true,
-			OTPEnabled:         true,
-			OTPSecretEncrypted: encryptOTPForTest(t, key.Secret()),
+			Id:                  1,
+			Enabled:             true,
+			OTPEnabled:          true,
+			OTPSecretEncrypted:  encryptOTPForTest(t, key.Secret()),
+			OtpConfigGeneration: 3,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
@@ -1547,7 +1550,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// answer: "not consumed" would refuse valid codes for the duration of the fault,
 		// and "consumed" would accept replays through it.
 		consumeError := errors.New("failed to consume the OTP step")
-		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, true).
+		database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
 			Return(false, consumeError)
 
 		pageRenderer.On("InternalServerError", rr, req, consumeError).Return()
@@ -1680,7 +1683,7 @@ func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 				Return(&record.Client{ClientIdentifier: "test-client"}, nil)
-			database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, false).
+			database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything).
 				Return(true, nil)
 
 			var calls []string
@@ -1730,7 +1733,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	//
 	// enrolled picks which half of the handler runs: the enrolled half verifies the code
 	// against the user's stored secret, the enrollment half against the one the ceremony is
-	// carrying. consumed is TryConsumeUserOTPStep's answer, and false is a step that has
+	// carrying. consumed is the step claim's answer, and false is a step that has
 	// already been spent. The two flags together select one of the four credential-rejection
 	// branches, each of which is its own recording call site.
 	newHandler := func(t *testing.T, enrolled bool, consumed bool) (http.Handler, *ceremony.AuthContext) {
@@ -1750,7 +1753,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		// Only the accepted-code case reaches it, and this table covers both outcomes.
 		ceremonyStore.On("RegenerateSession", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-		user := &record.User{Id: 1, Enabled: true, OTPEnabled: enrolled}
+		user := &record.User{Id: 1, Enabled: true, OTPEnabled: enrolled, OtpConfigGeneration: 3}
 		template := "/auth_otp.html"
 		if enrolled {
 			user.OTPSecretEncrypted = encryptOTPForTest(t, key.Secret())
@@ -1765,10 +1768,16 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&record.Client{ClientIdentifier: "test-client"}, nil)
-		// requireOTPEnabled mirrors enrolled: the enrolled half asserts an authenticator and
-		// the enrollment half establishes one (#111 decision 10).
-		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, enrolled).
-			Return(consumed, nil).Maybe()
+		// The claim follows enrolled: the enrolled half asserts an authenticator, at the
+		// generation read with it, and the enrollment half establishes one (#111 decision 10,
+		// #471 decision 3).
+		if enrolled {
+			database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything,
+				user.OtpConfigGeneration).Return(consumed, nil).Maybe()
+		} else {
+			database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything).
+				Return(consumed, nil).Maybe()
+		}
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 		pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
 			template, mock.Anything).Return(nil).Maybe()

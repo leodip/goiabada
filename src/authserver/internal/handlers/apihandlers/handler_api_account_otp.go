@@ -411,7 +411,7 @@ func HandleAccountOTPPut(
 
 			// VerifySupplied rather than VerifyStored, because this code is checked against
 			// the seed the server issued and recorded and not against an enrolled
-			// authenticator: requireOTPEnabled is false inside it, and it can only be off
+			// authenticator: its claim names no authenticator state, and OTP can only be off
 			// here, since the OTP_ALREADY_ENABLED check above refuses an enable when it is
 			// on (#111 decision 10).
 			verified, verifyErr := otpcredential.VerifySupplied(r.Context(), database, user, pendingSecret,
