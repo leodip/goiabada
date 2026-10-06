@@ -344,7 +344,7 @@ The response body contains error details:
     <tr>
       <td style="white-space: nowrap;"><code>invalid_grant</code></td>
       <td>400</td>
-      <td>Authorization code or refresh token is invalid, expired, revoked, or doesn't match the redirect URI.</td>
+      <td>Authorization code or refresh token is invalid, expired, revoked, or doesn't match the redirect URI, or it carries an administrative scope the client is no longer allowed to request.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>unauthorized_client</code></td>
@@ -376,6 +376,17 @@ The **password grant** answers `invalid_scope`, as it answers a scope the user d
   "error_description": "The client is not allowed to request the administrative scope 'authserver:manage'."
 }
 ```
+
+The **authorization code grant** answers `invalid_grant` when the code carries an administrative scope and the client is no longer allowed to request one. The allowance is read when the code is redeemed, so a code issued just before an operator switched the client's allowance off is not exchanged for tokens:
+
+```json
+{
+  "error": "invalid_grant",
+  "error_description": "The client is not allowed to request the administrative scope 'authserver:manage'."
+}
+```
+
+Start a new authorization request without the administrative scope.
 
 The **refresh token grant** answers `invalid_grant`, in the shape of its other per-scope checks. It judges the scope the refresh would issue, read now rather than when the token was issued, so a refresh token issued before an upgrade, or before an operator switched the client's allowance off, is not renewed with an administrative scope:
 

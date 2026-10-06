@@ -21,14 +21,16 @@ import (
 )
 
 // The token endpoint's half of #499: a client that may not request the administrative scopes is
-// refused them on the refresh token grant, whichever grant issued the refresh token, and on the
-// password grant (decision 6). A refresh is refused invalid_grant before the token is spent, so the
-// same token still refreshes once the request leaves the administrative scope out; the password
-// grant is refused invalid_scope. Each refusal leaves an administrative_scope_refused row naming the
-// grant as its checkpoint (decision 9).
+// refused them when it redeems a code carrying one, on the refresh token grant, whichever grant
+// issued the refresh token, and on the password grant (decision 6). A code redemption is refused
+// invalid_grant; a refresh is refused invalid_grant before the token is spent, so the same token
+// still refreshes once the request leaves the administrative scope out; the password grant is
+// refused invalid_scope. Each refusal leaves an administrative_scope_refused row naming the grant as
+// its checkpoint (decision 9).
 //
-// The refresh tokens here are issued while the client is allowed, and the allowance is then
-// withdrawn: the token an operator's withdrawal, or the upgrade itself, leaves in a client's hands.
+// The codes and refresh tokens here are issued while the client is allowed, and the allowance is
+// then withdrawn: the grant an operator's withdrawal, or the upgrade itself, leaves in a client's
+// hands.
 
 // refreshAdministrativeScopeRefusal is the refresh grant's answer, byte for byte, in the shape of
 // the other per-scope refresh re-checks (decision 7).
@@ -91,6 +93,36 @@ func assertRefreshRefused(t *testing.T, status int, body map[string]interface{})
 	assert.Equal(t, refreshAdministrativeScopeRefusal, body["error_description"])
 	assert.NotContains(t, body, "access_token")
 	assert.NotContains(t, body, "refresh_token")
+}
+
+// A code issued while the client was allowed, redeemed after the allowance was withdrawn and within
+// its 60 second life. /auth/issue was the last check before the code existed, so this redemption is
+// what would otherwise turn an operator's withdrawal into a fresh administrative token.
+func TestToken_AdministrativeScope_CodeRedeemedAfterTheAllowanceWasWithdrawn(t *testing.T) {
+	requireDatabaseAuditLogs(t)
+
+	clientSecret := fake.LetterN(32)
+	httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, "openid profile authserver:manage")
+	require.True(t, code.Client.AdministrativeScopesAllowed, "the fixture allows its client for an administrative scope")
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.Client.Id) })
+
+	withdrawAdministrativeScopes(t, code.Client.Id)
+
+	status, body, err := concurrentTokenPost(httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {code.Client.ClientIdentifier},
+		"client_secret": {clientSecret},
+		"code":          {code.Code},
+		"redirect_uri":  {code.RedirectURI},
+		"code_verifier": {testCodeVerifier},
+	})
+	require.NoError(t, err, "code redemption failed at the transport level")
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Equal(t, "invalid_grant", body["error"])
+	assert.Equal(t, administrativeScopeRefusal, body["error_description"])
+	assert.NotContains(t, body, "access_token")
+	assert.NotContains(t, body, "refresh_token")
+	assertRefusedAtTheTokenEndpoint(t, &code.Client, code.UserId, "authorization_code")
 }
 
 // A refresh token descended from an authorization code, issued while the client was allowed. It

@@ -161,8 +161,8 @@ func TestAdministrativeScopesDocs_NameWhatTheAllowanceRestsOn(t *testing.T) {
 
 // The endpoints page quotes what a client that may not request an administrative scope is answered,
 // as the code answers it: the authorization endpoint's invalid_scope, and on the token endpoint the
-// password grant's invalid_scope and the refresh token grant's invalid_grant carrying the same
-// sentence (#499 decision 7).
+// password grant's invalid_scope, the authorization code grant's invalid_grant with the same
+// sentence, and the refresh token grant's invalid_grant carrying it (#499 decision 7).
 func TestAdministrativeScopesDocs_TheEndpointsPageQuotesTheRefusal(t *testing.T) {
 	refusal := protocolvalidation.AdministrativeScopeRefusal([]string{"authserver:manage"}).Description()
 	root := filepath.Dir(guard.SourceRoot(t))
