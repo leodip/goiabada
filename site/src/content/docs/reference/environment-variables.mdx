@@ -151,27 +151,27 @@ Each server can serve Prometheus metrics on a listener of its own, which answers
 
 ## Rate limits
 
-With `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on, the auth server limits these endpoints. A refused request gets `429 Too Many Requests`, in the format the endpoint usually answers with.
+With `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on, the auth server limits these endpoints. A refused request gets `429 Too Many Requests`, in the format the endpoint usually answers with. The limiter is the name the `rate_limit_exceeded` [audit event](/concepts/audit-log/) and the `goiabada_rate_limit_refusals_total` [metric](/deploy/monitoring/) give it.
 
-| Endpoint | Limit | Counts | Counted by |
-|---|---|---|---|
-| `POST /auth/pwd` (password sign-in) | 10 per 15 minutes | failed sign-ins | IP address and email, shared with the password grant |
-| `POST /auth/pwd` | 100 per 60 minutes | failed sign-ins | email, shared with the password grant |
-| `POST /auth/pwd` | 30 per minute | every request | IP address |
-| `POST /auth/otp` (authenticator code) | 5 per 15 minutes | failed codes | user |
-| `POST /api/v1/account/email/verification` | 5 per 15 minutes | failed codes | the token's user |
-| `POST /api/v1/account/email/verification/send` | 5 per 60 minutes | every request | the token's user |
-| `PUT /api/v1/account/password`, `PUT /api/v1/account/otp` and `PUT /api/v1/account/email` | 5 per 15 minutes, for the three together | failed passwords | the token's user |
-| `POST /forgot-password` | 5 per 5 minutes | every request | email |
-| `POST /forgot-password` | 20 per 5 minutes | every request | IP address |
-| `GET` and `POST /reset-password` | 30 per 5 minutes | every request | IP address |
-| `POST /account/register` (self-registration) | 5 per 5 minutes | every request | email |
-| `POST /account/register` | 20 per 5 minutes | every request | IP address |
-| `GET` and `POST /account/activate` | 30 per 5 minutes | every request | IP address |
-| `POST /connect/register` (dynamic client registration) | 10 per minute | every request | IP address |
-| `POST /auth/token` with `grant_type=password` | 10 per 15 minutes | failed sign-ins | IP address and username, shared with `POST /auth/pwd` |
-| `POST /auth/token` with `grant_type=password` | 100 per 60 minutes | failed sign-ins | username, shared with `POST /auth/pwd` |
-| `POST /auth/token` with `grant_type=password` | 30 per minute | every request | IP address |
+| Endpoint | Limiter | Limit | Counts | Counted by |
+|---|---|---|---|---|
+| `POST /auth/pwd` (password sign-in) | `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and email, shared with the password grant |
+| `POST /auth/pwd` | `pwd_account` | 100 per 60 minutes | failed sign-ins | email, shared with the password grant |
+| `POST /auth/pwd` | `pwd_ip` | 30 per minute | every request | IP address |
+| `POST /auth/otp` (authenticator code) | `otp` | 5 per 15 minutes | failed codes | user |
+| `POST /api/v1/account/email/verification` | `email_verification` | 5 per 15 minutes | failed codes | the token's user |
+| `POST /api/v1/account/email/verification/send` | `email_verification_send` | 5 per 60 minutes | every request | the token's user |
+| `PUT /api/v1/account/password`, `PUT /api/v1/account/otp` and `PUT /api/v1/account/email` | `account_password` | 5 per 15 minutes, for the three together | failed passwords | the token's user |
+| `POST /forgot-password` | `forgot_pwd_email` | 5 per 5 minutes | every request | email |
+| `POST /forgot-password` | `forgot_pwd_ip` | 20 per 5 minutes | every request | IP address |
+| `GET /reset-password` and `POST /reset-password` | `reset_pwd` | 30 per 5 minutes, for the two together | every request | IP address |
+| `POST /account/register` (self-registration) | `register_email` | 5 per 5 minutes | every request | email |
+| `POST /account/register` | `register` | 20 per 5 minutes | every request | IP address |
+| `GET /account/activate` and `POST /account/activate` | `activate` | 30 per 5 minutes, for the two together | every request | IP address |
+| `POST /connect/register` (dynamic client registration) | `dcr` | 10 per minute | every request | IP address |
+| `POST /auth/token` with `grant_type=password` | `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and username, shared with `POST /auth/pwd` |
+| `POST /auth/token` with `grant_type=password` | `pwd_account` | 100 per 60 minutes | failed sign-ins | username, shared with `POST /auth/pwd` |
+| `POST /auth/token` with `grant_type=password` | `ropc_ip` | 30 per minute | every request | IP address |
 
 A few rules make these work:
 
