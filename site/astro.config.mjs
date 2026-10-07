@@ -5,6 +5,7 @@ import starlightLinksValidator from 'starlight-links-validator';
 import { fileURLToPath } from 'node:url';
 
 import buildChecks from './checks/build-checks.mjs';
+import { fullFile, indexFile } from './checks/llms.mjs';
 
 const googleAnalyticsId = 'G-CYZXDTHNB1'
 
@@ -16,8 +17,15 @@ export default defineConfig({
 			title: 'Goiabada',
 			// Fails the build on an internal link to no page, or to a fragment no heading on
 			// its target produces (#511). An http://localhost link is an example of a local
-			// install, not a link to this site, so it is not checked.
-			plugins: [starlightLinksValidator({ errorOnLocalLinks: false })],
+			// install, not a link to this site, so it is not checked. Nor are the links to the
+			// two llms files: buildChecks writes them after this check has run, under the
+			// names excluded here, and fails the build when it cannot read them back.
+			plugins: [
+				starlightLinksValidator({
+					errorOnLocalLinks: false,
+					exclude: [`/${indexFile}`, `/${fullFile}`],
+				}),
+			],
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/leodip/goiabada' }],
 			favicon: '/favicon.ico',
 			head: [

@@ -1,79 +1,107 @@
 ---
-title: Quick local test
-description: Get Goiabada running locally in minutes for development and testing.
+title: Quickstart
+description: Run Goiabada on your own machine in a few minutes, to try it out.
 ---
 
-import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
-This guide helps you quickly run Goiabada on your local machine for evaluation purposes. It's the fastest way to explore the features and test the authentication flows before planning a production deployment.
+This page gets Goiabada running on your machine in a few minutes, so you can try it out. All you need is Docker with Docker Compose.
 
 <Aside type="caution">
-This setup uses HTTP without encryption and is suitable only for local testing. Don't use in production!
+This setup serves plain HTTP on `localhost`. **Never** use it for a deployment other people reach: for that, see [Deploy](/deploy/docker-compose/).
 </Aside>
 
-<Aside type="tip">
-Goiabada Docker images support both **x86_64 (amd64)** and **ARM64** architectures. They run natively on Intel/AMD machines, Apple Silicon Macs, Raspberry Pi 4/5, AWS Graviton, and other ARM64 devices.
-</Aside>
+<Steps>
 
-## Using the setup wizard (recommended)
+1. Download the [setup wizard](/get-started/setup-wizard/) for your platform.
 
-The fastest way to get started:
+   <Tabs>
+     <TabItem label="Linux (x86_64)">
+       ```bash
+       curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-amd64
+       chmod +x goiabada-setup-linux-amd64
+       ```
+     </TabItem>
+     <TabItem label="Linux (ARM64)">
+       ```bash
+       curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-arm64
+       chmod +x goiabada-setup-linux-arm64
+       ```
+     </TabItem>
+     <TabItem label="macOS (Apple Silicon)">
+       ```bash
+       curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-arm64
+       chmod +x goiabada-setup-darwin-arm64
+       ```
+     </TabItem>
+     <TabItem label="macOS (Intel)">
+       ```bash
+       curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-amd64
+       chmod +x goiabada-setup-darwin-amd64
+       ```
+     </TabItem>
+     <TabItem label="Windows">
+       ```bash
+       curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-windows-amd64.exe
+       ```
+     </TabItem>
+   </Tabs>
 
-<Tabs>
-  <TabItem label="Linux (x86_64)">
-    ```bash
-    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-amd64
-    chmod +x goiabada-setup-linux-amd64
-    ./goiabada-setup-linux-amd64
-    ```
-  </TabItem>
-  <TabItem label="Linux (ARM64)">
-    ```bash
-    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-arm64
-    chmod +x goiabada-setup-linux-arm64
-    ./goiabada-setup-linux-arm64
-    ```
-  </TabItem>
-  <TabItem label="macOS (Apple Silicon)">
-    ```bash
-    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-arm64
-    chmod +x goiabada-setup-darwin-arm64
-    ./goiabada-setup-darwin-arm64
-    ```
-  </TabItem>
-  <TabItem label="macOS (Intel)">
-    ```bash
-    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-amd64
-    chmod +x goiabada-setup-darwin-amd64
-    ./goiabada-setup-darwin-amd64
-    ```
-  </TabItem>
-  <TabItem label="Windows">
-    ```powershell
-    Invoke-WebRequest -Uri "https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-windows-amd64.exe" -OutFile "goiabada-setup.exe"
-    .\goiabada-setup.exe
-    ```
-  </TabItem>
-</Tabs>
+2. In an empty directory, run it for local testing with SQLite. Use the name of the file you downloaded.
 
-Select **"1. Local testing"** when prompted, choose your database, and the wizard generates a ready-to-use `docker-compose.yml`.
+   ```bash
+   ./goiabada-setup-linux-amd64 --type=local --db=sqlite
+   ```
+
+   It writes `docker-compose.yml` and, beside it, `docker-compose.override.yml`, which holds the secrets.
+
+3. Start Goiabada.
+
+   ```bash
+   docker compose up -d
+   ```
+
+4. Check that both servers answer. Each one replies `healthy`.
+
+   ```bash
+   curl http://localhost:9090/health
+   curl http://localhost:9091/health
+   ```
+
+   The first start takes a little longer, while the auth server sets up its database.
+
+5. Get the admin password, which the wizard generated.
+
+   ```bash
+   grep GOIABADA_ADMIN_PASSWORD docker-compose.override.yml
+   ```
+
+6. Open the admin console at `http://localhost:9091` and [sign in](/get-started/first-sign-in/) as `admin@example.com` with that password.
+
+</Steps>
+
+## How it works
+
+The wizard writes a Docker Compose file with two containers, both from the images of the wizard's own release:
+
+| Container | Address | What it does |
+|---|---|---|
+| `goiabada-authserver` | `http://localhost:9090` | The auth server: signs users in and issues tokens. |
+| `goiabada-adminconsole` | `http://localhost:9091` | The admin console, where you manage clients, users and settings. |
+
+The admin console starts once the auth server is healthy. On its first start, the auth server finds an empty database and fills it: the first administrator, the admin console's client, its resource and permissions, and two signing keys.
+
+The SQLite database lives in a Docker volume, so it survives `docker compose down`. To start over from an empty database, remove the volume too:
 
 ```bash
-docker compose up -d
+docker compose down -v
 ```
 
-Access the admin console at: http://localhost:9091
+Prefer MySQL, PostgreSQL or SQL Server? Pass `--db=mysql`, `--db=postgres` or `--db=mssql` instead, and the Compose file runs that database in a third container. Or leave out every flag and the wizard asks you each question.
 
-## Verify it's working
+## Next steps
 
-```bash
-# Check containers are running
-docker ps | grep goiabada
-
-# Test auth server health (should return: healthy)
-curl http://localhost:9090/health && echo
-
-# Test admin console health (should return: healthy)
-curl http://localhost:9091/health && echo
-```
-
+<CardGrid>
+  <LinkCard title="First sign-in" description="Sign in to the admin console and secure your account." href="/get-started/first-sign-in/" />
+  <LinkCard title="Setup wizard" description="Every question and flag of the wizard." href="/get-started/setup-wizard/" />
+</CardGrid>
