@@ -44,7 +44,7 @@ GOIABADA_AUTHSERVER_TRUSTED_PROXIES="127.0.0.1"
 # The auth server's built-in rate limiter: per-IP limits on sign-in, password reset,
 # self-registration and client registration, and limits on failed passwords and codes per
 # account. The server's own default is off. The limits are listed at
-# https://goiabada.dev/reference/environment-variables/#security-settings
+# https://goiabada.dev/reference/environment-variables/#rate-limits
 GOIABADA_AUTHSERVER_RATELIMITER_ENABLED="false"
 GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY="auth-session-auth-key"
 GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY="auth-session-enc-key"

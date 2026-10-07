@@ -468,7 +468,7 @@ its next request waits for one to be released, until the client or the gateway g
 than the database refusing a new connection to every pod at once. Raising replicas without raising
 `max_connections` does not add capacity at the database: it moves the bottleneck from the pods'
 queues to the database's refusals. The pool settings are in the
-[environment variable reference](/reference/environment-variables/#database-configuration).
+[environment variable reference](/reference/environment-variables/#database).
 
 ### Disruptions and spread
 
@@ -534,7 +534,7 @@ With the limiter on, not every limit holds across replicas:
   address Goiabada sees is a node's, so a per-IP limit counts everyone arriving through one node
   together; under `Local` it is the client's. See [client IP and proxy trust](#client-ip-and-proxy-trust) before relying on one.
 
-The budgets are in the [rate limiting table](/reference/environment-variables/#security-settings).
+The budgets are in the [rate limiting table](/reference/environment-variables/#rate-limits).
 
 **The startup warning.** With the limiter on, the auth server logs a `rate limiter configuration
 warning` at every start, saying it trusts one proxy hop with no `GOIABADA_AUTHSERVER_TRUSTED_PROXIES`.
