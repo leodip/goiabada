@@ -1,7 +1,7 @@
 package guard
 
 // Seam 3: the rule table the three shared template guards enforce, over fstest.MapFS fixtures walked
-// through the same functions the four real callers reach.
+// through the same functions the six real callers reach, three in each server.
 //
 // The synthetic half exists because the real half cannot fail informatively. Both servers' templates
 // are green on arrival and have been for releases, so the real callers would pass identically
@@ -171,10 +171,10 @@ func TestTemplates_TheWalkReachesEveryHTMLFileAndNothingElse(t *testing.T) {
 	}, seen)
 }
 
-// TestTemplates_AWalkThatReachesNothingIsVisible pins the count WalkHTMLTemplates turns into a
+// TestTemplates_AWalkThatReachesNothingIsVisible pins the count walkOrFail turns into a
 // t.Fatalf. A directory that exists and holds no .html file is not an error from fs.WalkDir, so
 // zero is the only signal there is, and every rule here passes vacuously over it: a //go:embed
-// pattern narrowed by a rename would otherwise leave four guards reporting nothing and reading as
+// pattern narrowed by a rename would otherwise leave three guards reporting nothing and reading as
 // green.
 func TestTemplates_AWalkThatReachesNothingIsVisible(t *testing.T) {
 	fsys := fstest.MapFS{"template/readme.txt": {Data: []byte("no pages here")}}
@@ -186,7 +186,7 @@ func TestTemplates_AWalkThatReachesNothingIsVisible(t *testing.T) {
 }
 
 // TestTemplates_AMissingRootIsAnError pins the other half of that: a root that is not there at all
-// is an error rather than an empty walk, which is what WalkHTMLTemplates reports before it ever
+// is an error rather than an empty walk, which is what walkOrFail reports before it ever
 // looks at the count.
 func TestTemplates_AMissingRootIsAnError(t *testing.T) {
 	fsys := fstest.MapFS{"static/app.css": {Data: []byte("body{}")}}
