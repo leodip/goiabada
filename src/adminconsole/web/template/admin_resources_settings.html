@@ -20,7 +20,7 @@
         function submitForm() {
             if (isSystemLevel) {
                 showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_resources.settings.modal_system_title" }}",
-                    "{{ T $.ctx "adminconsole.admin_resources.settings.modal_system_body" }}",
+                    dialogMarkup(["{{ T $.ctx "adminconsole.admin_resources.settings.modal_system_body" }}"]),
                     function() { /* cancel */ },
                     function() { formResourceSettings.submit(); }
                 );
@@ -34,7 +34,7 @@
                 event.preventDefault();
                 resourceIdentifier.value = resourceIdentifier.value.trim();
                 if (resourceIdentifier.value !== originalResourceIdentifier) {
-                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_resources.settings.modal_identifier_title" }}", "<span class='text-accent'>{{ T $.ctx "adminconsole.admin_resources.settings.modal_identifier_em" }}</span>{{ T $.ctx "adminconsole.admin_resources.settings.modal_identifier_suffix" }}",
+                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_resources.settings.modal_identifier_title" }}", dialogMarkup(["<span class='text-accent'>{{ T $.ctx "adminconsole.admin_resources.settings.modal_identifier_em" }}</span>{{ T $.ctx "adminconsole.admin_resources.settings.modal_identifier_suffix" }}"]),
                     function() {
                     },
                     function() {

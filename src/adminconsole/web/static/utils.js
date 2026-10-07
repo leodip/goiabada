@@ -51,9 +51,51 @@ function goToSessionEnded() {
   window.location.assign(SESSION_ENDED_PATH);
 }
 
+// dialogMarkups holds every message dialogMarkup and dialogMarkupFormat have built, so that
+// showModalDialog can tell one from a string, and nothing but those two can make one.
+const dialogMarkups = new WeakSet();
+
+function sealDialogMarkup(html) {
+  const markup = Object.freeze({ html: html });
+  dialogMarkups.add(markup);
+  return markup;
+}
+
+// dialogMarkup builds a dialog message that keeps its markup, an accent span or a line break, from
+// the catalog: parts are catalog literals and values go between them, each escaped, so a value is
+// always shown as text. A part is never data; TestDialogMessages_MarkupOnlyThroughTheBuilder holds
+// every call's parts to an array of catalog literals (#120).
+function dialogMarkup(parts, ...values) {
+  if (!Array.isArray(parts) || parts.length !== values.length + 1) {
+    throw new Error("dialogMarkup takes one more part than it takes arguments to escape");
+  }
+  let html = parts[0];
+  for (let i = 0; i < values.length; i++) {
+    html += escapeHtml(values[i]) + parts[i + 1];
+  }
+  return sealDialogMarkup(html);
+}
+
+// dialogMarkupFormat is dialogMarkup for a client-side catalog sentence: it substitutes the
+// {{name}} placeholders of key's catalog value with params, each escaped, and keeps the sentence's
+// own markup (#120).
+function dialogMarkupFormat(key, params) {
+  let html = t(key);
+  for (const name in params) {
+    html = html.split("{{" + name + "}}").join(escapeHtml(params[name]));
+  }
+  return sealDialogMarkup(html);
+}
+
+// showModalDialog parses message as HTML only when dialogMarkup or dialogMarkupFormat built it.
 function showModalDialog(id, title, message, btn1callback, btn2callback) {
   document.getElementById(id + "_modalDialogTitle").innerText = title;
-  document.getElementById(id + "_modalDialogMessage").innerHTML = message;
+  const messageElement = document.getElementById(id + "_modalDialogMessage");
+  if (dialogMarkups.has(message)) {
+    messageElement.innerHTML = message.html;
+  } else {
+    messageElement.innerHTML = message;
+  }
 
   const btn1 = document.getElementById(id + "_btnModal1");
   if (btn1 && btn1callback) {

@@ -78,7 +78,7 @@
 
         if (isSystemLevel) {
             showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
-                "{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}",
+                dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"]),
                 function() { /* cancel */ },
                 function() { doSave(); }
             );

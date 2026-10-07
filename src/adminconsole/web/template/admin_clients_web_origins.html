@@ -56,7 +56,7 @@
 
                 if (isSystemLevel) {
                     showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
-                        "{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}",
+                        dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"]),
                         function() { /* cancel */ },
                         function() { doSave(); }
                     );
@@ -132,7 +132,7 @@
                 }, 100);
             }
         } else {
-            showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_clients.modal.error_title" }}", "{{ T $.ctx "adminconsole.admin_clients.web_origins.invalid_url_prefix" }}<span class='text-accent'>{{ T $.ctx "adminconsole.admin_clients.web_origins.invalid_url_em" }}</span>{{ T $.ctx "adminconsole.admin_clients.web_origins.invalid_url_suffix" }}",
+            showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_clients.modal.error_title" }}", dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.web_origins.invalid_url_prefix" }}<span class='text-accent'>{{ T $.ctx "adminconsole.admin_clients.web_origins.invalid_url_em" }}</span>{{ T $.ctx "adminconsole.admin_clients.web_origins.invalid_url_suffix" }}"]),
                 function() {
                     setTimeout(function() {
                         webOrigin.focus();

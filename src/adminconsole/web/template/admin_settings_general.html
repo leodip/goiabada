@@ -92,7 +92,7 @@
                     showModalDialog(
                         "modal1",
                         "{{ T $.ctx "adminconsole.admin_settings.general.modal_issuer_title" }}",
-                        "<span class='text-accent'>{{ T $.ctx "adminconsole.admin_settings.general.modal_issuer_em" }}</span>{{ T $.ctx "adminconsole.admin_settings.general.modal_issuer_suffix" }}",
+                        dialogMarkup(["<span class='text-accent'>{{ T $.ctx "adminconsole.admin_settings.general.modal_issuer_em" }}</span>{{ T $.ctx "adminconsole.admin_settings.general.modal_issuer_suffix" }}"]),
                         function() {
                             // Cancel callback - do nothing
                         },

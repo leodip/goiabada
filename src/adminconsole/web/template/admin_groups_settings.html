@@ -20,7 +20,7 @@
             event.preventDefault();
             groupIdentifier.value = groupIdentifier.value.trim();
             if (groupIdentifier.value !== originalGroupIdentifier) {
-                showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_groups.settings.modal_title" }}", "<span class='text-accent'>{{ T $.ctx "adminconsole.admin_groups.settings.modal_body_em" }}</span>{{ T $.ctx "adminconsole.admin_groups.settings.modal_body_suffix" }}",
+                showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_groups.settings.modal_title" }}", dialogMarkup(["<span class='text-accent'>{{ T $.ctx "adminconsole.admin_groups.settings.modal_body_em" }}</span>{{ T $.ctx "adminconsole.admin_groups.settings.modal_body_suffix" }}"]),
                 function() {
                 },
                 function() {
