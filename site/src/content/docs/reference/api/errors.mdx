@@ -22,31 +22,52 @@ Decide what to do from the HTTP status first: a `4xx` is something your request 
 
 ### The fields
 
-- **`error_code`** is a stable identifier for the failure. It's either an `UPPER_SNAKE` code from the list below, or, for a refused field the auth server can describe in several languages, a catalog key in dotted lowercase, such as `validator.email.invalid_format`.
+- **`error_code`** is a stable identifier for the failure. It's either an `UPPER_SNAKE` code from the table below, or, for a refused field the auth server can describe in several languages, a catalog key in dotted lowercase, such as `validator.email.invalid_format`.
 - **`error_description`** is a sentence for people. For a catalog key it's in the request's language; otherwise it's in English. Don't match on it: the wording can change, the code won't.
 
 The protocol endpoints, `/auth/authorize`, `/auth/token`, `/connect/register` and `/userinfo`, answer errors in the format their standards define, not this one. [Endpoints](/reference/endpoints/) covers them.
 
 ### Error codes
 
-- `ACCESS_TOKEN_REQUIRED`: `401`, no access token was sent.
-- `INVALID_TOKEN`: `401`, the token is malformed, expired, not an access token for `authserver`, or its user or session is gone.
-- `INVALID_REQUEST`: `400`, the `Authorization` header or the token was sent twice, or a form body doesn't parse.
-- `INSUFFICIENT_SCOPE`: `403`, the token carries none of the scopes the operation accepts. The `WWW-Authenticate` header says `error="insufficient_scope"`.
-- `USER_CONTEXT_REQUIRED`: `403`, an Account API call made with a token that wasn't issued for a user, such as one from the client credentials flow.
-- `FORBIDDEN`: `403`, the token is valid, but the account resource it names belongs to another user.
-- `MANAGE_SCOPE_REQUIRED`: `403`, the request acts on an administrator or an administrative permission, which only `authserver:manage` may do. See [Administrators](/reference/api/administrators/).
-- `INVALID_REQUEST_BODY`: `400`, the body isn't the JSON the operation expects.
-- `VALIDATION_ERROR`: `400`, a value was refused. `error_description` says which and why.
-- `NOT_FOUND`: `404`, nothing has that id.
-- `CONCURRENT_UPDATE`: `409`, another request changed what yours was based on. Nothing was saved: read it again and retry.
-- `LAST_ADMINISTRATOR`: `409`, the change would leave no enabled user holding `authserver:manage`. Grant it to another user first.
-- `SMTP_NOT_ENABLED`: `400`, a test email was asked for while SMTP is off.
-- `SEND_FAILED`: `400`, the test email couldn't be sent. `error_description` says what to check.
-- `TOO_MANY_REQUESTS`: `429`, a rate limit was reached. The `Retry-After` header says how many seconds to wait.
-- `INTERNAL_SERVER_ERROR`: `500`, the request failed inside the server. `error_description` ends with a request id an operator can find in the server's log. Retrying is reasonable.
+This is every `UPPER_SNAKE` code the two APIs answer.
 
-Some operations answer codes of their own, such as `EMAIL_ALREADY_EXISTS` or `ROTATION_IN_PROGRESS`. Each operation's page in the reference lists the ones it can answer.
+| Code | Status | Meaning |
+|---|---|---|
+| `VALIDATION_ERROR` | `400` | A value was refused. `error_description` says which and why. |
+| `INVALID_REQUEST_BODY` | `400` | The body isn't the JSON the operation expects. |
+| `INVALID_REQUEST` | `400` | The `Authorization` header or the `access_token` parameter was sent twice, the token was sent two ways at once, or a form body doesn't parse. |
+| `EMAIL_TOO_LONG` | `400` | The new user's email address is longer than 60 characters. |
+| `VALUE_TOO_LONG` | `400` | A user attribute's value is longer than 250 characters. |
+| `FILE_TOO_LARGE` | `400` | The uploaded picture or logo is over the size limit, or the form doesn't parse. |
+| `NO_FILE` | `400` | The upload has no `picture` field. |
+| `AUTHENTICATION_FAILED` | `400` | The password sent to confirm a password change, an email change, or turning two-factor authentication on or off is wrong. For two-factor authentication, a missing password answers it too. |
+| `OTP_CODE_REQUIRED` | `400` | Two-factor authentication was turned on without a code. |
+| `INVALID_OTP_CODE` | `400` | The code isn't six digits, or it doesn't match the authenticator. |
+| `OTP_ENROLLMENT_NOT_PENDING` | `400` | No enrollment is pending, or it expired. Start a new one with `GET /api/v1/account/otp/enrollment`. |
+| `SECRET_KEY_NOT_ACCEPTED` | `400` | The request sent a `secretKey`. Start an enrollment and send only the code from the authenticator. |
+| `OTP_ALREADY_ENABLED` | `400` | Two-factor authentication is already on. |
+| `OTP_NOT_ENABLED` | `400` | Two-factor authentication is already off. |
+| `INVALID_OR_EXPIRED_VERIFICATION_CODE` | `400` | The email verification code is wrong or has expired. |
+| `SMTP_NOT_ENABLED` | `400` | The operation needs to send email, and SMTP is off: a test email, or sending or checking an email verification code. |
+| `SEND_FAILED` | `400` | The test email couldn't be sent. `error_description` says what to check. |
+| `ACCESS_TOKEN_REQUIRED` | `401` | No access token was sent. |
+| `INVALID_TOKEN` | `401` | The token is malformed, expired, not an access token for `authserver`, or its user or session is gone. |
+| `INVALID_SUBJECT` | `401` | The token names no subject (`sub`). |
+| `INVALID_SESSION` | `401` | On `POST /api/v1/account/logout-request`: the token carries no session id (`sid`), its session is gone, or the token's client isn't part of that session. |
+| `UNAUTHORIZED` | `401` | A profile picture operation was reached without a validated token. The token check in front of it answers `ACCESS_TOKEN_REQUIRED` first, so you shouldn't see this one. |
+| `INSUFFICIENT_SCOPE` | `403` | The token carries none of the scopes the operation accepts. The `WWW-Authenticate` header says `error="insufficient_scope"`. |
+| `USER_CONTEXT_REQUIRED` | `403` | An Account API call was made with a token that wasn't issued for a user, such as one from the client credentials flow. |
+| `FORBIDDEN` | `403` | The token is valid, but the consent or session it names belongs to another user. |
+| `MANAGE_SCOPE_REQUIRED` | `403` | The request acts on an administrator or an administrative permission, which only `authserver:manage` may do. See [Administrators](/reference/api/administrators/). |
+| `NOT_FOUND` | `404` | Nothing has that id. |
+| `METHOD_NOT_ALLOWED` | `405` | `/api/public/settings` was called with a method other than `GET`. The router refuses that request first, with `405` and no body, so you shouldn't see this code. |
+| `CONCURRENT_UPDATE` | `409` | Another request changed what yours was based on. Nothing was saved: read it again and retry. |
+| `EMAIL_ALREADY_EXISTS` | `409` | Another user already has that email address. |
+| `LAST_ADMINISTRATOR` | `409` | The change would leave no enabled user holding `authserver:manage`. Grant it to another user first. |
+| `ROTATION_IN_PROGRESS` | `409` | Another signing key rotation won the race, and this call rotated nothing. Don't retry: the rotation it ran into already happened. |
+| `TOO_MANY_REQUESTS` | `429` | A rate limit was reached. The `Retry-After` header says how many seconds to wait. |
+| `INTERNAL_SERVER_ERROR` | `500` | The request failed inside the server. `error_description` ends with a request id an operator can find in the server's log. Retrying is reasonable. |
+| `KEY_SET_INCOMPLETE` | `500` | A signing key rotation found no current or no next key. That's a deployment problem a retry won't clear. `error_description` ends with a request id, as for `INTERNAL_SERVER_ERROR`. |
 
 ### Saving a whole list
 
