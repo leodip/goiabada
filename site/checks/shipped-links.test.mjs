@@ -48,8 +48,9 @@ async function runBuildDone(root) {
 		warn: (m) => logged.push(m),
 		error: (m) => logged.push(m),
 	};
-	const integration = buildChecks({ srcDir: join(root, 'src') });
+	const integration = buildChecks({ srcDir: join(root, 'src'), llms: { title: 'Goiabada', summary: 'Docs.' } });
 	try {
+		await integration.hooks['astro:config:done']({ config: { site: 'https://goiabada.dev' } });
 		await integration.hooks['astro:build:done']({ dir: pathToFileURL(join(root, 'site/dist') + '/'), logger });
 		return { error: undefined, logged };
 	} catch (error) {

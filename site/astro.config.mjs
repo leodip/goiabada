@@ -125,6 +125,13 @@ export default defineConfig({
 		}),
 		// After Starlight, so its checks read the finished pages. The repository's
 		// src/ is beside this directory, in a checkout and in the docs image's build.
-		buildChecks({ srcDir: fileURLToPath(new URL('../src/', import.meta.url)) }),
+		// It also writes /llms.txt and /llms-full.txt, which llms heads.
+		buildChecks({
+			srcDir: fileURLToPath(new URL('../src/', import.meta.url)),
+			llms: {
+				title: 'Goiabada',
+				summary: 'An open-source OAuth2 and OpenID Connect server for simple, secure authentication.',
+			},
+		}),
 	],
 });

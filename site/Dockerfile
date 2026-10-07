@@ -17,8 +17,9 @@ RUN npm ci
 COPY src/ /repo/src/
 COPY site/ ./
 
-# Build the static site. The build fails on a broken internal link or heading
-# anchor, and on a goiabada.dev link in src/ that names no built page.
+# Build the static site, with /llms.txt and /llms-full.txt. The build fails on a
+# broken internal link or heading anchor, on a goiabada.dev link in src/ that
+# names no built page, and when the llms files disagree with the pages.
 FROM sources AS builder
 
 RUN npm run build
