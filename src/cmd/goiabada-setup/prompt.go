@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/inputvalidation"
 	"golang.org/x/term"
 )
 
@@ -263,10 +264,13 @@ func (a asker) generatedPassword(prompt, generated string) (string, error) {
 	return a.hidden(prompt, generated, "generated")
 }
 
-// judgedPassword asks for a password read hidden, offering one generated as generatedPassword
-// does, and judges the strength of one typed instead. The generated one is not judged: it holds the
-// classes SQL Server asks for and no symbol, and was warned about as weak (#430).
-func (a asker) judgedPassword(prompt, generated string) (string, error) {
+// adminPassword asks for the first administrator's password read hidden, offering one generated as
+// generatedPassword does, and judges one typed instead. One the first start refuses to seed is
+// refused here with its reason and asked again, with no "use anyway": the wizard must not write a
+// configuration whose first start is refused (#500). Above that floor, weak character classes are
+// the operator's call. The generated one is not judged: it holds the classes SQL Server asks for and
+// no symbol, and was warned about as weak (#430).
+func (a asker) adminPassword(prompt, generated string) (string, error) {
 	for {
 		value, err := a.generatedPassword(prompt, generated)
 		if err != nil {
@@ -274,6 +278,10 @@ func (a asker) judgedPassword(prompt, generated string) (string, error) {
 		}
 		if value == generated {
 			return value, nil
+		}
+		if refused := inputvalidation.CheckAdminPassword(value); refused != nil {
+			a.out.printf("Invalid admin password: %s. Please try again.\n", refused)
+			continue
 		}
 		if issues := checkPasswordStrength(value); len(issues) > 0 {
 			a.out.warning("Weak password: %s", strings.Join(issues, ", "))

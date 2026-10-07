@@ -507,16 +507,17 @@ func TestWizard_EveryGeneratedPasswordHoldsThreeClasses(t *testing.T) {
 	}
 }
 
-// A password the operator gave is still judged: the warning moved off generated passwords only.
+// A password the operator gave is still judged: the warning moved off generated passwords only. One
+// the first start would seed is only warned about, however weak its character classes.
 func TestWizard_AChosenAdminPasswordIsJudged(t *testing.T) {
-	w, _, out, _ := testWizard(t, &CLIFlags{DeploymentType: "local", DBType: "sqlite", AdminPassword: "weakpass"}, nil)
+	w, _, out, _ := testWizard(t, &CLIFlags{DeploymentType: "local", DBType: "sqlite", AdminPassword: "weakpassphraseonly"}, nil)
 	if err := w.setup(); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "Weak password: no uppercase letter, no digit, no special character") {
 		t.Errorf("a weak chosen password is not warned about:\n%s", out)
 	}
-	if w.config.AdminPassword != "weakpass" {
+	if w.config.AdminPassword != "weakpassphraseonly" {
 		t.Errorf("admin password %q, want the one given", w.config.AdminPassword)
 	}
 }
@@ -830,6 +831,16 @@ func TestWizard_NonInteractiveRefusals(t *testing.T) {
 		"an oversized password file":      {native(func(f *CLIFlags) { f.DBPasswordFile = passwordFile(strings.Repeat("x", 4097)) }), "--db-password-file holds more than 4096 bytes"},
 		"a password file not UTF-8":       {native(func(f *CLIFlags) { f.AdminPasswordFile = passwordFile("pa\xffss") }), "--admin-password-file cannot be written to the configuration: it is not valid UTF-8"},
 		"a password file holding NUL":     {native(func(f *CLIFlags) { f.DBPasswordFile = passwordFile("pa\x00ss") }), "--db-password-file cannot be written to the configuration: it contains a NUL character"},
+		// The first start refuses to seed an admin password that is changeme, under 15 characters or
+		// over bcrypt's 72 bytes, so the wizard refuses to write one, naming the flag it came from
+		// (#500).
+		"--admin-password changeme":              {native(func(f *CLIFlags) { f.AdminPassword = "changeme" }), "invalid --admin-password: it is changeme, a password this project published"},
+		"--admin-password of 14 characters":      {native(func(f *CLIFlags) { f.AdminPassword = "Abcdefgh-12345" }), "invalid --admin-password: it is 14 characters long, and must be at least 15 characters"},
+		"--admin-password of 14 two-byte ones":   {native(func(f *CLIFlags) { f.AdminPassword = strings.Repeat("é", 14) }), "invalid --admin-password: it is 14 characters long"},
+		"--admin-password of 73 bytes":           {native(func(f *CLIFlags) { f.AdminPassword = strings.Repeat("Ab1-", 18) + "x" }), "invalid --admin-password: it is 73 bytes long, and bcrypt accepts at most 72 bytes"},
+		"--admin-password-file changeme":         {native(func(f *CLIFlags) { f.AdminPasswordFile = passwordFile("changeme\n") }), "invalid --admin-password-file: it is changeme, a password this project published"},
+		"--admin-password-file of 14 characters": {native(func(f *CLIFlags) { f.AdminPasswordFile = passwordFile("Abcdefgh-12345\n") }), "invalid --admin-password-file: it is 14 characters long"},
+		"--admin-password-file of 73 bytes":      {native(func(f *CLIFlags) { f.AdminPasswordFile = passwordFile(strings.Repeat("Ab1-", 18) + "x") }), "invalid --admin-password-file: it is 73 bytes long"},
 	}
 	// Every flag whose value is written into the file, refused by its name when it is not UTF-8 or
 	// holds NUL, before a step reads it (#430). Each would otherwise be refused, if at all, by a

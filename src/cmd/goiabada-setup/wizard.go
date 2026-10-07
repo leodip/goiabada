@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 // wizard fills a Config one step at a time, from the prompts or, when --type was given, from the
@@ -584,9 +585,9 @@ func (w *wizard) askAdmin() error {
 			return err
 		}
 		// A generated default, where the prompt offered changeme, the password the docs and the
-		// samples print, to every operator who pressed Enter.
+		// samples printed, to every operator who pressed Enter.
 		generated := generatePassword()
-		adminPassword, err := w.judgedPassword("Admin password", generated)
+		adminPassword, err := w.adminPassword("Admin password", generated)
 		if err != nil {
 			return err
 		}
@@ -615,8 +616,19 @@ func (w *wizard) askAdmin() error {
 	generated := adminPassword == ""
 	if generated {
 		adminPassword = generatePassword()
-	} else if issues := checkPasswordStrength(adminPassword); len(issues) > 0 {
-		w.out.warning("Weak password: %s", strings.Join(issues, ", "))
+	} else {
+		// The first start refuses to seed what this refuses, so writing it would ship a deployment
+		// that cannot start (#500).
+		if err := inputvalidation.CheckAdminPassword(adminPassword); err != nil {
+			flag := "--admin-password"
+			if w.flags.AdminPasswordFile != "" {
+				flag = "--admin-password-file"
+			}
+			return errs.Wrapf(err, "invalid %s", flag)
+		}
+		if issues := checkPasswordStrength(adminPassword); len(issues) > 0 {
+			w.out.warning("Weak password: %s", strings.Join(issues, ", "))
+		}
 	}
 	w.reportPassword("Admin password", generated)
 	w.out.info("Admin email: %s", adminEmail)

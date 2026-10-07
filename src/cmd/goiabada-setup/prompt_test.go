@@ -112,12 +112,12 @@ func TestAsker_AReadFaultIsNeverTheDefault(t *testing.T) {
 	})
 	t.Run("the weak-password confirmation", func(t *testing.T) {
 		a, in, _ := testAsker(t,
-			scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "weak"},
+			scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "weakpassphraseonly"},
 			scriptedStep{prompt: "Use this password anyway? [y/N]: ", err: errReadFault},
 		)
-		got, err := a.judgedPassword("Password", generatePassword())
+		got, err := a.adminPassword("Password", generatePassword())
 		if !errors.Is(err, errReadFault) || got != "" {
-			t.Errorf("judgedPassword = %q, %v; want \"\" and the read fault", got, err)
+			t.Errorf("adminPassword = %q, %v; want \"\" and the read fault", got, err)
 		}
 		in.assertConsumed()
 	})
@@ -244,23 +244,66 @@ func TestAsker_AnInvalidAnswerIsAskedAgain(t *testing.T) {
 	}
 }
 
+// A password weak only by its character classes is the operator's call: it is warned about and kept
+// only when confirmed. The floor the first start holds it to is not: seeding would refuse it, so it
+// is asked again with no "use anyway".
 func TestAsker_AWeakPasswordIsKeptOnlyWhenConfirmed(t *testing.T) {
 	a, in, out := testAsker(t,
-		scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "changeme"},
+		scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "weakpassphraseonly"},
 		scriptedStep{prompt: "Use this password anyway? [y/N]: ", answer: ""},
-		scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "weak"},
+		scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "weakpassphrasetoo"},
 		scriptedStep{prompt: "Use this password anyway? [y/N]: ", answer: "y"},
 		scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "Str0ng-Passw0rd!"},
 	)
-	if got, err := a.judgedPassword("Password", generatePassword()); err != nil || got != "weak" {
-		t.Errorf("judgedPassword = %q, %v; want the confirmed \"weak\"", got, err)
+	if got, err := a.adminPassword("Password", generatePassword()); err != nil || got != "weakpassphrasetoo" {
+		t.Errorf("adminPassword = %q, %v; want the confirmed \"weakpassphrasetoo\"", got, err)
 	}
-	if got, err := a.judgedPassword("Password", generatePassword()); err != nil || got != "Str0ng-Passw0rd!" {
-		t.Errorf("judgedPassword = %q, %v; want the strong one, not asked about", got, err)
+	if got, err := a.adminPassword("Password", generatePassword()); err != nil || got != "Str0ng-Passw0rd!" {
+		t.Errorf("adminPassword = %q, %v; want the strong one, not asked about", got, err)
 	}
 	in.assertConsumed()
-	if !strings.Contains(out.String(), "Weak password: ") {
+	if !strings.Contains(out.String(), "Weak password: no uppercase letter, no digit, no special character") {
 		t.Errorf("output lacks the weak-password warning:\n%s", out.String())
+	}
+}
+
+// The admin password is the first administrator's, and the first start refuses to seed one that is
+// changeme, under 15 characters or over bcrypt's 72 bytes (#500). The prompt refuses the same ones,
+// each with its reason and asked again, with no "use anyway" to keep it: the wizard must not write a
+// configuration whose first start is refused. Characters are counted, not bytes, and 15 is enough.
+func TestAsker_AnAdminPasswordTheFirstStartRefusesIsAskedAgain(t *testing.T) {
+	fourteenTwoByte := strings.Repeat("é", 14)
+	fifteenTwoByte := strings.Repeat("é", 15)
+	a, in, out := testAsker(t,
+		scriptedStep{prompt: "Admin password [generated]: ", hidden: true, answer: "changeme"},
+		scriptedStep{prompt: "Admin password [generated]: ", hidden: true, answer: "Abcdefgh-12345"},
+		scriptedStep{prompt: "Admin password [generated]: ", hidden: true, answer: fourteenTwoByte},
+		scriptedStep{prompt: "Admin password [generated]: ", hidden: true, answer: strings.Repeat("Ab1-", 18) + "x"},
+		scriptedStep{prompt: "Admin password [generated]: ", hidden: true, answer: fifteenTwoByte},
+		scriptedStep{prompt: "Use this password anyway? [y/N]: ", answer: "y"},
+		scriptedStep{prompt: "Admin password [generated]: ", hidden: true, answer: "Abcdefgh-123456"},
+	)
+	if got, err := a.adminPassword("Admin password", generatePassword()); err != nil || got != fifteenTwoByte {
+		t.Errorf("adminPassword = %q, %v; want the 15 two-byte characters, confirmed", got, err)
+	}
+	if got, err := a.adminPassword("Admin password", generatePassword()); err != nil || got != "Abcdefgh-123456" {
+		t.Errorf("adminPassword = %q, %v; want the 15 characters, not asked about", got, err)
+	}
+	in.assertConsumed()
+	for _, reason := range []string{
+		"Invalid admin password: it is changeme, a password this project published",
+		"Invalid admin password: it is 14 characters long, and must be at least 15 characters. Please try again.",
+		"Invalid admin password: it is 73 bytes long, and bcrypt accepts at most 72 bytes",
+	} {
+		if !strings.Contains(out.String(), reason) {
+			t.Errorf("output lacks %q:\n%s", reason, out.String())
+		}
+	}
+	if n := strings.Count(out.String(), "Invalid admin password: it is 14 characters long"); n != 2 {
+		t.Errorf("%d refusals for 14 characters, want 2, one for ASCII and one for two-byte characters:\n%s", n, out.String())
+	}
+	if n := strings.Count(out.String(), "Weak password"); n != 1 {
+		t.Errorf("%d weak-password warnings, want 1, for the confirmed password alone:\n%s", n, out.String())
 	}
 }
 
@@ -483,8 +526,8 @@ func TestAsker_AGeneratedPasswordIsOfferedWithoutItsValue(t *testing.T) {
 func TestAsker_AnEmptyPasswordAnswerTakesTheGeneratedOneUnjudged(t *testing.T) {
 	generated := generatePassword()
 	a, in, out := testAsker(t, scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: ""})
-	if got, err := a.judgedPassword("Password", generated); err != nil || got != generated {
-		t.Errorf("judgedPassword = %q, %v; want the generated %q", got, err, generated)
+	if got, err := a.adminPassword("Password", generated); err != nil || got != generated {
+		t.Errorf("adminPassword = %q, %v; want the generated %q", got, err, generated)
 	}
 	in.assertConsumed()
 	if strings.Contains(out.String(), "Weak password") {

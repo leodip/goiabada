@@ -82,7 +82,10 @@ The wizard will ask you a few questions:
 
 9. **Admin credentials** - Email and password for the first admin user. The password is a strong one
    generated if you press Enter, shown as `[generated]`, never its value. One you type is read without
-   echo and checked for strength, and a weak one is kept only if you confirm it (see
+   echo and held to the rule the auth server's first start holds it to: `changeme`, a password under 15
+   characters or one over 72 bytes is refused with the reason and asked again, since the first start
+   would refuse to create the administrator with it. Above that, a password missing an uppercase
+   letter, a lowercase letter, a digit or a symbol is warned about and kept only if you confirm it (see
    [Passwords and the terminal](#passwords-and-the-terminal))
 
 10. **Database password** - A strong password, generated if you press Enter. The prompt shows the
@@ -208,6 +211,11 @@ refused rather than one of them winning:
 printf '%s' "$DB_PASSWORD" | ./goiabada-setup --type=native --db=postgres \
   --auth-url=https://auth.example.com --db-host=localhost --db-password-file=-
 ```
+
+An admin password given with `--admin-password` or `--admin-password-file` is held to the same rule as
+one typed at the prompt: `changeme`, a password under 15 characters or one over 72 bytes ends the run
+with an error naming the flag, and nothing is written. A password missing a character class is warned
+about and kept.
 
 ## Next steps
 

@@ -93,6 +93,37 @@ func composeServerEnvironments(t *testing.T, content string) map[string]map[stri
 	}
 }
 
+// sampleServerEnvironments reads a hand-written sample's two server environments as
+// composeServerEnvironments reads a generated file's, except that an entry holding a variable
+// reference is kept as written rather than refused: the samples require the operator to set the
+// variables they must not publish, the admin password first (#500), and the trust entries this reads
+// them for hold none.
+func sampleServerEnvironments(t *testing.T, content string) map[string]map[string]string {
+	t.Helper()
+	docs := yamlDocuments(t, content)
+	if len(docs) != 1 {
+		t.Fatalf("%d documents, want 1", len(docs))
+	}
+	services := at[map[string]any](t, docs[0], "services")
+	envs := map[string]map[string]string{}
+	for server, service := range map[string]string{"AUTHSERVER": "goiabada-authserver", "ADMINCONSOLE": "goiabada-adminconsole"} {
+		env := map[string]string{}
+		for _, entry := range at[[]any](t, at[map[string]any](t, services, service), "environment") {
+			line, ok := entry.(string)
+			if !ok {
+				t.Fatalf("environment entry %v is %T, want a string", entry, entry)
+			}
+			if interpolated, ok := composeInterpolate(line); ok {
+				line = interpolated
+			}
+			name, value, _ := strings.Cut(line, "=")
+			env[name] = value
+		}
+		envs[server] = env
+	}
+	return envs
+}
+
 // trustedOutputs is every generated output, each deployment type on each engine it accepts and each
 // answer to the native question, plus the hand-written reverse-proxy sample.
 func trustedOutputs(t *testing.T) []trustedOutput {
@@ -112,7 +143,7 @@ func trustedOutputs(t *testing.T) []trustedOutput {
 		t.Fatal(err)
 	}
 	return append(outputs, trustedOutput{
-		name: reverseProxySample, content: string(sample), env: composeServerEnvironments(t, string(sample)),
+		name: reverseProxySample, content: string(sample), env: sampleServerEnvironments(t, string(sample)),
 		trust: "true", proxies: "",
 	})
 }
