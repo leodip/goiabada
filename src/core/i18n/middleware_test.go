@@ -191,7 +191,7 @@ func TestLocale_EnglishFallback(t *testing.T) {
 		seen = T(r.Context(), "auth.pwd.title")
 		assert.False(t, hasExplicitIntent(r.Context()))
 	})).ServeHTTP(rr, req)
-	assert.Equal(t, "Login", seen)
+	assert.Equal(t, "Sign in", seen)
 }
 
 func TestLocale_DoesNotConsumePostBody(t *testing.T) {
@@ -263,12 +263,12 @@ func TestWithLocale_NonExplicitDefersToExplicitIntentAndExplicitAlwaysWins(t *te
 		"a non-explicit call must not clobber a locale the request asked for")
 
 	won := WithLocale(explicit, true, "en")
-	assert.Equal(t, "Login", T(won, "auth.pwd.title"), "an explicit call always wins")
+	assert.Equal(t, "Sign in", T(won, "auth.pwd.title"), "an explicit call always wins")
 
 	// A non-explicit locale is not itself protected.
 	tentative := WithLocale(context.Background(), false, "pt-BR")
 	require.False(t, hasExplicitIntent(tentative))
-	assert.Equal(t, "Login", T(WithLocale(tentative, false, "en"), "auth.pwd.title"))
+	assert.Equal(t, "Sign in", T(WithLocale(tentative, false, "en"), "auth.pwd.title"))
 }
 
 func TestWithLocale_TrailingEnglishIsTheEmptyLocaleArm(t *testing.T) {
@@ -277,7 +277,7 @@ func TestWithLocale_TrailingEnglishIsTheEmptyLocaleArm(t *testing.T) {
 	// recipient locale renders English rather than the locale of whoever
 	// triggered the send.
 	ctx := WithLocale(WithLocale(context.Background(), true, "pt-BR"), true, "", "en")
-	assert.Equal(t, "Login", T(ctx, "auth.pwd.title"))
+	assert.Equal(t, "Sign in", T(ctx, "auth.pwd.title"))
 	assert.Equal(t, "en", LocaleTag(ctx))
 
 	// And a recipient who does have one still gets it.
@@ -293,7 +293,7 @@ func TestWithLocale_ReplacesRefineLocalizerWithUserLocale(t *testing.T) {
 
 	refined := inner.WithContext(WithLocale(inner.Context(), false, "pt-BR"))
 	assert.Equal(t, "Entrar", T(refined.Context(), "auth.pwd.title"))
-	assert.Equal(t, "Login", T(inner.Context(), "auth.pwd.title"),
+	assert.Equal(t, "Sign in", T(inner.Context(), "auth.pwd.title"),
 		"contexts are immutable: the original must be untouched")
 
 	// An empty stored locale changes nothing.
@@ -325,10 +325,10 @@ func TestWithLocale_ReplacesEmailContext(t *testing.T) {
 	admin := throughLocaleMiddleware(t, httptest.NewRequest("GET", "/api/v1/admin/users?ui_locales=pt-BR", nil))
 	require.True(t, hasExplicitIntent(admin.Context()))
 
-	assert.Equal(t, "Login", T(WithLocale(admin.Context(), true, "en", "en"), "auth.pwd.title"),
+	assert.Equal(t, "Sign in", T(WithLocale(admin.Context(), true, "en", "en"), "auth.pwd.title"),
 		"the recipient's locale must win over the sending admin's explicit one")
 	assert.Equal(t, "Entrar", T(WithLocale(admin.Context(), true, "pt-BR", "en"), "auth.pwd.title"))
-	assert.Equal(t, "Login", T(WithLocale(admin.Context(), true, "", "en"), "auth.pwd.title"),
+	assert.Equal(t, "Sign in", T(WithLocale(admin.Context(), true, "", "en"), "auth.pwd.title"),
 		"a recipient with no stored locale reads English, not the admin's")
 }
 
@@ -369,8 +369,8 @@ func TestResolveRequestLocale(t *testing.T) {
 	}{
 		{"ui_locales wins over the header", "/auth/pwd?ui_locales=pt-BR", "fr-FR", "Entrar"},
 		{"Accept-Language is honoured", "/auth/pwd", "pt-BR,en;q=0.9", "Entrar"},
-		{"nothing to go on falls back to English", "/auth/pwd", "", "Login"},
-		{"an unsupported language falls back to English", "/auth/pwd", "fr-FR", "Login"},
+		{"nothing to go on falls back to English", "/auth/pwd", "", "Sign in"},
+		{"an unsupported language falls back to English", "/auth/pwd", "fr-FR", "Sign in"},
 	}
 
 	for _, tt := range tests {
@@ -397,7 +397,7 @@ func TestResolveRequestLocale_LeavesTheRequestUntouched(t *testing.T) {
 
 	_ = ResolveRequestLocale(req.Context(), req)
 
-	assert.Equal(t, "Login", T(req.Context(), "auth.pwd.title"))
+	assert.Equal(t, "Sign in", T(req.Context(), "auth.pwd.title"))
 }
 
 func TestLocaleTag_FromContext(t *testing.T) {

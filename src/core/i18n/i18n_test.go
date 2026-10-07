@@ -16,7 +16,7 @@ import (
 func TestT_EnglishKeyResolves(t *testing.T) {
 	ctx := context.Background()
 	got := T(ctx, "auth.pwd.title")
-	assert.Equal(t, "Login", got)
+	assert.Equal(t, "Sign in", got)
 }
 
 func TestT_PtBRKeyResolves(t *testing.T) {
@@ -27,7 +27,7 @@ func TestT_PtBRKeyResolves(t *testing.T) {
 func TestT_UnknownLocaleFallsBackToEnglish(t *testing.T) {
 	// "xx" is not a registered locale; the matcher falls back to the tag at
 	// index 0, which is English.
-	assert.Equal(t, "Login", T(ctxFor("xx"), "auth.pwd.title"))
+	assert.Equal(t, "Sign in", T(ctxFor("xx"), "auth.pwd.title"))
 }
 
 func TestT_MissingKeyReturnsKey(t *testing.T) {
@@ -41,7 +41,7 @@ func TestLocalizer_NoCtxFallsBackToEnglish(t *testing.T) {
 	loc := localizer(context.Background())
 	require.NotNil(t, loc)
 	// T against an empty context resolves through the English fallback.
-	assert.Equal(t, "Login", T(context.Background(), "auth.pwd.title"))
+	assert.Equal(t, "Sign in", T(context.Background(), "auth.pwd.title"))
 }
 
 // TestRendering_WithNoLoadBundleServesTheEmbeddedCatalogs is the case that made the nine TestMains
@@ -53,7 +53,7 @@ func TestRendering_WithNoLoadBundleServesTheEmbeddedCatalogs(t *testing.T) {
 	t.Cleanup(func() { installed.Store(saved) })
 	installed.Store(nil)
 
-	assert.Equal(t, "Login", T(context.Background(), "auth.pwd.title"))
+	assert.Equal(t, "Sign in", T(context.Background(), "auth.pwd.title"))
 	assert.Equal(t, "Entrar", T(ctxFor("pt-BR"), "auth.pwd.title"))
 	assert.NotEqual(t, "js.error.unexpected", Raw(context.Background(), "js.error.unexpected"))
 
@@ -71,7 +71,7 @@ func TestLoad_EmptyDirIsTheEmbeddedCatalogs(t *testing.T) {
 	assert.Equal(t, tagStrings(embedded()), tagStrings(b))
 	assert.Equal(t, []string{"en", "pt-BR"}, tagStrings(b))
 	assert.Equal(t, "Entrar", T(ctxForBundle(b, "pt-BR"), "auth.pwd.title"))
-	assert.Equal(t, "Login", T(ctxForBundle(b, "en"), "auth.pwd.title"))
+	assert.Equal(t, "Sign in", T(ctxForBundle(b, "en"), "auth.pwd.title"))
 }
 
 // TestLoad_TouchesNothingGlobal: a load with overrides installs nothing, so what every rendering
@@ -149,12 +149,12 @@ func TestLoadBundle_InstallsTheOverrides(t *testing.T) {
 
 	dir := overridesDir(t, map[string]string{
 		"active.pt-BR.toml": "\"auth.pwd.title\" = \"Acesse\"\n",
-		"active.en.toml":    "\"auth.pwd.title\" = \"Sign in\"\n",
+		"active.en.toml":    "\"auth.pwd.title\" = \"Welcome back\"\n",
 	})
 	require.NoError(t, LoadBundle(dir))
 
 	assert.Equal(t, "Acesse", T(ctxFor("pt-BR"), "auth.pwd.title"))
-	assert.Equal(t, "Sign in", T(context.Background(), "auth.pwd.title"))
+	assert.Equal(t, "Welcome back", T(context.Background(), "auth.pwd.title"))
 }
 
 // TestLoadBundle_AFailureLeavesThePreviousBundleInstalled: an override that does not parse is
@@ -164,7 +164,7 @@ func TestLoadBundle_AFailureLeavesThePreviousBundleInstalled(t *testing.T) {
 	t.Cleanup(func() { installed.Store(saved) })
 
 	require.NoError(t, LoadBundle(overridesDir(t, map[string]string{
-		"active.en.toml": "\"auth.pwd.title\" = \"Sign in\"\n",
+		"active.en.toml": "\"auth.pwd.title\" = \"Welcome back\"\n",
 	})))
 	before := installed.Load()
 
@@ -174,7 +174,7 @@ func TestLoadBundle_AFailureLeavesThePreviousBundleInstalled(t *testing.T) {
 	require.Error(t, err)
 
 	assert.Same(t, before, installed.Load())
-	assert.Equal(t, "Sign in", T(context.Background(), "auth.pwd.title"))
+	assert.Equal(t, "Welcome back", T(context.Background(), "auth.pwd.title"))
 }
 
 // TestOrEmpty_AnEmbeddedFailureRendersEveryKeyAsItself is the leniency the embedded default
@@ -320,7 +320,7 @@ func TestT_TemplatedValueThatFailsToExecuteRendersTheKey(t *testing.T) {
 // first tag is unsupported.
 func TestLocalizerFor_MatchesAsGoI18nDid(t *testing.T) {
 	const (
-		en = "Login"
+		en = "Sign in"
 		pt = "Entrar"
 	)
 	for _, tc := range []struct {
@@ -371,7 +371,7 @@ func TestOverrideDir_EmptyValueRemovesTheTranslation(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := ctxForBundle(b, "pt-BR")
-	assert.Equal(t, "Login", T(ctx, "auth.pwd.title"))
+	assert.Equal(t, "Sign in", T(ctx, "auth.pwd.title"))
 	// Neighbouring keys are untouched by the removal.
 	assert.Equal(t, "Senha", T(ctx, "auth.pwd.password_label"))
 }
