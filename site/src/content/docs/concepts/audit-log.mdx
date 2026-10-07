@@ -1,80 +1,285 @@
 ---
 title: Audit log
-description: Logging and persisting security-sensitive events for compliance and forensics.
+description: See who signed in, what changed and what was refused, and alert on the events that matter.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-Goiabada records security-sensitive events as audit events. These include logins, token issuance, permission changes, and account modifications. They can be written to the console, persisted to the database, or both.
+This page helps you find out what happened on your auth server, and alert on the events that matter.
 
-## Logging targets
+Goiabada records security events as they happen: sign-ins, refused passwords, tokens issued, and every change an administrator makes. Each one is an audit event, with a name such as `auth_failed_pwd` and details saying who and what.
 
-Audit logging has two independent targets that can be enabled together or separately:
+## See what happened
 
-| Target | Default | Description |
-|--------|---------|-------------|
-| Console | Enabled | One log record per event, carrying the event name, its details as fields, and, for an event raised while serving a request, that request's id, picked up by your container or host log pipeline. |
-| Database | Enabled | Events are persisted to the `audit_logs` table and can be browsed in the admin console. |
+<Steps>
 
-Disabling both effectively turns off audit logging.
+1. In the admin console, open **Admin**, **Audit log viewer**.
 
-That request id is whatever the client or proxy sent in `X-Request-Id`, or one Goiabada generated when none was sent, so it ties an event to a log line and is not proof of who sent the request.
+2. Pick an event from the list, or paste a request id into **Filter by request id**, and click **Filter**.
 
-<Aside type="caution">
-Database persistence is only useful if you can guarantee the database stays available. For deployments where the database is the resource being audited, also enable console logging so events still reach an external log collector.
-</Aside>
+3. Read the entries, newest first. Each one shows its **Timestamp**, its **Event**, its **Request id** and its **Details**.
 
-## Retention
+</Steps>
 
-When database persistence is enabled, a background worker periodically deletes audit logs older than the configured retention period.
-
-| Setting | Default | Notes |
-|---------|---------|-------|
-| Retention (days) | 180 | Maximum 3650 (10 years). Use `0` for **infinite retention**, in which case no automatic cleanup happens. |
-
-The worker runs every 12 hours and deletes in batches of 1000 (up to 100,000 per run). On a high volume deployment, expect cleanup to amortize over multiple runs after the retention threshold is first reached.
-
-## Admin console
-
-Two pages are available in the admin console under **Settings**:
-
-- **Audit log settings**: toggle the console and database targets, and configure retention. Changing them needs `authserver:manage`: a token holding only `authserver:manage-settings` reads them but is refused a change, since switching a target off or shortening retention would hide what the other refusals record.
-- **Audit log viewer**: browse persisted events with event type and request id filtering, and pagination. Each entry shows the event name, timestamp, request id, and a JSON details payload.
-
-The viewer reads through the auth server's admin API, which serves the rows from the `audit_logs` table, so it only shows events captured while database persistence was enabled. The event type filter is filled from the auth server's catalog of event names, so it offers every event this server can write, including ones that have not occurred on this deployment yet.
-
-## REST API
-
-The same configuration and viewer are available via the admin REST API:
-
-- `GET/PUT /api/v1/admin/settings/audit-logs`: read or update logging targets and retention.
-- `GET /api/v1/admin/audit-logs`: paginated viewer endpoint with optional `auditEvent` and `requestId` filters.
-- `GET /api/v1/admin/audit-logs/event-types`: the catalog of event identifiers the `auditEvent` filter accepts.
-
-See [Update audit log settings](/reference/api/admin/operations/updatesettingsauditlogs/) for full details.
+By default, events are kept for 180 days and then deleted. To change that, or where events go, open **Admin**, **Audit log settings**.
 
 ## Events to alert on
 
-These events record who can administer Goiabada and who tried to reach past that, and they are the ones worth an alert rule or a saved filter in the viewer. Each is one event type, so a single filter on it sees every occurrence. See [administrators](/concepts/resources-and-permissions/#administrators) for the rule they are about, and [administrative scopes](/concepts/clients/#administrative-scopes) for which clients may request those scopes on a user's behalf.
+Most events are routine. These are the ones worth an alert rule, or a saved filter in the viewer. Each is one event, so a single filter on its name sees every occurrence.
+
+### Who is an administrator
+
+These record who can administer Goiabada and who tried to reach past that. See [administrators](/concepts/resources-and-permissions/#administrators) for the rule they're about, and [administrative scopes](/concepts/clients/#administrative-scopes) for which clients may ask for them on a user's behalf.
 
 | Event | Written when | Details |
-|-------|--------------|---------|
-| `administrator_change_refused` | An admin API request reached for something only `authserver:manage` may do, creating an administrator, changing one or changing what reaches one, and was refused `403 MANAGE_SCOPE_REQUIRED`. One entry per refused request, so an integration retrying leaves one per attempt. A route refusing a token without any of its scopes (`INSUFFICIENT_SCOPE`) writes none. | `loggedInUser` (the token's subject), `method`, `route` (the route pattern, such as `/api/v1/admin/users/{id}/permissions`), `ceiling` (`grant` for granting or revoking an administrative permission, directly or through a group, `target` for any other write on an administrator, for switching a client's administrative scopes allowance or for changing an administrative permission's description, `settings` for the email or audit-log settings), `targetKind` and `targetId` where the request has a target, and for a grant refusal or a description change `permissionIds`, the administrative permissions that caused it, and `groupIds` when it moved a user into or out of an administrative group |
-| `administrative_permission_changed` | An administrative permission was granted to or revoked from a user, a group or a client, or a user joined or left a group holding one. Written beside the change's own entry (`added_user_permission`, `updated_client_permissions`, `user_added_to_group` and their siblings), never instead of it. Deleting an administrator or an administrative group writes its own deletion entry and not this one. | `change` (`granted` or `revoked`), `targetKind` and `targetId` (the user, group or client, the user for a membership change), `permissionIdentifiers` (such as `authserver:manage`), `groupId` for a membership change, and `loggedInUser` |
-| `updated_client_administrative_scopes` | A client's allowance to request the administrative scopes on a user's behalf was switched, through `PUT /api/v1/admin/clients/{id}/administrative-scopes` or the client's **May request administrative scopes** switch in the admin console. An allowed client is an administrator client, so an alert on who is an administrator watches this beside `administrative_permission_changed`. Written once the switch is stored, once per switch, including a switch to the value already stored. | `clientId`, `clientIdentifier`, `allowed` (the new value) and `loggedInUser` |
-| `administrative_scope_refused` | A client that is not allowed to request the administrative scopes asked for one on a user's behalf and was refused (see [the endpoints' answers](/reference/endpoints/#administrative-scopes)). Written once someone has authenticated: at the authorization endpoint when the browser holds a valid session, `prompt=none` included, which is a crafted link reaching a signed-in user; when the code or implicit tokens are about to be issued; and on the authorization code, refresh token and password grants once the client has authenticated. A refusal at the authorization endpoint with no valid session writes a Warn log record instead, because that endpoint is open to anyone and not rate limited. | `clientId`, `clientIdentifier`, `scopes` (the refused administrative scopes, such as `authserver:manage`), `checkpoint` (`"authorize"`, `"issue"`, `"authorization_code"`, `"refresh_token"` or `"password"`) and `userId` |
-| `viewed_client_secret` | A client's secret was read, decrypted, through `GET /api/v1/admin/clients/{id}/secret`. The admin console reads it there each time its **Authentication** tab is opened for a confidential client. Reading a client that holds no secret writes nothing. | `clientId`, `clientIdentifier` and `loggedInUser` |
+|---|---|---|
+| `administrator_change_refused` | An Admin API request reached for something only `authserver:manage` may do, and was refused `403 MANAGE_SCOPE_REQUIRED`. That's creating or changing an administrator, granting or revoking an administrative permission, changing what reaches an administrator, or changing the email or audit log settings. One entry per refused request, so a client that retries leaves one per attempt. A token with none of a route's scopes is refused `INSUFFICIENT_SCOPE` instead, and writes nothing. | `loggedInUser`, `method`, `route` (the route pattern, such as `/api/v1/admin/users/{id}/permissions`), `ceiling` (`grant`, `target` or `settings`), `targetKind` and `targetId` when the request has a target, `permissionIds` for a grant or a description change, and `groupIds` for a group membership change |
+| `administrative_permission_changed` | An administrative permission was granted to or revoked from a user, a group or a client, or a user joined or left a group holding one. It's written after the change's own entries, such as `added_user_permission` or `user_added_to_group`, never instead of them. Deleting an administrator or an administrative group writes only its own deletion entry. | `change` (`granted` or `revoked`), `targetKind` and `targetId`, `permissionIdentifiers` (such as `authserver:manage`), `groupId` for a membership change, and `loggedInUser` |
+| `updated_client_administrative_scopes` | A client's **May request administrative scopes** switch was saved, on or off. An allowed client is an administrator client, so watch this beside `administrative_permission_changed`. It's written for every save, even one that keeps the value it had. | `clientId`, `clientIdentifier`, `allowed` (the new value) and `loggedInUser` |
+| `administrative_scope_refused` | A client that isn't allowed to ask for the administrative scopes asked for one on a signed-in user's behalf, and was refused (see [the endpoints' answers](/reference/endpoints/#administrative-scopes)). It's written at the authorization endpoint when the browser holds a valid session, at the last step before a code or tokens are issued, and on the token endpoint's authorization code, refresh token and password grants. A refusal at the authorization endpoint with no valid session writes a Warn log record instead, since anyone can reach that endpoint. | `clientId`, `clientIdentifier`, `scopes`, `checkpoint` (`"authorize"`, `"issue"`, `"authorization_code"`, `"refresh_token"` or `"password"`) and `userId` |
+| `viewed_client_secret` | Someone read a client's secret through `GET /api/v1/admin/clients/{id}/secret`. The admin console reads it there each time you open a confidential client's **Authentication** tab. Reading a client with no secret writes nothing. | `clientId`, `clientIdentifier` and `loggedInUser` |
 
-The `updated_client_permissions` entry names what a client permission save changed, in `grantedPermissionIds` and `revokedPermissionIds`, so a grant to a client can be traced to the permission it was.
+The `updated_client_permissions` entry names what a client permission save changed, in `grantedPermissionIds` and `revokedPermissionIds`, so you can trace a grant to a client back to the permission it was.
 
-## Event format
+### Signs of an attack
 
-Every audit event has a stable string identifier (such as `token_issued_authorization_code_response`, `auth_success_pwd`, or `deleted_user_session_client`) and a JSON details payload describing the actors and parameters involved. The full set of event identifiers is defined in `src/authserver/internal/audit/events.go`.
+Each of these means the server caught something and refused it. One entry is worth a look; a run of them is worth an alert.
 
-In the database, each row of the `audit_logs` table stores:
+| Event | Why it matters |
+|---|---|
+| `refresh_token_replay_detected` | A refresh token that had already been rotated came back. Either it was stolen or a client sent it twice. The server can't tell which, so it revoked the rest of that token's family. |
+| `auth_code_reuse_detected` | A client redeemed an authorization code a second time, after authenticating and passing PKCE. The server revoked the refresh tokens issued through that code's session and ended the session. |
+| `otp_code_replay_detected` | An authenticator code that had already been used was sent again. That usually means a phishing proxy relaying a user's sign-in in real time. |
+| `rate_limit_exceeded` | A rate limiter started refusing requests, often a password or code guessing run. It's written once per limiter and key per window, not once per refused request. |
 
-- `id`: auto increment primary key
-- `created_at`: timestamp the event was recorded
-- `audit_event`: event identifier
-- `details`: JSON payload as text
-- `request_id`: id of the request that raised the event, empty if there was none
+Two more are worth watching. A run of `auth_ceremony_mismatch` against one client is a page trying to act on sign-ins its users never started. And `redemption_refused_redirect_uri` means someone who held a valid code and its PKCE verifier tried to redeem it after you removed its redirect URI.
+
+## How it works
+
+### Where events go
+
+Goiabada writes each event to two places, and **Audit log settings** has a switch for each. Both are on by default.
+
+- **Log audit events to console** writes one log record per event, with the message `audit event`, the event's name in `event`, its details in `details`, and the `request_id`. Your container or host log pipeline picks it up.
+- **Persist audit logs to database** stores the event in the `audit_logs` table. The viewer and the Admin API read it from there.
+
+Turn both off and nothing is recorded. Changing either switch, or the retention, needs `authserver:manage`. The change is recorded with the old settings, so turning logging off still leaves an entry saying who did it.
+
+Recording an event never fails the request that raised it. If an event can't be written, the server logs an error and carries on.
+
+<Aside type="caution">
+If the database is what you're auditing, keep the console switch on too, so your events also reach a log collector outside it.
+</Aside>
+
+### The request id
+
+Every entry carries the id of the request that raised it. That's the `X-Request-Id` the client or a proxy sent, or one Goiabada generated when none came. Use it to find the request's own log lines next to the event. It's not proof of who sent the request, since a client can send any id it likes.
+
+### Retention
+
+| Setting | Default | Range |
+|---|---|---|
+| Audit log retention (days) | `180` | `0` to `3650`. `0` keeps events forever. |
+
+A background worker runs every 12 hours and deletes stored events older than the retention. It deletes at most 100,000 per run, 1,000 at a time, so a big backlog clears over several runs. It runs whatever the database switch says, so events you stored earlier still age out after you turn that switch off.
+
+### The `audit_logs` table
+
+Each stored event is one row:
+
+| Column | Holds |
+|---|---|
+| `id` | The row's id. |
+| `created_at` | When the event was recorded. |
+| `audit_event` | The event's name. |
+| `details` | The details, as JSON text. |
+| `request_id` | The id of the request that raised it, or empty when there was none. |
+
+### Details
+
+The details are a JSON object saying who and what. Their fields depend on the event. `loggedInUser` is the subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow.
+
+Events are about people and clients, so details carry ids, not secrets. A refresh token appears only as its `jti`, an authenticator code only as its time step, and the forgot-password and registration events store a SHA-256 digest of the email address instead of the address itself.
+
+### The Admin API
+
+- [`GET /api/v1/admin/audit-logs`](/reference/api/admin/operations/getauditlogs/) lists stored events, newest first, a page at a time: `page`, `size` (20 unless you ask, at most 200), and the `auditEvent` and `requestId` filters, each an exact match.
+- [`GET /api/v1/admin/audit-logs/event-types`](/reference/api/admin/operations/getauditeventtypes/) returns every event name the server can write. The viewer's event list comes from here, so it includes events that haven't happened yet.
+- [`GET /api/v1/admin/settings/audit-logs`](/reference/api/admin/operations/getsettingsauditlogs/) and [`PUT`](/reference/api/admin/operations/updatesettingsauditlogs/) read and change the two switches and the retention.
+
+Reading any of these needs `authserver:admin-read`, `authserver:manage-settings` or `authserver:manage`. Changing the settings needs `authserver:manage`.
+
+### Every event
+
+This is every event the auth server writes, grouped by what raises it. The viewer's event list holds the same names. "An administrator" means whoever called the Admin API, which is what the admin console does for you.
+
+#### Sign-in
+
+| Event | Meaning |
+|---|---|
+| `auth_success_pwd` | A user's password was accepted on the sign-in page. |
+| `auth_failed_pwd` | A password was refused on the sign-in page, because no user has that email or the password was wrong. |
+| `auth_success_otp` | A user's authenticator code was accepted at sign-in, including a first code that set up their authenticator. |
+| `auth_failed_otp` | An authenticator code was refused at sign-in, because it was wrong or had already been used. |
+| `otp_code_replay_detected` | An authenticator code that had already been used was sent again, at sign-in or while turning on two-factor authentication, and was refused. |
+| `user_disabled` | A disabled user was refused: at sign-in, when reusing a session, before a code or tokens were issued, at the token endpoint or at `/userinfo`. |
+| `rate_limit_exceeded` | A rate limiter started refusing requests from an IP address block, for an email address or for a user. Written once per key per window. |
+| `auth_ceremony_mismatch` | A sign-in step was refused because its page belonged to a sign-in the browser had since replaced, or named none. |
+| `started_new_user_session` | A user signed in and a new session was created for them. |
+| `bumped_user_session` | A user's existing session was reused and kept alive, by single sign-on, a `prompt=none` request or a refresh token grant. |
+| `cross_user_session_replaced` | A user signed in on a browser that still held another user's session, so that session was ended. |
+| `saved_consent` | A user approved a client's consent screen, and the scopes they granted were saved. |
+| `created_auth_code` | An authorization code was issued to a client for a user. |
+| `issuance_refused_session_invalid` | The last step of a sign-in was refused because the user's session had passed its idle timeout or maximum lifetime. |
+| `issuance_refused_scope_denied` | The last step of a sign-in was refused because the user no longer held any of the scopes the client asked for. |
+| `issuance_refused_redirect_uri` | The last step of a sign-in was refused because the client's redirect URI was removed while the user was signing in. Nothing was sent to the client. |
+| `administrative_scope_refused` | A client that isn't allowed to ask for the administrative scopes asked for one on a signed-in user's behalf, and was refused. |
+
+#### Sign-out and sessions
+
+| Event | Meaning |
+|---|---|
+| `logout` | A user signed out and their session ended. A sign-out confirmed with no session to end writes it too. |
+| `deleted_user_session_client` | A client signed a user out, and was removed from the user's session. The session ends only when no other client is left on it. |
+| `deleted_user_session` | A session was deleted: ended by an administrator or its user, replaced at sign-in, superseded by a new sign-in on the same device, or removed at sign-out. |
+| `terminated_user_session` | A session was ended by an administrator, by its own user, or by another user signing in on the same browser, and its codes and refresh tokens were revoked. |
+| `revoked_user_auth_state` | A user's password was reset or changed, or the user was disabled, so their sessions and refresh tokens were revoked. A user changing their own password keeps the session they did it from. |
+
+#### Tokens
+
+| Event | Meaning |
+|---|---|
+| `token_issued_authorization_code_response` | The token endpoint exchanged an authorization code for tokens. |
+| `token_issued_refresh_token_response` | The token endpoint exchanged a refresh token for new tokens. |
+| `token_issued_client_credentials_response` | The token endpoint issued an access token to a client through the client credentials flow. |
+| `token_issued_ropc_response` | The token endpoint issued tokens for a username and password, through the password grant. |
+| `token_issued_implicit_response` | The authorization endpoint issued tokens straight to a client, through the implicit flow. |
+| `token_scope_denied` | The token endpoint refused a request for a scope the client or user may not have. |
+| `ropc_auth_failed` | The token endpoint refused a password grant, because the email or password was wrong, or the user was disabled or has two-factor authentication on. |
+| `auth_code_reuse_detected` | A client redeemed an authorization code a second time. The refresh tokens issued through that code's session were revoked, and the session ended. |
+| `refresh_token_replay_detected` | A refresh token that had already been rotated came back, so the rest of its family was revoked. |
+| `redemption_refused_redirect_uri` | The token endpoint refused an authorization code because its redirect URI was removed from the client after the code was issued. |
+
+#### Registration and emailed links
+
+| Event | Meaning |
+|---|---|
+| `requested_registration` | Someone sent the registration form while email verification is required. `outcome` says whether an activation link, a notice that the account exists, or nothing was sent. |
+| `activated_account` | Someone followed their activation link and chose a password, which created their account. |
+| `failed_account_activation_code` | An activation link was refused, because it was unknown, expired or already used, or its address already has an account. |
+| `requested_password_reset` | Someone sent the forgot-password form. `outcome` says whether a reset link was sent, or why not. |
+| `failed_reset_password_code` | A password reset link was refused, because it was unknown, expired or already used, or no longer valid for its account. |
+
+#### A user's own account
+
+These come from the Account API, which users reach through the admin console's account pages.
+
+| Event | Meaning |
+|---|---|
+| `updated_own_profile` | A user saved their own profile: names, username, website, gender, birth date, time zone or locale. |
+| `updated_own_email` | A user changed their own email address, after confirming their password. The new address starts unverified. |
+| `sent_email_verification_message` | A user asked for an email verification code, and it was sent to their address. |
+| `verified_email` | A user verified their email address with the code they were sent. |
+| `failed_email_verification_code` | A user entered a wrong or expired email verification code. |
+| `updated_own_phone` | A user saved or cleared their own phone number. |
+| `updated_own_address` | A user saved their own address. |
+| `updated_own_profile_picture` | A user uploaded or replaced their own profile picture. |
+| `deleted_own_profile_picture` | A user removed their own profile picture. |
+| `changed_password` | A user changed their own password, after confirming the current one. |
+| `enabled_otp` | A user set up an authenticator for two-factor authentication, on their account page or when a sign-in required it. |
+| `disabled_otp` | A user's authenticator was removed, by the user or by an administrator. |
+| `deleted_own_user_consent` | A user withdrew the consent they had given a client. |
+
+#### Users
+
+| Event | Meaning |
+|---|---|
+| `created_user` | A user was created: by an administrator, by someone registering, or by someone activating their registration. |
+| `updated_user_details` | An administrator enabled or disabled a user. |
+| `updated_user_profile` | An administrator changed a user's profile: username, names, nickname, website, gender, birth date, time zone or locale. |
+| `updated_user_email` | An administrator changed a user's email address, or whether it's verified. |
+| `generated_email_verification_code` | An administrator generated an email verification code for a user. It was returned to the administrator, not emailed. |
+| `updated_user_phone` | An administrator changed or cleared a user's phone number. |
+| `updated_user_address` | An administrator changed a user's address. |
+| `updated_user_authentication` | An administrator set a new password for a user. |
+| `updated_user_profile_picture` | An administrator uploaded or replaced a user's profile picture. |
+| `deleted_user_profile_picture` | An administrator removed a user's profile picture. |
+| `added_user_attribute` | An administrator added a custom attribute to a user. |
+| `updated_user_attribute` | An administrator changed a user's custom attribute. |
+| `deleted_user_attribute` | An administrator deleted a user's custom attribute. |
+| `added_user_permission` | An administrator granted a permission to a user. One entry per permission. |
+| `deleted_user_permission` | An administrator revoked a permission from a user. One entry per permission. |
+| `deleted_user_consent` | An administrator deleted a consent a user had given a client. |
+| `deleted_user` | An administrator deleted a user. |
+
+#### Groups
+
+| Event | Meaning |
+|---|---|
+| `created_group` | An administrator created a group. |
+| `updated_group` | An administrator changed a group's identifier, description, or whether it goes in tokens. |
+| `deleted_group` | An administrator deleted a group. |
+| `added_group_attribute` | An administrator added a custom attribute to a group. |
+| `updated_group_attribute` | An administrator changed a group's custom attribute. |
+| `deleted_group_attribute` | An administrator deleted a group's custom attribute. |
+| `added_group_permission` | An administrator granted a permission to a group. One entry per permission. |
+| `deleted_group_permission` | An administrator revoked a permission from a group. One entry per permission. |
+| `user_added_to_group` | An administrator added a user to a group. One entry per group. |
+| `user_removed_from_group` | An administrator removed a user from a group. One entry per group. |
+
+#### Administrators
+
+| Event | Meaning |
+|---|---|
+| `administrative_permission_changed` | Who is an administrator changed: an administrative permission was granted or revoked, or a user joined or left a group holding one. |
+| `administrator_change_refused` | An Admin API request was refused because only `authserver:manage` may make that change. |
+
+#### Clients
+
+| Event | Meaning |
+|---|---|
+| `created_client` | An administrator created a client. |
+| `dynamic_client_registration` | A client registered itself through dynamic client registration. |
+| `updated_client_settings` | An administrator saved a client's settings: identifier, description, display options, enabled, consent required or default ACR level. |
+| `updated_client_authentication` | An administrator saved a client's authentication: made it public, or made it confidential with a new or the same secret. |
+| `revoked_client_grants` | An administrator made a confidential client public, so its authorization codes and refresh tokens were revoked. |
+| `viewed_client_secret` | Someone read a client's secret. |
+| `updated_client_oauth2_flows` | An administrator saved which flows a client may use, and whether it needs PKCE. |
+| `updated_redirect_uris` | An administrator saved a client's redirect URIs. |
+| `updated_web_origins` | An administrator saved a client's web origins. |
+| `updated_client_tokens` | An administrator saved a client's token settings: lifetimes, and which claims go in its tokens. |
+| `updated_client_permissions` | An administrator changed the permissions granted to a client. |
+| `updated_client_administrative_scopes` | An administrator allowed a client to ask for the administrative scopes, or stopped it. |
+| `updated_client_logo` | An administrator uploaded or replaced a client's logo. |
+| `deleted_client_logo` | An administrator removed a client's logo. |
+| `deleted_client` | An administrator deleted a client. |
+
+#### Resources
+
+| Event | Meaning |
+|---|---|
+| `created_resource` | An administrator created a resource. |
+| `updated_resource` | An administrator changed a resource's identifier or description. |
+| `updated_resource_permissions` | An administrator changed the permissions a resource defines: added, renamed, described or deleted them. Granting a permission writes a different event. |
+| `deleted_resource` | An administrator deleted a resource. |
+
+#### Settings and keys
+
+| Event | Meaning |
+|---|---|
+| `updated_general_settings` | An administrator saved the **General** settings. |
+| `updated_ui_theme_settings` | An administrator changed the **UI theme**. The entry names the old and the new theme. |
+| `updated_sessions_settings` | An administrator changed the session idle timeout or maximum lifetime. |
+| `updated_tokens_settings` | An administrator changed the default token settings. The entry holds the old and the new values. |
+| `updated_smtp_settings` | An administrator changed the **Email - SMTP** settings, including turning email on or off. |
+| `sent_test_email` | An administrator sent a test email, and the mail server accepted it. |
+| `updated_audit_logs_settings` | An administrator changed where audit events go or how long they're kept. |
+| `rotated_keys` | An administrator rotated the signing keys: the next key became the current one, and a new next key was generated. |
+| `revoked_key` | An administrator deleted a previous signing key. |
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Resources and permissions" description="Who can administer Goiabada, and what each permission allows." href="/concepts/resources-and-permissions/" />
+  <LinkCard title="Monitoring" description="Metrics and logs to watch beside the audit log." href="/deploy/monitoring/" />
+</CardGrid>
