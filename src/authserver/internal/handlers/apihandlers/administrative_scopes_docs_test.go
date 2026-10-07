@@ -128,7 +128,7 @@ func TestAdministrativeScopesDocs_NameWhatTheAllowanceRestsOn(t *testing.T) {
 
 	assertDocNames(t, filepath.Dir(guard.SourceRoot(t)), []docNames{
 		{
-			section: docSection{auditLogPage, "## Events to alert on"},
+			section: auditAlertSection,
 			pattern: docAuditEvent, kind: "audit event", live: events,
 			want: []string{"updated_client_administrative_scopes", "administrative_scope_refused"},
 		},

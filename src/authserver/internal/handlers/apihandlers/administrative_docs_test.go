@@ -126,7 +126,7 @@ func TestAdministrativeDocs_NameWhatTheModelRestsOn(t *testing.T) {
 
 	assertDocNames(t, filepath.Dir(guard.SourceRoot(t)), []docNames{
 		{
-			section: docSection{auditLogPage, "## Events to alert on"},
+			section: auditAlertSection,
 			pattern: docAuditEvent, kind: "audit event", live: events,
 			want: []string{"administrator_change_refused", "administrative_permission_changed", "viewed_client_secret"},
 		},
