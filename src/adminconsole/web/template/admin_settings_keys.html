@@ -28,7 +28,7 @@
         const key = keys.find(k => k.KeyIdentifier === keyIdentifier);
         if (key) {
             viewPublicKeyDialogPEMKeyId.innerText = key.KeyIdentifier;
-            viewPublicKeyDialogPEMContent.innerHTML = key.PublicKeyPEM;
+            viewPublicKeyDialogPEMContent.value = key.PublicKeyPEM;
 
             viewPublicKeyDialogPEM.showModal();
         }
@@ -44,7 +44,7 @@
         const key = keys.find(k => k.KeyIdentifier === keyIdentifier);
         if (key) {
             viewPublicKeyDialogASN1DERKeyId.innerText = key.KeyIdentifier;
-            viewPublicKeyDialogASN1DERContent.innerHTML = key.PublicKeyASN1DER;
+            viewPublicKeyDialogASN1DERContent.value = key.PublicKeyASN1DER;
 
             viewPublicKeyDialogASN1DER.showModal();
         }
@@ -60,7 +60,7 @@
         const key = keys.find(k => k.KeyIdentifier === keyIdentifier);
         if (key) {
             viewPublicKeyDialogJWKKeyId.innerText = key.KeyIdentifier;
-            viewPublicKeyDialogJWKContent.innerHTML = key.PublicKeyJWK;
+            viewPublicKeyDialogJWKContent.value = key.PublicKeyJWK;
 
             viewPublicKeyDialogJWK.showModal();
         }

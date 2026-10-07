@@ -132,23 +132,23 @@
             const cell3 = row.insertCell(2);
             const cell4 = row.insertCell(3);
             cell1.className = "p-1 font-mono text-sm align-middle";
-            cell1.innerHTML = perm.permissionIdentifier;
+            cell1.textContent = perm.permissionIdentifier;
 
             cell2.className = "p-1";
-            cell2.innerHTML = perm.description;
+            cell2.textContent = perm.description;
 
             cell3.className = "p-1 text-right w-16";
             if(isSystemLevelResource && isBuiltInPermission(perm.permissionIdentifier)) {
                 cell3.innerHTML =  "&nbsp;";
             } else {
-                cell3.innerHTML = getEditMarkup("", "editPermission(event, this);", "data-permissionid='" + perm.id + "'");
+                cell3.replaceChildren(createEditButton(editPermission, { permissionid: perm.id }));
             }
 
             cell4.className = "p-1 text-right w-16";
             if(isSystemLevelResource && isBuiltInPermission(perm.permissionIdentifier)) {
                 cell4.innerHTML =  "&nbsp;";
             } else {
-                cell4.innerHTML = getTrashCanMarkup("", "deletePermission(event, this);", "data-permissionid='" + perm.id + "'");
+                cell4.replaceChildren(createTrashCanButton(deletePermission, { permissionid: perm.id }));
             }
         });
       }

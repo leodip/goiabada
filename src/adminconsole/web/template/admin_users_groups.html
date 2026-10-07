@@ -106,10 +106,14 @@
                 const cell1 = row.insertCell(0);
                 const cell2 = row.insertCell(1);
                 cell1.className = "p-1 font-mono text-sm align-middle";
-                cell1.innerHTML = "<a class='link link-hover' href='/admin/groups/" + assignedGroup.id + "/settings'>" + assignedGroup.groupIdentifier + "</a>";
+                const groupLink = document.createElement("a");
+                groupLink.className = "link link-hover";
+                groupLink.href = "/admin/groups/" + parseInt(assignedGroup.id, 10) + "/settings";
+                groupLink.textContent = assignedGroup.groupIdentifier;
+                cell1.replaceChildren(groupLink);
 
                 cell2.className = "p-1 text-right";
-                cell2.innerHTML = getTrashCanMarkup("", "deleteGroupMembership(event, this);", "data-groupid='" + assignedGroup.id + "'");
+                cell2.replaceChildren(createTrashCanButton(deleteGroupMembership, { groupid: assignedGroup.id }));
             });
         }
     }
