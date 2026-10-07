@@ -1,0 +1,129 @@
+---
+title: Glossary
+description: The words the docs use, what each one means, and the one name each concept goes by.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+This page tells you what each word in the docs means, so you can read any page without guessing.
+
+Each concept has one name, the one the admin console uses, and the docs never swap in a synonym. When a page uses a term for the first time, it explains it in a few words and links here or to the term's concept page.
+
+## Words we use
+
+**Sign in** and **sign out** are the verbs: "sign in to the admin console", "the user signs out". **Sign-in** is the noun: "the sign-in page", "a sign-in that took too long".
+
+The docs never say log in, log out, login or logout in prose. Two things keep their own spelling:
+
+- **Protocol names**, which are spelled as the protocol spells them: `prompt=login`, `login_hint`, `/auth/logout`.
+- **UI labels**, which are quoted exactly as the screen shows them.
+
+**Your app** is the software you're building, the one you register in Goiabada as a client. The docs don't use it for anything else.
+
+## Terms
+
+### Access token
+
+A token a client sends to an API to show what it's allowed to do. Goiabada issues access tokens as signed JWTs, and an API checks the signature against the auth server's public keys at `/certs`. See [Tokens](/concepts/tokens/).
+
+### ACR
+
+Authentication Context Class Reference: how strongly the user signed in. Goiabada has three levels, `urn:goiabada:level1` (password), `urn:goiabada:level2_optional` (password, plus a one-time code if the user has two-factor authentication) and `urn:goiabada:level2_mandatory` (password and a one-time code). See [ACR and AMR](/concepts/acr-and-amr/).
+
+### Admin console
+
+The web app where you manage clients, users, groups, resources, permissions and settings. It's a client of the auth server and reaches the database only through the auth server.
+
+### AMR
+
+Authentication Methods References: which methods the user signed in with. Goiabada uses `pwd` (password) and `otp` (one-time code). See [ACR and AMR](/concepts/acr-and-amr/).
+
+### Attribute
+
+A name and value you add to a user or a group. A client gets a user's attributes, and those of the user's groups, in the user's claims when it asks for the `attributes` scope and the attribute is set to be included.
+
+### Audit log
+
+The record of security events: sign-ins, failed passwords, changes an administrator makes, and more. See [Audit log](/concepts/audit-log/).
+
+### Auth server
+
+The server that signs users in and issues tokens. It serves the OAuth2 and OpenID Connect endpoints, the sign-in pages and the API the admin console uses.
+
+### Authorization code
+
+A short-lived, single-use code the auth server sends to a client after the user signs in. The client exchanges it at `/auth/token` for tokens. See [Authorization code](/guides/authorization-code/).
+
+### Claim
+
+One piece of information inside a token, such as `sub` (who the user is) or `email`.
+
+### Client
+
+An application that asks the auth server for tokens: your app, an API calling another API, or the admin console itself. A client is identified by its client identifier, the `client_id` it sends. See [Clients](/concepts/clients/).
+
+- A **confidential client** runs on a server and has a client secret.
+- A **public client** runs where it can't keep a secret, such as a browser or a phone, so it has none and must always use PKCE.
+
+### Consent
+
+A user's approval for a client to receive what it asked for. The auth server asks for it when the client has "Consent required" turned on, when the client asks for `offline_access`, or when the request says `prompt=consent`. Users can revoke a consent under "Manage consents" in their account.
+
+### Dynamic client registration (DCR)
+
+A way for a client to register itself, by calling `/connect/register`, instead of an administrator creating it in the admin console. It's off until you turn it on.
+
+### Group
+
+A set of users. Permissions and attributes you give a group apply to every user in it. See [Users and groups](/concepts/users-and-groups/).
+
+### ID token
+
+A token that tells a client who the user is and how they signed in. Only clients that ask for the `openid` scope get one. See [Tokens](/concepts/tokens/).
+
+### Permission
+
+Something a resource lets you do, such as `manage` on the `authserver` resource. You give permissions to users, groups and clients, and a client asks for one as a scope written `resource:permission`, like `authserver:manage`. See [Resources and permissions](/concepts/resources-and-permissions/).
+
+### PKCE
+
+Proof Key for Code Exchange: a check that ties an authorization code to the client that asked for it, so a stolen code is useless. Public clients must always use it. See [PKCE](/concepts/pkce/).
+
+### Redirect URI
+
+The address the auth server sends the browser back to after sign-in, carrying the authorization code. It must be one of the redirect URIs registered on the client.
+
+### Refresh token
+
+A token a client exchanges for new tokens without asking the user to sign in again. A client that asks for the `offline_access` scope gets an offline refresh token, which keeps working after the user's session expires. See [Tokens](/concepts/tokens/).
+
+### Resource
+
+Something you protect, usually an API, and the permissions that go with it. Goiabada's own resource is `authserver`. See [Resources and permissions](/concepts/resources-and-permissions/).
+
+### Scope
+
+What a client asks for when it requests a token. There are two kinds: OpenID Connect scopes, such as `openid`, `profile` and `email`, which give access to the user's information, and permission scopes, written `resource:permission`. See [Scopes](/concepts/scopes/).
+
+### Session
+
+What lets a user sign in once and use several clients. After the user signs in, the auth server keeps a session for their browser, so the next client they use doesn't ask for the password again. A session ends when it has been idle too long, when it reaches its maximum lifetime, or when the user or an administrator ends it. See [Sessions](/concepts/sessions/).
+
+### Single sign-on (SSO)
+
+Signing in once and using several clients without signing in again, which the session makes possible.
+
+### Two-factor authentication
+
+Signing in with a password and a one-time code from an authenticator app. In the admin console it's under "2-factor auth (OTP)". See [ACR and AMR](/concepts/acr-and-amr/).
+
+### User
+
+A person who signs in. A user has a profile, an email address, a password, and optionally two-factor authentication, and can belong to groups. See [Users and groups](/concepts/users-and-groups/).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Clients" description="Register your app and choose its settings." href="/concepts/clients/" />
+  <LinkCard title="Resources and permissions" description="Decide who can do what." href="/concepts/resources-and-permissions/" />
+</CardGrid>

@@ -24,7 +24,7 @@ const (
 		"caller that reaches this server without passing the proxy, which then chooses the address it " +
 		"is rate-limited and audited under. Set GOIABADA_AUTHSERVER_TRUSTED_PROXIES only when a second " +
 		"proxy hop, such as a CDN or a load balancer, sits in front of the one that connects here. " +
-		"See https://goiabada.dev/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection"
+		"See https://goiabada.dev/deploy/reverse-proxy/#client-ip-resolution-and-spoofing-protection"
 )
 
 // rateLimiterConfigWarnings reports the proxy misconfigurations that change what a rate

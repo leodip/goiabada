@@ -14,7 +14,7 @@ import (
 //
 // OIDC Core 5.4 lists it with name, family_name, birthdate and the rest of what the profile scope
 // requests, and this repository's own documentation has always assigned it there
-// (site/src/content/docs/concepts/openid-connect.mdx, integration/endpoints.mdx). Issuance
+// (site/src/content/docs/concepts/scopes.mdx, reference/endpoints.mdx). Issuance
 // disagreed with both until this test's two "openid email" rows: it emitted the claim for any
 // scope beyond a lone openid, and in an access token for a lone openid too, because
 // generateAccessTokenCore then appended authserver:userinfo to the scope slice for the audience

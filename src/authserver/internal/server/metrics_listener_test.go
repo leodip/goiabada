@@ -206,6 +206,6 @@ func samplesOf(exposition, prefix string) []string {
 func TestMetricsCatalog_TheAuthServerRegistryIsTheDocumentedOne(t *testing.T) {
 	s := newMetricsTestServer(t)
 
-	guard.AssertMetricsCatalog(t, "site/src/content/docs/production-deployment/monitoring.mdx",
+	guard.AssertMetricsCatalog(t, "site/src/content/docs/deploy/monitoring.mdx",
 		"auth server", s.metrics.Families())
 }

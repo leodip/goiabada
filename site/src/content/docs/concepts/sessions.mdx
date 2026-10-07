@@ -77,9 +77,9 @@ A sign-in that was still in progress cannot slip past this. If someone was partw
 
 Nor can a sign-in that had already reached the consent screen. Goiabada checks the session once more at the very last step, just before it hands the application its authorization code, so a sign-in left waiting on that screen is sent back to the login page as well rather than collecting a code on a session that is no longer there, or on one that timed out while the screen was open.
 
-An application renewing quietly in the background with [`prompt=none`](/concepts/prompt-parameter/) hits the same check and is told rather than shown: it gets a `login_required` error back, never a login page, so it can decide when to ask the person to sign in again. A client that [registered itself](/concepts/clients/#dynamic-client-registration-rfc-7591) is one exception, and a `redirect_uri` no longer registered on the client is the other: Goiabada withholds the error redirect, so a silent request that does not return is itself the signal to send the person through an ordinary sign-in.
+An application renewing quietly in the background with [`prompt=none`](/concepts/prompt/) hits the same check and is told rather than shown: it gets a `login_required` error back, never a login page, so it can decide when to ask the person to sign in again. A client that [registered itself](/concepts/clients/#dynamic-client-registration-rfc-7591) is one exception, and a `redirect_uri` no longer registered on the client is the other: Goiabada withholds the error redirect, so a silent request that does not return is itself the signal to send the person through an ordinary sign-in.
 
-Logging out is not the same thing. It revokes nothing: no refresh token is marked revoked and no authorization code is touched. It can still end the session itself, and a normal refresh token stops working once the session behind it is gone. Offline refresh tokens are not tied to a session and keep working either way. See [/auth/logout](/integration/endpoints/) for which logout requests end the whole session.
+Logging out is not the same thing. It revokes nothing: no refresh token is marked revoked and no authorization code is touched. It can still end the session itself, and a normal refresh token stops working once the session behind it is gone. Offline refresh tokens are not tied to a session and keep working either way. See [/auth/logout](/reference/endpoints/) for which logout requests end the whole session.
 
 Each termination writes two entries to the [audit log](/concepts/audit-log/): `terminated_user_session`, recording what was revoked, and `deleted_user_session`, the lifecycle record beside it. Count `terminated_user_session` if you want to know how many sessions were ended.
 
@@ -91,7 +91,7 @@ The bound is the access token's own expiration, 5 minutes by default. If you hav
 
 ## A different user signs in on the same browser
 
-Sessions belong to a browser as much as to a person, so a shared or borrowed browser can arrive at the login page still carrying someone else's session. That happens whenever a client sends [`prompt=login`](/concepts/prompt-parameter/) or [`id_token_hint`](/concepts/id-token-hint/), and whenever the session that was there has simply stopped being valid.
+Sessions belong to a browser as much as to a person, so a shared or borrowed browser can arrive at the login page still carrying someone else's session. That happens whenever a client sends [`prompt=login`](/concepts/prompt/) or [`id_token_hint`](/concepts/id-token-hint/), and whenever the session that was there has simply stopped being valid.
 
 When the person who then signs in is a **different** user, Goiabada treats it as the browser changing hands:
 
@@ -127,7 +127,7 @@ This is useful when the client needs to ensure that the user authenticated withi
 
 Include `prompt=login` in the authorization request to **always** force re-authentication, regardless of session age. Unlike `max_age`, which only triggers re-authentication when the last sign-in is too old, `prompt=login` will require the user to log in again every time.
 
-See [Prompt parameter](/concepts/prompt-parameter/) for details on all supported `prompt` values.
+See [Prompt parameter](/concepts/prompt/) for details on all supported `prompt` values.
 
 ## Example
 

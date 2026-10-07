@@ -47,18 +47,18 @@ However, for clients from third-party organizations, configure the client to req
 
 ## Administrative scopes
 
-Six permissions on the `authserver` resource are [administrative](/concepts/resources-permissions/#administrators): `authserver:manage`, `authserver:admin-read`, `authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings` and `authserver:browser-sessions`. A token carrying one of them on a signed-in user's behalf acts at the Admin API with that user's administrative authority, so **only a client allowed to request the administrative scopes may obtain one**:
+Six permissions on the `authserver` resource are [administrative](/concepts/resources-and-permissions/#administrators): `authserver:manage`, `authserver:admin-read`, `authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings` and `authserver:browser-sessions`. A token carrying one of them on a signed-in user's behalf acts at the Admin API with that user's administrative authority, so **only a client allowed to request the administrative scopes may obtain one**:
 
 - **The admin console's own client**, always. Its allowance is on and cannot be switched off.
-- **Any other client an operator has allowed.** Switch **May request administrative scopes** on, on the client's **Settings** tab under **Consent required**, and save it with that switch's own **Save** button, or call [`PUT /api/v1/admin/clients/{id}/administrative-scopes`](/integration/rest-api/#switch-the-administrative-scopes-allowance). Only a token with `authserver:manage` switches it, on or off.
+- **Any other client an operator has allowed.** Switch **May request administrative scopes** on, on the client's **Settings** tab under **Consent required**, and save it with that switch's own **Save** button, or call [`PUT /api/v1/admin/clients/{id}/administrative-scopes`](/reference/rest-api/#switch-the-administrative-scopes-allowance). Only a token with `authserver:manage` switches it, on or off.
 
 A new client starts not allowed, whether an administrator creates it or it registers itself through [dynamic client registration](#dynamic-client-registration-rfc-7591), which offers no way to ask for the allowance. A self-registered client can be allowed once you have reviewed it, as it can have **Consent required** unticked.
 
-The rule holds on every grant where a client acts for a user: the authorization code flow, [`prompt=none`](/concepts/prompt-parameter/) included, the implicit flow, the refresh token grant and the password grant. A client that is not allowed and asks for an administrative scope is refused, never handed the rest of what it asked for: `invalid_scope` at the authorization endpoint and on the password grant, and `invalid_grant` when it redeems a code or refreshes, a refresh being one it can retry with a `scope` that leaves the administrative scope out (see [Endpoints](/integration/endpoints/#administrative-scopes) and [the token endpoint's answers](/integration/endpoints/#a-client-not-allowed-the-administrative-scopes)). The allowance is read again when the authorization code or the implicit tokens are issued, when the code is redeemed and at every refresh, so switching it off stops a sign-in under way, stops a code already issued being exchanged for tokens and stops a refresh token being renewed with an administrative scope. Access tokens already issued stay valid until they expire. The client credentials flow is not affected: there the client receives only the permissions granted to the client itself, and granting it an administrative one already needs `authserver:manage`.
+The rule holds on every grant where a client acts for a user: the authorization code flow, [`prompt=none`](/concepts/prompt/) included, the implicit flow, the refresh token grant and the password grant. A client that is not allowed and asks for an administrative scope is refused, never handed the rest of what it asked for: `invalid_scope` at the authorization endpoint and on the password grant, and `invalid_grant` when it redeems a code or refreshes, a refresh being one it can retry with a `scope` that leaves the administrative scope out (see [Endpoints](/reference/endpoints/#administrative-scopes) and [the token endpoint's answers](/reference/endpoints/#a-client-not-allowed-the-administrative-scopes)). The allowance is read again when the authorization code or the implicit tokens are issued, when the code is redeemed and at every refresh, so switching it off stops a sign-in under way, stops a code already issued being exchanged for tokens and stops a refresh token being renewed with an administrative scope. Access tokens already issued stay valid until they expire. The client credentials flow is not affected: there the client receives only the permissions granted to the client itself, and granting it an administrative one already needs `authserver:manage`.
 
 Allowing a client changes nothing else about how it signs users in. Whether it shows a consent screen is still decided by **Consent required**, `prompt=consent` and `offline_access`, and a token still carries only the scopes the signed-in user holds.
 
-**An allowed client is an administrator client.** It can obtain a signed-in administrator's whole authority, so, like the admin console's client and a client holding an administrative permission, every change to it (settings, authentication, flows, redirect URIs, web origins, token settings, permissions, logo, deletion) and reading its secret need `authserver:manage` (see [Administrators and authserver:manage](/integration/rest-api/#administrators-and-authservermanage)). Allow a client as deliberately as you would grant `authserver:manage`.
+**An allowed client is an administrator client.** It can obtain a signed-in administrator's whole authority, so, like the admin console's client and a client holding an administrative permission, every change to it (settings, authentication, flows, redirect URIs, web origins, token settings, permissions, logo, deletion) and reading its secret need `authserver:manage` (see [Administrators and authserver:manage](/reference/rest-api/#administrators-and-authservermanage)). Allow a client as deliberately as you would grant `authserver:manage`.
 
 Every switch of the allowance leaves an `updated_client_administrative_scopes` entry in the [audit log](/concepts/audit-log/#events-to-alert-on), and a refusal reaching a signed-in user or an authenticated client leaves an `administrative_scope_refused` entry.
 
@@ -103,7 +103,7 @@ By default, a client comes configured with `urn:goiabada:level2_optional`, which
 
 You can raise the client's default ACR level on a per-authorization basis, but never lower it. For example, if your client has the default `urn:goiabada:level2_optional` but you have a specific resource that requires 2FA, you can specify `urn:goiabada:level2_mandatory` in the `acr_values` parameter of the authorization request.
 
-Changing this setting applies to authorization requests that start after the change, so a sign-in already in progress finishes at the level it was accepted under. See [ACR and AMR](/concepts/acr-amr/) for the full rules.
+Changing this setting applies to authorization requests that start after the change, so a sign-in already in progress finishes at the level it was accepted under. See [ACR and AMR](/concepts/acr-and-amr/) for the full rules.
 
 ## Client display settings
 
@@ -117,7 +117,7 @@ Each of these has a corresponding **visibility toggle** (`showDisplayName`, `sho
 
 **Self-registered clients are named differently on the consent screen.** A client created through [dynamic client registration](#dynamic-client-registration-rfc-7591) supplies its own name at registration, and the consent screen shows that name with a note saying it has not been verified. Give the client a display name and turn on `showDisplayName` to replace it, with no note. The password and OTP screens are not affected and keep showing whatever the display settings above select.
 
-These settings can be managed through the admin console under the client's **Settings** tab, or via the [REST API](/integration/rest-api/#update-client-settings).
+These settings can be managed through the admin console under the client's **Settings** tab, or via the [REST API](/reference/rest-api/#update-client-settings).
 
 ## Client logo
 
@@ -127,7 +127,7 @@ Each client can have a logo image that is displayed on authentication screens (p
 
 Logos can be uploaded and managed through:
 - The **Logo** tab in the admin console client settings
-- The [REST API](/integration/rest-api/#client-logo) endpoints
+- The [REST API](/reference/rest-api/#client-logo) endpoints
 
 ### Public logo endpoint
 
@@ -154,7 +154,7 @@ The `admin-console-client` is a **system-level client** used internally by the a
 - Its **client identifier cannot be changed** (renaming is blocked)
 - It **cannot be deleted**
 - It is always allowed to request the [administrative scopes](#administrative-scopes), and its allowance cannot be switched off
-- All other settings (description, display name, redirect URIs, etc.) can be modified normally, though through the admin API only a token with `authserver:manage` changes them, since this client is an [administrator](/concepts/resources-permissions/#administrators)
+- All other settings (description, display name, redirect URIs, etc.) can be modified normally, though through the admin API only a token with `authserver:manage` changes them, since this client is an [administrator](/concepts/resources-and-permissions/#administrators)
 
 The API response for this client includes `"isSystemLevelClient": true` to indicate its protected status.
 
@@ -277,7 +277,7 @@ A self-registered client's **identifier cannot be changed**, in the same way the
 
 **A refused authorization is not redirected back to a self-registered client.** Anyone can register a client and point it at any address, so an error response is an instruction to send someone's browser to a site nobody here has checked. When Goiabada refuses an authorization for a self-registered client, whether the user declined it or the request was invalid, it shows the user a page naming the application and the address it asked to send them to, and the request stops there. Clients an administrator created keep the ordinary redirect, unless the address has since been removed from the client: deleting a redirect URI takes effect on sign-ins already under way, which stop on that same page instead of receiving the error.
 
-[Silent authentication](/concepts/prompt-parameter/) with `prompt=none` is covered rather than exempt: it is the version of the same attack that needs no session and nothing from the user. A hidden iframe shows nothing to anyone, but the browser sends Goiabada's session cookie only to an iframe on the same site, so a silent request from an iframe on another site is answered `login_required`.
+[Silent authentication](/concepts/prompt/) with `prompt=none` is covered rather than exempt: it is the version of the same attack that needs no session and nothing from the user. A hidden iframe shows nothing to anyone, but the browser sends Goiabada's session cookie only to an iframe on the same site, so a silent request from an iframe on another site is answered `login_required`.
 
 <Aside type="caution">
 **If you build a self-registered client:** you receive no error response in any of those cases. An authorization the user declines or the server refuses simply never completes, so treat one that does not return within a reasonable time as abandoned rather than waiting indefinitely. `prompt=none` included: a silent request that cannot be completed times out rather than returning `consent_required`, so send the user through one ordinary authorization when a silent one does not come back. If your integration needs the error response, it needs a client an administrator registered.

@@ -98,7 +98,7 @@ export GOIABADA_AUTHSERVER_INTERNALBASEURL="http://127.0.0.1:9090"
 ```
 
 <Aside type="tip">
-Use the [setup wizard](/getting-started/setup-wizard/) and select **"4. Native binaries"** to automatically generate a `goiabada.env` file with all keys and secrets pre-configured.
+Use the [setup wizard](/get-started/setup-wizard/) and select **"4. Native binaries"** to automatically generate a `goiabada.env` file with all keys and secrets pre-configured.
 </Aside>
 
 ## Secrets
@@ -222,7 +222,7 @@ the token the admin console holds for its sessions expires, within 5 minutes unl
 access token lifetime, every page behind the sign-in answers 500. Administrators signed in before
 step 3 stay signed in through the restart, and the auth server and every other client work
 throughout. If the admin console can no longer sign you in, set a secret you know through the admin
-API, as [the Kubernetes page shows](/production-deployment/kubernetes/#the-admin-consoles-client-secret)
+API, as [the Kubernetes page shows](/deploy/kubernetes/#the-admin-consoles-client-secret)
 with the env file in place of the Secret.
 
 `GOIABADA_ADMIN_PASSWORD` is read only by the first start, which creates the administrator: change the
@@ -357,7 +357,7 @@ nssm start GoiabadaAdminConsole
 
 ## Reverse proxy
 
-For production, use Nginx as a reverse proxy (see [reverse proxy guide](/production-deployment/reverse-proxy/)). Configure Nginx to proxy to:
+For production, use Nginx as a reverse proxy (see [reverse proxy guide](/deploy/reverse-proxy/)). Configure Nginx to proxy to:
 
 - Auth server: `http://127.0.0.1:9090`
 - Admin console: `http://127.0.0.1:9091`

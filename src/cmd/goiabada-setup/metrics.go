@@ -31,7 +31,7 @@ const (
 const defaultMetricsNamespace = "monitoring"
 
 // monitoringDocsURL is the page listing the metrics, how to scrape them and what to alert on.
-const monitoringDocsURL = "https://goiabada.dev/production-deployment/monitoring/"
+const monitoringDocsURL = "https://goiabada.dev/deploy/monitoring/"
 
 // String is the exposure as --metrics spells it, empty when the flag was left out.
 func (m *metricsExposure) String() string {

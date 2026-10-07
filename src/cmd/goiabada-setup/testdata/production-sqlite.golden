@@ -54,7 +54,7 @@ services:
       # entry, resolves the client with no list. Set the list only for a second proxy hop in
       # front of that one, naming every hop, this service's peer included: the Compose
       # network's gateway, not 127.0.0.1. For Cloudflare's proxy in front of nginx, have nginx
-      # resolve Cloudflare instead: https://goiabada.dev/production-deployment/cloudflare-nginx/
+      # resolve Cloudflare instead: https://goiabada.dev/deploy/cloudflare-nginx/
       - "GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true"
       - "GOIABADA_AUTHSERVER_TRUSTED_PROXIES="
       # The auth server's built-in rate limiter: per-IP limits on sign-in, password reset,
@@ -113,7 +113,7 @@ services:
       # entry, resolves the client with no list. Set the list only for a second proxy hop in
       # front of that one, naming every hop, this service's peer included: the Compose
       # network's gateway, not 127.0.0.1. For Cloudflare's proxy in front of nginx, have nginx
-      # resolve Cloudflare instead: https://goiabada.dev/production-deployment/cloudflare-nginx/
+      # resolve Cloudflare instead: https://goiabada.dev/deploy/cloudflare-nginx/
       - "GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=true"
       - "GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES="
       - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true

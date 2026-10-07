@@ -3,7 +3,7 @@ title: OpenID Connect scopes
 description: Standard OIDC scopes for retrieving identity information.
 ---
 
-Besides the authorization scopes that are formed by resources and permissions (as explained in [Resources and permissions](/concepts/resources-permissions/)), Goiabada supports typical OpenID Connect scopes.
+Besides the authorization scopes that are formed by resources and permissions (as explained in [Resources and permissions](/concepts/resources-and-permissions/)), Goiabada supports typical OpenID Connect scopes.
 
 ## Available OIDC scopes
 
@@ -64,7 +64,7 @@ GET /auth/authorize?
   code_challenge_method=S256
 ```
 
-The claims corresponding to the requested scopes are always available via the `/userinfo` endpoint. By default, they are also included in the ID token, but this can be configured globally or per-client (see [OIDC claims in tokens](#oidc-claims-in-tokens) below). The `locale` claim (in the `profile` scope) reflects the user's chosen language — see [Localization](/concepts/localization/).
+The claims corresponding to the requested scopes are always available via the `/userinfo` endpoint. By default, they are also included in the ID token, but this can be configured globally or per-client (see [OIDC claims in tokens](#oidc-claims-in-tokens) below). The `locale` claim (in the `profile` scope) reflects the user's chosen language — see [Localization](/guides/localization/).
 
 ## Scope to claims mapping
 

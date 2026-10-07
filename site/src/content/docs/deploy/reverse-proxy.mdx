@@ -41,7 +41,7 @@ DNS propagation can take up to 48 hours, but usually completes within minutes. Y
 
 ### 2. Start Goiabada containers
 
-Use the [setup wizard](/getting-started/setup-wizard/) to generate your `docker-compose.yml`:
+Use the [setup wizard](/get-started/setup-wizard/) to generate your `docker-compose.yml`:
 
 1. Select **"2. Production with reverse proxy"** when prompted
 2. Enter your domain names (e.g., `https://auth.example.com` and `https://admin.example.com`)
@@ -274,7 +274,7 @@ address is in the list, and walks `X-Forwarded-For` from the right past each
 listed address to the first one that is not, the client.
 
 For Cloudflare's proxy in front of Nginx, have Nginx resolve Cloudflare instead,
-as the [Cloudflare + Nginx guide](/production-deployment/cloudflare-nginx/#client-ip-behind-cloudflare)
+as the [Cloudflare + Nginx guide](/deploy/cloudflare-nginx/#client-ip-behind-cloudflare)
 does, so Goiabada still sees one hop and needs no list.
 </Aside>
 
@@ -289,7 +289,7 @@ Nginx connects to `127.0.0.1:9090`, but the connection a Compose service sees
 comes from the Compose network's gateway, an address such as `172.21.0.1`. A list
 naming `127.0.0.1` therefore makes Goiabada ignore the forwarded headers and
 resolve every request to the gateway, putting everyone in one rate-limit bucket.
-With one proxy, leave the list empty. The [native binaries](/production-deployment/native-binaries/#reverse-proxy),
+With one proxy, leave the list empty. The [native binaries](/deploy/native-binaries/#reverse-proxy),
 which Nginx reaches over loopback directly, are different: there the wizard
 writes `TRUSTED_PROXIES=127.0.0.1`.
 </Aside>

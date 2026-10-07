@@ -13,7 +13,11 @@ You can find a link to the well-known discovery URL by going to the root of the 
 https://auth.example.com/.well-known/openid-configuration
 ```
 
-This endpoint shows the capabilities supported by Goiabada.
+This endpoint shows the capabilities supported by Goiabada. Most OAuth2 and OpenID Connect client libraries configure themselves from it.
+
+## /certs (GET)
+
+The JWKS endpoint, named `jwks_uri` in the discovery document. It returns the public keys of the auth server's signing keys as a JSON Web Key Set, so a client or an API can check the signature of a token Goiabada issued. The set holds the current key, plus the next and the previous key when they exist, so a client that caches the set keeps verifying tokens across a key rotation.
 
 ## /auth/authorize (GET or POST)
 
@@ -46,8 +50,8 @@ A POST is answered with a `303 See Other` to a GET that carries a one-time `requ
       <td style="white-space: nowrap;"><code>response_type</code></td>
       <td>Yes</td>
       <td>
-        <code>code</code> for the <a href="/oauth2-flows/authorization-code/">authorization code flow</a> with PKCE (recommended).<br/>
-        <code>token</code>, <code>id_token</code>, or <code>id_token token</code> for the <a href="/oauth2-flows/implicit/">implicit flow</a> (legacy, must be enabled).
+        <code>code</code> for the <a href="/guides/authorization-code/">authorization code flow</a> with PKCE (recommended).<br/>
+        <code>token</code>, <code>id_token</code>, or <code>id_token token</code> for the <a href="/legacy-flows/implicit/">implicit flow</a> (legacy, must be enabled).
       </td>
     </tr>
     <tr>
@@ -94,14 +98,14 @@ A POST is answered with a `303 See Other` to a GET that carries a one-time `requ
       <td style="white-space: nowrap;"><code>prompt</code></td>
       <td>No</td>
       <td>
-        Controls authentication and consent behavior. Supported values: <code>none</code> (silent authentication — no UI allowed), <code>login</code> (force re-authentication), <code>consent</code> (force consent screen). Values can be combined with spaces (e.g., <code>login consent</code>), except <code>none</code> which must be used alone. See <a href="/concepts/prompt-parameter/">Prompt parameter</a> for details.
+        Controls authentication and consent behavior. Supported values: <code>none</code> (silent authentication — no UI allowed), <code>login</code> (force re-authentication), <code>consent</code> (force consent screen). Values can be combined with spaces (e.g., <code>login consent</code>), except <code>none</code> which must be used alone. See <a href="/concepts/prompt/">Prompt parameter</a> for details.
       </td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>ui_locales</code></td>
       <td>No</td>
       <td>
-        Preferred languages for the login and consent screens, as space-separated BCP 47 tags in order of preference (e.g. <code>pt-BR en</code>). See <a href="/concepts/localization/">Localization</a>.
+        Preferred languages for the login and consent screens, as space-separated BCP 47 tags in order of preference (e.g. <code>pt-BR en</code>). See <a href="/guides/localization/">Localization</a>.
       </td>
     </tr>
     <tr>
@@ -147,7 +151,7 @@ The allowance is read again just before the code or the implicit tokens are issu
 
 ## /auth/token (POST)
 
-The token endpoint serves the purpose of requesting tokens. This can happen either through the authorization code flow (exchanging an authorization code for tokens), the client credentials flow (client directly requests tokens), using a refresh token, or, where it is enabled, the deprecated [resource owner password credentials](/oauth2-flows/resource-owner-password/) flow (exchanging a user's username and password for tokens).
+The token endpoint serves the purpose of requesting tokens. This can happen either through the authorization code flow (exchanging an authorization code for tokens), the client credentials flow (client directly requests tokens), using a refresh token, or, where it is enabled, the deprecated [resource owner password credentials](/legacy-flows/ropc/) flow (exchanging a user's username and password for tokens).
 
 ### Client authentication
 
@@ -188,7 +192,7 @@ Per [RFC 6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.3), clien
   <tbody>
     <tr>
       <td style="white-space: nowrap;"><code>grant_type</code></td>
-      <td><code>authorization_code</code>, <code>client_credentials</code>, <code>refresh_token</code>, or <code>password</code>. The <code>password</code> grant is disabled by default and accepted only when it is enabled globally or for the client; see <a href="/oauth2-flows/resource-owner-password/">Resource Owner Password Credentials</a>.</td>
+      <td><code>authorization_code</code>, <code>client_credentials</code>, <code>refresh_token</code>, or <code>password</code>. The <code>password</code> grant is disabled by default and accepted only when it is enabled globally or for the client; see <a href="/legacy-flows/ropc/">Resource Owner Password Credentials</a>.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>client_id</code></td>

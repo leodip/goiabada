@@ -236,6 +236,6 @@ func TestInitRoutes_TheJWKSFetchAndTheAdminAPIRecordOnTheServersRegistry(t *test
 func TestMetricsCatalog_TheAdminConsoleRegistryIsTheDocumentedOne(t *testing.T) {
 	s := newMetricsTestServer(t)
 
-	guard.AssertMetricsCatalog(t, "site/src/content/docs/production-deployment/monitoring.mdx",
+	guard.AssertMetricsCatalog(t, "site/src/content/docs/deploy/monitoring.mdx",
 		"admin console", s.metrics.Families())
 }

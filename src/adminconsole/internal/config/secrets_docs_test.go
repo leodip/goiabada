@@ -20,10 +20,10 @@ import (
 type docSection struct{ page, heading string }
 
 var secretsDocs = []docSection{
-	{"site/src/content/docs/production-deployment/kubernetes.mdx", "## Secrets"},
-	{"site/src/content/docs/production-deployment/kubernetes.mdx", "## Updating Goiabada"},
-	{"site/src/content/docs/production-deployment/index.mdx", "## Secrets"},
-	{"site/src/content/docs/production-deployment/native-binaries.mdx", "## Secrets"},
+	{"site/src/content/docs/deploy/kubernetes.mdx", "## Secrets"},
+	{"site/src/content/docs/deploy/kubernetes.mdx", "## Updating Goiabada"},
+	{"site/src/content/docs/deploy/docker-compose.mdx", "## Secrets"},
+	{"site/src/content/docs/deploy/native-binaries.mdx", "## Secrets"},
 }
 
 // The secrets docs name only admin console variables this console reads, and every _PREVIOUS

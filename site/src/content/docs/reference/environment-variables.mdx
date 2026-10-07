@@ -89,7 +89,7 @@ Used only on first startup:
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_DB_CREATE</code><br/><code>--db-create</code></td>
       <td><code>true</code></td>
-      <td>Create the database if it does not exist (server engines only). Set to <code>false</code> for a <a href="/production-deployment/database/">pre-created database</a></td>
+      <td>Create the database if it does not exist (server engines only). Set to <code>false</code> for a <a href="/deploy/database/">pre-created database</a></td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_DB_DSN</code><br/><code>--db-dsn</code></td>
@@ -125,7 +125,7 @@ server at start, on one line naming every bad value, exit code 2; a bare number 
 otherwise ignored there: SQLite always runs on one connection. Every start writes one
 `database connection pool` record with the pool it opened. The `migrate` subcommand reads the same
 settings. With several replicas, every pod opens its own pool against one database: see
-[Kubernetes](/production-deployment/kubernetes/#scale-replicas) for sizing it against
+[Kubernetes](/deploy/kubernetes/#scale-replicas) for sizing it against
 `max_connections`.
 
 <Aside type="tip">
@@ -293,12 +293,12 @@ Shared means one budget, not two of the same size: a wrong password counts the s
 
 **Per pod.** The limits that count every request are counted in each auth server process, on every database: a deployment running several replicas multiplies each of them by the replica count, and a rollout resets them. They bound floods and outbound mail rather than guessing. For a request limit that holds across the whole deployment, put one at your gateway, reverse proxy, CDN or cloud WAF, which also stops a flood before it reaches the auth server. The `rate_limit_exceeded` audit event is likewise recorded at most once per key and window by each replica.
 
-**Keyed on IP addresses.** A limit keyed on an IP address is only as good as the client IP Goiabada resolves. Behind a reverse proxy it takes `TRUST_PROXY_HEADERS`. One hop, with `TRUSTED_PROXIES` empty, is sound behind a proxy that sets or appends `X-Forwarded-For`; a second proxy hop in front also takes `TRUSTED_PROXIES`. Either way, a caller that reaches Goiabada without passing the proxy can forge the address it is counted under. See [client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection).
+**Keyed on IP addresses.** A limit keyed on an IP address is only as good as the client IP Goiabada resolves. Behind a reverse proxy it takes `TRUST_PROXY_HEADERS`. One hop, with `TRUSTED_PROXIES` empty, is sound behind a proxy that sets or appends `X-Forwarded-For`; a second proxy hop in front also takes `TRUSTED_PROXIES`. Either way, a caller that reaches Goiabada without passing the proxy can forge the address it is counted under. See [client IP resolution](/deploy/reverse-proxy/#client-ip-resolution-and-spoofing-protection).
 </Aside>
 
 ### Customization
 
-See [Customizations](/reference/customizations/) for details on how to customize templates and static files.
+See [Customizations](/guides/customizations/) for details on how to customize templates and static files.
 
 <table>
   <thead>
@@ -327,7 +327,7 @@ See [Customizations](/reference/customizations/) for details on how to customize
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_I18N_OVERRIDES_DIR</code></td>
       <td><em>(empty)</em></td>
-      <td>Directory of override message catalogs. Set on both servers. See <a href="/concepts/localization/">Localization</a>.</td>
+      <td>Directory of override message catalogs. Set on both servers. See <a href="/guides/localization/">Localization</a>.</td>
     </tr>
   </tbody>
 </table>
@@ -378,7 +378,7 @@ See [Customizations](/reference/customizations/) for details on how to customize
 
 ### Metrics
 
-The auth server and the admin console can each serve Prometheus metrics on a listener of their own, which answers `GET /metrics` and nothing else and has no authentication. Keep their ports off the internet: publish them through no Service, route or proxy. See [Monitoring](/production-deployment/monitoring/) for what they report.
+The auth server and the admin console can each serve Prometheus metrics on a listener of their own, which answers `GET /metrics` and nothing else and has no authentication. Keep their ports off the internet: publish them through no Service, route or proxy. See [Monitoring](/deploy/monitoring/) for what they report.
 
 <table>
   <thead>
@@ -608,7 +608,7 @@ The admin console needs to know where the auth server is located. See [Network c
 
 ### Customization
 
-See [Customizations](/reference/customizations/) for details on how to customize templates and static files.
+See [Customizations](/guides/customizations/) for details on how to customize templates and static files.
 
 <table>
   <thead>
@@ -632,7 +632,7 @@ See [Customizations](/reference/customizations/) for details on how to customize
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_I18N_OVERRIDES_DIR</code></td>
       <td><em>(empty)</em></td>
-      <td>Directory of override message catalogs. Set on both servers. See <a href="/concepts/localization/">Localization</a>.</td>
+      <td>Directory of override message catalogs. Set on both servers. See <a href="/guides/localization/">Localization</a>.</td>
     </tr>
   </tbody>
 </table>

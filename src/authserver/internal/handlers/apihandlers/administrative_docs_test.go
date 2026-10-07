@@ -30,11 +30,11 @@ import (
 
 // The pages, relative to the repository root.
 const (
-	restAPIPage              = "site/src/content/docs/integration/rest-api.mdx"
-	resourcesPermissionsPage = "site/src/content/docs/concepts/resources-permissions.mdx"
-	usersGroupsPage          = "site/src/content/docs/concepts/users-groups.mdx"
+	restAPIPage              = "site/src/content/docs/reference/rest-api.mdx"
+	resourcesPermissionsPage = "site/src/content/docs/concepts/resources-and-permissions.mdx"
+	usersGroupsPage          = "site/src/content/docs/concepts/users-and-groups.mdx"
 	auditLogPage             = "site/src/content/docs/concepts/audit-log.mdx"
-	kubernetesPage           = "site/src/content/docs/production-deployment/kubernetes.mdx"
+	kubernetesPage           = "site/src/content/docs/deploy/kubernetes.mdx"
 )
 
 // docSection is one section of a page: from its heading line to the next heading of the same level

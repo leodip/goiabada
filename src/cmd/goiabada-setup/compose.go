@@ -286,7 +286,7 @@ func writeComposeTrust(sb *strings.Builder, behindProxy bool, server string) {
 	sb.WriteString("      # entry, resolves the client with no list. Set the list only for a second proxy hop in\n")
 	sb.WriteString("      # front of that one, naming every hop, this service's peer included: the Compose\n")
 	sb.WriteString("      # network's gateway, not 127.0.0.1. For Cloudflare's proxy in front of nginx, have nginx\n")
-	sb.WriteString("      # resolve Cloudflare instead: https://goiabada.dev/production-deployment/cloudflare-nginx/\n")
+	sb.WriteString("      # resolve Cloudflare instead: https://goiabada.dev/deploy/cloudflare-nginx/\n")
 	writeComposeVariable(sb, prefix+"TRUST_PROXY_HEADERS", "true")
 	writeComposeVariable(sb, prefix+"TRUSTED_PROXIES", "")
 }

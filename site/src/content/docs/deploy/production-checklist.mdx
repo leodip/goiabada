@@ -43,7 +43,7 @@ If behind a reverse proxy (Nginx, Cloudflare, etc.):
 
 - [ ] **Trust proxy headers enabled** - Set `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true`
 - [ ] **Proxy headers configured** - Ensure your proxy sends `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Real-IP`
-- [ ] **Trusted proxies set for multi-hop / CDN** - If more than one proxy sits in front of Goiabada (e.g. a CDN plus Nginx), set `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` (and the admin-console equivalent) to your proxy IPs/CIDRs so the client IP cannot be spoofed. See [Reverse proxy: client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection)
+- [ ] **Trusted proxies set for multi-hop / CDN** - If more than one proxy sits in front of Goiabada (e.g. a CDN plus Nginx), set `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` (and the admin-console equivalent) to your proxy IPs/CIDRs so the client IP cannot be spoofed. See [Reverse proxy: client IP resolution](/deploy/reverse-proxy/#client-ip-resolution-and-spoofing-protection)
 
 <Aside type="danger">
 Only enable `TRUST_PROXY_HEADERS=true` if Goiabada is actually behind a trusted proxy. Otherwise, clients can spoof their IP addresses.
@@ -52,7 +52,7 @@ Only enable `TRUST_PROXY_HEADERS=true` if Goiabada is actually behind a trusted 
 ## Database
 
 - [ ] **Production database** - Use MySQL or PostgreSQL for production (not SQLite)
-- [ ] **Dedicated database user** - Don't use root/admin accounts; see [database setup](/production-deployment/database/)
+- [ ] **Dedicated database user** - Don't use root/admin accounts; see [database setup](/deploy/database/)
 - [ ] **Database backups configured** - Regular automated backups with tested restore procedures
 - [ ] **Database encryption** - Enable TLS for database connections if over network
 
@@ -72,9 +72,9 @@ sudo systemctl status certbot.timer
 ## Monitoring
 
 - [ ] **Health checks configured** - Monitor `/health` endpoints. They say the process is up, not that the database or the auth server answers
-- [ ] **Metrics scraped** - Both servers' metrics listeners turned on and scraped, with their ports published nowhere. See [Monitoring](/production-deployment/monitoring/#turning-the-endpoint-on)
-- [ ] **Alerting set up** - At least on server errors, database pool waits, rate-limit refusals and the cleanup run. See [suggested alerts](/production-deployment/monitoring/#suggested-alerts)
-- [ ] **Logging configured** - Both servers' logs captured, with request logging on and the error records counted. See [what to watch in the logs](/production-deployment/monitoring/#what-to-watch-in-the-logs)
+- [ ] **Metrics scraped** - Both servers' metrics listeners turned on and scraped, with their ports published nowhere. See [Monitoring](/deploy/monitoring/#turning-the-endpoint-on)
+- [ ] **Alerting set up** - At least on server errors, database pool waits, rate-limit refusals and the cleanup run. See [suggested alerts](/deploy/monitoring/#suggested-alerts)
+- [ ] **Logging configured** - Both servers' logs captured, with request logging on and the error records counted. See [what to watch in the logs](/deploy/monitoring/#what-to-watch-in-the-logs)
 - [ ] **Audit log retention reviewed** - Confirm the **Audit log settings** page reflects your compliance and storage requirements (defaults: console and database both enabled, 180 day retention). See [Audit log](/concepts/audit-log/).
 
 Health check URLs:

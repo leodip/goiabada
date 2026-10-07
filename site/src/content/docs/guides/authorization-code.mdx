@@ -34,7 +34,7 @@ Redirect the user to the authorization endpoint with the following parameters:
 | `scope` | Space-separated list of scopes (include `openid` for OIDC) |
 
 <Aside>
-You can request both **OpenID Connect scopes** (`openid`, `profile`, `email`, `address`, `phone`) for user identity, and **resource:permission scopes** (e.g., `product-api:read`) for API access. See [OpenID Connect scopes](/concepts/openid-connect/) and [Resources and permissions](/concepts/resources-permissions/) for details.
+You can request both **OpenID Connect scopes** (`openid`, `profile`, `email`, `address`, `phone`) for user identity, and **resource:permission scopes** (e.g., `product-api:read`) for API access. See [OpenID Connect scopes](/concepts/scopes/) and [Resources and permissions](/concepts/resources-and-permissions/) for details.
 </Aside>
 
 ### PKCE parameters
@@ -52,10 +52,10 @@ See the [PKCE documentation](/concepts/pkce/) for details on generating these va
 |-----------|-------------|
 | `state` | Recommended. Random string to prevent CSRF attacks |
 | `nonce` | Recommended. Random string included in the ID token to prevent replay attacks |
-| `prompt` | Controls authentication and consent behavior (`none`, `login`, `consent`). See [Prompt parameter](/concepts/prompt-parameter/) |
+| `prompt` | Controls authentication and consent behavior (`none`, `login`, `consent`). See [Prompt parameter](/concepts/prompt/) |
 | `max_age` | Maximum acceptable time in seconds since the user last authenticated |
-| `ui_locales` | Preferred languages for the login and consent screens (space-separated BCP 47 tags, e.g. `pt-BR en`). See [Localization](/concepts/localization/) |
-| `acr_values` | Requested authentication level. See [ACR and AMR](/concepts/acr-amr/) |
+| `ui_locales` | Preferred languages for the login and consent screens (space-separated BCP 47 tags, e.g. `pt-BR en`). See [Localization](/guides/localization/) |
+| `acr_values` | Requested authentication level. See [ACR and AMR](/concepts/acr-and-amr/) |
 
 ### Example authorization URL
 

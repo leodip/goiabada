@@ -1745,7 +1745,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_PublicClient_Fails(t
 // Three rows, and the middle one is the deliberate limit rather than an oversight. Sessions
 // are swept once they idle out or reach their maximum lifetime, so a code whose session row
 // has gone is the ordinary state of an older grant and MUST still redeem. That is exactly why
-// this cannot be complete, and the residual is documented in concepts/user-sessions.mdx.
+// this cannot be complete, and the residual is documented in concepts/sessions.mdx.
 //
 // A fourth case is covered without a row here: a code with no session identifier performs no
 // lookup at all. Every other authorization_code test in this file leaves SessionIdentifier

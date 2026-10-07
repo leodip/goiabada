@@ -264,7 +264,7 @@ func loadWithOverrides(t *testing.T, files map[string]string) (*bundle, error) {
 
 func TestT_KeyMissingInMatchedLocaleFallsBackToEnglish(t *testing.T) {
 	// A self-hoster ships an fr catalog holding one key. Every other key must
-	// render the English text, which is what concepts/localization.mdx
+	// render the English text, which is what guides/localization.mdx
 	// promises; T used to render the key itself here (#273).
 	b, err := loadWithOverrides(t, map[string]string{
 		"active.fr.toml": "\"auth.pwd.title\" = \"Connexion\"\n",

@@ -4,6 +4,10 @@ The source of [goiabada.dev](https://goiabada.dev), built with [Astro](https://a
 [Starlight](https://starlight.astro.build). Pages are Markdown and MDX files in
 `src/content/docs/`; a file's path there is its URL. The sidebar is in `astro.config.mjs`.
 
+Every page follows [`STYLE.md`](STYLE.md): the voice, the shape of a page, how the sidebar is
+organized, and the [glossary](src/content/docs/concepts/glossary.mdx) that gives each concept
+its one name.
+
 ## Build and preview
 
 Build the site on your own machine, with Node.js 22 or later. The devcontainer has no Node.js.
