@@ -299,3 +299,71 @@ func TestUtilsJS_ModalTitleFollowsTheStatus(t *testing.T) {
 			"a 400, 404 or 409 is not the server's mistake (#279)", line)
 	}
 }
+
+// TestUtilsJS_DialogMarkupEscapesEveryValue pins the builders' half of #120's decision 1:
+// dialogMarkup and dialogMarkupFormat, whose results showModalDialog parses as HTML, pass every
+// value they are handed through escapeHtml. Their markup is the catalog's, which
+// TestDialogMessages_MarkupOnlyThroughTheBuilder holds; the values are what may carry data.
+//
+// Lexical, like its neighbours, and for the same reason: no JavaScript runs in any tier. The claim
+// is that inside each builder's body its values are read in exactly the ways listed and no other,
+// so a value read as values[i] or params[name] reaches the result only through escapeHtml, and a
+// spelling that reads them whole, values.join or a spread, is refused rather than missed.
+func TestUtilsJS_DialogMarkupEscapesEveryValue(t *testing.T) {
+	content := utilsJS(t)
+
+	for _, b := range []struct {
+		fn, values string
+		// reads are every way the body may name values, each as the text around the name.
+		reads []string
+	}{
+		{"dialogMarkup", "values", []string{"escapeHtml(values[", "values.length"}},
+		{"dialogMarkupFormat", "params", []string{"escapeHtml(params[", "in params)"}},
+	} {
+		bodyRe := regexp.MustCompile(`(?s)\nfunction\s+` + b.fn + `\s*\(([^)]*)\)\s*\{(.*?)\n\}`)
+		m := bodyRe.FindStringSubmatch(content)
+		if m == nil {
+			t.Errorf("static/utils.js: function %s not found, or its body is not a brace block "+
+				"ending at column zero; this check cannot read it (#120)", b.fn)
+			continue
+		}
+		if !strings.Contains(m[1], b.values) {
+			t.Errorf("static/utils.js: %s no longer takes its values as %q; update this check to "+
+				"name them (#120)", b.fn, b.values)
+			continue
+		}
+		body := m[2]
+		nameRe := regexp.MustCompile(`\b` + b.values + `\b`)
+		escaped := 0
+		for _, at := range nameRe.FindAllStringIndex(body, -1) {
+			ok := false
+			for _, r := range b.reads {
+				i := strings.Index(r, b.values)
+				if at[0] >= i && strings.HasPrefix(body[at[0]-i:], r) {
+					ok = true
+					if strings.HasPrefix(r, "escapeHtml(") {
+						escaped++
+					}
+				}
+			}
+			if !ok {
+				t.Errorf("static/utils.js: %s reads %s other than through escapeHtml: %q; "+
+					"showModalDialog parses its result as HTML, so every value must be escaped (#120)",
+					b.fn, b.values, strings.TrimSpace(lineAround(body, at[0])))
+			}
+		}
+		if escaped == 0 {
+			t.Errorf("static/utils.js: %s never passes %s through escapeHtml (#120)", b.fn, b.values)
+		}
+	}
+}
+
+// lineAround returns the line of s holding the byte at i.
+func lineAround(s string, i int) string {
+	start := strings.LastIndexByte(s[:i], '\n') + 1
+	end := strings.IndexByte(s[i:], '\n')
+	if end < 0 {
+		return s[start:]
+	}
+	return s[start : i+end]
+}

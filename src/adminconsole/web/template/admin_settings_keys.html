@@ -70,7 +70,7 @@
         evt.preventDefault();
 
         showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_title" }}",
-            "{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_body" }}",
+            dialogMarkup(["{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_body" }}"]),
             function () {
             },
             function () {

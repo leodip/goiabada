@@ -298,7 +298,7 @@
 
         if (isSystemLevelResource) {
             showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_resources.permissions.modal_system_title" }}",
-                "{{ T $.ctx "adminconsole.admin_resources.permissions.modal_system_body" }}",
+                dialogMarkup(["{{ T $.ctx "adminconsole.admin_resources.permissions.modal_system_body" }}"]),
                 function() { /* cancel */ },
                 function() { submitPermissions(); }
             );

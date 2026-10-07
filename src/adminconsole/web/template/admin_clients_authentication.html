@@ -31,7 +31,7 @@
             const formClientAuth = document.getElementsByTagName("form")[0];
             if (isSystemLevel) {
                 showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
-                    "{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}",
+                    dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"]),
                     function() { /* cancel */ },
                     function() { formClientAuth.submit(); }
                 );
@@ -51,21 +51,21 @@
                 if(confidentialClientRadio.checked && originalClientSecret !== "" &&
                     clientSecret.value !== originalClientSecret) {
 
-                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", "{{ T $.ctx "adminconsole.admin_clients.authentication.modal.secret_change" }}",
+                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.authentication.modal.secret_change" }}"]),
                     function() {
                     },
                     function() {
                         submitForm();
                     });
                 } else if(!isPublic && publicClientRadio.checked) {
-                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", "{{ T $.ctx "adminconsole.admin_clients.authentication.modal.confidential_to_public" }}",
+                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.authentication.modal.confidential_to_public" }}"]),
                     function() {
                     },
                     function() {
                         submitForm();
                     });
                 } else if(isPublic && confidentialClientRadio.checked) {
-                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", "{{ T $.ctx "adminconsole.admin_clients.authentication.modal.public_to_confidential" }}",
+                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.authentication.modal.public_to_confidential" }}"]),
                     function() {
                     },
                     function() {

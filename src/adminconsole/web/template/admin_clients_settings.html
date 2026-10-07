@@ -23,7 +23,7 @@
         function submitForm() {
             if (isSystemLevel) {
                 showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
-                    "{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}",
+                    dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"]),
                     function() { /* cancel */ },
                     function() { formClientSettings.submit(); }
                 );
@@ -42,7 +42,7 @@
                 if (!originallyAllowedAdministrativeScopes && administrativeScopesAllowed.checked) {
                     event.preventDefault();
                     showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
-                        "{{ T $.ctx "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" }}",
+                        dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" }}"]),
                         function() { /* cancel */ },
                         function() { formAdministrativeScopes.submit(); }
                     );
@@ -55,14 +55,14 @@
                 event.preventDefault();
                 clientIdentifier.value = clientIdentifier.value.trim();
                 if (clientIdentifier.value !== originalClientIdentifier) {
-                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", "{{ T $.ctx "adminconsole.admin_clients.settings.modal.identifier_change" }}",
+                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.settings.modal.identifier_change" }}"]),
                     function() {
                     },
                     function() {
                         submitForm();
                     });
                 } else if(originallyEnabled && enabledDisabled.checked === false) {
-                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", "{{ T $.ctx "adminconsole.admin_clients.settings.modal.disabled_warning" }}",
+                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.settings.modal.disabled_warning" }}"]),
                     function() {
                     },
                     function() {
