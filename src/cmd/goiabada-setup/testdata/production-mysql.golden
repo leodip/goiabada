@@ -77,7 +77,7 @@ services:
       # The auth server's built-in rate limiter: per-IP limits on sign-in, password reset,
       # self-registration and client registration, and limits on failed passwords and codes per
       # account. The server's own default is off. The limits are listed at
-      # https://goiabada.dev/reference/environment-variables/#security-settings
+      # https://goiabada.dev/reference/environment-variables/#rate-limits
       # With it on, the auth server logs a warning at every start that it trusts one proxy hop
       # with no list; behind the one reverse proxy on this host, that is expected.
       - "GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=true"

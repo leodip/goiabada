@@ -96,7 +96,7 @@ The wizard asks only the questions that apply to your deployment, in this order.
 
 ### The rate limiter under the Cluster traffic policy
 
-Under the Cluster policy, Goiabada sees a node's address for every client. The rate limiter's per-address limits would then count every user who arrives through one node together, and throttle sign-ins on a busy site. That's why it's off by default there. Its limits on failed passwords and codes count per account, so they work under either policy. See the [rate limits](/reference/environment-variables/#security-settings).
+Under the Cluster policy, Goiabada sees a node's address for every client. The rate limiter's per-address limits would then count every user who arrives through one node together, and throttle sign-ins on a busy site. That's why it's off by default there. Its limits on failed passwords and codes count per account, so they work under either policy. See the [rate limits](/reference/environment-variables/#rate-limits).
 
 ### Where the secrets go
 

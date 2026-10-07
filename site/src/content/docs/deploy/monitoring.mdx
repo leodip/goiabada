@@ -333,7 +333,7 @@ What each one is for:
   | `dcr` | Dynamic client registrations from one address |
   | `ropc_ip` | Every password grant request from one address |
 
-  The [rate limiting details](/reference/environment-variables/#security-settings) give each one's
+  The [rate limiting details](/reference/environment-variables/#rate-limits) give each one's
   budget. The limiter is off unless `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` is on, and then this
   metric records nothing.
 - **No successful cleanup.** One auth server pod claims a cleanup run every 12 hours, deleting

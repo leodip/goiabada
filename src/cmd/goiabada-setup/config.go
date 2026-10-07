@@ -54,7 +54,7 @@ const (
 )
 
 // rateLimitsDocsURL is where the limits the rate limiter turns on are listed.
-const rateLimitsDocsURL = "https://goiabada.dev/reference/environment-variables/#security-settings"
+const rateLimitsDocsURL = "https://goiabada.dev/reference/environment-variables/#rate-limits"
 
 // rateLimiterDefault is the answer the rate limiter question offers: on, but for a manifest behind
 // Envoy under the Cluster traffic policy, where the servers see a node's address for every client,

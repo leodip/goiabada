@@ -10,7 +10,7 @@ import (
 const rateLimiterVariable = "GOIABADA_AUTHSERVER_RATELIMITER_ENABLED"
 
 // rateLimitsDocs is where the limits the switch turns on are listed.
-const rateLimitsDocs = "https://goiabada.dev/reference/environment-variables/#security-settings"
+const rateLimitsDocs = "https://goiabada.dev/reference/environment-variables/#rate-limits"
 
 // Production Compose, native binaries and Kubernetes write the rate limiter's switch explicitly,
 // on or off as answered, to the auth server alone, under a comment saying what it turns on and where

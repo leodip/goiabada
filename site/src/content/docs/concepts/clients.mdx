@@ -202,7 +202,7 @@ With dynamic client registration (DCR) turned on, an app can register itself as 
 
 DCR is off until you turn on **Dynamic client registration enabled** under **Admin**, **General**. Until then, `/connect/register` answers 403 with `access_denied`.
 
-When it's on, anyone who can reach the endpoint can register a client. Limit `/connect/register` at your reverse proxy, or turn on Goiabada's rate limiter with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`, which then allows 10 registrations a minute from each IP address. See [Environment variables](/reference/environment-variables/).
+When it's on, anyone who can reach the endpoint can register a client. Limit `/connect/register` at your reverse proxy, or turn on Goiabada's rate limiter with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`, which then allows 10 registrations a minute from each IP address. See [rate limits](/reference/environment-variables/#rate-limits).
 
 A registration looks like this:
 
