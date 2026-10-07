@@ -25,10 +25,11 @@ import (
 // SavePermissionsResult{Success: false, Error: <the API's sentence>}. The comment on it argued the
 // page needed a 200 because it draws the message from result.Error. That was not true.
 // sendAjaxRequest in web/static/utils.js shows error_description from any non-2xx in the same
-// modal0 the callback uses, and escapes it on the way in, where the 200 path handed the value
-// straight to showModalDialog, which assigns innerHTML. So the 200 bought nothing and cost two
-// things: every reader of the status was told a save had succeeded when it had not, and the one
-// path that skipped escaping was the one carrying a value the API had echoed back.
+// modal0 the callback uses, and escaped it on the way in, where the 200 path handed the value
+// straight to showModalDialog, which then assigned every message to innerHTML. So the 200 bought
+// nothing and cost two things: every reader of the status was told a save had succeeded when it had
+// not, and the one path that skipped escaping was the one carrying a value the API had echoed back.
+// Since #120 the modal shows a plain message as text, on either path.
 //
 // The handler is exercised through the real HttpHelper rather than the mock, because the status on
 // the wire is the whole of what this pins; NewHttpHelper(nil) never reaches a template on a

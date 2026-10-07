@@ -22,9 +22,11 @@ import (
 // dialogMarkupFormat's first argument is a quoted client-side catalog key. A builder named any
 // other way, aliased or passed along, is refused too, because its arguments can no longer be read.
 //
-// Beside it, a dialog message given as one plain catalog literal, or one t("key"), carries no
-// markup in any catalog: a message that needs its accent span or line breaks goes through the
-// builder, so that it keeps them when a plain message is shown as text.
+// Beside it, a dialog message names no catalog text carrying markup in any locale outside a
+// builder call: not as one plain catalog literal, not as t("key") or tFormat("key", ...), and not
+// spliced around a value. showModalDialog shows a message its builders did not build as text, so
+// such a message would show its accent span as tags; a message that needs its markup goes through
+// the builder, which also escapes the values that join it.
 //
 // This rule is the console's and lives here rather than in core/guard, since the auth server has no
 // builder. It follows the guard shape all the same: a finder, and a reporting half driven through
@@ -189,11 +191,12 @@ func dialogFaultsIn(path, src string, toks []scriptToken, markup markupIn, n *di
 			continue
 		}
 		n.dialogs++
-		for _, key := range plainMessageKeys(callArgument(toks, i+2, 2)) {
+		for _, key := range unbuiltMessageKeys(callArgument(toks, i+2, 2)) {
 			if markup(key) {
-				report(t, fmt.Sprintf("the dialog message is the plain catalog text of %q, which "+
-					"carries markup; build it with dialogMarkup so it keeps its markup and "+
-					"escapes whatever joins it", key))
+				report(t, fmt.Sprintf("the dialog message carries the catalog text of %q, which "+
+					"carries markup, outside the builder; the dialog shows that as text, so build "+
+					"it with dialogMarkup, which keeps the markup and escapes whatever joins it", key))
+				break
 			}
 		}
 	}
@@ -261,24 +264,51 @@ func callArgument(toks []scriptToken, i, n int) []scriptToken {
 	return nil
 }
 
-// plainMessageKeys returns the catalog keys of a message given as one quoted literal of catalog
-// lookups, or as one t("key"). Anything else, a builder call or a message carrying data, is not a
-// plain catalog message and gives none.
-func plainMessageKeys(arg []scriptToken) []string {
-	switch {
-	case len(arg) == 1 && arg[0].kind == tokString:
-		var keys []string
-		for _, a := range arg[0].actions {
-			if m := catalogKeyRe.FindStringSubmatch(a); m != nil {
-				keys = append(keys, m[1])
+// unbuiltMessageKeys returns the catalog keys a message names outside any builder call: the
+// catalog lookups in its quoted literals, and the key of each t("key") or tFormat("key", ...).
+// A builder call's own arguments are the builder rule's, and a message held in a variable names
+// none.
+func unbuiltMessageKeys(arg []scriptToken) []string {
+	var keys []string
+	for i := 0; i < len(arg); i++ {
+		t := arg[i]
+		if _, ok := dialogBuilders[t.text]; ok && t.kind == tokIdent && i+1 < len(arg) && arg[i+1].is(tokPunct, "(") {
+			i = closingParen(arg, i+1)
+			continue
+		}
+		if t.kind == tokIdent && (t.text == "t" || t.text == "tFormat") && i+2 < len(arg) &&
+			arg[i+1].is(tokPunct, "(") && arg[i+2].kind == tokString && len(arg[i+2].actions) == 0 {
+			keys = append(keys, arg[i+2].text)
+			i += 2
+			continue
+		}
+		if t.kind == tokString {
+			for _, a := range t.actions {
+				if m := catalogKeyRe.FindStringSubmatch(a); m != nil {
+					keys = append(keys, m[1])
+				}
 			}
 		}
-		return keys
-	case len(arg) == 4 && arg[0].is(tokIdent, "t") && arg[1].is(tokPunct, "(") &&
-		arg[2].kind == tokString && len(arg[2].actions) == 0 && arg[3].is(tokPunct, ")"):
-		return []string{arg[2].text}
 	}
-	return nil
+	return keys
+}
+
+// closingParen returns the index of the parenthesis closing the one at toks[open], or the last
+// index when it is never closed.
+func closingParen(toks []scriptToken, open int) int {
+	depth := 0
+	for j := open; j < len(toks); j++ {
+		switch {
+		case toks[j].is(tokPunct, "("):
+			depth++
+		case toks[j].is(tokPunct, ")"):
+			depth--
+			if depth == 0 {
+				return j
+			}
+		}
+	}
+	return len(toks) - 1
 }
 
 type scriptTokenKind int

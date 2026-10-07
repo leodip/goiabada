@@ -11,11 +11,9 @@
 
     function endSessionClick(elem, evt, userSessionId, email, isCurrent) {
 
-        let msg = "{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_confirm_body_prefix" }}" + email + "{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_confirm_body_suffix" }}";
-        msg += "{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_revocation_note" }}";
-        if(isCurrent) {
-            msg += "{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_current_warning" }}";
-        }
+        const msg = isCurrent
+            ? dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_confirm_body_prefix" }}", "{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_confirm_body_suffix" }}{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_revocation_note" }}{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_current_warning" }}"], email)
+            : dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_confirm_body_prefix" }}", "{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_confirm_body_suffix" }}{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_revocation_note" }}"], email);
         showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.usersessions.modal_confirm_title" }}", msg,
             function() {
                 // no button
