@@ -11,7 +11,7 @@ import "testing"
 // the tests of every package a module imports. A test in core/adminpassword importing this package
 // put this package's own dependencies, chi through core/metrics and TOML, into the wizard's go.sum,
 // which is the leak the rule exists to stop, one level down. No test in a core package the wizard
-// imports may import core/guard.
+// imports may import core/guard, which AssertNoGuardInTestsReachedFrom holds.
 func TestAdminPassword_ImportsNothingButErrsAndTheStandardLibrary(t *testing.T) {
 	AssertImportsOnly(t, "core/adminpassword", map[string]string{
 		"github.com/leodip/goiabada/core/errs": "the error constructor pattern 7 requires",

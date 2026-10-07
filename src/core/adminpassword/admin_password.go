@@ -5,7 +5,8 @@
 // brought core/i18n, core/oauth, a TOML parser and a JWT library into a binary that uses none of
 // them. core/guard's imports_only_lint_test.go holds it to that, from there and not from a test
 // here: go mod tidy reads the tests of every package the wizard imports, so a test here importing
-// core/guard would put that package's own dependencies in the wizard's go.sum.
+// core/guard would put that package's own dependencies in the wizard's go.sum, which
+// guard.AssertNoGuardInTestsReachedFrom refuses.
 package adminpassword
 
 import (

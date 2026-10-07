@@ -151,7 +151,8 @@ Notes on rows that are not self-evident:
   standard library through `AssertImportsOnly`, the rule `authserver/internal/record` is held by
   too. The call is made from there rather than beside the package because `go mod tidy` reads the
   tests of every package the wizard imports, and a test in `core/adminpassword` importing
-  `core/guard` put chi and TOML in the wizard's `go.sum` (#500).
+  `core/guard` put chi and TOML in the wizard's `go.sum`. `AssertNoGuardInTestsReachedFrom` refuses
+  any test the wizard reaches that does so (#500).
 - `core/api` is declarations and nothing else. The model-aware `ToResponse` mapping left for
   `authserver/internal/apimapping` in #350, the model-typed fields became DTOs of its own, and the
   reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites are
