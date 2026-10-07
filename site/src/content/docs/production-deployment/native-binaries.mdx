@@ -41,7 +41,8 @@ Configure via environment variables. You can export them directly or use an envi
 ```bash
 # Admin user (created on first startup)
 export GOIABADA_ADMIN_EMAIL="admin@example.com"
-export GOIABADA_ADMIN_PASSWORD="changeme"
+# Required on the first start: at least 15 characters, and not changeme
+export GOIABADA_ADMIN_PASSWORD="<admin-password>"
 export GOIABADA_APPNAME="Goiabada"
 
 # Server URLs

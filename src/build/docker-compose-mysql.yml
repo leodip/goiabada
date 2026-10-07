@@ -76,8 +76,11 @@ services:
       # The email address of the admin user (the first user created)
       - GOIABADA_ADMIN_EMAIL=admin@example.com
 
-      # The password of the admin user (the first user created)
-      - GOIABADA_ADMIN_PASSWORD=changeme
+      # The password of the admin user (the first user created). There is no default:
+      # set GOIABADA_ADMIN_PASSWORD in your shell, or in a .env file beside this file,
+      # to at least 15 characters, and not changeme. Compose refuses to run until it is
+      # set, and it must stay set for later commands too. Used only on the first start.
+      - GOIABADA_ADMIN_PASSWORD=${GOIABADA_ADMIN_PASSWORD:?set GOIABADA_ADMIN_PASSWORD to the first administrator's password, at least 15 characters}
 
       # The name of your application or organization
       - GOIABADA_APPNAME=Goiabada
