@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"regexp"
 	"sort"
-	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/core/guard"
@@ -30,9 +29,15 @@ import (
 //
 // This rule is the console's and lives here rather than in core/guard, since the auth server has no
 // builder. It follows the guard shape all the same: a finder, and a reporting half driven through
-// guard.Run. The reading is lexical, over the same embedded bytes the browser is served. It skips
-// comments and reads strings, template literals and template actions as units; a regex literal
-// holding a quote would throw it off, and none exists.
+// guard.Run. The code is read through guard.ReadScripts, the reader core/guard.AssertNoHTMLSinks
+// shares, over the same embedded bytes the browser is served: every script, script element, on...
+// attribute and javascript: URL, with interpolations read as code and window["dialogMarkup"] read
+// as window.dialogMarkup.
+//
+// The builders are declared in static/utils.js inside the closure that keeps their markup's brand
+// private, and exported from it under their own names; that file may name them in a list of bare
+// names, { dialogMarkup, dialogMarkupFormat }, which is how a closure hands out what it declares.
+// TestUtilsJS_DialogMarkupBrandIsPrivate holds the shape of that closure.
 
 // dialogBuilders are the two builders, each with what its first argument must be.
 var dialogBuilders = map[string]string{
@@ -105,89 +110,70 @@ func assertDialogMessages(r guard.Reporter, markup markupIn, trees ...fs.FS) {
 	}
 }
 
-// scriptElementRe matches one <script> element's body in a page.
-var scriptElementRe = regexp.MustCompile(`(?is)<script\b[^>]*>(.*?)</script\s*>`)
-
 // catalogKeyRe matches a catalog lookup with no arguments and captures its key. It is the one
 // template action a builder's part, or a plain dialog message, may carry.
 var catalogKeyRe = regexp.MustCompile(`^\{\{-?\s*T\s+\$?\.ctx\s+"([^"\\]*)"\s*-?\}\}$`)
 
+// builderHome is the file that declares the builders.
+const builderHome = "static/utils.js"
+
 // findDialogFaults walks fsys and returns every builder call and plain dialog message the rule
 // refuses.
 func findDialogFaults(fsys fs.FS, markup markupIn) ([]dialogFault, dialogCalls, error) {
+	scripts, files, err := guard.ReadScripts(fsys)
 	var faults []dialogFault
-	var n dialogCalls
-	err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		page := strings.HasSuffix(p, ".html")
-		if d.IsDir() || (!page && !strings.HasSuffix(p, ".js")) {
-			return nil
-		}
-		b, err := fs.ReadFile(fsys, p)
-		if err != nil {
-			return err
-		}
-		n.files++
-		src := string(b)
-		spans := [][]int{{0, len(src)}}
-		if page {
-			spans = nil
-			for _, m := range scriptElementRe.FindAllStringSubmatchIndex(src, -1) {
-				spans = append(spans, m[2:4])
-			}
-		}
-		for _, s := range spans {
-			toks := lexScript(src, s[0], s[1], page)
-			faults = append(faults, dialogFaultsIn(p, src, toks, markup, &n)...)
-		}
-		return nil
-	})
+	n := dialogCalls{files: files}
+	for _, s := range scripts {
+		faults = append(faults, dialogFaultsIn(s.Path, s.Tokens, markup, &n)...)
+	}
 	return faults, n, err
 }
 
 // dialogFaultsIn applies the rule to one script's tokens.
-func dialogFaultsIn(path, src string, toks []scriptToken, markup markupIn, n *dialogCalls) []dialogFault {
+func dialogFaultsIn(path string, toks []guard.ScriptToken, markup markupIn, n *dialogCalls) []dialogFault {
 	var faults []dialogFault
-	at := func(i int) scriptToken {
+	at := func(i int) guard.ScriptToken {
 		if i >= 0 && i < len(toks) {
 			return toks[i]
 		}
-		return scriptToken{}
+		return guard.ScriptToken{}
 	}
-	report := func(t scriptToken, why string) {
-		faults = append(faults, dialogFault{path: path, line: strings.Count(src[:t.at], "\n") + 1, why: why})
+	report := func(t guard.ScriptToken, why string) {
+		faults = append(faults, dialogFault{path: path, line: t.Line, why: why})
 	}
 
 	for i, t := range toks {
-		if t.kind != tokIdent {
+		if t.Kind != guard.ScriptIdent {
 			continue
 		}
-		if want, ok := dialogBuilders[t.text]; ok {
-			if at(i-1).is(tokIdent, "function") {
+		if want, ok := dialogBuilders[t.Text]; ok {
+			if at(i-1).Is(guard.ScriptIdent, "function") {
 				continue
 			}
-			if !at(i+1).is(tokPunct, "(") {
-				report(t, t.text+" is named other than in a call, so its parts cannot be read")
+			if path == builderHome && (at(i-1).Is(guard.ScriptPunct, "{") || at(i-1).Is(guard.ScriptPunct, ",")) &&
+				(at(i+1).Is(guard.ScriptPunct, ",") || at(i+1).Is(guard.ScriptPunct, "}")) {
+				continue
+			}
+			if !at(i+1).Is(guard.ScriptPunct, "(") {
+				report(t, t.Text+" is named other than in a call, so its parts cannot be read")
 				continue
 			}
 			n.builders++
 			var ok bool
-			if t.text == "dialogMarkup" {
+			if t.Text == "dialogMarkup" {
 				ok = catalogPartsArray(toks, i+2)
 			} else {
 				arg := at(i + 2)
-				ok = arg.kind == tokString && len(arg.actions) == 0 &&
-					(at(i+3).is(tokPunct, ",") || at(i+3).is(tokPunct, ")"))
+				ok = arg.Kind == guard.ScriptString && len(arg.Actions) == 0 &&
+					(at(i+3).Is(guard.ScriptPunct, ",") || at(i+3).Is(guard.ScriptPunct, ")"))
 			}
 			if !ok {
-				report(t, t.text+"'s first argument is not "+want+"; the markup a builder renders "+
+				report(t, t.Text+"'s first argument is not "+want+"; the markup a builder renders "+
 					"comes from the catalog, and every value goes after it, to be escaped")
 			}
 			continue
 		}
-		if t.text != "showModalDialog" || at(i-1).is(tokIdent, "function") || !at(i+1).is(tokPunct, "(") {
+		if t.Text != "showModalDialog" || at(i-1).Is(guard.ScriptIdent, "function") || !at(i+1).Is(guard.ScriptPunct, "(") {
 			continue
 		}
 		n.dialogs++
@@ -205,42 +191,42 @@ func dialogFaultsIn(path, src string, toks []scriptToken, markup markupIn, n *di
 
 // catalogPartsArray reports whether toks[i:] opens with an array of one or more quoted strings
 // whose template actions are all catalog lookups, followed by the end of the argument.
-func catalogPartsArray(toks []scriptToken, i int) bool {
-	if i >= len(toks) || !toks[i].is(tokPunct, "[") {
+func catalogPartsArray(toks []guard.ScriptToken, i int) bool {
+	if i >= len(toks) || !toks[i].Is(guard.ScriptPunct, "[") {
 		return false
 	}
 	i++
 	parts := 0
 	for i < len(toks) {
 		t := toks[i]
-		if t.kind != tokString {
+		if t.Kind != guard.ScriptString {
 			break
 		}
-		for _, a := range t.actions {
+		for _, a := range t.Actions {
 			if !catalogKeyRe.MatchString(a) {
 				return false
 			}
 		}
 		parts++
 		i++
-		if i < len(toks) && toks[i].is(tokPunct, ",") {
+		if i < len(toks) && toks[i].Is(guard.ScriptPunct, ",") {
 			i++
 		}
 	}
-	return parts > 0 && i+1 < len(toks) && toks[i].is(tokPunct, "]") &&
-		(toks[i+1].is(tokPunct, ",") || toks[i+1].is(tokPunct, ")"))
+	return parts > 0 && i+1 < len(toks) && toks[i].Is(guard.ScriptPunct, "]") &&
+		(toks[i+1].Is(guard.ScriptPunct, ",") || toks[i+1].Is(guard.ScriptPunct, ")"))
 }
 
 // callArgument returns the tokens of argument n (from zero) of the call whose arguments start at
 // toks[i], or nil when the call has fewer.
-func callArgument(toks []scriptToken, i, n int) []scriptToken {
+func callArgument(toks []guard.ScriptToken, i, n int) []guard.ScriptToken {
 	depth, start, arg := 0, i, 0
 	for j := i; j < len(toks); j++ {
 		t := toks[j]
-		if t.kind != tokPunct {
+		if t.Kind != guard.ScriptPunct {
 			continue
 		}
-		switch t.text {
+		switch t.Text {
 		case "(", "[", "{":
 			depth++
 		case ")", "]", "}":
@@ -268,22 +254,22 @@ func callArgument(toks []scriptToken, i, n int) []scriptToken {
 // catalog lookups in its quoted literals, and the key of each t("key") or tFormat("key", ...).
 // A builder call's own arguments are the builder rule's, and a message held in a variable names
 // none.
-func unbuiltMessageKeys(arg []scriptToken) []string {
+func unbuiltMessageKeys(arg []guard.ScriptToken) []string {
 	var keys []string
 	for i := 0; i < len(arg); i++ {
 		t := arg[i]
-		if _, ok := dialogBuilders[t.text]; ok && t.kind == tokIdent && i+1 < len(arg) && arg[i+1].is(tokPunct, "(") {
+		if _, ok := dialogBuilders[t.Text]; ok && t.Kind == guard.ScriptIdent && i+1 < len(arg) && arg[i+1].Is(guard.ScriptPunct, "(") {
 			i = closingParen(arg, i+1)
 			continue
 		}
-		if t.kind == tokIdent && (t.text == "t" || t.text == "tFormat") && i+2 < len(arg) &&
-			arg[i+1].is(tokPunct, "(") && arg[i+2].kind == tokString && len(arg[i+2].actions) == 0 {
-			keys = append(keys, arg[i+2].text)
+		if t.Kind == guard.ScriptIdent && (t.Text == "t" || t.Text == "tFormat") && i+2 < len(arg) &&
+			arg[i+1].Is(guard.ScriptPunct, "(") && arg[i+2].Kind == guard.ScriptString && len(arg[i+2].Actions) == 0 {
+			keys = append(keys, arg[i+2].Text)
 			i += 2
 			continue
 		}
-		if t.kind == tokString {
-			for _, a := range t.actions {
+		if t.Kind == guard.ScriptString {
+			for _, a := range t.Actions {
 				if m := catalogKeyRe.FindStringSubmatch(a); m != nil {
 					keys = append(keys, m[1])
 				}
@@ -295,13 +281,13 @@ func unbuiltMessageKeys(arg []scriptToken) []string {
 
 // closingParen returns the index of the parenthesis closing the one at toks[open], or the last
 // index when it is never closed.
-func closingParen(toks []scriptToken, open int) int {
+func closingParen(toks []guard.ScriptToken, open int) int {
 	depth := 0
 	for j := open; j < len(toks); j++ {
 		switch {
-		case toks[j].is(tokPunct, "("):
+		case toks[j].Is(guard.ScriptPunct, "("):
 			depth++
-		case toks[j].is(tokPunct, ")"):
+		case toks[j].Is(guard.ScriptPunct, ")"):
 			depth--
 			if depth == 0 {
 				return j
@@ -309,107 +295,6 @@ func closingParen(toks []scriptToken, open int) int {
 		}
 	}
 	return len(toks) - 1
-}
-
-type scriptTokenKind int
-
-const (
-	tokEnd scriptTokenKind = iota
-	tokIdent
-	tokPunct
-	tokString // '...' or "...": text is the contents, actions the template actions in it
-	tokOther  // a template literal, a number or a template action outside a string
-)
-
-type scriptToken struct {
-	kind    scriptTokenKind
-	text    string
-	at      int
-	actions []string
-}
-
-func (t scriptToken) is(kind scriptTokenKind, text string) bool {
-	return t.kind == kind && t.text == text
-}
-
-// lexScript splits src[start:end] into tokens, dropping whitespace and comments. In a page a
-// template action is one unit wherever it stands, since its own quotes are the template's.
-func lexScript(src string, start, end int, page bool) []scriptToken {
-	var toks []scriptToken
-	action := func(j int) int {
-		if !page || !strings.HasPrefix(src[j:end], "{{") {
-			return -1
-		}
-		k := strings.Index(src[j:end], "}}")
-		if k < 0 {
-			return -1
-		}
-		return j + k + 2
-	}
-	for i := start; i < end; {
-		c := src[i]
-		switch {
-		case c == ' ' || c == '\t' || c == '\r' || c == '\n':
-			i++
-		case action(i) >= 0:
-			j := action(i)
-			toks = append(toks, scriptToken{kind: tokOther, text: src[i:j], at: i})
-			i = j
-		case strings.HasPrefix(src[i:end], "//"):
-			for i < end && src[i] != '\n' {
-				i++
-			}
-		case strings.HasPrefix(src[i:end], "/*"):
-			if k := strings.Index(src[i+2:end], "*/"); k >= 0 {
-				i += k + 4
-			} else {
-				i = end
-			}
-		case c == '"' || c == '\'' || c == '`':
-			t := scriptToken{kind: tokString, at: i}
-			if c == '`' {
-				t.kind = tokOther
-			}
-			var text strings.Builder
-			j := i + 1
-			for j < end && src[j] != c {
-				if k := action(j); k >= 0 {
-					t.actions = append(t.actions, src[j:k])
-					text.WriteString(src[j:k])
-					j = k
-					continue
-				}
-				if src[j] == '\\' && j+1 < end {
-					text.WriteByte(src[j])
-					j++
-				}
-				text.WriteByte(src[j])
-				j++
-			}
-			t.text = text.String()
-			toks = append(toks, t)
-			i = j + 1
-		case isScriptIdentByte(c):
-			j := i
-			for j < end && isScriptIdentByte(src[j]) {
-				j++
-			}
-			kind := tokIdent
-			if c >= '0' && c <= '9' {
-				kind = tokOther
-			}
-			toks = append(toks, scriptToken{kind: kind, text: src[i:j], at: i})
-			i = j
-		default:
-			toks = append(toks, scriptToken{kind: tokPunct, text: src[i : i+1], at: i})
-			i++
-		}
-	}
-	return toks
-}
-
-func isScriptIdentByte(c byte) bool {
-	return c == '_' || c == '$' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c >= 0x80
 }
 
 // renderDialogFaults renders findings as "<path>:<line>" so a failure names what was missed or
