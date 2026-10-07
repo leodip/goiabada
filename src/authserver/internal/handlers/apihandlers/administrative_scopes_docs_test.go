@@ -14,6 +14,7 @@ package apihandlers
 // It reads files and nothing else.
 
 import (
+	"context"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -30,6 +31,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/guard"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // The pages, relative to the repository root, beside administrative_docs_test.go's.
@@ -42,7 +44,7 @@ const (
 var (
 	allowanceRouteSection   = docSection{restAPIPage, "#### Switch the administrative scopes allowance"}
 	allowanceRESTSection    = docSection{restAPIPage, "### Clients that may request the administrative scopes"}
-	allowanceClientsSection = docSection{clientsPage, "## Administrative scopes"}
+	allowanceClientsSection = docSection{clientsPage, "### Administrative scopes"}
 	accountAPISetupSection  = docSection{restAPIPage, "### Account API access"}
 	clientCredentialsSetup  = docSection{restAPIPage, "### Setting up API access"}
 	authorizeSection        = docSection{endpointsPage, "## /auth/authorize (GET or POST)"}
@@ -157,6 +159,17 @@ func TestAdministrativeScopesDocs_NameWhatTheAllowanceRestsOn(t *testing.T) {
 			want: []string{"updated_client_administrative_scopes"},
 		},
 	})
+}
+
+// The clients page tells an operator which switch allows a client, as the admin console labels it,
+// and what a client that is not allowed is answered: invalid_scope at the authorization endpoint and
+// on the password grant, invalid_grant when it redeems a code or refreshes (#499 decision 7, #519
+// decision 8).
+func TestAdministrativeScopesDocs_TheClientsPageNamesTheSwitchAndTheRefusal(t *testing.T) {
+	label := i18n.T(context.Background(), "adminconsole.admin_clients.settings.field.administrative_scopes_allowed")
+
+	assertSectionText(t, filepath.Dir(guard.SourceRoot(t)), allowanceClientsSection,
+		[]string{"**" + label + "**", "`invalid_scope`", "`invalid_grant`"}, nil)
 }
 
 // The endpoints page quotes what a client that may not request an administrative scope is answered,
