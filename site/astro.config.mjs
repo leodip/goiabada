@@ -2,12 +2,35 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starlightLinksValidator from 'starlight-links-validator';
+import starlightOpenAPI, { openAPISidebarGroups } from 'starlight-openapi';
 import { fileURLToPath } from 'node:url';
 
+import { writeApiReference } from './checks/api-reference.mjs';
+import { apiReferences } from './checks/api-reference-links.mjs';
 import buildChecks from './checks/build-checks.mjs';
 import { fullFile, indexFile } from './checks/llms.mjs';
 
 const googleAnalyticsId = 'G-CYZXDTHNB1'
+
+// The Admin API and the Account API reference, rendered from the auth server's
+// openapi.yaml, the same file it serves at /openapi.yaml. It is split into the
+// two documents first, the internal Browser Sessions operations left out.
+const apiReference = writeApiReference({
+	specPath: fileURLToPath(new URL('../src/authserver/web/openapi.yaml', import.meta.url)),
+	outDir: fileURLToPath(new URL('./.openapi/', import.meta.url)),
+});
+
+// The generated pages, each one's sidebar group collapsed and its operations
+// labelled with their method. Code samples are curl only, as every example of
+// calling Goiabada is.
+function apiReferenceSchema(base, label, schema) {
+	return {
+		base,
+		schema,
+		sidebar: { label, collapsed: true, operations: { badges: true } },
+		snippets: { operation: { clients: { shell: ['curl'] } } },
+	};
+}
 
 // https://astro.build/config
 export default defineConfig({
@@ -15,15 +38,25 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'Goiabada',
-			// Fails the build on an internal link to no page, or to a fragment no heading on
-			// its target produces (#511). An http://localhost link is an example of a local
-			// install, not a link to this site, so it is not checked. Nor are the links to the
-			// two llms files: buildChecks writes them after this check has run, under the
-			// names excluded here, and fails the build when it cannot read them back.
+			// The links validator fails the build on an internal link to no page, or to a
+			// fragment no heading on its target produces (#511). An http://localhost link is
+			// an example of a local install, not a link to this site, so it is not checked.
+			// Nor are the links to the two llms files: buildChecks writes them after this
+			// check has run, under the names excluded here, and fails the build when it
+			// cannot read them back. Links into the generated API reference, whose pages the
+			// validator cannot see, are checked by buildChecks against the built pages.
 			plugins: [
+				starlightOpenAPI([
+					apiReferenceSchema(apiReferences.admin, 'Admin API', apiReference.admin),
+					apiReferenceSchema(apiReferences.account, 'Account API', apiReference.account),
+				]),
 				starlightLinksValidator({
 					errorOnLocalLinks: false,
-					exclude: [`/${indexFile}`, `/${fullFile}`],
+					exclude: [
+						`/${indexFile}`,
+						`/${fullFile}`,
+						...Object.values(apiReferences).flatMap((base) => [`/${base}/`, `/${base}/**`]),
+					],
 				}),
 			],
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/leodip/goiabada' }],
@@ -103,7 +136,16 @@ export default defineConfig({
 					label: 'Reference',
 					items: [
 						{ label: 'Endpoints', slug: 'reference/endpoints' },
-						{ label: 'REST API', slug: 'reference/rest-api' },
+						{
+							label: 'API',
+							items: [
+								{ label: 'Authentication', slug: 'reference/api/authentication' },
+								{ label: 'Scopes', slug: 'reference/api/scopes' },
+								{ label: 'Administrators', slug: 'reference/api/administrators' },
+								{ label: 'Errors', slug: 'reference/api/errors' },
+								...openAPISidebarGroups,
+							],
+						},
 						{ label: 'Environment variables', slug: 'reference/environment-variables' },
 						{ label: 'Security', slug: 'reference/security' },
 					],
@@ -128,9 +170,11 @@ export default defineConfig({
 		}),
 		// After Starlight, so its checks read the finished pages. The repository's
 		// src/ is beside this directory, in a checkout and in the docs image's build.
-		// It also writes /llms.txt and /llms-full.txt, which llms heads.
+		// It also writes /llms.txt and /llms-full.txt, which llms heads, and checks the
+		// links into the generated API reference.
 		buildChecks({
 			srcDir: fileURLToPath(new URL('../src/', import.meta.url)),
+			apiReferences,
 			llms: {
 				title: 'Goiabada',
 				summary: 'An open-source OAuth2 and OpenID Connect server for simple, secure authentication.',

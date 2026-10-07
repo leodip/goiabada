@@ -17,7 +17,7 @@ import (
 )
 
 // internalServerErrorCode is the one code every unexpected failure on this surface answers with.
-// The REST API page documents it as the category; the seven per-site spellings it replaced
+// The API reference's errors page documents it as the category; the seven per-site spellings it replaced
 // (INTERNAL_ERROR, ENCODING_ERROR, SAVE_ERROR, READ_ERROR, DELETE_ERROR, USER_CREATION_FAILED,
 // EMAIL_SEND_FAILED and friends) named one condition several ways and no caller acted on the
 // difference (#279 decision 7).

@@ -1,0 +1,78 @@
+---
+title: Administrators
+description: Who counts as an administrator, why only authserver:manage can change one, and what the API answers when another scope tries.
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page explains which users, groups and clients are administrators, and what the Admin API lets each scope do to them.
+
+The short version: a granular scope such as `authserver:manage-users` manages everyone else, but it can't make anyone an administrator, change an administrator, or change what reaches one. Only a token with `authserver:manage` can.
+
+## Change an administrator
+
+Use a token carrying `authserver:manage` for any change to an administrator, or to who is one. The admin console's sign-in gets one for an administrator who holds the `manage` permission, such as the administrator the setup created.
+
+A service that only manages ordinary users and clients should keep its granular scope. When one of its requests touches an administrator, it's refused with `403` and `MANAGE_SCOPE_REQUIRED`, and nothing changes. That refusal is the design working, not something to retry with a bigger scope.
+
+## How it works
+
+### Who is an administrator
+
+An administrator is a user, group or client holding any of the six administrative permissions on the `authserver` resource: `manage`, `admin-read`, `manage-users`, `manage-clients`, `manage-settings` and `browser-sessions`.
+
+- A **user** is one when they hold one of them directly or through any of their groups.
+- A **group** is one when it holds one of them.
+- A **client** is one when it holds one of them, when it's the admin console's own client, whatever it holds, or when it's [allowed to request the administrative scopes](/reference/api/scopes/#administrative-scopes-on-a-users-behalf).
+
+`manage-account` and the permissions you add to the `authserver` resource yourself aren't administrative. [Resources and permissions](/concepts/resources-and-permissions/#administrators) shows the built-in permissions.
+
+### What only `authserver:manage` does
+
+A granular scope reaching an operation is still refused when the request would:
+
+- **Grant or revoke an administrative permission**, to a user, a group or a client, or move a user into or out of a group holding one, through `POST` or `DELETE` on a group's members or `PUT` on a user's groups, or delete such a group.
+- **Write to an administrator**: any change to an administrator user (enabled, profile, address, email, verification code, phone, password, two-factor authentication, picture, attributes, sessions, consents, groups, permissions, deletion), to an administrative group (settings, attributes, members, permissions, deletion), or to an administrator client (settings, authentication, flows, redirect URIs, web origins, token settings, permissions, logo, deletion).
+- **Switch whether a client may request the administrative scopes**, on or off, on any client.
+- **Read an administrator client's secret**, the admin console's own included.
+- **Change the email or the audit-log settings.** The email settings decide where password reset links go, and the audit-log settings decide what's recorded. `authserver:manage-settings` still reads them, and changes every other setting.
+- **Change the description of an administrative permission.** The admin console shows that description to an operator choosing what to grant, so rewriting it could pass `authserver:manage` off as something harmless. `authserver:manage-settings` still changes the description of `manage-account` and of your own permissions.
+
+These rules judge the object a request writes. A change to an ordinary group or resource isn't a write to an administrator, even when an administrator is a member of the group or holds one of the resource's permissions. So `authserver:manage-users` can still rename an ordinary group with an administrator in it, change its permissions or delete it. That changes the administrator's groups and the claims in their tokens, but it can't make or unmake an administrator, because an ordinary group holds no administrative permission.
+
+Creating a user, group or client isn't restricted. None of the three requests carries a permission or a group, and a new user is granted only `manage-account`, so nothing new starts as an administrator.
+
+### The refusal
+
+A refused request writes nothing. It's answered after the request's own `400` and `404` checks, with `403`, the error code `MANAGE_SCOPE_REQUIRED`, and a challenge naming the one scope that would do:
+
+```
+WWW-Authenticate: Bearer realm="goiabada", error="insufficient_scope", error_description="Only a token with the authserver:manage scope may act on administrators or administrative permissions.", scope="authserver:manage"
+```
+
+Don't confuse it with `INSUFFICIENT_SCOPE`. That one means the token lacks the scope the operation accepts, and asking for that scope fixes the call. `MANAGE_SCOPE_REQUIRED` means no granular scope will ever be enough: use a token with `authserver:manage`, or leave the administrator alone.
+
+### The last administrator
+
+A token with `authserver:manage` passes every rule above, but meets one more. A change that would leave no enabled user holding `authserver:manage`, directly or through a group, is answered `409` with the error code `LAST_ADMINISTRATOR`, and nothing changes. A client holding the permission doesn't count, and neither does a disabled user.
+
+Seven operations can meet it: setting a user's permissions, setting a group's permissions, removing a group member, setting a user's groups, deleting a group, disabling a user and deleting a user. Grant `authserver:manage` to another user first, then repeat the request. [Users and groups](/concepts/users-and-groups/#the-last-administrator) covers it from the admin console.
+
+### What the audit log records
+
+- A refused request leaves an `administrator_change_refused` entry, naming the caller, the route, the target and the rule that refused it.
+- An administrative permission granted or revoked, on a user, a group or a client, or a user joining or leaving a group that holds one, leaves an `administrative_permission_changed` entry beside the change's own entry.
+- Deleting an administrator or an administrative group leaves its own deletion entry, `deleted_user`, `deleted_client` or `deleted_group`, and no `administrative_permission_changed`.
+
+An alert on who is an administrator watches all of these. [Audit log](/concepts/audit-log/#events-to-alert-on) lists the events to alert on.
+
+<Aside type="tip">
+A user provisioning service needs only `authserver:manage-users`. It can create, change, disable and delete users, put them in groups, and grant them `manage-account` and your own permissions, but it can never act on an administrator or make anyone one.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Scopes" description="Which scope each operation accepts." href="/reference/api/scopes/" />
+  <LinkCard title="Errors" description="The format of every error answer." href="/reference/api/errors/" />
+</CardGrid>

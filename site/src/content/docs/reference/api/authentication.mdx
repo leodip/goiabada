@@ -1,0 +1,140 @@
+---
+title: Authentication
+description: Get an access token and call the Admin API or the Account API with it.
+---
+
+import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page shows you how to get an access token for Goiabada's APIs and call them with it.
+
+Goiabada has two APIs, both served by the auth server:
+
+- The **Admin API**, under `/api/v1/admin/`, manages users, groups, clients, resources, permissions and settings. It's the API the admin console itself calls. A service calls it with a token of its own.
+- The **Account API**, under `/api/v1/account/`, lets a signed-in user manage their own account: profile, email, password, two-factor authentication, sessions and consents. Your app calls it with the user's token.
+
+Every operation is in the [Admin API](/reference/api/admin/) and [Account API](/reference/api/account/) reference, with a curl example.
+
+## Call the Admin API
+
+A service that manages Goiabada on its own, with no user present, gets its token through the client credentials flow: it signs in as a client, with the client's own permissions.
+
+<Steps>
+
+1. In the admin console, open **Admin**, **Clients** and click **Create new**. Enter a **Client identifier**, such as `provisioning-service`, turn on **Client credentials flow** and nothing else, and click **Create**.
+
+2. Click **Manage** next to the new client, open **Authentication** and copy the **Client secret**.
+
+3. Open **Permissions**, choose the `authserver` resource and the permission your service needs, such as `manage-users`, click **Grant permission** and then **Save**. [Scopes](/reference/api/scopes/) explains what each permission allows.
+
+4. Get an access token, asking for the scope that matches the permission:
+
+   ```bash
+   curl -X POST https://auth.example.com/auth/token \
+     -d grant_type=client_credentials \
+     -d client_id=provisioning-service \
+     -d client_secret=YOUR_CLIENT_SECRET \
+     -d scope=authserver:manage-users
+   ```
+
+   The answer carries the token in `access_token`, and its lifetime in seconds in `expires_in`.
+
+5. Call the API with the token in the `Authorization` header:
+
+   ```bash
+   curl "https://auth.example.com/api/v1/admin/users/search?query=ana" \
+     -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+   ```
+
+</Steps>
+
+Ask for several scopes at once by separating them with spaces, as in `scope=authserver:manage-users authserver:manage-clients`. When the token expires, request a new one the same way.
+
+Each of `manage`, `admin-read`, `manage-users`, `manage-clients` and `manage-settings` makes the client an [administrator](/reference/api/administrators/), so only an administrator holding `authserver:manage` can grant one. The administrator the setup created holds it.
+
+## Call the Account API
+
+The Account API acts on the account of the user the token was issued for, so it needs a token your app got for a signed-in user, through the authorization code flow. A token from the client credentials flow is refused.
+
+<Steps>
+
+1. Send the user to the authorization endpoint, asking for `authserver:manage-account` beside `openid`:
+
+   ```
+   GET https://auth.example.com/auth/authorize?client_id=my-app
+     &redirect_uri=https://my-app.example.com/callback
+     &response_type=code
+     &scope=openid%20authserver:manage-account
+     &code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+     &code_challenge_method=S256
+     &state=abc123
+   ```
+
+2. Exchange the code the user comes back with for tokens:
+
+   ```bash
+   curl -X POST https://auth.example.com/auth/token \
+     -d grant_type=authorization_code \
+     -d client_id=my-app \
+     -d client_secret=YOUR_CLIENT_SECRET \
+     -d code=THE_CODE \
+     -d redirect_uri=https://my-app.example.com/callback \
+     -d code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+   ```
+
+3. Call the API with the `access_token` from the answer:
+
+   ```bash
+   curl https://auth.example.com/api/v1/account/profile \
+     -H "Authorization: Bearer USER_ACCESS_TOKEN"
+   ```
+
+</Steps>
+
+Every user holds the `manage-account` permission from the moment they're created, and it isn't an administrative permission, so your client needs no permission of its own to ask for it. The [Authorization code](/guides/authorization-code/) guide covers the sign-in itself, PKCE included.
+
+## How it works
+
+### The bearer token
+
+Every operation under `/api/v1/` takes an access token in the `Authorization` header, as `Bearer` followed by the token. The one operation that takes none is the public client logo, `GET /client/logo/{clientIdentifier}`.
+
+The token must be an access token the auth server issued for the `authserver` resource, which is what asking for an `authserver:` scope gets you. An ID token or a refresh token is refused.
+
+### Which tokens each API accepts
+
+The Admin API accepts a client's token from the client credentials flow, and a user's token from the authorization code flow when the client may [request the administrative scopes on a user's behalf](/reference/api/scopes/#administrative-scopes-on-a-users-behalf).
+
+The Account API accepts only a token issued for a user. A token from the client credentials flow is answered `403` with the error code `USER_CONTEXT_REQUIRED`.
+
+### When a token stops working
+
+A user's token is checked against the user and their session on every call, so it stops working before it expires once the user is disabled or the session it was issued through ends. The call is then answered `401` with `INVALID_TOKEN`.
+
+The other refusals:
+
+| Answer | Error code | Why |
+|---|---|---|
+| `401` | `ACCESS_TOKEN_REQUIRED` | No token was sent. |
+| `401` | `INVALID_TOKEN` | The token is malformed, expired, not an access token for `authserver`, or its user or session is gone. |
+| `403` | `INSUFFICIENT_SCOPE` | The token carries none of the scopes the operation accepts. |
+
+The [errors](/reference/api/errors/) page has the format of every error answer.
+
+### The OpenAPI document
+
+The auth server serves the whole API as an OpenAPI 3.0 document at `/openapi.yaml`, with no authentication:
+
+```bash
+curl https://auth.example.com/openapi.yaml
+```
+
+This reference is generated from it, so the two always say the same thing. Import it into Postman or Swagger UI, or generate a client from it.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Scopes" description="Pick the smallest scope that does the job." href="/reference/api/scopes/" />
+  <LinkCard title="Administrators" description="What only authserver:manage can do." href="/reference/api/administrators/" />
+  <LinkCard title="Admin API" description="Every Admin API operation." href="/reference/api/admin/" />
+  <LinkCard title="Account API" description="Every Account API operation." href="/reference/api/account/" />
+</CardGrid>

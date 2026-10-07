@@ -7,6 +7,7 @@
 site/node_modules
 site/dist
 site/.astro
+site/.openapi
 
 # What git ignores under src/: local build output, never shipped code.
 src/**/tmp

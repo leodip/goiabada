@@ -209,7 +209,10 @@ paths:
     get:
       tags: [Users]
       summary: Get user
-      description: Get user details by ID
+      description: |
+        Get one user's own fields: profile, email, phone, address and whether OTP is enabled.
+        Groups, permissions and attributes are not included; each has its own operation:
+        `getUserGroups`, `getUserPermissions` and `getUserAttributes`.
       operationId: getUser
       parameters:
         - $ref: '#/components/parameters/UserIdParam'
@@ -340,8 +343,10 @@ paths:
       summary: Generate email verification code
       description: |
         Generate a new email verification code for a user and return it in the response.
+        Every call generates a new code, and sets the user's emailVerified flag to false.
 
-        Note: This call sets the user's emailVerified flag to false.
+        The code is 8 characters, four uppercase letters then four digits, and expires 5
+        minutes after it is generated, at `verificationCodeExpiresAt`.
       operationId: generateUserEmailVerificationCode
       parameters:
         - $ref: '#/components/parameters/UserIdParam'
@@ -508,7 +513,7 @@ paths:
       summary: Disable user OTP
       description: |
         Disable OTP (two-factor authentication) for a user. OTP can only be disabled via Admin API,
-        not enabled. The removal lands only while the user still has the authenticator this request
+        not enabled: a user enrolls through the Account API or their own account pages. The removal lands only while the user still has the authenticator this request
         read; when another request removed it first, the answer is 400 OTP_NOT_ENABLED, and when it
         was replaced, 409 CONCURRENT_UPDATE with nothing removed.
       operationId: updateUserOtp
@@ -575,7 +580,12 @@ paths:
     post:
       tags: [Users]
       summary: Upload user profile picture
-      description: Upload or replace the user's profile picture. Supports JPEG, PNG, GIF, and WebP formats up to the configured maximum size.
+      description: |
+        Upload or replace the user's profile picture.
+
+        Send it as `multipart/form-data` in the field `picture`: a JPEG, PNG, GIF or WebP image,
+        from 10x10 to 512x512 pixels, of at most `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` bytes,
+        3 MiB by default.
       operationId: uploadUserProfilePicture
       parameters:
         - $ref: '#/components/parameters/UserIdParam'
@@ -934,7 +944,13 @@ paths:
     get:
       tags: [User Sessions]
       summary: List user sessions
-      description: Get all active sessions for a user
+      description: |
+        Get the user's live sessions, each with its device, IP address and the identifiers of the
+        clients it authorized. Sessions that have passed the configured idle timeout or maximum
+        lifetime are left out.
+
+        `isCurrent` marks the session the calling token was issued through. A token carrying no
+        `sid` claim, such as one from the client credentials grant, gets `false` on every session.
       operationId: getUserSessions
       parameters:
         - $ref: '#/components/parameters/UserIdParam'
@@ -991,7 +1007,8 @@ paths:
       summary: Delete session
       description: |
         Terminate a user session. The session's authorization codes are marked revoked and the
-        refresh tokens descended from them are swept, in one transaction.
+        refresh tokens descended from them are swept, offline refresh tokens included, in one
+        transaction.
 
         Note: while GET takes the sessionIdentifier, DELETE takes the numeric session id at the
         same position. It does not accept the identifier: a value that is not an integer is
@@ -1728,7 +1745,15 @@ paths:
     put:
       tags: [Resources]
       summary: Update resource permissions
-      description: Replace permissions for a resource
+      description: |
+        Replace the permissions of a resource. An entry with an `id` updates that permission,
+        one without creates it, and a stored permission the list leaves out is deleted.
+
+        The built-in permissions of the `authserver` resource cannot be renamed or deleted, by
+        any caller. Changing the description of one of its administrative permissions needs
+        `authserver:manage`, because the admin console shows that description to an operator
+        choosing a permission to grant: `authserver:manage-settings` is refused with 403
+        MANAGE_SCOPE_REQUIRED.
       operationId: updateResourcePermissions
       parameters:
         - $ref: '#/components/parameters/ResourceIdParam'
@@ -1856,10 +1881,9 @@ paths:
         Get client details by ID.
 
         The response carries no client secret: read it from `getClientSecret`.
-        Earlier versions answered a confidential client's decrypted secret here as
-        `clientSecret`, to every scope that reads clients, `authserver:admin-read`
-        included. That property is gone, which is a breaking change for an
-        integration that read it.
+        `administrativeScopesAllowed` says whether the client may request the administrative
+        scopes on a user's behalf. It is read-only here and everywhere else but
+        `updateClientAdministrativeScopes`.
       operationId: getClient
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -1913,7 +1937,9 @@ paths:
     delete:
       tags: [Clients]
       summary: Delete client
-      description: Delete an OAuth2/OIDC client
+      description: |
+        Delete an OAuth2/OIDC client. The admin console's own client, the system-level client,
+        cannot be deleted: the request is refused with 400 and error_code VALIDATION_ERROR.
       operationId: deleteClient
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -2130,7 +2156,12 @@ paths:
     put:
       tags: [Clients]
       summary: Update token settings
-      description: Update token expiration settings for a client
+      description: |
+        Update token expiration settings for a client.
+
+        `includeOpenIDConnectClaimsInAccessToken` and `includeOpenIDConnectClaimsInIdToken` each take
+        "on", "off" or "default". "default" follows the global setting of the same name in
+        `updateSettingsTokens`.
       operationId: updateClientTokens
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -2231,20 +2262,23 @@ paths:
         scopes (`manage`, `admin-read`, `manage-users`, `manage-clients`,
         `manage-settings` and `browser-sessions`) on a user's behalf, through the
         authorization code, implicit, refresh token and password grants. A client
-        that is not allowed is answered `invalid_scope` (`invalid_grant` on a
-        refresh) when it asks for one. A new client starts not allowed; the admin
-        console's own client is always allowed.
+        that is not allowed is answered invalid_scope when it asks for one, or
+        invalid_grant when it redeems a code or refreshes. A new client starts not
+        allowed; the admin console's own client is always allowed.
 
         The route admits `authserver:manage-clients` and `authserver:manage`, and
         the switch itself is reserved to `authserver:manage`, either way and on any
-        client: `authserver:manage-clients` is refused with MANAGE_SCOPE_REQUIRED.
+        client: `authserver:manage-clients` is refused with `MANAGE_SCOPE_REQUIRED`.
         An allowed client is an administrator client, so every other write to it,
         and reading its secret, is reserved to `authserver:manage` too.
 
-        Switching the admin console's own client off is refused with
-        VALIDATION_ERROR. Every switch leaves an
-        `updated_client_administrative_scopes` audit record naming the client, the
-        new value and the caller. The answer is the client as it now is.
+        `allowed` is required: a body without it, or with null, is refused with
+        `VALIDATION_ERROR` rather than read as false. Switching the admin console's own
+        client off is refused with `VALIDATION_ERROR` too. Every switch, one to the value
+        already stored included, leaves an `updated_client_administrative_scopes` audit
+        record naming the client, the new value and the caller. The answer is the client
+        as it now is, with `administrativeScopesAllowed` holding the new value. No other
+        operation sets or clears that field.
       operationId: updateClientAdministrativeScopes
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -2342,7 +2376,13 @@ paths:
     post:
       tags: [Clients]
       summary: Upload client logo
-      description: Upload or replace the client logo image. Supports JPEG, PNG, GIF, and WebP formats up to the configured maximum size (3MB by default).
+      description: |
+        Upload or replace the client logo image.
+
+        Send it as `multipart/form-data` in the field `picture`: a JPEG, PNG, GIF or WebP image,
+        from 10x10 to 512x512 pixels, of at most `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` bytes,
+        3 MiB by default.
+        The limit is the one profile pictures have.
       operationId: uploadClientLogo
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -2500,7 +2540,9 @@ paths:
     get:
       tags: [Settings]
       summary: Get email settings
-      description: Get SMTP/email settings
+      description: |
+        Get SMTP/email settings. The SMTP password is never answered: `hasSmtpPassword` says
+        whether one is stored.
       operationId: getSettingsEmail
       responses:
         '200':
@@ -2519,7 +2561,12 @@ paths:
       tags: [Settings]
       summary: Update email settings
       description: |
-        Update SMTP/email settings. The stored SMTP password is kept, replaced or removed:
+        Update SMTP/email settings. A change needs `authserver:manage`: these settings decide
+        where password reset links are sent, so `authserver:manage-settings` reads them but is
+        refused a change with 403 MANAGE_SCOPE_REQUIRED. A save with `smtpEnabled: false`
+        clears every SMTP field, the stored password included.
+
+        The stored SMTP password is kept, replaced or removed:
         an absent or empty `smtpPassword` keeps it, a non-empty one replaces it, and
         `clearSmtpPassword: true` removes it. The two together are refused with 400
         `VALIDATION_ERROR`.
@@ -2559,13 +2606,19 @@ paths:
             A failed connection answers one of these fixed messages, naming at most its coarse
             cause:
 
-              - "Unable to connect to the SMTP server: host name not found."
-              - "Unable to connect to the SMTP server: connection timed out."
-              - "Unable to connect to the SMTP server: connection refused."
-              - "Unable to connect to the SMTP server."
+            - "Unable to connect to the SMTP server: host name not found." Check the host
+              name: it is misspelt, or the auth server cannot resolve it, or its resolver did
+              not answer in time. The auth server's resolver may not be the one your own
+              machine uses.
+            - "Unable to connect to the SMTP server: connection timed out." Nothing answered
+              within 3 seconds: check the port, and any firewall between the auth server and
+              the SMTP server.
+            - "Unable to connect to the SMTP server: connection refused." The host answered
+              but nothing listens on that port: check the port.
+            - "Unable to connect to the SMTP server." Any other failure, such as a network the
+              auth server has no route to.
 
-            The last is every failure the other three do not name, such as a network the auth
-            server has no route to. No address, port or operating-system error is answered; the
+            No address, port or operating-system error is answered; the
             full error goes to the auth server's log, at Warn, as "unable to connect to the smtp
             server" under the request's request_id.
           content:
@@ -2614,21 +2667,44 @@ paths:
 
             A SEND_FAILED answers one of these fixed messages, chosen by what failed:
 
-              - "Unable to send the test email: host name not found."
-              - "Unable to send the test email: connection timed out."
-              - "Unable to send the test email: connection refused."
-              - "The SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS."
-              - "The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS."
-              - "SMTP credentials are configured but the server offers no authentication."
-              - "The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5."
-              - "The TLS connection failed; check the encryption setting and the server's certificate."
-              - "The SMTP server rejected the username or password."
-              - "The SMTP server refused the message."
-              - "Unable to send the test email."
+            - "Unable to send the test email: host name not found." Check the host name, as
+              for a save.
+            - "Unable to send the test email: connection timed out." Check the port and any
+              firewall, as for a save. A server that accepted the connection and then went
+              quiet also ends here, which is what STARTTLS or None against an SSL/TLS port
+              such as 465 looks like.
+            - "Unable to send the test email: connection refused." Check the port.
+            - "The SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS."
+              The encryption is STARTTLS and the server does not offer it. Goiabada does not
+              continue unencrypted.
+            - "The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS."
+              The encryption is None, a username is set, and the server would be sent the
+              password in the clear by PLAIN or LOGIN. Only a server on `localhost`,
+              `127.0.0.1` or `::1` is exempt.
+            - "SMTP credentials are configured but the server offers no authentication." A
+              username is set and the server offers no AUTH: the wrong host or port, or a
+              server that offers authentication only after STARTTLS, reached with the
+              encryption set to None.
+            - "The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5." The server offers only
+              mechanisms Goiabada does not implement, such as XOAUTH2: use a password the
+              server accepts through one of these three, often called an app password or an
+              SMTP key.
+            - "The TLS connection failed; check the encryption setting and the server's certificate."
+              SSL/TLS against a port that expects STARTTLS, such as 587; a certificate the auth
+              server does not trust, that has expired, or that names a host other than
+              `smtpHost`; or a server that refused the STARTTLS command. Certificates are
+              always verified.
+            - "The SMTP server rejected the username or password." Check the username and
+              password.
+            - "The SMTP server refused the message." The server refused the sender, the
+              recipient or the message itself, most often because the account may not send
+              from `smtpFromEmail`.
+            - "Unable to send the test email." Any other failure: a connection that dropped
+              partway through the conversation, a network the auth server has no route to,
+              or a stored password the auth server cannot decrypt, such as one encrypted under
+              a `GOIABADA_AES_ENCRYPTION_KEY` it no longer has.
 
-            The last is every failure the others do not name, such as a connection that dropped
-            partway through the conversation or a stored password the auth server cannot
-            decrypt. The REST API documentation says what to check for each. Nothing from the
+            Nothing from the
             error itself is answered, no address, operating-system error or server reply; the
             full error goes to the auth server's log, at Warn, as "unable to send the test
             email" under the request's request_id.
@@ -2803,7 +2879,15 @@ paths:
     put:
       tags: [Settings]
       summary: Update audit log settings
-      description: Update audit log destinations and retention
+      description: |
+        Update audit log destinations and retention. A change needs `authserver:manage`: these
+        settings decide what is recorded, so `authserver:manage-settings` reads them but is refused
+        a change with 403 MANAGE_SCOPE_REQUIRED.
+
+        `auditLogsInConsoleEnabled` writes each audit event to the application log as one record,
+        with the event name and its details as fields. `auditLogsInDatabaseEnabled` stores each one
+        in the `audit_logs` table, which `getAuditLogs` reads. A background worker deletes entries
+        older than `auditLogRetentionDays`.
       operationId: updateSettingsAuditLogs
       requestBody:
         required: true
@@ -2928,7 +3012,13 @@ paths:
     get:
       tags: [Settings]
       summary: Get phone countries
-      description: Get list of countries with calling codes
+      description: |
+        Get the list of countries with their calling codes. An entry's `uniqueId` is what
+        `phoneCountryUniqueId` takes when a user's phone number is set.
+
+        Unlike the other reads, it accepts only `authserver:admin-read` or `authserver:manage`: a
+        token with a domain scope alone, such as `authserver:manage-users`, is refused with 403
+        INSUFFICIENT_SCOPE.
       operationId: getPhoneCountries
       responses:
         '200':
@@ -2959,7 +3049,10 @@ paths:
       parameters:
         - name: auditEvent
           in: query
-          description: Return only entries for this audit event
+          description: |
+            Return only entries for this audit event, matched exactly. The events are those
+            `getAuditEventTypes` lists; a value outside them answers an empty page rather
+            than an error.
           schema:
             type: string
         - name: requestId
@@ -3078,7 +3171,16 @@ paths:
         password, checked before the address: a blank one is a 400 with error_code
         VALIDATION_ERROR, a wrong one a 400 with error_code AUTHENTICATION_FAILED that counts
         against the failure limit shared with the password and OTP changes. Submitting the
-        address the account already has changes nothing and answers 200 with the user as stored.
+        address the account already has changes nothing, keeps it verified, and answers 200
+        with the user as stored.
+
+        A change clears any pending verification code, and any password reset link already
+        sent stops working, since it was mailed to the previous address. Verify the new
+        address with `sendAccountEmailVerification` and `verifyAccountEmail`.
+
+        When SMTP is enabled and the previous address was verified, it is sent a notice that
+        the address was changed, in the user's language, after the response. The notice does
+        not name the new address, and one that cannot be sent does not fail the change.
       operationId: updateAccountEmail
       requestBody:
         required: true
@@ -3123,7 +3225,15 @@ paths:
     post:
       tags: [Account]
       summary: Send verification email
-      description: Send email verification code (one per 5 minutes per account, the code's lifetime; 5 per hour when the rate limiter is enabled)
+      description: |
+        Send an email verification code to the account's address. A code lives 5 minutes, and an
+        account is sent at most one per 5 minutes, so it has at most one live code at a time.
+
+        Inside that cooldown nothing is sent: the answer is 200 with `tooManyRequests` true and
+        `waitInSeconds` holding the seconds left. Changing or verifying the address does not reset
+        the cooldown, and of requests sent at the same moment exactly one sends a code. When the
+        rate limiter is enabled, the operation is also limited to 5 requests per hour per account,
+        answered 429.
       operationId: sendAccountEmailVerification
       responses:
         '200':
@@ -3158,7 +3268,10 @@ paths:
     post:
       tags: [Account]
       summary: Verify email
-      description: Verify email with code (expires in 5 minutes)
+      description: |
+        Verify the account's address with the code `sendAccountEmailVerification` sent: 8
+        characters, four letters then four digits, compared without regard to case, valid for 5
+        minutes.
       operationId: verifyAccountEmail
       requestBody:
         required: true
@@ -3250,7 +3363,10 @@ paths:
     put:
       tags: [Account]
       summary: Change own password
-      description: Change password (requires current password)
+      description: |
+        Change the password. Requires the current password: a wrong one is a 400 with error_code
+        AUTHENTICATION_FAILED that counts against the failure limit shared with the email and OTP
+        changes. The new password must meet the configured password policy.
       operationId: updateAccountPassword
       requestBody:
         required: true
@@ -3426,7 +3542,10 @@ paths:
     get:
       tags: [Account]
       summary: List own sessions
-      description: Get all active sessions for the authenticated user
+      description: |
+        Get the caller's live sessions, each with its device, IP address and the identifiers of the
+        clients it authorized. Sessions that have passed the configured idle timeout or maximum
+        lifetime are left out. `isCurrent` marks the session the calling token was issued through.
       operationId: getAccountSessions
       responses:
         '200':
@@ -3448,7 +3567,11 @@ paths:
     delete:
       tags: [Account]
       summary: Terminate own session
-      description: Terminate a session
+      description: |
+        Terminate one of the caller's own sessions, the current one included. The session's
+        authorization codes are marked revoked and the refresh tokens descended from them are swept,
+        offline refresh tokens included, in one transaction. A session of another user is refused
+        with 403 FORBIDDEN.
       operationId: deleteAccountSession
       parameters:
         - name: id
@@ -3534,7 +3657,12 @@ paths:
     post:
       tags: [Account]
       summary: Upload own profile picture
-      description: Upload or replace the authenticated user's profile picture. Supports JPEG, PNG, GIF, and WebP formats up to the configured maximum size.
+      description: |
+        Upload or replace the authenticated user's profile picture.
+
+        Send it as `multipart/form-data` in the field `picture`: a JPEG, PNG, GIF or WebP image,
+        from 10x10 to 512x512 pixels, of at most `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` bytes,
+        3 MiB by default.
       operationId: uploadAccountProfilePicture
       requestBody:
         required: true
@@ -4051,7 +4179,7 @@ components:
         4xx is a client-correctable failure (validation, not found,
         permission denied, rate limited); 5xx is a server-side problem.
         The body provides a stable error_code, optional error_args, and
-        an English error_description for non-localizing consumers.
+        an error_description for people to read.
         Protocol endpoints (/auth/token, /auth/authorize, /connect/register,
         /userinfo) use their RFC-defined error envelopes instead of this one.
       properties:
@@ -4067,7 +4195,9 @@ components:
           description: Substitution values for the localized message template.
         error_description:
           type: string
-          description: Rendered English message. Stable for non-localizing consumers.
+          description: |
+            A sentence for people to read: in the request's language when error_code is a
+            catalog key, in English otherwise. Route on error_code, not on this text.
       required:
         - error_description
 

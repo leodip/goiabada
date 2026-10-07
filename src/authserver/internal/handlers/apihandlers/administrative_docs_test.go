@@ -4,7 +4,7 @@ package apihandlers
 //
 // The pages an operator and an integrator read are where the boundary is decided: the built-in
 // permission table is what an operator consults before granting one, the audit-log page is where an
-// alert rule is written from, and the REST API page is where an integration learns which error codes
+// alert rule is written from, and the API reference is where an integration learns which error codes
 // it must handle. Each names facts the code owns, the administrative set, the seeded descriptions,
 // the audit catalog and the error codes, and a page naming one the code does not hold, or leaving
 // out one the model rests on, misleads with nothing going red. So each section is held to the code
@@ -24,13 +24,17 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
+	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/guard"
 )
 
 // The pages, relative to the repository root.
 const (
-	restAPIPage              = "site/src/content/docs/reference/rest-api.mdx"
+	apiAuthenticationPage    = "site/src/content/docs/reference/api/authentication.mdx"
+	apiScopesPage            = "site/src/content/docs/reference/api/scopes.mdx"
+	apiAdministratorsPage    = "site/src/content/docs/reference/api/administrators.mdx"
+	apiErrorsPage            = "site/src/content/docs/reference/api/errors.mdx"
 	resourcesPermissionsPage = "site/src/content/docs/concepts/resources-and-permissions.mdx"
 	usersGroupsPage          = "site/src/content/docs/concepts/users-and-groups.mdx"
 	auditLogPage             = "site/src/content/docs/concepts/audit-log.mdx"
@@ -60,8 +64,8 @@ var (
 	docAuditEvent = regexp.MustCompile("`([a-z][a-z0-9]*(?:_[a-z0-9]+)+)`")
 	// docErrorCode is a backticked UPPER_SNAKE identifier, the spelling of every API error code.
 	docErrorCode = regexp.MustCompile("`([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)`")
-	// docErrorCodeItem is an error code leading a list item, the shape of the REST API page's list
-	// of codes, which also names the UPPER_SNAKE convention itself in backticks.
+	// docErrorCodeItem is an error code leading a list item, the shape of the errors page's list of
+	// codes, which also names the UPPER_SNAKE convention itself in backticks.
 	docErrorCodeItem = regexp.MustCompile("(?m)^- `([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)`")
 	// docScopeRequest is a token request's scope parameter on the authserver resource, as a curl
 	// example spells it.
@@ -105,7 +109,9 @@ func TestAdministrativeDocs_TheBuiltInPermissionTableIsTheSeedAndThePolicy(t *te
 // Every audit event, error code and authserver scope the administrative model's sections name is
 // live, and each section names those the model rests on: the three events an operator alerts on,
 // the two codes the policy and the guard answer beside the route gate's, and every scope the
-// granular-scope section describes (#402 decision 15).
+// granular-scope section describes (#402 decision 15). The one operation that answers a client
+// secret names its audit event in its own description in openapi.yaml, which the API reference
+// renders (#519 decision 7).
 func TestAdministrativeDocs_NameWhatTheModelRestsOn(t *testing.T) {
 	events := make(map[string]bool)
 	for _, event := range audit.EventTypes() {
@@ -127,17 +133,17 @@ func TestAdministrativeDocs_NameWhatTheModelRestsOn(t *testing.T) {
 			want: []string{"administrator_change_refused", "administrative_permission_changed", "viewed_client_secret"},
 		},
 		{
-			section: docSection{restAPIPage, "## Error responses"},
+			section: docSection{apiErrorsPage, "### Error codes"},
 			pattern: docErrorCodeItem, kind: "error code", live: codes,
 			want: []string{"INSUFFICIENT_SCOPE", "MANAGE_SCOPE_REQUIRED", "LAST_ADMINISTRATOR"},
 		},
 		{
-			section: docSection{restAPIPage, "### Granular Admin API scopes"},
+			section: docSection{apiAdministratorsPage, "## How it works"},
 			pattern: docErrorCode, kind: "error code", live: codes,
 			want: []string{"MANAGE_SCOPE_REQUIRED", "LAST_ADMINISTRATOR"},
 		},
 		{
-			section: docSection{restAPIPage, "### Granular Admin API scopes"},
+			section: docSection{apiScopesPage, "## The Admin API scopes"},
 			pattern: docAuthServerScope, kind: "scope", live: scopes,
 			want: []string{
 				"authserver:manage", "authserver:admin-read", "authserver:manage-users",
@@ -145,15 +151,20 @@ func TestAdministrativeDocs_NameWhatTheModelRestsOn(t *testing.T) {
 			},
 		},
 		{
-			section: docSection{restAPIPage, "#### Get client secret"},
-			pattern: docAuditEvent, kind: "audit event", live: events,
-			want: []string{"viewed_client_secret"},
-		},
-		{
 			section: docSection{usersGroupsPage, "## The last administrator"},
 			pattern: docErrorCode, kind: "error code", live: codes,
 			want: []string{"LAST_ADMINISTRATOR"},
 		},
+	})
+
+	description, err := openAPIOperationDescription(web.OpenAPISpec(), "get", "/api/v1/admin/clients/{id}/secret")
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	assertNamesIn(t, description, docNames{
+		section: docSection{openAPISpecPath, "GET /api/v1/admin/clients/{id}/secret"},
+		pattern: docAuditEvent, kind: "audit event", live: events,
+		want: []string{"viewed_client_secret"},
 	})
 }
 

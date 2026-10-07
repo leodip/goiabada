@@ -21,6 +21,20 @@ npm run preview   # serves dist/ as built
 npm test          # the tests of the site's own checks
 ```
 
+## The API reference
+
+The Admin API and Account API reference under `/reference/api/admin/` and
+`/reference/api/account/` is generated from the auth server's
+`src/authserver/web/openapi.yaml`, the document it serves at `/openapi.yaml`, by
+[`starlight-openapi`](https://github.com/HiDeoo/starlight-openapi). To change what an operation's
+page says, change its description in `openapi.yaml`: that's the one home of every per-operation
+fact, so the reference and `/openapi.yaml` never disagree.
+
+Before rendering, `checks/api-reference.mjs` splits the spec into the two APIs, the Account API
+grouped by resource, and leaves out the internal Browser Sessions operations. An operation it
+can't place fails the build: add its path or resource there. Authentication, scopes, administrators
+and errors are handwritten pages beside the generated ones, in `src/content/docs/reference/api/`.
+
 ## What fails the build
 
 `npm run build` fails, and so does the docs image's build, when:
@@ -28,6 +42,10 @@ npm test          # the tests of the site's own checks
 - **An internal link is broken:** a link to a page that does not exist, or to a fragment no
   heading on its page produces. `starlight-links-validator` checks this. Links to
   `http://localhost` are examples of a local install and are not checked.
+- **A link into the generated API reference names nothing:** the links validator can't see the
+  generated pages, so `checks/api-reference-links.mjs` checks every link into them against the
+  built pages instead, a fragment against the headings on its page.
+- **An operation in `openapi.yaml` has no place in the API reference:** see above.
 - **A link in shipped code names nothing:** every `https://goiabada.dev` link under the
   repository's `src/` (server messages, the setup wizard's generated files, templates) must name
   a page the build published, and a fragment on it must name a heading on that page. When you move

@@ -3,9 +3,11 @@ package apihandlers
 // The documentation of which clients may request the administrative scopes, held to the code (#499
 // decisions 5, 7, 9 and 11).
 //
-// An operator learns from the clients page and the REST API page which clients may request the six
+// An operator learns from the clients page and the API reference which clients may request the six
 // administrative scopes and how to allow one, an integrator learns from the endpoints page what a
-// refused client is answered, and an alert rule is written from the audit-log page. Each names facts
+// refused client is answered, and an alert rule is written from the audit-log page. What the route
+// that switches the allowance does is in its own description in openapi.yaml, which the reference
+// renders (#519 decision 7). Each names facts
 // the code owns, the scopes, the route, the response field, the error codes, the refusal's sentence
 // and the audit events, and a page naming one the code does not hold, or leaving out one the
 // allowance rests on, misleads with nothing going red. The Account API setup is held too: it told
@@ -42,14 +44,16 @@ const (
 
 // The sections the allowance is described in.
 var (
-	allowanceRouteSection   = docSection{restAPIPage, "#### Switch the administrative scopes allowance"}
-	allowanceRESTSection    = docSection{restAPIPage, "### Clients that may request the administrative scopes"}
+	allowanceRESTSection    = docSection{apiScopesPage, "### Administrative scopes on a user's behalf"}
 	allowanceClientsSection = docSection{clientsPage, "### Administrative scopes"}
-	accountAPISetupSection  = docSection{restAPIPage, "### Account API access"}
-	clientCredentialsSetup  = docSection{restAPIPage, "### Setting up API access"}
+	accountAPISetupSection  = docSection{apiAuthenticationPage, "## Call the Account API"}
+	clientCredentialsSetup  = docSection{apiAuthenticationPage, "## Call the Admin API"}
 	authorizeSection        = docSection{endpointsPage, "## /auth/authorize (GET or POST)"}
 	tokenSection            = docSection{endpointsPage, "## /auth/token (POST)"}
 )
+
+// allowanceRoute is the route that switches a client's allowance, as openapi.yaml spells it.
+const allowanceRoute = "/api/v1/admin/clients/{id}/administrative-scopes"
 
 // The patterns the allowance's sections are read with, each capturing the name.
 var (
@@ -104,10 +108,10 @@ func openAPIPaths(t *testing.T) map[string]bool {
 }
 
 // Every scope, route, field, error code and audit event the allowance's sections name is live, and
-// each section names those the allowance rests on: the clients page and the REST API page the six
-// scopes it covers, the route's section its path, its field, the two codes its ceiling and the admin
-// console's client answer and its audit event, and the events to alert on both new events (#499
-// decisions 5 and 9).
+// each section names those the allowance rests on: the clients page and the scopes page the six
+// scopes it covers, the scopes page the route's path, the route's description in openapi.yaml its
+// field, the two codes its ceiling and the admin console's client answer and its audit event, and
+// the events to alert on both new events (#499 decisions 5 and 9).
 func TestAdministrativeScopesDocs_NameWhatTheAllowanceRestsOn(t *testing.T) {
 	events := make(map[string]bool)
 	for _, event := range audit.EventTypes() {
@@ -139,26 +143,36 @@ func TestAdministrativeScopesDocs_NameWhatTheAllowanceRestsOn(t *testing.T) {
 			want: administrativeScopes(),
 		},
 		{
-			section: allowanceRouteSection,
+			section: allowanceRESTSection,
 			pattern: docAdminRoute, kind: "route", live: openAPIPaths(t),
 			want: []string{"/api/v1/admin/clients/{id}/administrative-scopes"},
 		},
+	})
+
+	description, err := openAPIOperationDescription(web.OpenAPISpec(), "put", allowanceRoute)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	routeSection := docSection{openAPISpecPath, "PUT " + allowanceRoute}
+	for _, check := range []docNames{
 		{
-			section: allowanceRouteSection,
+			section: routeSection,
 			pattern: docJSONField, kind: "client field", live: clientJSONFields(),
 			want: []string{"administrativeScopesAllowed"},
 		},
 		{
-			section: allowanceRouteSection,
+			section: routeSection,
 			pattern: docErrorCode, kind: "error code", live: codes,
 			want: []string{"MANAGE_SCOPE_REQUIRED", "VALIDATION_ERROR"},
 		},
 		{
-			section: allowanceRouteSection,
+			section: routeSection,
 			pattern: docAuditEvent, kind: "audit event", live: events,
 			want: []string{"updated_client_administrative_scopes"},
 		},
-	})
+	} {
+		assertNamesIn(t, description, check)
+	}
 }
 
 // The clients page tells an operator which switch allows a client, as the admin console labels it,
@@ -186,9 +200,9 @@ func TestAdministrativeScopesDocs_TheEndpointsPageQuotesTheRefusal(t *testing.T)
 }
 
 // The Account API takes a signed-in user's token, from the authorization code flow requesting
-// authserver:manage-account, and refuses a client-credentials token, so the page's setup for it asks
-// for the first and never the second, and the client-credentials setup no longer tells the reader to
-// grant manage-account to a client (#499 decision 11).
+// authserver:manage-account, and refuses a client-credentials token, so the authentication page's
+// setup for it asks for the first and never the second, and the client-credentials setup does not
+// tell the reader to grant manage-account to a client (#499 decision 11).
 func TestAdministrativeScopesDocs_TheAccountAPISetupUsesAUserToken(t *testing.T) {
 	root := filepath.Dir(guard.SourceRoot(t))
 

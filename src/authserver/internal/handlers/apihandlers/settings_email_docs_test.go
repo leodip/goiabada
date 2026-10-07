@@ -3,11 +3,12 @@ package apihandlers
 // The failure messages of the email settings endpoints, held to the two documents that list them.
 //
 // A failed connectivity dial on save and a failed test send each answer one of a closed set of
-// fixed messages (#410 decisions 4 and 5), and an administrator who gets one looks it up on the REST
-// API page or in openapi.yaml. A message the code changes and a document does not, or one a
-// document lists and the code no longer answers, leaves that administrator with nothing to look up,
-// with nothing going red. So each list is held to the code in both directions: every message it
-// quotes is one the code answers, and every message the code answers is quoted.
+// fixed messages (#410 decisions 4 and 5), and an administrator who gets one looks it up in
+// openapi.yaml, or in the API reference the docs site renders from it (#519 decision 7). A message
+// the code changes and the spec does not, or one the spec lists and the code no longer answers,
+// leaves that administrator with nothing to look up, with nothing going red. So each list is held to
+// the code in both directions: every message it quotes is one the code answers, and every message
+// the code answers is quoted.
 //
 // It reads files and nothing else.
 
@@ -15,7 +16,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -28,14 +28,13 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/web"
-	"github.com/leodip/goiabada/core/guard"
 )
 
 // openAPISpecPath is where openapi.yaml sits, relative to the repository root, as a failure names it.
 const openAPISpecPath = "src/authserver/web/openapi.yaml"
 
-// docFailureMessage is a fixed failure message as both documents quote it: in double quotes, leading
-// a table row on the REST API page and a list item in openapi.yaml. No message holds a double quote.
+// docFailureMessage is a fixed failure message as a document quotes it: in double quotes, leading a
+// table row on a docs page or a list item in openapi.yaml. No message holds a double quote.
 var docFailureMessage = regexp.MustCompile(`(?m)^\s*(?:\|\s*|- )"([^"]+)"`)
 
 // A kind or a cause past the last one declared answers the default message, so these bounds, well
@@ -100,21 +99,6 @@ func TestSettingsEmailDocs_TheCensusReachesEveryMessage(t *testing.T) {
 	assert.Len(t, sendFailureMessages(), 11)
 }
 
-// The REST API page lists every message each failure can answer, in the section of its endpoint.
-func TestSettingsEmailDocs_TheRESTAPIPageListsEveryFailureMessage(t *testing.T) {
-	dial, send := dialFailureMessages(), sendFailureMessages()
-	assertDocNames(t, filepath.Dir(guard.SourceRoot(t)), []docNames{
-		{
-			section: docSection{restAPIPage, "#### Email settings"},
-			pattern: docFailureMessage, kind: failureMessage, live: messageSet(dial), want: dial,
-		},
-		{
-			section: docSection{restAPIPage, "#### Send test email"},
-			pattern: docFailureMessage, kind: failureMessage, live: messageSet(send), want: send,
-		},
-	})
-}
-
 // openapi.yaml lists every message each failure can answer, in the 400 of its operation. What is
 // read is the embedded spec, which is what GET /openapi.yaml serves.
 func TestSettingsEmailDocs_OpenAPIListsEveryFailureMessage(t *testing.T) {
@@ -173,6 +157,43 @@ func TestSettingsEmailDocs_ThePatternReadsOnlyListedMessages(t *testing.T) {
 		read = append(read, match[1])
 	}
 	assert.Equal(t, []string{"Row message.", "Item message."}, read)
+}
+
+func TestOpenAPIDocs_AnOperationWithNoDescriptionFails(t *testing.T) {
+	spec := []byte("paths:\n" +
+		"  /things:\n" +
+		"    get:\n" +
+		"      description: |\n" +
+		"        Reads the things.\n" +
+		"    put:\n" +
+		"      summary: Write the things\n")
+
+	description, err := openAPIOperationDescription(spec, "get", "/things")
+	require.NoError(t, err)
+	assert.Equal(t, "Reads the things.\n", description)
+
+	_, err = openAPIOperationDescription(spec, "put", "/things")
+	assert.EqualError(t, err, "openapi.yaml gives PUT /things no description")
+	_, err = openAPIOperationDescription(spec, "delete", "/things")
+	assert.EqualError(t, err, "openapi.yaml gives DELETE /things no description")
+}
+
+// openAPIOperationDescription is the description of the operation verb path in spec, the text the
+// API reference shows on that operation's page, or an error when there is none.
+func openAPIOperationDescription(spec []byte, verb, path string) (string, error) {
+	var doc struct {
+		Paths map[string]map[string]struct {
+			Description string `yaml:"description"`
+		} `yaml:"paths"`
+	}
+	if err := yaml.Unmarshal(spec, &doc); err != nil {
+		return "", fmt.Errorf("parsing openapi.yaml: %w", err)
+	}
+	description := doc.Paths[path][verb].Description
+	if description == "" {
+		return "", fmt.Errorf("openapi.yaml gives %s %s no description", strings.ToUpper(verb), path)
+	}
+	return description, nil
 }
 
 // openAPIResponseDescription is the description of the status response of the operation verb path
