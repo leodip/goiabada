@@ -13,6 +13,15 @@
   "dependencies": {
     "@astrojs/starlight": "^0.42.0",
     "astro": "^7.3.2",
+    "hast-util-from-html": "^2.0.3",
+    "hast-util-select": "^6.0.4",
+    "hast-util-to-mdast": "^10.1.2",
+    "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-gfm-strikethrough": "^2.0.1",
+    "mdast-util-gfm-table": "^2.0.0",
+    "mdast-util-gfm-task-list-item": "^2.0.0",
+    "mdast-util-to-markdown": "^2.1.2",
+    "mdast-util-to-string": "^4.0.0",
     "sharp": "^0.35.5",
     "starlight-links-validator": "^0.26.0"
   }

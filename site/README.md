@@ -29,6 +29,13 @@ npm test          # the tests of the site's own checks
   a page the build published, and a fragment on it must name a heading on that page. When you move
   a page or reword a heading, update those links in the same change. This check is ours, in
   `checks/shipped-links.mjs`, run from `checks/build-checks.mjs` once the pages are written.
+- **The llms files disagree with the pages:** the build writes `/llms.txt`, the
+  [llmstxt.org](https://llmstxt.org) index of every page with its title, URL and description,
+  and `/llms-full.txt`, every page's content as Markdown headed by its title and URL, from the
+  pages it has just written, the 404 page left out. It then reads them back and fails when a page
+  is missing from either file, an entry names no page, or an entry lacks text its page renders.
+  This step is ours, in `checks/llms.mjs`. The project title and summary that head `llms.txt`
+  are in `astro.config.mjs`, and its sections follow the sidebar.
 
 `npm test` runs the checks' tests on small fixtures with Node's built-in test runner.
 

@@ -507,8 +507,9 @@ jobs:
   # Go change that moves a docs link fails here. Everything runs in the docs
   # image's own stages, so the checks' tests and the build use the Node version
   # the image is built with, and the build is the one a release pushes: it fails
-  # on a broken internal link or heading anchor, and on a goiabada.dev link in
-  # src/ that names no built page. The last step asserts nginx's answers, which
+  # on a broken internal link or heading anchor, on a goiabada.dev link in src/
+  # that names no built page, and on llms files that disagree with the pages.
+  # The last step asserts nginx's answers, which
   # only a running image shows.
   docs:
     name: Docs
