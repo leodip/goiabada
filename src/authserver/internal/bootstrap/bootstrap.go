@@ -171,7 +171,7 @@ func logInitialSetupRequired(ctx context.Context) {
 	slog.ErrorContext(ctx, "initial setup is required, because the database is empty and neither bootstrap mode is configured",
 		"options", []string{
 			"run goiabada-setup, which writes a ready-to-use docker-compose.yml carrying every credential",
-			"or set GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE and restart, then copy the credentials out of the file it writes",
+			"or set GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE, and GOIABADA_ADMIN_PASSWORD to the first administrator's password of at least 15 characters, and restart, then copy the credentials out of the file it writes",
 		})
 }
 

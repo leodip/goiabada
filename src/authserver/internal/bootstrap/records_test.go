@@ -76,7 +76,9 @@ func TestLogInitialSetupRequired_OffersBothBootstrapModes(t *testing.T) {
 	assert.Contains(t, options[0], "goiabada-setup",
 		"the recommended route first, since it is one step")
 	assert.Contains(t, options[1], "GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE",
-		"and the legacy route naming the variable that selects it, which is the whole action")
+		"and the legacy route naming the variable that selects it")
+	assert.Contains(t, options[1], "GOIABADA_ADMIN_PASSWORD",
+		"and the password that mode now needs, since the first run refuses to seed without one (#500)")
 }
 
 // The five names are asserted as a set here rather than inside the two records above, so that

@@ -234,8 +234,8 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			ConnMaxLifetime: getEnvAsDuration("GOIABADA_DB_CONN_MAX_LIFETIME", defaultConnMaxLifetime, &malformed),
 			ConnMaxIdleTime: getEnvAsDuration("GOIABADA_DB_CONN_MAX_IDLE_TIME", defaultConnMaxIdleTime, &malformed),
 		},
-		AdminEmail:               getEnv("GOIABADA_ADMIN_EMAIL", "admin"),
-		AdminPassword:            getEnv("GOIABADA_ADMIN_PASSWORD", "changeme"),
+		AdminEmail:               getEnv("GOIABADA_ADMIN_EMAIL", "admin@example.com"),
+		AdminPassword:            getEnv("GOIABADA_ADMIN_PASSWORD", ""),
 		AppName:                  getEnv("GOIABADA_APPNAME", "Goiabada"),
 		AESEncryptionKey:         getEnv("GOIABADA_AES_ENCRYPTION_KEY", ""),
 		AESEncryptionKeyPrevious: getEnv("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS", ""),
@@ -278,7 +278,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 
 	// Initial setup
 	fs.StringVar(&c.AdminEmail, "admin-email", c.AdminEmail, "Default admin email")
-	fs.StringVar(&c.AdminPassword, "admin-password", c.AdminPassword, "Default admin password")
+	fs.StringVar(&c.AdminPassword, "admin-password", c.AdminPassword, "First administrator's password, required on first startup: at least 15 characters, not changeme")
 	fs.StringVar(&c.AppName, "appname", c.AppName, "Default app name")
 
 	// Under flag.CommandLine, built with ExitOnError, a bad flag has already exited by here; a set

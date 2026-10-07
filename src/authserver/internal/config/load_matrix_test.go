@@ -265,10 +265,14 @@ var configVariables = []configVar{
 		func(c *Config) any { return c.Database.ConnMaxIdleTime }),
 
 	// Initial setup and the data-encryption keys
-	strVar("GOIABADA_ADMIN_EMAIL", "admin-email", "admin",
+	// One default for unset and empty alike, the address the seed falls back to for an empty
+	// one: unset used to give "admin", which is not an address (#500 decision 5).
+	strVar("GOIABADA_ADMIN_EMAIL", "admin-email", "admin@example.com",
 		"env-admin@example.com", "flag-admin@example.com",
 		func(c *Config) any { return c.AdminEmail }),
-	strVar("GOIABADA_ADMIN_PASSWORD", "admin-password", "changeme",
+	// No default: the published changeme it had seeded an administrator anyone could sign in
+	// as, and the seed now refuses an empty password (#500 decision 1).
+	strVar("GOIABADA_ADMIN_PASSWORD", "admin-password", "",
 		"env-admin-password", "flag-admin-password",
 		func(c *Config) any { return c.AdminPassword }),
 	strVar("GOIABADA_APPNAME", "appname", "Goiabada",

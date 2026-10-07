@@ -20,10 +20,12 @@ You now have a running Goiabada instance accessible at:
 - **Auth server**: http://localhost:19090
 - **Admin console**: http://localhost:19091
 
-Default credentials:
+The dev container sets the first administrator's credentials, which the auth server seeds on its first start:
 
 - **Email**: admin@example.com
-- **Password**: changeme
+- **Password**: devcontainer-admin-password
+
+These are published development values. CI and the test stack use the same ones; never use them in a deployment.
 
 ## AI-assisted development
 
