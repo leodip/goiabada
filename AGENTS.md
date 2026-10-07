@@ -22,7 +22,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 ## Key Directories
 
 ### Core (`src/core/`)
-- `adminpassword/` - The one rule for the first administrator's password, `Check`: at least 15 characters, at most bcrypt's 72 bytes, and never `changeme`. The auth server's first start and the setup wizard both apply it, so the two cannot disagree on which passwords seed. A leaf of its own, importing only `core/errs`, because in `inputvalidation` it linked `core/i18n`, `core/oauth`, TOML and JWT into the wizard (#500)
+- `adminpassword/` - The one rule for the first administrator's password, `Check`: at least 15 characters, at most bcrypt's 72 bytes, and never `changeme`. The auth server's first start and the setup wizard both apply it, so the two cannot disagree on which passwords seed. A leaf of its own, importing only `core/errs`, because in `inputvalidation` it linked `core/i18n`, `core/oauth`, TOML and JWT into the wizard; `import_lint_test.go` holds it there through `guard.AssertImportsOnly` (#500)
 - `api/` - The admin API wire contract: request and response DTOs, declarations only, importing no persistence model. The model-to-DTO mapping belongs to the auth server, in `internal/apimapping` (#350). One file per resource, each holding its requests beside its responses (#441)
 - `boundedread/` - The one rule for a capped response body: read one byte past the cap and refuse the overrun rather than decode a prefix. Nine callers: the admin console's seven reads from the auth server, `internal/pinnedfetch`, which the generators download through, and the timezones generator's read of the decompressed tarball (#386, #432)
 - `buildinfo/` - The build stamp both servers report, `Version`, `BuildDate` and `GitCommit`, which the release builds set with `-ldflags -X` and which read `development` in any other build. It left `core/constants` beside `builtin/` when that package split, because the linker writes these values rather than the two processes agreeing on them (#442)
@@ -407,6 +407,11 @@ exported `Assert*` keeps its `*testing.T` and delegates, so no caller moves. Bot
 driven from a rule test: the finder directly, the reporting half through `guard.Run`, which
 runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` the way the real one
 does. Every guard follows this: those in `core/guard`, the newest
+`AssertImportsOnly`, which holds one package's production files to importing the standard library
+and an allowlist its caller names, which #387 wrote as `record`'s own lint, holding that package
+to `core/builtin` and `core/errs`, before #500 moved it here when `core/adminpassword` became the
+second package held to one, to `core/errs` alone, so the setup wizard links nothing more to reach
+the admin password rule, and before it
 `AssertNoParentImport`, which holds each child handler package a caller names to naming no import
 of its parent, which the auth server calls over `apihandlers` and `accounthandlers` and the admin
 console over its six, and which #387 wrote as that server's own lint before #440 moved it here for
@@ -425,12 +430,10 @@ key-generation call (#409) and resolves the data cipher's methods by receiver ty
 its admin-route classification lint beside it, which holds every admin write route, and every admin read
 whose handler applies a ceiling of the administrative policy, to a row naming the ceilings its handler applies
 or why it needs none, in both directions (#402),
-its write-once lint in `internal/ceremony`, which refuses a write to an `AuthContext` request field
-outside `HandleAuthorizeGet`, resolved with `go/types` (#436), and the import rule #387 added
-beside the child-package one: `record/import_lint_test.go`, which holds that package to the
-standard library, `core/builtin` and `core/errs` -- both parse imports with `go/parser` rather
-than matching text, because an alias binds a different name to the same path and one of the 39
-production files did exactly that.
+and its write-once lint in `internal/ceremony`, which refuses a write to an `AuthContext` request field
+outside `HandleAuthorizeGet`, resolved with `go/types` (#436). `AssertImportsOnly` and
+`AssertNoParentImport` both parse imports with `go/parser` rather than matching text, because an
+alias binds a different name to the same path and one of the 39 production files did exactly that.
 `git grep -n 'func assert.*\(r Reporter\|r guard\.Reporter\)' -- '*.go'` lists them; no count is
 kept here, because the one that was drifted each time a guard was added (#442). Each owes three
 cases: a tree that must fail, a tree that must pass, and the walk that reached nothing. One of

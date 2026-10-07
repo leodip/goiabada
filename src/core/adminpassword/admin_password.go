@@ -3,7 +3,7 @@
 // importing nothing beyond the standard library and core/errs, because the wizard links whatever its
 // home imports: in core/inputvalidation, beside the identifier validator's localized refusal, it
 // brought core/i18n, core/oauth, a TOML parser and a JWT library into a binary that uses none of
-// them.
+// them. import_lint_test.go holds it to that through guard.AssertImportsOnly.
 package adminpassword
 
 import (

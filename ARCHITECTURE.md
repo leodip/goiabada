@@ -147,7 +147,9 @@ Notes on rows that are not self-evident:
   its one rule, and it is a package of its own rather than a file in `core/inputvalidation` because
   the wizard links whatever its home imports: there, the identifier validator's `core/i18n` import
   brought the message catalogs, `core/oauth`, a TOML parser and a JWT library into a binary that
-  uses none of them (#500).
+  uses none of them. `import_lint_test.go` beside it holds it to `core/errs` and the standard
+  library through `guard.AssertImportsOnly`, the rule `authserver/internal/record` is held by
+  too (#500).
 - `core/api` is declarations and nothing else. The model-aware `ToResponse` mapping left for
   `authserver/internal/apimapping` in #350, the model-typed fields became DTOs of its own, and the
   reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites are
