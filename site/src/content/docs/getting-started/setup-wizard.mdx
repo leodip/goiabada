@@ -214,8 +214,9 @@ printf '%s' "$DB_PASSWORD" | ./goiabada-setup --type=native --db=postgres \
 
 An admin password given with `--admin-password` or `--admin-password-file` is held to the same rule as
 one typed at the prompt: `changeme`, a password under 15 characters or one over 72 bytes ends the run
-with an error naming the flag, and nothing is written. A password missing a character class is warned
-about and kept.
+with an error naming the flag, and nothing is written. Whitespace around it is dropped first, as the
+auth server drops it when it reads `GOIABADA_ADMIN_PASSWORD`, so the password judged and written is the
+one you sign in with. A password missing a character class is warned about and kept.
 
 ## Next steps
 

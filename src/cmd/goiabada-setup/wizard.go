@@ -617,6 +617,10 @@ func (w *wizard) askAdmin() error {
 	if generated {
 		adminPassword = generatePassword()
 	} else {
+		// The auth server reads GOIABADA_ADMIN_PASSWORD with the whitespace around it trimmed, as the
+		// prompt trims an answer, so the password judged and written is the one the first start
+		// seeds, and the one the administrator signs in with (#500).
+		adminPassword = strings.TrimSpace(adminPassword)
 		// The first start refuses to seed what this refuses, so writing it would ship a deployment
 		// that cannot start (#500).
 		if err := inputvalidation.CheckAdminPassword(adminPassword); err != nil {
