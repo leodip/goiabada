@@ -162,10 +162,10 @@
             const cell1 = row.insertCell(0);
             const cell2 = row.insertCell(1);
             cell1.className = "p-1 font-mono text-sm align-middle";
-            cell1.innerHTML = value.Scope;
+            cell1.textContent = value.Scope;
 
             cell2.className = "p-1 text-right";
-            cell2.innerHTML = getTrashCanMarkup("", "deletePermission(event, this);", "data-permissionid='" + parseInt(key, 10) + "'");
+            cell2.replaceChildren(createTrashCanButton(deletePermission, { permissionid: parseInt(key, 10) }));
          }
       }
    }

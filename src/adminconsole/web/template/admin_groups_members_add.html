@@ -62,12 +62,16 @@
             const familyNameCell = row.insertCell();
             const addToGroupCell = row.insertCell();
 
-            subjectCell.innerHTML = user.Subject;
-            usernameCell.innerHTML = user.Username;
-            emailCell.innerHTML = `<a href="/admin/users/${user.Id}/details" class="link link-hover link-secondary">${user.Email}</a>`;
-            givenNameCell.innerHTML = user.GivenName;
-            middleNameCell.innerHTML = user.MiddleName;
-            familyNameCell.innerHTML = user.FamilyName;
+            subjectCell.textContent = user.Subject;
+            usernameCell.textContent = user.Username;
+            const emailLink = document.createElement("a");
+            emailLink.href = "/admin/users/" + parseInt(user.Id, 10) + "/details";
+            emailLink.className = "link link-hover link-secondary";
+            emailLink.textContent = user.Email;
+            emailCell.appendChild(emailLink);
+            givenNameCell.textContent = user.GivenName;
+            middleNameCell.textContent = user.MiddleName;
+            familyNameCell.textContent = user.FamilyName;
 
             if(user.AddedToGroup) {
                 const alreadyAdded = document.createElement("span");
@@ -78,7 +82,9 @@
 
                 const addToGroupButton = document.createElement("button");
                 addToGroupButton.setAttribute("class", "btn btn-xs btn-primary");
-                addToGroupButton.setAttribute("onclick", "AddUserToGroup(event, this, " + user.Id + ", '" + user.Email + "');");
+                addToGroupButton.onclick = function(event) {
+                    AddUserToGroup(event, addToGroupButton, user.Id, user.Email);
+                };
                 addToGroupButton.innerHTML = "{{ T $.ctx "adminconsole.admin_groups.members_add.add_button" }}";
                 addToGroupCell.appendChild(addToGroupButton);
 
@@ -94,7 +100,10 @@
             const cell = row.insertCell();
             cell.setAttribute("colspan", "7");
             cell.setAttribute("class", "text-center");
-            cell.innerHTML = "<span class='p-1 rounded text-warning-content bg-warning'>{{ T $.ctx "adminconsole.admin_groups.members_add.results_truncated_prefix" }}" + maxRows + "{{ T $.ctx "adminconsole.admin_groups.members_add.results_truncated_suffix" }}</span>";
+            const truncatedBanner = document.createElement("span");
+            truncatedBanner.className = "p-1 rounded text-warning-content bg-warning";
+            truncatedBanner.textContent = "{{ T $.ctx "adminconsole.admin_groups.members_add.results_truncated_prefix" }}" + maxRows + "{{ T $.ctx "adminconsole.admin_groups.members_add.results_truncated_suffix" }}";
+            cell.appendChild(truncatedBanner);
         }
 
         if(emptyResult) {

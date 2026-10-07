@@ -96,7 +96,7 @@
                 cell1.textContent = uri;
 
                 cell2.className = "p-1 text-right";
-                cell2.innerHTML = getTrashCanMarkup("", "deleteRedirectURI(event, this);", "");
+                cell2.replaceChildren(createTrashCanButton(deleteRedirectURI));
             });
         }
     }
