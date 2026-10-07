@@ -20,9 +20,11 @@
     function addPermission(elem, evt, id, groupIdentifier) {
         evt.preventDefault();
 
-        showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_add_title" }}", "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_add_body_prefix" }}" +
-            {{.resourceIdentifier}} + ":" + {{.selectedPermissionIdentifier}} +
-            "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_add_body_middle" }}" + groupIdentifier + "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_add_body_suffix" }}",
+        showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_add_title" }}", dialogMarkup([
+            "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_add_body_prefix" }}",
+            "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_add_body_middle" }}",
+            "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_add_body_suffix" }}",
+        ], {{.resourceIdentifier}} + ":" + {{.selectedPermissionIdentifier}}, groupIdentifier),
             function() {},
             function() {
 
@@ -68,9 +70,11 @@
     function removePermission(elem, evt, id, groupIdentifier) {
         evt.preventDefault();
 
-        showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_remove_title" }}", "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_remove_body_prefix" }}" +
-            {{.resourceIdentifier}} + ":" + {{.selectedPermissionIdentifier}} +
-            "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_remove_body_middle" }}" + groupIdentifier + "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_remove_body_suffix" }}",
+        showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_remove_title" }}", dialogMarkup([
+            "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_remove_body_prefix" }}",
+            "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_remove_body_middle" }}",
+            "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.modal_remove_body_suffix" }}",
+        ], {{.resourceIdentifier}} + ":" + {{.selectedPermissionIdentifier}}, groupIdentifier),
             function() {},
             function() {
 

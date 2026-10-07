@@ -127,10 +127,9 @@ func HandleAPIErrorWithCallback(httpHelper ErrorWriter, w http.ResponseWriter, r
 // server error has occurred", and the sentence naming the offending value goes to the log
 // instead of to the screen (#122).
 //
-// Whatever renders the forwarded description must escape it: it can carry the caller's own
-// input echoed back by the API. sendAjaxRequest in adminconsole's utils.js does, and that
-// escaping is load-bearing rather than defensive, because showModalDialog assigns the
-// description to innerHTML.
+// Whatever renders the forwarded description must show it as text: it can carry the caller's
+// own input echoed back by the API. sendAjaxRequest in adminconsole's utils.js hands it to
+// showModalDialog as a plain message, which the dialog shows as text (#120).
 // 404 joins them, and is the AJAX half of what HandleAPIError answers with the 404 page: every
 // apiclient method funnels a non-2xx through parseAPIError, so "the row is gone" reaches this
 // function as an *apiclient.APIError and nothing else. It answers the console's own 404 sentence

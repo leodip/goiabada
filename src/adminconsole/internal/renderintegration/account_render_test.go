@@ -328,10 +328,12 @@ func TestRender_SessionPagesRenderAMissingInstantAsBlank(t *testing.T) {
 // A label is derived from Sec-CH-UA and Sec-CH-UA-Platform, whose values UA-CH requires a
 // server to accept arbitrarily (authserver/internal/useragent pins that premise), so any user
 // can put markup in their own session's label by completing a login with hand-written headers.
-// On these two pages the End Session button hands that label to endSessionClick, which builds a
-// message showModalDialog assigns to innerHTML. html/template escapes the label for the JavaScript
-// string literal in the onclick attribute and stops there, so the concatenation is where the
-// escaping has to happen, and only rendered HTML can see whether it does (#281).
+// On these two pages the End Session button hands that label to endSessionClick, which builds the
+// dialog's message. html/template escapes the label for the JavaScript string literal in the
+// onclick attribute and stops there (#281). The message keeps its accent span, so the label joins
+// it as a value of dialogMarkup, which escapes it once; escaping it before that would show its
+// entities as typed, and concatenating it into the message would show the span as tags. Only
+// rendered HTML can see which it is (#120).
 //
 // The third session page passes the user's email rather than the device label to its modal, so
 // it is asserted here as the negative: no device concatenation to escape.
@@ -342,6 +344,8 @@ func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
 	// a later edit would reintroduce; matching on it rather than on the fixed text is what makes
 	// the guard survive reformatting.
 	unescaped := regexp.MustCompile(`\+\s*device\s*\+`)
+	// The label as a value of dialogMarkup, after its parts.
+	builderValue := regexp.MustCompile(`\],\s*device\)`)
 
 	for _, tc := range []struct {
 		name       string
@@ -399,19 +403,21 @@ func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
 			assert.Contains(t, out, "&lt;script&gt;alert(1)&lt;/script&gt;",
 				"the label belongs in the Device cell, as text")
 
+			assert.NotContains(t, out, "escapeHtml(device)",
+				"dialogMarkup escapes the label, so escaping it first shows its entities as typed")
 			if !tc.modalTakes {
-				assert.NotContains(t, out, "escapeHtml(device)")
+				assert.NotRegexp(t, builderValue, out)
 				assert.NotRegexp(t, unescaped, out,
 					"this page's modal takes the email, so no device label reaches it")
 				return
 			}
 
-			// And the script that reads it back out of the attribute escapes it before the
-			// innerHTML sink. Dropping the call leaves every other assertion here passing.
-			assert.Contains(t, out, "escapeHtml(device)",
-				"the device label must be escaped before showModalDialog assigns it to innerHTML")
+			// And the script that reads it back out of the attribute hands it to the dialog only
+			// as a value of dialogMarkup, once for each arm of the current-session warning.
+			assert.Len(t, builderValue.FindAllString(out, -1), 2,
+				"the device label must reach the dialog as a value of dialogMarkup, which escapes it")
 			assert.NotRegexp(t, unescaped, out,
-				"the device label must not be concatenated into the modal message unescaped")
+				"the device label must not be concatenated into the modal message")
 		})
 	}
 }

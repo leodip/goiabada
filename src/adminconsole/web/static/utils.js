@@ -8,8 +8,8 @@ function t(key) {
 }
 
 // tFormat substitutes {{name}} placeholders in the catalog value with the
-// supplied params. Plain string-replace — does NOT HTML-escape values, so
-// don't pass untrusted data without escaping at the call site.
+// supplied params. Plain string-replace — does NOT HTML-escape values, so its
+// result is text: show it as text, or use dialogMarkupFormat for a dialog.
 function tFormat(key, params) {
   let s = t(key);
   if (params) {
@@ -20,9 +20,11 @@ function tFormat(key, params) {
   return s;
 }
 
-// escapeHtml renders a string as text in a place that expects markup. Callers pass
-// literal markup to showModalDialog on purpose, so the escaping belongs at the one call
-// site that forwards a server-supplied string rather than inside showModalDialog itself.
+// escapeHtml renders a string as text in a place that expects markup. dialogMarkup and
+// dialogMarkupFormat call it on every value they are given, because theirs is the one result
+// showModalDialog parses as HTML; a plain message is shown as text and is never escaped first,
+// or its entities would show as typed. Nothing else should need it: put data into the page as
+// text instead (#120).
 //
 // The ampersand has to be replaced first, or the entities produced by the later
 // replacements get their own ampersands escaped.
@@ -87,14 +89,15 @@ function dialogMarkupFormat(key, params) {
   return sealDialogMarkup(html);
 }
 
-// showModalDialog parses message as HTML only when dialogMarkup or dialogMarkupFormat built it.
+// showModalDialog parses message as HTML only when dialogMarkup or dialogMarkupFormat built it, and
+// shows any other message as text, so a value reaching it by any route is never parsed (#120).
 function showModalDialog(id, title, message, btn1callback, btn2callback) {
   document.getElementById(id + "_modalDialogTitle").innerText = title;
   const messageElement = document.getElementById(id + "_modalDialogMessage");
   if (dialogMarkups.has(message)) {
     messageElement.innerHTML = message.html;
   } else {
-    messageElement.innerHTML = message;
+    messageElement.textContent = message;
   }
 
   const btn1 = document.getElementById(id + "_btnModal1");
@@ -236,7 +239,7 @@ function sendAjaxRequest(props) {
               if (isSessionEnded(err)) {
                 setLoading(false);
                 showModalDialog(props.modalId, t("js.error.session_expired_title"),
-                  escapeHtml(err.error_description));
+                  err.error_description);
                 document.getElementById(props.modalId + "_modalDialog")
                   .addEventListener("close", goToSessionEnded, { once: true });
                 return;
@@ -250,14 +253,15 @@ function sendAjaxRequest(props) {
                 : t("js.error.error_title");
               // error_description can echo back what the user typed: handlers now
               // forward the API's 400 description verbatim so a validation failure is
-              // readable, and showModalDialog assigns this to innerHTML (#122).
-              showModalDialog(props.modalId, title, escapeHtml(err.error_description));
+              // readable (#122). It goes to the dialog as a plain message, which is shown
+              // as text, so it is not escaped first (#120).
+              showModalDialog(props.modalId, title, err.error_description);
               setLoading(false);
             } catch (err) {
               showModalDialog(
                 props.modalId,
                 t("js.error.error_title"),
-                tFormat("js.error.unexpected", { detail: response.status })
+                dialogMarkupFormat("js.error.unexpected", { detail: response.status })
               );
               setLoading(false);
             }
@@ -276,14 +280,14 @@ function sendAjaxRequest(props) {
         showModalDialog(
           props.modalId,
           t("js.error.error_title"),
-          tFormat("js.error.unexpected", { detail: err })
+          dialogMarkupFormat("js.error.unexpected", { detail: err })
         );
       });
   } catch (err) {
     showModalDialog(
       props.modalId,
       t("js.error.error_title"),
-      tFormat("js.error.unexpected", { detail: err })
+      dialogMarkupFormat("js.error.unexpected", { detail: err })
     );
     setLoading(false);
   }

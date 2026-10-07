@@ -31,12 +31,12 @@
                 if(result.EmailVerified) {
                     showModalDialog("modal0", "{{ T $.ctx "adminconsole.account.email_verification.modal_already_verified_title" }}", "{{ T $.ctx "adminconsole.account.email_verification.modal_already_verified_body" }}");
                 } else if(result.TooManyRequests) {
-                    showModalDialog("modal0", "{{ T $.ctx "adminconsole.account.email_verification.modal_too_many_title" }}", "{{ T $.ctx "adminconsole.account.email_verification.modal_too_many_body_prefix" }}" + result.WaitInSeconds + "{{ T $.ctx "adminconsole.account.email_verification.modal_too_many_body_suffix" }}");
+                    showModalDialog("modal0", "{{ T $.ctx "adminconsole.account.email_verification.modal_too_many_title" }}", dialogMarkup(["{{ T $.ctx "adminconsole.account.email_verification.modal_too_many_body_prefix" }}", "{{ T $.ctx "adminconsole.account.email_verification.modal_too_many_body_suffix" }}"], result.WaitInSeconds));
                 } else if(result.EmailVerificationSent) {
                     showModalDialog(
                         "modal0",
                         "{{ T $.ctx "adminconsole.account.email_verification.modal_sent_title" }}",
-                        "{{ T $.ctx "adminconsole.account.email_verification.modal_sent_body_prefix" }}" + result.EmailDestination + "{{ T $.ctx "adminconsole.account.email_verification.modal_sent_body_suffix" }}",
+                        dialogMarkup(["{{ T $.ctx "adminconsole.account.email_verification.modal_sent_body_prefix" }}", "{{ T $.ctx "adminconsole.account.email_verification.modal_sent_body_suffix" }}"], result.EmailDestination),
                         function() {
                             const verificationCode = document.getElementById("verificationCode");
                             setTimeout(function() {

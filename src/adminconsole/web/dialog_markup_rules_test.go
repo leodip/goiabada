@@ -47,6 +47,10 @@ func TestDialogMessages_TheRefusedShapes(t *testing.T) {
 		"template/plain_markup.html": dialogPage(`showModalDialog("m", "t", "{{ T $.ctx "has.markup" }}");`),
 		"template/split_markup.html": dialogPage(`showModalDialog("m", "t", "{{ T $.ctx "a" }}<span class='text-accent'>{{ T $.ctx "b.markup" }}</span>", function() {});`),
 		"static/plain_markup.js":     {Data: []byte("showModalDialog(id, title, t(\"js.markup\"));\n")},
+		// Catalog markup spliced around a value, or formatted, outside the builder.
+		"template/spliced.html":    dialogPage(`showModalDialog("m", "t", "{{ T $.ctx "a.markup" }}" + email + "{{ T $.ctx "b" }}");`),
+		"template/half_built.html": dialogPage(`showModalDialog("m", "t", cond ? dialogMarkup(["{{ T $.ctx "a" }}"]) : "{{ T $.ctx "b.markup" }}");`),
+		"static/format_markup.js":  {Data: []byte("showModalDialog(id, title, tFormat(\"js.markup\", { detail: err }));\n")},
 	}
 
 	found, n, err := findDialogFaults(fsys, fixtureMarkup)
@@ -54,6 +58,7 @@ func TestDialogMessages_TheRefusedShapes(t *testing.T) {
 	assert.Equal(t, len(fsys), n.files)
 	assert.Equal(t, []string{
 		"static/alias.js:1",
+		"static/format_markup.js:1",
 		"static/plain_markup.js:1",
 		"template/action.html:4",
 		"template/alias.html:4",
@@ -64,17 +69,19 @@ func TestDialogMessages_TheRefusedShapes(t *testing.T) {
 		"template/empty.html:4",
 		"template/format_act.html:4",
 		"template/format_key.html:4",
+		"template/half_built.html:4",
 		"template/kv_action.html:4",
 		"template/plain_markup.html:4",
+		"template/spliced.html:4",
 		"template/split_markup.html:4",
 		"template/variable.html:4",
 	}, renderDialogFaults(found))
 }
 
 // TestDialogMessages_TheAllowedShapes holds what the rule leaves alone: builder calls whose markup
-// is catalog literals, with values after them; a plain message whose catalog text is text; a
-// message carrying data, which is not a plain catalog message; the builders' own definitions; and
-// the names in a comment or a string.
+// is catalog literals, with values after them; a plain message whose catalog text is text, with or
+// without a value joining it; a message held in a variable; the builders' own definitions; and the
+// names in a comment or a string.
 func TestDialogMessages_TheAllowedShapes(t *testing.T) {
 	fsys := fstest.MapFS{
 		"template/allowed.html": dialogPage(strings.Join([]string{
@@ -85,7 +92,9 @@ func TestDialogMessages_TheAllowedShapes(t *testing.T) {
 			`    "</span>{{ T $.ctx "b" }}",`,
 			`], email));`,
 			`showModalDialog("m", "t", "{{ T $.ctx "plain" }}");`,
-			`showModalDialog("m", "t", "{{ T $.ctx "a.markup" }}" + email);`,
+			`showModalDialog("m", "t", "{{ T $.ctx "plain" }}" + email + t("js.plain"));`,
+			`showModalDialog("m", "t", result.Error);`,
+			`showModalDialog("m", "t", cond ? dialogMarkup(["{{ T $.ctx "a.markup" }}"], email) : msg);`,
 			`// dialogMarkup(parts) in a comment, and showModalDialog("m", "t", "{{ T $.ctx "has.markup" }}")`,
 			`const s = "dialogMarkup(parts)";`,
 		}, "\n")),
@@ -101,8 +110,8 @@ func TestDialogMessages_TheAllowedShapes(t *testing.T) {
 	found, n, err := findDialogFaults(fsys, fixtureMarkup)
 	require.NoError(t, err)
 	assert.Equal(t, 2, n.files)
-	assert.Equal(t, 7, n.dialogs)
-	assert.Equal(t, 4, n.builders)
+	assert.Equal(t, 9, n.dialogs)
+	assert.Equal(t, 5, n.builders)
 	assert.Empty(t, renderDialogFaults(found))
 }
 

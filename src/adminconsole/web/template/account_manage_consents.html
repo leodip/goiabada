@@ -16,7 +16,7 @@
 
     function revokeClick(elem, consentId, client, scope) {
 
-        showModalDialog("modal1", "{{ T $.ctx "adminconsole.account.consents.modal_confirm_title" }}", "{{ T $.ctx "adminconsole.account.consents.modal_confirm_body_prefix" }}" + client + "{{ T $.ctx "adminconsole.account.consents.modal_confirm_body_middle" }}" + scope + "{{ T $.ctx "adminconsole.account.consents.modal_confirm_body_suffix" }}",
+        showModalDialog("modal1", "{{ T $.ctx "adminconsole.account.consents.modal_confirm_title" }}", dialogMarkup(["{{ T $.ctx "adminconsole.account.consents.modal_confirm_body_prefix" }}", "{{ T $.ctx "adminconsole.account.consents.modal_confirm_body_middle" }}", "{{ T $.ctx "adminconsole.account.consents.modal_confirm_body_suffix" }}"], client, scope),
             null,
             function() {
                 // yes button

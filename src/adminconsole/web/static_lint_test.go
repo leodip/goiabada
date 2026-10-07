@@ -38,53 +38,71 @@ func jsLiteral(s string) string {
 	return s[1 : len(s)-1]
 }
 
-// TestUtilsJS_ErrorDescriptionIsEscaped pins the call site half of #122's fix: every read of the
-// server-supplied err.error_description in utils.js goes through escapeHtml before it reaches
-// showModalDialog, which assigns its message to innerHTML.
+// TestUtilsJS_ErrorDescriptionReachesTheDialogAsText pins what replaced #122's fix: every read of
+// the server-supplied err.error_description in utils.js is handed to showModalDialog whole, as its
+// message, and showModalDialog shows a message its builders did not build as text. The description
+// can echo back what the administrator typed, since handlers forward the API's 400 description
+// verbatim so a validation failure is readable.
 //
-// The reason this needs a lint is that nothing else in any tier can observe it. The Go handler test
-// for this path (adminclienthandlers) asserts the status and the JSON bytes the API proxy writes,
-// which is the correct seam for what it covers and stops one layer short of the browser. There is no
-// JavaScript test runner anywhere in this repository. So deleting the escapeHtml call leaves the
-// complete admin console tier green while the administrator's own raw input is parsed as markup in a
-// script sink. That mutation was run and it survived, which is what produced this file.
+// #122 escaped it at the call site, because the dialog parsed every message as HTML. Since #120 the
+// dialog parses only what dialogMarkup or dialogMarkupFormat built, so escaping the description
+// before it reaches the dialog would now show its entities as typed: "a < b" as "a &lt; b". Wrapping
+// it in either builder is refused too, since it carries no markup to keep. What keeps it from the
+// HTML parser is the dialog's plain branch, which core/guard.AssertNoHTMLSinks holds to writing no
+// innerHTML, and which this test reads as a textContent write besides.
 //
-// The claim is lexical and stops there: no occurrence of the string err.error_description appears
-// outside an escapeHtml( call. A future comment spelling err.error_description in prose would trip
-// this, which is a loud, safe direction to fail in; update the guard rather than the comment. A sink
-// that reaches the same value by another spelling, destructuring it or aliasing it first, is out of
-// this check's reach, and closing that would mean parsing the file with a JavaScript parser this
-// module does not depend on.
-func TestUtilsJS_ErrorDescriptionIsEscaped(t *testing.T) {
-	const (
-		sink    = "err.error_description"
-		wrapper = "escapeHtml("
-	)
-
+// Lexical, like its neighbours, because no JavaScript runs in any tier: each occurrence of
+// err.error_description outside a comment must be the whole third argument of a showModalDialog
+// call. A sink that reaches the same value by another spelling, destructuring it or aliasing it
+// first, is out of this check's reach.
+func TestUtilsJS_ErrorDescriptionReachesTheDialogAsText(t *testing.T) {
 	content := utilsJS(t)
+	toks := lexScript(content, 0, len(content), false)
 
-	found := 0
-	for i := 0; ; {
-		j := strings.Index(content[i:], sink)
-		if j < 0 {
-			break
-		}
-		at := i + j
-		found++
-		if !strings.HasSuffix(content[:at], wrapper) {
-			line := 1 + strings.Count(content[:at], "\n")
-			t.Errorf("static/utils.js:%d: %s is not wrapped in %s; showModalDialog assigns "+
-				"its message to innerHTML, so the server-supplied description must be escaped (#122)",
-				line, sink, wrapper)
-		}
-		i = at + len(sink)
+	isDescription := func(toks []scriptToken, i int) bool {
+		return i+2 < len(toks) && toks[i].is(tokIdent, "err") && toks[i+1].is(tokPunct, ".") &&
+			toks[i+2].is(tokIdent, "error_description")
 	}
 
-	// If the sink is renamed or the branch is restructured, every assertion above passes
-	// vacuously and this file would go on reporting success while guarding nothing.
+	whole := map[int]bool{}
+	for i, tok := range toks {
+		if !tok.is(tokIdent, "showModalDialog") || (i > 0 && toks[i-1].is(tokIdent, "function")) ||
+			i+1 >= len(toks) || !toks[i+1].is(tokPunct, "(") {
+			continue
+		}
+		if arg := callArgument(toks, i+2, 2); len(arg) == 3 && isDescription(arg, 0) {
+			whole[arg[0].at] = true
+		}
+	}
+
+	found := 0
+	for i := range toks {
+		if !isDescription(toks, i) {
+			continue
+		}
+		found++
+		if !whole[toks[i].at] {
+			line := 1 + strings.Count(content[:toks[i].at], "\n")
+			t.Errorf("static/utils.js:%d: err.error_description is not handed to showModalDialog "+
+				"whole, as its message; the dialog shows a plain message as text, so escaping it "+
+				"first shows its entities as typed, and it carries no markup for a builder to keep (#120)",
+				line)
+		}
+	}
 	if found == 0 {
-		t.Errorf("static/utils.js: no %s found; the AJAX error branch was renamed or removed, "+
-			"so this guard no longer covers anything. Update it to name the new sink", sink)
+		t.Errorf("static/utils.js: no err.error_description found; the AJAX error branch was renamed " +
+			"or removed, so this check no longer covers anything. Update it to name the new sink")
+	}
+
+	body := regexp.MustCompile(`(?s)\nfunction\s+showModalDialog\s*\([^)]*\)\s*\{(.*?)\n\}`).
+		FindStringSubmatch(content)
+	if body == nil {
+		t.Fatalf("static/utils.js: function showModalDialog not found, or its body is not a brace " +
+			"block ending at column zero; this check cannot read it (#120)")
+	}
+	if !strings.Contains(body[1], ".textContent = message;") {
+		t.Errorf("static/utils.js: showModalDialog no longer writes a plain message through " +
+			"textContent; a message its builders did not build is shown as text (#120)")
 	}
 }
 
@@ -116,11 +134,12 @@ func TestUtilsJS_EscapeHtmlEscapes(t *testing.T) {
 			"block ending at column zero; this guard cannot read it (#122)")
 	}
 
-	// The chain must start from String(str), or a description that is absent or not a string
-	// throws a TypeError on .split and the modal never opens at all.
+	// The chain must start from String(str), or a builder value that is not a string, the unexpected
+	// error dialog's status number or Error, throws a TypeError on .split and the modal never opens
+	// at all.
 	if !strings.Contains(body[1], "String(str)") {
-		t.Errorf("static/utils.js: escapeHtml no longer coerces with String(str); a missing or " +
-			"non-string error_description would throw on .split and suppress the whole dialog")
+		t.Errorf("static/utils.js: escapeHtml no longer coerces with String(str); a non-string " +
+			"builder value would throw on .split and suppress the whole dialog")
 	}
 
 	type link struct{ from, to string }
@@ -151,7 +170,7 @@ func TestUtilsJS_EscapeHtmlEscapes(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("static/utils.js: escapeHtml no longer replaces %q; that character reaches "+
-				"showModalDialog's innerHTML assignment unescaped (#122)", w.from)
+				"the dialog's markup branch unescaped through a builder value (#120)", w.from)
 		}
 	}
 

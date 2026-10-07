@@ -773,9 +773,9 @@ func TestLabels_RepeatedFieldLinesAreJoinedBeforeParsing(t *testing.T) {
 //
 // This row is the premise of that obligation, and it is pinned here so the two places that
 // discharge it cannot drift from it: the Device cell and its tooltip, escaped by html/template,
-// and the End Session modal message, escaped by escapeHtml at the concatenation because
-// showModalDialog assigns that message to innerHTML. Both are proved in the admin console's
-// renderintegration package, over the real templates (#281).
+// and the End Session modal message, which the label joins as a value of dialogMarkup, which
+// escapes it (#120). Both are proved in the admin console's renderintegration package, over the
+// real templates (#281).
 func TestLabels_HintsCarryArbitraryTextIncludingMarkup(t *testing.T) {
 	const markup = `<script>alert(1)</script>`
 
