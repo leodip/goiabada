@@ -3,15 +3,18 @@ title: Welcome
 description: An open-source OAuth2 and OpenID Connect server for simple, secure authentication.
 hero:
   title: Goiabada
-  tagline: An open-source OAuth2 and OpenID Connect server
+  tagline: Sign-in, single sign-on and permissions for your apps, on a server you run yourself.
   image:
     alt: Goiabada logo
     file: ../../assets/goiaba.png
   actions:
     - text: Get started
-      link: /get-started/setup-wizard/
+      link: /get-started/introduction/
       icon: right-arrow
       variant: primary
+    - text: Quickstart
+      link: /get-started/quickstart/
+      variant: secondary
     - text: View on GitHub
       link: https://github.com/leodip/goiabada
       icon: external
@@ -20,69 +23,52 @@ hero:
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-## What does Goiabada do?
+Goiabada signs your users in, so your apps don't have to. It's an OAuth2 and OpenID Connect server: your apps send users to it, and get back tokens that say who each user is and what they can do.
 
-If you're building applications and need to handle user logins, manage permissions, or enable users to sign in across multiple apps with one account, Goiabada takes care of this for you. Instead of building authentication from scratch, you can integrate Goiabada and focus on what makes your application unique.
-
-Goiabada handles:
-
-- **User authentication** - Secure login with passwords and two-factor authentication
-- **Authorization** - Control who can access what in your applications
-- **Single sign-on (SSO)** - Let users log in once and access multiple apps
-- **API security** - Protect server-to-server communications
-- **User self-service** - Give users control over their own profiles and security settings
-
-## Who is Goiabada for?
-
-- **Developers** building web or mobile apps who need authentication
-- **Teams** wanting to centralize user management across multiple applications
-- **Organizations** that need to self-host their identity provider for security or compliance
-- **Anyone** who wants an alternative to proprietary services like Auth0, Keycloak or cloud-only solutions
-
-## Key features
+## What you get
 
 <CardGrid stagger>
-  <Card title="OAuth2 & OpenID Connect" icon="approve-check">
-    Industry-standard protocols. Compatibility with your existing tools.
+  <Card title="OAuth2 and OpenID Connect" icon="approve-check">
+    The standards your languages and frameworks already have libraries for.
   </Card>
-  <Card title="Single sign-on (SSO)" icon="rocket">
-    One login for all your connected applications. Users authenticate once and access multiple apps seamlessly.
+  <Card title="Single sign-on" icon="rocket">
+    Users sign in once and use all your apps.
   </Card>
-  <Card title="Two-factor & step-up auth" icon="approve-check-circle">
-    Extra security with one-time passwords (OTP). Step-up authentication for sensitive operations.
+  <Card title="Two-factor authentication" icon="approve-check-circle">
+    Codes from an authenticator app, required for the apps that need them.
   </Card>
-  <Card title="Fine-grained permissions" icon="setting">
-    Define exactly who can access what in your applications.
+  <Card title="Permissions" icon="setting">
+    Decide who can do what in your APIs, by user, group or client.
   </Card>
-  <Card title="Self-service account management" icon="pencil">
-    Users can update their own profiles, change passwords, and manage their security settings.
-  </Card>  
+  <Card title="Self-service accounts" icon="pencil">
+    Users manage their own profile, password and two-factor authentication.
+  </Card>
   <Card title="Dynamic client registration" icon="add-document">
-    Apps can self-register via RFC 7591. Useful for MCP servers and native applications.
+    Apps such as MCP servers register themselves, when you turn it on.
   </Card>
-  <Card title="Multiple database support" icon="laptop">
-    Choose your database: MySQL, PostgreSQL, Microsoft SQL Server, or SQLite.
+  <Card title="Your choice of database" icon="laptop">
+    MySQL, PostgreSQL, SQL Server or SQLite.
   </Card>
-  <Card title="Built with Go" icon="seti:go">
-    Fast, lightweight, and resource-efficient. Low resource usage means lower hosting costs.
-  </Card>
-  <Card title="Multi-architecture Docker images" icon="linux">
-    Run on Intel/AMD (x86_64) or ARM64 (Raspberry Pi, Apple Silicon, AWS Graviton).
+  <Card title="Light to run" icon="seti:go">
+    Two small Go servers, as Docker images for x86_64 and ARM64, or as native binaries.
   </Card>
 </CardGrid>
 
-## Why choose Goiabada?
+## Why Goiabada
 
-- **Self-hosted & private** - Keep full control of your user data and infrastructure. Your data never leaves your servers.
-- **Free & MIT licensed** - 100% free to use with no licensing fees, subscriptions, or vendor lock-in. Truly open source.
-- **Lightweight** - Low resource usage means lower hosting costs
-- **Standards-compliant** - Built on OAuth2 and OpenID Connect for maximum compatibility
-- **Developer-friendly** - Quick to set up, easy to integrate
+- **Your data stays with you.** You host it, so your users' data lives on your servers.
+- **Free and open source.** MIT licensed, with no fees or subscriptions.
+- **Standard.** Anything that speaks OAuth2 or OpenID Connect works with it.
 
-## Screenshots
+## Have a look
 
-![Goiabada login screen](../../assets/screenshot1.png)
+![The admin console's account pages, where a user updates their phone number](../../assets/screenshot2.png)
 
-![Goiabada admin console](../../assets/screenshot2.png)
+![The admin console's list of users](../../assets/screenshot3.png)
 
-![Goiabada user management](../../assets/screenshot3.png)
+## Start here
+
+<CardGrid>
+  <LinkCard title="Introduction" description="What Goiabada is and how its parts fit together." href="/get-started/introduction/" />
+  <LinkCard title="Quickstart" description="Run it on your machine in a few minutes." href="/get-started/quickstart/" />
+</CardGrid>

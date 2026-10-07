@@ -20,6 +20,12 @@ import { gfmTaskListItemToMarkdown } from 'mdast-util-gfm-task-list-item';
 import { toMarkdown } from 'mdast-util-to-markdown';
 import { toString } from 'mdast-util-to-string';
 
+// The two files' names, at the site's root. A page may link to them, and
+// astro.config.mjs keeps those two links from the link check, which runs before
+// they are written.
+export const indexFile = 'llms.txt';
+export const fullFile = 'llms-full.txt';
+
 // GitHub's tables, strikethrough and task lists, which the converter emits, but
 // not its autolink literals: those escape the colon of every URL in prose.
 const markdownOptions = {
@@ -143,12 +149,12 @@ function sections(pages, site) {
 // returns how many pages they hold. title and summary head llms.txt.
 export function writeLlmsFiles({ distDir, site, title, summary }) {
 	const ordered = sections(readPages(distDir, site), site);
-	const fullUrl = new URL('/llms-full.txt', site).href;
+	const fullUrl = new URL(`/${fullFile}`, site).href;
 
 	const index = [
 		{ type: 'heading', depth: 1, children: [text(title)] },
 		{ type: 'blockquote', children: [paragraph([text(summary)])] },
-		paragraph([text('Every page below, in full and as Markdown, is in one file: '), link(fullUrl, 'llms-full.txt')]),
+		paragraph([text('Every page below, in full and as Markdown, is in one file: '), link(fullUrl, fullFile)]),
 	];
 	for (const section of ordered) {
 		index.push({ type: 'heading', depth: 2, children: [text(section.label)] });
@@ -164,7 +170,7 @@ export function writeLlmsFiles({ distDir, site, title, summary }) {
 			})),
 		});
 	}
-	writeFileSync(join(distDir, 'llms.txt'), toMarkdown({ type: 'root', children: index }, markdownOptions));
+	writeFileSync(join(distDir, indexFile), toMarkdown({ type: 'root', children: index }, markdownOptions));
 
 	const entries = ordered.flatMap((section) => section.pages).map((page) => {
 		const body = toMdast({ type: 'root', children: transform(page.content.children, page.url) });
@@ -175,7 +181,7 @@ export function writeLlmsFiles({ distDir, site, title, summary }) {
 		];
 		return toMarkdown({ type: 'root', children: entry }, markdownOptions);
 	});
-	writeFileSync(join(distDir, 'llms-full.txt'), entries.join('\n'));
+	writeFileSync(join(distDir, fullFile), entries.join('\n'));
 
 	return entries.length;
 }
@@ -381,12 +387,12 @@ export function findLlmsProblems({ distDir, site }) {
 		}
 	};
 
-	check('llms.txt', indexEntries(readText(join(distDir, 'llms.txt'))), (entry, page) => {
+	check(indexFile, indexEntries(readText(join(distDir, indexFile))), (entry, page) => {
 		if (page.description && entry.description !== page.description) {
 			findings.push(`llms.txt: the entry ${page.url} lacks the description its page renders: "${page.description}"`);
 		}
 	});
-	check('llms-full.txt', fullEntries(readText(join(distDir, 'llms-full.txt'))), (entry, page) => {
+	check(fullFile, fullEntries(readText(join(distDir, fullFile))), (entry, page) => {
 		const entryText = squash(entry.text);
 		for (const piece of renderedText(page.content)) {
 			if (!entryText.includes(piece.key)) {

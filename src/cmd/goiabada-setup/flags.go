@@ -108,6 +108,15 @@ func (p *trafficPolicy) Set(value string) error {
 // exit to main: the flag package's own ExitOnError would have been a second exit (#430).
 func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 	flags := &CLIFlags{}
+	if err := newFlagSet(flags, stderr).Parse(args); err != nil {
+		return nil, err
+	}
+	return flags, nil
+}
+
+// newFlagSet declares every flag the wizard reads, each writing into flags, with the usage text -h
+// prints. The setup wizard's docs page lists the same flags, and a test holds the two together.
+func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
@@ -224,11 +233,7 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 		p("      --db-host=localhost --db-password-file=/run/secrets/db-password\n\n")
 		p("For more information, visit: https://goiabada.dev\n")
 	}
-
-	if err := fs.Parse(args); err != nil {
-		return nil, err
-	}
-	return flags, nil
+	return fs
 }
 
 // checkWritable refuses, by its name, a flag whose value no generated file could carry, before a

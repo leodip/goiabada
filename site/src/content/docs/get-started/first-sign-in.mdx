@@ -1,34 +1,73 @@
 ---
-title: First login
-description: What to do after starting Goiabada for the first time.
+title: First sign-in
+description: Sign in to the admin console for the first time, and the three things worth doing right after.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-After starting Goiabada, here's what to do next.
+This page walks you through your first sign-in to the admin console, and the three settings worth checking straight after.
 
-## Log in to the admin console
+<Steps>
 
-Open the admin console URL in your browser:
+1. Find the first administrator's email and password. The wizard's last message names the email, and the password is here:
 
-- **Local testing**: http://localhost:9091
-- **Production**: https://admin.yourdomain.com
+   | Deployment | Where the password is |
+   |---|---|
+   | Docker Compose | `GOIABADA_ADMIN_PASSWORD` in `docker-compose.override.yml` |
+   | Native binaries | `GOIABADA_ADMIN_PASSWORD` in `goiabada.env` |
+   | Kubernetes | In the cluster. The wizard's last message prints the command that reads it, like this one for the namespace `goiabada`. |
 
-Log in with the admin email and password. For a deployment made with the [setup wizard](/get-started/setup-wizard/), its completion message says where the password is: `GOIABADA_ADMIN_PASSWORD` in `docker-compose.override.yml` or `goiabada.env`, or, for Kubernetes, a `kubectl get secret` command that reads it back out of the cluster. Otherwise they are the `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD` values you configured.
+   ```bash
+   kubectl get secret goiabada-secrets -n goiabada -o jsonpath='{.data.admin-password}' | base64 -d
+   ```
+
+   Didn't use the wizard? They're the `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD` you set.
+
+2. Open the admin console: `http://localhost:9091` after the [Quickstart](/get-started/quickstart/), or the admin console URL you gave the wizard.
+
+3. Click **Admin**. The admin console sends you to the auth server's sign-in page.
+
+4. Enter the email and password, and click **Sign in**. You're back in the admin console, on the list of clients.
+
+</Steps>
+
+## Right after you sign in
+
+### Turn on two-factor authentication
+
+Your account can manage everything, so give it a second factor. Under **Account**, open **2-factor auth (OTP)**, scan the QR code with an authenticator app, and enter your password and the app's code.
+
+From then on, signing in to the admin console asks for a code from that app as well as your password.
+
+### Decide who can register
+
+New installs let anyone who reaches the sign-in page register an account. New accounts can manage only their own profile, not Goiabada itself.
+
+If only you should create users, turn off **User self registration enabled** under **Admin**, **General**.
+
+### Set up email
+
+Goiabada sends email to verify addresses and to reset passwords. Add your SMTP server under **Admin**, **Email - SMTP**, and send yourself a test message from there.
+
+## How it works
+
+The admin console is a client of the auth server, like the apps you'll connect later. Clicking **Admin** starts a standard OpenID Connect sign-in: the browser goes to the auth server, you sign in there, and the auth server sends you back to the admin console with an authorization code.
+
+To open the **Admin** pages, a user needs the `authserver:manage` permission. The first administrator has it, along with `authserver:manage-account`, which opens a user's own **Account** pages and which every new user gets. A user without `authserver:manage` who clicks **Admin** sees an "Unauthorized (403)" page.
+
+The admin console's client asks for a second factor only from users who have one set up. That's why your first sign-in needs only a password, and why signing in needs a code too once you turn on two-factor authentication.
+
+The auth server reads `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD` only on its first start, when it creates the first administrator in an empty database. Changing them later does nothing, so change your password under **Account**, **Change password**.
 
 <Aside type="caution">
-`GOIABADA_ADMIN_PASSWORD` has no default, and the first start refuses `changeme` or a password shorter than 15 characters. Earlier sample Compose files and guides set it to `changeme`, a password this project published: if your deployment was started from one of those, anyone who reaches its sign-in page can try it, so change the administrator's password in the admin console now.
+The first start refuses an admin password shorter than 15 characters, longer than 72 bytes, or set to `changeme`. If your administrator's password is `changeme` anyway, anyone who reaches the sign-in page can try it: change it **now**.
 </Aside>
 
-## OpenID Connect discovery
+The admin console's home page also links to the auth server's discovery document, at `/.well-known/openid-configuration` on the auth server, such as `http://localhost:9090/.well-known/openid-configuration`. It lists the auth server's endpoints, scopes and claims, and every OpenID Connect library can configure itself from it.
 
-Goiabada exposes a standard OpenID Connect discovery endpoint at:
+## Next steps
 
-```
-{auth-server-url}/.well-known/openid-configuration
-```
-
-For example: http://localhost:9090/.well-known/openid-configuration
-
-This endpoint provides all the information OAuth/OIDC clients need to integrate with Goiabada.
-
+<CardGrid>
+  <LinkCard title="Clients" description="Register your app with Goiabada." href="/concepts/clients/" />
+  <LinkCard title="Users and groups" description="Create users and organize them." href="/concepts/users-and-groups/" />
+</CardGrid>
