@@ -15,9 +15,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/uuid"
+	"github.com/leodip/goiabada/core/adminpassword"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/leodip/goiabada/core/securerandom"
 )
 
@@ -422,7 +422,7 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 // validator has seen, so without this a password bcrypt cannot hash surfaced as a hashing failure,
 // and before #409 not at all, and any weak one, changeme included, seeded (#500).
 func checkAdminPassword(password string) error {
-	if err := inputvalidation.CheckAdminPassword(password); err != nil {
+	if err := adminpassword.Check(password); err != nil {
 		return errs.Wrap(err, "GOIABADA_ADMIN_PASSWORD cannot be the first administrator's password")
 	}
 	return nil

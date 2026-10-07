@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/leodip/goiabada/core/adminpassword"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/inputvalidation"
 	"golang.org/x/term"
 )
 
@@ -279,7 +279,7 @@ func (a asker) adminPassword(prompt, generated string) (string, error) {
 		if value == generated {
 			return value, nil
 		}
-		if refused := inputvalidation.CheckAdminPassword(value); refused != nil {
+		if refused := adminpassword.Check(value); refused != nil {
 			a.out.printf("Invalid admin password: %s. Please try again.\n", refused)
 			continue
 		}
