@@ -64,9 +64,6 @@ var (
 	docAuditEvent = regexp.MustCompile("`([a-z][a-z0-9]*(?:_[a-z0-9]+)+)`")
 	// docErrorCode is a backticked UPPER_SNAKE identifier, the spelling of every API error code.
 	docErrorCode = regexp.MustCompile("`([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)`")
-	// docErrorCodeItem is an error code leading a list item, the shape of the errors page's list of
-	// codes, which also names the UPPER_SNAKE convention itself in backticks.
-	docErrorCodeItem = regexp.MustCompile("(?m)^- `([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)`")
 	// docScopeRequest is a token request's scope parameter on the authserver resource, as a curl
 	// example spells it.
 	docScopeRequest = regexp.MustCompile(`scope=(` + builtin.AuthServerResourceIdentifier + `:[a-z][a-z0-9-]*)`)
@@ -108,8 +105,9 @@ func TestAdministrativeDocs_TheBuiltInPermissionTableIsTheSeedAndThePolicy(t *te
 
 // Every audit event, error code and authserver scope the administrative model's sections name is
 // live, and each section names those the model rests on: the three events an operator alerts on,
-// the two codes the policy and the guard answer beside the route gate's, and every scope the
-// granular-scope section describes (#402 decision 15). The one operation that answers a client
+// the two codes the policy and the guard answer, and every scope the granular-scope section
+// describes (#402 decision 15). The errors page's catalog, which lists every code, the route gate's
+// INSUFFICIENT_SCOPE among them, is held whole by error_codes_docs_test.go. The one operation that answers a client
 // secret names its audit event in its own description in openapi.yaml, which the API reference
 // renders (#519 decision 7).
 func TestAdministrativeDocs_NameWhatTheModelRestsOn(t *testing.T) {
@@ -131,11 +129,6 @@ func TestAdministrativeDocs_NameWhatTheModelRestsOn(t *testing.T) {
 			section: docSection{auditLogPage, "## Events to alert on"},
 			pattern: docAuditEvent, kind: "audit event", live: events,
 			want: []string{"administrator_change_refused", "administrative_permission_changed", "viewed_client_secret"},
-		},
-		{
-			section: docSection{apiErrorsPage, "### Error codes"},
-			pattern: docErrorCodeItem, kind: "error code", live: codes,
-			want: []string{"INSUFFICIENT_SCOPE", "MANAGE_SCOPE_REQUIRED", "LAST_ADMINISTRATOR"},
 		},
 		{
 			section: docSection{apiAdministratorsPage, "## How it works"},
