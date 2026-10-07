@@ -30,7 +30,7 @@ Every authorization request passes through these stages:
 ```
 
 <Aside>
-This page focuses on the authorization code flow (`response_type=code`), which is the recommended flow. The [implicit flow](/oauth2-flows/implicit/) is supported for legacy clients. When used, tokens are delivered directly in the URI fragment instead of an authorization code.
+This page focuses on the authorization code flow (`response_type=code`), which is the recommended flow. The [implicit flow](/legacy-flows/implicit/) is supported for legacy clients. When used, tokens are delivered directly in the URI fragment instead of an authorization code.
 </Aside>
 
 ## Stage 1: Request validation
@@ -80,7 +80,7 @@ This is [RFC 9700](https://www.rfc-editor.org/rfc/rfc9700.html) section 4.11.2, 
 Key details:
 - **Scopes**: `openid`, `profile`, `email`, `address`, `phone`, `groups`, `attributes`, and `offline_access` are always allowed. Custom scopes must be in `resource:permission` format. Scope *validation* (does it exist?) happens here; scope *authorization* (is this user allowed?) happens later in [post-authentication checks](#stage-4-post-authentication-checks).
 - **PKCE**: Required by default (`S256` only). Can be made optional globally in Settings or per client. When optional, PKCE parameters are still validated if provided. See [PKCE](/concepts/pkce/) for details.
-- **Prompt**: `none`, `login`, and `consent` are supported. `none` cannot be combined with other values. Validation happens *before* prompt-specific logic, so `prompt=none login` returns `invalid_request`, not `login_required`. See [Prompt parameter](/concepts/prompt-parameter/) for details.
+- **Prompt**: `none`, `login`, and `consent` are supported. `none` cannot be combined with other values. Validation happens *before* prompt-specific logic, so `prompt=none login` returns `invalid_request`, not `login_required`. See [Prompt parameter](/concepts/prompt/) for details.
 
 ## Stage 2: Routing
 
@@ -105,7 +105,7 @@ Goiabada attempts to fulfill the request without any user interaction. It runs t
 
 If all checks pass, the response is issued silently (an authorization code for code flow, or tokens directly for implicit flow) and the user is redirected to the client. The session's `last_accessed` timestamp is updated to prevent idle timeout.
 
-If any check fails, the error is redirected to the client and no UI is shown. Two things stop that: a client that [registered itself](/concepts/clients/#dynamic-client-registration-rfc-7591) never receives an error redirect, and neither does one whose `redirect_uri` is no longer registered on it. The redirect is withheld, so the silent request gets no error back and simply never returns. See [Prompt parameter](/concepts/prompt-parameter/) for what a client should do about that.
+If any check fails, the error is redirected to the client and no UI is shown. Two things stop that: a client that [registered itself](/concepts/clients/#dynamic-client-registration-rfc-7591) never receives an error redirect, and neither does one whose `redirect_uri` is no longer registered on it. The redirect is withheld, so the silent request gets no error back and simply never returns. See [Prompt parameter](/concepts/prompt/) for what a client should do about that.
 
 ### Branch B: prompt=login (force re-authentication)
 
@@ -113,7 +113,7 @@ Goiabada never uses an existing session to skip authentication here, so the user
 
 After authentication, the flow continues normally through post-authentication checks (including consent, if `prompt=login consent` was requested).
 
-If the same user signs in, the session that was already in the browser is reused, as long as it is still valid; one that has idled out, reached its maximum lifetime, or fallen outside a requested `max_age` is simply replaced, with nothing revoked. If a **different** user signs in, that session is ended and replaced: it is deleted, and the refresh tokens and unredeemed authorization codes that came from it are revoked. See [Prompt parameter](/concepts/prompt-parameter/).
+If the same user signs in, the session that was already in the browser is reused, as long as it is still valid; one that has idled out, reached its maximum lifetime, or fallen outside a requested `max_age` is simply replaced, with nothing revoked. If a **different** user signs in, that session is ended and replaced: it is deleted, and the refresh tokens and unredeemed authorization codes that came from it are revoked. See [Prompt parameter](/concepts/prompt/).
 
 <Aside>
 When the same user re-authenticates and their session is still valid, it is not invalidated. Other clients using it continue to work, and only this authorization request requires fresh credentials. A session that is no longer valid for this request is replaced by a new one instead, so that assurance does not apply to it.
@@ -149,7 +149,7 @@ Goiabada determines the **target ACR level** and compares it against the session
 | OTP configuration changed since login and target requires level 2 | Redirect to level 2 |
 | Target ACR is `level1`, or session ACR is already sufficient | Skip to post-authentication checks |
 
-See [ACR and AMR](/concepts/acr-amr/) for details on ACR levels and step-up authentication.
+See [ACR and AMR](/concepts/acr-and-amr/) for details on ACR levels and step-up authentication.
 
 ### Level 2: OTP
 
@@ -251,7 +251,7 @@ All three are time-based session checks, but they measure different things:
 | Max lifetime | `started` (never resets) | Global setting: max lifetime in seconds |
 | `max_age` | `auth_time` (resets on each sign-in) | Per-request parameter |
 
-A session is valid only if **all three** pass. The `max_age` parameter bounds the time since the user last signed in, not the session's age. See [User sessions](/concepts/user-sessions/) for details.
+A session is valid only if **all three** pass. The `max_age` parameter bounds the time since the user last signed in, not the session's age. See [User sessions](/concepts/sessions/) for details.
 
 ### acr_values vs client default ACR
 

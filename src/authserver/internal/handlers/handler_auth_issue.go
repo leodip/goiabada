@@ -832,7 +832,7 @@ func refuseIssuanceUnusableSession(
 
 	// prompt=none is the one ceremony that cannot be restarted: /auth/level1 sends the browser to
 	// /auth/pwd, which renders a form, and this request forbids any UI at all (OIDC Core 3.1.2.1,
-	// and concepts/prompt-parameter.mdx says the same). Nothing between here and the form reads
+	// and concepts/prompt.mdx says the same). Nothing between here and the form reads
 	// the prompt, so the client would be handed a login page and no error, and a silent-renewal
 	// iframe would wait for its own timeout instead. It gets login_required instead (#129 decision
 	// 16), which is what handlePromptNone itself returns when its session lookup finds no row: the

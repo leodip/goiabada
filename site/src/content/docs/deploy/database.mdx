@@ -58,7 +58,7 @@ To refuse an absent file instead of creating one, put `mode=rw` in `GOIABADA_DB_
 
 The auth server runs as uid 10001, so the directory holding the file must be writable by it. In
 Docker, mount the volume at `/data`, which the image creates owned by that user; a volume written by
-the root images of earlier releases needs a [one-time `chown`](/production-deployment/#upgrading-a-compose-deployment-that-uses-sqlite).
+the root images of earlier releases needs a [one-time `chown`](/deploy/docker-compose/#upgrading-a-compose-deployment-that-uses-sqlite).
 
 ## Schema migrations and rollback
 

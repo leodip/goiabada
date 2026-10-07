@@ -25,9 +25,9 @@ const adminConsoleImage = "leodip/goiabada:adminconsole-"
 // sections of each that do. Each section runs from its heading to the next heading of the same
 // level.
 const (
-	kubernetesPage = "site/src/content/docs/production-deployment/kubernetes.mdx"
-	composePage    = "site/src/content/docs/production-deployment/index.mdx"
-	nativePage     = "site/src/content/docs/production-deployment/native-binaries.mdx"
+	kubernetesPage = "site/src/content/docs/deploy/kubernetes.mdx"
+	composePage    = "site/src/content/docs/deploy/docker-compose.mdx"
+	nativePage     = "site/src/content/docs/deploy/native-binaries.mdx"
 )
 
 type docSection struct{ page, heading string }

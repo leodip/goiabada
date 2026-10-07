@@ -11,12 +11,12 @@ import (
 // The sections that tell an operator how to turn the metrics listener on and what to read beside
 // it. The auth server's tier reads the same sections.
 var monitoringDocs = []docSection{
-	{"site/src/content/docs/production-deployment/monitoring.mdx", "## Turning the endpoint on"},
-	{"site/src/content/docs/production-deployment/monitoring.mdx", "## Scraping the endpoint"},
-	{"site/src/content/docs/production-deployment/monitoring.mdx", "## Metrics catalog"},
-	{"site/src/content/docs/production-deployment/monitoring.mdx", "## Suggested alerts"},
-	{"site/src/content/docs/production-deployment/monitoring.mdx", "## What to watch in the logs"},
-	{"site/src/content/docs/production-deployment/kubernetes.mdx", "## Metrics"},
+	{"site/src/content/docs/deploy/monitoring.mdx", "## Turning the endpoint on"},
+	{"site/src/content/docs/deploy/monitoring.mdx", "## Scraping the endpoint"},
+	{"site/src/content/docs/deploy/monitoring.mdx", "## Metrics catalog"},
+	{"site/src/content/docs/deploy/monitoring.mdx", "## Suggested alerts"},
+	{"site/src/content/docs/deploy/monitoring.mdx", "## What to watch in the logs"},
+	{"site/src/content/docs/deploy/kubernetes.mdx", "## Metrics"},
 }
 
 // The monitoring docs name only admin console variables this console reads. A misspelt switch is

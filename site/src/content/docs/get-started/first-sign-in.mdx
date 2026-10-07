@@ -14,7 +14,7 @@ Open the admin console URL in your browser:
 - **Local testing**: http://localhost:9091
 - **Production**: https://admin.yourdomain.com
 
-Log in with the admin email and password. For a deployment made with the [setup wizard](/getting-started/setup-wizard/), its completion message says where the password is: `GOIABADA_ADMIN_PASSWORD` in `docker-compose.override.yml` or `goiabada.env`, or, for Kubernetes, a `kubectl get secret` command that reads it back out of the cluster. Otherwise they are the `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD` values you configured.
+Log in with the admin email and password. For a deployment made with the [setup wizard](/get-started/setup-wizard/), its completion message says where the password is: `GOIABADA_ADMIN_PASSWORD` in `docker-compose.override.yml` or `goiabada.env`, or, for Kubernetes, a `kubectl get secret` command that reads it back out of the cluster. Otherwise they are the `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD` values you configured.
 
 <Aside type="caution">
 `GOIABADA_ADMIN_PASSWORD` has no default, and the first start refuses `changeme` or a password shorter than 15 characters. Earlier sample Compose files and guides set it to `changeme`, a password this project published: if your deployment was started from one of those, anyone who reaches its sign-in page can try it, so change the administrator's password in the admin console now.

@@ -76,9 +76,13 @@ expect "GET ${page%/}?q=1 status" "$status" 301
 expect "GET ${page%/}?q=1 Location" "$location" "$page?q=1"
 
 # /_astro/ is a directory every Astro build writes and no page: neither it nor its
-# path without the slash is a page.
+# path without the slash is a page. The /production-deployment/ links are pages
+# released binaries print, which moved when the docs were reorganized and are not
+# redirected.
 for path in /no/such/page/ /no/such/page /getting-started/no-such-page/ /404 /404/ /404.html /index \
-	/_astro/ /_astro /_astro/no-such-file.js; do
+	/_astro/ /_astro /_astro/no-such-file.js \
+	/production-deployment/monitoring/ /production-deployment/cloudflare-nginx/ \
+	/production-deployment/reverse-proxy/; do
 	request "$path"
 	expect "GET $path status" "$status" 404
 	expect "GET $path Content-Type" "$content_type" "text/html; charset=utf-8"

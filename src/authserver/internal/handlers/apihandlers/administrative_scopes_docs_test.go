@@ -35,7 +35,7 @@ import (
 // The pages, relative to the repository root, beside administrative_docs_test.go's.
 const (
 	clientsPage   = "site/src/content/docs/concepts/clients.mdx"
-	endpointsPage = "site/src/content/docs/integration/endpoints.mdx"
+	endpointsPage = "site/src/content/docs/reference/endpoints.mdx"
 )
 
 // The sections the allowance is described in.

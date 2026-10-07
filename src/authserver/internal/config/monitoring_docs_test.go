@@ -8,7 +8,7 @@ import (
 	"github.com/leodip/goiabada/core/guard"
 )
 
-const monitoringPage = "site/src/content/docs/production-deployment/monitoring.mdx"
+const monitoringPage = "site/src/content/docs/deploy/monitoring.mdx"
 
 // The sections that tell an operator how to turn the metrics listener on and what to read beside
 // it. The admin console's tier reads the same sections.

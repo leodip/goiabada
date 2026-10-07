@@ -53,7 +53,7 @@ so it must hold every file of that set, not only the ones you change.
 3. **Make the files readable by the containers**
 
    Both images run as uid 10001 and gid 10001 (see [the user the images run
-   as](/production-deployment/#the-user-the-images-run-as)), so every file must be readable by that
+   as](/deploy/docker-compose/#the-user-the-images-run-as)), so every file must be readable by that
    user and every directory searchable by it. Files copied under a restrictive umask are not, and a
    page whose template the server cannot read fails with a 500:
 

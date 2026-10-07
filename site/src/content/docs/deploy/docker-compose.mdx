@@ -13,27 +13,27 @@ Before deploying Goiabada to production, choose your deployment method based on 
   <LinkCard
     title="Cloudflare Tunnel"
     description="Simplest setup. No SSL certificates, no open ports, no Nginx."
-    href="/production-deployment/cloudflare-tunnel/"
+    href="/deploy/cloudflare-tunnel/"
   />
   <LinkCard
     title="Cloudflare + Nginx"
     description="For servers already running Nginx with other sites."
-    href="/production-deployment/cloudflare-nginx/"
+    href="/deploy/cloudflare-nginx/"
   />
   <LinkCard
     title="Reverse proxy (no Cloudflare)"
     description="Standard Nginx/Traefik setup with Let's Encrypt SSL."
-    href="/production-deployment/reverse-proxy/"
+    href="/deploy/reverse-proxy/"
   />
   <LinkCard
     title="Kubernetes"
     description="Deploy to a Kubernetes cluster with Gateway API."
-    href="/production-deployment/kubernetes/"
+    href="/deploy/kubernetes/"
   />
   <LinkCard
     title="Native binaries"
     description="Run without Docker using pre-built binaries."
-    href="/production-deployment/native-binaries/"
+    href="/deploy/native-binaries/"
   />
 </CardGrid>
 
@@ -49,7 +49,7 @@ Before deploying Goiabada to production, choose your deployment method based on 
 
 ## Using the setup wizard
 
-The [setup wizard](/getting-started/setup-wizard/) can generate production-ready configurations:
+The [setup wizard](/get-started/setup-wizard/) can generate production-ready configurations:
 
 ```bash
 ./goiabada-setup-linux-amd64
@@ -68,13 +68,13 @@ The wizard will ask for your domain names, generate all credentials (session key
 You still need to set up SSL termination using one of the methods above (except for Kubernetes, where the wizard configures cert-manager).
 
 <Aside type="tip">
-Before going live, review the [production checklist](/production-deployment/production-checklist/) for security and configuration requirements.
+Before going live, review the [production checklist](/deploy/production-checklist/) for security and configuration requirements.
 </Aside>
 
 ## Secrets
 
-This section is about the Docker Compose output. The [Kubernetes](/production-deployment/kubernetes/#secrets)
-and [native binaries](/production-deployment/native-binaries/#secrets) pages have their own.
+This section is about the Docker Compose output. The [Kubernetes](/deploy/kubernetes/#secrets)
+and [native binaries](/deploy/native-binaries/#secrets) pages have their own.
 
 The wizard writes every secret into `docker-compose.override.yml`, under the service that reads it,
 and none into `docker-compose.yml`, which can therefore be committed. The override is plain text, and
@@ -239,7 +239,7 @@ the token the admin console holds for its sessions expires, within 5 minutes unl
 access token lifetime, every page behind the sign-in answers 500. Administrators signed in before
 step 3 stay signed in through the restart, and the auth server and every other client work
 throughout. If the admin console can no longer sign you in, set a secret you know through the admin
-API, as [the Kubernetes page shows](/production-deployment/kubernetes/#the-admin-consoles-client-secret)
+API, as [the Kubernetes page shows](/deploy/kubernetes/#the-admin-consoles-client-secret)
 with the override in place of the Secret.
 
 `GOIABADA_ADMIN_PASSWORD` is read only by the first start, which creates the administrator: change the
@@ -273,7 +273,7 @@ The image names them by number, so a platform that refuses a root container, suc
 
 A file you mount into a container must be readable by uid 10001 or gid 10001: the certificate and
 key named by `GOIABADA_AUTHSERVER_CERTFILE` and `GOIABADA_AUTHSERVER_KEYFILE` (and the admin
-console's pair), and the templates and static files of a [customization](/reference/customizations/).
+console's pair), and the templates and static files of a [customization](/guides/customizations/).
 A key file left at mode `0600` and owned by root cannot be read; give it to the user, or to the group
 with mode `0640`:
 

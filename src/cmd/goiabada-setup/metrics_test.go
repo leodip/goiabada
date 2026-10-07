@@ -718,7 +718,7 @@ func TestSummary_ReportsTheMetricsAnswer(t *testing.T) {
 // selected only by a matching Prometheus; and with the NetworkPolicies on, the namespace they admit.
 // The other deployments' completion messages say nothing of metrics (#400 decisions 7 and 8).
 func TestKubernetesInstructions_SayWhatTheMetricsAnswerNeeds(t *testing.T) {
-	const monitoringDocs = "https://goiabada.dev/production-deployment/monitoring/"
+	const monitoringDocs = "https://goiabada.dev/deploy/monitoring/"
 	cases := map[string]struct {
 		configure func(*Config)
 		want      []string

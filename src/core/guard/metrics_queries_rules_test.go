@@ -18,7 +18,7 @@ import (
 // suggests selects, compares and groups only by what the families carry, so none of them is an
 // alert that cannot fire.
 func TestMonitoringPage_QueriesNameOnlyWhatTheCatalogDeclares(t *testing.T) {
-	assertMetricsQueries(t, filepath.Dir(SourceRoot(t)), "site/src/content/docs/production-deployment/monitoring.mdx")
+	assertMetricsQueries(t, filepath.Dir(SourceRoot(t)), "site/src/content/docs/deploy/monitoring.mdx")
 }
 
 var queriesCatalogLines = []string{

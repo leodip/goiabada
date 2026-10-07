@@ -271,7 +271,7 @@ User: postgres.your-project-ref
 
 ### Step 5: Generate and deploy Goiabada
 
-Use the [setup wizard](/getting-started/setup-wizard/):
+Use the [setup wizard](/get-started/setup-wizard/):
 
 ```bash
 ./goiabada-setup
@@ -590,7 +590,7 @@ securityContext:
 ```
 
 uid 10001 is the user both images run as (see [the user the images run
-as](/production-deployment/#the-user-the-images-run-as)). No writable volume is mounted, because
+as](/deploy/docker-compose/#the-user-the-images-run-as)). No writable volume is mounted, because
 neither server writes to its filesystem under Kubernetes: the legacy bootstrap file is not used here,
 and the auth server's one other write, Go spilling a picture upload over its size limit to `/tmp`,
 fails on the read-only root and is refused as `FILE_TOO_LARGE` rather than by the image check, a 400
@@ -657,7 +657,7 @@ any `X-Forwarded-For` it likes, choosing the address it is rate limited and audi
 trusted-proxy list prevents that, since Envoy's pods are pods too; a NetworkPolicy admitting only
 Envoy's namespace does (see [Who can reach Goiabada](#who-can-reach-goiabada)).
 
-See [client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection)
+See [client IP resolution](/deploy/reverse-proxy/#client-ip-resolution-and-spoofing-protection)
 for how the resolution works, and the startup warning the auth server logs about it when the rate
 limiter is on.
 
@@ -1227,9 +1227,9 @@ answers 500. Administrators signed in before step 3 stay signed in through the r
 server and every other client work throughout.
 
 If the admin console can no longer sign you in, because the database holds a secret its Secret does
-not, set a secret you know through the [admin API](/integration/rest-api/), with a client of your
+not, set a secret you know through the [admin API](/reference/rest-api/), with a client of your
 own allowed `authserver:manage`. It has to be `manage`: the admin console's client is an
-[administrator](/concepts/resources-permissions/#administrators), and only a token with
+[administrator](/concepts/resources-and-permissions/#administrators), and only a token with
 `authserver:manage` writes to one, so a `manage-clients` token is refused `403
 MANAGE_SCOPE_REQUIRED`. Holding `manage` makes your client an administrator too, so keep its secret
 with the care you give the admin console's own. Have that client before you rotate: once the admin
@@ -1417,7 +1417,7 @@ your Prometheus selects PodMonitors by, such as `release=kube-prometheus-stack`
 cluster without the Prometheus Operator's CRDs, `kubectl apply` exits 1 on the PodMonitor after
 applying everything else. For Grafana Alloy, the OpenTelemetry Collector or another scraper that
 discovers pods itself, answer pod annotations, which turns the listeners on and names the port, and
-see [scraping the endpoint](/production-deployment/monitoring/#scraping-the-endpoint).
+see [scraping the endpoint](/deploy/monitoring/#scraping-the-endpoint).
 
 The listeners are turned on by `GOIABADA_AUTHSERVER_METRICS_ENABLED` and
 `GOIABADA_ADMINCONSOLE_METRICS_ENABLED`, each in its server's ConfigMap. To expose the metrics from a
@@ -1446,7 +1446,7 @@ Every generated manifest also turns request logging on, `GOIABADA_AUTHSERVER_LOG
 `GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS` set to `"true"` in the two ConfigMaps, so each request
 writes one `http request` record to the pod's log.
 
-See [Monitoring](/production-deployment/monitoring/) for what the metrics report, what to alert on and
+See [Monitoring](/deploy/monitoring/) for what the metrics report, what to alert on and
 what to watch in the logs.
 
 ## First start and upgrades
@@ -1470,7 +1470,7 @@ A pod stopped while it starts, because it was deleted or its startup budget ran 
 a wait for the database or the migration lock ends at once, a migration file already running runs to
 its end and the next does not start, and the auth server exits 0 with the schema clean at the version
 it reached, which the next start carries on from. The [database
-page](/production-deployment/database/#schema-migrations-and-rollback) has the details and the
+page](/deploy/database/#schema-migrations-and-rollback) has the details and the
 records. The grace period below bounds that too: a single migration file running longer than 65
 seconds is ended by SIGKILL mid-file, leaving the schema dirty, so the startup budget is what has to
 cover the longest migration, not the grace period.
@@ -1575,4 +1575,4 @@ database password does not match the database user's, and new session keys sign 
 
 The images now run as uid 10001 rather than root. That changes nothing for a Kubernetes deployment,
 which mounts no volume; a Compose deployment on SQLite needs [a one-time
-`chown`](/production-deployment/#upgrading-a-compose-deployment-that-uses-sqlite).
+`chown`](/deploy/docker-compose/#upgrading-a-compose-deployment-that-uses-sqlite).

@@ -144,7 +144,7 @@ func isEncryptedIDTokenHint(hint string) bool {
 
 // decryptIDTokenHint decrypts a JWE-encrypted id_token_hint. The token is a JWE
 // (dir + A256GCM) whose key is derived from the client secret, per the scheme
-// documented in integration/endpoints.mdx and implemented in
+// documented in reference/endpoints.mdx and implemented in
 // idtokenhint.Decrypt. client_id selects which client's secret to
 // use, as required by RP-Initiated Logout for symmetrically-encrypted hints.
 //

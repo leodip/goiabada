@@ -580,10 +580,10 @@ func TestWizard_SaysWhichFileToKeepOutOfVersionControl(t *testing.T) {
 		{"kubernetes outside a tree", deploymentKubernetes, "", "", "goiabada-secrets.yaml", ""},
 		{"production outside a tree", deploymentProduction, "", "", "docker-compose.override.yml", ""},
 		{"native outside a tree", deploymentNative, "", "", "goiabada.env", ""},
-		{"kubernetes in a repository", deploymentKubernetes, "", "dir", "goiabada-secrets.yaml", "/deploy/goiabada-secrets.yaml"},
-		{"production in a worktree", deploymentProduction, "", "file", "docker-compose.override.yml", "/deploy/docker-compose.override.yml"},
-		{"native in a repository", deploymentNative, "", "dir", "goiabada.env", "/deploy/goiabada.env"},
-		{"a name gitignore reads as a pattern", deploymentKubernetes, "id [1]*?.yaml", "dir", "id [1]*?-secrets.yaml", `/deploy/id \[1\]\*\?-secrets.yaml`},
+		{"kubernetes in a repository", deploymentKubernetes, "", "dir", "goiabada-secrets.yaml", "/generated/goiabada-secrets.yaml"},
+		{"production in a worktree", deploymentProduction, "", "file", "docker-compose.override.yml", "/generated/docker-compose.override.yml"},
+		{"native in a repository", deploymentNative, "", "dir", "goiabada.env", "/generated/goiabada.env"},
+		{"a name gitignore reads as a pattern", deploymentKubernetes, "id [1]*?.yaml", "dir", "id [1]*?-secrets.yaml", `/generated/id \[1\]\*\?-secrets.yaml`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -598,7 +598,7 @@ func TestWizard_SaysWhichFileToKeepOutOfVersionControl(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			dir := filepath.Join(root, "deploy")
+			dir := filepath.Join(root, "generated")
 			if err := os.Mkdir(dir, 0o700); err != nil {
 				t.Fatal(err)
 			}
@@ -625,7 +625,7 @@ func TestWizard_SaysWhichFileToKeepOutOfVersionControl(t *testing.T) {
 			if !strings.Contains(message, "git working tree") {
 				t.Errorf("the message does not warn that %s is in a git working tree:\n%s", dir, message)
 			}
-			if got := completionLine(t, message, "/deploy/"); got != tc.ignoring {
+			if got := completionLine(t, message, "/generated/"); got != tc.ignoring {
 				t.Errorf("the line to add to .gitignore is %q, want %q", got, tc.ignoring)
 			}
 		})

@@ -30,7 +30,7 @@ Instead of granting full admin access with `authserver:manage`, you can give an 
 
 #### Administrators and authserver:manage
 
-An **administrator** is a user, group or client holding any of the six administrative permissions on the `authserver` resource: `manage`, `admin-read`, `manage-users`, `manage-clients`, `manage-settings` and `browser-sessions`. A user is one when they hold one directly or through any of their groups, the admin console's own client is always one, whatever it holds, and so is a client [allowed to request the administrative scopes](#clients-that-may-request-the-administrative-scopes). `manage-account` and the custom permissions you add to the `authserver` resource are not administrative (see [Resources and permissions › Administrators](/concepts/resources-permissions/#administrators)).
+An **administrator** is a user, group or client holding any of the six administrative permissions on the `authserver` resource: `manage`, `admin-read`, `manage-users`, `manage-clients`, `manage-settings` and `browser-sessions`. A user is one when they hold one directly or through any of their groups, the admin console's own client is always one, whatever it holds, and so is a client [allowed to request the administrative scopes](#clients-that-may-request-the-administrative-scopes). `manage-account` and the custom permissions you add to the `authserver` resource are not administrative (see [Resources and permissions › Administrators](/concepts/resources-and-permissions/#administrators)).
 
 **Only `authserver:manage` creates an administrator, changes one, or changes what reaches one.** A granular scope keeps full control of everyone else, and still reads administrators, but it cannot:
 
@@ -51,7 +51,7 @@ WWW-Authenticate: Bearer realm="goiabada", error="insufficient_scope", error_des
 
 It also leaves one `administrator_change_refused` entry in the [audit log](/concepts/audit-log/#events-to-alert-on), naming the caller, the route, the target and which rule refused it. Its remedy is not the one for `INSUFFICIENT_SCOPE`: that code means the token lacks the route's scope, and requesting it fixes the call, while `MANAGE_SCOPE_REQUIRED` means no granular scope will ever be enough. Either use a token with `authserver:manage` or leave the administrator alone.
 
-A token with `authserver:manage` is never refused by these rules, but it meets one more: a change that would leave no enabled user holding `authserver:manage` is answered `409` with the error code `LAST_ADMINISTRATOR`, and changes nothing. Seven operations can meet it: setting a user's permissions, setting a group's permissions, removing a group member, setting a user's groups, deleting a group, disabling a user and deleting a user. Grant `authserver:manage` to another user first, then repeat the request (see [Users and groups › The last administrator](/concepts/users-groups/#the-last-administrator)).
+A token with `authserver:manage` is never refused by these rules, but it meets one more: a change that would leave no enabled user holding `authserver:manage` is answered `409` with the error code `LAST_ADMINISTRATOR`, and changes nothing. Seven operations can meet it: setting a user's permissions, setting a group's permissions, removing a group member, setting a user's groups, deleting a group, disabling a user and deleting a user. Grant `authserver:manage` to another user first, then repeat the request (see [Users and groups › The last administrator](/concepts/users-and-groups/#the-last-administrator)).
 
 An administrative permission granted or revoked, on a user, a group or a client, or a user joining or leaving a group holding one, leaves an `administrative_permission_changed` entry beside the change's own entry, so one alert rule sees every grant, revocation and membership change. Deleting an administrator or an administrative group is recorded by its own deletion entry (`deleted_user`, `deleted_client` or `deleted_group`) and not by this one, so an alert on who is an administrator also watches those (see [Events to alert on](/concepts/audit-log/#events-to-alert-on)).
 
@@ -118,7 +118,7 @@ The **Admin API** scope (`authserver:manage`) provides full administrative contr
 
 ### Obtaining an access token
 
-Once your client is configured with the required permissions, use the [client credentials flow](/integration/endpoints/#authtoken-post) to obtain an access token:
+Once your client is configured with the required permissions, use the [client credentials flow](/reference/endpoints/#authtoken-post) to obtain an access token:
 
 ```bash
 curl -X POST https://auth.example.com/auth/token \
@@ -161,7 +161,7 @@ A token from the client credentials flow carries the client's own permissions. A
 - the admin console's own client, always, and
 - any other client an operator has allowed, through the client's **May request administrative scopes** switch in the admin console or [`PUT /api/v1/admin/clients/{id}/administrative-scopes`](#switch-the-administrative-scopes-allowance). Only `authserver:manage` switches it.
 
-A new client starts not allowed, including one created through dynamic client registration. The rule holds on the authorization code flow, `prompt=none` included, the implicit flow, the refresh token grant and the password grant. Any other client asking for one of these scopes is refused, never handed a narrower token: `invalid_scope` from the authorization endpoint and the password grant, `invalid_grant` on a refresh (see [the authorization endpoint's](/integration/endpoints/#administrative-scopes) and [the token endpoint's](/integration/endpoints/#a-client-not-allowed-the-administrative-scopes) exact answers). The client credentials flow is unaffected: a client holding an administrative permission of its own keeps requesting it there, and only `authserver:manage` grants it one.
+A new client starts not allowed, including one created through dynamic client registration. The rule holds on the authorization code flow, `prompt=none` included, the implicit flow, the refresh token grant and the password grant. Any other client asking for one of these scopes is refused, never handed a narrower token: `invalid_scope` from the authorization endpoint and the password grant, `invalid_grant` on a refresh (see [the authorization endpoint's](/reference/endpoints/#administrative-scopes) and [the token endpoint's](/reference/endpoints/#a-client-not-allowed-the-administrative-scopes) exact answers). The client credentials flow is unaffected: a client holding an administrative permission of its own keeps requesting it there, and only `authserver:manage` grants it one.
 
 An allowed client is an [administrator](#administrators-and-authservermanage) client, so every write to it, and reading its secret, needs `authserver:manage`. See [Clients › Administrative scopes](/concepts/clients/#administrative-scopes) for the whole rule.
 
@@ -171,7 +171,7 @@ After upgrading to a version with this allowance, only the admin console's clien
 
 ### Account API access
 
-The Account API acts on the signed-in user's own account, so it takes a token issued for a user, never one issued to a client: a client credentials token is refused `403` with the error code `USER_CONTEXT_REQUIRED`. Obtain the token with the [authorization code flow](/oauth2-flows/authorization-code/), requesting `authserver:manage-account`. Every user holds `manage-account` from creation, so the client needs no permission of its own for it, and it is not an administrative scope, so the client needs no allowance either.
+The Account API acts on the signed-in user's own account, so it takes a token issued for a user, never one issued to a client: a client credentials token is refused `403` with the error code `USER_CONTEXT_REQUIRED`. Obtain the token with the [authorization code flow](/guides/authorization-code/), requesting `authserver:manage-account`. Every user holds `manage-account` from creation, so the client needs no permission of its own for it, and it is not an administrative scope, so the client needs no allowance either.
 
 Send the user to the authorization endpoint:
 
@@ -633,7 +633,7 @@ Returns details for a specific session by its session identifier.
 DELETE /api/v1/admin/user-sessions/{id}
 ```
 
-Terminates a user session by ID. This also revokes the refresh tokens and authorization codes that session authorized, including offline refresh tokens. See [ending a session](/concepts/user-sessions/#ending-a-session).
+Terminates a user session by ID. This also revokes the refresh tokens and authorization codes that session authorized, including offline refresh tokens. See [ending a session](/concepts/sessions/#ending-a-session).
 
 ---
 
@@ -1113,7 +1113,7 @@ PUT /api/v1/admin/clients/{id}/tokens
 
 **Field notes:**
 - `includeOpenIDConnectClaimsInAccessToken`: Three-state setting (`"default"`, `"on"`, `"off"`) - Controls OIDC scope claims in access tokens
-- `includeOpenIDConnectClaimsInIdToken`: Three-state setting (`"default"`, `"on"`, `"off"`) - Controls OIDC scope claims in ID tokens (see [OIDC claims configuration](/concepts/openid-connect/#oidc-claims-in-tokens))
+- `includeOpenIDConnectClaimsInIdToken`: Three-state setting (`"default"`, `"on"`, `"off"`) - Controls OIDC scope claims in ID tokens (see [OIDC claims configuration](/concepts/scopes/#oidc-claims-in-tokens))
 
 #### Get client permissions
 
@@ -1370,7 +1370,7 @@ PUT /api/v1/admin/settings/tokens
 
 **Field notes:**
 - `includeOpenIDConnectClaimsInAccessToken`: Boolean - Global default for including OIDC scope claims in access tokens
-- `includeOpenIDConnectClaimsInIdToken`: Boolean - Global default for including OIDC scope claims in ID tokens (default: `true`). See [OIDC claims configuration](/concepts/openid-connect/#oidc-claims-in-tokens) for details.
+- `includeOpenIDConnectClaimsInIdToken`: Boolean - Global default for including OIDC scope claims in ID tokens (default: `true`). See [OIDC claims configuration](/concepts/scopes/#oidc-claims-in-tokens) for details.
 
 #### Audit log settings
 
@@ -1777,7 +1777,7 @@ Returns the caller's active sessions with their device, IP address and the ident
 DELETE /api/v1/account/sessions/{id}
 ```
 
-Terminates one of the caller's own sessions, including the current one. This also revokes the refresh tokens and authorization codes that session authorized, including offline refresh tokens. See [ending a session](/concepts/user-sessions/#ending-a-session).
+Terminates one of the caller's own sessions, including the current one. This also revokes the refresh tokens and authorization codes that session authorized, including offline refresh tokens. See [ending a session](/concepts/sessions/#ending-a-session).
 
 ---
 

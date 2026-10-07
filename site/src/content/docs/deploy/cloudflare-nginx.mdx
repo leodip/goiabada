@@ -49,7 +49,7 @@ Type: A    Name: admin   Content: <your-server-ip>    Proxy: ON
 
 ### 3. Start Goiabada containers
 
-Use the [setup wizard](/getting-started/setup-wizard/) to generate your `docker-compose.yml`:
+Use the [setup wizard](/get-started/setup-wizard/) to generate your `docker-compose.yml`:
 
 1. Select **"2. Production with reverse proxy"** when prompted
 2. Enter your domain names (e.g., `https://auth.example.com` and `https://admin.example.com`)
@@ -325,5 +325,5 @@ everyone.
 To check, open the sign-in page and read the auth server's request log (`docker
 compose logs goiabada-authserver`): the `ip` of your request should be your own
 address, not Cloudflare's.
-See [Reverse proxy: client IP resolution](/production-deployment/reverse-proxy/#client-ip-resolution-and-spoofing-protection)
+See [Reverse proxy: client IP resolution](/deploy/reverse-proxy/#client-ip-resolution-and-spoofing-protection)
 for how the resolution works.
