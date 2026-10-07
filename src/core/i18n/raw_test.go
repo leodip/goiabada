@@ -47,7 +47,7 @@ func TestRaw_ResolvesTheLocaleTheSameWayTAsDoes(t *testing.T) {
 		// strings must be too.
 		{"fr-FR,pt;q=0.8", "Enviar", "Entrar"},
 		// English outranks pt-BR here, and both surfaces must say so.
-		{"en-US,pt-BR;q=0.5", "Upload", "Login"},
+		{"en-US,pt-BR;q=0.5", "Upload", "Sign in"},
 	} {
 		req := httptest.NewRequest(http.MethodGet, "/auth/pwd", nil)
 		req.Header.Set("Accept-Language", tc.acceptLanguage)

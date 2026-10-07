@@ -42,8 +42,8 @@
 # --- Login page (auth/pwd) ---------------------------------------------------
 
 "auth.pwd.page_title" = "Password authentication"
-"auth.pwd.title" = "Login"
-"auth.pwd.button" = "Login"
+"auth.pwd.title" = "Sign in"
+"auth.pwd.button" = "Sign in"
 "auth.pwd.email_label" = "Email"
 "auth.pwd.email_placeholder" = "user@example.com"
 "auth.pwd.password_label" = "Password"
@@ -96,9 +96,9 @@
 
 # --- Logout confirmation (auth/logout) --------------------------------------
 
-"logout_consent.page_title" = "Logout consent"
-"logout_consent.title" = "Logout"
-"logout_consent.confirm" = "Are you sure you want to logout?"
+"logout_consent.page_title" = "Sign-out consent"
+"logout_consent.title" = "Sign out"
+"logout_consent.confirm" = "Are you sure you want to sign out?"
 
 # --- Logged out (auth/logout) -----------------------------------------------
 
@@ -149,14 +149,14 @@
 "account.register.title" = "Register"
 "account.register.button" = "Register"
 "account.register.have_account_prompt" = "Already have an account?"
-"account.register.login_link" = "Login"
+"account.register.login_link" = "Sign in"
 "account.register.verification_hint" = "We'll email you a link to choose your password."
 
 "account.register_success.page_title" = "Register"
 "account.register_success.title" = "Register"
 "account.register_success.account_created" = "Your account has been created."
 "account.register_success.login_prompt_prefix" = "If you wish, "
-"account.register_success.login_prompt_suffix" = " to login and access your account page."
+"account.register_success.login_prompt_suffix" = " to sign in and access your account page."
 
 "account.register_check_email.page_title" = "Check your email"
 "account.register_check_email.title" = "Check your email"
@@ -175,7 +175,7 @@
 "account.activation_result.expired_link_suffix" = " to attempt the registration process again."
 "account.activation_result.success_body" = "Congratulations! Your account has been activated."
 "account.activation_result.login_prompt_prefix" = "If you wish, "
-"account.activation_result.login_prompt_suffix" = " to login and access your account page."
+"account.activation_result.login_prompt_suffix" = " to sign in and access your account page."
 
 # --- Forgot password (forgot-password) --------------------------------------
 
@@ -224,7 +224,7 @@
 "adminconsole.menu.home" = "Home"
 "adminconsole.menu.account" = "Account"
 "adminconsole.menu.admin" = "Admin"
-"adminconsole.menu.logout" = "Logout"
+"adminconsole.menu.logout" = "Sign out"
 "adminconsole.menu.version_label" = "version:"
 
 # --- Adminconsole account-side drawer ---------------------------------------
@@ -335,7 +335,7 @@
 "adminconsole.welcome.page_title" = "Welcome"
 "adminconsole.welcome.subtitle" = "Admin console"
 "adminconsole.welcome.authenticated_label" = "Authenticated"
-"adminconsole.welcome.logout_label" = "Logout"
+"adminconsole.welcome.logout_label" = "Sign out"
 "adminconsole.welcome.discovery_card_title" = "OpenID Connect discovery"
 "adminconsole.welcome.discovery_card_body_prefix" = "This is the "
 "adminconsole.welcome.discovery_card_body_em" = "well-known URL"
@@ -540,7 +540,7 @@
 "adminconsole.account.sessions.modal_confirm_body_prefix" = "Would you like to end the session on device <span class='text-accent'>"
 "adminconsole.account.sessions.modal_confirm_body_suffix" = "</span>?"
 "adminconsole.account.sessions.modal_revocation_note" = " <br /><br />Applications you authorized from this session, including ones that keep working in the background, will need to sign in again."
-"adminconsole.account.sessions.modal_current_warning" = " <br /><br />Be aware that ending your current session will result in an immediate logout."
+"adminconsole.account.sessions.modal_current_warning" = " <br /><br />Be aware that ending your current session will result in an immediate sign-out."
 
 # === Adminconsole — admin clients =============================================
 
@@ -571,7 +571,7 @@
 "adminconsole.admin_clients.new.field.identifier" = "Client identifier"
 "adminconsole.admin_clients.new.field.identifier_tooltip" = "A unique identifier assigned to the client, also referred to as client_id."
 "adminconsole.admin_clients.new.field.display_name" = "Display name"
-"adminconsole.admin_clients.new.field.display_name_tooltip" = "A user-friendly name for the client, shown to users on login and consent screens when enabled."
+"adminconsole.admin_clients.new.field.display_name_tooltip" = "A user-friendly name for the client, shown to users on sign-in and consent screens when enabled."
 "adminconsole.admin_clients.new.toggle.auth_code_prefix" = "Enable user authentication and authorization - "
 "adminconsole.admin_clients.new.toggle.auth_code_em" = "Authorization code flow with PKCE"
 "adminconsole.admin_clients.new.toggle.client_creds_prefix" = "Enable server to server authentication and authorization - "
@@ -635,7 +635,7 @@
 "adminconsole.admin_clients.usersessions.modal_confirm_body_prefix" = "Do you want to end the session for user <span class='text-accent'>"
 "adminconsole.admin_clients.usersessions.modal_confirm_body_suffix" = "</span>?"
 "adminconsole.admin_clients.usersessions.modal_revocation_note" = " <br /><br />Applications the user authorized from this session, including ones that keep working in the background, will need to sign in again."
-"adminconsole.admin_clients.usersessions.modal_current_warning" = " <br /><br />Be aware that ending your current session will result in an immediate logout."
+"adminconsole.admin_clients.usersessions.modal_current_warning" = " <br /><br />Be aware that ending your current session will result in an immediate sign-out."
 
 # --- Common modal strings used across client management pages --------------
 
@@ -653,9 +653,9 @@
 "adminconsole.admin_clients.settings.field.description" = "Description"
 "adminconsole.admin_clients.settings.field.description_tooltip" = "Free-text description of the client."
 "adminconsole.admin_clients.settings.field.website_url" = "Website URL"
-"adminconsole.admin_clients.settings.field.website_url_tooltip" = "The client's website URL, displayed to users on consent and login screens."
+"adminconsole.admin_clients.settings.field.website_url_tooltip" = "The client's website URL, displayed to users on consent and sign-in screens."
 "adminconsole.admin_clients.settings.field.display_name" = "Display name"
-"adminconsole.admin_clients.settings.field.display_name_tooltip" = "A user-friendly name for the client, shown to users on login and consent screens when enabled."
+"adminconsole.admin_clients.settings.field.display_name_tooltip" = "A user-friendly name for the client, shown to users on sign-in and consent screens when enabled."
 "adminconsole.admin_clients.settings.field.default_acr" = "Default ACR level"
 "adminconsole.admin_clients.settings.field.default_acr_tooltip" = "The minimum authentication policy for the client. An authorization request can ask for a stronger level, but never a weaker one. If you're unsure, it's recommended to leave it at ACR level 2."
 "adminconsole.admin_clients.settings.acr_level1" = "ACR level 1 - password only"
@@ -669,13 +669,13 @@
 "adminconsole.admin_clients.settings.administrative_scopes_always_allowed" = "The admin console's client may always request the administrative scopes."
 "adminconsole.admin_clients.settings.administrative_scopes_saved" = "Administrative scopes allowance saved successfully"
 "adminconsole.admin_clients.settings.field.show_logo" = "Show logo"
-"adminconsole.admin_clients.settings.field.show_logo_tooltip" = "When enabled, the client logo is displayed on login and consent screens (requires a logo to be uploaded in the Logo tab)."
+"adminconsole.admin_clients.settings.field.show_logo_tooltip" = "When enabled, the client logo is displayed on sign-in and consent screens (requires a logo to be uploaded in the Logo tab)."
 "adminconsole.admin_clients.settings.field.show_display_name" = "Show display name"
-"adminconsole.admin_clients.settings.field.show_display_name_tooltip" = "When enabled, the display name is shown instead of the client identifier on login and consent screens."
+"adminconsole.admin_clients.settings.field.show_display_name_tooltip" = "When enabled, the display name is shown instead of the client identifier on sign-in and consent screens."
 "adminconsole.admin_clients.settings.field.show_description" = "Show description"
-"adminconsole.admin_clients.settings.field.show_description_tooltip" = "When enabled, the client description is displayed on login and consent screens."
+"adminconsole.admin_clients.settings.field.show_description_tooltip" = "When enabled, the client description is displayed on sign-in and consent screens."
 "adminconsole.admin_clients.settings.field.show_website_url" = "Show website URL"
-"adminconsole.admin_clients.settings.field.show_website_url_tooltip" = "When enabled, the client website URL is displayed as a link on login and consent screens."
+"adminconsole.admin_clients.settings.field.show_website_url_tooltip" = "When enabled, the client website URL is displayed as a link on sign-in and consent screens."
 "adminconsole.admin_clients.settings.saved_successfully" = "Client settings saved successfully"
 "adminconsole.admin_clients.settings.modal.identifier_change" = "<span class='text-accent'>You've modified the client identifier</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?"
 "adminconsole.admin_clients.settings.modal.disabled_warning" = "<span class='text-accent'>You've disabled the client</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?"
@@ -835,7 +835,7 @@
 "adminconsole.admin_clients.oauth2_flows.implicit_warning" = "Warning: The implicit flow is deprecated in OAuth 2.1 and has known security vulnerabilities. Tokens are exposed in URLs and browser history, and no refresh tokens can be issued. Use the authorization code flow with PKCE instead whenever possible."
 "adminconsole.admin_clients.oauth2_flows.ropc_label" = "Resource Owner Password Credentials (ROPC)"
 "adminconsole.admin_clients.oauth2_flows.ropc_tooltip" = "RFC 6749 Section 4.3 - The resource owner password credentials grant allows clients to obtain tokens using the user's username and password directly. This flow is deprecated in OAuth 2.1 due to security concerns."
-"adminconsole.admin_clients.oauth2_flows.ropc_warning" = "Warning: The Resource Owner Password Credentials flow is deprecated in OAuth 2.1 and has known security concerns. User credentials are exposed directly to the client application, bypassing the authorization server's login UI. This flow does not support users with two-factor authentication enabled. Use the authorization code flow with PKCE instead whenever possible."
+"adminconsole.admin_clients.oauth2_flows.ropc_warning" = "Warning: The Resource Owner Password Credentials flow is deprecated in OAuth 2.1 and has known security concerns. User credentials are exposed directly to the client application, bypassing the authorization server's sign-in UI. This flow does not support users with two-factor authentication enabled. Use the authorization code flow with PKCE instead whenever possible."
 "adminconsole.admin_clients.oauth2_flows.saved_successfully" = "Client OAuth2 flows saved successfully"
 
 # --- Admin users (list, create, delete, details) -----------------------------
@@ -976,7 +976,7 @@
 "adminconsole.admin_users.sessions.modal_confirm_body_prefix" = "Would you like to end the session on device <span class='text-accent'>"
 "adminconsole.admin_users.sessions.modal_confirm_body_suffix" = "</span>?"
 "adminconsole.admin_users.sessions.modal_revocation_note" = " <br /><br />Applications the user authorized from this session, including ones that keep working in the background, will need to sign in again."
-"adminconsole.admin_users.sessions.modal_confirm_current_warning" = " <br /><br />Be aware that ending your current session will result in an immediate logout."
+"adminconsole.admin_users.sessions.modal_confirm_current_warning" = " <br /><br />Be aware that ending your current session will result in an immediate sign-out."
 "adminconsole.admin_users.sessions.col_device" = "Device"
 "adminconsole.admin_users.sessions.col_clients" = "Clients"
 "adminconsole.admin_users.sessions.col_ip" = "IP address"
@@ -1364,7 +1364,7 @@
 "adminconsole.admin_settings.general.password_policy_medium" = "Medium strength - at least 8 chars (must contain 1 uppercase, 1 lowercase and 1 number)"
 "adminconsole.admin_settings.general.password_policy_high" = "High strength - at least 10 chars (must contain 1 uppercase, 1 lowercase, 1 number and 1 special char/symbol)"
 "adminconsole.admin_settings.general.field.self_registration_enabled" = "User self registration enabled"
-"adminconsole.admin_settings.general.self_registration_enabled_tooltip" = "If enabled, a 'register' link will be displayed on the login page. If disabled, only admins will have the ability to create users."
+"adminconsole.admin_settings.general.self_registration_enabled_tooltip" = "If enabled, a 'register' link will be displayed on the sign-in page. If disabled, only admins will have the ability to create users."
 "adminconsole.admin_settings.general.field.self_registration_email_verification" = "User self registration requires email verification"
 "adminconsole.admin_settings.general.self_registration_email_verification_tooltip" = "If enabled, self-registered users will need to activate their accounts via a confirmation link sent to their email. If disabled, accounts will be created instantly without the need for email confirmation."
 "adminconsole.admin_settings.general.field.dynamic_client_registration" = "Dynamic client registration enabled"
