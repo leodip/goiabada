@@ -11,7 +11,7 @@ Before deploying Goiabada to production, verify each item on this checklist.
 
 - [ ] **HTTPS enabled** - Either direct HTTPS or behind a reverse proxy with SSL termination
 - [ ] **Secure cookies** - Automatic when the base URLs are `https://` (the `Secure` flag is derived from the base URL scheme; there is no separate setting)
-- [ ] **Admin password changed** - Never use the default `changeme` password
+- [ ] **Admin password not published** - `GOIABADA_ADMIN_PASSWORD` has no default; set it to a password of your own, at least 15 characters. If the deployment was started from an earlier sample or guide that set `changeme`, change the administrator's password in the admin console
 - [ ] **Strong database password** - Use a randomly generated password (16+ characters)
 - [ ] **Unique session keys** - Generate fresh keys, never use examples or defaults
 
