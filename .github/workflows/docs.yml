@@ -1,7 +1,9 @@
 # The documentation image. Decoupled from releases, so a typo fix ships when it
 # is merged rather than waiting for the next release or a remembered manual
 # dispatch. The path filter means Go-only PRs, the large majority, never pay for
-# it.
+# it. openapi.yaml is in it because the site is built from the repository root
+# and reads it; CI's Check workflow builds the site on every pull request, so a
+# change elsewhere in src/ that breaks the build is caught there.
 #
 # This workflow owns EVERY docs build. An earlier draft had publish.yml dispatch
 # it as well, which meant a stable release built and pushed the docs image
@@ -12,7 +14,7 @@ name: Docs
 on:
   push:
     branches: [main]
-    paths: ['site/**']
+    paths: ['site/**', 'src/authserver/web/openapi.yaml']
   release:
     types: [published]
   workflow_dispatch:
@@ -65,11 +67,11 @@ jobs:
           echo "args=$args" >> "$GITHUB_OUTPUT"
           echo "Pushing: ${TAGS[*]}"
 
+      # From the repository root: the site's build reads src/ (site/Dockerfile).
       - name: Build and push
-        working-directory: site
         run: |
           set -euo pipefail
-          docker build ${{ steps.tags.outputs.args }} .
+          docker build ${{ steps.tags.outputs.args }} -f site/Dockerfile .
           for t in $(echo "${{ steps.tags.outputs.args }}" | tr ' ' '\n' | grep -v '^-t$' | grep -v '^$'); do
             docker push "$t"
           done

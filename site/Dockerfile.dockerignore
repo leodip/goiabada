@@ -1,0 +1,14 @@
+# The docs image is built from the repository root (see Dockerfile). Docker reads
+# this file, named for the Dockerfile, in place of a .dockerignore at the root.
+*
+!site
+!src
+
+site/node_modules
+site/dist
+site/.astro
+
+# What git ignores under src/: local build output, never shipped code.
+src/**/tmp
+src/**/.devdata
+src/**/node_modules

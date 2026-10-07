@@ -1,31 +1,35 @@
-# Build stage
-FROM node:22-alpine AS builder
+# The docs image. Built from the repository root, not from site/, because the
+# build reads the repository's src/: the shipped-link check reads its code.
+#
+#   docker build -f site/Dockerfile -t goiabada-docs .
+#
+# Site/Dockerfile.dockerignore keeps the context to site/ and src/.
 
-WORKDIR /app
+# Dependencies and sources, with nothing built yet. CI runs the site checks'
+# tests in this stage, so they run on the Node version the site is built with.
+FROM node:22-alpine AS sources
 
-# Copy package files
-COPY package.json package-lock.json ./
+WORKDIR /repo/site
 
-# Install dependencies
+COPY site/package.json site/package-lock.json ./
 RUN npm ci
 
-# Copy source files
-COPY . .
+COPY src/ /repo/src/
+COPY site/ ./
 
-# Build the static site
+# Build the static site. The build fails on a broken internal link or heading
+# anchor, and on a goiabada.dev link in src/ that names no built page.
+FROM sources AS builder
+
 RUN npm run build
 
 # Production stage
 FROM nginx:alpine
 
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY site/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy built static files from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /repo/site/dist /usr/share/nginx/html
 
-# Expose port 80
 EXPOSE 80
 
-# Start nginx
 CMD ["nginx", "-g", "daemon off;"]
