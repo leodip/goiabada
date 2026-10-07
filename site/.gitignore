@@ -19,3 +19,6 @@ pnpm-debug.log*
 
 # macOS-specific files
 .DS_Store
+
+# the API reference documents, split from openapi.yaml at build
+.openapi/

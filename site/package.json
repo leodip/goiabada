@@ -23,6 +23,8 @@
     "mdast-util-to-markdown": "^2.1.2",
     "mdast-util-to-string": "^4.0.0",
     "sharp": "^0.35.5",
-    "starlight-links-validator": "^0.26.0"
+    "starlight-links-validator": "^0.26.0",
+    "starlight-openapi": "^0.26.2",
+    "yaml": "^2.9.1"
   }
 }

@@ -1227,7 +1227,7 @@ answers 500. Administrators signed in before step 3 stay signed in through the r
 server and every other client work throughout.
 
 If the admin console can no longer sign you in, because the database holds a secret its Secret does
-not, set a secret you know through the [admin API](/reference/rest-api/), with a client of your
+not, set a secret you know through the [admin API](/reference/api/authentication/), with a client of your
 own allowed `authserver:manage`. It has to be `manage`: the admin console's client is an
 [administrator](/concepts/resources-and-permissions/#administrators), and only a token with
 `authserver:manage` writes to one, so a `manage-clients` token is refused `403

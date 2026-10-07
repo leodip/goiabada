@@ -1,0 +1,69 @@
+---
+title: Scopes
+description: Which scope each Admin API and Account API operation accepts, and how to pick the smallest one that does the job.
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page helps you pick the scope a token needs for the operations you call.
+
+A scope is what a client asks for when it requests a token. For the APIs, each scope is a permission on the `authserver` resource, written `authserver:` and the permission, and a token carries only the scopes its client or user holds.
+
+Give each integration the smallest scope that does its job. A service that creates and disables users needs `authserver:manage-users`, not `authserver:manage`: it can then manage every user who isn't an administrator, and nothing else.
+
+## The Admin API scopes
+
+| Scope | Reads | Writes |
+|---|---|---|
+| `authserver:admin-read` | Every Admin API operation that reads, administrators included, except a client's secret | Nothing |
+| `authserver:manage-users` | Users and groups, with their attributes, sessions, consents, memberships and permissions | The same, except administrators and administrative permissions |
+| `authserver:manage-clients` | Clients, their secrets included | Clients, except administrator clients |
+| `authserver:manage-settings` | Settings, resources and their permissions, signing keys, and the audit log | Settings except email and audit logging, resources and their permissions, signing keys |
+| `authserver:manage` | Everything | Everything, administrators included |
+
+Every operation that reads accepts `authserver:admin-read`, the scope of its domain, or `authserver:manage`. Every operation that writes accepts the scope of its domain or `authserver:manage`. Two reads are different:
+
+- **A client's secret** (`GET /api/v1/admin/clients/{id}/secret`) is a credential, so `authserver:admin-read` doesn't reach it. It takes `authserver:manage-clients` or `authserver:manage`.
+- **The phone countries** (`GET /api/v1/admin/phone-countries`) belong to no domain, so they take `authserver:admin-read` or `authserver:manage` only.
+
+A token with none of the scopes an operation accepts is answered `403` with the error code `INSUFFICIENT_SCOPE`.
+
+The four granular scopes stop short of administrators: they read them, but they can't create, change or delete one. Only `authserver:manage` does that, as [Administrators](/reference/api/administrators/) explains.
+
+## The Account API scope
+
+Every Account API operation takes `authserver:manage-account`, on a token issued for a user. Each user holds the `manage-account` permission from the moment they're created, so any client that signs a user in can ask for it. It isn't an administrative scope: a token carrying it reaches the user's own account and nothing else.
+
+## How it works
+
+### The domains
+
+Each Admin API operation belongs to one domain, and the domain decides which granular scope reaches it:
+
+| Domain | Operations |
+|---|---|
+| Users | Users, user attributes, user sessions, user consents, groups, group members, group attributes, and the permissions of users and groups |
+| Clients | Clients, with their authentication, flows, redirect URIs, web origins, tokens, permissions, sessions, logo and secret |
+| Settings | General, email, session, token, UI theme and audit log settings, signing keys, resources and their permissions, and the audit log |
+
+### Administrative scopes on a user's behalf
+
+A token from the client credentials flow carries the client's own permissions. A token your app gets for a signed-in user, through the authorization code flow, carries the scopes that user holds. For the six administrative scopes, `authserver:manage`, `authserver:admin-read`, `authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings` and `authserver:browser-sessions`, that token would reach the Admin API with the user's administrative rights. So only a client allowed to request the administrative scopes can get one on a user's behalf:
+
+- the admin console's own client, always;
+- any other client an operator has allowed, with the **May request administrative scopes** switch on the client's settings in the admin console, or with `PUT /api/v1/admin/clients/{id}/administrative-scopes`. Only `authserver:manage` turns it on or off.
+
+A new client starts not allowed, including one that registered itself. The rule holds on the authorization code flow, `prompt=none` included, on the implicit flow, and on the refresh token and password grants. A client that isn't allowed and asks for one of these scopes is refused, never handed a narrower token: `invalid_scope` from the authorization endpoint and on the password grant, and `invalid_grant` when it redeems a code or refreshes. [The authorization endpoint](/reference/endpoints/#administrative-scopes) and [the token endpoint](/reference/endpoints/#a-client-not-allowed-the-administrative-scopes) have the exact answers.
+
+The client credentials flow isn't affected: a client holding an administrative permission of its own keeps asking for it there.
+
+<Aside type="caution">
+An allowed client is an administrator client, so every change to it, and reading its secret, takes `authserver:manage`. Allow only clients you trust with your users' administrative rights. [Clients](/concepts/clients/#administrative-scopes) has the whole rule.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Administrators" description="What only authserver:manage can do." href="/reference/api/administrators/" />
+  <LinkCard title="Authentication" description="Get a token and call the API." href="/reference/api/authentication/" />
+</CardGrid>

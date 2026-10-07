@@ -23,7 +23,7 @@ import (
 
 // A request body the request-body limit cut short reaches a handler as a failed read, and the API
 // answers it the way it answers any body that will not decode: 400 INVALID_REQUEST_BODY in the flat
-// error shape rest-api.mdx documents (#426 decision 6). The limit's own boundary through the real
+// error shape the API reference's errors page documents (#426 decision 6). The limit's own boundary through the real
 // root chain is server/body_limit_test.go's; what is claimed here is the handler's answer.
 
 // cutBody is body behind a limit of limit bytes, as the root's httpmw.BodyLimit leaves it.
@@ -75,7 +75,7 @@ func TestCutBody_TheAccountPhonePut(t *testing.T) {
 }
 
 // The four permission PUTs answered VALIDATION_ERROR to a body that would not decode, where every
-// other decoder on this surface answers INVALID_REQUEST_BODY, the code rest-api.mdx gives a
+// other decoder on this surface answers INVALID_REQUEST_BODY, the code the errors page gives a
 // malformed body and the one api_error_code_lint_test.go reserves for it (#426).
 func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 	const body = `{"permissionIds":[1,2,3]}`

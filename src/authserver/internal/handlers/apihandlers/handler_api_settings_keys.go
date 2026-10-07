@@ -118,7 +118,7 @@ func HandleSettingsKeysRotatePost(
 			// 409 rather than 200: this call rotated nothing. Reporting success would have the
 			// admin console announce one rotation twice, and would invite a caller to believe
 			// it holds a key it never created. Retrying is wrong for the same reason, which is
-			// what the REST API page now says.
+			// what the operation's description in openapi.yaml says.
 			writeJSONError(w, "Another key rotation is in progress", "ROTATION_IN_PROGRESS",
 				http.StatusConflict)
 

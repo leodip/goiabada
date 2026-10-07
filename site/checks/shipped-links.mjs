@@ -63,21 +63,24 @@ export function findShippedLinkProblems({ distDir, srcDir }) {
 	const headingsByPage = new Map();
 	const findings = [];
 	for (const link of links) {
-		const url = new URL(link.url);
-		const pathname = safeDecode(url.pathname);
-		const page = join(distDir, pathname.endsWith('/') ? pathname : `${pathname}/`, 'index.html');
-		if (!existsSync(page)) {
-			findings.push({ ...link, problem: 'names no built page' });
-			continue;
-		}
-		const fragment = safeDecode(url.hash.slice(1));
-		if (fragment === '') continue;
-		if (!headingsByPage.has(page)) headingsByPage.set(page, headingIds(readFileSync(page, 'utf8')));
-		if (!headingsByPage.get(page).has(fragment)) {
-			findings.push({ ...link, problem: 'names no heading on its page' });
-		}
+		const problem = builtLinkProblem(distDir, new URL(link.url), headingsByPage);
+		if (problem) findings.push({ ...link, problem });
 	}
 	return { links, findings };
+}
+
+// What is wrong with a link to url on the site built in distDir: 'names no built
+// page', 'names no heading on its page', or undefined when it names a page and,
+// with a fragment, a heading on it. headingsByPage caches each page's heading ids
+// across calls.
+export function builtLinkProblem(distDir, url, headingsByPage) {
+	const pathname = safeDecode(url.pathname);
+	const page = join(distDir, pathname.endsWith('/') ? pathname : `${pathname}/`, 'index.html');
+	if (!existsSync(page)) return 'names no built page';
+	const fragment = safeDecode(url.hash.slice(1));
+	if (fragment === '') return undefined;
+	if (!headingsByPage.has(page)) headingsByPage.set(page, headingIds(readFileSync(page, 'utf8')));
+	return headingsByPage.get(page).has(fragment) ? undefined : 'names no heading on its page';
 }
 
 function safeDecode(text) {
