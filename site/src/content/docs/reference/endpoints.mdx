@@ -145,7 +145,7 @@ It is delivered as every other invalid authorization request is, in the response
 
 - **A browser holding a valid session**, and any `prompt=none` request, is answered at once, with no page shown. When the session is valid, the refusal also leaves an `administrative_scope_refused` entry in the [audit log](/concepts/audit-log/#events-to-alert-on).
 - **A signed-out browser** is answered only after the user has entered their password, so the error reveals nothing to someone who has not signed in. That sign-in creates no session, and the refusal leaves a log record but no audit entry.
-- **A [self-registered client](/concepts/clients/#security-considerations)** is never redirected to: the user sees the refusal page instead.
+- **A [self-registered client](/concepts/clients/#self-registered-clients)** is never redirected to: the user sees the refusal page instead.
 
 The allowance is read again just before the code or the implicit tokens are issued, so a sign-in under way when an operator switches a client's allowance off ends with the same answer.
 
