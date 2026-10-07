@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/leodip/goiabada/core/securerandom"
 )
 
@@ -78,19 +79,13 @@ func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 	// the ROPC grant each look the account up by the lowercased address (#221, #283).
 	adminEmail = strings.ToLower(strings.TrimSpace(adminEmail))
 
-	adminPassword := r.cfg.AdminPassword
-	if len(adminPassword) == 0 {
-		const defaultAdminPassword = "changeme"
-		// The default is a published constant rather than a secret, and an operator who did not
-		// set one has to be told what they got: the alternative is an admin account nobody can
-		// sign in to. A configured password is never written here.
-		slog.WarnContext(ctx, "admin password is not set, defaulting it", "password", defaultAdminPassword)
-		adminPassword = defaultAdminPassword
-	}
-
-	// Checked before anything is generated or written, so a password bcrypt refuses costs no key
+	// Checked before anything is generated or written, so a refused password costs no key
 	// generation and leaves the database empty for the next start, with the variable fixed (#409).
-	if err := checkAdminPasswordLength(adminPassword); err != nil {
+	// There is no default: an unset or empty password is refused like the published changeme the
+	// configuration and this seed used to supply, which made whoever reached the sign-in page a
+	// full administrator (#500).
+	adminPassword := r.cfg.AdminPassword
+	if err := checkAdminPassword(adminPassword); err != nil {
 		return err
 	}
 
@@ -421,16 +416,14 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 	)
 }
 
-// checkAdminPasswordLength refuses an admin password bcrypt cannot hash, naming the variable it
-// came from and the bound, in bytes because bcrypt counts bytes. The seed is the one path that
-// hashes a password no validator has seen, so without this the refusal surfaced as a hashing
-// failure, and before #409 not at all: the error was discarded and the admin was stored with an
-// empty password hash, an account nobody could sign in to.
-func checkAdminPasswordLength(password string) error {
-	if len(password) > passwordhash.MaxPasswordBytes {
-		return errs.Errorf("the admin password in GOIABADA_ADMIN_PASSWORD is %d bytes long, and bcrypt accepts "+
-			"at most %d bytes: shorten it, counting two to four bytes for each non-ASCII character",
-			len(password), passwordhash.MaxPasswordBytes)
+// checkAdminPassword refuses an admin password the first administrator may not have, under the
+// one rule core defines for it, naming the variable it came from: an operator reading the
+// refusal has only the startup log to go on. The seed is the one path that hashes a password no
+// validator has seen, so without this a password bcrypt cannot hash surfaced as a hashing failure,
+// and before #409 not at all, and any weak one, changeme included, seeded (#500).
+func checkAdminPassword(password string) error {
+	if err := inputvalidation.CheckAdminPassword(password); err != nil {
+		return errs.Wrap(err, "GOIABADA_ADMIN_PASSWORD cannot be the first administrator's password")
 	}
 	return nil
 }

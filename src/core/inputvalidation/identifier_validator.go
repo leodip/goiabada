@@ -2,7 +2,8 @@
 // administrator or a registering client supplies: IdentifierValidator, which admits a resource,
 // permission, group or client identifier or an attribute key, and ContainsAngleBrackets, the
 // predicate the auth server wraps in a localized refusal and the admin console checks a
-// permission's description with.
+// permission's description with. Beside them is CheckAdminPassword, the one rule for the first
+// administrator's password, which the auth server's first start applies (#500).
 package inputvalidation
 
 import (

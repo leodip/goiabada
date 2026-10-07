@@ -100,34 +100,6 @@ func TestRun_RefusesAnOverlongAdminPasswordBeforeAnyWrite(t *testing.T) {
 	assert.Empty(t, entries, "refused before the bootstrap file is staged, so nothing is left to clean up")
 }
 
-// TestCheckAdminPasswordLength_CountsBytes holds the seed to bcrypt's bound on either side of it,
-// and in the unit bcrypt uses: 37 accented characters are 74 bytes, far fewer than 72 characters,
-// and are refused. Every refusal names the variable to change and both numbers, since an operator
-// reading it has only the startup log to go on (#409).
-func TestCheckAdminPasswordLength_CountsBytes(t *testing.T) {
-	assert.NoError(t, checkAdminPasswordLength(strings.Repeat("a", passwordhash.MaxPasswordBytes)))
-	assert.NoError(t, checkAdminPasswordLength(strings.Repeat("é", passwordhash.MaxPasswordBytes/2)))
-
-	cases := []struct {
-		name     string
-		password string
-		length   string
-	}{
-		{"one ASCII byte over", strings.Repeat("a", passwordhash.MaxPasswordBytes+1), "73 bytes"},
-		{"37 two-byte characters", strings.Repeat("é", 37), "74 bytes"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			err := checkAdminPasswordLength(tc.password)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "GOIABADA_ADMIN_PASSWORD")
-			assert.Contains(t, err.Error(), tc.length)
-			assert.Contains(t, err.Error(), "at most 72 bytes")
-			assert.Contains(t, err.Error(), "non-ASCII")
-		})
-	}
-}
-
 // The production key size and the production rename, which the tests below replace: a runner built
 // any other way than through newRunner does not reach production.
 func TestNewRunner_ProductionDefaults(t *testing.T) {

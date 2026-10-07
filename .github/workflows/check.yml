@@ -63,7 +63,7 @@ env:
   TZ: Europe/Lisbon
 
   GOIABADA_ADMIN_EMAIL: admin@example.com
-  GOIABADA_ADMIN_PASSWORD: changeme
+  GOIABADA_ADMIN_PASSWORD: devcontainer-admin-password
   GOIABADA_APPNAME: Goiabada
 
   GOIABADA_AUTHSERVER_BASEURL: http://localhost:19090
