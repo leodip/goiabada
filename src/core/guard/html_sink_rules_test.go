@@ -63,6 +63,20 @@ func TestHTMLSinks_TheRefusedShapes(t *testing.T) {
 		"template/onclick.html":  script(`b.setAttribute("onclick", "Add(event, this, " + user.Id + ");");`),
 		"template/onload.html":   script(`img.setAttribute('ONLOAD', handler);`),
 		"template/computed.html": script(`b.setAttribute(attributeName, value);`),
+		// A member named by a fixed string is the member, by either quote and read or written.
+		"template/computed_write.html":  script(`cell["innerHTML"] = row.Label;`),
+		"template/computed_read.html":   script("const label = cell[`innerHTML`];"),
+		"template/computed_method.html": script(`button["setAttribute"]("onclick", handlerText);`),
+		"template/computed_write2.html": script(`document['write'](row.Label);`),
+		// A template literal's interpolation is code.
+		"template/interpolation.html": script("const label = `${cell.innerHTML = row.Label}`;"),
+		// An on... attribute and a javascript: URL are code, their character references decoded
+		// as the browser decodes them, and so is a script element written in capitals.
+		"template/inline.html":      {Data: []byte("<div>\n<button onclick=\"cell.innerHTML = row.Label;\">Update</button>\n</div>\n")},
+		"template/inline_ref.html":  {Data: []byte("<div>\n<button ONCLICK='cell.inner&#72;TML = row.Label' class=\"{{ if .x }}a{{ end }}\">x</button>\n</div>\n")},
+		"template/inline_bare.html": {Data: []byte("<div>\n<img src=x onerror=cell.innerHTML=row.Label>\n</div>\n")},
+		"template/js_url.html":      {Data: []byte("<div>\n<a href=\" JavaScript:document.write(row.Label)\">x</a>\n</div>\n")},
+		"template/upper.html":       {Data: []byte("<div>\n<SCRIPT>\ncell.innerHTML = row.Label;\n</SCRIPT>\n</div>\n")},
 		// A static script is held like a page, and a regex literal holding a quote does not
 		// derail the reading of the line after it.
 		"static/utils.js": {Data: []byte("function esc(s) {\n  return s.replace(/\"/g, \"&quot;\").replace(/'/g, \"&#039;\");\n}\nel.innerHTML = message;\n")},
@@ -82,8 +96,17 @@ func TestHTMLSinks_TheRefusedShapes(t *testing.T) {
 		`template/call.html:4: cell.innerHTML = getTrashCanMarkup("", "f();", "");`,
 		`template/compare.html:4: if (cell.innerHTML == "") { go(); }`,
 		`template/computed.html:4: b.setAttribute(attributeName, value);`,
+		`template/computed_method.html:4: button["setAttribute"]("onclick", handlerText);`,
+		"template/computed_read.html:4: const label = cell[`innerHTML`];",
+		`template/computed_write.html:4: cell["innerHTML"] = row.Label;`,
+		`template/computed_write2.html:4: document['write'](row.Label);`,
 		`template/concat.html:4: cell.innerHTML = "<span>{{ T $.ctx "a" }}" + maxRows + "</span>";`,
 		`template/concat_later.html:4: cell.innerHTML = "<b>"`,
+		`template/inline.html:2: <button onclick="cell.innerHTML = row.Label;">Update</button>`,
+		`template/inline_bare.html:2: <img src=x onerror=cell.innerHTML=row.Label>`,
+		`template/inline_ref.html:2: <button ONCLICK='cell.inner&#72;TML = row.Label' class="{{ if .x }}a{{ end }}">x</button>`,
+		"template/interpolation.html:4: const label = `${cell.innerHTML = row.Label}`;",
+		`template/js_url.html:2: <a href=" JavaScript:document.write(row.Label)">x</a>`,
 		`template/kv_action.html:4: cell.innerHTML = "{{ T $.ctx "k" "name" .user.Email }}";`,
 		`template/onclick.html:4: b.setAttribute("onclick", "Add(event, this, " + user.Id + ");");`,
 		`template/onload.html:4: img.setAttribute('ONLOAD', handler);`,
@@ -91,6 +114,7 @@ func TestHTMLSinks_TheRefusedShapes(t *testing.T) {
 		`template/read.html:4: const uri = row.getElementsByTagName("td")[0].innerHTML;`,
 		"template/static_tick.html:4: cell.innerHTML = `static`;",
 		`template/ternary.html:4: cell.innerHTML = ok ? "{{ T $.ctx "a" }}" : "";`,
+		`template/upper.html:3: cell.innerHTML = row.Label;`,
 		`template/variable.html:4: cell.innerHTML = value.Scope;`,
 		`template/write.html:4: document.write("<p>x</p>");`,
 		`template/writeln.html:4: document.writeln(x);`,
@@ -114,8 +138,12 @@ func TestHTMLSinks_TheAllowedShapes(t *testing.T) {
 		"template/mentions.html": {Data: []byte(`<p>innerHTML and document.write are named here</p>
 {{/* outerHTML in a template comment */}}
 <!-- insertAdjacentHTML in a markup comment -->
-<button onclick="go()">x</button>
+<button onclick="go()" title="innerHTML = x" data-x='{{ .y }}'>x</button>
+<button onclick="cell.textContent = &quot;{{ T $.ctx "a" }}&quot;; el.innerHTML = '{{ T $.ctx "b" }}'">y</button>
+<a href="/innerHTML">javascript: is text here</a>
 <script>
+  const names = ["innerHTML"], picked = names["length"];
+  const label = ` + "`innerHTML ${value}`" + `;
   // textContent, not innerHTML: a redirect URI is data.
   /* reading innerHTML re-serialises the value */
   const msg = "showModalDialog assigns its message to innerHTML";

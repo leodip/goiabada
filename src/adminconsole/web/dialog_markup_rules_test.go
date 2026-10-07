@@ -51,6 +51,13 @@ func TestDialogMessages_TheRefusedShapes(t *testing.T) {
 		"template/spliced.html":    dialogPage(`showModalDialog("m", "t", "{{ T $.ctx "a.markup" }}" + email + "{{ T $.ctx "b" }}");`),
 		"template/half_built.html": dialogPage(`showModalDialog("m", "t", cond ? dialogMarkup(["{{ T $.ctx "a" }}"]) : "{{ T $.ctx "b.markup" }}");`),
 		"static/format_markup.js":  {Data: []byte("showModalDialog(id, title, tFormat(\"js.markup\", { detail: err }));\n")},
+		// The same calls in an on... attribute, through a member named by a string, and after a
+		// regex literal holding a quote.
+		"template/inline.html":   {Data: []byte("<div>\n<button onclick=\"showModalDialog('m', 't', dialogMarkup(parts, user.Email));\">x</button>\n</div>\n")},
+		"template/computed.html": dialogPage(`showModalDialog("m", "t", window["dialogMarkup"](parts, user.Email));`),
+		"template/regex.html":    dialogPage(`const quote = /'/g; showModalDialog("m", "t", dialogMarkup(parts, user.Email));`),
+		// A list of bare names hands a builder out, which only the file declaring it may do.
+		"static/export.js": {Data: []byte("const builders = { dialogMarkup, dialogMarkupFormat };\n")},
 	}
 
 	found, n, err := findDialogFaults(fsys, fixtureMarkup)
@@ -58,20 +65,25 @@ func TestDialogMessages_TheRefusedShapes(t *testing.T) {
 	assert.Equal(t, len(fsys), n.files)
 	assert.Equal(t, []string{
 		"static/alias.js:1",
+		"static/export.js:1",
+		"static/export.js:1",
 		"static/format_markup.js:1",
 		"static/plain_markup.js:1",
 		"template/action.html:4",
 		"template/alias.html:4",
 		"template/array_tail.html:4",
 		"template/backtick.html:4",
+		"template/computed.html:4",
 		"template/concat.html:4",
 		"template/data_part.html:4",
 		"template/empty.html:4",
 		"template/format_act.html:4",
 		"template/format_key.html:4",
 		"template/half_built.html:4",
+		"template/inline.html:2",
 		"template/kv_action.html:4",
 		"template/plain_markup.html:4",
+		"template/regex.html:4",
 		"template/spliced.html:4",
 		"template/split_markup.html:4",
 		"template/variable.html:4",
@@ -80,8 +92,8 @@ func TestDialogMessages_TheRefusedShapes(t *testing.T) {
 
 // TestDialogMessages_TheAllowedShapes holds what the rule leaves alone: builder calls whose markup
 // is catalog literals, with values after them; a plain message whose catalog text is text, with or
-// without a value joining it; a message held in a variable; the builders' own definitions; and the
-// names in a comment or a string.
+// without a value joining it; a message held in a variable; the builders' own definitions and their
+// export from the file declaring them; and the names in a comment or a string.
 func TestDialogMessages_TheAllowedShapes(t *testing.T) {
 	fsys := fstest.MapFS{
 		"template/allowed.html": dialogPage(strings.Join([]string{
@@ -102,6 +114,9 @@ func TestDialogMessages_TheAllowedShapes(t *testing.T) {
 			`function dialogMarkup(parts, ...values) {}`,
 			`function dialogMarkupFormat(key, params) {}`,
 			`function showModalDialog(id, title, message) {}`,
+			`const { dialogMarkup, dialogMarkupFormat, showModalDialog } = (function () {`,
+			`  return { dialogMarkup, dialogMarkupFormat, showModalDialog };`,
+			`})();`,
 			`showModalDialog(id, t("js.error.error_title"), dialogMarkupFormat("js.error.unexpected", { detail: err }));`,
 			`showModalDialog(id, t("js.error.session_expired_title"), t("js.error.session_expired_body"));`,
 		}, "\n"))},

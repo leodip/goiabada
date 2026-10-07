@@ -2,8 +2,11 @@ package web
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/leodip/goiabada/core/guard"
 )
 
 // utilsJS returns the real embedded static/utils.js, the file the browser is served.
@@ -57,21 +60,21 @@ func jsLiteral(s string) string {
 // first, is out of this check's reach.
 func TestUtilsJS_ErrorDescriptionReachesTheDialogAsText(t *testing.T) {
 	content := utilsJS(t)
-	toks := lexScript(content, 0, len(content), false)
+	toks := guard.TokenizeScript(content)
 
-	isDescription := func(toks []scriptToken, i int) bool {
-		return i+2 < len(toks) && toks[i].is(tokIdent, "err") && toks[i+1].is(tokPunct, ".") &&
-			toks[i+2].is(tokIdent, "error_description")
+	isDescription := func(toks []guard.ScriptToken, i int) bool {
+		return i+2 < len(toks) && toks[i].Is(guard.ScriptIdent, "err") && toks[i+1].Is(guard.ScriptPunct, ".") &&
+			toks[i+2].Is(guard.ScriptIdent, "error_description")
 	}
 
 	whole := map[int]bool{}
 	for i, tok := range toks {
-		if !tok.is(tokIdent, "showModalDialog") || (i > 0 && toks[i-1].is(tokIdent, "function")) ||
-			i+1 >= len(toks) || !toks[i+1].is(tokPunct, "(") {
+		if !tok.Is(guard.ScriptIdent, "showModalDialog") || (i > 0 && toks[i-1].Is(guard.ScriptIdent, "function")) ||
+			i+1 >= len(toks) || !toks[i+1].Is(guard.ScriptPunct, "(") {
 			continue
 		}
 		if arg := callArgument(toks, i+2, 2); len(arg) == 3 && isDescription(arg, 0) {
-			whole[arg[0].at] = true
+			whole[arg[0].Offset] = true
 		}
 	}
 
@@ -81,8 +84,8 @@ func TestUtilsJS_ErrorDescriptionReachesTheDialogAsText(t *testing.T) {
 			continue
 		}
 		found++
-		if !whole[toks[i].at] {
-			line := 1 + strings.Count(content[:toks[i].at], "\n")
+		if !whole[toks[i].Offset] {
+			line := toks[i].Line
 			t.Errorf("static/utils.js:%d: err.error_description is not handed to showModalDialog "+
 				"whole, as its message; the dialog shows a plain message as text, so escaping it "+
 				"first shows its entities as typed, and it carries no markup for a builder to keep (#120)",
@@ -94,13 +97,12 @@ func TestUtilsJS_ErrorDescriptionReachesTheDialogAsText(t *testing.T) {
 			"or removed, so this check no longer covers anything. Update it to name the new sink")
 	}
 
-	body := regexp.MustCompile(`(?s)\nfunction\s+showModalDialog\s*\([^)]*\)\s*\{(.*?)\n\}`).
-		FindStringSubmatch(content)
-	if body == nil {
-		t.Fatalf("static/utils.js: function showModalDialog not found, or its body is not a brace " +
-			"block ending at column zero; this check cannot read it (#120)")
+	_, body, ok := functionBody(content, "showModalDialog")
+	if !ok {
+		t.Fatalf("static/utils.js: function showModalDialog not found, or its body cannot be read; " +
+			"this check cannot read it (#120)")
 	}
-	if !strings.Contains(body[1], ".textContent = message;") {
+	if !strings.Contains(body, ".textContent = message;") {
 		t.Errorf("static/utils.js: showModalDialog no longer writes a plain message through " +
 			"textContent; a message its builders did not build is shown as text (#120)")
 	}
@@ -339,19 +341,17 @@ func TestUtilsJS_DialogMarkupEscapesEveryValue(t *testing.T) {
 		{"dialogMarkup", "values", []string{"escapeHtml(values[", "values.length"}},
 		{"dialogMarkupFormat", "params", []string{"escapeHtml(params[", "in params)"}},
 	} {
-		bodyRe := regexp.MustCompile(`(?s)\nfunction\s+` + b.fn + `\s*\(([^)]*)\)\s*\{(.*?)\n\}`)
-		m := bodyRe.FindStringSubmatch(content)
-		if m == nil {
-			t.Errorf("static/utils.js: function %s not found, or its body is not a brace block "+
-				"ending at column zero; this check cannot read it (#120)", b.fn)
+		params, body, ok := functionBody(content, b.fn)
+		if !ok {
+			t.Errorf("static/utils.js: function %s not found, or its body cannot be read; this "+
+				"check cannot read it (#120)", b.fn)
 			continue
 		}
-		if !strings.Contains(m[1], b.values) {
+		if !strings.Contains(params, b.values) {
 			t.Errorf("static/utils.js: %s no longer takes its values as %q; update this check to "+
 				"name them (#120)", b.fn, b.values)
 			continue
 		}
-		body := m[2]
 		nameRe := regexp.MustCompile(`\b` + b.values + `\b`)
 		escaped := 0
 		for _, at := range nameRe.FindAllStringIndex(body, -1) {
@@ -385,4 +385,156 @@ func lineAround(s string, i int) string {
 		return s[start:]
 	}
 	return s[start : i+end]
+}
+
+// functionBody returns the parameter list and the body of the one function declared as name in the
+// JavaScript source src, each without its brackets, read through the tokenizer so its indentation
+// does not matter.
+func functionBody(src, name string) (params, body string, ok bool) {
+	toks := guard.TokenizeScript(src)
+	for i := 0; i+2 < len(toks); i++ {
+		if !toks[i].Is(guard.ScriptIdent, "function") || !toks[i+1].Is(guard.ScriptIdent, name) ||
+			!toks[i+2].Is(guard.ScriptPunct, "(") {
+			continue
+		}
+		closeParams := matching(toks, i+2)
+		if closeParams < 0 || closeParams+1 >= len(toks) || !toks[closeParams+1].Is(guard.ScriptPunct, "{") {
+			return "", "", false
+		}
+		closeBody := matching(toks, closeParams+1)
+		if closeBody < 0 {
+			return "", "", false
+		}
+		return src[toks[i+2].Offset+1 : toks[closeParams].Offset],
+			src[toks[closeParams+1].Offset+1 : toks[closeBody].Offset], true
+	}
+	return "", "", false
+}
+
+// matching returns the index of the bracket closing the one at toks[open], or -1.
+func matching(toks []guard.ScriptToken, open int) int {
+	closer := map[string]string{"(": ")", "[": "]", "{": "}"}[toks[open].Text]
+	depth := 0
+	for j := open; j < len(toks); j++ {
+		switch {
+		case toks[j].Is(guard.ScriptPunct, toks[open].Text):
+			depth++
+		case toks[j].Is(guard.ScriptPunct, closer):
+			depth--
+			if depth == 0 {
+				return j
+			}
+		}
+	}
+	return -1
+}
+
+// dialogExports are the names the dialog's markup boundary in utils.js hands out.
+var dialogExports = []string{"dialogMarkup", "dialogMarkupFormat", "showModalDialog"}
+
+// TestUtilsJS_DialogMarkupBrandIsPrivate pins where the dialog's markup boundary is kept (#120,
+// decision 1). showModalDialog parses a message as HTML when it carries the brand its builders put
+// on what they built, so whatever can put that brand on a value can hand the dialog raw markup.
+// That is the registry and the function adding to it, and both are private to one closure in
+// utils.js, which exports the two builders and the dialog and nothing else. Were the registry or the
+// sealing function declared at the top level, any page could brand a value it never escaped.
+//
+// Lexical, like its neighbours: the file declares the three names once, by destructuring them from
+// a function expression called in place; that function's one return is a list of exactly those
+// names; the registry, the file's one WeakSet, is created inside it, and nothing inside it names
+// window, globalThis or self, which is how a closure would leak a name past its return.
+func TestUtilsJS_DialogMarkupBrandIsPrivate(t *testing.T) {
+	content := utilsJS(t)
+	toks := guard.TokenizeScript(content)
+
+	names := func(open int) ([]string, int) {
+		closeAt := matching(toks, open)
+		if closeAt < 0 {
+			return nil, -1
+		}
+		var out []string
+		for j := open + 1; j < closeAt; j++ {
+			switch {
+			case toks[j].Kind == guard.ScriptIdent && (toks[j+1].Is(guard.ScriptPunct, ",") || j+1 == closeAt):
+				out = append(out, toks[j].Text)
+			case toks[j].Is(guard.ScriptPunct, ","):
+			default:
+				return nil, -1
+			}
+		}
+		slices.Sort(out)
+		return out, closeAt
+	}
+
+	// const { ... } = (function () { ... })();
+	start := -1
+	for i := 0; i+1 < len(toks); i++ {
+		if toks[i].Is(guard.ScriptIdent, "const") && toks[i+1].Is(guard.ScriptPunct, "{") {
+			if got, end := names(i + 1); end >= 0 && slices.Equal(got, dialogExports) {
+				start = end
+				break
+			}
+		}
+	}
+	if start < 0 {
+		t.Fatalf("static/utils.js: no `const { %s } = ...` declaring the dialog's three names; "+
+			"the boundary keeping the markup brand private is gone or reshaped (#120)",
+			strings.Join(dialogExports, ", "))
+	}
+	head := []string{"=", "(", "function", "(", ")", "{"}
+	for k, want := range head {
+		if j := start + 1 + k; j >= len(toks) || toks[j].Text != want {
+			t.Fatalf("static/utils.js:%d: the dialog's names are not destructured from a function "+
+				"expression called in place, `= (function () { ... })();`; the brand is private "+
+				"only inside such a closure (#120)", toks[start].Line)
+		}
+	}
+	bodyOpen := start + len(head)
+	bodyClose := matching(toks, bodyOpen)
+	if bodyClose < 0 || bodyClose+4 >= len(toks) || !toks[bodyClose+1].Is(guard.ScriptPunct, ")") ||
+		!toks[bodyClose+2].Is(guard.ScriptPunct, "(") || !toks[bodyClose+3].Is(guard.ScriptPunct, ")") {
+		t.Fatalf("static/utils.js: the dialog's closure is not called in place (#120)")
+	}
+
+	depth := 0
+	returns, weakSets := 0, 0
+	for j := bodyOpen + 1; j < bodyClose; j++ {
+		tok := toks[j]
+		switch {
+		case tok.Is(guard.ScriptPunct, "{"):
+			depth++
+		case tok.Is(guard.ScriptPunct, "}"):
+			depth--
+		case tok.Is(guard.ScriptIdent, "return") && depth == 0:
+			returns++
+			got, end := names(j + 1)
+			if !toks[j+1].Is(guard.ScriptPunct, "{") || end < 0 || !slices.Equal(got, dialogExports) {
+				t.Errorf("static/utils.js:%d: the dialog's closure returns something other than "+
+					"{ %s }; whatever else it hands out is outside the boundary, and the brand "+
+					"must not be (#120)", tok.Line, strings.Join(dialogExports, ", "))
+			}
+		case tok.Kind == guard.ScriptIdent && (tok.Text == "window" || tok.Text == "globalThis" || tok.Text == "self"):
+			t.Errorf("static/utils.js:%d: the dialog's closure names %s, through which it can hand "+
+				"out what its return does not (#120)", tok.Line, tok.Text)
+		}
+	}
+	if returns != 1 {
+		t.Errorf("static/utils.js: the dialog's closure returns %d times at its top level; it "+
+			"returns its three names once (#120)", returns)
+	}
+
+	for j, tok := range toks {
+		if !tok.Is(guard.ScriptIdent, "WeakSet") {
+			continue
+		}
+		weakSets++
+		if j <= bodyOpen || j >= bodyClose {
+			t.Errorf("static/utils.js:%d: a WeakSet is created outside the dialog's closure; the "+
+				"registry of built messages lives inside it, where no page can add to it (#120)", tok.Line)
+		}
+	}
+	if weakSets != 1 {
+		t.Errorf("static/utils.js: found %d WeakSets; the dialog's registry is the one, inside its "+
+			"closure, and this check names it by that (#120)", weakSets)
+	}
 }

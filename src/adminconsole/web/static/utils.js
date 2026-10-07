@@ -53,67 +53,73 @@ function goToSessionEnded() {
   window.location.assign(SESSION_ENDED_PATH);
 }
 
-// dialogMarkups holds every message dialogMarkup and dialogMarkupFormat have built, so that
-// showModalDialog can tell one from a string, and nothing but those two can make one.
-const dialogMarkups = new WeakSet();
+// The dialog's markup boundary. showModalDialog parses a message as HTML only when dialogMarkup or
+// dialogMarkupFormat built it, and shows any other message as text, so a value reaching it by any
+// route is never parsed (#120). What marks a message as built, the registry and the function that
+// adds to it, is private to this closure: a page reaches the HTML branch through the two builders,
+// which escape every value, and through nothing else. TestUtilsJS_DialogMarkupBrandIsPrivate holds
+// the closure to exporting these three and nothing more.
+const { dialogMarkup, dialogMarkupFormat, showModalDialog } = (function () {
+  const built = new WeakSet();
 
-function sealDialogMarkup(html) {
-  const markup = Object.freeze({ html: html });
-  dialogMarkups.add(markup);
-  return markup;
-}
-
-// dialogMarkup builds a dialog message that keeps its markup, an accent span or a line break, from
-// the catalog: parts are catalog literals and values go between them, each escaped, so a value is
-// always shown as text. A part is never data; TestDialogMessages_MarkupOnlyThroughTheBuilder holds
-// every call's parts to an array of catalog literals (#120).
-function dialogMarkup(parts, ...values) {
-  if (!Array.isArray(parts) || parts.length !== values.length + 1) {
-    throw new Error("dialogMarkup takes one more part than it takes arguments to escape");
-  }
-  let html = parts[0];
-  for (let i = 0; i < values.length; i++) {
-    html += escapeHtml(values[i]) + parts[i + 1];
-  }
-  return sealDialogMarkup(html);
-}
-
-// dialogMarkupFormat is dialogMarkup for a client-side catalog sentence: it substitutes the
-// {{name}} placeholders of key's catalog value with params, each escaped, and keeps the sentence's
-// own markup (#120).
-function dialogMarkupFormat(key, params) {
-  let html = t(key);
-  for (const name in params) {
-    html = html.split("{{" + name + "}}").join(escapeHtml(params[name]));
-  }
-  return sealDialogMarkup(html);
-}
-
-// showModalDialog parses message as HTML only when dialogMarkup or dialogMarkupFormat built it, and
-// shows any other message as text, so a value reaching it by any route is never parsed (#120).
-function showModalDialog(id, title, message, btn1callback, btn2callback) {
-  document.getElementById(id + "_modalDialogTitle").innerText = title;
-  const messageElement = document.getElementById(id + "_modalDialogMessage");
-  if (dialogMarkups.has(message)) {
-    messageElement.innerHTML = message.html;
-  } else {
-    messageElement.textContent = message;
+  function seal(html) {
+    const markup = Object.freeze({ html: html });
+    built.add(markup);
+    return markup;
   }
 
-  const btn1 = document.getElementById(id + "_btnModal1");
-  if (btn1 && btn1callback) {
-    btn1.onclick = null;
-    btn1.onclick = btn1callback;
+  // dialogMarkup builds a dialog message that keeps its markup, an accent span or a line break,
+  // from the catalog: parts are catalog literals and values go between them, each escaped, so a
+  // value is always shown as text. A part is never data; TestDialogMessages_MarkupOnlyThroughTheBuilder
+  // holds every call's parts to an array of catalog literals (#120).
+  function dialogMarkup(parts, ...values) {
+    if (!Array.isArray(parts) || parts.length !== values.length + 1) {
+      throw new Error("dialogMarkup takes one more part than it takes arguments to escape");
+    }
+    let html = parts[0];
+    for (let i = 0; i < values.length; i++) {
+      html += escapeHtml(values[i]) + parts[i + 1];
+    }
+    return seal(html);
   }
 
-  const btn2 = document.getElementById(id + "_btnModal2");
-  if (btn2 && btn2callback) {
-    btn2.onclick = null;
-    btn2.onclick = btn2callback;
+  // dialogMarkupFormat is dialogMarkup for a client-side catalog sentence: it substitutes the
+  // {{name}} placeholders of key's catalog value with params, each escaped, and keeps the
+  // sentence's own markup (#120).
+  function dialogMarkupFormat(key, params) {
+    let html = t(key);
+    for (const name in params) {
+      html = html.split("{{" + name + "}}").join(escapeHtml(params[name]));
+    }
+    return seal(html);
   }
 
-  document.getElementById(id + "_modalDialog").showModal();
-}
+  function showModalDialog(id, title, message, btn1callback, btn2callback) {
+    document.getElementById(id + "_modalDialogTitle").innerText = title;
+    const messageElement = document.getElementById(id + "_modalDialogMessage");
+    if (built.has(message)) {
+      messageElement.innerHTML = message.html;
+    } else {
+      messageElement.textContent = message;
+    }
+
+    const btn1 = document.getElementById(id + "_btnModal1");
+    if (btn1 && btn1callback) {
+      btn1.onclick = null;
+      btn1.onclick = btn1callback;
+    }
+
+    const btn2 = document.getElementById(id + "_btnModal2");
+    if (btn2 && btn2callback) {
+      btn2.onclick = null;
+      btn2.onclick = btn2callback;
+    }
+
+    document.getElementById(id + "_modalDialog").showModal();
+  }
+
+  return { dialogMarkup, dialogMarkupFormat, showModalDialog };
+})();
 
 // createIconButton returns a small ghost button holding one icon drawn from the path data in
 // pathData, built with DOM calls so no value reaches an HTML parser. onclick is called with the
