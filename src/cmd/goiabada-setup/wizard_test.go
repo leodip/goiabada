@@ -522,6 +522,41 @@ func TestWizard_AChosenAdminPasswordIsJudged(t *testing.T) {
 	}
 }
 
+// The auth server reads GOIABADA_ADMIN_PASSWORD with the whitespace around it trimmed, so a given
+// admin password is written as that start will read it, which is the password the administrator
+// signs in with, and judged as such (#500).
+func TestWizard_AGivenAdminPasswordIsWrittenAsTheFirstStartReadsIt(t *testing.T) {
+	const padded, password = " \tZq7AdminPadded-Passw0rd  ", "Zq7AdminPadded-Passw0rd"
+	for name, set := range map[string]func(t *testing.T, f *CLIFlags){
+		"--admin-password": func(_ *testing.T, f *CLIFlags) { f.AdminPassword = padded },
+		"--admin-password-file": func(t *testing.T, f *CLIFlags) {
+			f.AdminPasswordFile = filepath.Join(t.TempDir(), "admin-password")
+			if err := os.WriteFile(f.AdminPasswordFile, []byte(padded+"\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			flags := nonInteractiveFlags(deploymentNative, testEngine("postgres"), false)
+			set(t, flags)
+			w, _, out, _ := testWizard(t, flags, nil)
+			if err := w.setup(); err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			if w.config.AdminPassword != password || w.config.AdminPasswordGenerated {
+				t.Errorf("admin password %q, generated %v; want %q, set", w.config.AdminPassword, w.config.AdminPasswordGenerated, password)
+			}
+			secrets, err := os.ReadFile(w.paths.secrets)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if line := `GOIABADA_ADMIN_PASSWORD="` + password + `"`; !strings.Contains(string(secrets), line) {
+				t.Errorf("the secrets file lacks %q:\n%s", line, secrets)
+			}
+		})
+	}
+}
+
 // A non-interactive run can be given an existing database's password, and the admin password, with
 // nothing secret on its command line: --db-password and --admin-password reach shell history and the
 // process list, and leaving them out generates a password no existing database user has. Each file
@@ -841,6 +876,13 @@ func TestWizard_NonInteractiveRefusals(t *testing.T) {
 		"--admin-password-file changeme":         {native(func(f *CLIFlags) { f.AdminPasswordFile = passwordFile("changeme\n") }), "invalid --admin-password-file: it is changeme, a password this project published"},
 		"--admin-password-file of 14 characters": {native(func(f *CLIFlags) { f.AdminPasswordFile = passwordFile("Abcdefgh-12345\n") }), "invalid --admin-password-file: it is 14 characters long"},
 		"--admin-password-file of 73 bytes":      {native(func(f *CLIFlags) { f.AdminPasswordFile = passwordFile(strings.Repeat("Ab1-", 18) + "x") }), "invalid --admin-password-file: it is 73 bytes long"},
+		// The auth server trims the whitespace around every variable it reads, so the rule is applied
+		// to what the first start will see, not to what the flag carried (#500).
+		"--admin-password of 14 characters inside spaces":      {native(func(f *CLIFlags) { f.AdminPassword = " Abcdefgh-12345 " }), "invalid --admin-password: it is 14 characters long"},
+		"--admin-password changeme inside spaces":              {native(func(f *CLIFlags) { f.AdminPassword = "\tchangeme  " }), "invalid --admin-password: it is changeme"},
+		"--admin-password of only spaces":                      {native(func(f *CLIFlags) { f.AdminPassword = "   " }), "invalid --admin-password: it is empty"},
+		"--admin-password-file of 14 characters inside spaces": {native(func(f *CLIFlags) { f.AdminPasswordFile = passwordFile(" Abcdefgh-12345 \n") }), "invalid --admin-password-file: it is 14 characters long"},
+		"--admin-password-file of only spaces":                 {native(func(f *CLIFlags) { f.AdminPasswordFile = passwordFile("  \t\n") }), "invalid --admin-password-file: it is empty"},
 	}
 	// Every flag whose value is written into the file, refused by its name when it is not UTF-8 or
 	// holds NUL, before a step reads it (#430). Each would otherwise be refused, if at all, by a
