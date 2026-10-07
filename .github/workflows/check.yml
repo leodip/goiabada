@@ -502,6 +502,29 @@ jobs:
         working-directory: src/authserver
         run: ./run-tests.sh --type adminconsole --race --no-build
 
+  # The docs site and the image that serves it. No path filter: the site's build
+  # reads src/, whose code the shipped-link check holds to the built pages, so a
+  # Go change that moves a docs link fails here. Everything runs in the docs
+  # image's own stages, so the checks' tests and the build use the Node version
+  # the image is built with, and the build is the one a release pushes: it fails
+  # on a broken internal link or heading anchor, and on a goiabada.dev link in
+  # src/ that names no built page. The last step asserts nginx's answers, which
+  # only a running image shows.
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Site check tests
+        run: |
+          set -euo pipefail
+          docker build --target sources -f site/Dockerfile -t goiabada-docs-sources:ci .
+          docker run --rm goiabada-docs-sources:ci npm test
+      - name: Build the site and the docs image
+        run: docker build -f site/Dockerfile -t goiabada-docs:ci .
+      - name: Docs server answers
+        run: site/checks/docs-image.sh goiabada-docs:ci
+
   # The four database jobs are written out rather than expressed as a matrix.
   # `matrix` IS available to `services`, so a matrix is possible -- this is a
   # readability choice. Each database needs its own env block, health command

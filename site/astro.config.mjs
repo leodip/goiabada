@@ -1,14 +1,23 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightLinksValidator from 'starlight-links-validator';
+import { fileURLToPath } from 'node:url';
+
+import buildChecks from './checks/build-checks.mjs';
 
 const googleAnalyticsId = 'G-CYZXDTHNB1'
 
 // https://astro.build/config
 export default defineConfig({
+	site: 'https://goiabada.dev',
 	integrations: [
 		starlight({
 			title: 'Goiabada',
+			// Fails the build on an internal link to no page, or to a fragment no heading on
+			// its target produces (#511). An http://localhost link is an example of a local
+			// install, not a link to this site, so it is not checked.
+			plugins: [starlightLinksValidator({ errorOnLocalLinks: false })],
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/leodip/goiabada' }],
 			favicon: '/favicon.ico',
 			head: [
@@ -114,5 +123,8 @@ export default defineConfig({
 				},
 			],
 		}),
+		// After Starlight, so its checks read the finished pages. The repository's
+		// src/ is beside this directory, in a checkout and in the docs image's build.
+		buildChecks({ srcDir: fileURLToPath(new URL('../src/', import.meta.url)) }),
 	],
 });

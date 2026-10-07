@@ -7,11 +7,13 @@
     "start": "NODE_OPTIONS='--max-http-header-size=32768' astro dev",
     "build": "astro build",
     "preview": "astro preview",
+    "test": "node --test 'checks/*.test.mjs'",
     "astro": "astro"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.42.0",
     "astro": "^7.3.2",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "starlight-links-validator": "^0.26.0"
   }
 }
