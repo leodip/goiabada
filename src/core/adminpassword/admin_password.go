@@ -1,4 +1,10 @@
-package inputvalidation
+// Package adminpassword holds Check, the one rule for the first administrator's password, which
+// the auth server's first start and the setup wizard both apply (#500). It is a package of its own,
+// importing nothing beyond the standard library and core/errs, because the wizard links whatever its
+// home imports: in core/inputvalidation, beside the identifier validator's localized refusal, it
+// brought core/i18n, core/oauth, a TOML parser and a JWT library into a binary that uses none of
+// them.
+package adminpassword
 
 import (
 	"unicode/utf8"
@@ -20,13 +26,13 @@ const (
 	publishedAdminPassword = "changeme"
 )
 
-// CheckAdminPassword answers why password may not be the first administrator's, or nil when it
-// may. The first start seeds that administrator, holding authserver:manage, with a password no
-// other validator sees, and the setup wizard writes the configuration that start reads, so the
-// rule is defined once here, where both can reach it, and the two cannot disagree on which
-// passwords seed (#500). The reason names no
-// variable or flag: each caller knows which one the password came from and says so.
-func CheckAdminPassword(password string) error {
+// Check answers why password may not be the first administrator's, or nil when it may. The first
+// start seeds that administrator, holding authserver:manage, with a password no other validator
+// sees, and the setup wizard writes the configuration that start reads, so the rule is defined
+// once here, where both can reach it, and the two cannot disagree on which passwords seed (#500).
+// The reason names no variable or flag: each caller knows which one the password came from and
+// says so.
+func Check(password string) error {
 	if password == "" {
 		return errs.Errorf("it is empty, and the first administrator needs a password of at least %d characters",
 			adminPasswordMinCharacters)

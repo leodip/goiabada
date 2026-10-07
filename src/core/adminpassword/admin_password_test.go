@@ -1,4 +1,4 @@
-package inputvalidation
+package adminpassword
 
 import (
 	"strings"
@@ -11,7 +11,7 @@ import (
 // The first administrator's password on each side of both bounds: 15 characters, counted as
 // characters, and bcrypt's 72 bytes, counted as bytes (#500 decision 1, #409). The bounds are
 // literals here rather than the rule's own constants, so a test cannot agree with a moved bound.
-func TestCheckAdminPassword_AcceptsWithinBothBounds(t *testing.T) {
+func TestCheck_AcceptsWithinBothBounds(t *testing.T) {
 	for name, password := range map[string]string{
 		"15 ASCII characters":                   strings.Repeat("a", 15),
 		"15 two-byte characters, 30 bytes":      strings.Repeat("é", 15),
@@ -20,12 +20,12 @@ func TestCheckAdminPassword_AcceptsWithinBothBounds(t *testing.T) {
 		"a generated password of 16 characters": "Xq7-mZp2_vR9tLk4",
 	} {
 		t.Run(name, func(t *testing.T) {
-			assert.NoError(t, CheckAdminPassword(password))
+			assert.NoError(t, Check(password))
 		})
 	}
 }
 
-func TestCheckAdminPassword_Refuses(t *testing.T) {
+func TestCheck_Refuses(t *testing.T) {
 	cases := []struct {
 		name     string
 		password string
@@ -40,7 +40,7 @@ func TestCheckAdminPassword_Refuses(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := CheckAdminPassword(tc.password)
+			err := Check(tc.password)
 			require.Error(t, err)
 			for _, part := range tc.reason {
 				assert.Contains(t, err.Error(), part)
@@ -51,8 +51,8 @@ func TestCheckAdminPassword_Refuses(t *testing.T) {
 
 // changeme is refused with a reason of its own even though the length rule would refuse it too,
 // so the operator who copied it from an old guide is told why (#500 decision 1).
-func TestCheckAdminPassword_ChangemeIsNotRefusedForItsLength(t *testing.T) {
-	err := CheckAdminPassword("changeme")
+func TestCheck_ChangemeIsNotRefusedForItsLength(t *testing.T) {
+	err := Check("changeme")
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "8 characters")
 }

@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/leodip/goiabada/core/adminpassword"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 // wizard fills a Config one step at a time, from the prompts or, when --type was given, from the
@@ -623,7 +623,7 @@ func (w *wizard) askAdmin() error {
 		adminPassword = strings.TrimSpace(adminPassword)
 		// The first start refuses to seed what this refuses, so writing it would ship a deployment
 		// that cannot start (#500).
-		if err := inputvalidation.CheckAdminPassword(adminPassword); err != nil {
+		if err := adminpassword.Check(adminPassword); err != nil {
 			flag := "--admin-password"
 			if w.flags.AdminPasswordFile != "" {
 				flag = "--admin-password-file"

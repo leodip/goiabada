@@ -269,8 +269,8 @@ func validateDatabaseName(name string) error {
 }
 
 // checkPasswordStrength names the character classes a chosen admin password lacks, which the
-// operator may accept. Its length is not judged here: inputvalidation.CheckAdminPassword refuses one
-// the first start would not seed before this is asked (#500).
+// operator may accept. Its length is not judged here: adminpassword.Check refuses one the first
+// start would not seed before this is asked (#500).
 func checkPasswordStrength(password string) []string {
 	var issues []string
 	hasUpper := false

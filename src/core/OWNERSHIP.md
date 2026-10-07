@@ -99,6 +99,7 @@ command itself and fails on a tree it changed.
 
 | package | symbol | justification | note |
 |---|---|---|---|
+| `core/adminpassword` | `Check` | contract | The one rule for which admin passwords the first start seeds the first administrator with. The setup wizard, which is not one of the two applications, writes the configuration that start reads, and the two must agree on which passwords seed, so the rule is defined once here for both rather than copied into each (#500 decision 6). |
 | `core/api` | `AccountEmailVerificationSendResponse` | both-apps | — |
 | `core/api` | `AccountLogoutFormPostResponse` | both-apps | — |
 | `core/api` | `AccountLogoutRedirectResponse` | both-apps | — |
@@ -387,7 +388,6 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `T` | kernel | — |
 | `core/i18n` | `UILocalesReader` | reachable | — |
 | `core/i18n` | `WithLocale` | both-apps | — |
-| `core/inputvalidation` | `CheckAdminPassword` | contract | The one rule for which admin passwords the first start seeds the first administrator with. The setup wizard, which is not one of the two applications, writes the configuration that start reads, and the two must agree on which passwords seed, so the rule is defined once here for both rather than copied into each (#500 decision 6). |
 | `core/inputvalidation` | `ContainsAngleBrackets` | both-apps | — |
 | `core/inputvalidation` | `IdentifierValidator` | own-package | — |
 | `core/inputvalidation` | `NewIdentifierValidator` | both-apps | — |

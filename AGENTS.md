@@ -22,6 +22,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 ## Key Directories
 
 ### Core (`src/core/`)
+- `adminpassword/` - The one rule for the first administrator's password, `Check`: at least 15 characters, at most bcrypt's 72 bytes, and never `changeme`. The auth server's first start and the setup wizard both apply it, so the two cannot disagree on which passwords seed. A leaf of its own, importing only `core/errs`, because in `inputvalidation` it linked `core/i18n`, `core/oauth`, TOML and JWT into the wizard (#500)
 - `api/` - The admin API wire contract: request and response DTOs, declarations only, importing no persistence model. The model-to-DTO mapping belongs to the auth server, in `internal/apimapping` (#350). One file per resource, each holding its requests beside its responses (#441)
 - `boundedread/` - The one rule for a capped response body: read one byte past the cap and refuse the overrun rather than decode a prefix. Nine callers: the admin console's seven reads from the auth server, `internal/pinnedfetch`, which the generators download through, and the timezones generator's read of the decompressed tarball (#386, #432)
 - `buildinfo/` - The build stamp both servers report, `Version`, `BuildDate` and `GitCommit`, which the release builds set with `-ldflags -X` and which read `development` in any other build. It left `core/constants` beside `builtin/` when that package split, because the linker writes these values rather than the two processes agreeing on them (#442)

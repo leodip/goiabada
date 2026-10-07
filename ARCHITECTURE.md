@@ -92,6 +92,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 
 | package | owner | moves in |
 |---|---|---|
+| `core/adminpassword` | kernel | — |
 | `core/api` | kernel | — |
 | `core/boundedread` | kernel | — |
 | `core/buildinfo` | kernel | — |
@@ -142,6 +143,11 @@ Notes on rows that are not self-evident:
   labels take only declared values, the Prometheus text exposition and the request middleware. It is
   written here rather than taken from `prometheus/client_golang`, which would add eight modules and
   link `expvar` into both binaries, and which takes any string as a label value (#400).
+- `core/adminpassword` is kernel because the auth server's first start and the setup wizard apply
+  its one rule, and it is a package of its own rather than a file in `core/inputvalidation` because
+  the wizard links whatever its home imports: there, the identifier validator's `core/i18n` import
+  brought the message catalogs, `core/oauth`, a TOML parser and a JWT library into a binary that
+  uses none of them (#500).
 - `core/api` is declarations and nothing else. The model-aware `ToResponse` mapping left for
   `authserver/internal/apimapping` in #350, the model-typed fields became DTOs of its own, and the
   reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites are
