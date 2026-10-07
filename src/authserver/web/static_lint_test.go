@@ -176,7 +176,7 @@ func TestUtilsJS_EveryFunctionIsReachedFromATemplate(t *testing.T) {
 // TestLayouts_JSBootstrapHasAReader states the coherence rule the JSBootstrap chain needs, as an
 // implication in both directions, so that either half alone fails and both halves together pass.
 //
-// The chain is: a layout emits {{ JSBootstrap }}, which renders <script>window.i18n={...}</script>,
+// The chain is: a layout writes <script>window.i18n={{ JSBootstrap }};</script>, the catalog map as JSON,
 // and a served script reads window.i18n to resolve a key. Half of it is useless and neither half
 // fails loudly on its own. The block without a reader is what the auth server shipped until #360 --
 // nineteen localized strings on every page, eleven of them for an image-upload script this server

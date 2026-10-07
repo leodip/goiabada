@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,6 +57,25 @@ func TestVersionCommentFuncMap(t *testing.T) {
 
 	if result != expectedHTML {
 		t.Errorf("versionComment() = %v, want %v", result, expectedHTML)
+	}
+}
+
+// TestJSBootstrapFuncMap_HandsTheEngineAValueNotMarkup holds the bootstrap helper to returning the
+// catalog as data. Each layout writes the script element around it, so the engine escapes the map
+// for the script it lands in; written anywhere else it is escaped as text and opens no element. A
+// helper returning its own script element as typed-safe markup would be copied out as it stands,
+// wherever it was called (#120).
+func TestJSBootstrapFuncMap_HandsTheEngineAValueNotMarkup(t *testing.T) {
+	tmpl := template.Must(template.New("p").Funcs(templateFuncMap).Parse(`<p>{{ JSBootstrap .ctx }}</p>`))
+	var out strings.Builder
+	if err := tmpl.Execute(&out, map[string]any{"ctx": context.Background()}); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if strings.Contains(out.String(), "<script") {
+		t.Errorf("JSBootstrap wrote markup into an HTML text context: %s", out.String())
+	}
+	if !strings.Contains(out.String(), "js.error.unexpected") {
+		t.Errorf("JSBootstrap wrote no catalog entry at all: %s", out.String())
 	}
 }
 
@@ -125,13 +145,14 @@ func TestInstantOf(t *testing.T) {
 	}
 }
 
-// TestTemplateFuncMap_IsThisApplicationsTwentyTwo pins the split #385 made. The one map in core
-// held these same twenty-two and the auth server parsed every template with all of them, though
-// its pages call four: T, Lang, args and versionComment, which are also here. The other eighteen
-// -- the five page predicates over this console's own URL paths, the JS bootstrap block, the
+// TestTemplateFuncMap_IsThisApplicationsTwentyOne pins the split #385 made. The one map in core
+// held twenty-two and the auth server parsed every template with all of them, though its pages
+// call four: T, Lang, args and versionComment, which are also here. The other seventeen -- the
+// five page predicates over this console's own URL paths, the JS bootstrap catalog, the
 // reference-data formatters -- are this application's alone, and a new entry here means one of its
-// templates calls it.
-func TestTemplateFuncMap_IsThisApplicationsTwentyTwo(t *testing.T) {
+// templates calls it. The twenty-second was marshal, which typed the keys page's JSON as already
+// safe and went in #120, the engine escaping that value itself.
+func TestTemplateFuncMap_IsThisApplicationsTwentyOne(t *testing.T) {
 	keys := make([]string, 0, len(templateFuncMap))
 	for k := range templateFuncMap {
 		keys = append(keys, k)
@@ -142,7 +163,7 @@ func TestTemplateFuncMap_IsThisApplicationsTwentyTwo(t *testing.T) {
 		"DateTime", "JSBootstrap", "Lang", "LocaleLabel", "RefCountry", "RefPhoneCountry",
 		"RefTimezone", "Since", "T", "add", "addUrlParam", "args", "concat", "deref",
 		"isAdminClientPage", "isAdminGroupPage", "isAdminResourcePage", "isAdminSettingsEmailPage",
-		"isAdminUserPage", "isLast", "marshal", "versionComment",
+		"isAdminUserPage", "isLast", "versionComment",
 	}
 	if !reflect.DeepEqual(keys, want) {
 		t.Errorf("templateFuncMap = %v, want %v", keys, want)

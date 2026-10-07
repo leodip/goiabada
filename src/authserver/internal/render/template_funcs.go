@@ -10,7 +10,7 @@ import (
 
 // templateFuncMap is the four functions this application's templates call, counted by grepping
 // every declared key against src/authserver/web/template. The admin console's copy of this file
-// declares twenty-two, these four among them.
+// declares twenty-one, these four among them.
 //
 // The one map both binaries parsed with lived in core until #385 and held all twenty-two, so
 // eighteen functions no auth server page can reach -- five console page predicates, the JS
