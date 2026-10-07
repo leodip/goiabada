@@ -3,7 +3,9 @@
 // importing nothing beyond the standard library and core/errs, because the wizard links whatever its
 // home imports: in core/inputvalidation, beside the identifier validator's localized refusal, it
 // brought core/i18n, core/oauth, a TOML parser and a JWT library into a binary that uses none of
-// them. import_lint_test.go holds it to that through guard.AssertImportsOnly.
+// them. core/guard's imports_only_lint_test.go holds it to that, from there and not from a test
+// here: go mod tidy reads the tests of every package the wizard imports, so a test here importing
+// core/guard would put that package's own dependencies in the wizard's go.sum.
 package adminpassword
 
 import (
