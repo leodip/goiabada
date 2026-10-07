@@ -19,15 +19,9 @@ type templateFinding struct {
 	detail string
 }
 
-// WalkHTMLTemplates calls fn for every .html file under root in fsys, with the file's path as fsys
-// spells it and its whole contents as a string.
-//
-// The three rules below are the ones both servers run, and this walk is what they share. It is
-// exported because a fourth caller reaches it: the admin console's own
-// TestTemplates_RedirectURIAndWebOriginCellsAreText, a rule about two of its client pages that
-// belongs to that module alone (#105) and stays there. Sharing the walk and not the rule is the
-// shape of this whole file -- lifting that rule too would make core/guard the place one
-// application's policy lives, which is what ARCHITECTURE.md rule 2 refuses (#333).
+// walkOrFail calls fn for every .html file under root in fsys, with the file's path as fsys spells
+// it and its whole contents as a string. The three rules below are the ones both servers run, and
+// this walk is what they share.
 //
 // Callers pass their //go:embed FS rather than a directory on disk, deliberately. That FS is what
 // the binary renders from, so it is the set a rule about rendered output has to be held against: a
@@ -38,14 +32,9 @@ type templateFinding struct {
 // no file at all is fatal rather than a silent pass. Each of these rules passes vacuously over an
 // empty set, and both callers are green on arrival and have been for releases, so nothing else in
 // any tier can tell a guard that covers every page from one that covers none.
-func WalkHTMLTemplates(t *testing.T, fsys fs.FS, root string, fn func(path, content string)) {
-	t.Helper()
-
-	walkOrFail(t, fsys, root, fn)
-}
-
-// walkOrFail is the reporting half of the walk, failing through a Reporter so a rule test can
-// drive it and the three assertions built on it against a fixture FS. See Reporter in guard.go.
+//
+// It fails through a Reporter so a rule test can drive it and the three assertions built on it
+// against a fixture FS. See Reporter in guard.go.
 func walkOrFail(r Reporter, fsys fs.FS, root string, fn func(path, content string)) {
 	r.Helper()
 

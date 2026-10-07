@@ -2,7 +2,7 @@
 
 function showModalDialog(id, title, message, btn1callback, btn2callback) {
   document.getElementById(id + "_modalDialogTitle").innerText = title;
-  document.getElementById(id + "_modalDialogMessage").innerHTML = message;
+  document.getElementById(id + "_modalDialogMessage").textContent = message;
 
   const btn1 = document.getElementById(id + "_btnModal1");
   if (btn1 && btn1callback) {
