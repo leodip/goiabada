@@ -1,9 +1,7 @@
 package render
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -17,7 +15,7 @@ import (
 )
 
 // This file is one of two. The auth server's copy declares the four entries its templates call --
-// T, Lang, args and versionComment -- and the twenty-two below include those four. The one map
+// T, Lang, args and versionComment -- and the twenty-one below include those four. The one map
 // both binaries parsed with lived in core until #385, so every page this server renders parsed
 // eighteen functions it could not reach, five of them predicates over this console's own URL
 // paths (#385).
@@ -178,42 +176,34 @@ var templateFuncMap = template.FuncMap{
 	// and comments stay in English.
 	"RefTimezone": refTimezone,
 
-	// JSBootstrap renders a <script> block that populates window.i18n with
-	// the strings client-side JS needs (session-expired modal, image-upload
-	// status messages, etc.). The admin console's two layouts call it once
-	// after loading utils.js, whose t() / tFormat() helpers read window.i18n
-	// at runtime; they are the only callers, and a layout that emits the block
-	// without serving a reader ships a table nothing consumes (#360).
+	// JSBootstrap returns the strings client-side JS needs (session-expired modal,
+	// image-upload status messages, etc.), keyed by catalog key, for the
+	// window.i18n script element. The admin console's two layouts write that
+	// element themselves, once, after loading utils.js, whose t() / tFormat()
+	// helpers read window.i18n at runtime; they are the only callers, and a
+	// layout that emits the block without serving a reader ships a table nothing
+	// consumes (#360).
+	//
+	// It returns the map as a plain value rather than the encoded element, so the
+	// template engine escapes it for the script it lands in: as JSON with every
+	// <, > and & escaped, so no catalog value, an operator's override included,
+	// can close the script. It returned the whole element typed as already safe
+	// until #120, which the engine copied out unescaped wherever it was called.
 	//
 	// The set of bootstrap keys is fixed and small. Adding a new client-side
 	// string means: (1) add a "js.*" key to active.en.toml, (2) extend the
 	// jsBootstrapKeys list below, (3) consume via t()/tFormat() in JS.
 	//
-	//
 	// Uses i18n.Raw (not T): several keys carry {{param}} placeholders that
 	// tFormat() substitutes client-side. T() would try to execute them as
 	// text/templates, fail on the unknown "param", and leak the key. Raw
 	// returns the un-templated string so the placeholders reach the browser.
-	"JSBootstrap": func(ctx context.Context) template.HTML {
+	"JSBootstrap": func(ctx context.Context) map[string]string {
 		m := make(map[string]string, len(jsBootstrapKeys))
 		for _, k := range jsBootstrapKeys {
 			m[k] = i18n.Raw(ctx, k)
 		}
-		var buf bytes.Buffer
-		enc := json.NewEncoder(&buf)
-		// SetEscapeHTML is the default but be explicit: it escapes "<", ">",
-		// "&" to their \uXXXX forms, which makes the JSON safe to embed in a
-		// <script> tag (a literal "</script>" inside a value would otherwise
-		// terminate the script).
-		enc.SetEscapeHTML(true)
-		if err := enc.Encode(m); err != nil {
-			slog.ErrorContext(ctx, "unable to encode the js i18n bootstrap", "error", err)
-			return template.HTML("<script>window.i18n={};</script>")
-		}
-		// enc.Encode appends a trailing newline; trim it.
-		out := strings.TrimSpace(buf.String())
-		//nolint:gosec // G203: JSON encoded with HTML escaping, so no value can close the script
-		return template.HTML("<script>window.i18n=" + out + ";</script>")
+		return m
 	},
 
 	// https://dev.to/moniquelive/passing-multiple-arguments-to-golang-templates-16h8
@@ -237,11 +227,6 @@ var templateFuncMap = template.FuncMap{
 		return strings.Join(parts, "")
 	},
 	"addUrlParam": addUrlParam,
-	"marshal": func(v interface{}) template.JS {
-		a, _ := json.Marshal(v)
-		//nolint:gosec // G203: json.Marshal escapes <, > and &, so the value is a JS literal that cannot close its script
-		return template.JS(a)
-	},
 	"versionComment": func() template.HTML {
 		//nolint:gosec // G203: build-time constants stamped by the linker, never request input
 		return template.HTML("<!-- version: " + buildinfo.Version + "; build date: " + buildinfo.BuildDate + "; git commit: " + buildinfo.GitCommit + "-->")

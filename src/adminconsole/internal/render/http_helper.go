@@ -28,7 +28,7 @@ import (
 // The duplication is deliberate and is what owning a renderer costs. The single copy this
 // replaced lived in core and hid two things only one binary ever reached: the loggedInUser and
 // isAdmin page data, which the auth server never binds, and a template FuncMap of which this
-// application calls all twenty-two entries where the auth server calls four. Passing either in as
+// application calls all twenty-one entries where the auth server calls four. Passing either in as
 // a parameter would have left one shared package behaving differently for its two callers, which
 // is the shape #385
 // exists to remove. Drift between the two copies is the accepted price; a change worth making in
