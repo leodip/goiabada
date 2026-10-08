@@ -860,10 +860,10 @@ type signedOutTexts struct {
 
 var (
 	signedOutEnglish = signedOutTexts{
-		pageTitle: "Logged out",
-		heading:   "Logged out",
-		message:   "You have been logged out.",
-		declined:  "We could not return you to the application that logged you out.",
+		pageTitle: "Signed out",
+		heading:   "Signed out",
+		message:   "You have been signed out.",
+		declined:  "We could not return you to the application that signed you out.",
 	}
 	signedOutPortuguese = signedOutTexts{
 		pageTitle: "Sessão encerrada",

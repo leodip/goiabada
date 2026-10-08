@@ -67,15 +67,16 @@ func TestCatalog_ParityEnPtBR(t *testing.T) {
 	}
 }
 
-// logInOrOut matches login, logout, log in, log out and log-in as words, but
-// not a protocol value such as prompt=login, nor login_hint, whose spelling is
-// the protocol's.
-var logInOrOut = regexp.MustCompile(`(?i)(?:^|[^=\w])log[ -]?(?:in|out)\b`)
+// logInOrOut matches login, logout, log in, log out, log-in, logged out,
+// logging in and logged you out as words, but not a protocol value such as
+// prompt=login, nor login_hint, whose spelling is the protocol's.
+var logInOrOut = regexp.MustCompile(`(?i)(?:^|[^=\w])log(?:ged|ging)?(?:[ -]?|\s+(?:you|them|me|us)\s+)(?:in|out)\b`)
 
 // TestCatalog_EnglishSaysSignInAndSignOut holds the English catalog to the
 // glossary's words (#519): "sign in" and "sign out" as verbs, "sign-in" as the
-// noun, never login or logout. Keys are not values, so translation overrides
-// keyed on the old spelling keep working.
+// noun, never login or logout, and "signed out" for what a sign-out leaves.
+// Keys are not values, so translation overrides keyed on the old spelling keep
+// working.
 func TestCatalog_EnglishSaysSignInAndSignOut(t *testing.T) {
 	for k, v := range loadCatalogFlat(t, "active.en.toml") {
 		assert.Falsef(t, logInOrOut.MatchString(v), "active.en.toml: key %q says %q; the UI says sign in, sign out and sign-in", k, v)
@@ -83,10 +84,40 @@ func TestCatalog_EnglishSaysSignInAndSignOut(t *testing.T) {
 }
 
 func TestCatalog_LogInOrOutMatchesOnlyTheWords(t *testing.T) {
-	for _, v := range []string{"Login", "Logout", "Are you sure you want to logout?", "shown on login and consent screens", "Log in", "log-in page", "Log out now"} {
+	for _, v := range []string{"Login", "Logout", "Are you sure you want to logout?", "shown on login and consent screens", "Log in", "log-in page",
+		"Log out now", "Logged out", "You have been logged out.", "while logging in", "the application that logged you out"} {
 		assert.Truef(t, logInOrOut.MatchString(v), "%q should match", v)
 	}
-	for _, v := range []string{"Sign in", "Sign out", "the sign-in page", "You have been logged out.", "prompt=login", "login_hint", "catalogue"} {
+	for _, v := range []string{"Sign in", "Sign out", "the sign-in page", "You have been signed out.", "prompt=login", "login_hint", "catalogue",
+		"logo uploads", "the audit log is", "logged into the audit log"} {
 		assert.Falsef(t, logInOrOut.MatchString(v), "%q should not match", v)
+	}
+}
+
+// otherConceptNames matches the names the English catalog used for a concept
+// the glossary names otherwise (#519): 2FA, 2-factor and two-factor alone for
+// two-factor authentication, and authorization server for the auth server.
+var otherConceptNames = regexp.MustCompile(`(?i)\b(?:2fa|2-factor|two-factor|authorization server)\b`)
+
+// glossaryConceptNames is what otherConceptNames leaves alone: the glossary's
+// own name for the concept.
+var glossaryConceptNames = regexp.MustCompile(`(?i)two-factor authentication`)
+
+// TestCatalog_EnglishNamesEachConceptAsTheGlossaryDoes holds the English
+// catalog to one name per concept, the glossary's: "two-factor authentication"
+// and "auth server".
+func TestCatalog_EnglishNamesEachConceptAsTheGlossaryDoes(t *testing.T) {
+	for k, v := range loadCatalogFlat(t, "active.en.toml") {
+		other := otherConceptNames.FindString(glossaryConceptNames.ReplaceAllString(v, ""))
+		assert.Emptyf(t, other, "active.en.toml: key %q says %q; the glossary says two-factor authentication and auth server", k, v)
+	}
+}
+
+func TestCatalog_OtherConceptNamesMatchesOnlyTheOtherNames(t *testing.T) {
+	for _, v := range []string{"2-factor auth (OTP)", "Users with 2FA enabled", "Your two-factor settings changed", "with the authorization server."} {
+		assert.NotEmptyf(t, otherConceptNames.FindString(glossaryConceptNames.ReplaceAllString(v, "")), "%q should match", v)
+	}
+	for _, v := range []string{"Two-factor authentication", "Your two-factor authentication settings changed", "with the auth server.", "authorization code"} {
+		assert.Emptyf(t, otherConceptNames.FindString(glossaryConceptNames.ReplaceAllString(v, "")), "%q should not match", v)
 	}
 }

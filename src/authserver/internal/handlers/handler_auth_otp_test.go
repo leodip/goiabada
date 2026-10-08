@@ -1637,7 +1637,7 @@ func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 	}{
 		{
 			locale:  "en",
-			title:   "Your two-factor settings changed",
+			title:   "Your two-factor authentication settings changed",
 			message: "The two-factor authentication settings of this account changed while you were signing in, so this sign-in cannot continue. Go back to the application you were signing in to and sign in again.",
 		},
 		{

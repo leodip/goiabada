@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Goiabada API
   description: |
-    REST API for Goiabada authentication and authorization server.
+    The REST API of the Goiabada auth server.
 
     ## Authentication
 
@@ -2580,7 +2580,7 @@ paths:
 
         Once every other check has passed, a save with `smtpEnabled: true` opens a TCP
         connection to `smtpHost` on `smtpPort`, with a 3-second timeout. It only checks that
-        something answers there: it does not speak SMTP, negotiate TLS or log in, which is what
+        something answers there: it does not speak SMTP, negotiate TLS or authenticate, which is what
         the send-test operation is for. A connection that fails is a 400; see that response.
       operationId: updateSettingsEmail
       requestBody:
@@ -3602,10 +3602,10 @@ paths:
   /api/v1/account/logout-request:
     post:
       tags: [Account]
-      summary: Prepare a logout
+      summary: Prepare a sign-out
       description: >-
-        Validate the logout target, mint a short-lived id_token_hint and return the prepared
-        logout operation, as either a self-submitting form's parameters or a URL to follow.
+        Validate the sign-out target, mint a short-lived id_token_hint and return the prepared
+        sign-out operation, as either a self-submitting form's parameters or a URL to follow.
       operationId: requestAccountLogout
       requestBody:
         required: true
@@ -3616,7 +3616,7 @@ paths:
       responses:
         '200':
           description: |
-            The prepared logout. The shape depends on the responseMode field of the request:
+            The prepared sign-out. The shape depends on the responseMode field of the request:
             "form_post" gives AccountLogoutFormPostResponse, and anything else, absent
             included, gives AccountLogoutRedirectResponse.
           content:
@@ -3737,7 +3737,7 @@ paths:
       summary: Read a browser session
       description: |
         Return one stored browser session. 404 means the session is gone: no such session, one
-        that was logged out or reaped, or one that has expired. It is distinct from 500, which
+        that was signed out or reaped, or one that has expired. It is distinct from 500, which
         means the lookup could not be performed; a caller must treat 404 as "start a fresh
         session" and 500 as a refused request, never the other way round.
       operationId: loadBrowserSession
@@ -3871,7 +3871,7 @@ paths:
       description: |
         Remove a session. 204 whether or not a row was there, so there is no 404: deleting a
         session that is already gone is the outcome the caller asked for, and reporting a failure
-        would make a logout that raced the reaper look like one.
+        would make a sign-out that raced the reaper look like one.
       operationId: deleteBrowserSession
       requestBody:
         required: true
@@ -5468,16 +5468,16 @@ components:
           description: Read-only. True when the client may request the administrative authserver scopes on a user's behalf; always true for the admin console's own client. Switched through PUT /api/v1/admin/clients/{id}/administrative-scopes, with authserver:manage alone
         showLogo:
           type: boolean
-          description: When true, the client logo is displayed on login and consent screens
+          description: When true, the client logo is displayed on sign-in and consent screens
         showDisplayName:
           type: boolean
           description: When true, the display name is shown instead of the client identifier
         showDescription:
           type: boolean
-          description: When true, the client description is displayed on login and consent screens
+          description: When true, the client description is displayed on sign-in and consent screens
         showWebsiteUrl:
           type: boolean
-          description: When true, the client website URL is displayed on login and consent screens
+          description: When true, the client website URL is displayed on sign-in and consent screens
         isPublic:
           type: boolean
         isSystemLevelClient:
@@ -5631,16 +5631,16 @@ components:
           type: boolean
         showLogo:
           type: boolean
-          description: When true, the client logo is displayed on login and consent screens
+          description: When true, the client logo is displayed on sign-in and consent screens
         showDisplayName:
           type: boolean
           description: When true, the display name is shown instead of the client identifier
         showDescription:
           type: boolean
-          description: When true, the client description is displayed on login and consent screens
+          description: When true, the client description is displayed on sign-in and consent screens
         showWebsiteUrl:
           type: boolean
-          description: When true, the client website URL is displayed on login and consent screens
+          description: When true, the client website URL is displayed on sign-in and consent screens
         defaultAcrLevel:
           type: string
 

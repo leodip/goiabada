@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Asserts what a built docs image answers over HTTP: 200 for a page, 404 with the
-# site's 404 page for any path that is not a built file, a 301 to the relative
+# site's 404 page, its search and its sidebar, for any path that is not a built file, a 301 to the relative
 # path with the slash for a page asked without it, and UTF-8 text. These answers
 # are nginx's, so only a running image shows them.
 #
@@ -88,6 +88,8 @@ for path in /no/such/page/ /no/such/page /getting-started/no-such-page/ /404 /40
 	expect "GET $path Content-Type" "$content_type" "text/html; charset=utf-8"
 	expect_body "GET $path" "may have moved when the docs were reorganized"
 	expect_body "GET $path" "<site-search"
+	expect_body "GET $path" 'id="starlight__sidebar"'
+	expect_body "GET $path" 'href="/get-started/introduction/"'
 	expect_body "GET $path" 'href="/"'
 done
 
