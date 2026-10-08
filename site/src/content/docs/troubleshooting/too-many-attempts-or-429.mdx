@@ -1,0 +1,67 @@
+---
+title: Too many attempts or 429
+description: A sign-in page says "Too many attempts", or an endpoint answers 429 Too Many Requests.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you when Goiabada's rate limiter refuses a request, and especially when it refuses everyone at once.
+
+## What you see
+
+The rate limiter is off until you set `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` to `true`. Once it's on, a refused request gets `429 Too Many Requests` with a `Retry-After` header, in the format the endpoint usually answers with:
+
+- **A sign-in, two-factor, registration, activation or password reset page** shows "Too many attempts" and "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again."
+- **The token endpoint's password grant and `POST /connect/register`** answer `{"error": "invalid_request", "error_description": "Too many requests. Please wait and try again later."}`.
+- **The Account API** answers the error code `TOO_MANY_REQUESTS`.
+
+The auth server logs a `rate limit reached` warning naming the limiter, and writes a `rate_limit_exceeded` [audit event](/concepts/audit-log/), once per key and window on each replica.
+
+## Why it happens
+
+Most of the time it's the limiter doing its job: someone typed a wrong password too often, or a script is trying addresses. Each limit counts by something, an IP address, an email or a user, and refuses the next request once that one has used its budget. The [rate limits table](/reference/environment-variables/#rate-limits) lists every limit, what it counts and what it counts by.
+
+When **every user** sees "Too many attempts" at once, the auth server is almost certainly behind a proxy it doesn't trust. It then sees the proxy's address on every request, so all your users share one IP address's budget, and a handful of sign-ins uses it up for everyone.
+
+## Fix it
+
+If one user or one address is refused, wait. The `Retry-After` header gives the limit's window in seconds, and the budget comes back gradually over the window after it. Restarting the auth server resets only the limits it keeps in the process, as described below, so on PostgreSQL, MySQL and SQL Server it doesn't reset the limits on wrong passwords.
+
+If everyone is refused behind a proxy, tell the auth server to read the client's address from the proxy's headers:
+
+<Steps>
+
+1. Look for this warning in the auth server's startup log. It's there when the limiter is on and forwarded headers are not trusted:
+
+   ```
+   config: GOIABADA_AUTHSERVER_RATELIMITER_ENABLED is true but GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS is false; if this server sits behind a reverse proxy, every request resolves to the proxy's address and the whole deployment shares one per-IP bucket. Set GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS, and GOIABADA_AUTHSERVER_TRUSTED_PROXIES with it
+   ```
+
+2. Set `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS` to `true`.
+
+3. If more than one proxy sits in front of the auth server, such as a CDN and a load balancer, set `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` to the addresses of every hop you control, including the one that connects to the auth server. Behind a single proxy, leave it empty.
+
+4. Restart the auth server.
+
+</Steps>
+
+<Aside type="danger">
+Trust forwarded headers only when the proxy is the **only** way to reach the auth server. A client that connects directly can send any `X-Forwarded-For` it likes, and picks the address it's limited under.
+</Aside>
+
+[Client IP addresses](/reference/environment-variables/#client-ip-addresses) has the precise rules, and [client IP resolution](/deploy/reverse-proxy/#client-ip-resolution-and-spoofing-protection) shows them behind Nginx.
+
+## How it works
+
+A limit that counts failures, such as wrong passwords, isn't spent by a success, so signing in normally never uses it up. A limit that counts every request is spent by every request, successful or not.
+
+Limits on failures are kept in the database on PostgreSQL, MySQL and SQL Server, so they hold across replicas and a restart doesn't refill them. Limits on every request are kept in each process: each replica allows the full budget, and a restart resets it. On SQLite, which runs one replica, both are kept in the process.
+
+Wrong passwords meet two limits. `pwd_account_net` counts by IP address and email together, so someone guessing from one network spends only their own budget, and the account's owner signs in normally from anywhere else. `pwd_account` counts by email alone, as a ceiling across every network. Wrong passwords from enough networks use it up, and then the account can't sign in for the rest of its window, whoever is typing. That's the price of having a ceiling per account at all.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Rate limits" description="Every limit, its budget and what it counts by." href="/reference/environment-variables/#rate-limits" />
+  <LinkCard title="Audit log" description="Find rate_limit_exceeded and the limiter that tripped." href="/concepts/audit-log/" />
+</CardGrid>

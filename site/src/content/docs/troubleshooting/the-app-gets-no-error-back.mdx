@@ -1,0 +1,63 @@
+---
+title: The app gets no error back
+description: A sign-in fails, and your app never receives the error response it expects at its redirect URI.
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page helps you when your app sends a user to sign in with a request the auth server refuses, and no `error` ever arrives at your redirect URI.
+
+Find your case by what the user sees.
+
+## The user sees the sign-in page
+
+Your request had a mistake, such as a scope that doesn't exist or a missing `code_challenge`, but the user is asked for their password as if nothing were wrong. Only once they sign in does your app get the `error` and `error_description`.
+
+That's on purpose. The auth server won't send an unauthenticated browser to a client's redirect URI with an error, because an attacker could use that to bounce visitors through a trusted sign-in page to wherever the redirect URI points ([RFC 9700 section 4.11.2](https://www.rfc-editor.org/rfc/rfc9700.html#section-4.11.2)). So it keeps the error, signs the user in, and then redirects with it. That sign-in creates no session.
+
+If the user never signs in, your app gets nothing at all.
+
+The error is sent straight away, without asking for a password, when:
+
+- the request has `prompt=none`;
+- the browser already has a valid session, and the request doesn't have `prompt=login`.
+
+**Fix it:** read the error once it arrives, and fix the request. While you develop, sign in with a test user, or sign in once beforehand so the browser has a session and the error comes back at once.
+
+## The user sees "Unable to authorize"
+
+The auth server couldn't tell where to send an error, so it shows it to the user instead. That covers:
+
+- a missing, unknown or disabled `client_id`, or a client without the authorization code flow;
+- a missing, malformed or unregistered `redirect_uri`, as [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/) explains;
+- a `response_mode` other than `query`, `fragment` or `form_post`: "Invalid response_mode parameter. Supported values are: query, fragment, form_post.";
+- a parameter sent twice, or one that isn't correctly encoded.
+
+**Fix it:** the message on the page names the problem. Fix the request.
+
+## The user sees "You have not been sent anywhere"
+
+The page says "This application asked to send you to" an address, and "The request stops here." The auth server had an error, or the user declined consent, and it wouldn't redirect, because:
+
+- **the client registered itself.** A self-registered client is never sent an error: anyone can register one pointing anywhere, so an error redirect would be an open door. Every error, a declined consent included, ends on this page.
+- **the redirect URI was removed from the client** while the user was signing in.
+
+**Fix it:** for a self-registered client, treat a sign-in that doesn't come back in a reasonable time as abandoned. If you need error responses, ask an administrator to create your client in the admin console instead. See [self-registered clients](/concepts/clients/#self-registered-clients).
+
+## The user sees another error page
+
+These end the sign-in on a page, and nothing is sent to your app:
+
+- **"This request is no longer active"**: another sign-in started in the same browser, such as in a second tab, and replaced this one.
+- **"This step is no longer available"**: the user went back in the browser to a step they had finished.
+- **"This sign-in link is no longer valid."**: your app sent a POST to `/auth/authorize`, and the browser came back to its one-time link after it expired or was used.
+- **"Your two-factor authentication settings changed"**: the user's authenticator changed while they were setting one up.
+
+**Fix it:** each one asks the user to go back to your app and start again, so let them. A new authorization request starts a new sign-in.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Clients" description="Redirect URIs, self-registered clients and consent." href="/concepts/clients/" />
+  <LinkCard title="login_required" description="The errors a silent request gets back." href="/troubleshooting/login-required/" />
+</CardGrid>

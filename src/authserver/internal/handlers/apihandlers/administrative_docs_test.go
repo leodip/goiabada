@@ -38,7 +38,7 @@ const (
 	resourcesPermissionsPage = "site/src/content/docs/concepts/resources-and-permissions.mdx"
 	usersGroupsPage          = "site/src/content/docs/concepts/users-and-groups.mdx"
 	auditLogPage             = "site/src/content/docs/concepts/audit-log.mdx"
-	kubernetesPage           = "site/src/content/docs/deploy/kubernetes.mdx"
+	lockedOutPage            = "site/src/content/docs/troubleshooting/locked-out-of-the-admin-console.mdx"
 )
 
 // docSection is one section of a page: from its heading line to the next heading of the same level
@@ -166,14 +166,14 @@ func TestAdministrativeDocs_NameWhatTheModelRestsOn(t *testing.T) {
 	})
 }
 
-// The deployment guides' way back into a locked-out admin console sets the admin console's client
-// secret through the admin API. That client is an administrator, so only a token with
-// authserver:manage writes to it, and a procedure requesting any other scope ends in 403
-// MANAGE_SCOPE_REQUIRED at the moment an operator has no other way in (#402 decisions 1 and 15).
-// The Docker and native-binaries pages link to this one rather than repeat it.
+// The way back into an admin console locked out by its client secret sets that secret through the
+// admin API. That client is an administrator, so only a token with authserver:manage writes to it,
+// and a procedure requesting any other scope ends in 403 MANAGE_SCOPE_REQUIRED at the moment an
+// operator has no other way in (#402 decisions 1 and 15). It is on the Troubleshooting page for a
+// locked-out admin console, and the deployment pages link to it rather than repeat it (#522).
 func TestAdministrativeDocs_TheConsoleLockoutRecoveryRequestsManage(t *testing.T) {
 	assertScopeRequests(t, filepath.Dir(guard.SourceRoot(t)),
-		docSection{kubernetesPage, "#### The admin console's client secret"},
+		docSection{lockedOutPage, "## The admin console's client secret changed"},
 		builtin.AuthServerResourceIdentifier+":"+builtin.ManagePermissionIdentifier)
 }
 

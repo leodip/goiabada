@@ -1,0 +1,63 @@
+---
+title: login_required
+description: A silent request with prompt=none, or a request with an id_token_hint, comes back with error=login_required.
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page helps you when your app gets `error=login_required` back at its redirect URI.
+
+## What you see
+
+Your app sent an authorization request, usually with `prompt=none` to check for a session without showing the user anything, and got `error=login_required` back, with one of these `error_description`s:
+
+| `error_description` | What it means |
+|---|---|
+| "User authentication is required" | The browser has no session with the auth server, or the session it had ended while the request was under way. |
+| "User session has expired" | The session was idle too long, or reached its maximum lifetime. |
+| "Session age exceeds max_age" | The session is fine, but the user signed in longer ago than the request's `max_age` allows. |
+| "The current session user does not match the id_token_hint" | The browser is signed in as someone other than the user the `id_token_hint` names. |
+| "The authenticated user does not match the id_token_hint" | The user who signed in isn't the user the `id_token_hint` names. |
+
+## Why it happens
+
+`login_required` means the user has to sign in, and your request said not to ask them. That's the expected answer to `prompt=none` whenever there's no usable session, so it isn't a fault on its own: it's how your app learns the user is signed out.
+
+It's surprising when you expected a session. The common reasons:
+
+- **The session timed out.** A session ends after 2 hours without activity, or 24 hours after sign-in, unless an administrator changed **User session - idle timeout in seconds** or **User session - max lifetime in seconds** under **Admin**, **Sessions**.
+- **The session was ended,** by the user signing out, by an administrator, by another user signing in on the same browser, or because the user's password was changed or reset.
+- **The browser didn't send the session cookie.** The auth server's session cookie is `SameSite=Lax`. A silent request in a hidden iframe is a cross-site request when your app runs on another site, and a browser blocking third-party cookies won't send it.
+- **The hint names another user.** Your app sent the `id_token_hint` of a user who has since signed out, and someone else signed in on that browser.
+
+## Fix it
+
+Treat `login_required` as "show the user a sign-in": send the same authorization request again without `prompt=none`. The user signs in, and your app gets its code.
+
+For the hint mismatch, drop the `id_token_hint` of the previous user, or sign that user out of your app first.
+
+If silent requests fail in an iframe on every browser that blocks third-party cookies, don't rely on them there. Use a refresh token to keep the user signed in to your app, or redirect the whole page with `prompt=none` rather than using an iframe.
+
+## How it works
+
+With `prompt=none`, the auth server runs every check it would otherwise show the user a page for, and answers with an error instead of the page. `login_required` is one of them. The others:
+
+| `error` | `error_description` | Send the user through without `prompt=none` to |
+|---|---|---|
+| `interaction_required` | "Higher authentication level required" | enter their authenticator code, for the client's ACR level. |
+| `interaction_required` | "Additional authentication setup required" | set up two-factor authentication, which `urn:goiabada:level2_mandatory` requires. |
+| `interaction_required` | "Authentication configuration has changed" | enter their code again, since their two-factor authentication changed. |
+| `consent_required` | "User consent is required" or "Additional consent is required" | approve the scopes on the consent screen. |
+| `access_denied` | "The user account is disabled" | nothing: an administrator disabled the user. |
+| `access_denied` | "The user is not authorized to access any of the requested scopes" | nothing: the user holds none of the permissions asked for. |
+
+An `id_token_hint` without `prompt=none` changes what the user sees, not the result: a browser signed in as another user is asked to sign in again, and if the person who signs in isn't the hint's user, the request ends in `login_required` too.
+
+A user whose password was changed while they were signing in is sent back to sign in again, and a request with `prompt=none` gets "User authentication is required".
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="prompt" description="prompt=none, login and consent." href="/concepts/prompt/" />
+  <LinkCard title="Sessions" description="How long a session lasts, and what ends it." href="/concepts/sessions/" />
+</CardGrid>

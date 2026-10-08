@@ -57,7 +57,7 @@ To open the **Admin** pages, a user needs the `authserver:manage` permission. Th
 
 The admin console's client asks for a second factor only from users who have one set up. That's why your first sign-in needs only a password, and why signing in needs a code too once you turn on two-factor authentication.
 
-The auth server reads `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD` only on its first start, when it creates the first administrator in an empty database. Changing them later does nothing, so change your password under **Account**, **Change password**.
+The auth server reads `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD` only on its first start, when it creates the first administrator in an empty database. Changing them later does nothing, so change your password under **Account**, **Change password**. Changed them and can't sign in? See [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/).
 
 <Aside type="caution">
 The first start refuses an admin password shorter than 15 characters, longer than 72 bytes, or set to `changeme`. If your administrator's password is `changeme` anyway, anyone who reaches the sign-in page can try it: change it **now**.

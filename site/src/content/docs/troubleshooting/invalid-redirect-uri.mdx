@@ -1,0 +1,77 @@
+---
+title: Invalid redirect_uri
+description: The sign-in stops on "Unable to authorize" with "Invalid redirect_uri parameter", or the token endpoint answers "Invalid redirect_uri."
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you when the auth server refuses the redirect URI your app sends.
+
+## What you see
+
+Your app sends the browser to `/auth/authorize`, and instead of a sign-in page the browser shows **Unable to authorize** with one of these messages:
+
+- "Invalid redirect_uri parameter. The client does not have this redirect URI registered."
+- "Invalid redirect_uri parameter. The redirect URI must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host."
+- "The redirect_uri parameter is missing."
+
+Nothing is sent back to your app. The auth server can't trust an address the client hasn't registered, so it never redirects to one, not even with an error.
+
+At the token endpoint, exchanging a code answers `400` with `invalid_grant` and "Invalid redirect_uri." when the `redirect_uri` differs from the one in the authorization request.
+
+## Why it happens
+
+A redirect URI must match one registered on the client **exactly**. The auth server compares it byte for byte: no wildcards, no case folding, and no tolerance for a trailing slash. `https://app.example.com/callback` and `https://app.example.com/callback/` are two different addresses.
+
+The usual causes:
+
+- **It was never registered,** or it was registered on another client.
+- **It differs in a detail:** `http` against `https`, a port, a trailing slash, a path's case, or a query.
+- **Your app moved.** The app now runs on a new hostname or port, and the client still holds the old address.
+- **The database was set up for other URLs.** You pointed a deployment at a database created for another one, such as a copy from staging. The clients in it hold the other deployment's addresses, the admin console's own client among them.
+
+## Fix it
+
+<Steps>
+
+1. Copy the `redirect_uri` exactly as your app sends it, from the address bar of the "Unable to authorize" page.
+
+2. In the admin console, open **Admin**, **Clients**, click **Manage** next to your client and open **Redirect URIs**.
+
+3. Add the address exactly as your app sends it, or change your app to send one already in the list, and click **Save**.
+
+</Steps>
+
+At the token endpoint, send the same `redirect_uri` you sent in the authorization request. The code is bound to it.
+
+### When it's the admin console that's refused
+
+The admin console signs in as the client `admin-console-client`, with the redirect URI `GOIABADA_ADMINCONSOLE_BASEURL` followed by `/auth/callback`. The auth server registers that address, and the base URL itself for signing out, on its first start, from its own `GOIABADA_ADMINCONSOLE_BASEURL`. It never updates them. So when you change the admin console's URL after the first start, or the database was created for another deployment, the admin console's own sign-in stops on "Invalid redirect_uri parameter".
+
+Fix it in one of these ways:
+
+- **Put the old URL back** for a moment, sign in, and add the new addresses on the client's **Redirect URIs** tab, then switch to the new URL.
+- **Call the Admin API** with a client of your own allowed `authserver:manage`: [`PUT /api/v1/admin/clients/{id}/redirect-uris`](/reference/api/admin/operations/updateclientredirecturis/). The admin console's client is an [administrator](/reference/api/administrators/), so a token with only `authserver:manage-clients` is refused.
+- **Start from an empty database,** when the one you have holds nothing worth keeping.
+
+## How it works
+
+The checks run in this order, before anything else in the request, and each failure shows the page:
+
+1. `client_id` is missing, names no client, names a disabled client, or names a client without the authorization code flow.
+2. `redirect_uri` is missing.
+3. `redirect_uri` isn't absolute: it has no scheme, has a fragment, has a malformed percent-escape, or is `http` or `https` with no host.
+4. `redirect_uri` isn't registered on the client.
+
+These pages answer `200`, not an error status.
+
+**Loopback addresses are the one exception to the exact match.** When a registered redirect URI is `http` on `127.0.0.1`, `[::1]` or `localhost`, the port may differ, for `response_type=code` only. See [loopback redirect URIs](/concepts/clients/#loopback-redirect-uris).
+
+**Removing a redirect URI takes effect on sign-ins already under way.** A user signing in when you remove it sees "You have not been sent anywhere" and the address the app asked for, instead of being sent back, and the auth server writes an `issuance_refused_redirect_uri` [audit event](/concepts/audit-log/). A code issued before you removed it can't be redeemed any more: the token endpoint answers `invalid_grant` with "The redirect URI recorded on this authorization code is no longer registered on the client, so the code can no longer be redeemed.", and writes `redemption_refused_redirect_uri`.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Redirect URIs" description="Every rule a redirect URI must meet." href="/concepts/clients/#redirect-uris" />
+  <LinkCard title="The app gets no error back" description="When a sign-in fails and nothing returns to your app." href="/troubleshooting/the-app-gets-no-error-back/" />
+</CardGrid>

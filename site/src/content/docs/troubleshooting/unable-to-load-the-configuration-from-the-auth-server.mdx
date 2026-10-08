@@ -1,0 +1,75 @@
+---
+title: Unable to load the configuration from the auth server
+description: Every admin console page answers 500 with "Unable to load the configuration from the auth server", or signing in fails.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you when the admin console can't talk to the auth server.
+
+## What you see
+
+Every admin console page answers `500` with one line of text:
+
+```
+Unable to load the configuration from the auth server. You can find further information in the server logs.
+```
+
+The admin console's log has `unable to fetch settings from the auth server`, and its `error` says what the connection failed with: a name that doesn't resolve, a connection refused, a timeout, or a certificate the admin console doesn't trust.
+
+For up to 30 seconds after the auth server goes away, while the admin console still holds its settings, a page answers **Server error** instead.
+
+The admin console's own `/health` still answers `healthy`, because it doesn't check the auth server. So a container or a pod looks fine while every page fails.
+
+## Why it happens
+
+The admin console calls the auth server on every page, for its settings and for everything it shows. It calls it at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, or at `GOIABADA_AUTHSERVER_BASEURL` when the internal URL is empty. Those are the admin console's own variables: set on the auth server alone, they do nothing for the admin console.
+
+The usual causes:
+
+- **The auth server isn't running yet,** or stopped. Check its own `/health`.
+- **The internal URL is wrong for where the admin console runs.** Inside Docker Compose, `localhost` is the admin console's own container, not the auth server's. Use the auth server's service name, such as `http://goiabada-authserver:9090`.
+- **The internal URL is empty, and the public URL isn't reachable from inside,** such as a public hostname that only resolves outside your network, or a firewall that stops the admin console's host from reaching it.
+- **The internal URL is `https`, and its certificate isn't trusted** or doesn't name the host in the URL.
+
+## Fix it
+
+<Steps>
+
+1. Find the URL the admin console calls: its `GOIABADA_AUTHSERVER_INTERNALBASEURL`, or its `GOIABADA_AUTHSERVER_BASEURL` when that's empty.
+
+2. From where the admin console runs, check that the auth server answers there. For example, with Docker Compose:
+
+   ```bash
+   docker compose exec goiabada-adminconsole wget -qO- http://goiabada-authserver:9090/health
+   ```
+
+   It should print `healthy`.
+
+3. Set the admin console's `GOIABADA_AUTHSERVER_INTERNALBASEURL` to the address that answered, and restart the admin console.
+
+</Steps>
+
+For an `https` internal URL, the admin console trusts the operating system's certificate authorities. To trust your own, point `SSL_CERT_FILE` at a file of PEM certificates, or `SSL_CERT_DIR` at a directory of them, on the admin console. Either replaces the system's set rather than adding to it, so include every authority it needs.
+
+## When only signing in fails
+
+Pages behind the sign-in need the browser to reach the auth server too. The admin console sends the browser to `GOIABADA_AUTHSERVER_BASEURL` to sign in, so that one must be the auth server's public address, reachable from the administrator's browser.
+
+The sign-in can end on **Sign-in failed** after the password, when the browser reached the auth server but the admin console couldn't finish the sign-in with it:
+
+- "The admin console could not complete the sign-in with the auth server. This usually means the console's client secret or the auth server's address is wrong." Check the internal URL as above. If it answers, the client secret is the likelier cause: see [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-admin-consoles-client-secret-changed).
+- "The auth server's answer could not be verified. This usually means the admin console and the auth server disagree about the issuer or the client." The admin console couldn't fetch the auth server's signing keys from `/certs` at the internal URL, or the ID token didn't name the issuer the auth server reports.
+
+## How it works
+
+The hop from the admin console to the auth server carries the admin console's client secret and administrators' tokens. With an `http` internal URL it's plain HTTP, which is sound on a network you trust, such as a Docker Compose network or a cluster's pod network. When the network isn't trusted, use an `https` internal URL to the auth server's own HTTPS listener, whose certificate names the host the admin console calls.
+
+The admin console waits up to 10 seconds for each call to the auth server.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Environment variables" description="The base URLs and the internal URL." href="/reference/environment-variables/#urls-and-listeners" />
+  <LinkCard title="Locked out of the admin console" description="When signing in to the admin console fails." href="/troubleshooting/locked-out-of-the-admin-console/" />
+</CardGrid>
