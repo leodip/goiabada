@@ -5,7 +5,7 @@ description: On Kubernetes, the Gateway's certificates stay not ready, so the au
 
 import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-This page helps you when cert-manager doesn't issue the certificates for a Kubernetes deployment set up with [Envoy Gateway and cert-manager](/deploy/kubernetes/#example-setup-envoy-gateway--cert-manager).
+This page helps you when cert-manager doesn't issue the certificates for a Kubernetes deployment set up with [Envoy Gateway and cert-manager](/deploy/kubernetes/gateway-and-certificates/).
 
 ## What you see
 
@@ -22,7 +22,7 @@ The certificates come from a chain of four pieces, and any of them can stop it:
 
 So the usual causes are:
 
-- **No Certificates at all:** cert-manager runs without `--enable-gateway-api`, so it never reads the Gateway. [Install cert-manager](/deploy/kubernetes/#step-2-install-cert-manager) turns it on, after Envoy Gateway has brought the Gateway API's resources.
+- **No Certificates at all:** cert-manager runs without `--enable-gateway-api`, so it never reads the Gateway. Step 2 of [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/#set-it-up) turns it on, after Envoy Gateway has brought the Gateway API's resources.
 - **The issuer doesn't match:** the ClusterIssuer isn't named `letsencrypt-prod`, isn't ready, or its solver's `parentRefs` names another Gateway or namespace than the one you deployed into.
 - **DNS doesn't point at the Gateway yet,** so Let's Encrypt fetches the token from somewhere else.
 - **Port 80 doesn't reach Envoy:** a firewall or security group in front of the load balancer, or the `Local` traffic policy with nodes that have no Envoy pod.
@@ -62,7 +62,7 @@ So the usual causes are:
    kubectl get daemonset -n envoy-gateway-system
    ```
 
-   If your load balancer still can't reach Envoy, switch to the `Cluster` traffic policy, whose `gatewayclass.yaml` has no `envoyDaemonSet`. Goiabada then sees a node's address for every client. If your `eg` GatewayClass has no `parametersRef` to the EnvoyProxy at all, apply the `gatewayclass.yaml` of [Install Envoy Gateway](/deploy/kubernetes/#step-1-install-envoy-gateway).
+   If your load balancer still can't reach Envoy, switch to the `Cluster` traffic policy, whose `gatewayclass.yaml` has no `envoyDaemonSet`. Goiabada then sees a node's address for every client. If your `eg` GatewayClass has no `parametersRef` to the EnvoyProxy at all, apply the `gatewayclass.yaml` for your traffic policy from [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/#set-it-up).
 
 5. Once the cause is fixed, delete the failed challenges so cert-manager tries again:
 
@@ -83,6 +83,6 @@ The Gateway terminates TLS for both host names, with the certificate in each lis
 ## Next steps
 
 <CardGrid>
-  <LinkCard title="Kubernetes" description="The Envoy Gateway and cert-manager setup, step by step." href="/deploy/kubernetes/#example-setup-envoy-gateway--cert-manager" />
+  <LinkCard title="Gateway and certificates" description="The Envoy Gateway and cert-manager setup, step by step." href="/deploy/kubernetes/gateway-and-certificates/" />
   <LinkCard title="Invalid redirect_uri" description="When the site answers, but signing in fails." href="/troubleshooting/invalid-redirect-uri/" />
 </CardGrid>

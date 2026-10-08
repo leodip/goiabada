@@ -1,0 +1,141 @@
+---
+title: Security
+description: The pod security Goiabada's Kubernetes manifest sets, the NetworkPolicies that decide who reaches its pods, and how to encrypt the hop to the auth server.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you decide who in your cluster can reach Goiabada's pods, and what those pods may do.
+
+## Lock it down
+
+<Steps>
+
+1. **Restrict who reaches the pods** with the NetworkPolicies, by answering yes when the setup wizard asks, or passing `--network-policy`. Check the two things in [Who can reach Goiabada](#who-can-reach-goiabada) first.
+
+2. **Enforce the restricted Pod Security Standard,** if you own the namespace outright and everything else running there meets it, cert-manager's HTTP-01 solver pods included:
+
+   ```bash
+   kubectl label namespace goiabada pod-security.kubernetes.io/enforce=restricted
+   ```
+
+3. **Decide whether the hop from the admin console to the auth server needs encrypting,** as [Encrypt the hop to the auth server](#encrypt-the-hop-to-the-auth-server) explains.
+
+4. **Limit who can read the Secrets,** and the AES key above all: see [Who can read the AES key](/deploy/kubernetes/secrets/#who-can-read-the-aes-key).
+
+</Steps>
+
+## How it works
+
+### Pod security
+
+Every generated container runs with this `securityContext`, which is everything the restricted [Pod Security Standard](https://kubernetes.io/docs/concepts/security/pod-security-standards/) requires, and a read-only root file system besides:
+
+```yaml
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+```
+
+uid 10001 is [the user the images run as](/deploy/docker-compose/#the-user-the-images-run-as). No writable volume is mounted, because neither server writes to its file system here. The legacy bootstrap file isn't used under Kubernetes, and the auth server's one other write, Go spilling a picture upload over its size limit to `/tmp`, fails on the read-only root and is refused as `FILE_TOO_LARGE` rather than by the image check: a 400 either way. A certificate or customization you mount from a Secret or ConfigMap is readable by default, mode `0644`; with a stricter `defaultMode`, keep it readable by uid or gid 10001.
+
+Both pod specs also set:
+
+- **`automountServiceAccountToken: false`,** because neither server calls the Kubernetes API, so a compromised pod gets no API credential.
+- **`enableServiceLinks: false`,** because Kubernetes would otherwise give each container variables for every Service in the namespace, and two of the generated Services are named so that those begin with `GOIABADA_`, such as `GOIABADA_AUTHSERVER_PORT` and `GOIABADA_ADMINCONSOLE_SERVICE_HOST`, which neither server reads.
+
+The generated Namespace is labelled `pod-security.kubernetes.io/warn: restricted` and `pod-security.kubernetes.io/audit: restricted`. For any pod in it that breaks the standard, Goiabada's own included, `kubectl apply` prints a warning and the API server writes an audit entry; nothing is refused. It doesn't enforce, because the wizard accepts an existing namespace, whose other workloads `kubectl apply` would then start refusing.
+
+### Who can reach Goiabada
+
+Without a NetworkPolicy, any pod in the cluster can call the `goiabada-authserver` and `goiabada-adminconsole` Services directly, around Envoy. Besides reaching the admin console from inside the cluster, such a pod chooses the address it's rate limited and audited under, by sending its own `X-Forwarded-For` (see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#kubernetes)). The wizard asks whether to close that; the answer is no unless you say yes, or pass `--network-policy`.
+
+On yes, the manifest carries one ingress-only NetworkPolicy per Deployment:
+
+| Pods | Admitted on | From |
+|------|-------------|------|
+| `goiabada-authserver` | TCP 9090 | Envoy's namespace, `envoy-gateway-system`; the admin console's pods |
+| `goiabada-adminconsole` | TCP 9091 | Envoy's namespace, `envoy-gateway-system` |
+| `goiabada-authserver` | TCP 9190, with metrics exposed | The metrics scraper's namespace, `monitoring` unless you name another |
+| `goiabada-adminconsole` | TCP 9191, with metrics exposed | The metrics scraper's namespace, `monitoring` unless you name another |
+
+The metrics ports are a second rule of each policy, so the scraper's namespace reaches the metrics port and nothing else, and Envoy and the admin console don't reach it at all (see [Scrape on Kubernetes](/deploy/monitoring/#scrape-on-kubernetes)).
+
+Envoy's namespace is selected by its `kubernetes.io/metadata.name` label, which Kubernetes sets on every namespace. `envoy-gateway-system` is where Envoy Gateway runs its proxies by default; if yours runs them elsewhere, change the name in both policies. The kubelet's probes come from the pod's own node, which a NetworkPolicy can't block, and cert-manager's HTTP-01 solver pods carry other labels, so neither is affected.
+
+Before you answer yes, check two things:
+
+- **Your network plugin enforces NetworkPolicy.** Calico and Cilium do. Some clusters' default plugin doesn't, or does only once enforcement is turned on in the cluster's settings; there the policies are accepted and do nothing.
+- **Nothing else in the cluster calls the auth server through its Service.** A resource server that fetches `/certs` or calls `/userinfo` at `http://goiabada-authserver.goiabada:9090` is blocked once the policy applies: its connection times out or is refused, depending on the plugin. Admit its namespace by adding a peer to the first rule of the auth server's policy, as its comment shows:
+
+  ```yaml
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: envoy-gateway-system
+    - podSelector:
+        matchLabels:
+          app: goiabada-adminconsole
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: my-resource-server
+  ```
+
+  A workload that calls the auth server's public URL goes through Envoy and needs nothing.
+
+The policies state no egress rules, so they restrict nothing the servers connect to. An egress rule would have to name every destination, and two can't be named: the SMTP host and port are settings in the database, changed in the admin console, and the database host is often a DNS name, while a NetworkPolicy selects only pods, namespaces and IP blocks. A rule written for today's addresses would cut email or the database when either moved.
+
+To see what the policies admit:
+
+```bash
+kubectl describe networkpolicy -n goiabada
+```
+
+### Encrypt the hop to the auth server
+
+The admin console calls the auth server at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, which the wizard sets to `http://goiabada-authserver:9090`: plain HTTP to the Service, inside the cluster. That hop carries the admin console's client secret, its refresh token and administrators' tokens. The gateway's hop to each pod is plain HTTP too, and carries what users send, passwords included. Both are sound on a pod network only your cluster uses. The comment the manifest carries above the variable says so.
+
+When the pod network isn't one you trust, such as a cluster shared with workloads you don't control, or nodes that talk across a network others can read, encrypt the hops. Any of these works, and none needs a change to Goiabada:
+
+- **A network plugin that encrypts pod traffic,** such as Calico's or Cilium's WireGuard mode. It encrypts every hop between nodes, the gateway's included, and the manifest stays as it is.
+- **A service mesh with mutual TLS** between the pods, such as Istio or Linkerd. It covers both hops too. Check that its sidecars leave `X-Forwarded-For` as Envoy wrote it, or Goiabada reads the wrong client address: see [A second proxy hop](/deploy/client-ip-and-proxy-trust/#a-second-proxy-hop).
+- **TLS at the auth server itself,** for the admin console's hop:
+
+  <Steps>
+
+  1. Make a certificate for the name the admin console calls, `goiabada-authserver`, from a certificate authority of your own (cert-manager's CA issuer can issue and renew it). Put it in a Secret, and mount it into the auth server's container.
+
+  2. Turn on the auth server's HTTPS listener, on port 9443, by setting `GOIABADA_AUTHSERVER_CERTFILE` and `GOIABADA_AUTHSERVER_KEYFILE` in its ConfigMap to the mounted files. Add port 9443 to its container and its Service, and, with the NetworkPolicies on, to the auth server's policy. Its plain HTTP listener stays on for the gateway and the probes.
+
+  3. Mount your certificate authority's certificate into the admin console's container, and set, in the admin console's ConfigMap:
+
+     ```yaml
+     GOIABADA_AUTHSERVER_INTERNALBASEURL: "https://goiabada-authserver:9443"
+     SSL_CERT_FILE: "/certs/ca.pem"
+     ```
+
+     `SSL_CERT_FILE`, or `SSL_CERT_DIR` for a directory, replaces the system's certificate authorities rather than adding to them, so the file must hold every authority the admin console needs.
+
+  4. Restart both Deployments. The auth server reads its certificate when it starts, so restart it after each renewal too.
+
+  </Steps>
+
+- **A [`BackendTLSPolicy`](https://gateway-api.sigs.k8s.io/api-types/backendtlspolicy/)** for the gateway's hop, once the auth server serves HTTPS as above: it has the gateway connect to a Service port over TLS and check the certificate against your authority. Point the auth server's HTTPRoute at port 9443, and name every host name the gateway uses in the certificate.
+
+If the admin console then can't reach the auth server, see [Unable to load the configuration from the auth server](/troubleshooting/unable-to-load-the-configuration-from-the-auth-server/).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Secrets" description="Who can read the Secrets, and other ways to create them." href="/deploy/kubernetes/secrets/" />
+  <LinkCard title="Client IP and proxy trust" description="How Goiabada reads the address Envoy forwards." href="/deploy/client-ip-and-proxy-trust/#kubernetes" />
+  <LinkCard title="Production checklist" description="What to check before going live." href="/deploy/production-checklist/" />
+</CardGrid>

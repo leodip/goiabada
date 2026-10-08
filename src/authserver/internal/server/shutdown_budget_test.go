@@ -37,8 +37,9 @@ const (
 
 // headroom is what every deployment file gives over the budget, for the signal's delivery and the
 // last records: the "plus 10s of headroom" the generator's two grace-period constants, the comment
-// each golden and sample file carries and the Kubernetes docs page all state. It is a floor here
-// so that a raised shutdown constant cannot spend it with every one of those still saying 10s.
+// each golden and sample file carries and the Kubernetes Probes and shutdown page all state. It is
+// a floor here so that a raised shutdown constant cannot spend it with every one of those still
+// saying 10s.
 const headroom = 10 * time.Second
 
 // authServerShutdownBudget is the longest a stop takes once the signal arrives, read from the

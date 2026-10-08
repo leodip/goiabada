@@ -266,7 +266,7 @@ The four pool settings apply to PostgreSQL, MySQL and SQL Server. SQLite always 
 
 The lifetime and idle time hand connections back over time, so they move to a new endpoint after a failover and a quiet replica doesn't hold on to them. Every start writes one `database connection pool` log record with the pool it opened, and the `migrate` subcommand reads the same settings.
 
-With several replicas, each opens its own pool against the one database. [Kubernetes](/deploy/kubernetes/#scale-replicas) shows how to size it against your database's connection limit.
+With several replicas, each opens its own pool against the one database. [High availability](/deploy/kubernetes/high-availability/#scale-out) shows how to size it against your database's connection limit.
 
 ### SQLite
 

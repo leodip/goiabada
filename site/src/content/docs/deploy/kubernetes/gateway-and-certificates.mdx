@@ -1,0 +1,205 @@
+---
+title: Gateway and certificates
+description: Install Envoy Gateway and cert-manager on a Kubernetes cluster, then deploy Goiabada behind them with HTTPS.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you put Goiabada on a cluster behind Envoy Gateway, with certificates from Let's Encrypt through cert-manager.
+
+It's the recipe the project tests. Any Gateway API implementation and certificate issuer work too: the Goiabada side is the same, and [Overview](/deploy/kubernetes/overview/#what-goiabada-needs) lists what it needs.
+
+<Aside type="caution" title="For a cluster without a gateway or cert-manager">
+The steps install Envoy Gateway and cert-manager, and create cluster-wide resources. If your cluster already runs either, skip its installation, check that what it runs fits the steps, and **never** apply these files over it. Ask whoever runs the cluster when in doubt.
+</Aside>
+
+## Set it up
+
+<Steps>
+
+1. **Install Envoy Gateway and its GatewayClass.** Envoy Gateway's install brings the Gateway API's resources; wait for it:
+
+   ```bash
+   kubectl apply --server-side -f https://github.com/envoyproxy/gateway/releases/download/v1.9.1/install.yaml
+   kubectl wait --timeout=5m -n envoy-gateway-system \
+     deployment/envoy-gateway --for=condition=Available
+   ```
+
+   Check the [Envoy Gateway releases](https://github.com/envoyproxy/gateway/releases) for a newer version.
+
+   Then create the `eg` GatewayClass the manifest names, with an EnvoyProxy that sets the traffic policy of the load balancer in front of Envoy. This is the `Cluster` policy, the wizard's default, which works behind every load balancer; for `Local`, use the file in [The gateway's traffic policy](#the-gateways-traffic-policy) instead. Save it as `gatewayclass.yaml`:
+
+   ```yaml
+   apiVersion: gateway.envoyproxy.io/v1alpha1
+   kind: EnvoyProxy
+   metadata:
+     name: goiabada-proxy
+     namespace: envoy-gateway-system
+   spec:
+     provider:
+       type: Kubernetes
+       kubernetes:
+         envoyService:
+           externalTrafficPolicy: Cluster
+   ---
+   apiVersion: gateway.networking.k8s.io/v1
+   kind: GatewayClass
+   metadata:
+     name: eg
+   spec:
+     controllerName: gateway.envoyproxy.io/gatewayclass-controller
+     parametersRef:
+       group: gateway.envoyproxy.io
+       kind: EnvoyProxy
+       name: goiabada-proxy
+       namespace: envoy-gateway-system
+   ```
+
+   ```bash
+   kubectl apply -f gatewayclass.yaml
+   ```
+
+2. **Install cert-manager,** after Envoy Gateway, since it looks for the Gateway API's resources when it starts. Turn on its Gateway API support, and wait for it:
+
+   ```bash
+   kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.21.2/cert-manager.yaml
+   kubectl -n cert-manager patch deployment cert-manager --type=json \
+     -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--enable-gateway-api"}]'
+   kubectl -n cert-manager rollout status deployment/cert-manager --timeout=5m
+   kubectl -n cert-manager rollout status deployment/cert-manager-webhook --timeout=5m
+   kubectl -n cert-manager rollout status deployment/cert-manager-cainjector --timeout=5m
+   ```
+
+   Check the [cert-manager releases](https://github.com/cert-manager/cert-manager/releases) for a newer version.
+
+3. **Create a ClusterIssuer for Let's Encrypt,** which answers its challenge through Goiabada's Gateway. Put your email address in, and your namespace if it isn't `goiabada`, then save it as `letsencrypt-issuer.yaml`:
+
+   ```yaml
+   apiVersion: cert-manager.io/v1
+   kind: ClusterIssuer
+   metadata:
+     name: letsencrypt-prod
+   spec:
+     acme:
+       server: https://acme-v02.api.letsencrypt.org/directory
+       email: your-email@example.com
+       privateKeySecretRef:
+         name: letsencrypt-prod
+       solvers:
+       - http01:
+           gatewayHTTPRoute:
+             parentRefs:
+             - name: goiabada
+               namespace: goiabada
+               kind: Gateway
+   ```
+
+   ```bash
+   kubectl apply -f letsencrypt-issuer.yaml
+   ```
+
+4. **Prepare the database,** MySQL, PostgreSQL or SQL Server, reachable from the cluster's pods, as [Database](/deploy/database/) describes.
+
+5. **Generate the files and deploy them.** Run the [setup wizard](/get-started/setup-wizard/) and choose **Kubernetes cluster**. Then answer, in order: the database, the two public URLs (such as `https://auth.example.com` and `https://admin.example.com`), the namespace (`goiabada` unless you change it), the gateway's traffic policy, whether [NetworkPolicies](/deploy/kubernetes/security/#who-can-reach-goiabada) restrict who reaches the pods, the [rate limiter](/deploy/kubernetes/high-availability/#rate-limiting-across-replicas), whether to expose [metrics](/deploy/monitoring/#scrape-on-kubernetes), the administrator, and the database's connection details.
+
+   The wizard offers to test the database connection, warns if the database isn't empty, and writes `goiabada-k8s.yaml` and `goiabada-secrets.yaml`. **Back up the AES key** from `goiabada-secrets.yaml` before anything else, as [Back up the AES key](/deploy/secrets/#back-up-the-aes-key) says, and **never** commit that file; the wizard warns when it writes into a git working tree.
+
+   Deploy both files, the manifest first, since it creates the namespace the Secrets are in:
+
+   ```bash
+   kubectl apply -f goiabada-k8s.yaml -f goiabada-secrets.yaml
+   ```
+
+   For production, you can create the Secrets another way instead of from the file: see [Secrets](/deploy/kubernetes/secrets/#create-the-secrets-another-way).
+
+6. **Point DNS at the Gateway.** Read its address:
+
+   ```bash
+   kubectl get gateway goiabada -n goiabada -o jsonpath='{.status.addresses[0].value}'
+   ```
+
+   Then create an `A` record for each host name, `auth.example.com` and `admin.example.com`, with that address. cert-manager can't get the certificates until both resolve to it.
+
+7. **Check it's up, and sign in.**
+
+   ```bash
+   kubectl get pods -n goiabada                    # both Running, 1/1
+   kubectl get gateway,httproute -n goiabada       # the Gateway PROGRAMMED True, with an ADDRESS
+   kubectl get certificates -n goiabada            # both READY True, once DNS resolves
+   ```
+
+   Then sign in at `https://admin.example.com`, as [First sign-in](/get-started/first-sign-in/) describes. The wizard prints no secret, so read the administrator's password back out of the cluster:
+
+   ```bash
+   kubectl get secret goiabada-secrets -n goiabada -o jsonpath='{.data.admin-password}' | base64 -d
+   ```
+
+</Steps>
+
+If something goes wrong:
+
+- The certificates stay not ready: [Certificates are not issued](/troubleshooting/certificates-are-not-issued/).
+- The auth server's pod is in `CrashLoopBackOff`, or can't reach the database: [CrashLoopBackOff or unable to create the database connection](/troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection/).
+- A start waits for the migration lock, or refuses a dirty schema: [Waiting for the migration lock, or marked dirty](/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/).
+- Signing in fails with "Invalid redirect_uri": [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/).
+
+## How it works
+
+### The route in
+
+The Gateway has three listeners: HTTP on port 80, and HTTPS on port 443 for each host name, each ending TLS with a certificate of its own, `goiabada-tls-auth` and `goiabada-tls-admin`. One HTTPRoute per host name sends its traffic to the server's Service, and a third answers every plain HTTP request with a `301` to HTTPS.
+
+The Gateway carries the annotation `cert-manager.io/cluster-issuer: "letsencrypt-prod"`. From it, cert-manager creates one Certificate per HTTPS listener, and the ClusterIssuer proves you control each host name by answering Let's Encrypt's HTTP-01 challenge through a temporary route on the Gateway's port 80 listener. cert-manager renews the certificates itself.
+
+### The gateway's traffic policy
+
+The traffic policy of the load balancer in front of Envoy decides which address Envoy sees for a client, and so what Goiabada's rate limits, audit records and session records count. The wizard asks which one you use, writes its comments to match, and prints the GatewayClass file for it.
+
+**`Cluster`,** the wizard's default, works behind every load balancer: the load balancer may send a connection to any node, and the node forwards it to an Envoy pod wherever one runs. The node replaces the client's address with its own, so Goiabada sees a node's address for every client.
+
+**`Local`, with Envoy on every node** (`--gateway-traffic-policy=local`), keeps the client's address: a node delivers a connection only to an Envoy pod on that same node, so nothing rewrites its source. A node with no Envoy pod drops what the load balancer sends it, which is why Envoy runs as a DaemonSet here, at the cost of one Envoy pod per node. Save this as `gatewayclass.yaml` instead:
+
+```yaml
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: goiabada-proxy
+  namespace: envoy-gateway-system
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDaemonSet: {}
+      envoyService:
+        externalTrafficPolicy: Local
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: goiabada-proxy
+    namespace: envoy-gateway-system
+```
+
+An empty `envoyDaemonSet` is a DaemonSet with every default; an EnvoyProxy takes it or `envoyDeployment`, not both. This variant follows Envoy Gateway v1.9.1's API and hasn't been tried on a load-balanced cluster by the project, so check that a pod runs on every node after applying it: `kubectl get daemonset -n envoy-gateway-system`.
+
+A third way keeps the client's address without an Envoy pod per node: Proxy Protocol, where the load balancer prepends the client's address to each connection. It needs annotations on the load balancer's Service that differ from cloud to cloud, so the wizard doesn't offer it; Envoy Gateway's [client traffic policy](https://gateway.envoyproxy.io/docs/tasks/traffic/client-traffic-policy/) documentation covers the Envoy side.
+
+<Aside type="caution" title="The EnvoyProxy and GatewayClass are cluster-wide">
+Every Gateway of class `eg` shares them. On a cluster that already runs Envoy Gateway, the traffic policy belongs to whoever runs it: agree it with them rather than apply either file over theirs, and answer the wizard with the policy the cluster actually uses.
+</Aside>
+
+[Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#kubernetes) has how Goiabada reads the address Envoy forwards.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="High availability" description="Run more than one pod, and size the database for it." href="/deploy/kubernetes/high-availability/" />
+  <LinkCard title="Security" description="Who can reach the pods, and what they may do." href="/deploy/kubernetes/security/" />
+  <LinkCard title="Secrets" description="The Secrets the manifest reads, and other ways to create them." href="/deploy/kubernetes/secrets/" />
+</CardGrid>

@@ -1,0 +1,78 @@
+---
+title: Overview
+description: What Goiabada needs from a Kubernetes cluster, what the setup wizard's manifest runs, and the order to set it up in.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you plan a Goiabada deployment on a Kubernetes cluster.
+
+## Deploy it
+
+<Steps>
+
+1. **Check you have what Goiabada needs,** below: a cluster with `kubectl` access, a database server, and two host names on one domain.
+
+2. **Set up a gateway and its certificates, then deploy,** as [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/) walks through with Envoy Gateway and cert-manager. The [setup wizard](/get-started/setup-wizard/) writes the manifest and the Secrets in that procedure.
+
+3. **Sign in** at your admin console's URL, as [First sign-in](/get-started/first-sign-in/) describes, with the password you read back out of the cluster.
+
+4. **Get it ready for production:** [High availability](/deploy/kubernetes/high-availability/) to run more than one pod, [Security](/deploy/kubernetes/security/) to decide who can reach the pods, and [Secrets](/deploy/kubernetes/secrets/) to choose how the Secrets are created and who can read them.
+
+</Steps>
+
+## What Goiabada needs
+
+| Requirement | Why |
+|---|---|
+| **HTTPS on both public URLs** | Each server marks its cookies `Secure` only when its URL is `https://`. The gateway serves HTTPS and passes plain HTTP to the pods. |
+| **Two host names, on one registrable domain** | The gateway routes by host name, so the auth server and the admin console each need one of their own, such as `auth.example.com` and `admin.example.com`. Both must be on the same site: `admin.example.net` beside `auth.example.com` fails, because the admin console's sign-in ends with the auth server posting back to it, and the browser leaves the admin console's session cookie off a cross-site post. Every sign-in then stops at "This sign-in can't be finished". |
+| **A database every pod shares** | MySQL, PostgreSQL or SQL Server, in the cluster or outside it. SQLite isn't offered: it's a file on one host, used through one connection. See [Database](/deploy/database/). |
+| **An empty database on the first start** | The auth server seeds it with the administrator and the admin console's client, configured for the URLs you gave the wizard. A database seeded for other URLs refuses the admin console's sign-in: see [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/). |
+| **A Gateway API implementation and a certificate issuer** | The manifest creates a Gateway of class `eg` with a cert-manager annotation. [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/) is the recipe the project tests; any implementation and issuer work if you adapt the Gateway to them. |
+
+You also need `kubectl` configured for the cluster, and the setup wizard on the machine you run it from.
+
+## How it works
+
+### What runs where
+
+```
+Internet → Gateway (HTTPS) → auth.example.com  → goiabada-authserver Service (9090)   → auth server pods
+                           → admin.example.com → goiabada-adminconsole Service (9091) → admin console pods
+
+admin console pods → goiabada-authserver Service (9090), plain HTTP inside the cluster
+auth server pods   → your database
+```
+
+The admin console calls the auth server's API at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, which the wizard sets to `http://goiabada-authserver:9090`: straight to the Service, without passing the gateway. That hop is plain HTTP, and it carries the admin console's client secret, its refresh token and administrators' tokens. It's sound on a pod network you trust; [Encrypt the hop to the auth server](/deploy/kubernetes/security/#encrypt-the-hop-to-the-auth-server) has what to do when it isn't.
+
+### What the wizard generates
+
+The wizard writes two files. `goiabada-k8s.yaml` holds no secret, so you can commit it:
+
+- **A Namespace,** labelled to warn about any pod that breaks the restricted Pod Security Standard. See [Security](/deploy/kubernetes/security/#pod-security).
+- **Two ConfigMaps,** `goiabada-authserver-config` and `goiabada-adminconsole-config`, each holding only what its server reads. The three URLs are in both, written from the same answers, so change them in both.
+- **Two Deployments,** one per server, at one replica each, with a rolling update that never runs fewer pods than replicas and a spread over nodes. See [High availability](/deploy/kubernetes/high-availability/).
+- **Probes, a stop pause and a grace period** on every container. See [Probes and shutdown](/deploy/kubernetes/probes-and-shutdown/).
+- **Two PodDisruptionBudgets,** one per Deployment.
+- **Two ClusterIP Services,** `goiabada-authserver` on 9090 and `goiabada-adminconsole` on 9091.
+- **Two NetworkPolicies,** if you ask for them, admitting only Envoy and the admin console. See [Who can reach Goiabada](/deploy/kubernetes/security/#who-can-reach-goiabada).
+- **A Gateway and three HTTPRoutes:** one route per host name, and one redirecting HTTP to HTTPS.
+- **A PodMonitor,** if you ask for one, or scrape annotations. See [Scrape on Kubernetes](/deploy/monitoring/#scrape-on-kubernetes).
+
+`goiabada-secrets.yaml`, beside it, holds the two Secrets the Deployments read: `goiabada-encryption-key`, with the AES key alone, and `goiabada-secrets`, with every other secret. **Never** commit it. See [Secrets](/deploy/kubernetes/secrets/).
+
+Both servers trust one proxy hop, the gateway, to tell them each client's IP address, and log one record per request. See [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#kubernetes) and [Logs](/deploy/logs/).
+
+<Aside type="note">
+The wizard takes a lowercase domain name for each host, never an IP address, and refuses the same host for both servers: the Gateway routes by host name, and two listeners on one host and port are both rejected.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Gateway and certificates" description="Install Envoy Gateway and cert-manager, then deploy Goiabada." href="/deploy/kubernetes/gateway-and-certificates/" />
+  <LinkCard title="High availability" description="Run more than one pod, and size the database for it." href="/deploy/kubernetes/high-availability/" />
+  <LinkCard title="Secrets" description="The Secrets the manifest reads, and other ways to create them." href="/deploy/kubernetes/secrets/" />
+</CardGrid>

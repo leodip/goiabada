@@ -105,13 +105,13 @@ With no proxy in front (`--local-proxy=false`), the wizard turns forwarded heade
 
 ### Kubernetes
 
-The [Kubernetes](/deploy/kubernetes/) manifests the wizard generates trust one hop, the gateway, with empty lists. Envoy appends the address it received each connection from to `X-Forwarded-For`, so whatever a client sends ends up to the left of Envoy's entry and is never read.
+The [Kubernetes](/deploy/kubernetes/overview/) manifests the wizard generates trust one hop, the gateway, with empty lists. Envoy appends the address it received each connection from to `X-Forwarded-For`, so whatever a client sends ends up to the left of Envoy's entry and is never read.
 
 Which address Envoy sees depends on the gateway's external traffic policy. Under `Cluster`, it's a node's address, so the clients a node forwards share one rate limit. Under `Local`, with Envoy on every node, it's the client's. The comment above each pair in the manifest says which, following your answer to the wizard.
 
 Leave the lists empty. The lists that come to mind for a cluster both go wrong: the private ranges hold the node addresses Envoy records under `Cluster`, so Goiabada would walk past Envoy's entry and adopt whatever the client wrote to its left, and the pod range does the same on clusters where pods and nodes share a subnet.
 
-A pod that calls the `goiabada-authserver` or `goiabada-adminconsole` Service directly, around Envoy, can send any `X-Forwarded-For` it likes. No list stops that, since Envoy's pods are pods too. A NetworkPolicy admitting only Envoy does: see [Who can reach Goiabada](/deploy/kubernetes/#who-can-reach-goiabada).
+A pod that calls the `goiabada-authserver` or `goiabada-adminconsole` Service directly, around Envoy, can send any `X-Forwarded-For` it likes. No list stops that, since Envoy's pods are pods too. A NetworkPolicy admitting only Envoy does: see [Who can reach Goiabada](/deploy/kubernetes/security/#who-can-reach-goiabada).
 
 ### A second proxy hop
 

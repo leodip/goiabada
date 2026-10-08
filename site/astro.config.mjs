@@ -133,7 +133,17 @@ export default defineConfig({
 						{ label: 'Cloudflare Tunnel', slug: 'deploy/cloudflare-tunnel' },
 						{ label: 'Cloudflare + Nginx', slug: 'deploy/cloudflare-nginx' },
 						{ label: 'Reverse proxy', slug: 'deploy/reverse-proxy' },
-						{ label: 'Kubernetes', slug: 'deploy/kubernetes' },
+						{
+							label: 'Kubernetes',
+							items: [
+								{ label: 'Overview', slug: 'deploy/kubernetes/overview' },
+								{ label: 'Gateway and certificates', slug: 'deploy/kubernetes/gateway-and-certificates' },
+								{ label: 'High availability', slug: 'deploy/kubernetes/high-availability' },
+								{ label: 'Security', slug: 'deploy/kubernetes/security' },
+								{ label: 'Secrets', slug: 'deploy/kubernetes/secrets' },
+								{ label: 'Probes and shutdown', slug: 'deploy/kubernetes/probes-and-shutdown' },
+							],
+						},
 						{ label: 'Native binaries', slug: 'deploy/native-binaries' },
 						{ label: 'Client IP and proxy trust', slug: 'deploy/client-ip-and-proxy-trust' },
 						{ label: 'Database', slug: 'deploy/database' },
