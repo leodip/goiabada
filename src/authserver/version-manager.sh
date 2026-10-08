@@ -667,8 +667,7 @@ cmd_update() {
     echo -e "\n${BOLD}Production Dockerfiles${NC}"
 
     for dockerfile in "$BASE_DIR/src/build/Dockerfile-adminconsole" \
-                      "$BASE_DIR/src/build/Dockerfile-authserver" \
-                      "$BASE_DIR/src/build/Dockerfile-test"; do
+                      "$BASE_DIR/src/build/Dockerfile-authserver"; do
         if [ -f "$dockerfile" ]; then
             # Go base image: golang:X.Y.Z-alpine
             if update_file "$dockerfile" \
@@ -680,26 +679,12 @@ cmd_update() {
             fi
 
             # Alpine base of the release images' final stage: FROM alpine:X.Y.
-            # Dockerfile-test has no such stage; it runs from its build stage.
-            if [[ "$dockerfile" != *"Dockerfile-test"* ]]; then
-                if update_file "$dockerfile" \
-                    "s|^FROM alpine:[0-9.]* |FROM alpine:${ALPINE_VERSION} |" \
-                    "Alpine base image"; then
-                    ((success_count++))
-                else
-                    ((fail_count++))
-                fi
-            fi
-
-            # Tailwind in Dockerfile-test (musl variant)
-            if [[ "$dockerfile" == *"Dockerfile-test"* ]]; then
-                if update_file "$dockerfile" \
-                    "s|tailwindcss/releases/download/v[0-9.]*/tailwindcss-linux-x64-musl|tailwindcss/releases/download/v${TAILWIND_VERSION}/tailwindcss-linux-x64-musl|g" \
-                    "Tailwind CSS (musl)"; then
-                    ((success_count++))
-                else
-                    ((fail_count++))
-                fi
+            if update_file "$dockerfile" \
+                "s|^FROM alpine:[0-9.]* |FROM alpine:${ALPINE_VERSION} |" \
+                "Alpine base image"; then
+                ((success_count++))
+            else
+                ((fail_count++))
             fi
         fi
     done

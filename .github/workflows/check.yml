@@ -62,7 +62,7 @@ permissions:
 # holds is one that code can read. Where the secrets are absent, as on a pull request from a fork,
 # the runner pulls anonymously, as it did before, and the login steps are skipped.
 
-# Test-only values, copied as literals from src/build/docker-compose-test.yml.
+# Test-only values.
 # These are fixed test credentials, not secrets: keeping them literal is what
 # lets a developer reproduce a CI failure locally. Declared once at workflow
 # level because GitHub does not support YAML anchors in workflow files, and

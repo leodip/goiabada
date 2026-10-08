@@ -18,7 +18,7 @@
 # Tool Versions
 # -----------------------------------------------------------------------------
 # go:             Go language version (used in go.mod, Dockerfiles, GitHub Actions)
-# tailwind:       Tailwind CSS CLI version (devcontainer, Dockerfile-test)
+# tailwind:       Tailwind CSS CLI version (devcontainer)
 # golangci-lint:  Go linter version (devcontainer)
 # mockery:        Mock generator version (devcontainer)
 # staticcheck:    Static analyzer (devcontainer, make check)

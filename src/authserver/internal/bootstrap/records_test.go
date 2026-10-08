@@ -54,7 +54,7 @@ func TestLogCredentialsNotConfigured_CarriesTheErrorTheFileAndEveryRequiredVaria
 	assert.Contains(t, records[0].Attrs["error"].(error).Error(), "64 bytes",
 		"and says which key was wrong")
 	assert.Equal(t, "/somewhere/else.env", records[0].Attrs["bootstrap_file"],
-		"read from the configuration: the banner printed ./bootstrap/bootstrap.env, which is the shipped compose files' path rather than this deployment's")
+		"read from the configuration: the banner printed ./bootstrap/bootstrap.env, which was the sample compose files' path rather than this deployment's")
 	assert.Equal(t, bootstrapCredentialVars, records[0].Attrs["required"],
 		"the same five names as the bootstrap-complete record, from the same list, so the two cannot disagree")
 }

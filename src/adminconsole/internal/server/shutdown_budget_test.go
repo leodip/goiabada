@@ -16,16 +16,15 @@ import (
 )
 
 // adminConsoleImage is the image reference every deployment file running this binary names, the
-// generator's `adminconsole-<tag>` and the samples' `adminconsole-latest` alike.
+// generator's `adminconsole-<tag>`.
 const adminConsoleImage = "leodip/goiabada:adminconsole-"
 
 // deploymentSources are the deployment files a platform runs this binary from, relative to the
 // source root: the setup wizard's goldens, which are its generator's output held to it byte for
-// byte, and the sample Compose files under src/build. Each must hold at least one file running the
-// binary, so a source moved or emptied fails the test rather than leaving it nothing to read.
+// byte. They must hold at least one file running the binary, so a source moved or emptied fails
+// the test rather than leaving it nothing to read.
 var deploymentSources = []string{
 	"cmd/goiabada-setup/testdata/*.golden",
-	"build/docker-compose-*.yml",
 }
 
 // The platform's own grace periods, which a file that sets none gets: Compose's stop_grace_period
@@ -37,25 +36,24 @@ const (
 
 // headroom is what every deployment file gives over the budget, for the signal's delivery and the
 // last records: the "plus 10s of headroom" the generator's two grace-period constants, the comment
-// each golden and sample file carries and the Kubernetes Probes and shutdown page all state. It is
-// a floor here so that a raised shutdown constant cannot spend it with every one of those still
-// saying 10s.
+// each golden carries and the Kubernetes Probes and shutdown page all state. It is a floor here so
+// that a raised shutdown constant cannot spend it with every one of those still saying 10s.
 const headroom = 10 * time.Second
 
 // Every deployment file running the admin console gives it the time its stop can take, which is
 // its listeners' drain, and the headroom over it: Compose's stop_grace_period, and in Kubernetes
 // the pod's grace period less the preStop pause, which counts against it. Raising
-// httpShutdownTimeout by any amount fails here until the generator, its goldens and the sample
-// files follow (#390 decision 3). The auth server holds the same files to its own budget from its
-// own tier, and since every file gives both binaries the auth server's ceiling (decision 4), it is
-// that tier a small raise fails first; this one is the floor the admin console's own stop owes.
+// httpShutdownTimeout by any amount fails here until the generator and its goldens follow (#390
+// decision 3). The auth server holds the same files to its own budget from its own tier, and since
+// every file gives both binaries the auth server's ceiling (decision 4), it is that tier a small
+// raise fails first; this one is the floor the admin console's own stop owes.
 func TestDeploymentFiles_GracePeriodsCoverTheShutdownBudget(t *testing.T) {
 	assertGracePeriodsCover(t, guard.SourceRoot(t), adminConsoleImage, httpShutdownTimeout)
 }
 
 func TestDeploymentFiles_AShortGracePeriodFailsNamingTheFile(t *testing.T) {
 	root := t.TempDir()
-	writeDeploymentFixture(t, root, "build/docker-compose-short.yml", `
+	writeDeploymentFixture(t, root, "cmd/goiabada-setup/testdata/compose-short.golden", `
 services:
   console:
     image: leodip/goiabada:adminconsole-latest
@@ -63,19 +61,19 @@ services:
   unrelated:
     image: postgres:18
 `)
-	writeDeploymentFixture(t, root, "build/docker-compose-default.yml", `
+	writeDeploymentFixture(t, root, "cmd/goiabada-setup/testdata/compose-default.golden", `
 services:
   console:
     image: leodip/goiabada:adminconsole-latest
 `)
 	// 20 covers the budget, and not the headroom over it.
-	writeDeploymentFixture(t, root, "build/docker-compose-budget-only.yml", `
+	writeDeploymentFixture(t, root, "cmd/goiabada-setup/testdata/compose-budget-only.golden", `
 services:
   console:
     image: leodip/goiabada:adminconsole-latest
     stop_grace_period: 20s
 `)
-	writeDeploymentFixture(t, root, "build/docker-compose-enough.yml", `
+	writeDeploymentFixture(t, root, "cmd/goiabada-setup/testdata/compose-enough.golden", `
 services:
   console:
     image: leodip/goiabada:adminconsole-latest
@@ -115,16 +113,16 @@ spec:
 	}
 	text := report.Text()
 	for _, want := range []string{
-		"build/docker-compose-short.yml",
-		"build/docker-compose-budget-only.yml",
-		"build/docker-compose-default.yml",
+		"cmd/goiabada-setup/testdata/compose-short.golden",
+		"cmd/goiabada-setup/testdata/compose-budget-only.golden",
+		"cmd/goiabada-setup/testdata/compose-default.golden",
 		"cmd/goiabada-setup/testdata/kubernetes-pause.golden",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("no failure names %s:\n%s", want, text)
 		}
 	}
-	for _, unwanted := range []string{"docker-compose-enough.yml", "local-env.golden", "unrelated"} {
+	for _, unwanted := range []string{"compose-enough.golden", "local-env.golden", "unrelated"} {
 		if strings.Contains(text, unwanted) {
 			t.Errorf("a failure names %s, which covers the budget and the headroom or runs no admin console:\n%s", unwanted, text)
 		}
@@ -136,19 +134,14 @@ spec:
 
 func TestDeploymentFiles_AWalkFindingNothingFails(t *testing.T) {
 	root := t.TempDir()
-	// The goldens are there; the sample files are not.
-	writeDeploymentFixture(t, root, "cmd/goiabada-setup/testdata/production-sqlite.golden", `
-services:
-  console:
-    image: leodip/goiabada:adminconsole-latest
-    stop_grace_period: 20s
-`)
+	// The goldens' directory holds a file, and it runs neither server.
+	writeDeploymentFixture(t, root, "cmd/goiabada-setup/testdata/native-sqlite.golden", "GOIABADA_DB_TYPE=\"sqlite\"\n")
 
 	report := guard.Run(func(r guard.Reporter) {
 		assertGracePeriodsCover(r, root, adminConsoleImage, 15*time.Second)
 	})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, "build/docker-compose-*.yml") {
+	if !report.Stopped || !strings.Contains(report.Fatal, "cmd/goiabada-setup/testdata/*.golden") {
 		t.Errorf("a source holding no deployment file did not stop the walk naming it: %+v", report)
 	}
 }

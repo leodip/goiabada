@@ -1,10 +1,9 @@
 # Shared setup for the container-based test jobs in check.yml.
 #
 # The golang:*-bookworm image is close to what run-tests.sh needs but not
-# identical, and seven jobs need the same three steps. Debian rather than the
-# alpine base used by Dockerfile-test, because GitHub injects a glibc-linked
-# Node.js runtime into container jobs to execute actions, which does not run on
-# musl.
+# identical, and seven jobs need the same three steps. Debian rather than
+# alpine, because GitHub injects a glibc-linked Node.js runtime into container
+# jobs to execute actions, which does not run on musl.
 
 name: Set up test container
 description: Install the OS packages, Tailwind CLI and Go caches that run-tests.sh and build.sh need.
@@ -27,7 +26,7 @@ runs:
         apt-get update -qq
         apt-get install -y -qq --no-install-recommends net-tools curl zip ca-certificates
 
-    # The glibc build, not the -musl one Dockerfile-test fetches for alpine.
+    # The glibc build, which the Debian image runs.
     - name: Install Tailwind CLI
       shell: bash
       run: |

@@ -1,14 +1,9 @@
 package main
 
 import (
-	"os"
 	"strings"
 	"testing"
 )
-
-// reverseProxySample is the hand-written Compose sample for a deployment behind a reverse proxy,
-// which the docs point at beside the wizard's own output.
-const reverseProxySample = "../../build/docker-compose-reverse-proxy.yml"
 
 // trustedOutput is one configuration an operator deploys from, with what each server reads from it.
 type trustedOutput struct {
@@ -93,39 +88,8 @@ func composeServerEnvironments(t *testing.T, content string) map[string]map[stri
 	}
 }
 
-// sampleServerEnvironments reads a hand-written sample's two server environments as
-// composeServerEnvironments reads a generated file's, except that an entry holding a variable
-// reference is kept as written rather than refused: the samples require the operator to set the
-// variables they must not publish, the admin password first (#500), and the trust entries this reads
-// them for hold none.
-func sampleServerEnvironments(t *testing.T, content string) map[string]map[string]string {
-	t.Helper()
-	docs := yamlDocuments(t, content)
-	if len(docs) != 1 {
-		t.Fatalf("%d documents, want 1", len(docs))
-	}
-	services := at[map[string]any](t, docs[0], "services")
-	envs := map[string]map[string]string{}
-	for server, service := range map[string]string{"AUTHSERVER": "goiabada-authserver", "ADMINCONSOLE": "goiabada-adminconsole"} {
-		env := map[string]string{}
-		for _, entry := range at[[]any](t, at[map[string]any](t, services, service), "environment") {
-			line, ok := entry.(string)
-			if !ok {
-				t.Fatalf("environment entry %v is %T, want a string", entry, entry)
-			}
-			if interpolated, ok := composeInterpolate(line); ok {
-				line = interpolated
-			}
-			name, value, _ := strings.Cut(line, "=")
-			env[name] = value
-		}
-		envs[server] = env
-	}
-	return envs
-}
-
 // trustedOutputs is every generated output, each deployment type on each engine it accepts and each
-// answer to the native question, plus the hand-written reverse-proxy sample.
+// answer to the native question.
 func trustedOutputs(t *testing.T) []trustedOutput {
 	t.Helper()
 	var outputs []trustedOutput
@@ -138,14 +102,7 @@ func trustedOutputs(t *testing.T) []trustedOutput {
 			trust: trust, proxies: proxies,
 		})
 	}
-	sample, err := os.ReadFile(reverseProxySample)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return append(outputs, trustedOutput{
-		name: reverseProxySample, content: string(sample), env: sampleServerEnvironments(t, string(sample)),
-		trust: "true", proxies: "",
-	})
+	return outputs
 }
 
 // Every output that trusts forwarded headers says whom it trusts: each server's
@@ -205,7 +162,7 @@ func TestEveryOutput_PairsTrustWithTheProxiesItTrusts(t *testing.T) {
 // one hop still resolves the client behind both.
 const cloudflareNginxTrustDocs = "https://goiabada.dev/deploy/client-ip-and-proxy-trust/#cloudflare--nginx"
 
-// Every Compose file for the reverse proxy on the host, generated or hand-written, sends an
+// Every Compose file the wizard writes for the reverse proxy on the host sends an
 // operator with Cloudflare's proxy in front of nginx to the section saying how nginx resolves
 // Cloudflare, in the comment above each server's trust, rather than to a list of Cloudflare's
 // ranges that would make Goiabada ignore the forwarded headers.
@@ -217,12 +174,6 @@ func TestComposeBehindAProxy_LinksCloudflareInFrontOfNginxToItsSection(t *testin
 			outputs[testCase.name] = descriptionOf(config)
 		}
 	}
-	sample, err := os.ReadFile(reverseProxySample)
-	if err != nil {
-		t.Fatal(err)
-	}
-	outputs[reverseProxySample] = string(sample)
-
 	linked := 0
 	for name, content := range outputs {
 		t.Run(name, func(t *testing.T) {

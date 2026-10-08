@@ -239,7 +239,7 @@ func (m *malformedValues) err() error {
 // getEnvAsInt answers the default when the variable is unset or empty after the trim, and the
 // number when it parses. Anything else is recorded as malformed rather than read as the default:
 // a mistyped port used to leave the server on the port it shipped with and say nothing (#434).
-// Empty stays the default because every shipped compose file and the setup wizard write
+// Empty stays the default because the setup wizard writes
 // GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS= to mean no https listener.
 func getEnvAsInt(key string, defaultVal int, malformed *malformedValues) int {
 	valueStr := getEnv(key, "")

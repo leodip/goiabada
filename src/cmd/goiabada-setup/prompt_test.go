@@ -521,8 +521,8 @@ func TestAsker_AGeneratedPasswordIsOfferedWithoutItsValue(t *testing.T) {
 }
 
 // An empty answer takes the generated password, which is shown only as [generated] and not judged:
-// it holds no symbol, and a strength check would call it weak (#430). The prompt offered changeme,
-// which the docs and the samples print, until the generated default replaced it.
+// it holds no symbol, and a strength check would call it weak (#430). The prompt offered changeme
+// until the generated default replaced it.
 func TestAsker_AnEmptyPasswordAnswerTakesTheGeneratedOneUnjudged(t *testing.T) {
 	generated := generatePassword()
 	a, in, out := testAsker(t, scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: ""})
