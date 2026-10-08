@@ -96,8 +96,8 @@ func TestGetEnv(t *testing.T) {
 func TestGetEnvAsInt(t *testing.T) {
 	const key = "GOIABADA_TEST_PORT"
 
-	// Unset or empty after the trim is the default, and records nothing: every shipped compose
-	// file writes the https port empty to mean no https listener. Anything else strconv.Atoi
+	// Unset or empty after the trim is the default, and records nothing: every Compose file the
+	// setup wizard writes gives the https port empty to mean no https listener. Anything else strconv.Atoi
 	// refuses is recorded as malformed.
 	//
 	// Keep the refusal rows: they reverse the earlier position, that a mistyped port falls back to

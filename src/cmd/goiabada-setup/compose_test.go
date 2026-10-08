@@ -168,11 +168,9 @@ func TestComposeFile_PinsTheDatabaseMajor(t *testing.T) {
 }
 
 // developmentStacks are the files that run a database for development and testing: the dev
-// container, the test stack, and CI's check workflow, whose database jobs the data and integration
-// tiers run in.
+// container, and CI's check workflow, whose database jobs the data and integration tiers run in.
 var developmentStacks = []string{
 	"../../.devcontainer/docker-compose.yml",
-	"../../build/docker-compose-test.yml",
 	"../../../.github/workflows/check.yml",
 }
 

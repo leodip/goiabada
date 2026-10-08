@@ -31,8 +31,8 @@ type Config struct {
 
 	// BootstrapEnvOutFile, when set and OAuthClientSecret is not, selects the legacy two-step
 	// mode: the seed generates the credentials, writes them here, and the process exits for the
-	// operator to copy them across. The shipped compose files, CI and run-tests.sh all start the
-	// server this way (#424 decision 2).
+	// operator to copy them across. CI and run-tests.sh start the server this way (#424
+	// decision 2).
 	BootstrapEnvOutFile string
 }
 
@@ -183,8 +183,8 @@ func logInitialSetupRequired(ctx context.Context) {
 // is here so the variables it names come from the same list as the bootstrap-complete record's.
 //
 // bootstrap_file is read from the configuration. The banner this replaced printed
-// "./bootstrap/bootstrap.env", which is the path the shipped compose files happen
-// to use rather than this deployment's, so an operator who mounted the file
+// "./bootstrap/bootstrap.env", which was the path the sample compose files used
+// rather than this deployment's, so an operator who mounted the file
 // somewhere else was sent to look at a path that did not exist (#320).
 func LogCredentialsNotConfigured(ctx context.Context, err error, bootstrapFile string) {
 	slog.ErrorContext(ctx, "bootstrap credentials are not configured, so the auth server cannot start: copy every credential from the bootstrap file into the two services' configuration, then restart them",
