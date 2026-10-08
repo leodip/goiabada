@@ -1,0 +1,88 @@
+---
+title: Certificates are not issued
+description: On Kubernetes, the Gateway's certificates stay not ready, so the auth server and the admin console don't answer over HTTPS.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you when cert-manager doesn't issue the certificates for a Kubernetes deployment set up with [Envoy Gateway and cert-manager](/deploy/kubernetes/#example-setup-envoy-gateway--cert-manager).
+
+## What you see
+
+`kubectl get certificates -n goiabada` shows `goiabada-tls-auth` and `goiabada-tls-admin` with `READY` at `False`, or lists nothing at all. Meanwhile, `https://auth.example.com` fails in the browser with a certificate or connection error, since the Gateway has no certificate to serve.
+
+## Why it happens
+
+The certificates come from a chain of four pieces, and any of them can stop it:
+
+1. The generated Gateway carries the annotation `cert-manager.io/cluster-issuer: "letsencrypt-prod"`. cert-manager reads it, and creates one Certificate for each HTTPS listener, named after the listener's `certificateRefs`: `goiabada-tls-auth` and `goiabada-tls-admin`. It does that only with its Gateway API support turned on.
+2. The ClusterIssuer named `letsencrypt-prod` asks Let's Encrypt for each certificate.
+3. Let's Encrypt checks you control each host name with an HTTP-01 challenge: it fetches a token from `http://<host>/.well-known/acme-challenge/` on port 80.
+4. cert-manager answers that request through a temporary HTTPRoute it attaches to the Gateway named in the ClusterIssuer's solver, and a solver pod it starts in the `goiabada` namespace. The Gateway's `http` listener on port 80 carries it.
+
+So the usual causes are:
+
+- **No Certificates at all:** cert-manager runs without `--enable-gateway-api`, so it never reads the Gateway. [Install cert-manager](/deploy/kubernetes/#step-2-install-cert-manager) turns it on, after Envoy Gateway has brought the Gateway API's resources.
+- **The issuer doesn't match:** the ClusterIssuer isn't named `letsencrypt-prod`, isn't ready, or its solver's `parentRefs` names another Gateway or namespace than the one you deployed into.
+- **DNS doesn't point at the Gateway yet,** so Let's Encrypt fetches the token from somewhere else.
+- **Port 80 doesn't reach Envoy:** a firewall or security group in front of the load balancer, or the `Local` traffic policy with nodes that have no Envoy pod.
+- **The solver pod is refused,** because the namespace enforces the `restricted` Pod Security standard. The generated namespace only warns, but if you added `pod-security.kubernetes.io/enforce: restricted`, cert-manager's solver pods are refused there.
+
+## Fix it
+
+<Steps>
+
+1. Follow the chain to where it stops:
+
+   ```bash
+   kubectl get certificates,certificaterequests,orders,challenges -n goiabada
+   kubectl describe challenges -n goiabada
+   ```
+
+   A Challenge's status and events say what Let's Encrypt or cert-manager's own check got back, such as a host that doesn't resolve or a connection that timed out.
+
+2. Check the issuer is ready and named as the Gateway expects:
+
+   ```bash
+   kubectl get clusterissuer letsencrypt-prod
+   ```
+
+3. Check that the Gateway has an address and that DNS points at it:
+
+   ```bash
+   kubectl get gateway goiabada -n goiabada
+   nslookup auth.example.com
+   ```
+
+   `PROGRAMMED` should be `True`, and both host names should resolve to the `ADDRESS` it shows.
+
+4. Under the `Local` traffic policy, check that Envoy runs a pod on every node:
+
+   ```bash
+   kubectl get daemonset -n envoy-gateway-system
+   ```
+
+   If your load balancer still can't reach Envoy, switch to the `Cluster` traffic policy, whose `gatewayclass.yaml` has no `envoyDaemonSet`. Goiabada then sees a node's address for every client. If your `eg` GatewayClass has no `parametersRef` to the EnvoyProxy at all, apply the `gatewayclass.yaml` of [Install Envoy Gateway](/deploy/kubernetes/#step-1-install-envoy-gateway).
+
+5. Once the cause is fixed, delete the failed challenges so cert-manager tries again:
+
+   ```bash
+   kubectl delete challenges -n goiabada --all
+   ```
+
+</Steps>
+
+<Aside type="caution">
+Let's Encrypt limits how many failed validations it accepts for one host name in an hour. Fix the cause before you retry, rather than deleting challenges in a loop.
+</Aside>
+
+## How it works
+
+The Gateway terminates TLS for both host names, with the certificate in each listener's Secret. Goiabada's own HTTPRoutes attach only to the two HTTPS listeners, so the `http` listener on port 80 carries nothing but cert-manager's challenges. cert-manager renews each certificate before it expires the same way, so port 80 has to stay reachable after the first issue too.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Kubernetes" description="The Envoy Gateway and cert-manager setup, step by step." href="/deploy/kubernetes/#example-setup-envoy-gateway--cert-manager" />
+  <LinkCard title="Invalid redirect_uri" description="When the site answers, but signing in fails." href="/troubleshooting/invalid-redirect-uri/" />
+</CardGrid>

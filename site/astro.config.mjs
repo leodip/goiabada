@@ -163,6 +163,11 @@ export default defineConfig({
 						{ label: 'Locked out of the admin console', slug: 'troubleshooting/locked-out-of-the-admin-console' },
 						{ label: 'Unable to load the configuration from the auth server', slug: 'troubleshooting/unable-to-load-the-configuration-from-the-auth-server' },
 						{ label: 'A user cannot reset their password', slug: 'troubleshooting/a-user-cannot-reset-their-password' },
+						{ label: 'Certificates are not issued', slug: 'troubleshooting/certificates-are-not-issued' },
+						{ label: 'CrashLoopBackOff or unable to create the database connection', slug: 'troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection' },
+						{ label: 'attempt to write a readonly database', slug: 'troubleshooting/attempt-to-write-a-readonly-database' },
+						{ label: 'Waiting for the migration lock, or marked dirty', slug: 'troubleshooting/waiting-for-the-migration-lock-or-marked-dirty' },
+						{ label: 'Metrics are not scraped', slug: 'troubleshooting/metrics-are-not-scraped' },
 					],
 				},
 				{

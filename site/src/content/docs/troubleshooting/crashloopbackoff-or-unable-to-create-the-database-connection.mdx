@@ -1,0 +1,94 @@
+---
+title: CrashLoopBackOff or unable to create the database connection
+description: The auth server's pod crash-loops, or its container keeps restarting, because it can't reach the database or refuses its configuration.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you when the auth server stops as soon as it starts, over and over.
+
+## What you see
+
+On Kubernetes, `kubectl get pods -n goiabada` shows the auth server's pod in `CrashLoopBackOff`, with its restarts climbing. Under Docker Compose, the container keeps restarting. Either way, the auth server exits with status 1 before it listens, so `/health` never answers.
+
+Its last record says why. On Kubernetes, read the run that stopped:
+
+```bash
+kubectl logs -n goiabada deployment/goiabada-authserver --previous
+```
+
+Under Docker Compose, `docker compose logs goiabada-authserver`.
+
+Most often the record is `unable to create the database connection`, and its `error` starts with one of these:
+
+| Engine | `GOIABADA_DB_CREATE` on, the default | `GOIABADA_DB_CREATE` off |
+|---|---|---|
+| PostgreSQL | `unable to check whether the database exists` | `unable to connect to database` |
+| MySQL | `unable to create database` | `unable to connect to database` |
+| SQL Server | `unable to connect to master database` | `unable to connect to database` |
+
+The rest of the `error` is the database driver's own words, such as `connection refused`, `no such host`, a refused password or a database that doesn't exist.
+
+## Why it happens
+
+The auth server opens the database before anything else, and it doesn't retry: if the first connection fails, it exits, and Kubernetes or Compose starts it again. Kubernetes waits longer before each restart, which is the back-off in `CrashLoopBackOff`.
+
+With `GOIABADA_DB_CREATE` on, which is the default, the auth server first connects to the server's own database to create Goiabada's when it's missing: `postgres` on PostgreSQL, `master` on SQL Server. That's why the message differs. With it off, it connects straight to `GOIABADA_DB_NAME`.
+
+The usual causes:
+
+- **The host or port is wrong** for where the auth server runs. In Docker Compose, use the database's service name. In Kubernetes, use the database's Service name, or the managed database's host name.
+- **The database refuses the connection,** because its firewall or allowed networks don't include your cluster's or host's addresses.
+- **The username or password is wrong,** or the database doesn't exist and `GOIABADA_DB_CREATE` is off.
+- **The database's endpoint is IPv6 and your cluster isn't.** Some managed services give direct connections over IPv6 only, and a connection pooler endpoint over IPv4.
+
+A database that doesn't answer at all, as when a firewall drops packets, makes the start wait for the connection attempt to time out instead. On Kubernetes, a pod that hasn't answered `/health` within its startup probe's 5 minutes is restarted.
+
+On SQLite, `unable to connect to database` means the file couldn't be opened. When the rest of the message is `attempt to write a readonly database`, see [attempt to write a readonly database](/troubleshooting/attempt-to-write-a-readonly-database/).
+
+## Fix it
+
+<Steps>
+
+1. Check the database variables the auth server reads: `GOIABADA_DB_TYPE`, `GOIABADA_DB_HOST`, `GOIABADA_DB_PORT`, `GOIABADA_DB_NAME`, `GOIABADA_DB_USERNAME` and `GOIABADA_DB_PASSWORD`. On Kubernetes the first five are in the `goiabada-authserver-config` ConfigMap, and the password is in the `goiabada-secrets` Secret.
+
+2. Check that the database answers from where the auth server runs. On Kubernetes, from a throwaway pod in the same namespace, with your host and port:
+
+   ```bash
+   kubectl run -it --rm debug -n goiabada --image=busybox --restart=Never -- \
+     nc -zv your-db-host 5432
+   ```
+
+   If it doesn't connect, fix the network first: the host name, the database's allowed networks, or a pooler endpoint over IPv4.
+
+3. If it connects, the credentials or the database name are what's wrong. Connect with the same username and password from your own client to check them, and see [Database](/deploy/database/) for what each engine needs prepared, including what `GOIABADA_DB_CREATE` asks of the user.
+
+4. Fix the value, then restart the auth server: `kubectl rollout restart deployment/goiabada-authserver -n goiabada`, or `docker compose up -d`.
+
+</Steps>
+
+## When it isn't the database
+
+The auth server refuses to start on these too, each with its own record and exit status 1:
+
+- `the data encryption key is missing or malformed, so the auth server cannot start`: `GOIABADA_AES_ENCRYPTION_KEY` isn't set to 64 hex characters.
+- `the auth server session keys are missing or malformed, so the auth server cannot start`: the session keys aren't set, or aren't the length they must be.
+- `the trusted proxy list is malformed, so the auth server cannot start`: `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` has an entry that isn't an address or a CIDR range.
+- `initial setup is required, because the database is empty and neither bootstrap mode is configured`: the database is empty, and neither `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` nor `GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE` is set to seed it with.
+
+When the record is `unable to create the database connection` and its `error` starts `unable to migrate the database`, the database answered but its schema couldn't be brought up to date: see [Waiting for the migration lock, or marked dirty](/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/), or [attempt to write a readonly database](/troubleshooting/attempt-to-write-a-readonly-database/) on SQLite.
+
+A variable that doesn't parse, such as a port that isn't a number, stops it even sooner, with one line on standard error starting `malformed configuration:` that names the variable, and exit status 2.
+
+## How it works
+
+`/health` answers only once the auth server listens, and it opens and migrates the database before it does. So a pod that can't reach the database never becomes ready, and nothing else in the cluster calls it in the meantime. Once it runs, `/health` doesn't check the database at all, so a database outage later doesn't restart every pod at once.
+
+The admin console doesn't open the database, so it keeps running while the auth server crash-loops, and answers every page with [Unable to load the configuration from the auth server](/troubleshooting/unable-to-load-the-configuration-from-the-auth-server/).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Database" description="Preparing PostgreSQL, MySQL, SQL Server and SQLite." href="/deploy/database/" />
+  <LinkCard title="Environment variables" description="Every database variable and its default." href="/reference/environment-variables/#database" />
+</CardGrid>

@@ -8,7 +8,10 @@ import (
 	"github.com/leodip/goiabada/core/guard"
 )
 
-const monitoringPage = "site/src/content/docs/deploy/monitoring.mdx"
+const (
+	monitoringPage        = "site/src/content/docs/deploy/monitoring.mdx"
+	metricsNotScrapedPage = "site/src/content/docs/troubleshooting/metrics-are-not-scraped.mdx"
+)
 
 // The sections that tell an operator how to turn the metrics listener on and what to read beside
 // it. The admin console's tier reads the same sections.
@@ -19,6 +22,8 @@ var monitoringDocs = []docSection{
 	{monitoringPage, "## Suggested alerts"},
 	{monitoringPage, "## What to watch in the logs"},
 	{kubernetesPage, "## Metrics"},
+	{metricsNotScrapedPage, "## Why it happens"},
+	{metricsNotScrapedPage, "## Fix it"},
 }
 
 // The monitoring docs name only variables this server reads. A misspelt switch is ignored, so the

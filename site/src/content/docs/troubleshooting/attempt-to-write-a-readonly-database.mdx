@@ -1,0 +1,96 @@
+---
+title: attempt to write a readonly database
+description: The auth server on SQLite stops at start with "attempt to write a readonly database", usually after a new image or a move to another user.
+---
+
+import { Aside, CardGrid, LinkCard, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+This page helps you when the auth server can't write its SQLite database.
+
+## What you see
+
+The auth server stops right after it opens the database, and its log has `unable to create the database connection`, with one of these as its `error`:
+
+- `unable to connect to database: : attempt to write a readonly database (1544)`, when it can't write the **directory** holding the database file, where SQLite creates the files it keeps beside it.
+- `unable to migrate the database: unable to clear schema_migrations: attempt to write a readonly database (8)`, when it can't write the **file**, and the new release has a migration to run.
+
+Under Docker Compose, the container restarts and stops again with the same record.
+
+When the file is read-only and there's nothing to migrate, the auth server starts. Every request that writes to the database then fails instead, such as a sign-in, and its error record ends in `attempt to write a readonly database (8)`.
+
+## Why it happens
+
+The auth server runs as a user that can't write the database. SQLite needs to write the file and to create the files it keeps beside it in the same directory, `goiabada.db-wal` and `goiabada.db-shm`.
+
+The image runs as uid `10001` and gid `10001`. Its `/data` directory belongs to that user, and Docker copies a mount point's owner into an empty named volume, so a new volume mounted at `/data` is writable from the first start. A volume whose files belong to another user isn't:
+
+- **The volume was written by a container that ran as root,** such as an older image, or a `docker compose run` as root.
+- **The volume is mounted somewhere other than `/data`,** at a path the image doesn't have. Docker creates that directory owned by root.
+- **It's a bind mount of a host directory** that belongs to another user.
+
+With native binaries, it's the same story when the service runs as a user other than the one owning the database's directory.
+
+Kubernetes doesn't run into this: SQLite isn't supported there, and the generated manifest mounts no volume.
+
+## Fix it
+
+Give the database's directory, and every file in it, to the user the auth server runs as.
+
+<Tabs>
+<TabItem label="Docker Compose">
+
+<Steps>
+
+1. Stop the auth server, from the directory holding your `docker-compose.yml`:
+
+   ```bash
+   docker compose stop goiabada-authserver
+   ```
+
+2. Change the owner, once, in a throwaway container of the auth server's service:
+
+   ```bash
+   docker compose run --rm --no-deps --user 0:0 --cap-add CHOWN --entrypoint chown \
+     goiabada-authserver -R 10001:10001 /data
+   ```
+
+   This runs `chown` as root, so it reaches the volume wherever the service mounts it. `--cap-add CHOWN` is what lets root change the owner in a service that drops every capability. Use the path your file mounts the volume at, `/data` in the file the setup wizard writes.
+
+3. Start everything again:
+
+   ```bash
+   docker compose up -d
+   ```
+
+</Steps>
+
+</TabItem>
+<TabItem label="Native binaries">
+
+Give the directory to the user the service runs as, here `goiabada` with the database in `/var/lib/goiabada`:
+
+```bash
+sudo systemctl stop goiabada-authserver
+sudo chown -R goiabada:goiabada /var/lib/goiabada
+sudo systemctl start goiabada-authserver
+```
+
+</TabItem>
+</Tabs>
+
+<Aside type="caution">
+Change the owner of the whole directory, `-R` included. A database file you give to the right user beside a `goiabada.db-wal` that still belongs to root fails the same way.
+</Aside>
+
+## How it works
+
+SQLite opens a file it can't write read-only rather than refusing it. A read-only database connects, so the auth server only finds out at its first write. On an upgrade, that's the migration's first step, recording the version it's about to apply, which is why the second message names `schema_migrations`. A directory it can't write fails sooner, since the database runs in WAL mode and SQLite can't create its WAL files.
+
+The auth server checks nothing about the file's owner before it opens it. Nothing is written when a start fails this way, so the start after the fix migrates as usual.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Database" description="Preparing SQLite and the other engines." href="/deploy/database/#sqlite" />
+  <LinkCard title="The user the images run as" description="Which files the containers must read and write." href="/deploy/docker-compose/#the-user-the-images-run-as" />
+</CardGrid>
