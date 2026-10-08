@@ -1,0 +1,153 @@
+---
+title: Upgrade Goiabada
+description: Update a deployment to a new release, what the auth server does to the database schema when it starts, and how to roll back.
+---
+
+import { Aside, CardGrid, LinkCard, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+This page helps you move a deployment to a new release of Goiabada, and back again if you need to.
+
+You don't migrate the database yourself. The auth server brings the schema up to date when it starts, before it listens. The admin console holds no database connection of its own, since it reaches the auth server through its API, so restarting it migrates nothing.
+
+## Update to a new release
+
+<Steps>
+
+1. **Read the release notes** on the [releases page](https://github.com/leodip/goiabada/releases). Anything a release asks of an upgrade beyond these steps, its notes state.
+
+2. **Back up the database,** and the AES key if you haven't: see [Back up the AES key](/deploy/secrets/#back-up-the-aes-key).
+
+3. **Install the new release, and restart.**
+
+   <Tabs syncKey="platform">
+     <TabItem label="Docker Compose">
+       Set both image lines in `docker-compose.yml` to the new release, `leodip/goiabada:authserver-<version>` and `leodip/goiabada:adminconsole-<version>`, then:
+
+       ```bash
+       docker compose pull
+       docker compose up -d
+       ```
+
+       A setup wizard built from source writes the moving `latest` tag instead of a version, so `docker compose pull` fetches whatever release `latest` names that day. Replace it with a [release version](https://github.com/leodip/goiabada/releases), so that you choose when to upgrade.
+     </TabItem>
+     <TabItem label="Native binaries">
+       Download the release's ZIP for your platform from the [releases page](https://github.com/leodip/goiabada/releases), put both binaries where the old ones are, and restart. With the layout on [Native binaries](/deploy/native-binaries/#running-on-linux-with-systemd):
+
+       ```bash
+       unzip goiabada-<version>-linux-amd64.zip
+       sudo install -m 0755 goiabada-authserver goiabada-adminconsole /opt/goiabada/
+       sudo systemctl restart goiabada-authserver goiabada-adminconsole
+       ```
+
+       Keep the old binaries until the new release works: a [rollback](#roll-back-to-an-earlier-release) installs them again.
+     </TabItem>
+     <TabItem label="Kubernetes">
+       A release of the setup wizard writes its own version into both image lines, with `imagePullPolicy: IfNotPresent`, since a version tag names one build. A wizard built from source writes `latest` with `imagePullPolicy: Always`, under a comment, and warns you when it finishes: `latest` moves, so pods started at different times can run different releases. Replace it with a [release version](https://github.com/leodip/goiabada/releases) before production.
+
+       Set both image lines in `goiabada-k8s.yaml` to the new release, then apply it. It alone carries the image tags, so the Secrets need no applying again:
+
+       ```bash
+       kubectl apply -f goiabada-k8s.yaml
+       kubectl rollout status deployment/goiabada-authserver deployment/goiabada-adminconsole -n goiabada
+       ```
+
+       If you regenerate the manifest with the setup wizard instead, apply only the new `goiabada-k8s.yaml`: the `goiabada-secrets.yaml` written beside it holds new secrets, which the database wasn't set up with.
+     </TabItem>
+   </Tabs>
+
+4. **Check the start.** The auth server writes `database migrated` once it has run the release's migrations, or `no need to migrate the database` when it had none to run, and then starts its listeners.
+
+</Steps>
+
+<Aside type="caution">
+Running the setup wizard again generates new secrets. Before you use its output for a deployment that already has a database, copy your existing secret values over the new ones, as [Secrets](/deploy/secrets/#how-it-works) explains: a new AES key can't decrypt the database.
+</Aside>
+
+## How migrations run
+
+The auth server applies whatever migrations its release carries when it starts, between opening the database and starting its listeners. It refuses to start on a database that is half migrated, and on one a newer release has already migrated, since it can't know what that release changed. [Waiting for the migration lock, or marked dirty](/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/) covers both refusals.
+
+A start writes these Info records about the schema:
+
+| Record | When | Attributes |
+|---|---|---|
+| `waiting for the migration lock` | Another process holds the lock. Written once, before the wait | none |
+| `migrating the database` | Before the first migration runs | `from_version`, `to_version`, `pending` |
+| `database migrated` | After the last migration has run | `from_version`, `to_version`, `applied`, `duration` |
+| `no need to migrate the database` | The schema is already current | none |
+| `database migration stopped` | A stop signal ended the migrations between two files | `from_version`, `reached_version`, `applied`, `remaining` |
+
+`from_version` is the schema version the database recorded, 0 for one that was never migrated, and `to_version` the one this release expects. `pending` and `applied` count migration files. A replica that waited behind another one's migration writes `waiting for the migration lock` and then `no need to migrate the database`.
+
+### The migration lock
+
+Only one process migrates a database at a time. A process takes the migration lock before it migrates and releases it when it's done, so with several replicas the first to start migrates, and the others wait for it, then find the schema current and start. The `migrate` command takes the same lock, and waits the same way.
+
+A waiting process waits for as long as the lock is held, on every engine; nothing in Goiabada gives up. A start that writes `waiting for the migration lock` and nothing more is waiting for a process that's still migrating, not hung. The lock belongs to the holder's database session, so a holder that dies releases it and can't strand the others. On SQLite the lock covers one process only, so a start there never waits for it.
+
+Your platform decides how long a start may take:
+
+- **Kubernetes:** the generated manifest's startup probe allows 5 minutes, and restarts the container after that. An upgrade whose migrations take longer needs a higher `failureThreshold`, as [First start and upgrades](/deploy/kubernetes/#first-start-and-upgrades) explains.
+- **Docker Compose:** the auth server's healthcheck gives a start 5 minutes, `start_period: 300s`, before its failures count, and the admin console waits for that healthcheck to pass before it starts.
+
+### A start that's stopped
+
+A stop signal (SIGTERM, which Kubernetes and Compose send, or SIGINT) that reaches the auth server while it's still starting stops it cleanly, whatever it's doing:
+
+- A wait ends at once: for the database connection, for the database to be created, or for the migration lock.
+- A migration file already running runs to its end, and the next one doesn't start. The lock is released and the schema is left clean at the version it reached, which the next start carries on from, so a start stopped again and again still moves forward file by file.
+- The AES key's re-encryption and a first start's seed each commit whole: one under way completes, and one not yet begun doesn't begin.
+
+The auth server then writes `shutdown signal received`, `database migration stopped` if migrations were under way, and `auth server stopped`, and exits 0. In `database migration stopped`, `reached_version` is where the schema now is, and `remaining` how many files the next start will run.
+
+The one thing the auth server can't finish is a migration file that runs longer than the grace period the platform allows a stop, `terminationGracePeriodSeconds` on Kubernetes or `stop_grace_period` in Compose. The platform then ends it with SIGKILL, which no process can catch, and that file is left marked dirty: on MySQL and SQL Server, which run a file without an enclosing transaction, partly applied. The next start refuses until the schema is repaired by hand, as [A migration was cut short](/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/#a-migration-was-cut-short) walks through. Before an upgrade whose release notes announce a long migration, give the start enough time that the platform doesn't stop it, and don't stop it yourself.
+
+## Roll back to an earlier release
+
+The `migrate` command steps the schema without starting the server, against the database in `GOIABADA_DB_*`. The `--db-*` flags override those variables, given before or after `migrate`; any other flag goes before it. A mistyped command, such as `migrat`, is refused rather than starting the server.
+
+| Command | What it does |
+|---|---|
+| `goiabada-authserver migrate version` | Prints the schema version this binary expects and the one the database records |
+| `goiabada-authserver migrate to <version>` | Steps the schema to that version, up or down |
+
+<Steps>
+
+1. **Back up the database.** A rollback discards whatever the newer release wrote into columns and tables the older one doesn't have.
+
+2. **Step the schema down with the current binary,** naming the schema version the target release expects, which its release notes state. The current binary is the one that must run it, because it's the only one carrying the migrations being rolled back.
+
+   <Tabs syncKey="platform">
+     <TabItem label="Docker Compose">
+       ```bash
+       docker compose run --rm goiabada-authserver migrate to <version>
+       ```
+     </TabItem>
+     <TabItem label="Native binaries">
+       ```bash
+       set -a && . /etc/goiabada/authserver.env && set +a
+       /opt/goiabada/goiabada-authserver migrate to <version>
+       ```
+     </TabItem>
+     <TabItem label="Kubernetes">
+       ```bash
+       kubectl exec -n goiabada deployment/goiabada-authserver -- /app/goiabada-authserver migrate to <version>
+       ```
+     </TabItem>
+   </Tabs>
+
+3. **Install the target release straight away,** as in [Update to a new release](#update-to-a-new-release), with its version in place of the new one.
+
+</Steps>
+
+`migrate to` refuses any version below `000044`: releases older than the one carrying that schema changed stored data in ways no migration reverses, so no rollback reaches them.
+
+Ctrl-C or SIGTERM stops `migrate to` the way it stops a starting auth server: a wait ends at once, a migration file already running runs to its end, and the next one doesn't start, so the schema is left clean. The command then prints the schema version the database is at, how many migrations it applied and how many remain, and exits 1, because it didn't reach the version you asked for. Run the same command again to carry on from there. `migrate version` only reads, so Ctrl-C simply ends it.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Waiting for the migration lock, or marked dirty" description="When a start waits, or refuses the database." href="/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/" />
+  <LinkCard title="Database" description="Prepare the database for each engine." href="/deploy/database/" />
+  <LinkCard title="Secrets" description="What each secret protects, and backing up the AES key." href="/deploy/secrets/" />
+</CardGrid>

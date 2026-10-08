@@ -21,55 +21,77 @@ import (
 // Secret contract says which of the two servers reads each key, so this tier tells them apart.
 const adminConsoleImage = "leodip/goiabada:adminconsole-"
 
-// The pages that document the deployment's secrets, relative to the repository root, and the
-// sections of each that do. Each section runs from its heading to the next heading of the same
-// level.
+// The pages that document the deployment's secrets, relative to the repository root.
 const (
 	kubernetesPage = "site/src/content/docs/deploy/kubernetes.mdx"
-	composePage    = "site/src/content/docs/deploy/docker-compose.mdx"
-	nativePage     = "site/src/content/docs/deploy/native-binaries.mdx"
+	secretsPage    = "site/src/content/docs/deploy/secrets.mdx"
+	rotatePage     = "site/src/content/docs/deploy/rotate-secrets.mdx"
+	upgradePage    = "site/src/content/docs/deploy/upgrade-goiabada.mdx"
 )
 
+// docSection is one section of a page: the lines after its heading up to the next heading of the
+// same or a higher level. A section with no heading is the whole page.
 type docSection struct{ page, heading string }
 
-var secretsDocs = []docSection{
-	{kubernetesPage, "## Secrets"},
-	{kubernetesPage, "## Updating Goiabada"},
-	{composePage, "## Secrets"},
-	{nativePage, "## Secrets"},
+func (s docSection) String() string {
+	if s.heading == "" {
+		return s.page
+	}
+	return s.page + ": " + s.heading
 }
 
-// The secrets docs name only variables a server reads, and every _PREVIOUS variable this server
-// reads is named on each page, which is where its rotation is told. A misspelt variable in a
-// rotation procedure is ignored by the server it was meant for, and the rotation then signs
-// everybody out or, for the AES key, leaves the auth server unable to read the database. The
-// admin console's own variables are held by that console's tier (#396 decision 18).
+// secretsDocs is every section that names the deployment's secrets: what each protects, where
+// Kubernetes keeps them, how each rotates, and the update that must leave them alone.
+var secretsDocs = []docSection{
+	{kubernetesPage, "## Secrets"},
+	{secretsPage, ""},
+	{rotatePage, ""},
+	{upgradePage, "## Update to a new release"},
+}
+
+// rotationPlatforms are the tabs Rotate secrets tells every rotation in, one per way the setup
+// wizard deploys Goiabada.
+var rotationPlatforms = []string{"Docker Compose", "Native binaries", "Kubernetes"}
+
+// The secrets docs name only variables a server reads. A misspelt variable in a rotation procedure
+// is ignored by the server it was meant for, and the rotation then signs everybody out or, for the
+// AES key, leaves the auth server unable to read the database. The admin console's own variables
+// are held by that console's tier (#396 decision 18).
 func TestSecretsDocs_NameOnlyVariablesTheServersRead(t *testing.T) {
 	assertSecretsDocsVariables(t, filepath.Dir(guard.SourceRoot(t)), secretsDocs, readVariables())
 }
 
+// Every rotation is told once, on Rotate secrets, with a tab per platform for what differs, so
+// each platform's tabs name every _PREVIOUS variable this server reads: a platform whose tabs
+// never name one does not tell that rotation, and a reader of that tab is left with no way to
+// rotate without signing everybody out or, for the AES key, losing the database (#522 decision 15).
+func TestRotateSecretsDocs_EveryPlatformTellsEveryRotation(t *testing.T) {
+	assertRotationTabs(t, filepath.Dir(guard.SourceRoot(t)), rotatePage, rotationPlatforms, readVariables())
+}
+
 // The Secret contract in kubernetes.mdx is what the generated manifests read: every Secret, key
 // and variable, which server reads it, and whether its reference is optional, row for row in both
-// directions. Every `kubectl create secret generic` the Kubernetes sections print creates exactly
-// the keys the manifests require from that Secret, so a Secret created by any route the docs show
-// is one the manifest can start from; the optional ones are the previous keys a rotation fills
+// directions. Every `kubectl create secret generic` the secrets docs print creates exactly the
+// keys the manifests require from that Secret, so a Secret created by any route the docs show is
+// one the manifest can start from; the optional ones are the previous keys a rotation fills
 // (#396 decision 18).
 func TestKubernetesDocs_TheSecretContractIsWhatTheManifestsRead(t *testing.T) {
 	assertSecretContract(t, filepath.Dir(guard.SourceRoot(t)))
 }
 
-func TestSecretsDocs_AnUnreadVariableAndAMissingRotationFail(t *testing.T) {
+func TestSecretsDocs_AnUnreadVariableFails(t *testing.T) {
 	root := t.TempDir()
 	writeManifestFixture(t, root, "site/k8s.mdx", "intro GOIABADA_NEVER_READ_OUTSIDE\n\n"+
 		"## Secrets\n\nSet GOIABADA_APPNAME and GOIABADA_ADMIN_PASSWORD_TYPO.\n\n"+
 		"```bash\n## not a heading inside a fence: GOIABADA_IN_FENCE\n```\n\n"+
 		"Ignored here: GOIABADA_ADMINCONSOLE_ANYTHING.\n\n"+
 		"## Next\n\nGOIABADA_AFTER_THE_SECTION\n")
-	writeManifestFixture(t, root, "site/native.mdx", "## Secrets\n\nGOIABADA_APPNAME_PREVIOUS\n")
+	writeManifestFixture(t, root, "site/rotate.mdx", "---\ntitle: Rotate\n---\n\nGOIABADA_APPNAME_PREVIOUS\n\n"+
+		"## Anything\n\nGOIABADA_ROTATION_TYPO\n")
 
 	report := guard.Run(func(r guard.Reporter) {
 		assertSecretsDocsVariables(r, root,
-			[]docSection{{"site/k8s.mdx", "## Secrets"}, {"site/native.mdx", "## Secrets"}},
+			[]docSection{{"site/k8s.mdx", "## Secrets"}, {"site/rotate.mdx", ""}},
 			map[string]bool{"GOIABADA_APPNAME": true, "GOIABADA_APPNAME_PREVIOUS": true, "GOIABADA_ADMIN_PASSWORD": true})
 	})
 
@@ -80,15 +102,15 @@ func TestSecretsDocs_AnUnreadVariableAndAMissingRotationFail(t *testing.T) {
 	for _, want := range []string{
 		"site/k8s.mdx: ## Secrets names GOIABADA_ADMIN_PASSWORD_TYPO",
 		"site/k8s.mdx: ## Secrets names GOIABADA_IN_FENCE",
-		"site/k8s.mdx never names GOIABADA_APPNAME_PREVIOUS",
+		"site/rotate.mdx names GOIABADA_ROTATION_TYPO",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("no failure says %q:\n%s", want, text)
 		}
 	}
-	for _, unwanted := range []string{"NEVER_READ_OUTSIDE", "AFTER_THE_SECTION", "ADMINCONSOLE_ANYTHING", "native.mdx"} {
+	for _, unwanted := range []string{"NEVER_READ_OUTSIDE", "AFTER_THE_SECTION", "ADMINCONSOLE_ANYTHING", "APPNAME_PREVIOUS"} {
 		if strings.Contains(text, unwanted) {
-			t.Errorf("a failure names %s, which is outside the sections or this server's to check:\n%s", unwanted, text)
+			t.Errorf("a failure names %s, which is outside the sections, read, or this server's to check:\n%s", unwanted, text)
 		}
 	}
 	if len(report.Errors) != 3 {
@@ -107,6 +129,78 @@ func TestSecretsDocs_AMissingSectionStops(t *testing.T) {
 
 	if !report.Stopped || !strings.Contains(report.Fatal, "## Secrets") {
 		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
+	}
+}
+
+// rotationFixture tells two rotations in two tabs each, the second platform's AES tab leaving its
+// previous variable out, and a third platform with no tab at all.
+const rotationFixture = "Before the tabs: GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS.\n\n" +
+	"## The session keys\n\n<Tabs>\n" +
+	"  <TabItem label=\"Docker Compose\">\n    GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS\n  </TabItem>\n" +
+	"  <TabItem label=\"Native binaries\">\n    GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS\n  </TabItem>\n" +
+	"</Tabs>\n\n## The AES key\n\n<Tabs>\n" +
+	"  <TabItem label=\"Docker Compose\">\n    GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS\n  </TabItem>\n" +
+	"  <TabItem label=\"Native binaries\">\n    GOIABADA_AES_ENCRYPTION_KEY\n  </TabItem>\n" +
+	"</Tabs>\n\nAfter the tabs: GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS.\n"
+
+var rotationFixtureRead = map[string]bool{
+	"GOIABADA_AES_ENCRYPTION_KEY":                             true,
+	"GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS":                    true,
+	"GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS": true,
+}
+
+func TestRotateSecretsDocs_APlatformMissingARotationFails(t *testing.T) {
+	root := t.TempDir()
+	writeManifestFixture(t, root, "site/rotate.mdx", rotationFixture)
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertRotationTabs(r, root, "site/rotate.mdx", []string{"Docker Compose", "Native binaries", "Kubernetes"}, rotationFixtureRead)
+	})
+
+	if report.Stopped {
+		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
+	}
+	text := report.Text()
+	for _, want := range []string{
+		"site/rotate.mdx: the Native binaries tabs never name GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS, so they do not tell its rotation",
+		"site/rotate.mdx has no tab labelled Kubernetes",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("no failure says %q:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "Docker Compose") {
+		t.Errorf("a failure names the platform whose tabs tell every rotation:\n%s", text)
+	}
+	if len(report.Errors) != 2 {
+		t.Errorf("%d failures, want 2:\n%s", len(report.Errors), text)
+	}
+}
+
+func TestRotateSecretsDocs_EveryPlatformTellingEveryRotationPasses(t *testing.T) {
+	root := t.TempDir()
+	writeManifestFixture(t, root, "site/rotate.mdx", strings.Replace(rotationFixture,
+		"    GOIABADA_AES_ENCRYPTION_KEY\n", "    GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS\n", 1))
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertRotationTabs(r, root, "site/rotate.mdx", []string{"Docker Compose", "Native binaries"}, rotationFixtureRead)
+	})
+
+	if report.Stopped || len(report.Errors) != 0 {
+		t.Errorf("tabs naming every previous variable failed: %+v", report)
+	}
+}
+
+func TestRotateSecretsDocs_APageWithNoTabsStops(t *testing.T) {
+	root := t.TempDir()
+	writeManifestFixture(t, root, "site/rotate.mdx", "## The AES key\n\nGOIABADA_AES_ENCRYPTION_KEY_PREVIOUS\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertRotationTabs(r, root, "site/rotate.mdx", []string{"Docker Compose"}, rotationFixtureRead)
+	})
+
+	if !report.Stopped || !strings.Contains(report.Fatal, "<TabItem") {
+		t.Errorf("a page with no tabs did not stop the check naming them: %+v", report)
 	}
 }
 
@@ -178,8 +272,21 @@ const contractPage = "## Secrets\n\n" +
 	"```bash\nkubectl create secret generic goiabada-secrets -n goiabada --dry-run=client -o json \\\n" +
 	"  --from-file=db-password-previous=<(openssl rand -hex 32) \\\n" +
 	"  | kubeseal --format yaml --merge-into goiabada-secrets.sealed.yaml\n```\n\n" +
-	"## Updating Goiabada\n\n" +
-	"```bash\nprintf x | kubectl create secret generic goiabada-encryption-key -n goiabada --from-file=aes-encryption-key=/dev/stdin\n```\n"
+	"## After\n\n" +
+	"```bash\nkubectl create secret generic goiabada-secrets -n goiabada --from-file=outside=x\n```\n"
+
+// contractRotatePage and contractUpgradePage each print a create command the contract holds.
+const (
+	contractRotatePage  = "## The AES key\n\n```bash\nprintf x | kubectl create secret generic goiabada-encryption-key -n goiabada --from-file=aes-encryption-key=/dev/stdin\n```\n"
+	contractUpgradePage = "## Update to a new release\n\n```bash\nkubectl create secret generic goiabada-encryption-key -n goiabada \\\n  --from-file=aes-encryption-key=<(openssl rand -hex 32)\n```\n"
+)
+
+func writeContractPages(t *testing.T, root, kubernetes, upgrade string) {
+	t.Helper()
+	writeManifestFixture(t, root, kubernetesPage, kubernetes)
+	writeManifestFixture(t, root, rotatePage, contractRotatePage)
+	writeManifestFixture(t, root, upgradePage, upgrade)
+}
 
 func TestKubernetesDocs_ADriftedContractFails(t *testing.T) {
 	root := t.TempDir()
@@ -196,7 +303,9 @@ func TestKubernetesDocs_ADriftedContractFails(t *testing.T) {
 		// An optional reference the table does not say is optional.
 		"| auth server | Optional. A key |", "| auth server | A key |",
 	).Replace(contractPage)
-	writeManifestFixture(t, root, kubernetesPage, page)
+	// A create command on another page of the secrets docs that creates a key the manifest does
+	// not read.
+	writeContractPages(t, root, page, strings.Replace(contractUpgradePage, "aes-encryption-key=", "aes-key=", 1))
 
 	report := guard.Run(func(r guard.Reporter) { assertSecretContract(r, root) })
 
@@ -210,23 +319,24 @@ func TestKubernetesDocs_ADriftedContractFails(t *testing.T) {
 		"kubernetes-postgres.golden: the docs' table has goiabada-secrets/extra as GOIABADA_EXTRA, which the manifest does not read",
 		"`kubectl create secret generic goiabada-secrets` creates [db-password], want [db-password oauth-client-secret]",
 		"kubernetes-postgres.golden: the manifest reads goiabada-encryption-key/aes-encryption-key-previous as GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS, read by auth server, optional; the docs' table says auth server",
+		upgradePage + ": `kubectl create secret generic goiabada-encryption-key` creates [aes-key], want [aes-encryption-key]",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("no failure says %q:\n%s", want, text)
 		}
 	}
-	if strings.Contains(text, "secrets.golden") || strings.Contains(text, "goiabada-encryption-key` creates") {
-		t.Errorf("a failure names the secrets golden or the correct create command:\n%s", text)
+	if strings.Contains(text, "secrets.golden") || strings.Contains(text, rotatePage) || strings.Contains(text, "[outside]") {
+		t.Errorf("a failure names the secrets golden, the correct create command or one outside the section:\n%s", text)
 	}
-	if len(report.Errors) != 5 {
-		t.Errorf("%d failures, want 5:\n%s", len(report.Errors), text)
+	if len(report.Errors) != 6 {
+		t.Errorf("%d failures, want 6:\n%s", len(report.Errors), text)
 	}
 }
 
 func TestKubernetesDocs_AMatchingContractPasses(t *testing.T) {
 	root := t.TempDir()
 	writeManifestFixture(t, root, "src/cmd/goiabada-setup/testdata/kubernetes-postgres.golden", contractManifest)
-	writeManifestFixture(t, root, kubernetesPage, contractPage)
+	writeContractPages(t, root, contractPage, contractUpgradePage)
 
 	report := guard.Run(func(r guard.Reporter) { assertSecretContract(r, root) })
 
@@ -238,7 +348,7 @@ func TestKubernetesDocs_AMatchingContractPasses(t *testing.T) {
 func TestKubernetesDocs_AContractWithNoTableStops(t *testing.T) {
 	root := t.TempDir()
 	writeManifestFixture(t, root, "src/cmd/goiabada-setup/testdata/kubernetes-postgres.golden", contractManifest)
-	writeManifestFixture(t, root, kubernetesPage, "## Secrets\n\nNo table.\n\n## Updating Goiabada\n")
+	writeContractPages(t, root, "## Secrets\n\nNo table.\n", contractUpgradePage)
 
 	report := guard.Run(func(r guard.Reporter) { assertSecretContract(r, root) })
 
@@ -263,29 +373,60 @@ func assertSecretsDocsVariables(r guard.Reporter, root string, sections []docSec
 var docVariable = regexp.MustCompile(`GOIABADA_[A-Z0-9_]*[A-Z0-9]`)
 
 // secretsDocsVariableFindings returns one line per variable a section names that read does not
-// hold, the admin console's own (GOIABADA_ADMINCONSOLE_) excepted unless read holds it, and one per
-// page that never names a _PREVIOUS variable read holds.
+// hold, the admin console's own (GOIABADA_ADMINCONSOLE_) excepted unless read holds it.
 func secretsDocsVariableFindings(root string, sections []docSection, read map[string]bool) ([]string, error) {
 	var findings []string
-	named := map[string]map[string]bool{}
-	var pages []string
 	for _, s := range sections {
 		text, err := docSectionText(root, s)
 		if err != nil {
 			return nil, err
 		}
-		if named[s.page] == nil {
-			named[s.page] = map[string]bool{}
-			pages = append(pages, s.page)
-		}
 		seen := map[string]bool{}
 		for _, name := range docVariable.FindAllString(text, -1) {
-			named[s.page][name] = true
 			if seen[name] || read[name] || strings.HasPrefix(name, "GOIABADA_ADMINCONSOLE_") {
 				continue
 			}
 			seen[name] = true
-			findings = append(findings, fmt.Sprintf("%s: %s names %s, which this server does not read", s.page, s.heading, name))
+			findings = append(findings, fmt.Sprintf("%s names %s, which this server does not read", s, name))
+		}
+	}
+	return findings, nil
+}
+
+// assertRotationTabs is the reporting half of the rotation check.
+func assertRotationTabs(r guard.Reporter, root, page string, platforms []string, read map[string]bool) {
+	r.Helper()
+	findings, err := rotationTabFindings(root, page, platforms, read)
+	if err != nil {
+		r.Fatalf("%v", err)
+	}
+	for _, finding := range findings {
+		r.Errorf("%s", finding)
+	}
+}
+
+// tabItem is one Starlight tab: its label and what it holds, up to its closing tag.
+var tabItem = regexp.MustCompile(`(?s)<TabItem label="([^"]+)"[^>]*>(.*?)</TabItem>`)
+
+// rotationTabFindings returns one line per platform with no tab on the page, and one per
+// _PREVIOUS variable read holds that a platform's tabs, taken together, never name. A page with no
+// tab at all is an error, since the check would then read nothing.
+func rotationTabFindings(root, page string, platforms []string, read map[string]bool) ([]string, error) {
+	text, err := docSectionText(root, docSection{page, ""})
+	if err != nil {
+		return nil, err
+	}
+	tabs := tabItem.FindAllStringSubmatch(text, -1)
+	if len(tabs) == 0 {
+		return nil, fmt.Errorf("%s holds no <TabItem label=...>, so this check read nothing", page)
+	}
+	named := map[string]map[string]bool{}
+	for _, tab := range tabs {
+		if named[tab[1]] == nil {
+			named[tab[1]] = map[string]bool{}
+		}
+		for _, name := range docVariable.FindAllString(tab[2], -1) {
+			named[tab[1]][name] = true
 		}
 	}
 	var previous []string
@@ -295,10 +436,15 @@ func secretsDocsVariableFindings(root string, sections []docSection, read map[st
 		}
 	}
 	sort.Strings(previous)
-	for _, page := range pages {
+	var findings []string
+	for _, platform := range platforms {
+		if named[platform] == nil {
+			findings = append(findings, fmt.Sprintf("%s has no tab labelled %s", page, platform))
+			continue
+		}
 		for _, name := range previous {
-			if !named[page][name] {
-				findings = append(findings, fmt.Sprintf("%s never names %s, so it does not tell its rotation", page, name))
+			if !named[platform][name] {
+				findings = append(findings, fmt.Sprintf("%s: the %s tabs never name %s, so they do not tell its rotation", page, platform, name))
 			}
 		}
 	}
@@ -306,11 +452,15 @@ func secretsDocsVariableFindings(root string, sections []docSection, read map[st
 }
 
 // docSectionText is a page's section: the lines after its heading up to the next heading of the
-// same or a higher level, a line in a fenced code block being no heading.
+// same or a higher level, a line in a fenced code block being no heading. A section with no
+// heading is the whole page.
 func docSectionText(root string, s docSection) (string, error) {
 	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(s.page)))
 	if err != nil {
 		return "", err
+	}
+	if s.heading == "" {
+		return string(content), nil
 	}
 	level := strings.Index(s.heading, " ")
 	var b strings.Builder
@@ -379,9 +529,17 @@ func assertSecretContract(r guard.Reporter, root string) {
 	}
 }
 
+// createCommandDocs is every section whose `kubectl create secret generic` commands the contract
+// holds: the Kubernetes page's Secrets, every rotation, and the update.
+var createCommandDocs = []docSection{
+	{kubernetesPage, "## Secrets"},
+	{rotatePage, ""},
+	{upgradePage, ""},
+}
+
 // secretContractFindings holds the contract table in kubernetes.mdx's Secrets section to every
-// Kubernetes golden, and each `kubectl create secret generic` in its Kubernetes sections to the
-// keys the goldens read from that Secret.
+// Kubernetes golden, and each `kubectl create secret generic` in createCommandDocs to the keys the
+// goldens read from that Secret.
 func secretContractFindings(root string) ([]string, error) {
 	section, err := docSectionText(root, docSection{kubernetesPage, "## Secrets"})
 	if err != nil {
@@ -445,16 +603,16 @@ func secretContractFindings(root string) ([]string, error) {
 		return nil, fmt.Errorf("no file matching %s runs %s, so this check read nothing", kubernetesManifests, authServerImage)
 	}
 
-	for _, heading := range []string{"## Secrets", "## Updating Goiabada"} {
-		text, err := docSectionText(root, docSection{kubernetesPage, heading})
+	for _, section := range createCommandDocs {
+		text, err := docSectionText(root, section)
 		if err != nil {
 			return nil, err
 		}
 		for _, command := range createSecretCommands(text) {
 			want := sortedKeys(keysRead[command.secret])
 			if got := sortedKeys(command.keys); strings.Join(got, " ") != strings.Join(want, " ") {
-				findings = append(findings, fmt.Sprintf("%s: %s: `kubectl create secret generic %s` creates %v, want %v",
-					kubernetesPage, heading, command.secret, got, want))
+				findings = append(findings, fmt.Sprintf("%s: `kubectl create secret generic %s` creates %v, want %v",
+					section, command.secret, got, want))
 			}
 		}
 	}

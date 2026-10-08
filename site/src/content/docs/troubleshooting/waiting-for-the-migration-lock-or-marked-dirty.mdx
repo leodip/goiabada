@@ -103,7 +103,7 @@ The database is at a schema version this release has no migration for, so a newe
 
 ### Fix it
 
-Install the newer release again. To go back to this release for good, run the newer release's `goiabada-authserver migrate to <version>` first, naming the version the message gives, then install this one. [Schema migrations and rollback](/deploy/database/#schema-migrations-and-rollback) has the rollback procedure.
+Install the newer release again. To go back to this release for good, run the newer release's `goiabada-authserver migrate to <version>` first, naming the version the message gives, then install this one. [Roll back to an earlier release](/deploy/upgrade-goiabada/#roll-back-to-an-earlier-release) has the procedure.
 
 ## How it works
 
@@ -122,6 +122,6 @@ A stop signal during a start ends a wait at once and lets a running file finish,
 ## Next steps
 
 <CardGrid>
-  <LinkCard title="Schema migrations and rollback" description="The lock, the records and the migrate command." href="/deploy/database/#schema-migrations-and-rollback" />
+  <LinkCard title="Upgrade Goiabada" description="The lock, the records and the migrate command." href="/deploy/upgrade-goiabada/" />
   <LinkCard title="First start and upgrades" description="The startup probe and how long a start may take on Kubernetes." href="/deploy/kubernetes/#first-start-and-upgrades" />
 </CardGrid>
