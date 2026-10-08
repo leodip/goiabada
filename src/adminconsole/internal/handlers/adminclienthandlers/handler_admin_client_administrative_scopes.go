@@ -74,8 +74,10 @@ func HandleAdministrativeScopesPost(
 		// A refusal draws the Settings tab again from the client as stored, the allowance included,
 		// and puts the reason beside the allowance's own Save.
 		renderError := func(message string) {
+			stored := clientSettingsFrom(clientResp)
 			bind := map[string]interface{}{
-				"client":                    clientSettingsFrom(clientResp),
+				"client":                    stored,
+				"storedClient":              stored,
 				"administrativeScopesError": message,
 			}
 

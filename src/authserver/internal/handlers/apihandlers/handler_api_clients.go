@@ -500,6 +500,34 @@ func HandleClientUpdatePut(
 		// Prepare the new identifier value
 		trimmedClientIdentifier := strings.TrimSpace(updateReq.ClientIdentifier)
 
+		// The two clients whose identifier may not change are refused for that reason before the new
+		// identifier's format and uniqueness are checked: a rename that can never succeed is not
+		// answered as though another identifier might (#522).
+		//
+		// System-level client protection: block identifier changes
+		if client.IsSystemLevelClient() && trimmedClientIdentifier != client.ClientIdentifier {
+			writeJSONError(w, "The identifier of a system-level client cannot be changed.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		// Self-registered client protection: block identifier changes too. Until the created_via_dcr
+		// column existed, the dcr_ identifier prefix was the only record that a client had
+		// registered itself, so renaming one here erased that fact permanently: migration 000029
+		// backfills from the prefix, and a client renamed before the upgrade is left unmarked, with
+		// consent off, still issuing codes with no consent screen. The column makes new renames
+		// harmless to the backfill, and blocking the rename keeps the prefix and the column saying
+		// the same thing for anything that still reads a client identifier, a log line or an
+		// operator's eye included (#108, decision 16).
+		//
+		// It blocks the rename and nothing else. Every other setting on a self-registered client
+		// stays editable, Consent required above all: unticking it for one reviewed client is the
+		// escape hatch this whole change rests on, so a guard that refused the update outright
+		// would take away the remedy along with the risk.
+		if client.CreatedViaDCR && trimmedClientIdentifier != client.ClientIdentifier {
+			writeJSONError(w, "The identifier of a self-registered client cannot be changed.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
 		// The identifier is checked only when the request actually submits a different one, and
 		// that is load bearing rather than an optimisation. A client that registered itself is
 		// given "dcr_" plus a UUID, which is 40 characters, and IdentifierValidator.Validate caps an
@@ -559,30 +587,6 @@ func HandleClientUpdatePut(
 				writeJSONError(w, "Website URL must use http or https scheme.", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
-		}
-
-		// System-level client protection: block identifier changes
-		if client.IsSystemLevelClient() && trimmedClientIdentifier != client.ClientIdentifier {
-			writeJSONError(w, "The identifier of a system-level client cannot be changed.", "VALIDATION_ERROR", http.StatusBadRequest)
-			return
-		}
-
-		// Self-registered client protection: block identifier changes too. Until the created_via_dcr
-		// column existed, the dcr_ identifier prefix was the only record that a client had
-		// registered itself, so renaming one here erased that fact permanently: migration 000029
-		// backfills from the prefix, and a client renamed before the upgrade is left unmarked, with
-		// consent off, still issuing codes with no consent screen. The column makes new renames
-		// harmless to the backfill, and blocking the rename keeps the prefix and the column saying
-		// the same thing for anything that still reads a client identifier, a log line or an
-		// operator's eye included (#108, decision 16).
-		//
-		// It blocks the rename and nothing else. Every other setting on a self-registered client
-		// stays editable, Consent required above all: unticking it for one reviewed client is the
-		// escape hatch this whole change rests on, so a guard that refused the update outright
-		// would take away the remedy along with the risk.
-		if client.CreatedViaDCR && trimmedClientIdentifier != client.ClientIdentifier {
-			writeJSONError(w, "The identifier of a self-registered client cannot be changed.", "VALIDATION_ERROR", http.StatusBadRequest)
-			return
 		}
 
 		client.ClientIdentifier = trimmedClientIdentifier

@@ -650,6 +650,7 @@
 "adminconsole.admin_clients.settings.page_title_prefix" = "Client settings - "
 "adminconsole.admin_clients.settings.field.identifier" = "Client identifier"
 "adminconsole.admin_clients.settings.field.identifier_tooltip" = "A unique identifier assigned to the client, also referred to as client_id."
+"adminconsole.admin_clients.settings.field.identifier_self_registered" = "A self-registered client keeps the identifier it registered with."
 "adminconsole.admin_clients.settings.field.description" = "Description"
 "adminconsole.admin_clients.settings.field.description_tooltip" = "Free-text description of the client."
 "adminconsole.admin_clients.settings.field.website_url" = "Website URL"

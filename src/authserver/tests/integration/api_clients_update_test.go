@@ -317,8 +317,10 @@ func TestAPIClientUpdatePut_SystemLevelClientAllowed(t *testing.T) {
 	assert.Equal(t, "Updated description", updatedClient.Client.Description)
 }
 
+// The system-level client's identifier cannot change either, and a new identifier that is taken
+// or malformed is refused for that reason rather than for its format or its uniqueness (#522).
 func TestAPIClientUpdatePut_SystemLevelClientIdentifierChangeBlocked(t *testing.T) {
-	accessToken, _ := createAdminClientWithToken(t)
+	accessToken, adminClient := createAdminClientWithToken(t)
 
 	// Find admin-console-client id via list
 	listURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
@@ -340,17 +342,30 @@ func TestAPIClientUpdatePut_SystemLevelClientIdentifierChangeBlocked(t *testing.
 		t.Skip("system-level client not found")
 	}
 
-	// Attempt to change identifier (should fail)
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
-	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: "different-identifier", Description: "test"}
-	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer func() { _ = resp2.Body.Close() }()
-	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
+	testCases := []struct {
+		name          string
+		newIdentifier string
+	}{
+		{name: "a free identifier", newIdentifier: "different-identifier"},
+		{name: "a taken identifier", newIdentifier: adminClient.ClientIdentifier},
+		{name: "a malformed identifier", newIdentifier: "not a valid identifier"},
+	}
 
-	var errResp api.ErrorResponse
-	err = json.NewDecoder(resp2.Body).Decode(&errResp)
-	assert.NoError(t, err)
-	assert.Contains(t, errResp.ErrorDescription, "identifier of a system-level client cannot be changed")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
+			reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: tc.newIdentifier, Description: "test"}
+			resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
+			defer func() { _ = resp2.Body.Close() }()
+			assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
+
+			var errResp api.ErrorResponse
+			err := json.NewDecoder(resp2.Body).Decode(&errResp)
+			assert.NoError(t, err)
+			assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode)
+			assert.Equal(t, "The identifier of a system-level client cannot be changed.", errResp.ErrorDescription)
+		})
+	}
 }
 
 // TestAPIClientUpdatePut_SelfRegisteredClientIdentifierChangeBlocked is decision 16's D half. Until
@@ -359,31 +374,50 @@ func TestAPIClientUpdatePut_SystemLevelClientIdentifierChangeBlocked(t *testing.
 // client renamed that way is invisible to migration 000029's backfill, so it keeps consent off and
 // goes on issuing codes with no consent screen, which is the defect this whole change exists to
 // remove.
+//
+// The refusal names the real reason whatever the new identifier is: one that is taken or malformed
+// is refused because the identifier cannot change at all, not for its format or its uniqueness,
+// which would suggest another identifier might be accepted (#522).
 func TestAPIClientUpdatePut_SelfRegisteredClientIdentifierChangeBlocked(t *testing.T) {
 	enableDCR(t)
 
 	accessToken, _ := createAdminClientWithToken(t)
-	client := registerDCRClient(t, "Renameable Portal", "https://dcr-rename.example.com/callback")
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
-	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: "looks-administrator-created", Description: "renamed"}
-	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
-	defer func() { _ = resp.Body.Close() }()
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	testCases := []struct {
+		name          string
+		newIdentifier string
+	}{
+		{name: "a free identifier", newIdentifier: "looks-administrator-created"},
+		{name: "a taken identifier", newIdentifier: "admin-console-client"},
+		{name: "a malformed identifier", newIdentifier: "not a valid identifier"},
+	}
 
-	var errResp api.ErrorResponse
-	err := json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.NoError(t, err)
-	assert.Contains(t, errResp.ErrorDescription, "identifier of a self-registered client cannot be changed")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			client := registerDCRClient(t, "Renameable Portal", "https://dcr-rename.example.com/callback")
+			defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	// The refusal has to leave the row alone as well as answer 400: a guard that rejects the
-	// response after writing the rename would report a block it did not perform.
-	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
-	assert.NoError(t, err)
-	assert.Equal(t, client.ClientIdentifier, refreshed.ClientIdentifier)
-	assert.Equal(t, client.Description, refreshed.Description,
-		"and nothing else in the refused request lands either")
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+			reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: tc.newIdentifier, Description: "renamed"}
+			resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
+			defer func() { _ = resp.Body.Close() }()
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+			var errResp api.ErrorResponse
+			err := json.NewDecoder(resp.Body).Decode(&errResp)
+			assert.NoError(t, err)
+			assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode)
+			assert.Equal(t, "The identifier of a self-registered client cannot be changed.", errResp.ErrorDescription)
+
+			// The refusal has to leave the row alone as well as answer 400: a guard that rejects the
+			// response after writing the rename would report a block it did not perform.
+			refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
+			assert.NoError(t, err)
+			assert.Equal(t, client.ClientIdentifier, refreshed.ClientIdentifier)
+			assert.Equal(t, client.Description, refreshed.Description,
+				"and nothing else in the refused request lands either")
+		})
+	}
 }
 
 // TestAPIClientUpdatePut_SelfRegisteredClientRemainsEditable owns two properties that both have to

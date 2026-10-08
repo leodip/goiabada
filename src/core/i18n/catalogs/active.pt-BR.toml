@@ -613,6 +613,7 @@
 "adminconsole.admin_clients.settings.page_title_prefix" = "Configurações do cliente - "
 "adminconsole.admin_clients.settings.field.identifier" = "Identificador do cliente"
 "adminconsole.admin_clients.settings.field.identifier_tooltip" = "Identificador único atribuído ao cliente, também conhecido como client_id."
+"adminconsole.admin_clients.settings.field.identifier_self_registered" = "Um cliente autorregistrado mantém o identificador com que se registrou."
 "adminconsole.admin_clients.settings.field.description" = "Descrição"
 "adminconsole.admin_clients.settings.field.description_tooltip" = "Descrição em texto livre do cliente."
 "adminconsole.admin_clients.settings.field.website_url" = "URL do site"
