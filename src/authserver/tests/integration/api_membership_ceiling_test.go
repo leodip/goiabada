@@ -220,17 +220,17 @@ func TestMembershipCeiling_AGranularTokenCannotMoveAUserThroughAnAdministrativeG
 				rows := refusalRows(t, manageToken, requestId)
 				require.Len(t, rows, 1, "exactly one administrator_change_refused row for the refused request")
 				row := rows[0]
-				assert.Equal(t, caller.ClientIdentifier, row["loggedInUser"], "the caller is the token's sub")
+				assert.Equal(t, caller.ClientIdentifier, row["logged_in_user"], "the caller is the token's sub")
 				assert.Equal(t, change.method, row["method"])
 				assert.Equal(t, change.route, row["route"])
 				assert.Equal(t, "grant", row["ceiling"])
-				assert.Equal(t, change.targetKind, row["targetKind"])
-				assert.Equal(t, float64(change.targetId(userId, groupId)), row["targetId"])
-				assert.Equal(t, []any{float64(administrative)}, row["permissionIds"], "the administrative permission the group holds")
+				assert.Equal(t, change.targetKind, row["target_kind"])
+				assert.Equal(t, float64(change.targetId(userId, groupId)), row["target_id"])
+				assert.Equal(t, []any{float64(administrative)}, row["permission_ids"], "the administrative permission the group holds")
 				if change.targetKind == "user" {
-					assert.Equal(t, []any{float64(groupId)}, row["groupIds"], "the group whose membership was refused")
+					assert.Equal(t, []any{float64(groupId)}, row["group_ids"], "the group whose membership was refused")
 				} else {
-					assert.NotContains(t, row, "groupIds")
+					assert.NotContains(t, row, "group_ids")
 				}
 			})
 		}

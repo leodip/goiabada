@@ -230,7 +230,7 @@ func HandleIssueGet(
 			// The same event and the same answer as /auth/completed gives the same condition, arriving
 			// later: the account was disabled while the ceremony sat on a step.
 			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
-				"userId": facts.user.Id,
+				"user_id": facts.user.Id,
 			})
 			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
 				redirectErrorFromAuthContext(authContext, issuingClient, "access_denied", userDisabledDescription))
@@ -257,8 +257,8 @@ func HandleIssueGet(
 				"client_identifier", authContext.ClientId)
 
 			auditLogger.Log(r.Context(), audit.EventIssuanceRefusedScopeDenied, map[string]interface{}{
-				"userId":   authContext.UserId,
-				"clientId": authContext.ClientId,
+				"user_id":           authContext.UserId,
+				"client_identifier": authContext.ClientId,
 			})
 
 			// The wording and the error code are /auth/completed's for the same condition,
@@ -567,8 +567,8 @@ func refuseIssuanceUnregisteredRedirect(
 		"client_identifier", authContext.ClientId)
 
 	auditLogger.Log(r.Context(), audit.EventIssuanceRefusedRedirectURI, map[string]interface{}{
-		"userId":   authContext.UserId,
-		"clientId": authContext.ClientId,
+		"user_id":           authContext.UserId,
+		"client_identifier": authContext.ClientId,
 	})
 
 	// The clear goes FIRST, the order every refusal in this handler uses: ClearAuthContext persists
@@ -715,9 +715,9 @@ func issueAuthorizationCodeGrant(
 	}
 
 	auditLogger.Log(r.Context(), audit.EventCreatedAuthCode, map[string]interface{}{
-		"userId":   createCodeInput.UserId,
-		"clientId": code.ClientId,
-		"codeId":   code.Id,
+		"user_id":   createCodeInput.UserId,
+		"client_id": code.ClientId,
+		"code_id":   code.Id,
 	})
 
 	// A failed clear leaves the context in ready_to_issue_code, so a reload mints a second code, and
@@ -824,9 +824,9 @@ func refuseIssuanceUnusableSession(
 	// conditions would make it useless for answering the question it exists for.
 	if shape == sessionExpired {
 		auditLogger.Log(r.Context(), audit.EventIssuanceRefusedSessionInvalid, map[string]interface{}{
-			"userId":            authContext.UserId,
-			"clientId":          authContext.ClientId,
-			"sessionIdentifier": sessionIdentifier,
+			"user_id":            authContext.UserId,
+			"client_identifier":  authContext.ClientId,
+			"session_identifier": sessionIdentifier,
 		})
 	}
 
@@ -982,12 +982,12 @@ func issueImplicitGrant(
 	// Everything below this line attests to what was signed, so it waits for the issuer to return,
 	// which is after the commit.
 	auditLogger.Log(r.Context(), audit.EventTokenIssuedImplicitResponse, map[string]interface{}{
-		"userId":           user.Id,
-		"clientId":         client.Id,
-		"scope":            scope,
-		"responseType":     authContext.ResponseType,
-		"issueAccessToken": issueAccessToken,
-		"issueIdToken":     issueIdToken,
+		"user_id":            user.Id,
+		"client_id":          client.Id,
+		"scope":              scope,
+		"response_type":      authContext.ResponseType,
+		"issue_access_token": issueAccessToken,
+		"issue_id_token":     issueIdToken,
 	})
 	tokenMetrics.Issued(oidc.GrantTypeImplicit)
 

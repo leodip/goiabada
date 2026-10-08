@@ -181,9 +181,9 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		// The error page is visibly different anyway, so its record is written with it rather than
 		// after it, and nothing is left to run.
 		assert.Equal(t, map[string]interface{}{
-			"ip":          testClientIP,
-			"emailDigest": emptyAddressDigest,
-			"outcome":     "invalid_address",
+			"ip":           testClientIP,
+			"email_digest": emptyAddressDigest,
+			"outcome":      "invalid_address",
 		}, *details, "a malformed address is audited too, and no account is named")
 		assert.Empty(t, jobs.jobs, "a malformed address leaves no work for after the response")
 
@@ -280,7 +280,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 			})).Return(nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["outcome"] == "code_issued" && details["userId"] == int64(1)
+			return details["outcome"] == "code_issued" && details["user_id"] == int64(1)
 		})).Return().Once()
 
 		jobs.runAll(t, afterresponse.ClassRecovery)
@@ -335,9 +335,9 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		// The request still leaves its one record, and names no account, since none was found
 		// (#404 decision 6).
 		assert.Equal(t, map[string]interface{}{
-			"ip":          testClientIP,
-			"emailDigest": existingDigest,
-			"outcome":     "server_error",
+			"ip":           testClientIP,
+			"email_digest": existingDigest,
+			"outcome":      "server_error",
 		}, *details)
 	})
 
@@ -366,10 +366,10 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		jobs.runAll(t, afterresponse.ClassRecovery)
 
 		assert.Equal(t, map[string]interface{}{
-			"ip":          testClientIP,
-			"emailDigest": existingDigest,
-			"userId":      int64(1),
-			"outcome":     "server_error",
+			"ip":           testClientIP,
+			"email_digest": existingDigest,
+			"user_id":      int64(1),
+			"outcome":      "server_error",
 		}, *details)
 		database.AssertNotCalled(t, "TryStoreForgotPasswordCode", mock.Anything, mock.Anything, mock.Anything,
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -408,10 +408,10 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		// The store failed, which is the server's fault: the Error line says why, and the one
 		// record keeps the request in the catalog with its digest and account.
 		assert.Equal(t, map[string]interface{}{
-			"ip":          testClientIP,
-			"emailDigest": existingDigest,
-			"userId":      int64(1),
-			"outcome":     "server_error",
+			"ip":           testClientIP,
+			"email_digest": existingDigest,
+			"user_id":      int64(1),
+			"outcome":      "server_error",
 		}, *details)
 		assertOneErrorRecordOnTheRequest(t, capture)
 	})
@@ -448,29 +448,29 @@ func TestHandleForgotPasswordPost_SendsNothingUnlessTheAccountIsVerifiedAndEnabl
 	}{
 		{
 			name: "an address with no account", user: nil,
-			wantAudit: map[string]interface{}{"ip": testClientIP, "emailDigest": someoneDigest, "outcome": "unknown_address"},
+			wantAudit: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest, "outcome": "unknown_address"},
 		},
 		{
 			name: "an unverified address", user: &record.User{Id: 7, Enabled: true, Email: email, EmailVerified: false},
-			wantAudit: map[string]interface{}{"ip": testClientIP, "emailDigest": someoneDigest, "userId": int64(7),
+			wantAudit: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest, "user_id": int64(7),
 				"outcome": "unverified_address"},
 		},
 		{
 			name: "a disabled account", user: &record.User{Id: 7, Enabled: false, Email: email, EmailVerified: true},
-			wantAudit: map[string]interface{}{"ip": testClientIP, "emailDigest": someoneDigest, "userId": int64(7),
+			wantAudit: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest, "user_id": int64(7),
 				"outcome": "account_disabled"},
 		},
 		{
 			// Disabled is what an administrator did, and the reason re-verifying would not help.
 			name: "a disabled account with an unverified address", user: &record.User{Id: 7, Enabled: false, Email: email},
-			wantAudit: map[string]interface{}{"ip": testClientIP, "emailDigest": someoneDigest, "userId": int64(7),
+			wantAudit: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest, "user_id": int64(7),
 				"outcome": "account_disabled"},
 		},
 		{
 			name:         "an account changed between the lookup and the store",
 			user:         &record.User{Id: 7, Enabled: true, Email: email, EmailVerified: true},
 			storeRefused: true,
-			wantAudit: map[string]interface{}{"ip": testClientIP, "emailDigest": someoneDigest, "userId": int64(7),
+			wantAudit: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest, "user_id": int64(7),
 				"outcome": "account_changed"},
 		},
 	}
@@ -621,9 +621,9 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, map[string]interface{}{
-			"ip":          testClientIP,
-			"emailDigest": notAnAddressDigest,
-			"outcome":     "invalid_address",
+			"ip":           testClientIP,
+			"email_digest": notAnAddressDigest,
+			"outcome":      "invalid_address",
 		}, *details, "lowercased as every other submission is, and no account looked up")
 		database.AssertNotCalled(t, "GetUserByEmail", mock.Anything, mock.Anything, mock.Anything)
 		assert.Empty(t, jobs.jobs)
@@ -664,10 +664,10 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		assert.Equal(t, map[string]interface{}{
-			"ip":          testClientIP,
-			"emailDigest": someoneDigest,
-			"userId":      int64(7),
-			"outcome":     "code_issued",
+			"ip":           testClientIP,
+			"email_digest": someoneDigest,
+			"user_id":      int64(7),
+			"outcome":      "code_issued",
 		}, details)
 		assert.Equal(t, []string{"audit", "send"}, order,
 			"the record is written once the code is stored and before the mail is sent")

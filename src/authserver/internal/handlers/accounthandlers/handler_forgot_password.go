@@ -101,7 +101,7 @@ func ineligibleRecoveryOutcome(user *record.User) string {
 // address typed into an unauthenticated form, attacker-chosen or mistyped; the digest still lets
 // attempts on one address be correlated, and checked against a known one. It is of the address
 // as the lookup was given it, so it is the same for every spelling the lookup treats as one.
-// userId is absent, not zero, when no account matched (#404 decision 6).
+// user_id is absent, not zero, when no account matched (#404 decision 6).
 //
 // It takes the context rather than the request because a well-formed request's entry is written
 // by the job after its response, under the job's context, which keeps the request's id; the
@@ -109,12 +109,12 @@ func ineligibleRecoveryOutcome(user *record.User) string {
 func auditRequestedPasswordReset(ctx context.Context, auditLogger AuditLogger, clientIP string, email string,
 	userId int64, outcome string) {
 	details := map[string]interface{}{
-		"ip":          clientIP,
-		"emailDigest": hashutil.HashString(email),
-		"outcome":     outcome,
+		"ip":           clientIP,
+		"email_digest": hashutil.HashString(email),
+		"outcome":      outcome,
 	}
 	if userId != 0 {
-		details["userId"] = userId
+		details["user_id"] = userId
 	}
 	auditLogger.Log(ctx, audit.EventRequestedPasswordReset, details)
 }

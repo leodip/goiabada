@@ -288,7 +288,7 @@ func HandleAuthOtpPost(
 		// i18n surface: A — browser-flow form rerender.
 		if !user.Enabled {
 			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
-				"userId": user.Id,
+				"user_id": user.Id,
 			})
 			renderError(i18n.NewLocalizedError(i18n.ErrCodeOtpAccountDisabled, nil).Localize(r.Context()))
 			return
@@ -335,11 +335,11 @@ func HandleAuthOtpPost(
 			// one: a code already spent proves nothing about who is submitting it.
 			credentialFailures.RecordCredentialFailure(r)
 			auditLogger.Log(r.Context(), audit.EventOTPCodeReplayDetected, map[string]interface{}{
-				"userId": user.Id,
-				"step":   verified.Step,
+				"user_id": user.Id,
+				"step":    verified.Step,
 			})
 			auditLogger.Log(r.Context(), audit.EventAuthFailedOtp, map[string]interface{}{
-				"userId": user.Id,
+				"user_id": user.Id,
 			})
 			renderError(incorrectOtpError)
 			return
@@ -348,7 +348,7 @@ func HandleAuthOtpPost(
 			// counter the whole OTP budget exists to move (#219).
 			credentialFailures.RecordCredentialFailure(r)
 			auditLogger.Log(r.Context(), audit.EventAuthFailedOtp, map[string]interface{}{
-				"userId": user.Id,
+				"user_id": user.Id,
 			})
 			renderError(incorrectOtpError)
 			return
@@ -375,14 +375,14 @@ func HandleAuthOtpPost(
 			enrolledGeneration = &generation
 
 			auditLogger.Log(r.Context(), audit.EventEnabledOTP, map[string]interface{}{
-				"userId": user.Id,
+				"user_id": user.Id,
 			})
 		}
 
 		// from this point the user is considered authenticated with otp
 
 		auditLogger.Log(r.Context(), audit.EventAuthSuccessOtp, map[string]interface{}{
-			"userId": user.Id,
+			"user_id": user.Id,
 		})
 
 		authContext.RecordOTPVerified(time.Now(), enrolledGeneration)

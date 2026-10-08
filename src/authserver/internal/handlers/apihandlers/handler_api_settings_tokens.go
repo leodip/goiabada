@@ -121,9 +121,9 @@ func HandleSettingsTokensPut(
 			"includeOpenIDConnectClaimsInIdToken":     currentSettings.IncludeOpenIDConnectClaimsInIdToken,
 		}
 		auditLogger.Log(r.Context(), audit.EventUpdatedTokensSettings, map[string]interface{}{
-			"loggedInUser": callerSubject(r),
-			"old":          oldVals,
-			"new":          newVals,
+			"logged_in_user": callerSubject(r),
+			"old":            oldVals,
+			"new":            newVals,
 		})
 
 		resp := api.SettingsTokensResponse{

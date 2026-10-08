@@ -674,7 +674,7 @@ func failedResetReasonsFor(t *testing.T, userId int64) []string {
 		if err := json.Unmarshal([]byte(entry.Details), &details); err != nil {
 			continue
 		}
-		if id, ok := details["userId"].(float64); ok && int64(id) == userId {
+		if id, ok := details["user_id"].(float64); ok && int64(id) == userId {
 			reason, _ := details["reason"].(string)
 			reasons = append(reasons, reason)
 		}
@@ -773,7 +773,7 @@ func requestedPasswordResetRecordsFor(t *testing.T, adminToken string, address s
 	for _, entry := range logs.AuditLogs {
 		var details map[string]interface{}
 		require.NoError(t, json.Unmarshal([]byte(entry.Details), &details))
-		if details["emailDigest"] == digest {
+		if details["email_digest"] == digest {
 			assert.NotEmpty(t, entry.RequestId, "the record carries the request's id")
 			records = append(records, details)
 		}
@@ -835,9 +835,9 @@ func TestForgotPassword_EveryRequestIsAuditedOnce(t *testing.T) {
 			assert.Equal(t, tc.outcome, auditDetails["outcome"])
 			assert.NotEmpty(t, auditDetails["ip"])
 			if tc.userId == 0 {
-				assert.NotContains(t, auditDetails, "userId", "no account matched, so none is named")
+				assert.NotContains(t, auditDetails, "user_id", "no account matched, so none is named")
 			} else {
-				assert.Equal(t, float64(tc.userId), auditDetails["userId"])
+				assert.Equal(t, float64(tc.userId), auditDetails["user_id"])
 			}
 			for key, value := range auditDetails {
 				assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), tc.address,

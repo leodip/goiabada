@@ -180,9 +180,9 @@ func recordMembershipAudits(t *testing.T, auditLogger *handlersmocks.AuditLogger
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			details := args.Get(2).(map[string]interface{})
-			assert.Equal(t, userGroupsOwnerId, details["userId"])
-			assert.Contains(t, details, "loggedInUser")
-			*records = append(*records, audited(args.String(1), details["groupId"].(int64)))
+			assert.Equal(t, userGroupsOwnerId, details["user_id"])
+			assert.Contains(t, details, "logged_in_user")
+			*records = append(*records, audited(args.String(1), details["group_id"].(int64)))
 			if order != nil {
 				*order = append(*order, "audit")
 			}

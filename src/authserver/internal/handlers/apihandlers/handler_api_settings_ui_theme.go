@@ -80,9 +80,9 @@ func HandleSettingsUIThemePut(
 
 		// Audit log old/new
 		auditLogger.Log(r.Context(), audit.EventUpdatedUIThemeSettings, map[string]interface{}{
-			"loggedInUser": callerSubject(r),
-			"oldUITheme":   oldTheme,
-			"newUITheme":   currentSettings.UITheme,
+			"logged_in_user": callerSubject(r),
+			"old_ui_theme":   oldTheme,
+			"new_ui_theme":   currentSettings.UITheme,
 		})
 
 		resp := api.SettingsUIThemeResponse{

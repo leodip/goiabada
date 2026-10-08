@@ -259,9 +259,9 @@ func HandleClientSecretGet(
 				return
 			}
 			auditLogger.Log(r.Context(), audit.EventViewedClientSecret, map[string]interface{}{
-				"clientId":         client.Id,
-				"clientIdentifier": client.ClientIdentifier,
-				"loggedInUser":     callerSubject(r),
+				"client_id":         client.Id,
+				"client_identifier": client.ClientIdentifier,
+				"logged_in_user":    callerSubject(r),
 			})
 		}
 
@@ -315,9 +315,9 @@ func HandleClientDelete(
 		}
 
 		auditLogger.Log(r.Context(), audit.EventDeletedClient, map[string]interface{}{
-			"clientId":         client.Id,
-			"clientIdentifier": client.ClientIdentifier,
-			"loggedInUser":     callerSubject(r),
+			"client_id":         client.Id,
+			"client_identifier": client.ClientIdentifier,
+			"logged_in_user":    callerSubject(r),
 		})
 
 		resp := api.SuccessResponse{Success: true}
@@ -420,9 +420,9 @@ func HandleClientCreatePost(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventCreatedClient, map[string]interface{}{
-			"clientId":         client.Id,
-			"clientIdentifier": client.ClientIdentifier,
-			"loggedInUser":     callerSubject(r),
+			"client_id":         client.Id,
+			"client_identifier": client.ClientIdentifier,
+			"logged_in_user":    callerSubject(r),
 		})
 
 		// Load related fields for response consistency (fail if these operations fail)
@@ -635,8 +635,8 @@ func HandleClientUpdatePut(
 		// The write's transaction has committed: it is recorded now, before the reads building the
 		// answer, whose failure answers 500 but does not undo the change.
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientSettings, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": callerSubject(r),
+			"client_id":      client.Id,
+			"logged_in_user": callerSubject(r),
 		})
 
 		// Load related fields for response consistency
@@ -772,8 +772,8 @@ func HandleClientAuthenticationPut(
 		// Either branch has committed its write by here: it is recorded now, before the reads
 		// building the answer, whose failure answers 500 but does not undo the change.
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientAuthentication, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": callerSubject(r),
+			"client_id":      client.Id,
+			"logged_in_user": callerSubject(r),
 		})
 
 		// Load related fields for response consistency
@@ -855,10 +855,10 @@ func HandleClientAdministrativeScopesPut(
 		// The write ran outside any transaction, so it has committed: it is recorded now, before the
 		// reads building the answer, whose failure answers 500 but does not undo the switch.
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientAdministrativeScopes, map[string]interface{}{
-			"clientId":         client.Id,
-			"clientIdentifier": client.ClientIdentifier,
-			"allowed":          allowed,
-			"loggedInUser":     callerSubject(r),
+			"client_id":         client.Id,
+			"client_identifier": client.ClientIdentifier,
+			"allowed":           allowed,
+			"logged_in_user":    callerSubject(r),
 		})
 
 		// The answer is the row as stored, read back after the write.
@@ -962,8 +962,8 @@ func HandleClientOAuth2FlowsPut(
 		// The write's transaction has committed: it is recorded now, before the reads building the
 		// answer, whose failure answers 500 but does not undo the change.
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientOAuth2Flows, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": callerSubject(r),
+			"client_id":      client.Id,
+			"logged_in_user": callerSubject(r),
 		})
 
 		// Load related fields for response consistency
@@ -1156,8 +1156,8 @@ func HandleClientRedirectURIsPut(
 
 		// Audit, once the save has committed.
 		auditLogger.Log(r.Context(), audit.EventUpdatedRedirectURIs, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": callerSubject(r),
+			"client_id":      client.Id,
+			"logged_in_user": callerSubject(r),
 		})
 
 		// Reload related fields for response consistency
@@ -1330,8 +1330,8 @@ func HandleClientWebOriginsPut(
 
 		// Audit, once the save has committed.
 		auditLogger.Log(r.Context(), audit.EventUpdatedWebOrigins, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": callerSubject(r),
+			"client_id":      client.Id,
+			"logged_in_user": callerSubject(r),
 		})
 
 		// Reload related fields for response consistency
@@ -1439,8 +1439,8 @@ func HandleClientTokensPut(
 		// The write's transaction has committed: it is recorded now, before the reads building the
 		// answer, whose failure answers 500 but does not undo the change.
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientTokens, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": callerSubject(r),
+			"client_id":      client.Id,
+			"logged_in_user": callerSubject(r),
 		})
 
 		// Reload related fields for response consistency

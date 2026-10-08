@@ -178,8 +178,8 @@ func TestClientWrites_ACommittedWriteIsAuditedWhateverTheAnswerReadsDo(t *testin
 				}
 				require.Equal(t, want, events, "a committed write leaves exactly its entries")
 				assert.Equal(t, map[string]interface{}{
-					"clientId":     targetClientId,
-					"loggedInUser": grantCaller,
+					"client_id":      targetClientId,
+					"logged_in_user": grantCaller,
 				}, (*records)[len(*records)-1].details)
 			})
 		}

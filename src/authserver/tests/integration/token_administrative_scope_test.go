@@ -77,11 +77,11 @@ func assertRefusedAtTheTokenEndpoint(t *testing.T, client *record.Client, userId
 	rows := administrativeScopeRefusedRows(t, client.ClientIdentifier)
 	require.Len(t, rows, 1, "one row for the refusal")
 	assert.Equal(t, map[string]any{
-		"clientId":         float64(client.Id),
-		"clientIdentifier": client.ClientIdentifier,
-		"scopes":           []any{"authserver:manage"},
-		"checkpoint":       checkpoint,
-		"userId":           float64(userId),
+		"client_id":         float64(client.Id),
+		"client_identifier": client.ClientIdentifier,
+		"scopes":            []any{"authserver:manage"},
+		"checkpoint":        checkpoint,
+		"user_id":           float64(userId),
 	}, rows[0])
 }
 

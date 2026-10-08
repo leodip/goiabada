@@ -68,22 +68,22 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 	refreshToken := grant.RefreshToken
 	if grant.IsROPC {
 		tr.auditLogger.Log(r.Context(), audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
-			"userId":          refreshToken.UserId.Int64,
-			"clientId":        refreshToken.ClientId.Int64,
-			"refreshTokenJti": refreshToken.RefreshTokenJti,
-			"flow":            "ropc",
+			"user_id":           refreshToken.UserId.Int64,
+			"client_id":         refreshToken.ClientId.Int64,
+			"refresh_token_jti": refreshToken.RefreshTokenJti,
+			"flow":              "ropc",
 		})
 	} else {
 		if outcome.BumpedSession != nil {
 			tr.auditLogger.Log(r.Context(), audit.EventBumpedUserSession, map[string]interface{}{
-				"userId":   outcome.BumpedSession.UserId,
-				"clientId": refreshToken.Code.ClientId,
+				"user_id":   outcome.BumpedSession.UserId,
+				"client_id": refreshToken.Code.ClientId,
 			})
 		}
 		tr.auditLogger.Log(r.Context(), audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
-			"codeId":          refreshToken.Code.Id,
-			"refreshTokenJti": refreshToken.RefreshTokenJti,
-			"flow":            "auth_code",
+			"code_id":           refreshToken.Code.Id,
+			"refresh_token_jti": refreshToken.RefreshTokenJti,
+			"flow":              "auth_code",
 		})
 	}
 
@@ -128,11 +128,11 @@ func (tr tokenResponder) auditRefreshTokenReplay(ctx context.Context, grant *pro
 	}
 
 	tr.auditLogger.Log(ctx, audit.EventRefreshTokenReplayDetected, map[string]interface{}{
-		"presentedRefreshTokenJti": refreshToken.RefreshTokenJti,
-		"firstRefreshTokenJti":     refreshToken.FirstRefreshTokenJti,
-		"revokedCount":             revokedCount,
-		"clientId":                 replayClientId,
-		"userId":                   replayUserId,
-		"flow":                     replayFlow,
+		"presented_refresh_token_jti": refreshToken.RefreshTokenJti,
+		"first_refresh_token_jti":     refreshToken.FirstRefreshTokenJti,
+		"revoked_count":               revokedCount,
+		"client_id":                   replayClientId,
+		"user_id":                     replayUserId,
+		"flow":                        replayFlow,
 	})
 }

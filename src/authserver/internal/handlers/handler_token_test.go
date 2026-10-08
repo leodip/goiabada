@@ -214,7 +214,7 @@ func TestHandleTokenPost(t *testing.T) {
 		endpoint.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, theseSettings(requestSettings), code).
 			Return(tokenResponse, nil).Once()
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedAuthorizationCodeResponse, map[string]interface{}{
-			"codeId": code.Id,
+			"code_id": code.Id,
 		}).Return().Once()
 		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
@@ -236,8 +236,8 @@ func TestHandleTokenPost(t *testing.T) {
 		endpoint.issuer.On("IssueClientCredentialsGrant", mock.Anything, theseSettings(requestSettings), client, "test_scope").
 			Return(tokenResponse, nil).Once()
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedClientCredentialsResponse, map[string]interface{}{
-			"clientId": client.Id,
-			"scope":    "test_scope",
+			"client_id": client.Id,
+			"scope":     "test_scope",
 		}).Return().Once()
 		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
@@ -297,8 +297,8 @@ func TestHandleTokenPost(t *testing.T) {
 			Client: grant.Client, User: grant.User, Scope: grant.Scope,
 		}).Return(tokenResponse, nil).Once()
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedROPCResponse, map[string]interface{}{
-			"userId":   int64(42),
-			"clientId": int64(1),
+			"user_id":   int64(42),
+			"client_id": int64(1),
 		}).Return().Once()
 		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
@@ -361,13 +361,13 @@ func TestHandleTokenPost(t *testing.T) {
 
 		var order []string
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, map[string]interface{}{
-			"userId":   int64(456),
-			"clientId": grant.RefreshToken.Code.ClientId,
+			"user_id":   int64(456),
+			"client_id": grant.RefreshToken.Code.ClientId,
 		}).Run(func(mock.Arguments) { order = append(order, audit.EventBumpedUserSession) }).Return().Once()
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
-			"codeId":          grant.RefreshToken.Code.Id,
-			"refreshTokenJti": grant.RefreshToken.RefreshTokenJti,
-			"flow":            "auth_code",
+			"code_id":           grant.RefreshToken.Code.Id,
+			"refresh_token_jti": grant.RefreshToken.RefreshTokenJti,
+			"flow":              "auth_code",
 		}).Run(func(mock.Arguments) { order = append(order, audit.EventTokenIssuedRefreshTokenResponse) }).Return().Once()
 		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
@@ -389,9 +389,9 @@ func TestHandleTokenPost(t *testing.T) {
 			Return(tokenResponse, &issuance.RefreshOutcome{}, nil).Once()
 		// The strict double refuses any other Log call, the bump's included.
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
-			"codeId":          grant.RefreshToken.Code.Id,
-			"refreshTokenJti": grant.RefreshToken.RefreshTokenJti,
-			"flow":            "auth_code",
+			"code_id":           grant.RefreshToken.Code.Id,
+			"refresh_token_jti": grant.RefreshToken.RefreshTokenJti,
+			"flow":              "auth_code",
 		}).Return().Once()
 		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
@@ -411,10 +411,10 @@ func TestHandleTokenPost(t *testing.T) {
 		endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
 			Return(tokenResponse, &issuance.RefreshOutcome{}, nil).Once()
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
-			"userId":          grant.RefreshToken.UserId.Int64,
-			"clientId":        grant.RefreshToken.ClientId.Int64,
-			"refreshTokenJti": grant.RefreshToken.RefreshTokenJti,
-			"flow":            "ropc",
+			"user_id":           grant.RefreshToken.UserId.Int64,
+			"client_id":         grant.RefreshToken.ClientId.Int64,
+			"refresh_token_jti": grant.RefreshToken.RefreshTokenJti,
+			"flow":              "ropc",
 		}).Return().Once()
 		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
@@ -981,7 +981,7 @@ func TestHandleTokenPost_AuthCodeReuse_AuditsAfterTheCommit(t *testing.T) {
 
 	assert.Equal(t, []string{"begin", "revoke", "commit", "audit", "answer"}, order,
 		"the audit row must wait for the commit, and the client's answer for the audit row")
-	assert.Equal(t, []string{"rt-1"}, audited["revokedRefreshTokenJtis"],
+	assert.Equal(t, []string{"rt-1"}, audited["revoked_refresh_token_jtis"],
 		"the row lists what the committed transaction revoked")
 	database.AssertExpectations(t)
 }
@@ -1104,12 +1104,12 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 
 			require.Len(t, logged, 1, "exactly one replay event must be emitted")
 			assert.Equal(t, map[string]interface{}{
-				"presentedRefreshTokenJti": presentedJti,
-				"firstRefreshTokenJti":     familyJti,
-				"revokedCount":             int64(2),
-				"clientId":                 clientId,
-				"userId":                   userId,
-				"flow":                     tc.wantFlow,
+				"presented_refresh_token_jti": presentedJti,
+				"first_refresh_token_jti":     familyJti,
+				"revoked_count":               int64(2),
+				"client_id":                   clientId,
+				"user_id":                     userId,
+				"flow":                        tc.wantFlow,
 			}, logged[0], "the replay payload must carry exactly these six fields")
 		})
 	}
@@ -1414,8 +1414,8 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 
 			auditLogger.On("Log", mock.Anything, audit.EventTokenScopeDenied, mock.MatchedBy(
 				func(details map[string]interface{}) bool {
-					return details["clientIdentifier"] == "test_client" &&
-						details["grantType"] == tc.grantType &&
+					return details["client_identifier"] == "test_client" &&
+						details["grant_type"] == tc.grantType &&
 						details["scope"] == tc.wantScope
 				})).Return()
 
@@ -1489,7 +1489,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 
 		auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedClientCredentialsResponse, mock.MatchedBy(
 			func(details map[string]interface{}) bool {
-				clientId, ok := details["clientId"].(int64)
+				clientId, ok := details["client_id"].(int64)
 				return ok && clientId == mockClient.Id && details["scope"] == "billing-api:read"
 			})).Return()
 
@@ -1703,8 +1703,8 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		assert.Equal(t, http.StatusOK, post(handler))
 		// Declared since the grant was written and never fired until now (#126).
 		auditLogger.AssertCalled(t, "Log", mock.Anything, audit.EventROPCAuthFailed, map[string]interface{}{
-			"email":            username,
-			"clientIdentifier": "app",
+			"email":             username,
+			"client_identifier": "app",
 		})
 	})
 
@@ -1722,8 +1722,8 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		req.RemoteAddr = "203.0.113.7:5000"
 		handler.ServeHTTP(httptest.NewRecorder(), req)
 		auditLogger.AssertCalled(t, "Log", mock.Anything, audit.EventROPCAuthFailed, map[string]interface{}{
-			"email":            username,
-			"clientIdentifier": "app",
+			"email":             username,
+			"client_identifier": "app",
 		})
 	})
 
@@ -1738,11 +1738,11 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		handler, auditLogger := newHandler(t, disabled)
 		assert.Equal(t, http.StatusOK, post(handler))
 		auditLogger.AssertCalled(t, "Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
-			"clientId": "app",
+			"client_identifier": "app",
 		})
 		auditLogger.AssertCalled(t, "Log", mock.Anything, audit.EventROPCAuthFailed, map[string]interface{}{
-			"email":            username,
-			"clientIdentifier": "app",
+			"email":             username,
+			"client_identifier": "app",
 		})
 	})
 
@@ -1878,10 +1878,10 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 
 		auditLogger.On("Log", mock.Anything, audit.EventRedemptionRefusedRedirectURI, mock.MatchedBy(
 			func(details map[string]interface{}) bool {
-				// clientIdentifier, the request's string, matching the neighbouring events.
+				// client_identifier, the request's string, matching the neighbouring events.
 				// Unlike EventTokenScopeDenied's it has been PROVED rather than asserted: this
 				// refusal is reachable only below client authentication and PKCE.
-				return details["clientIdentifier"] == "test_client"
+				return details["client_identifier"] == "test_client"
 			})).Return()
 
 		jsonWriter.On("JSONError", rr, req, mock.Anything).Return()

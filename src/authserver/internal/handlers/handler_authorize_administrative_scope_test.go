@@ -112,11 +112,11 @@ func TestHandleAuthorizeGet_AnAdministrativeScopeTheClientMayNotRequest(t *testi
 			}
 			if tc.audited {
 				auditLogger.On("Log", mock.Anything, audit.EventAdministrativeScopeRefused, map[string]interface{}{
-					"clientId":         int64(1),
-					"clientIdentifier": "test-client",
-					"scopes":           []string{"authserver:manage"},
-					"checkpoint":       "authorize",
-					"userId":           sessionUserId,
+					"client_id":         int64(1),
+					"client_identifier": "test-client",
+					"scopes":            []string{"authserver:manage"},
+					"checkpoint":        "authorize",
+					"user_id":           sessionUserId,
 				}).Return().Once()
 			}
 

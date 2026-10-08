@@ -138,9 +138,9 @@ func HandleAccountEmailVerificationSendPost(
 
 		// Audit
 		auditLogger.Log(r.Context(), audit.EventSentEmailVerificationMessage, map[string]interface{}{
-			"userId":           user.Id,
-			"emailDestination": user.Email,
-			"loggedInUser":     subject,
+			"user_id":           user.Id,
+			"email_destination": user.Email,
+			"logged_in_user":    subject,
 		})
 
 		// Response
@@ -252,8 +252,8 @@ func HandleAccountEmailVerificationPost(
 			credentialFailures.RecordCredentialFailure(r)
 
 			auditLogger.Log(r.Context(), audit.EventFailedEmailVerificationCode, map[string]interface{}{
-				"userId":       user.Id,
-				"loggedInUser": subject,
+				"user_id":        user.Id,
+				"logged_in_user": subject,
 			})
 
 			writeJSONError(w, "Invalid or expired verification code", "INVALID_OR_EXPIRED_VERIFICATION_CODE", http.StatusBadRequest)
@@ -294,8 +294,8 @@ func HandleAccountEmailVerificationPost(
 		user.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 		auditLogger.Log(r.Context(), audit.EventVerifiedEmail, map[string]interface{}{
-			"userId":       user.Id,
-			"loggedInUser": subject,
+			"user_id":        user.Id,
+			"logged_in_user": subject,
 		})
 
 		resp := api.UpdateUserResponse{User: *apimapping.ToUserResponse(user)}

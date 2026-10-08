@@ -209,14 +209,14 @@ func assertRefusedByTheGrantCeiling(t *testing.T, resp *http.Response, requestId
 	rows := refusalRows(t, readerToken, requestId)
 	require.Len(t, rows, 1, "exactly one administrator_change_refused row for the refused request")
 	row := rows[0]
-	assert.Equal(t, caller.ClientIdentifier, row["loggedInUser"], "the caller is the token's sub")
+	assert.Equal(t, caller.ClientIdentifier, row["logged_in_user"], "the caller is the token's sub")
 	assert.Equal(t, http.MethodPut, row["method"])
 	assert.Equal(t, "/api/v1/admin/"+target.kind+"s/{id}/permissions", row["route"])
 	assert.Equal(t, "grant", row["ceiling"])
-	assert.Equal(t, target.kind, row["targetKind"])
-	assert.Equal(t, float64(targetId), row["targetId"])
+	assert.Equal(t, target.kind, row["target_kind"])
+	assert.Equal(t, float64(targetId), row["target_id"])
 	var named []int64
-	if raw, ok := row["permissionIds"].([]any); assert.True(t, ok, "permissionIds is a list: %v", row["permissionIds"]) {
+	if raw, ok := row["permission_ids"].([]any); assert.True(t, ok, "permissionIds is a list: %v", row["permission_ids"]) {
 		for _, id := range raw {
 			named = append(named, int64(id.(float64)))
 		}

@@ -153,8 +153,8 @@ const (
 // verification leaves.
 //
 // The address is digested rather than recorded, as requested_password_reset digests it, so the
-// table does not collect every address typed into an unauthenticated form. userId is absent, not
-// zero, when no account matched, and preRegistrationId when no pending registration was written
+// table does not collect every address typed into an unauthenticated form. user_id is absent, not
+// zero, when no account matched, and pre_registration_id when no pending registration was written
 // or found (#207 decision 8).
 //
 // It takes the context rather than the request because a well-formed request's entry is written
@@ -162,15 +162,15 @@ const (
 func auditRequestedRegistration(ctx context.Context, auditLogger AuditLogger, clientIP string, email string,
 	userId int64, preRegistrationId int64, outcome string) {
 	details := map[string]interface{}{
-		"ip":          clientIP,
-		"emailDigest": hashutil.HashString(email),
-		"outcome":     outcome,
+		"ip":           clientIP,
+		"email_digest": hashutil.HashString(email),
+		"outcome":      outcome,
 	}
 	if userId != 0 {
-		details["userId"] = userId
+		details["user_id"] = userId
 	}
 	if preRegistrationId != 0 {
-		details["preRegistrationId"] = preRegistrationId
+		details["pre_registration_id"] = preRegistrationId
 	}
 	auditLogger.Log(ctx, audit.EventRequestedRegistration, details)
 }

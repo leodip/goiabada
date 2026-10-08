@@ -160,8 +160,8 @@ func TestHandleAccountEmailPut_SavesThroughTheNarrowWrite(t *testing.T) {
 	database.On("TrySetUserEmail", mock.Anything, (*sql.Tx)(nil), emailTestUserId, "old@example.com", true, "new@example.com").
 		Return(true, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnEmail, map[string]interface{}{
-		"userId":       emailTestUserId,
-		"loggedInUser": emailTestSubject,
+		"user_id":        emailTestUserId,
+		"logged_in_user": emailTestSubject,
 	}).Return().Once()
 	credentials := &countingCredentials{}
 

@@ -767,7 +767,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["userId"] == int64(123)
+			return details["user_id"] == int64(123)
 		})).Return()
 
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
@@ -3045,7 +3045,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "pwd", record.AcrLevel1, "203.0.113.7").Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["userId"] == int64(789) && details["clientId"] == int64(1)
+			return details["user_id"] == int64(789) && details["client_id"] == int64(1)
 		})).Return()
 
 		// The one save the silent path makes, just before code issuance. It carries the hint and
@@ -3160,7 +3160,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "pwd", record.AcrLevel1, "").Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["userId"] == int64(789) && details["clientId"] == int64(1)
+			return details["user_id"] == int64(789) && details["client_id"] == int64(1)
 		})).Return()
 
 		var savedCeremonyId string

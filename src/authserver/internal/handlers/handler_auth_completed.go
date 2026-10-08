@@ -124,7 +124,7 @@ func HandleAuthCompletedGet(
 				return
 			case beforeBindingUserDisabled:
 				auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
-					"userId": user.Id,
+					"user_id": user.Id,
 				})
 				answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
 					redirectErrorFromAuthContext(authContext, client, "access_denied", userDisabledDescription))
@@ -466,8 +466,8 @@ func bindReusedSession(
 	}
 
 	auditLogger.Log(r.Context(), audit.EventBumpedUserSession, map[string]interface{}{
-		"userId":   authContext.UserId,
-		"clientId": client.Id,
+		"user_id":   authContext.UserId,
+		"client_id": client.Id,
 	})
 
 	return bumpedSession, nil
@@ -517,15 +517,15 @@ func bindNewSession(
 		// that failure recorded as a termination with no actor and no reason, which is the worse
 		// trade (#133).
 		//
-		// Neither event below carries loggedInUser: this is a browser ceremony with no bearer
+		// Neither event below carries logged_in_user: this is a browser ceremony with no bearer
 		// token, and the only identity in scope is the cookie's, which at this instant still names
 		// the user being terminated -- recording it would name the party losing the session as the
-		// actor who ended it. The actor is this event's userId, which is where an auditor reads it.
+		// actor who ended it. The actor is this event's user_id, which is where an auditor reads it.
 		auditLogger.Log(r.Context(), audit.EventCrossUserSessionReplaced, map[string]interface{}{
-			"userId":                    authContext.UserId,
-			"previousUserId":            userSession.UserId,
-			"previousSessionIdentifier": userSession.SessionIdentifier,
-			"clientId":                  client.Id,
+			"user_id":                     authContext.UserId,
+			"previous_user_id":            userSession.UserId,
+			"previous_session_identifier": userSession.SessionIdentifier,
+			"client_id":                   client.Id,
 		})
 
 		// deleted_user_session beside terminated_user_session, the pairing every caller of
@@ -535,8 +535,8 @@ func bindNewSession(
 		// never reaches a consumer watching the lifecycle stream, and it would falsify the promise
 		// that ending a session always writes both.
 		auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
-			"userSessionId": userSession.Id,
-			"loggedInUser":  "",
+			"user_session_id": userSession.Id,
+			"logged_in_user":  "",
 		})
 		revocation.LogTerminatedUserSession(r.Context(), auditLogger, userSession, "", terminationResult)
 	}
@@ -569,8 +569,8 @@ func bindNewSession(
 	// to name beyond the user the new session is for.
 	for _, removedSession := range removedSessions {
 		auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
-			"userSessionId": removedSession.Id,
-			"loggedInUser":  "",
+			"user_session_id": removedSession.Id,
+			"logged_in_user":  "",
 		})
 	}
 	if err != nil {
@@ -587,8 +587,8 @@ func bindNewSession(
 	}
 
 	auditLogger.Log(r.Context(), audit.EventStartedNewUserSession, map[string]interface{}{
-		"userId":   authContext.UserId,
-		"clientId": client.Id,
+		"user_id":   authContext.UserId,
+		"client_id": client.Id,
 	})
 
 	return newSession, nil

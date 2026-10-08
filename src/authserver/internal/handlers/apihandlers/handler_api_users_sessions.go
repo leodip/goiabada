@@ -160,8 +160,8 @@ func HandleUserSessionDelete(
 		// payload untouched and terminated_user_session carries the security detail (decision 9).
 		loggedInUser := callerSubject(r)
 		auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
-			"userSessionId": sessionId,
-			"loggedInUser":  loggedInUser,
+			"user_session_id": sessionId,
+			"logged_in_user":  loggedInUser,
 		})
 		revocation.LogTerminatedUserSession(r.Context(), auditLogger, userSession, loggedInUser, result)
 

@@ -90,9 +90,9 @@ func HandleUserEmailVerificationCodePost(
 		}
 
 		auditLogger.Log(r.Context(), audit.EventGeneratedEmailVerificationCode, map[string]interface{}{
-			"userId":       user.Id,
-			"email":        user.Email,
-			"loggedInUser": loggedInUser,
+			"user_id":        user.Id,
+			"email":          user.Email,
+			"logged_in_user": loggedInUser,
 		})
 
 		expiresAt := issuedAt.Add(emailVerificationCodeLifetime)

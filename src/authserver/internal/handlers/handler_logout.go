@@ -560,13 +560,13 @@ func handleExistingSessionOnLogout(
 			// "" rather than a subject, and the key stays: /auth/logout carries no bearer
 			// token -- authHeaderToContext is mounted on /userinfo and the /api/ groups and
 			// nowhere else -- so there is no caller identity to read here, and "" is what
-			// this row has always carried. The actor is this event's own userId, which is
+			// this row has always carried. The actor is this event's own user_id, which is
 			// where an auditor reads it (#385).
 			auditLogger.Log(r.Context(), audit.EventDeletedUserSessionClient, map[string]interface{}{
-				"userId":        userSession.UserId,
-				"userSessionId": userSession.Id,
-				"clientId":      sessionClient.Client.Id,
-				"loggedInUser":  "",
+				"user_id":         userSession.UserId,
+				"user_session_id": userSession.Id,
+				"client_id":       sessionClient.Client.Id,
+				"logged_in_user":  "",
 			})
 
 			if len(userSession.Clients) == 1 {
@@ -576,11 +576,11 @@ func handleExistingSessionOnLogout(
 				}
 
 				// "" for the reason given above: no bearer token reaches /auth/logout, and
-				// the actor is this event's own userId.
+				// the actor is this event's own user_id.
 				auditLogger.Log(r.Context(), audit.EventLogout, map[string]interface{}{
-					"userId":            userSession.UserId,
-					"sessionIdentifier": sessionIdentifier,
-					"loggedInUser":      "",
+					"user_id":            userSession.UserId,
+					"session_identifier": sessionIdentifier,
+					"logged_in_user":     "",
 				})
 			}
 			break
@@ -725,11 +725,11 @@ func doLogout(
 		// another device, and the End-User asking to leave has got what they asked for either way.
 		// "" rather than a subject, and the key stays: /auth/logout carries no bearer token,
 		// so there is no caller identity to read, and "" is what this row has always
-		// carried. The actor is this event's own userId (#385).
+		// carried. The actor is this event's own user_id (#385).
 		auditLogger.Log(r.Context(), audit.EventLogout, map[string]interface{}{
-			"userId":            userId,
-			"sessionIdentifier": sessionIdentifier,
-			"loggedInUser":      "",
+			"user_id":            userId,
+			"session_identifier": sessionIdentifier,
+			"logged_in_user":     "",
 		})
 	}
 
@@ -825,10 +825,10 @@ func deleteWholeUserSession(
 
 	// "" rather than a subject, and the key stays: /auth/logout carries no bearer token, so
 	// there is no caller identity to read, and "" is what this row has always carried. The
-	// actor is this event's own userSessionId (#385).
+	// actor is this event's own user_session_id (#385).
 	auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
-		"userSessionId": userSession.Id,
-		"loggedInUser":  "",
+		"user_session_id": userSession.Id,
+		"logged_in_user":  "",
 	})
 
 	return userSession.UserId, nil

@@ -119,7 +119,7 @@ func expectAuditFailedActivationCode(auditLogger *handlersmocks.AuditLogger, wan
 			if _, present := details["email"]; present {
 				return false
 			}
-			id, present := details["preRegistrationId"]
+			id, present := details["pre_registration_id"]
 			if wantPreRegistrationId == 0 {
 				return !present
 			}
@@ -693,14 +693,14 @@ func TestRefuseActivationLink_AuditPayload(t *testing.T) {
 		assert.Equal(t, "203.0.113.7", details["ip"])
 		assert.Equal(t, activationReasonUnknownCode, details["reason"])
 		assert.NotContains(t, details, "email")
-		assert.NotContains(t, details, "preRegistrationId",
+		assert.NotContains(t, details, "pre_registration_id",
 			"an unresolved lookup must leave the key absent rather than naming row 0")
 	})
 
 	t.Run("a resolved preRegistrationId is recorded beside it", func(t *testing.T) {
 		details := capture(t, activationCleanGetRequest(), 42, activationReasonCodeExpired)
 
-		assert.Equal(t, int64(42), details["preRegistrationId"])
+		assert.Equal(t, int64(42), details["pre_registration_id"])
 		assert.NotContains(t, details, "email")
 	})
 

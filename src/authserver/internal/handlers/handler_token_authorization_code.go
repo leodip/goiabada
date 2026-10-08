@@ -30,7 +30,7 @@ func (tr tokenResponder) respondAuthorizationCode(w http.ResponseWriter, r *http
 	}
 
 	tr.auditLogger.Log(r.Context(), audit.EventTokenIssuedAuthorizationCodeResponse, map[string]interface{}{
-		"codeId": grant.Code.Id,
+		"code_id": grant.Code.Id,
 	})
 
 	tr.writeTokenResponse(w, r, oidc.GrantTypeAuthorizationCode, tokenResponse)

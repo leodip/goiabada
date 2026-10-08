@@ -178,9 +178,9 @@ func HandleGroupMemberAddPost(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventUserAddedToGroup, map[string]interface{}{
-			"userId":       user.Id,
-			"groupId":      group.Id,
-			"loggedInUser": callerSubject(r),
+			"user_id":        user.Id,
+			"group_id":       group.Id,
+			"logged_in_user": callerSubject(r),
 		})
 		recordMembershipChanges(r, auditLogger, user.Id, changeGranted, administrative)
 
@@ -302,9 +302,9 @@ func HandleGroupMemberDelete(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventUserRemovedFromGroup, map[string]interface{}{
-			"userId":       user.Id,
-			"groupId":      group.Id,
-			"loggedInUser": callerSubject(r),
+			"user_id":        user.Id,
+			"group_id":       group.Id,
+			"logged_in_user": callerSubject(r),
 		})
 		recordMembershipChanges(r, auditLogger, user.Id, changeRevoked, administrative)
 

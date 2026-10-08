@@ -187,8 +187,8 @@ func HandleUserPasswordPut(
 
 		// Both events, after commit. The pre-existing one is unchanged (decision 7).
 		auditLogger.Log(r.Context(), audit.EventUpdatedUserAuthentication, map[string]interface{}{
-			"userId":       user.Id,
-			"loggedInUser": loggedInUser,
+			"user_id":        user.Id,
+			"logged_in_user": loggedInUser,
 		})
 		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id,
 			revocation.ReasonAdminPasswordSet, loggedInUser, result)
@@ -283,7 +283,7 @@ func HandleUserOTPPut(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventDisabledOTP, map[string]interface{}{
-			"userId": user.Id,
+			"user_id": user.Id,
 		})
 
 		// Get the updated user to return
@@ -496,8 +496,8 @@ func HandleUserCreatePost(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventCreatedUser, map[string]interface{}{
-			"email":        createdUser.Email,
-			"loggedInUser": loggedInUser,
+			"email":          createdUser.Email,
+			"logged_in_user": loggedInUser,
 		})
 
 		// Handle email flow if needed
@@ -683,8 +683,8 @@ func HandleUserEnabledPut(
 		// Unchanged in both directions, per decision 7: the endpoint's existing event still
 		// fires for every successful request, including the ones that revoke nothing.
 		auditLogger.Log(r.Context(), audit.EventUpdatedUserDetails, map[string]interface{}{
-			"userId":       userId,
-			"loggedInUser": loggedInUser,
+			"user_id":        userId,
+			"logged_in_user": loggedInUser,
 		})
 
 		// Only on a real disable transition, and only after its commit.
@@ -787,8 +787,8 @@ func HandleUserDelete(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventDeletedUser, map[string]interface{}{
-			"userId":       userId,
-			"loggedInUser": loggedInUser,
+			"user_id":        userId,
+			"logged_in_user": loggedInUser,
 		})
 
 		// Create response

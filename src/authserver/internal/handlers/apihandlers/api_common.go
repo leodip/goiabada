@@ -132,7 +132,7 @@ func writeValidationError(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 // callerSubject is the `sub` of the access token this request authenticated with, and it is
-// what an audit row's "loggedInUser" names: the administrator who performed the action.
+// what an audit row's "logged_in_user" names: the administrator who performed the action.
 //
 // Every handler in this package sits behind JwtAuthorizationHeaderToContext and a scope
 // middleware, so the token is on the context whenever the request got this far; the empty

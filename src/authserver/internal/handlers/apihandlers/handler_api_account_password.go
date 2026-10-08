@@ -126,8 +126,8 @@ func HandleAccountPasswordPut(
 		// existing event stays exactly as it is, and the revocation gets its own so revocations
 		// are queryable as a class rather than spread across four generic event types.
 		auditLogger.Log(r.Context(), audit.EventChangedPassword, map[string]interface{}{
-			"userId":       user.Id,
-			"loggedInUser": subject,
+			"user_id":        user.Id,
+			"logged_in_user": subject,
 		})
 		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id,
 			revocation.ReasonPasswordChange, subject, result)

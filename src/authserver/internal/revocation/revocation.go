@@ -813,15 +813,15 @@ func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, client
 	loggedInUser string, result ClientGrantResult) {
 
 	auditLogger.Log(ctx, audit.EventRevokedClientGrants, map[string]interface{}{
-		"clientId":     clientId,
-		"reason":       reason,
-		"loggedInUser": loggedInUser,
+		"client_id":      clientId,
+		"reason":         reason,
+		"logged_in_user": loggedInUser,
 		// What this call TRANSITIONED, not what the client had. A second flip reports 0 and an
 		// empty list, which is the honest answer to the only question an auditor asks of this
 		// event.
-		"revokedCodeCount": result.RevokedCodeCount,
+		"revoked_code_count": result.RevokedCodeCount,
 		// Always a list rather than null: the success path initialises it.
-		"revokedRefreshTokenJtis": result.RevokedRefreshTokenJtis,
+		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
 	})
 }
 
@@ -836,17 +836,17 @@ func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userI
 	loggedInUser string, result UserAuthStateResult) {
 
 	auditLogger.Log(ctx, audit.EventRevokedUserAuthState, map[string]interface{}{
-		"userId":       userId,
-		"reason":       reason,
-		"loggedInUser": loggedInUser,
+		"user_id":        userId,
+		"reason":         reason,
+		"logged_in_user": loggedInUser,
 		// Always present, and always a list rather than null: UserAuthStateResult initialises
 		// both slices, so an action that swept nothing logs [] (finding 8).
-		"terminatedSessionIdentifiers": result.TerminatedSessionIdentifiers,
-		"revokedRefreshTokenJtis":      result.RevokedRefreshTokenJtis,
+		"terminated_session_identifiers": result.TerminatedSessionIdentifiers,
+		"revoked_refresh_token_jtis":     result.RevokedRefreshTokenJtis,
 		// "" on the three sites that preserve nothing, never absent.
-		"preservedSessionIdentifier": result.PreservedSessionIdentifier,
-		"oldGeneration":              result.OldGeneration,
-		"newGeneration":              result.NewGeneration,
+		"preserved_session_identifier": result.PreservedSessionIdentifier,
+		"old_generation":               result.OldGeneration,
+		"new_generation":               result.NewGeneration,
 	})
 }
 
@@ -860,12 +860,12 @@ func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userI
 // ctx is the request's, for the reason LogRevokedClientGrants states (#328).
 func LogAuthCodeReuse(ctx context.Context, auditLogger AuditLogger, code *record.Code, result AuthCodeReuseResult) {
 	auditLogger.Log(ctx, audit.EventAuthCodeReuseDetected, map[string]interface{}{
-		"clientId":          code.ClientId,
-		"userId":            code.UserId,
-		"codeId":            code.Id,
-		"sessionIdentifier": code.SessionIdentifier,
+		"client_id":          code.ClientId,
+		"user_id":            code.UserId,
+		"code_id":            code.Id,
+		"session_identifier": code.SessionIdentifier,
 		// Always a list rather than null: AuthCodeReuseResult initialises it on the success path.
-		"revokedRefreshTokenJtis": result.RevokedRefreshTokenJtis,
+		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
 	})
 }
 
@@ -887,15 +887,15 @@ func LogTerminatedUserSession(ctx context.Context, auditLogger AuditLogger, user
 	loggedInUser string, result TerminationResult) {
 
 	auditLogger.Log(ctx, audit.EventTerminatedUserSession, map[string]interface{}{
-		"userId":            userSession.UserId,
-		"userSessionId":     userSession.Id,
-		"sessionIdentifier": userSession.SessionIdentifier,
-		"loggedInUser":      loggedInUser,
+		"user_id":            userSession.UserId,
+		"user_session_id":    userSession.Id,
+		"session_identifier": userSession.SessionIdentifier,
+		"logged_in_user":     loggedInUser,
 		// What this call TRANSITIONED, not what the session had. A second termination of the same
 		// session reports 0 and an empty list, which is the honest answer to the only question an
 		// auditor asks of this event.
-		"revokedCodeCount": result.RevokedCodeCount,
+		"revoked_code_count": result.RevokedCodeCount,
 		// Always a list rather than null: TerminationResult initialises it on the success path.
-		"revokedRefreshTokenJtis": result.RevokedRefreshTokenJtis,
+		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
 	})
 }

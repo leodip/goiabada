@@ -279,16 +279,16 @@ func HandleUserGroupsPut(
 		loggedInSubject := callerSubject(r)
 		for _, groupId := range added {
 			auditLogger.Log(r.Context(), audit.EventUserAddedToGroup, map[string]interface{}{
-				"userId":       user.Id,
-				"groupId":      groupId,
-				"loggedInUser": loggedInSubject,
+				"user_id":        user.Id,
+				"group_id":       groupId,
+				"logged_in_user": loggedInSubject,
 			})
 		}
 		for _, groupId := range removed {
 			auditLogger.Log(r.Context(), audit.EventUserRemovedFromGroup, map[string]interface{}{
-				"userId":       user.Id,
-				"groupId":      groupId,
-				"loggedInUser": loggedInSubject,
+				"user_id":        user.Id,
+				"group_id":       groupId,
+				"logged_in_user": loggedInSubject,
 			})
 		}
 		recordMembershipChanges(r, auditLogger, user.Id, changeGranted, joined)

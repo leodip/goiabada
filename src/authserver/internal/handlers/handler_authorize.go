@@ -418,7 +418,7 @@ func HandleAuthorizeGet(
 
 		case authorizeRouteDisabledUser:
 			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
-				"userId": userSession.UserId,
+				"user_id": userSession.UserId,
 			})
 
 			// Answered at once, never deferred: this path has a valid session, so somebody is
@@ -684,11 +684,11 @@ func validateAuthorizeRequest(ctx context.Context, authorizeValidator AuthorizeV
 // user they were asked for (#499 decision 9).
 func administrativeScopeRefusedDetails(client *record.Client, scopes []string, checkpoint string, userId int64) map[string]interface{} {
 	return map[string]interface{}{
-		"clientId":         client.Id,
-		"clientIdentifier": client.ClientIdentifier,
-		"scopes":           scopes,
-		"checkpoint":       checkpoint,
-		"userId":           userId,
+		"client_id":         client.Id,
+		"client_identifier": client.ClientIdentifier,
+		"scopes":            scopes,
+		"checkpoint":        checkpoint,
+		"user_id":           userId,
 	}
 }
 
@@ -922,7 +922,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 	if answer.errorCode != "" {
 		if answer.userDisabled {
 			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
-				"userId": facts.session.UserId,
+				"user_id": facts.session.UserId,
 			})
 		}
 		redirectWithError(answer.errorCode, answer.errorDescription)
@@ -958,8 +958,8 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 	}
 
 	auditLogger.Log(r.Context(), audit.EventBumpedUserSession, map[string]interface{}{
-		"userId":   authContext.UserId,
-		"clientId": client.Id,
+		"user_id":   authContext.UserId,
+		"client_id": client.Id,
 	})
 
 	// Ready to issue code

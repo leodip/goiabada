@@ -82,7 +82,7 @@ func awaitRequestedRegistrationRecords(t *testing.T, address string, count int) 
 		for _, entry := range logs.AuditLogs {
 			var details map[string]interface{}
 			require.NoError(t, json.Unmarshal([]byte(entry.Details), &details))
-			if details["emailDigest"] == digest {
+			if details["email_digest"] == digest {
 				assert.NotEmpty(t, entry.RequestId, "the record carries the request's id")
 				records = append(records, details)
 			}
@@ -275,14 +275,14 @@ func TestSelfRegister_WithVerificationEveryRequestIsAuditedOnce(t *testing.T) {
 			assert.Equal(t, tc.outcome, details["outcome"])
 			assert.NotEmpty(t, details["ip"])
 			if tc.userId == 0 {
-				assert.NotContains(t, details, "userId", "no account matched, so none is named")
+				assert.NotContains(t, details, "user_id", "no account matched, so none is named")
 			} else {
-				assert.Equal(t, float64(tc.userId), details["userId"])
+				assert.Equal(t, float64(tc.userId), details["user_id"])
 			}
 			if tc.preRegistrationId == 0 {
-				assert.NotContains(t, details, "preRegistrationId")
+				assert.NotContains(t, details, "pre_registration_id")
 			} else {
-				assert.Equal(t, float64(tc.preRegistrationId), details["preRegistrationId"])
+				assert.Equal(t, float64(tc.preRegistrationId), details["pre_registration_id"])
 			}
 			for key, value := range details {
 				assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), tc.address,

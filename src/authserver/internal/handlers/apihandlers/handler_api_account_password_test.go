@@ -164,14 +164,14 @@ func TestHandleAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	// the only durable record of what a revocation did, and a missing or renamed field is
 	// invisible to every other test.
 	require.NotNil(t, payload)
-	assert.Equal(t, int64(42), payload["userId"])
+	assert.Equal(t, int64(42), payload["user_id"])
 	assert.Equal(t, "password_change", payload["reason"])
-	assert.Equal(t, subject, payload["loggedInUser"])
-	assert.Equal(t, []string{"sid-other"}, payload["terminatedSessionIdentifiers"])
-	assert.Equal(t, []string{"rt-other"}, payload["revokedRefreshTokenJtis"])
-	assert.Equal(t, callerSid, payload["preservedSessionIdentifier"])
-	assert.Equal(t, int64(7), payload["oldGeneration"])
-	assert.Equal(t, int64(8), payload["newGeneration"])
+	assert.Equal(t, subject, payload["logged_in_user"])
+	assert.Equal(t, []string{"sid-other"}, payload["terminated_session_identifiers"])
+	assert.Equal(t, []string{"rt-other"}, payload["revoked_refresh_token_jtis"])
+	assert.Equal(t, callerSid, payload["preserved_session_identifier"])
+	assert.Equal(t, int64(7), payload["old_generation"])
+	assert.Equal(t, int64(8), payload["new_generation"])
 	// Exactly these eight keys. A ninth would go unnoticed, and more importantly this pins that
 	// none of the eight was dropped, which an individual assertion on a nil map value cannot do.
 	assert.Len(t, payload, 8)
@@ -224,7 +224,7 @@ func TestHandleAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T) {
 
 	// Present and "", never absent and never JSON null (finding 8). Asserting the key exists
 	// separately from its value is the only way to tell those apart in a map[string]interface{}.
-	value, present := payload["preservedSessionIdentifier"]
+	value, present := payload["preserved_session_identifier"]
 	assert.True(t, present, "the key must be present even when nothing was preserved")
 	assert.Equal(t, "", value)
 }

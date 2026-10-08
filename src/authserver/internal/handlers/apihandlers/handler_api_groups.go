@@ -135,9 +135,9 @@ func HandleGroupCreatePost(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventCreatedGroup, map[string]interface{}{
-			"groupId":         group.Id,
-			"groupIdentifier": group.GroupIdentifier,
-			"loggedInUser":    callerSubject(r),
+			"group_id":         group.Id,
+			"group_identifier": group.GroupIdentifier,
+			"logged_in_user":   callerSubject(r),
 		})
 
 		// Return created group
@@ -283,9 +283,9 @@ func HandleGroupUpdatePut(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventUpdatedGroup, map[string]interface{}{
-			"groupId":         group.Id,
-			"groupIdentifier": group.GroupIdentifier,
-			"loggedInUser":    callerSubject(r),
+			"group_id":         group.Id,
+			"group_identifier": group.GroupIdentifier,
+			"logged_in_user":   callerSubject(r),
 		})
 
 		memberCounts, err := countGroupMembers(r.Context(), database, []record.Group{*group})
@@ -374,9 +374,9 @@ func HandleGroupDelete(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventDeletedGroup, map[string]interface{}{
-			"groupId":         group.Id,
-			"groupIdentifier": group.GroupIdentifier,
-			"loggedInUser":    callerSubject(r),
+			"group_id":         group.Id,
+			"group_identifier": group.GroupIdentifier,
+			"logged_in_user":   callerSubject(r),
 		})
 
 		// Return success response

@@ -113,9 +113,9 @@ func HandleResourceCreatePost(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventCreatedResource, map[string]interface{}{
-			"resourceId":         resource.Id,
-			"resourceIdentifier": resource.ResourceIdentifier,
-			"loggedInUser":       callerSubject(r),
+			"resource_id":         resource.Id,
+			"resource_identifier": resource.ResourceIdentifier,
+			"logged_in_user":      callerSubject(r),
 		})
 
 		// Response
@@ -249,9 +249,9 @@ func HandleResourceUpdatePut(
 
 		// Audit
 		auditLogger.Log(r.Context(), audit.EventUpdatedResource, map[string]interface{}{
-			"resourceId":         resource.Id,
-			"resourceIdentifier": resource.ResourceIdentifier,
-			"loggedInUser":       callerSubject(r),
+			"resource_id":         resource.Id,
+			"resource_identifier": resource.ResourceIdentifier,
+			"logged_in_user":      callerSubject(r),
 		})
 
 		// Response
@@ -301,9 +301,9 @@ func HandleResourceDelete(
 		}
 
 		auditLogger.Log(r.Context(), audit.EventDeletedResource, map[string]interface{}{
-			"resourceId":         resource.Id,
-			"resourceIdentifier": resource.ResourceIdentifier,
-			"loggedInUser":       callerSubject(r),
+			"resource_id":         resource.Id,
+			"resource_identifier": resource.ResourceIdentifier,
+			"logged_in_user":      callerSubject(r),
 		})
 
 		resp := api.SuccessResponse{Success: true}

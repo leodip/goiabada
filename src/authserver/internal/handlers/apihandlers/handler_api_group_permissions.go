@@ -232,16 +232,16 @@ func HandleGroupPermissionsPut(
 		// from the plan of the attempt that committed (#428).
 		for _, permissionId := range granted {
 			auditLogger.Log(r.Context(), audit.EventAddedGroupPermission, map[string]interface{}{
-				"groupId":      group.Id,
-				"permissionId": permissionId,
-				"loggedInUser": callerSubject(r),
+				"group_id":       group.Id,
+				"permission_id":  permissionId,
+				"logged_in_user": callerSubject(r),
 			})
 		}
 		for _, permissionId := range revoked {
 			auditLogger.Log(r.Context(), audit.EventDeletedGroupPermission, map[string]interface{}{
-				"groupId":      group.Id,
-				"permissionId": permissionId,
-				"loggedInUser": callerSubject(r),
+				"group_id":       group.Id,
+				"permission_id":  permissionId,
+				"logged_in_user": callerSubject(r),
 			})
 		}
 		recordAdministrativePermissionChanges(r, auditLogger, administrative, targetKindGroup, group.Id, granted, revoked)

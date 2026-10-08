@@ -68,9 +68,9 @@ func TestSettingsAuditLogsPut_SwitchingLoggingOffIsRecordedUnderTheOldSwitches(t
 
 	require.Len(t, *records, 1)
 	assert.Equal(t, "updated_audit_logs_settings", (*records)[0].event)
-	assert.Equal(t, false, (*records)[0].details["auditLogsInConsoleEnabled"])
-	assert.Equal(t, false, (*records)[0].details["auditLogsInDatabaseEnabled"])
-	assert.Equal(t, 1, (*records)[0].details["auditLogRetentionDays"])
+	assert.Equal(t, false, (*records)[0].details["audit_logs_in_console_enabled"])
+	assert.Equal(t, false, (*records)[0].details["audit_logs_in_database_enabled"])
+	assert.Equal(t, 1, (*records)[0].details["audit_log_retention_days"])
 	require.NotNil(t, atLog, "no settings on the context the event was logged with")
 	assert.True(t, atLog.AuditLogsInConsoleEnabled, "the event was logged under the new console switch")
 	assert.True(t, atLog.AuditLogsInDatabaseEnabled, "the event was logged under the new database switch")

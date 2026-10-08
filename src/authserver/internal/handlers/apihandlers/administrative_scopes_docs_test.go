@@ -130,7 +130,8 @@ func TestAdministrativeScopesDocs_NameWhatTheAllowanceRestsOn(t *testing.T) {
 		{
 			section: auditAlertSection,
 			pattern: docAuditEvent, kind: "audit event", live: events,
-			want: []string{"updated_client_administrative_scopes", "administrative_scope_refused"},
+			want:       []string{"updated_client_administrative_scopes", "administrative_scope_refused"},
+			skipColumn: "Details",
 		},
 		{
 			section: allowanceClientsSection,

@@ -188,7 +188,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		// Mock audit logging
 		auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["userId"] == int64(123) && details["clientId"] == int64(1) && details["codeId"] == int64(1)
+			return details["user_id"] == int64(123) && details["client_id"] == int64(1) && details["code_id"] == int64(1)
 		})).Return()
 
 		// Mock clearing auth context
@@ -1596,7 +1596,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		// Mock audit logging
 		auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["userId"] == int64(123) && details["clientId"] == int64(1) && details["issueAccessToken"] == true && details["issueIdToken"] == false
+			return details["user_id"] == int64(123) && details["client_id"] == int64(1) && details["issue_access_token"] == true && details["issue_id_token"] == false
 		})).Return()
 
 		// Mock clearing auth context
@@ -1689,7 +1689,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}), false, true).Return(tokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["issueAccessToken"] == false && details["issueIdToken"] == true
+			return details["issue_access_token"] == false && details["issue_id_token"] == true
 		})).Return()
 
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
@@ -1783,7 +1783,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}), true, true).Return(tokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["issueAccessToken"] == true && details["issueIdToken"] == true
+			return details["issue_access_token"] == true && details["issue_id_token"] == true
 		})).Return()
 
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
@@ -1912,7 +1912,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "unknown-client").Return(nil, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["clientId"] == "unknown-client" && details["userId"] == int64(123)
+			return details["client_identifier"] == "unknown-client" && details["user_id"] == int64(123)
 		})).Return()
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
@@ -3275,7 +3275,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		// Mock audit logging
 		auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["userId"] == int64(1) && details["clientId"] == int64(1) && details["codeId"] == int64(1)
+			return details["user_id"] == int64(1) && details["client_id"] == int64(1) && details["code_id"] == int64(1)
 		})).Return()
 
 		// Mock clearing auth context
@@ -3650,7 +3650,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		// Mock audit logging
 		auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["userId"] == int64(1) && details["clientId"] == int64(1) && details["codeId"] == int64(1)
+			return details["user_id"] == int64(1) && details["client_id"] == int64(1) && details["code_id"] == int64(1)
 		})).Return()
 
 		// Mock clearing auth context
@@ -3881,7 +3881,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 				auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return()
 			} else {
 				auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
-					return details["clientId"] == "test-client" && details["userId"] == int64(123)
+					return details["client_identifier"] == "test-client" && details["user_id"] == int64(123)
 				})).Return()
 				pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
 					mock.MatchedBy(func(data map[string]interface{}) bool {
@@ -4052,9 +4052,9 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 				testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, (*int64)(nil)).Return(false)
 
 			auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedSessionInvalid, mock.MatchedBy(func(details map[string]interface{}) bool {
-				return details["userId"] == int64(123) &&
-					details["clientId"] == "test-client" &&
-					details["sessionIdentifier"] == liveSessionIdentifier
+				return details["user_id"] == int64(123) &&
+					details["client_identifier"] == "test-client" &&
+					details["session_identifier"] == liveSessionIdentifier
 			})).Return()
 
 			if tc.silent {
@@ -4218,7 +4218,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 				auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return()
 			} else {
 				auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedScopeDenied, mock.MatchedBy(func(details map[string]interface{}) bool {
-					return details["userId"] == int64(123) && details["clientId"] == "test-client"
+					return details["user_id"] == int64(123) && details["client_identifier"] == "test-client"
 				})).Return()
 			}
 

@@ -54,8 +54,8 @@ func TestLogToConsole_KeepsNestedValuesAsValues(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 
 	details := map[string]any{
-		"terminatedSessionIdentifiers": []string{"sid-1", "sid-2"},
-		"user":                         map[string]any{"id": "456", "name": "Jane"},
+		"terminated_session_identifiers": []string{"sid-1", "sid-2"},
+		"user":                           map[string]any{"id": "456", "name": "Jane"},
 	}
 	LogToConsole(context.Background(), "data_update", details)
 
@@ -64,7 +64,7 @@ func TestLogToConsole_KeepsNestedValuesAsValues(t *testing.T) {
 
 	written, ok := records[0].Attrs["details"].(map[string]any)
 	require.True(t, ok, "details must arrive as a map, not as a rendering of one")
-	assert.Equal(t, []string{"sid-1", "sid-2"}, written["terminatedSessionIdentifiers"])
+	assert.Equal(t, []string{"sid-1", "sid-2"}, written["terminated_session_identifiers"])
 	assert.Equal(t, map[string]any{"id": "456", "name": "Jane"}, written["user"])
 }
 

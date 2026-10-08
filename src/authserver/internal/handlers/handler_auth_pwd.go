@@ -240,7 +240,7 @@ func HandleAuthPwdPost(
 		// would let anyone spend an account's failure budget without ever guessing (#219).
 		if !user.Enabled {
 			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
-				"userId": user.Id,
+				"user_id": user.Id,
 			})
 			renderError(i18n.NewLocalizedError(i18n.ErrCodeLoginAccountDisabled, nil))
 			return
@@ -249,7 +249,7 @@ func HandleAuthPwdPost(
 		// from this point the user is considered authenticated with pwd
 
 		auditLogger.Log(r.Context(), audit.EventAuthSuccessPwd, map[string]interface{}{
-			"userId": user.Id,
+			"user_id": user.Id,
 		})
 
 		authContext.RecordPasswordVerified(user, time.Now())

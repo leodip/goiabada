@@ -108,13 +108,13 @@ func TestPermissionDescriptionCeiling_ManageSettingsCannotRewriteAnAdministrativ
 			rows := refusalRows(t, manageToken, requestId)
 			require.Len(t, rows, 1, "exactly one administrator_change_refused row for the refused request")
 			row := rows[0]
-			assert.Equal(t, caller.ClientIdentifier, row["loggedInUser"], "the caller is the token's sub")
+			assert.Equal(t, caller.ClientIdentifier, row["logged_in_user"], "the caller is the token's sub")
 			assert.Equal(t, http.MethodPut, row["method"])
 			assert.Equal(t, "/api/v1/admin/resources/{resourceId}/permissions", row["route"])
 			assert.Equal(t, "target", row["ceiling"])
-			assert.Equal(t, "resource", row["targetKind"])
-			assert.Equal(t, float64(resource.Id), row["targetId"])
-			assert.Equal(t, []any{float64(permissionId)}, row["permissionIds"])
+			assert.Equal(t, "resource", row["target_kind"])
+			assert.Equal(t, float64(resource.Id), row["target_id"])
+			assert.Equal(t, []any{float64(permissionId)}, row["permission_ids"])
 		})
 	}
 }

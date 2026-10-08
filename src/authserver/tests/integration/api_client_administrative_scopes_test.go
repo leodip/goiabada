@@ -92,10 +92,10 @@ func TestClientAdministrativeScopes_AManageTokenSwitchesTheAllowance(t *testing.
 		rows := allowanceSwitchRows(t, manageToken, requestId)
 		require.Len(t, rows, 1, "one updated_client_administrative_scopes row for the switch to %v", allowed)
 		assert.Equal(t, map[string]any{
-			"clientId":         float64(f.clientId),
-			"clientIdentifier": f.identifier,
-			"allowed":          allowed,
-			"loggedInUser":     manageCaller.ClientIdentifier,
+			"client_id":         float64(f.clientId),
+			"client_identifier": f.identifier,
+			"allowed":           allowed,
+			"logged_in_user":    manageCaller.ClientIdentifier,
 		}, rows[0])
 		assert.Empty(t, refusalRows(t, manageToken, requestId))
 	}
@@ -363,7 +363,7 @@ func TestClientAdministrativeScopes_AnAllowanceWithdrawnDuringTheSignInRefusesIt
 			rows := administrativeScopeRefusedRows(t, f.client.ClientIdentifier)
 			require.Len(t, rows, 1)
 			assert.Equal(t, "issue", rows[0]["checkpoint"])
-			assert.Equal(t, float64(f.user.Id), rows[0]["userId"])
+			assert.Equal(t, float64(f.user.Id), rows[0]["user_id"])
 			assert.Equal(t, []any{"authserver:manage"}, rows[0]["scopes"])
 		})
 	}

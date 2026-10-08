@@ -150,13 +150,13 @@ func TestGrantCeiling_AGranularTokenChangingAnAdministrativePermissionIsRefused(
 				require.Len(t, *records, 1, "one record per refused request")
 				record := (*records)[0]
 				assert.Equal(t, "administrator_change_refused", record.event)
-				assert.Equal(t, grantCaller, record.details["loggedInUser"])
+				assert.Equal(t, grantCaller, record.details["logged_in_user"])
 				assert.Equal(t, http.MethodPut, record.details["method"])
 				assert.Contains(t, record.details, "route")
 				assert.Equal(t, "grant", record.details["ceiling"])
-				assert.Equal(t, save.kind, record.details["targetKind"])
-				assert.Equal(t, grantOwnerId, record.details["targetId"])
-				assert.Equal(t, variant.causes, record.details["permissionIds"])
+				assert.Equal(t, save.kind, record.details["target_kind"])
+				assert.Equal(t, grantOwnerId, record.details["target_id"])
+				assert.Equal(t, variant.causes, record.details["permission_ids"])
 			})
 		}
 	}

@@ -56,7 +56,7 @@ func TestHandleTokenPost_Refresh_Replay_ARecordWrittenWithNothingLiveIsAudited(t
 
 			endpoint.assertExpectations(t)
 			require.Len(t, logged, 1, "the record alone is worth one replay event")
-			assert.Equal(t, int64(0), logged[0]["revokedCount"])
+			assert.Equal(t, int64(0), logged[0]["revoked_count"])
 			assert.Equal(t, tc.wantFlow, logged[0]["flow"])
 		})
 	}

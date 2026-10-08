@@ -1379,7 +1379,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 					return false
 				}
 				_, hasCode := payload["otp"]
-				return payload["userId"] == int64(1) && !hasCode
+				return payload["user_id"] == int64(1) && !hasCode
 			})).Return()
 		// Emitted alongside, not instead: the replay is additional signal on top of the
 		// ordinary failure the caller sees (#111 decision 5).
@@ -1468,7 +1468,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 					return false
 				}
 				_, hasCode := payload["otp"]
-				return payload["userId"] == int64(1) && !hasCode
+				return payload["user_id"] == int64(1) && !hasCode
 			})).Return()
 		auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOtp, mock.Anything).Return()
 

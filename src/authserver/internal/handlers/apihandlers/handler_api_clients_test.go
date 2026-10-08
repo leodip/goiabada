@@ -261,7 +261,7 @@ func TestHandleClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *testing
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 	require.NotNil(t, revokedPayload)
-	assert.Equal(t, int64(2), revokedPayload["revokedCodeCount"])
+	assert.Equal(t, int64(2), revokedPayload["revoked_code_count"])
 
 	// The classification has to run BEFORE the client write, and the order is asserted rather
 	// than left to reading. UpdateClient projects every mutable column from the caller's copy,

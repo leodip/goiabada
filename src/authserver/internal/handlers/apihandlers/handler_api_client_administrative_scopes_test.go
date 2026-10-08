@@ -101,10 +101,10 @@ func TestClientAdministrativeScopesPut_ACommittedSwitchIsAuditedWhateverTheAnswe
 			require.Len(t, *records, 1, "a committed switch leaves exactly one entry")
 			assert.Equal(t, audit.EventUpdatedClientAdministrativeScopes, (*records)[0].event)
 			assert.Equal(t, map[string]interface{}{
-				"clientId":         targetClientId,
-				"clientIdentifier": "allowance-client",
-				"allowed":          true,
-				"loggedInUser":     grantCaller,
+				"client_id":         targetClientId,
+				"client_identifier": "allowance-client",
+				"allowed":           true,
+				"logged_in_user":    grantCaller,
 			}, (*records)[0].details)
 		})
 	}
