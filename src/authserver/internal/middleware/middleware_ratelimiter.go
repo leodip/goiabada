@@ -602,9 +602,12 @@ type subjectFunc func(r *http.Request) (key string, audited map[string]interface
 //
 // A request with no subject passes through to the handler. No subject means no bucket to key,
 // and each of the three handlers answers that request before reaching the credential: a
-// missing auth context the way every step of the auth flow does, a missing token with
-// ACCESS_TOKEN_REQUIRED. So the skipped limit costs nothing, where returning here instead
-// would write no response at all, which net/http turns into a blank 200 (#114).
+// missing auth context the way every step of the auth flow does, a missing token or subject
+// with the API's 500. The bearer middleware ahead of the account routes refuses a client's
+// request with no token or subject, so only a route mounted without it could pass one on, and
+// the account handlers treat that as the wiring fault it is (#522 decision 4). So the skipped
+// limit costs nothing, where returning here instead would write no response at all, which
+// net/http turns into a blank 200 (#114).
 //
 // The reservation is taken before the handler runs and charged or dropped after it, which is
 // what ratelimit.FailureLimiter's in-flight count makes safe under concurrency; the handler
@@ -677,8 +680,8 @@ func (m *RateLimiter) ceremonyUserSubject(r *http.Request) (string, map[string]i
 // The subject rather than the client IP because the budget has to follow the account being
 // attacked rather than the host attacking it, and reaching this route at all requires a
 // valid access token for that account. A request with no readable token passes through to
-// the handler, which answers ACCESS_TOKEN_REQUIRED before touching the code, so the skipped
-// limit costs nothing: LimitOtp's rule from #114, unchanged.
+// the handler, which answers it 500 before touching the code, so the skipped limit costs
+// nothing: LimitOtp's rule from #114, unchanged.
 func (m *RateLimiter) LimitEmailVerification(next http.Handler) http.Handler {
 	return m.limitFailuresPerSubject(next, m.emailVerification, rejectAPI, tokenSubject)
 }
@@ -690,7 +693,7 @@ func (m *RateLimiter) LimitEmailVerification(next http.Handler) http.Handler {
 // The subject rather than the address the mail goes to because the account chooses that address:
 // a per-address key would bucket the caller's own choice of recipient and bound nothing, the
 // reason LimitRegister gives for keying on the client block. A request with no readable token
-// passes through to the handler, which answers ACCESS_TOKEN_REQUIRED before sending anything.
+// passes through to the handler, which answers it 500 before sending anything.
 func (m *RateLimiter) LimitEmailVerificationSend(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip rate limiting if disabled
@@ -730,7 +733,7 @@ func (m *RateLimiter) LimitEmailVerificationSend(next http.Handler) http.Handler
 // The subject rather than the client IP, for LimitEmailVerification's reason: the budget has
 // to follow the account being attacked, and reaching any of them needs a valid access token
 // for that account. A request with no readable token passes through to the handler, which
-// answers ACCESS_TOKEN_REQUIRED before touching the password.
+// answers it 500 before touching the password.
 func (m *RateLimiter) LimitAccountPassword(next http.Handler) http.Handler {
 	return m.limitFailuresPerSubject(next, m.accountPassword, rejectAPI, tokenSubject)
 }

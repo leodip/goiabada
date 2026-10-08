@@ -8,7 +8,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/imageupload"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -32,16 +31,8 @@ func HandleAccountProfilePicturePost(
 	maxUploadBytes int64,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get logged in user from access token
-		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
+		_, sub, ok := accountCaller(w, r)
 		if !ok {
-			writeJSONError(w, "Unauthorized", "UNAUTHORIZED", http.StatusUnauthorized)
-			return
-		}
-
-		sub := jwtToken.StringClaim("sub")
-		if len(sub) == 0 {
-			writeJSONError(w, "Invalid token", "INVALID_TOKEN", http.StatusUnauthorized)
 			return
 		}
 
@@ -115,16 +106,8 @@ func HandleAccountProfilePictureDelete(
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get logged in user from access token
-		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
+		_, sub, ok := accountCaller(w, r)
 		if !ok {
-			writeJSONError(w, "Unauthorized", "UNAUTHORIZED", http.StatusUnauthorized)
-			return
-		}
-
-		sub := jwtToken.StringClaim("sub")
-		if len(sub) == 0 {
-			writeJSONError(w, "Invalid token", "INVALID_TOKEN", http.StatusUnauthorized)
 			return
 		}
 
@@ -164,16 +147,8 @@ func HandleAccountProfilePictureGet(
 	baseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get logged in user from access token
-		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
+		_, sub, ok := accountCaller(w, r)
 		if !ok {
-			writeJSONError(w, "Unauthorized", "UNAUTHORIZED", http.StatusUnauthorized)
-			return
-		}
-
-		sub := jwtToken.StringClaim("sub")
-		if len(sub) == 0 {
-			writeJSONError(w, "Invalid token", "INVALID_TOKEN", http.StatusUnauthorized)
 			return
 		}
 

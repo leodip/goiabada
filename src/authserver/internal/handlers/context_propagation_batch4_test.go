@@ -50,16 +50,3 @@ func TestPublicSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
 	require.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)
 }
-
-// The reject arm: a method other than GET is refused before the settings read, so the port is
-// never reached and there is no context to get wrong. It is the arm that stops the accept arm
-// passing on a handler that read the settings before deciding whether to answer at all.
-func TestPublicSettings_AWrongMethodReachesNoSettingsPort(t *testing.T) {
-	database := datamocks.NewDatabase(t)
-
-	rr := httptest.NewRecorder()
-	NewPublicSettings(database).ServeHTTP(rr, requestCarryingId(t, http.MethodPost, "/api/v1/public/settings"))
-
-	require.Equal(t, http.StatusMethodNotAllowed, rr.Code)
-	database.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything, mock.Anything)
-}

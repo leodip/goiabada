@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -79,15 +80,13 @@ func TestHandleAccountProfilePictureGet_NoToken(t *testing.T) {
 
 	req, _ := http.NewRequest("GET", "/api/v1/account/profile-picture", nil)
 	rr := httptest.NewRecorder()
+	capture := logtest.CaptureSlog(t)
 
 	handler.ServeHTTP(rr, req)
 
-	assert.Equal(t, http.StatusUnauthorized, rr.Code)
-
-	var response map[string]interface{}
-	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.Contains(t, response["error_code"], "UNAUTHORIZED")
+	// The bearer middleware refuses a request with no token before it gets here, so reaching the
+	// handler without one is a route mounted without it (#522 decision 4).
+	assertWiringFault(t, rr, capture)
 }
 
 func TestHandleAccountProfilePictureGet_EmptySub(t *testing.T) {
@@ -98,15 +97,12 @@ func TestHandleAccountProfilePictureGet_EmptySub(t *testing.T) {
 	req, _ := http.NewRequest("GET", "/api/v1/account/profile-picture", nil)
 	req = setTokenContext(req, "")
 	rr := httptest.NewRecorder()
+	capture := logtest.CaptureSlog(t)
 
 	handler.ServeHTTP(rr, req)
 
-	assert.Equal(t, http.StatusUnauthorized, rr.Code)
-
-	var response map[string]interface{}
-	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.Contains(t, response["error_code"], "INVALID_TOKEN")
+	// The bearer middleware refuses an empty subject with INVALID_TOKEN before it gets here.
+	assertWiringFault(t, rr, capture)
 }
 
 func TestHandleAccountProfilePictureGet_UserNotFound(t *testing.T) {
@@ -181,10 +177,11 @@ func TestHandleAccountProfilePicturePost_NoToken(t *testing.T) {
 
 	req, _ := http.NewRequest("POST", "/api/v1/account/profile-picture", nil)
 	rr := httptest.NewRecorder()
+	capture := logtest.CaptureSlog(t)
 
 	handler.ServeHTTP(rr, req)
 
-	assert.Equal(t, http.StatusUnauthorized, rr.Code)
+	assertWiringFault(t, rr, capture)
 }
 
 func TestHandleAccountProfilePicturePost_UserNotFound(t *testing.T) {
@@ -404,10 +401,11 @@ func TestHandleAccountProfilePictureDelete_NoToken(t *testing.T) {
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/account/profile-picture", nil)
 	rr := httptest.NewRecorder()
+	capture := logtest.CaptureSlog(t)
 
 	handler.ServeHTTP(rr, req)
 
-	assert.Equal(t, http.StatusUnauthorized, rr.Code)
+	assertWiringFault(t, rr, capture)
 }
 
 func TestHandleAccountProfilePictureDelete_UserNotFound(t *testing.T) {

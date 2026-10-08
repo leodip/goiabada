@@ -26,15 +26,14 @@ func NewPublicSettings(database publicSettingsDatabase) *PublicSettings {
 	}
 }
 
+// ServeHTTP answers GET /api/public/settings, which needs no authentication: the settings the
+// admin console needs before anyone holds a token, the application name, the UI theme, whether
+// SMTP is configured and the issuer, as JSON, or the API's JSON 500 when the settings row cannot
+// be read (#279 decision 17).
+//
+// The route is registered for GET only, so the router answers any other method itself, 405 with
+// an Allow header and no body, as it does for every API route (#522 decision 5).
 func (h *PublicSettings) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Only allow GET requests. This endpoint answers JSON, so its refusals answer JSON too:
-	// until now a caller that mis-spelled the method, or hit a settings failure, got
-	// text/plain from a route it had every reason to parse (#279 decision 17).
-	if r.Method != http.MethodGet {
-		apiresponse.WriteError(w, "Method not allowed", "METHOD_NOT_ALLOWED", http.StatusMethodNotAllowed)
-		return
-	}
-
 	// Get settings from database
 	settings, err := h.database.GetSettingsById(r.Context(), nil, 1)
 	if err != nil {

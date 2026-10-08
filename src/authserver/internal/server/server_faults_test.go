@@ -188,3 +188,24 @@ func TestInitRoutes_TheTokenEndpointStillRefusesGETWith405(t *testing.T) {
 	assert.Equal(t, http.StatusMethodNotAllowed, rr.Code, rr.Body.String())
 	assert.Equal(t, "POST", rr.Header().Get("Allow"))
 }
+
+// /api/public/settings is registered for GET only, so the router answers every other method, as
+// it does on every API route: 405, Allow naming GET, and no body. The handler's own JSON 405 was
+// unreachable behind it and is gone (#522 decision 5); RFC 9110 section 15.5.6 asks a 405 for the
+// Allow header and nothing more.
+func TestInitRoutes_PublicSettingsRefusesOtherMethodsWith405(t *testing.T) {
+	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch} {
+		t.Run(method, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil).Maybe()
+			s := newFaultsTestServer(database)
+
+			rr := httptest.NewRecorder()
+			s.router.ServeHTTP(rr, httptest.NewRequest(method, "/api/public/settings", nil))
+
+			assert.Equal(t, http.StatusMethodNotAllowed, rr.Code, rr.Body.String())
+			assert.Equal(t, "GET", rr.Header().Get("Allow"))
+			assert.Empty(t, rr.Body.String())
+		})
+	}
+}

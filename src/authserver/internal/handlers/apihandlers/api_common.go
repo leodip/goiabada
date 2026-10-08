@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -135,7 +137,9 @@ func writeValidationError(w http.ResponseWriter, r *http.Request, err error) {
 // Every handler in this package sits behind JwtAuthorizationHeaderToContext and a scope
 // middleware, so the token is on the context whenever the request got this far; the empty
 // string is what a caller with no validated token would have recorded anyway, which is the
-// same fallback the thirty-eight sites that already read the token inline carry.
+// same fallback the admin handlers that read the token inline carry. The account handlers act
+// as the caller rather than record them, so they read the caller through accountCaller, which
+// refuses instead of falling back.
 //
 // This replaced AuthHelper.GetLoggedInSubject, which read the admin console's session key
 // ContextKeyJwtInfo. Nothing in this process writes that key -- the auth server installs the
@@ -148,4 +152,31 @@ func callerSubject(r *http.Request) string {
 		return ""
 	}
 	return jwtToken.StringClaim("sub")
+}
+
+// accountCaller is the validated access token of an account API request and its subject, the
+// user every /api/v1/account/* handler acts as. ok false means the answer is already written.
+//
+// Every route in that group runs the bearer middleware first, which refuses a request with no
+// token as ACCESS_TOKEN_REQUIRED and a user token whose subject is empty as INVALID_TOKEN, so no
+// request a client can send arrives here without both. One that does came through a route
+// mounted without that middleware: a wiring fault, answered as the API's 500 and logged as an
+// error, so it fails loudly instead of running the request as an empty user. This replaced 35
+// inline checks that answered such a request 401 with INVALID_SUBJECT or UNAUTHORIZED, codes
+// nothing else wrote (#522 decision 4).
+//
+// The subject is returned as the token carries it; only the blank test trims, as the middleware
+// does.
+func accountCaller(w http.ResponseWriter, r *http.Request) (oauth.JwtToken, string, bool) {
+	jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
+	if !ok {
+		writeInternalServerError(w, r, errs.New("an account API request reached its handler with no validated access token"))
+		return oauth.JwtToken{}, "", false
+	}
+	subject := jwtToken.StringClaim("sub")
+	if strings.TrimSpace(subject) == "" {
+		writeInternalServerError(w, r, errs.New("an account API request reached its handler with a token whose subject is empty"))
+		return oauth.JwtToken{}, "", false
+	}
+	return jwtToken, subject, true
 }

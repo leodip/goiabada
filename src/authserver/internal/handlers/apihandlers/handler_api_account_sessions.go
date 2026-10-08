@@ -36,16 +36,8 @@ func HandleAccountSessionsGet(
 	database accountSessionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract validated access token (auth and scope enforced by middleware)
-		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
+		jwtToken, subject, ok := accountCaller(w, r)
 		if !ok {
-			writeJSONError(w, "Access token required", "ACCESS_TOKEN_REQUIRED", http.StatusUnauthorized)
-			return
-		}
-
-		subject := jwtToken.StringClaim("sub")
-		if subject == "" {
-			writeJSONError(w, "Invalid token subject", "INVALID_SUBJECT", http.StatusUnauthorized)
 			return
 		}
 
@@ -102,15 +94,8 @@ func HandleAccountSessionDelete(
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract token and subject
-		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
+		_, subject, ok := accountCaller(w, r)
 		if !ok {
-			writeJSONError(w, "Access token required", "ACCESS_TOKEN_REQUIRED", http.StatusUnauthorized)
-			return
-		}
-		subject := jwtToken.StringClaim("sub")
-		if subject == "" {
-			writeJSONError(w, "Invalid token subject", "INVALID_SUBJECT", http.StatusUnauthorized)
 			return
 		}
 
