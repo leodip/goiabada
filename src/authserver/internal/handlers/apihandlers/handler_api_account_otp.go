@@ -120,16 +120,8 @@ func HandleAccountOTPEnrollmentGet(
 	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Token and scope are enforced by middleware; extract validated token
-		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
+		_, subject, ok := accountCaller(w, r)
 		if !ok {
-			writeJSONError(w, "Access token required", "ACCESS_TOKEN_REQUIRED", http.StatusUnauthorized)
-			return
-		}
-
-		subject := jwtToken.StringClaim("sub")
-		if strings.TrimSpace(subject) == "" {
-			writeJSONError(w, "Invalid token subject", "INVALID_SUBJECT", http.StatusUnauthorized)
 			return
 		}
 
@@ -261,16 +253,8 @@ func HandleAccountOTPPut(
 	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Token and scope are enforced by middleware; extract validated token
-		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
+		_, subject, ok := accountCaller(w, r)
 		if !ok {
-			writeJSONError(w, "Access token required", "ACCESS_TOKEN_REQUIRED", http.StatusUnauthorized)
-			return
-		}
-
-		subject := jwtToken.StringClaim("sub")
-		if strings.TrimSpace(subject) == "" {
-			writeJSONError(w, "Invalid token subject", "INVALID_SUBJECT", http.StatusUnauthorized)
 			return
 		}
 

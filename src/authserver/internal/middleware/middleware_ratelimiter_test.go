@@ -1259,8 +1259,8 @@ func TestLimitEmailVerification_PerSubject(t *testing.T) {
 	t.Run("a request carrying no token reaches the handler", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
 		// Well past the budget: with no subject there is no bucket, and the handler
-		// answers ACCESS_TOKEN_REQUIRED before it compares anything, so the skipped limit
-		// costs nothing. Returning here instead would write no response at all.
+		// answers 500 before it compares anything, so the skipped limit costs nothing.
+		// Returning here instead would write no response at all.
 		for i := 0; i < budget*4; i++ {
 			if code, reached, _ := runVerification(m, "", true); code != http.StatusTeapot || !reached {
 				t.Fatalf("attempt %d: got code %d, handler reached %v; want %d and true",
@@ -1508,9 +1508,9 @@ func TestLimitAccountPassword_PerSubject(t *testing.T) {
 
 	t.Run("a request carrying no token reaches the handler", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
-		// With no subject there is no bucket, and the handler answers ACCESS_TOKEN_REQUIRED
-		// before it verifies anything, so the skipped limit costs nothing. Returning here
-		// instead would write no response at all.
+		// With no subject there is no bucket, and the handler answers 500 before it
+		// verifies anything, so the skipped limit costs nothing. Returning here instead
+		// would write no response at all.
 		for i := 0; i < budget*4; i++ {
 			if code, reached, _ := runAccountPassword(m, accountPasswordRoute, "", true); code != http.StatusTeapot || !reached {
 				t.Fatalf("attempt %d: got code %d, handler reached %v; want %d and true",

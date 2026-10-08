@@ -56,26 +56,6 @@ func TestPublicSettings_Success(t *testing.T) {
 	assert.Equal(t, "https://issuer.example", body.Issuer)
 }
 
-func TestPublicSettings_OnlyGetIsAllowed(t *testing.T) {
-	for _, method := range []string{"POST", "PUT", "DELETE", "PATCH", "HEAD"} {
-		t.Run(method, func(t *testing.T) {
-			// NewDatabase(t) fails on any unexpected call, so the absence of a
-			// GetSettingsById expectation proves the method check short circuits.
-			database := datamocks.NewDatabase(t)
-			handler := NewPublicSettings(database)
-
-			recorder := httptest.NewRecorder()
-			handler.ServeHTTP(recorder, httptest.NewRequest(method, "/api/public/settings", nil))
-
-			assert.Equal(t, http.StatusMethodNotAllowed, recorder.Code)
-			// The refusal is JSON too. It answered text/plain until #279 decision 17,
-			// on a route whose whole purpose is to be parsed.
-			assert.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
-			assert.Contains(t, recorder.Body.String(), "METHOD_NOT_ALLOWED")
-		})
-	}
-}
-
 func TestPublicSettings_DatabaseError(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	handler := NewPublicSettings(database)

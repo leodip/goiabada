@@ -42,10 +42,8 @@ func HandleAccountLogoutRequestPost(
 	baseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Access token + required scope enforced by middleware
-		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
+		jwtToken, _, ok := accountCaller(w, r)
 		if !ok {
-			writeJSONError(w, "Access token required", "ACCESS_TOKEN_REQUIRED", http.StatusUnauthorized)
 			return
 		}
 

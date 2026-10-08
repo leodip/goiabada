@@ -52,15 +52,12 @@ This is every `UPPER_SNAKE` code the two APIs answer.
 | `SEND_FAILED` | `400` | The test email couldn't be sent. `error_description` says what to check. |
 | `ACCESS_TOKEN_REQUIRED` | `401` | No access token was sent. |
 | `INVALID_TOKEN` | `401` | The token is malformed, expired, not an access token for `authserver`, or its user or session is gone. |
-| `INVALID_SUBJECT` | `401` | The token names no subject (`sub`). |
 | `INVALID_SESSION` | `401` | On `POST /api/v1/account/logout-request`: the token carries no session id (`sid`), its session is gone, or the token's client isn't part of that session. |
-| `UNAUTHORIZED` | `401` | A profile picture operation was reached without a validated token. The token check in front of it answers `ACCESS_TOKEN_REQUIRED` first, so you shouldn't see this one. |
 | `INSUFFICIENT_SCOPE` | `403` | The token carries none of the scopes the operation accepts. The `WWW-Authenticate` header says `error="insufficient_scope"`. |
 | `USER_CONTEXT_REQUIRED` | `403` | An Account API call was made with a token that wasn't issued for a user, such as one from the client credentials flow. |
 | `FORBIDDEN` | `403` | The token is valid, but the consent or session it names belongs to another user. |
 | `MANAGE_SCOPE_REQUIRED` | `403` | The request acts on an administrator or an administrative permission, which only `authserver:manage` may do. See [Administrators](/reference/api/administrators/). |
 | `NOT_FOUND` | `404` | Nothing has that id. |
-| `METHOD_NOT_ALLOWED` | `405` | `/api/public/settings` was called with a method other than `GET`. The router refuses that request first, with `405` and no body, so you shouldn't see this code. |
 | `CONCURRENT_UPDATE` | `409` | Another request changed what yours was based on. Nothing was saved: read it again and retry. |
 | `EMAIL_ALREADY_EXISTS` | `409` | Another user already has that email address. |
 | `LAST_ADMINISTRATOR` | `409` | The change would leave no enabled user holding `authserver:manage`. Grant it to another user first. |

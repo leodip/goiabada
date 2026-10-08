@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -28,16 +27,8 @@ func HandleAccountProfileGet(
 	database accountProfileDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Token and scope are enforced by middleware; extract validated token
-		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
+		_, subject, ok := accountCaller(w, r)
 		if !ok {
-			writeJSONError(w, "Access token required", "ACCESS_TOKEN_REQUIRED", http.StatusUnauthorized)
-			return
-		}
-
-		subject := jwtToken.StringClaim("sub")
-		if strings.TrimSpace(subject) == "" {
-			writeJSONError(w, "Invalid token subject", "INVALID_SUBJECT", http.StatusUnauthorized)
 			return
 		}
 
@@ -63,16 +54,8 @@ func HandleAccountProfilePut(
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Token and scope are enforced by middleware; extract validated token
-		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
+		_, subject, ok := accountCaller(w, r)
 		if !ok {
-			writeJSONError(w, "Access token required", "ACCESS_TOKEN_REQUIRED", http.StatusUnauthorized)
-			return
-		}
-
-		subject := jwtToken.StringClaim("sub")
-		if strings.TrimSpace(subject) == "" {
-			writeJSONError(w, "Invalid token subject", "INVALID_SUBJECT", http.StatusUnauthorized)
 			return
 		}
 
