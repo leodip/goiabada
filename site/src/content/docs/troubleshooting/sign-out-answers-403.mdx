@@ -1,0 +1,54 @@
+---
+title: Sign-out answers 403
+description: A POST to /auth/logout answers 403 Forbidden with "Your request was refused for security reasons."
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page helps you when your app signs a user out with a POST to `/auth/logout` and gets `403 Forbidden` back.
+
+## What you see
+
+The auth server answers `403 Forbidden` with a plain-text body, not a page:
+
+```
+Your request was refused for security reasons. Please reload the page and try again.
+```
+
+The user stays signed in. The auth server's log has a `cross-origin request refused` warning, whose `explanation` and `remedy` fields say which check refused the request. No audit event is written.
+
+## Why it happens
+
+The auth server refuses a POST that comes from another site, unless it can tell the request is safe. That's what stops any web page from submitting forms to the auth server on a user's behalf.
+
+For `/auth/logout`, a POST is safe when it carries an `id_token_hint`. A POST **without** one is exactly what the auth server's own "Are you sure you want to sign out?" screen submits when the user clicks **Yes**. Accepting it from another site would let any page sign your users out without asking them, so the auth server refuses it.
+
+So the usual cause is a self-submitting form on your app's page that posts to `/auth/logout` without an `id_token_hint`. Your app's origin is a different site from the auth server's, which makes the form cross-site.
+
+## Fix it
+
+Pick one:
+
+- **Send the `id_token_hint`** in the form, with the ID token the user signed in with. A cross-site POST with a hint is accepted. If the auth server can confirm the hint, the user is signed out straight away. If it can't, it answers `303 See Other` back to `GET /auth/logout`, which shows the confirmation screen.
+- **Use a GET.** Send the browser to `/auth/logout` with a link or a redirect. A GET is never refused this way, and without a hint the user sees the confirmation screen.
+
+POST is worth it when you have an `id_token_hint`, because it keeps the ID token out of the address bar, the browser's history and the `Referer` header.
+
+## When the confirmation screen itself answers 403
+
+If clicking **Yes** on the auth server's own "Are you sure you want to sign out?" screen answers 403, the form and the auth server look like two different sites to the browser, though they're the same. The same refusal then hits every form the auth server serves, the sign-in page included. The warning's `explanation` names one of these:
+
+- **The browser reached the auth server on another hostname, port or scheme** than the one it's configured with, such as a bare domain beside a `www` host, or `http` beside `https`. Use exactly `GOIABADA_AUTHSERVER_BASEURL`.
+- **A proxy rewrote the `Host` header**, so it no longer matches the `Origin` the browser sent. Configure the proxy to pass the original `Host` on, such as `proxy_set_header Host $host;` in Nginx.
+- **The page was served with `Referrer-Policy: no-referrer`**, so the browser sent `Origin: null`. The auth server sets `same-origin` itself: check that nothing in front of it replaces that header.
+
+<Aside type="caution">
+**Never** work around the refusal by stripping `Origin` or `Sec-Fetch-Site` at the proxy. The check is what keeps other sites from submitting forms as your users.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Logout endpoint" description="Every /auth/logout parameter and answer." href="/reference/endpoints/#authlogout-get-or-post" />
+  <LinkCard title="id_token_hint" description="What the hint is and how the auth server checks it." href="/concepts/id-token-hint/" />
+</CardGrid>

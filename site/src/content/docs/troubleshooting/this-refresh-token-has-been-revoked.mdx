@@ -1,0 +1,69 @@
+---
+title: This refresh token has been revoked
+description: A refresh answers invalid_grant, and the refresh token your app just got stops working too.
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page helps you when refreshing a token fails and takes your app's newest refresh token down with it, so the user has to sign in again.
+
+## What you see
+
+Your app refreshes, and the token endpoint answers `400`:
+
+```json
+{"error": "invalid_grant", "error_description": "This refresh token has been revoked."}
+```
+
+Then the refresh token your app got from its previous refresh fails too, with "The refresh token is invalid." The audit log may hold a `refresh_token_replay_detected` [event](/concepts/audit-log/) for your client.
+
+## Why it happens
+
+A refresh token is good for one refresh. Each refresh returns a new one and retires the old one, and that's called rotation.
+
+When a retired refresh token comes back, the auth server can't tell whether an attacker stole it or your own app sent it twice. So it assumes the worst: it revokes every live refresh token descended from the same sign-in, the newest one included. That's what stops someone holding a stolen token from refreshing for as long as they like.
+
+Your own app usually causes it in one of two ways:
+
+- **Parallel refreshes.** Two threads, tabs or instances notice the access token has expired, and each refreshes with the same refresh token. One wins. The other is either refused, or, when it reads the token after the winner retired it, treated as a replay.
+- **Retrying after a lost response.** The auth server rotated the token, but the response never reached your app. Retrying sends the retired token.
+
+There's no grace period for either: a retired token is retired the moment the refresh succeeds.
+
+## Fix it
+
+<Aside type="caution">
+Refresh through **one** path at a time, and store the new refresh token in place of the old one **before** you use anything else from the response.
+</Aside>
+
+- **Serialize refreshes.** Share one refresh between every thread, tab or instance that needs a token, with a lock or a single in-flight request the others wait for.
+- **Treat a lost response as "sign in again", not "retry".** Without the response, your app doesn't have the new refresh token, and the old one is retired.
+
+Once a family is revoked, the user has to sign in to your app again. Their session with the auth server survives, so they usually go straight through.
+
+## How it works
+
+**Only that one grant is revoked.** The user's session with the auth server, their sign-ins to other clients and their other grants keep working.
+
+**Access tokens already issued stay valid** until they expire. They're signed JWTs your APIs check on their own, so revoking the refresh token stops the next refresh, not an access token already handed out. Keep access token lifetimes short.
+
+**The replay check comes last.** A refresh that fails for another reason first, such as a user who was disabled or whose password changed, gets that reason, and nothing is revoked.
+
+The `refresh_token_replay_detected` event is written when the auth server revokes something, not on every repeat, and its `first_refresh_token_jti` identifies the grant. It doesn't prove an attack: an app that refreshes in parallel triggers it too.
+
+Other reasons a refresh answers `invalid_grant`:
+
+| `error_description` | Why |
+|---|---|
+| "The refresh token is invalid (token has invalid claims: token is expired)." | The refresh token expired. An offline one expires after going unused for its idle timeout. |
+| "The refresh token is invalid because it was superseded." | The user's password was changed or reset, or the user was disabled. |
+| "The refresh token is invalid because the associated session has expired or been terminated." | The session it was issued through ended, or the client was made public. |
+| "The refresh token is invalid because it has expired (offline_access_max_lifetime)." | An offline refresh token reached its maximum lifetime. |
+| "The refresh token is invalid." | The user is disabled, or the token is unknown or in a revoked family. |
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Tokens" description="Refresh token rotation and what your client must do." href="/concepts/tokens/#refresh-token-rotation" />
+  <LinkCard title="Audit log" description="The refresh_token_replay_detected event and its details." href="/concepts/audit-log/" />
+</CardGrid>

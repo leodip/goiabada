@@ -400,12 +400,7 @@ kubectl delete challenges -n goiabada --all
 
 ### OAuth "Invalid redirect_uri" error
 
-This means the database has OAuth clients configured for different URLs than you're using.
-
-**Solutions:**
-1. Use a fresh/empty database
-2. Use the same URLs as the previous deployment
-3. Manually update `redirect_uris` in the `clients` table
+See [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/).
 
 ### Database connection errors
 
@@ -1227,37 +1222,9 @@ answers 500. Administrators signed in before step 3 stay signed in through the r
 server and every other client work throughout.
 
 If the admin console can no longer sign you in, because the database holds a secret its Secret does
-not, set a secret you know through the [admin API](/reference/api/authentication/), with a client of your
-own allowed `authserver:manage`. It has to be `manage`: the admin console's client is an
-[administrator](/concepts/resources-and-permissions/#administrators), and only a token with
-`authserver:manage` writes to one, so a `manage-clients` token is refused `403
-MANAGE_SCOPE_REQUIRED`. Holding `manage` makes your client an administrator too, so keep its secret
-with the care you give the admin console's own. Have that client before you rotate: once the admin
-console is locked out, it is the only way back in.
-
-```bash
-read -rsp 'API client secret: ' API_CLIENT_SECRET; echo
-TOKEN=$(printf %s "$API_CLIENT_SECRET" | curl -s https://auth.example.com/auth/token \
-  -d grant_type=client_credentials -d client_id=<your API client> \
-  --data-urlencode client_secret@- -d scope=authserver:manage | jq -r .access_token)
-unset API_CLIENT_SECRET
-CLIENT_ID=$(curl -s https://auth.example.com/api/v1/admin/clients -H "Authorization: Bearer $TOKEN" \
-  | jq '.clients[] | select(.clientIdentifier == "admin-console-client") | .id')
-CLIENT_SECRET=$(openssl rand -hex 32)
-kubectl patch secret goiabada-secrets -n goiabada --type=merge --patch-file=/dev/stdin <<EOF
-{"stringData": {"oauth-client-secret": "$CLIENT_SECRET"}}
-EOF
-curl -s -X PUT "https://auth.example.com/api/v1/admin/clients/$CLIENT_ID/authentication" \
-  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data-binary @- <<EOF
-{"isPublic": false, "clientSecret": "$CLIENT_SECRET"}
-EOF
-unset CLIENT_SECRET TOKEN
-kubectl rollout restart deployment/goiabada-adminconsole -n goiabada
-```
-
-The new secret goes into the Secret before the auth server holds it, and neither secret reaches the
-process list. The admin API accepts a secret of 60 to 255 letters, digits, `-`, `_` and `.`, which
-`openssl rand -hex 32`, 64 hex characters, is.
+not, [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-admin-consoles-client-secret-changed)
+sets a secret you know through the admin API. Have the client it needs before you rotate: once the
+admin console is locked out, it is the only way back in.
 
 #### The admin password
 

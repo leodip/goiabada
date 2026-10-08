@@ -151,6 +151,21 @@ export default defineConfig({
 					],
 				},
 				{
+					label: 'Troubleshooting',
+					items: [
+						{ label: 'Invalid redirect_uri', slug: 'troubleshooting/invalid-redirect-uri' },
+						{ label: 'The app gets no error back', slug: 'troubleshooting/the-app-gets-no-error-back' },
+						{ label: 'invalid_scope', slug: 'troubleshooting/invalid-scope' },
+						{ label: 'login_required', slug: 'troubleshooting/login-required' },
+						{ label: 'This refresh token has been revoked', slug: 'troubleshooting/this-refresh-token-has-been-revoked' },
+						{ label: 'Sign-out answers 403', slug: 'troubleshooting/sign-out-answers-403' },
+						{ label: 'Too many attempts or 429', slug: 'troubleshooting/too-many-attempts-or-429' },
+						{ label: 'Locked out of the admin console', slug: 'troubleshooting/locked-out-of-the-admin-console' },
+						{ label: 'Unable to load the configuration from the auth server', slug: 'troubleshooting/unable-to-load-the-configuration-from-the-auth-server' },
+						{ label: 'A user cannot reset their password', slug: 'troubleshooting/a-user-cannot-reset-their-password' },
+					],
+				},
+				{
 					label: 'Legacy flows',
 					items: [
 						{ label: 'Implicit', slug: 'legacy-flows/implicit' },

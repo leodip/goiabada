@@ -1,0 +1,81 @@
+---
+title: invalid_scope
+description: A request is refused with invalid_scope, or a token comes back without a scope your app asked for.
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page helps you when a scope your app asks for is refused, or quietly left out of the token.
+
+## What you see
+
+One of these:
+
+- your app gets `error=invalid_scope` at its redirect URI, or from the token endpoint with `400`;
+- a refresh or a code exchange answers `invalid_grant`, with an `error_description` about a scope;
+- the token arrives, but its `scope` lacks something you asked for;
+- your app gets `access_denied` with "The user is not authorized to access any of the requested scopes".
+
+The `error_description` names the scope and the reason. Read it first: it's usually the whole answer.
+
+## Why it happens
+
+### The scope doesn't exist
+
+A scope is either an OpenID Connect scope, `openid`, `profile`, `email`, `address`, `phone`, `groups` or `attributes`, or a permission, written `resource:permission`, such as `backend-service:create-product`. Scopes are separated by exactly one space. The auth server refuses:
+
+| `error_description` starts with | The problem |
+|---|---|
+| "Invalid scope format" | It's neither an OpenID Connect scope nor `resource:permission`. |
+| "Invalid scope: ... Could not find a resource with identifier" | No resource has that identifier. |
+| "Scope ... is invalid." or "Scope ... is not recognized. The resource identified by" | The resource has no permission with that identifier. |
+| "The 'scope' parameter is malformed." | Two spaces between scopes, or a space at either end. |
+| "The 'scope' parameter is missing." | The authorization request has no scope. |
+| "The 'scope' parameter holds only 'offline_access'" | `offline_access` grants nothing by itself. Ask for `openid` or a permission beside it. |
+
+**Fix it:** check the spelling against the resource's **Permissions** tab in the admin console, or create the permission.
+
+### The client may not have it
+
+**With the client credentials flow,** a client gets only the permissions granted to the client itself, on its **Permissions** tab. Asking for another answers "Permission to access scope '...' is not granted to the client." Asking for an OpenID Connect scope answers `invalid_request`, since there's no user to describe. Leave `scope` out, and the token carries every permission the client holds.
+
+**The administrative scopes,** `authserver:manage` and the other permissions that administer Goiabada, need the client to be allowed to request them: "The client is not allowed to request the administrative scope". See [administrative scopes](/concepts/clients/#administrative-scopes).
+
+**Fix it:** grant the permission on the client's **Permissions** tab, or turn on **May request administrative scopes** for that one.
+
+### The user doesn't hold it
+
+When a client signs a user in, the token carries only the permissions the user holds, directly or through a group. A permission the user lacks is **left out of the token without an error**, and the `scope` in the token response says what was granted. Only when nothing is left does the auth server refuse with `access_denied` and "The user is not authorized to access any of the requested scopes".
+
+**Fix it:** grant the user the permission, or add them to a group that has it, and have your app send a new authorization request. The scope is decided during the sign-in, and a refresh keeps it.
+
+### A refresh asked for more
+
+A refresh can ask for the same scope as the original grant or less, never more: "Scope '...' is not recognized. The original access token does not grant the '...' permission." A refresh also checks again that the user still holds each permission and, for a client that requires consent or an `offline_access` token, still consents to it, and answers `invalid_grant` when they don't.
+
+**Fix it:** send the user through the authorization request again with the wider scope.
+
+### The Admin API or the Account API refuses the token
+
+These answer with an error code rather than an OAuth error:
+
+- `403 INSUFFICIENT_SCOPE`: the token carries none of the scopes the operation accepts.
+- `403 USER_CONTEXT_REQUIRED`: the Account API needs a token issued for a user, not one from the client credentials flow.
+- `403 MANAGE_SCOPE_REQUIRED`: the request acts on an administrator, which only `authserver:manage` may do.
+
+See [Errors](/reference/api/errors/) and [Scopes](/reference/api/scopes/).
+
+## How it works
+
+At `/auth/authorize`, a scope error is sent to your redirect URI. When the browser has no session yet, the auth server first asks the user to sign in, and sends the error after: [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/#the-user-sees-the-sign-in-page) explains why.
+
+The permissions a user holds are checked again just before the code is issued, so a permission revoked while they sign in is left out too.
+
+Every `invalid_scope` from the token endpoint for a client that authenticated writes a `token_scope_denied` [audit event](/concepts/audit-log/), and every refused administrative scope reaching a signed-in user or an authenticated client writes `administrative_scope_refused`.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Scopes" description="The OpenID Connect scopes and the permission scopes." href="/concepts/scopes/" />
+  <LinkCard title="Resources and permissions" description="Create the permissions your scopes name." href="/concepts/resources-and-permissions/" />
+</CardGrid>

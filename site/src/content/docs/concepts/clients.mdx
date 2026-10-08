@@ -99,7 +99,7 @@ The scheme, host and fragment rules are checked again on every authorization req
 
 The authorization code is bound to the redirect URI it was issued for. Your app must send that same `redirect_uri` when it exchanges the code at `/auth/token`.
 
-Removing a redirect URI takes effect on sign-ins already under way. The auth server doesn't send the browser to an address the client no longer has: the user sees a page naming that address instead, and the sign-in stops there.
+Removing a redirect URI takes effect on sign-ins already under way: [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/#how-it-works) says what the user sees.
 
 #### Loopback redirect URIs
 
@@ -236,7 +236,7 @@ Because nobody has reviewed them, self-registered clients are treated more caref
 Once you've reviewed a self-registered client, you can change its settings like any other, **Consent required** included.
 
 <Aside type="caution">
-**Building a self-registered client?** You get no error response when a sign-in fails: it just never comes back. Treat one that doesn't return in a reasonable time as abandoned. If you need error responses, ask an administrator to create your client instead.
+**Building a self-registered client?** You get no error response when a sign-in fails: it just never comes back. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/#the-user-sees-you-have-not-been-sent-anywhere).
 </Aside>
 
 #### Redirect URIs for self-registered clients

@@ -1,0 +1,132 @@
+---
+title: Locked out of the admin console
+description: The admin console can't sign you in, or nobody who can manage Goiabada can sign in any more.
+---
+
+import { Aside, CardGrid, LinkCard, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+This page helps you get back into the admin console when signing in to it stops working.
+
+Find your case first:
+
+- **Signing in fails for every administrator** with **Sign-in failed** or **Server error**: [the admin console's client secret changed](#the-admin-consoles-client-secret-changed).
+- **The password you set in `GOIABADA_ADMIN_PASSWORD` is refused:** [you changed it after the first start](#you-changed-goiabada_admin_password).
+- **The only administrator can't sign in**, because they forgot their password or lost their authenticator: [the last administrator can't sign in](#the-last-administrator-cant-sign-in).
+
+## The admin console's client secret changed
+
+The admin console signs administrators in as a client of the auth server, `admin-console-client`, and proves who it is with that client's secret. It uses the same secret for the token it reaches its own sessions with, which the auth server stores. The auth server keeps the secret in its database. The admin console reads its copy from `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET`. When the two differ, the auth server refuses the admin console with `invalid_client`, and:
+
+- a sign-in fails after the password, on **Sign-in failed**: "The admin console could not complete the sign-in with the auth server. This usually means the console's client secret or the auth server's address is wrong.";
+- an administrator already signed in is signed out once their access token falls due;
+- once the token the admin console holds for its sessions expires, within the access token lifetime, 5 minutes unless you changed it, or straight away after the admin console restarts, every page that needs a session answers `500` on **Server error**, starting a sign-in included.
+
+The admin console's log has the cause: `the auth server's token endpoint answered 401 (invalid_client: Client authentication failed. Please review your client_secret.)`.
+
+The auth server and every other client keep working.
+
+That happens when someone generated a new secret on the client's **Authentication** tab and saved it without giving the admin console the same one, or when the admin console's configuration lost its value. The auth server reads `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` only on its first start, so changing the variable later never changes the database.
+
+### Fix it
+
+If you know the secret the database holds, put it back in the admin console's configuration and restart the admin console. Otherwise, set a secret you know through the [Admin API](/reference/api/authentication/), with a client of your own allowed `authserver:manage`.
+
+It has to be `manage`. The admin console's client is an [administrator](/reference/api/administrators/), and only a token with `authserver:manage` writes to one, so a `manage-clients` token is refused `403 MANAGE_SCOPE_REQUIRED`. Holding `manage` makes your client an administrator too, so keep its secret with the care you give the admin console's own.
+
+<Aside type="caution">
+Create that client **before** you need it: a client with the **Client credentials flow** on, and the `authserver` resource's `manage` permission granted on its **Permissions** tab. Once the admin console is locked out, it's the only way back in.
+</Aside>
+
+<Steps>
+
+1. Get a token for your client, and find the admin console client's id:
+
+   ```bash
+   read -rsp 'API client secret: ' API_CLIENT_SECRET; echo
+   TOKEN=$(printf %s "$API_CLIENT_SECRET" | curl -s https://auth.example.com/auth/token \
+     -d grant_type=client_credentials -d client_id=<your API client> \
+     --data-urlencode client_secret@- -d scope=authserver:manage | jq -r .access_token)
+   unset API_CLIENT_SECRET
+   CLIENT_ID=$(curl -s https://auth.example.com/api/v1/admin/clients -H "Authorization: Bearer $TOKEN" \
+     | jq '.clients[] | select(.clientIdentifier == "admin-console-client") | .id')
+   CLIENT_SECRET=$(openssl rand -hex 32)
+   ```
+
+2. Store the new secret where the admin console reads it, before the auth server holds it:
+
+   <Tabs>
+     <TabItem label="Docker Compose">
+       Set `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` to `$CLIENT_SECRET` under both services in `docker-compose.override.yml`.
+     </TabItem>
+     <TabItem label="Native binaries">
+       Set `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` to `$CLIENT_SECRET` in the admin console's env file.
+     </TabItem>
+     <TabItem label="Kubernetes">
+       ```bash
+       kubectl patch secret goiabada-secrets -n goiabada --type=merge --patch-file=/dev/stdin <<EOF
+       {"stringData": {"oauth-client-secret": "$CLIENT_SECRET"}}
+       EOF
+       ```
+     </TabItem>
+   </Tabs>
+
+3. Set the same secret on the client:
+
+   ```bash
+   curl -s -X PUT "https://auth.example.com/api/v1/admin/clients/$CLIENT_ID/authentication" \
+     -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data-binary @- <<EOF
+   {"isPublic": false, "clientSecret": "$CLIENT_SECRET"}
+   EOF
+   unset CLIENT_SECRET TOKEN
+   ```
+
+4. Restart the admin console:
+
+   <Tabs>
+     <TabItem label="Docker Compose">
+       ```bash
+       docker compose up -d --no-deps goiabada-adminconsole
+       ```
+     </TabItem>
+     <TabItem label="Native binaries">
+       ```bash
+       sudo systemctl restart goiabada-adminconsole
+       ```
+     </TabItem>
+     <TabItem label="Kubernetes">
+       ```bash
+       kubectl rollout restart deployment/goiabada-adminconsole -n goiabada
+       ```
+     </TabItem>
+   </Tabs>
+
+5. Sign in from a private window to check.
+
+</Steps>
+
+Neither secret reaches the process list. The Admin API accepts a client secret of 60 to 255 letters, digits, `-`, `_` and `.`, which `openssl rand -hex 32`, 64 hex characters, is.
+
+## You changed GOIABADA_ADMIN_PASSWORD
+
+The auth server reads `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD` only on its first start, when it creates the first administrator in an empty database. On every later start they do nothing, so the password you set there is refused at sign-in with "Authentication failed.", and the old one still works.
+
+Sign in with the password the administrator had, and change it under **Account**, **Change password**. If nobody knows it any more, see the next section.
+
+## The last administrator can't sign in
+
+The auth server never lets a change leave no enabled user holding `authserver:manage`: it refuses it with `LAST_ADMINISTRATOR`. That keeps the permission alive, but not a person able to use it. A user who set up two-factor authentication is always asked for a code when signing in to the admin console, and there are no backup codes. So when the only administrator forgets their password or loses their authenticator, they're stuck, and there's no recovery command. Here's what works today.
+
+**Another administrator can let them back in.** Any user with `authserver:manage` can open **Admin**, **Users**, the user, and their **Authentication** tab, then use **Set password**, or turn off **Two-factor authentication enabled**. So the best fix comes before the problem: give `authserver:manage` to a second person.
+
+**A forgotten password can be reset by email**, when SMTP is set up, the administrator's email address is verified, and their mailbox still exists. [A user cannot reset their password](/troubleshooting/a-user-cannot-reset-their-password/) covers what stops it.
+
+**A client of your own with `authserver:manage`** can do everything another administrator could, through the Admin API: [set the administrator's password](/reference/api/admin/operations/updateuserpassword/), or [turn off their two-factor authentication](/reference/api/admin/operations/updateuserotp/). It's the same client the [client secret](#the-admin-consoles-client-secret-changed) fix needs.
+
+With none of these, the only way back is editing the database by hand, which nothing supports or records.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Administrators" description="Who is an administrator, and what only authserver:manage can do." href="/reference/api/administrators/" />
+  <LinkCard title="First sign-in" description="The first administrator and the admin console's sign-in." href="/get-started/first-sign-in/" />
+</CardGrid>

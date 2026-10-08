@@ -206,7 +206,7 @@ Each server needs at least one listener. With both off, it refuses to start.
 
 ### Client IP addresses
 
-The rate limiter counts by client IP address, and the audit log records it. With `TRUST_PROXY_HEADERS` off, the server uses the address of whatever connected to it. Behind a proxy, that's the proxy, so every client looks the same.
+The rate limiter counts by client IP address, and the audit log records it. With `TRUST_PROXY_HEADERS` off, the server uses the address of whatever connected to it. Behind a proxy, that's the proxy, so every client looks the same, and every user shares one rate limit: see [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
 
 Turn `TRUST_PROXY_HEADERS` on behind a proxy. With `TRUSTED_PROXIES` empty, the server trusts one hop: the last address in `X-Forwarded-For`, or `X-Real-IP` when there's none. That's right behind a single proxy that sets or appends `X-Forwarded-For`. With more than one hop in front, such as a CDN and a proxy, list them in `TRUSTED_PROXIES`, and the server walks `X-Forwarded-For` from the right across them.
 
@@ -258,7 +258,7 @@ When the auth server starts on an empty database, it creates the first administr
 - **Only `GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE` set:** it generates the secret and both servers' session keys, writes them to that file, and exits. Copy them into your configuration and start again.
 - **Neither set:** it refuses to start, and the database stays empty.
 
-On every later start, the database already holds the administrator and the client, and none of these variables does anything on the auth server.
+On every later start, the database already holds the administrator and the client, and none of these variables does anything on the auth server. Changed one and can't sign in? See [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/).
 
 ### The connection pool
 
