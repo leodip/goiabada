@@ -250,11 +250,13 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	//
 	// **What this is and is not.** It is every authenticated invalid_scope failure: the two
 	// scope validators', and the refresh arm's request for a scope its grant does not hold.
-	// That is a POSITIONAL boundary, not a semantic one. Only three of the ten branches it
+	// That is a POSITIONAL boundary, not a semantic one. Only three of the eleven branches it
 	// covers are authorization denials in any strict sense: "not granted to the client",
 	// "the user does not have permission" and the refresh request beyond its grant. The rest
-	// are malformed format and unknown resource or permission, which usually mean a
-	// misconfigured client rather than a caller probing for access it was not granted. So
+	// are malformed format, unknown resource or permission, an OpenID Connect scope on the
+	// client credentials grant and a client credentials request with nothing to grant, which
+	// usually mean a misconfigured client rather than a caller probing for access it was not
+	// granted. So
 	// read a row as "a request that got past authentication and then asked for a scope the
 	// server would not give", and check the message before treating it as an authorization
 	// probe.
@@ -262,16 +264,17 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	// Keyed on the error code rather than the grant type, deliberately: within the validator
 	// invalid_scope is returned only by the two scope validators and the refresh arm's
 	// beyond-the-grant check, so the predicate cannot pick up unrelated failures and stays
-	// correct if any of them gains another branch. It covers ten of the twelve scope denial
-	// branches, the tenth being a client credentials request that omits scope from a client
-	// holding no permissions, so that nothing is left to grant. Two are outside it: the client
-	// credentials OIDC-scope rejection returns invalid_request, and the provided-but-empty
-	// rejection in parseTokenRequest fires before authentication. The refresh request beyond its grant was a third, and the one genuine
-	// authorization denial this missed, until #425 answered it with the invalid_scope RFC
-	// 6749 section 5.2 names for it rather than invalid_grant, a code 22 unrelated failures
-	// share. The refresh arm's refusals of the grant itself (consent withdrawn, a permission
-	// since revoked, a stored value this server does not issue) stay invalid_grant, and are
-	// not scope denials of the request.
+	// correct if any of them gains another branch. It covers eleven of the twelve scope denial
+	// branches, among them a client credentials request that omits scope from a client holding
+	// no permissions, so that nothing is left to grant, and the same grant's refusal of an
+	// OpenID Connect scope, which answered invalid_request until #529. One is outside it: the
+	// provided-but-empty rejection in parseTokenRequest fires before authentication. The
+	// refresh request beyond its grant was outside it too, and the one genuine authorization
+	// denial this missed, until #425 answered it with the invalid_scope RFC 6749 section 5.2
+	// names for it rather than invalid_grant, a code 22 unrelated failures share. The refresh
+	// arm's refusals of the grant itself (consent withdrawn, a permission since revoked, a
+	// stored value this server does not issue) stay invalid_grant, and are not scope denials
+	// of the request.
 	//
 	// THIS IS THE ONLY CALL SITE, and adding a second at the provided-but-empty rejection is
 	// the obvious-looking completeness fix and is wrong: that branch runs before the client

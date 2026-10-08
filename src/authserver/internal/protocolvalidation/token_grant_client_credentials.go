@@ -117,8 +117,11 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 
 	for _, scopeStr := range oidc.SplitScope(scope) {
 
+		// The request is well formed; it is the scope this grant can't serve, which RFC 6749
+		// section 5.2 names invalid_scope, as every other refusal here does. It was
+		// invalid_request, the code for a malformed request.
 		if oidc.IsClaimScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
-			return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
+			return oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 				fmt.Sprintf("Id token scopes (such as '%v') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.", scopeStr),
 				http.StatusBadRequest)
 		}

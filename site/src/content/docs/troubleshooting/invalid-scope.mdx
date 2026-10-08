@@ -37,7 +37,7 @@ A scope is either an OpenID Connect scope, `openid`, `profile`, `email`, `addres
 
 ### The client may not have it
 
-**With the client credentials flow,** a client gets only the permissions granted to the client itself, on its **Permissions** tab. Asking for another answers "Permission to access scope '...' is not granted to the client." Asking for an OpenID Connect scope answers `invalid_request`, since there's no user to describe. Leave `scope` out, and the token carries every permission the client holds; a client that holds none gets "The client holds no permissions, so a request without a scope has nothing to grant."
+**With the client credentials flow,** a client gets only the permissions granted to the client itself, on its **Permissions** tab. Asking for another answers "Permission to access scope '...' is not granted to the client." Asking for an OpenID Connect scope answers "Id token scopes ... are not supported in the client credentials flow", since there's no user to describe. Leave `scope` out, and the token carries every permission the client holds; a client that holds none gets "The client holds no permissions, so a request without a scope has nothing to grant."
 
 **The administrative scopes,** `authserver:manage` and the other permissions that administer Goiabada, need the client to be allowed to request them: "The client is not allowed to request the administrative scope". See [administrative scopes](/concepts/clients/#administrative-scopes).
 
