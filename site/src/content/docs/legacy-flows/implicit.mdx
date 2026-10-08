@@ -1,254 +1,123 @@
 ---
-title: Implicit Flow
-description: OAuth2 Implicit Grant for legacy browser-based applications.
+title: Implicit flow
+description: The deprecated implicit flow, which hands tokens to the browser in the redirect. When to turn it on, how it works, and how to move off it.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-The implicit flow is a simplified OAuth 2.0 authorization flow originally designed for browser-based applications (single-page applications) that cannot securely store client secrets. It's defined in [RFC 6749 Section 4.2](https://datatracker.ietf.org/doc/html/rfc6749#section-4.2).
+This page helps you keep an old browser app that uses the implicit flow working, and move it off.
 
-<Aside type="caution">
-The implicit flow is **deprecated** in OAuth 2.1 due to security concerns. For new applications, use the [authorization code flow with PKCE](/guides/add-sign-in-to-a-spa-or-mobile-app/) instead, which provides better security for all client types including browser-based applications.
+<Aside type="danger" title="Deprecated, and off by default">
+The implicit flow is deprecated. OAuth 2.1 drops it, and [RFC 9700 section 2.1.2](https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.2) says clients should not use it. It's off in a new install. **Never** turn it on for a new app: use the [authorization code flow with PKCE](/guides/add-sign-in-to-a-spa-or-mobile-app/), which works in the browser too.
 </Aside>
 
-## When to use implicit flow
+The implicit flow skips the authorization code. The browser comes back from the auth server with the tokens themselves, after the `#` in your redirect URI, and your app's JavaScript reads them from there. It was made for browser apps from before they could call a token endpoint on another origin. They all can now, so the only reason left to use it is an app you can't change yet.
 
-The implicit flow should only be considered for:
+## When to turn it on
 
-- **Legacy applications** that cannot be updated to use the authorization code flow with PKCE
-- **Compatibility requirements** with older OAuth libraries that don't support PKCE
-- **Specific compliance scenarios** where implicit flow is mandated
+Turn it on only for an app that speaks nothing but the implicit flow and that you can't update yet, and only for that app's client, while you [move it off](#move-to-the-authorization-code-flow). Leave the global setting off, so no other client gets it by accident.
 
-For all new development, use the authorization code flow with PKCE.
+## Turn it on for one client
 
-## How implicit flow works
+<Steps>
 
-Unlike the authorization code flow, which returns a code that is then exchanged for tokens, the implicit flow returns tokens directly from the authorization endpoint:
+1. In the admin console, open **Admin**, **Clients** and click **Manage** beside your app's client.
 
-1. Client redirects user to the authorization endpoint with `response_type=token` (or `id_token` or `id_token token`)
-2. User authenticates and grants consent (if required)
-3. Authorization server redirects back to the client with tokens in the **URL fragment** (the part after `#`)
-4. Client extracts tokens from the URL fragment using JavaScript
+2. On **OAuth2 flows**, under **Legacy flows (deprecated in OAuth 2.1)**, set **Implicit flow** to **Enabled**, and click **Save**.
 
-```
-https://your-app.com/callback#access_token=eyJhbG...&token_type=Bearer&expires_in=3600&state=abc123
-```
+3. On **Redirect URIs**, add the page that receives the tokens, such as `https://app.example.com/callback`, and click **Save**.
 
-## Security considerations
+4. Make a new random `state` and `nonce`, keep them, and send the browser to the authorization endpoint with `response_type=id_token token`:
 
-The implicit flow has several security limitations compared to the authorization code flow:
+   ```http
+   GET /auth/authorize?client_id=legacy-spa&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback&response_type=id_token%20token&scope=openid%20email&state=af0ifjsldkj&nonce=n-0S6_WzA2Mj HTTP/1.1
+   Host: auth.example.com
+   ```
 
-### Tokens exposed in URLs
+5. The user signs in, and the browser comes back with the tokens after the `#`:
 
-Tokens are returned in the URL fragment, which means they can be:
-- Visible in browser history
-- Logged by intermediate proxies (though fragments are typically not sent to servers)
-- Accessed by malicious JavaScript on the page
+   ```http
+   HTTP/1.1 302 Found
+   Location: https://app.example.com/callback#access_token=eyJhbGciOiJSUzI1NiIs...&token_type=Bearer&expires_in=300&id_token=eyJhbGciOiJSUzI1NiIs...&scope=openid+email&state=af0ifjsldkj
+   ```
 
-### No refresh tokens
+6. Check that `state` is the one you kept. Check the ID token as [a web app does](/guides/add-sign-in-to-a-web-app/#what-the-id-token-says), `nonce` included, and check its `at_hash` against the access token. Then replace the address in the browser's history with one that has no `#` part, so the tokens don't stay there.
 
-Per [RFC 6749 Section 4.2.2](https://datatracker.ietf.org/doc/html/rfc6749#section-4.2.2), the authorization server **must not** issue refresh tokens for the implicit grant. This means:
-- Users must re-authenticate when access tokens expire
-- Applications cannot silently refresh tokens in the background
-- Shorter session durations are harder to manage
+</Steps>
 
-### Limited token lifetime
+**Implicit flow** on the **OAuth2 flows** tab has three choices: **Enabled**, **Disabled**, or inherit the global **Implicit flow enabled** under **Admin**, **General**, which is off in a new install.
 
-Access tokens from implicit flow should have short expiration times to minimize the window of exposure if a token is compromised.
+## How it works
 
-### No client authentication
+### Response types
 
-Since the implicit flow is designed for public clients that cannot store secrets, there is no client authentication. This means any application that knows your client ID could potentially initiate an authorization request.
+| `response_type` | What comes back |
+|---|---|
+| `id_token token` | An ID token and an access token. The ID token carries `at_hash`, a hash of the access token. |
+| `id_token` | An ID token only |
+| `token` | An access token only |
 
-## Supported response types
+`token id_token` works too, since the order doesn't matter. A request asking for an ID token needs `openid` in its `scope` and a `nonce`, as [OpenID Connect Core 1.0 section 3.2.2.1](https://openid.net/specs/openid-connect-core-1_0.html#ImplicitAuthRequest) requires, or it's refused with `invalid_request`.
 
-Goiabada supports the following response types for implicit flow:
+Ask for `id_token token` when your app needs an access token. `at_hash` ties the access token to an ID token that carries your `nonce`, which is the one way your app can tell the access token was issued for its own request. With `id_token` alone there's no access token to call [UserInfo](/reference/endpoints/userinfo/) with, so the user's claims reach your app only when **Include OpenID Connect claims in the ID token** is on. It's on in a new install. See [Scopes](/concepts/scopes/).
 
-| Response Type | Description | Returns |
-|--------------|-------------|---------|
-| `token` | OAuth 2.0 implicit grant | Access token only |
-| `id_token` | OpenID Connect implicit flow | ID token only |
-| `id_token token` | OpenID Connect implicit flow | Both ID token and access token |
+### What comes back
 
-### Response type: token
+The browser comes back to your redirect URI with these parameters after the `#`:
 
-Use this when you only need an access token to call APIs:
+| Parameter | When |
+|---|---|
+| `access_token` | `response_type` has `token` |
+| `token_type` | With `access_token`. It's `Bearer`. |
+| `expires_in` | With `access_token`: its lifetime in seconds, the client's token expiration or else the global one, 300 in a new install |
+| `id_token` | `response_type` has `id_token` |
+| `scope` | The scopes granted, which can be fewer than your app asked for |
+| `state` | When your app sent one, unchanged |
 
-```
-GET /auth/authorize?
-  client_id=my-spa&
-  redirect_uri=https://my-app.com/callback&
-  response_type=token&
-  scope=openid profile&
-  state=abc123
-```
+There's **never a refresh token**: [RFC 6749 section 4.2.2](https://www.rfc-editor.org/rfc/rfc6749.html#section-4.2.2) forbids one, so `offline_access` is dropped from the scope, as [OpenID Connect Core 1.0 section 11](https://openid.net/specs/openid-connect-core-1_0.html#OfflineAccess) asks. When the access token expires, send the browser back to the auth server. A user whose [session](/concepts/sessions/) is still valid isn't asked for their password again.
 
-### Response type: id_token
+With `response_mode=form_post`, the same parameters are posted to your redirect URI by a page that sends a form on its own. `response_mode=query` is refused with `invalid_request`, since tokens never travel in the query. Errors come back the same way as tokens, after the `#` or posted: `error`, `error_description`, and `state` when your app sent one.
 
-Use this when you only need to authenticate the user and get identity claims:
+### What the auth server checks
 
-```
-GET /auth/authorize?
-  client_id=my-spa&
-  redirect_uri=https://my-app.com/callback&
-  response_type=id_token&
-  scope=openid profile&
-  state=abc123&
-  nonce=xyz789
-```
+The implicit flow goes through the same [authorization endpoint](/reference/endpoints/authorize/) as the authorization code flow, with the same checks, sign-in, [ACR levels](/concepts/acr-and-amr/), consent and [prompt](/concepts/prompt/). These rules are its own:
 
-<Aside type="note">
-When requesting `id_token`, the `nonce` parameter is **required**. This is mandated by [OIDC Core Section 3.2.2.1](https://openid.net/specs/openid-connect-core-1_0.html#ImplicitAuthRequest) to protect against replay attacks.
+- **The client needs the implicit flow on,** or the request is refused with `unauthorized_client`. It doesn't need the authorization code flow on.
+- **The redirect URI matches exactly.** A loopback redirect URI's port isn't ignored, as it is for the authorization code flow, since tokens rather than a code would go to whatever program is listening there.
+- **PKCE doesn't apply.** There's no code to tie it to, and a `code_challenge` is ignored.
+- **The setting is read again just before the tokens are issued,** so a sign-in under way when an administrator turns the flow off ends with `unauthorized_client` and no tokens.
+- **The tokens are tied to the user's session,** which must still be valid when they're issued. Each issue leaves a `token_issued_implicit_response` entry in the [audit log](/concepts/audit-log/).
+
+### Why it's deprecated
+
+<Aside type="danger" title="The tokens travel in the address">
+The tokens are part of the address the browser lands on, so they can stay in the browser's history, leak to other sites through the `Referer` header, or be carried to an attacker through an open redirect on your site, since browsers keep the `#` part across a redirect ([RFC 9700 sections 4.1 to 4.3](https://www.rfc-editor.org/rfc/rfc9700.html#section-4.1)). **Never** use the implicit flow on a page that loads scripts or images from other sites.
 </Aside>
 
-### Response type: id_token token
-
-Use this when you need both authentication and API access:
-
-```
-GET /auth/authorize?
-  client_id=my-spa&
-  redirect_uri=https://my-app.com/callback&
-  response_type=id_token%20token&
-  scope=openid profile&
-  state=abc123&
-  nonce=xyz789
-```
-
-When both tokens are returned, the ID token includes an `at_hash` claim containing a hash of the access token, allowing the client to verify that the access token was issued together with the ID token (per [OIDC Core Section 3.2.2.10](https://openid.net/specs/openid-connect-core-1_0.html#ImplicitTokenValidation)).
-
-## Parameters
-
-### Authorization request
-
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `client_id` | Yes | The client identifier |
-| `redirect_uri` | Yes | Must exactly match a registered redirect URI |
-| `response_type` | Yes | `token`, `id_token`, or `id_token token` |
-| `scope` | Yes | Space-separated scopes. Must include `openid` for `id_token` |
-| `state` | Recommended | Random string for CSRF protection, echoed back in response |
-| `nonce` | Conditional | Required when requesting `id_token`. Included in the ID token for replay protection |
-
-### Success response
-
-Tokens are returned in the URL fragment, or posted to the redirect URI in an auto-submitting HTML form when the request has `response_mode=form_post`:
-
-| Parameter | Description |
-|-----------|-------------|
-| `access_token` | The access token (if requested) |
-| `token_type` | Always `Bearer` |
-| `expires_in` | Token lifetime in seconds |
-| `id_token` | The ID token JWT (if requested) |
-| `state` | Echo of the state parameter from the request |
-| `scope` | The granted scopes (may differ from requested) |
-
-### Error response
-
-Errors are returned the same way:
-
-| Parameter | Description |
-|-----------|-------------|
-| `error` | Error code (e.g., `unauthorized_client`, `invalid_request`) |
-| `error_description` | Human-readable error description |
-| `state` | Echo of the state parameter from the request |
-
-## Configuration
-
-### Enabling implicit flow
-
-By default, implicit flow is **disabled** for security reasons. To enable it:
-
-#### Global setting
-
-1. Navigate to **Settings → General** in the admin console
-2. Enable "Implicit flow"
-3. Save changes
-
-This enables implicit flow for all clients that inherit from the global setting.
-
-#### Per-client setting
-
-Individual clients can override the global setting:
-
-1. Navigate to **Clients → [Client Name] → OAuth2 flows** in the admin console
-2. Under "Implicit flow", choose:
-   - **Inherit from global setting** - Uses the global configuration
-   - **Enabled** - This client can use implicit flow regardless of global setting
-   - **Disabled** - This client cannot use implicit flow regardless of global setting
-3. Save changes
-4. Register the client's callback under **Clients → [Client Name] → Redirect URIs**
-
-<Aside type="tip">
-You can keep implicit flow disabled globally while enabling it only for specific legacy clients that require it.
+<Aside type="danger" title="An access token can be swapped in">
+Nothing in a `token` response proves the access token was issued for your request, so an attacker can put a stolen one in its place ([RFC 9700 section 4.6](https://www.rfc-editor.org/rfc/rfc9700.html#section-4.6)). **Never** ask for `token` alone: ask for `id_token token`, and check `at_hash` and `nonce`.
 </Aside>
 
-### Error when disabled
+## Move to the authorization code flow
 
-If a client attempts to use implicit flow when it's not enabled, the authorization server returns an error:
+<Steps>
 
-```
-https://your-app.com/callback#error=unauthorized_client&error_description=The+client+is+not+authorized+to+use+the+implicit+grant+type...&state=abc123
-```
+1. On the client's **Authentication** tab, choose **Public client** if it isn't one, and click **Save**. Your app runs in the browser, so it can't keep a secret.
 
-## Validating tokens
+2. On **OAuth2 flows**, turn on **Authorization code with PKCE**, and click **Save**.
 
-### Validating ID tokens
+3. On **Web origins**, add your app's origin, such as `https://app.example.com`, so the browser lets it call the token endpoint.
 
-When receiving an ID token from implicit flow, validate:
+4. Change your app to send `response_type=code` with a PKCE challenge, and redeem the code at the token endpoint. [Add sign-in to a SPA or mobile app](/guides/add-sign-in-to-a-spa-or-mobile-app/) walks through it. Your app gets refresh tokens now too.
 
-1. **Signature** - Verify the JWT signature using the authorization server's public key (available at the JWKS endpoint)
-2. **Issuer (`iss`)** - Must match your authorization server's issuer
-3. **Audience (`aud`)** - Must contain your client ID
-4. **Expiration (`exp`)** - Token must not be expired
-5. **Nonce** - Must match the nonce you sent in the authorization request
-6. **`at_hash`** - If access token was also returned, verify the at_hash claim
+5. Once no user is on the old version, set **Implicit flow** to **Disabled**.
 
-### Validating at_hash
+</Steps>
 
-When `response_type=id_token token`, the ID token contains an `at_hash` claim. To validate it:
+## Next steps
 
-1. Hash the access token using SHA-256
-2. Take the left half (first 128 bits) of the hash
-3. Base64url-encode without padding
-4. Compare with the `at_hash` claim in the ID token
-
-```javascript
-const crypto = require('crypto');
-
-function validateAtHash(accessToken, atHashFromIdToken) {
-  const hash = crypto.createHash('sha256').update(accessToken).digest();
-  const leftHalf = hash.slice(0, hash.length / 2);
-  const expectedAtHash = leftHalf.toString('base64url');
-  return expectedAtHash === atHashFromIdToken;
-}
-```
-
-
-## Migration to authorization code flow
-
-If you're currently using implicit flow, consider migrating to authorization code flow with PKCE:
-
-1. **Update your OAuth library** - Most modern OAuth/OIDC libraries support PKCE
-2. **Change response_type** - Switch from `token` or `id_token token` to `code`
-3. **Implement PKCE** - Generate code verifier and challenge (see [PKCE documentation](/concepts/pkce/))
-4. **Add token exchange** - After receiving the code, exchange it for tokens at the token endpoint
-5. **Handle refresh tokens** - You can now silently refresh tokens without user interaction
-
-The authorization code flow with PKCE provides:
-- Tokens are not exposed in URLs
-- Refresh tokens for longer sessions
-- Better protection against token interception
-
-## Best practices
-
-If you must use implicit flow:
-
-1. **Use short token lifetimes** - Minimize the impact of token compromise
-2. **Always use state parameter** - Protect against CSRF attacks
-3. **Always use nonce for id_token** - Protect against replay attacks
-4. **Validate at_hash** - When receiving both id_token and access_token
-5. **Clear the URL fragment** - Remove tokens from browser history after extraction
-6. **Use HTTPS only** - Never use implicit flow over unencrypted connections
-7. **Consider Content Security Policy** - Restrict which scripts can run on your page
-8. **Plan for migration** - Treat implicit flow as temporary while planning PKCE adoption
+<CardGrid>
+  <LinkCard title="Add sign-in to a SPA or mobile app" description="The flow to use instead, for an app in the browser." href="/guides/add-sign-in-to-a-spa-or-mobile-app/" />
+  <LinkCard title="Authorize" description="Every parameter and check of the authorization endpoint." href="/reference/endpoints/authorize/" />
+  <LinkCard title="ROPC" description="The other legacy flow, and why to avoid it too." href="/legacy-flows/ropc/" />
+</CardGrid>

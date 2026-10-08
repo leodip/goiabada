@@ -172,7 +172,15 @@ func TestEndpointDocs_ADiscoveryTableWithoutItsFieldColumnStops(t *testing.T) {
 // document", in the failure.
 func assertFieldTable(r guard.Reporter, root string, section conceptSection, fields []string, carrier string) {
 	r.Helper()
-	columns, err := conceptTableColumns(root, section, "Field")
+	assertNamedTable(r, root, section, "Field", fields, carrier)
+}
+
+// assertNamedTable is assertFieldTable for a table whose names sit under another column header,
+// such as Parameter.
+func assertNamedTable(r guard.Reporter, root string, section conceptSection, column string, fields []string,
+	carrier string) {
+	r.Helper()
+	columns, err := conceptTableColumns(root, section, column)
 	if err != nil {
 		r.Fatalf("%v", err)
 		return
