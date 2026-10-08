@@ -85,6 +85,10 @@ A set of users. Permissions and attributes you give a group apply to every user 
 
 A token that tells a client who the user is and how they signed in. Only clients that ask for the `openid` scope get one. See [Tokens](/concepts/tokens/).
 
+### Implicit flow
+
+A deprecated flow in which the browser comes back from sign-in with the tokens themselves rather than an authorization code. It's off by default. See [Implicit flow](/legacy-flows/implicit/).
+
 ### Permission
 
 Something a resource lets you do, such as `manage` on the `authserver` resource. You give permissions to users, groups and clients, and a client asks for one as a scope written `resource:permission`, like `authserver:manage`. See [Resources and permissions](/concepts/resources-and-permissions/).
@@ -104,6 +108,10 @@ A token a client exchanges for new tokens without asking the user to sign in aga
 ### Resource
 
 Something you protect, usually an API, and the permissions that go with it. Goiabada's own resource is `authserver`. See [Resources and permissions](/concepts/resources-and-permissions/).
+
+### Resource Owner Password Credentials (ROPC)
+
+A deprecated flow, also called the password grant, in which a client sends a user's email and password to the token endpoint for tokens. It's off by default. See [ROPC](/legacy-flows/ropc/).
 
 ### Rotation
 
