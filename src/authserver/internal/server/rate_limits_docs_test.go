@@ -7,13 +7,13 @@ package server
 // failures it allows over which window, and which limiter name the rate_limit_exceeded audit event
 // and goiabada_rate_limit_refusals_total carry when it trips. Every tier middleware.NewRateLimiter
 // builds is held to it in both directions: a tier with no row fails, and so does a row naming a
-// limiter the auth server does not have, or giving one a limit, a window, a counting rule or an
-// endpoint other than its own. A tier counted on two routes, as the password tiers shared by the
+// limiter the auth server does not have, or giving one a limit, a window, a counting rule, a
+// Counted by cell or an endpoint other than its own. A tier counted on two routes, as the password tiers shared by the
 // sign-in form and the password grant are, may take a row per route, and between them they must
 // list every route it guards.
 //
-// The tiers are read from the constructor's source, the one place a tier's limit, window and
-// counting rule are written down, and cross-checked against the limiter label the limiter
+// The tiers are read from the constructor's source, the one place a tier's limit, window, counting
+// rule and the kind of key it counts by are written down, and cross-checked against the limiter label the limiter
 // registers its refusal metric with, so a tier the reader cannot see stops the check. The routes
 // are the real router's, through chi.Walk over initRoutes, as the routes tests resolve them.
 
@@ -49,14 +49,32 @@ const rateLimiterSource = "authserver/internal/middleware/middleware_ratelimiter
 const rateLimitRefusalsFamily = "goiabada_rate_limit_refusals_total"
 
 // rateLimitTier is one tier as the table is held to it: its name, its budget, whether only a failed
-// credential check spends it, and the routes it guards, each as "METHOD /path".
+// credential check spends it, the key kind it declares it counts by, as the constant's name, and the
+// routes it guards, each as "METHOD /path".
 type rateLimitTier struct {
 	name         string
 	limit        int
 	window       time.Duration
 	failuresOnly bool
+	countedBy    string
 	routes       []string
 }
+
+// docCountedBy is how the table's Counted by cell writes each key kind a tier can declare (#522
+// decision 11). {account} is the word the route names an account by: username on the password grant,
+// whose parameter RFC 6749 section 4.3.2 names so, and email on every form. A kind missing here is
+// one the table has no words for, which fails the row rather than passing it.
+var docCountedBy = map[string]string{
+	"countedByIP":            "IP address",
+	"countedByAccount":       "{account}",
+	"countedByIPAndAccount":  "IP address and {account}",
+	"countedBySigningInUser": "user",
+	"countedByTokenUser":     "the token's user",
+}
+
+// docSharedNote is what may follow a Counted by cell's kind: the routes or grant that share the
+// tier's budget, as "email, shared with the password grant".
+const docSharedNote = ", shared with "
 
 var (
 	// docLimiterCell is a cell holding one backticked limiter name and nothing else.
@@ -92,24 +110,47 @@ func TestRateLimitsDocs_ATableDisagreeingWithTheCodeFails(t *testing.T) {
 		"| the registration endpoint | `register` | 20 per 5 minutes | every request | IP address |\n"+
 		"| `POST /account/register` | register_email | 5 per 5 minutes | every request | email |\n"+
 		"| `GET /account/activate` | `activate` | 30 per 5 minutes | every request | |\n"+
-		"| `POST /auth/token` | `ropc_ip` | 30 per minute | every request |\n\n"+
+		"| `POST /auth/token` | `ropc_ip` | 30 per minute | every request |\n"+
+		"| `POST /api/v1/account/email/verification` | `email_verification` | 5 per 15 minutes | failed codes | user |\n"+
+		"| `POST /auth/token` with `grant_type=password` | `ropc_account` | 100 per 60 minutes | failed sign-ins | email |\n"+
+		"| `POST /auth/token` | `ropc_account_net` | 10 per 15 minutes | failed sign-ins | IP address and email, shared with `POST /auth/pwd` |\n"+
+		"| `POST /account/register` | `register_address` | 5 per 5 minutes | every request | IP address |\n"+
+		"| `GET /reset-password` | `reset_pwd` | 30 per 5 minutes | every request | IP address shared with activate |\n"+
+		"| `POST /api/v1/account/email/verification/send` | `send` | 5 per 60 minutes | every request | the token's user |\n\n"+
 		"## Next\n\n| `POST /auth/token` | `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP and email |\n")
 
 	tiers := []rateLimitTier{
-		{name: "pwd_ip", limit: 30, window: time.Minute, routes: []string{"POST /auth/pwd"}},
-		{name: "pwd_account", limit: 100, window: time.Hour, failuresOnly: true,
+		{name: "pwd_ip", limit: 30, window: time.Minute, countedBy: "countedByIP", routes: []string{"POST /auth/pwd"}},
+		{name: "pwd_account", limit: 100, window: time.Hour, failuresOnly: true, countedBy: "countedByAccount",
 			routes: []string{"POST /auth/pwd", "POST /auth/token"}},
 		{name: "pwd_account_net", limit: 10, window: 15 * time.Minute, failuresOnly: true,
-			routes: []string{"POST /auth/pwd", "POST /auth/token"}},
-		{name: "otp", limit: 5, window: 15 * time.Minute, failuresOnly: true, routes: []string{"POST /auth/otp"}},
-		{name: "forgot_pwd_ip", limit: 20, window: 5 * time.Minute, routes: []string{"POST /forgot-password"}},
-		{name: "forgot_pwd_email", limit: 5, window: 5 * time.Minute, routes: []string{"POST /forgot-password"}},
-		{name: "dcr", limit: 10, window: time.Minute, routes: []string{"POST /connect/register"}},
-		{name: "register", limit: 20, window: 5 * time.Minute, routes: []string{"POST /account/register"}},
-		{name: "register_email", limit: 5, window: 5 * time.Minute, routes: []string{"POST /account/register"}},
-		{name: "activate", limit: 30, window: 5 * time.Minute,
+			countedBy: "countedByIPAndAccount", routes: []string{"POST /auth/pwd", "POST /auth/token"}},
+		{name: "otp", limit: 5, window: 15 * time.Minute, failuresOnly: true, countedBy: "countedBySigningInUser",
+			routes: []string{"POST /auth/otp"}},
+		{name: "forgot_pwd_ip", limit: 20, window: 5 * time.Minute, countedBy: "countedByIP",
+			routes: []string{"POST /forgot-password"}},
+		{name: "forgot_pwd_email", limit: 5, window: 5 * time.Minute, countedBy: "countedByAccount",
+			routes: []string{"POST /forgot-password"}},
+		{name: "dcr", limit: 10, window: time.Minute, countedBy: "countedByIP", routes: []string{"POST /connect/register"}},
+		{name: "register", limit: 20, window: 5 * time.Minute, countedBy: "countedByIP",
+			routes: []string{"POST /account/register"}},
+		{name: "register_email", limit: 5, window: 5 * time.Minute, countedBy: "countedByAccount",
+			routes: []string{"POST /account/register"}},
+		{name: "activate", limit: 30, window: 5 * time.Minute, countedBy: "countedByIP",
 			routes: []string{"GET /account/activate", "POST /account/activate"}},
-		{name: "ropc_ip", limit: 30, window: time.Minute, routes: []string{"POST /auth/token"}},
+		{name: "ropc_ip", limit: 30, window: time.Minute, countedBy: "countedByIP", routes: []string{"POST /auth/token"}},
+		{name: "email_verification", limit: 5, window: 15 * time.Minute, failuresOnly: true,
+			countedBy: "countedByTokenUser", routes: []string{"POST /api/v1/account/email/verification"}},
+		{name: "ropc_account", limit: 100, window: time.Hour, failuresOnly: true, countedBy: "countedByAccount",
+			routes: []string{"POST /auth/token"}},
+		{name: "ropc_account_net", limit: 10, window: 15 * time.Minute, failuresOnly: true,
+			countedBy: "countedByIPAndAccount", routes: []string{"POST /auth/token"}},
+		{name: "register_address", limit: 5, window: 5 * time.Minute, countedBy: "countedByAccount",
+			routes: []string{"POST /account/register"}},
+		{name: "reset_pwd", limit: 30, window: 5 * time.Minute, countedBy: "countedByIP",
+			routes: []string{"GET /reset-password"}},
+		{name: "send", limit: 5, window: time.Hour, countedBy: "countedBySender",
+			routes: []string{"POST /api/v1/account/email/verification/send"}},
 	}
 	report := guard.Run(func(r guard.Reporter) {
 		assertRateLimitTable(r, root, docSection{"site/env.mdx", "## Rate limits"}, tiers)
@@ -126,6 +167,7 @@ func TestRateLimitsDocs_ATableDisagreeingWithTheCodeFails(t *testing.T) {
 		where + " says forgot_pwd_ip counts failures, but it counts every request",
 		where + " gives forgot_pwd_email the endpoint `POST /reset-password`, which it does not guard",
 		where + " lists forgot_pwd_email on `POST /forgot-password` twice",
+		where + ` says forgot_pwd_email counts by "email, again", want "email"`,
 		where + ` gives dcr the limit "ten a minute", want a count per window such as "10 per 15 minutes"`,
 		where + " names the limiter dcr_retired, which the auth server does not have",
 		where + " gives register no endpoint",
@@ -133,6 +175,13 @@ func TestRateLimitsDocs_ATableDisagreeingWithTheCodeFails(t *testing.T) {
 		where + " says nothing of what activate counts by",
 		where + ` has a row of 4 cells, want endpoint, limiter, limit, counts and counted by: ["` +
 			"`POST /auth/token`" + `" "` + "`ropc_ip`" + `" "30 per minute" "every request"]`,
+		where + ` says email_verification counts by "user", want "the token's user"`,
+		where + ` says ropc_account counts by "email", want "username"`,
+		where + ` says ropc_account_net counts by "IP address and email, shared with ` + "`POST /auth/pwd`" +
+			`", want "IP address and username"`,
+		where + ` says register_address counts by "IP address", want "email"`,
+		where + ` says reset_pwd counts by "IP address shared with activate", want "IP address"`,
+		where + " gives send the key kind countedBySender, which the table has no words for",
 		where + " does not list pwd_account on `POST /auth/token`",
 		where + " does not list pwd_account_net",
 		where + " does not list register on `POST /account/register`",
@@ -151,24 +200,34 @@ func TestRateLimitsDocs_ATableMatchingTheCodePasses(t *testing.T) {
 		"Text before the table.\n\n"+
 		"| Endpoint | Limiter | Limit | Counts | Counted by |\n"+
 		"|---|---|---|---|---|\n"+
-		"| `POST /auth/pwd` (password sign-in) | `pwd_account` | 100 per 60 minutes | failed sign-ins | email |\n"+
+		"| `POST /auth/pwd` (password sign-in) | `pwd_account` | 100 per 60 minutes | failed sign-ins | email, shared with the password grant |\n"+
+		"| `POST /auth/pwd` | `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and email |\n"+
 		"| `POST /auth/pwd` | `pwd_ip` | 30 per minute | every request | IP address |\n"+
+		"| `POST /auth/otp` | `otp` | 5 per 15 minutes | failed codes | user |\n"+
 		"| `PUT /api/v1/account/password` and `PUT /api/v1/account/otp` | `account_password` | 5 per 15 minutes, for the two together | failed passwords | the token's user |\n"+
 		"| `GET /reset-password` and `POST /reset-password` | `reset_pwd` | 30 per 5 minutes | every request | IP address |\n"+
-		"| `POST /auth/token` with `grant_type=password` | `pwd_account` | 100 per hour | failed sign-ins | username |\n"+
+		"| `POST /auth/token` with `grant_type=password` | `pwd_account` | 100 per hour | failed sign-ins | username, shared with `POST /auth/pwd` |\n"+
+		"| `POST /auth/token` | `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and username, shared with `POST /auth/pwd` |\n"+
+		"| `POST /forgot-password` | `forgot_pwd_email` | 5 per 5 minutes | every request | email |\n"+
 		"| `POST /connect/register` | `dcr` | 10 per 60 seconds | every request | IP address |\n\n"+
 		"- A rule after the table.\n\n"+
 		"## Next\n\nText.\n")
 
 	tiers := []rateLimitTier{
-		{name: "pwd_account", limit: 100, window: time.Hour, failuresOnly: true,
+		{name: "pwd_account", limit: 100, window: time.Hour, failuresOnly: true, countedBy: "countedByAccount",
 			routes: []string{"POST /auth/pwd", "POST /auth/token"}},
-		{name: "pwd_ip", limit: 30, window: time.Minute, routes: []string{"POST /auth/pwd"}},
+		{name: "pwd_account_net", limit: 10, window: 15 * time.Minute, failuresOnly: true,
+			countedBy: "countedByIPAndAccount", routes: []string{"POST /auth/pwd", "POST /auth/token"}},
+		{name: "pwd_ip", limit: 30, window: time.Minute, countedBy: "countedByIP", routes: []string{"POST /auth/pwd"}},
+		{name: "otp", limit: 5, window: 15 * time.Minute, failuresOnly: true, countedBy: "countedBySigningInUser",
+			routes: []string{"POST /auth/otp"}},
 		{name: "account_password", limit: 5, window: 15 * time.Minute, failuresOnly: true,
-			routes: []string{"PUT /api/v1/account/otp", "PUT /api/v1/account/password"}},
-		{name: "reset_pwd", limit: 30, window: 5 * time.Minute,
+			countedBy: "countedByTokenUser", routes: []string{"PUT /api/v1/account/otp", "PUT /api/v1/account/password"}},
+		{name: "reset_pwd", limit: 30, window: 5 * time.Minute, countedBy: "countedByIP",
 			routes: []string{"GET /reset-password", "POST /reset-password"}},
-		{name: "dcr", limit: 10, window: time.Minute, routes: []string{"POST /connect/register"}},
+		{name: "forgot_pwd_email", limit: 5, window: 5 * time.Minute, countedBy: "countedByAccount",
+			routes: []string{"POST /forgot-password"}},
+		{name: "dcr", limit: 10, window: time.Minute, countedBy: "countedByIP", routes: []string{"POST /connect/register"}},
 	}
 	report := guard.Run(func(r guard.Reporter) {
 		assertRateLimitTable(r, root, docSection{"site/env.mdx", "## Rate limits"}, tiers)
@@ -234,14 +293,15 @@ func TestRateLimiterSourceTiers_ReadsTheConstructorAndTheLimitMethods(t *testing
 import "time"
 
 func NewRateLimiter(store any) *RateLimiter {
-	request := func(name string, keyField string, limit int, window time.Duration) *requestTier { return nil }
-	failure := func(name string, limit int, window time.Duration) *failureTier { return nil }
+	request := func(name string, counted countedBy, keyField string, limit int, window time.Duration) *requestTier { return nil }
+	failure := func(name string, counted countedBy, limit int, window time.Duration) *failureTier { return nil }
 	m := &RateLimiter{
-		store:      store,
-		pwdAccount: newAccountTiers(failure("pwd_account_net", 10, 15*time.Minute), failure("pwd_account", 100, 60*time.Minute)),
-		pwdIp:      request("pwd_ip", "ip", 30, time.Minute),
-		otp:        failure("otp", 5, 15*time.Minute),
-		dcr:        request("dcr", "ip", 10, 2*time.Hour),
+		store: store,
+		pwdAccount: newAccountTiers(failure("pwd_account_net", countedByIPAndAccount, 10, 15*time.Minute),
+			failure("pwd_account", countedByAccount, 100, 60*time.Minute)),
+		pwdIp: request("pwd_ip", countedByIP, "ip", 30, time.Minute),
+		otp:   failure("otp", countedBySigningInUser, 5, 15*time.Minute),
+		dcr:   request("dcr", countedByIP, "ip", 10, 2*time.Hour),
 	}
 	return m
 }
@@ -265,11 +325,11 @@ func (m *RateLimiter) LimitDCR(next any) any { return m.limitFailures(next, m.dc
 	}
 
 	wantTiers := []rateLimitTier{
-		{name: "pwd_account_net", limit: 10, window: 15 * time.Minute, failuresOnly: true},
-		{name: "pwd_account", limit: 100, window: time.Hour, failuresOnly: true},
-		{name: "pwd_ip", limit: 30, window: time.Minute},
-		{name: "otp", limit: 5, window: 15 * time.Minute, failuresOnly: true},
-		{name: "dcr", limit: 10, window: 2 * time.Hour},
+		{name: "pwd_account_net", limit: 10, window: 15 * time.Minute, failuresOnly: true, countedBy: "countedByIPAndAccount"},
+		{name: "pwd_account", limit: 100, window: time.Hour, failuresOnly: true, countedBy: "countedByAccount"},
+		{name: "pwd_ip", limit: 30, window: time.Minute, countedBy: "countedByIP"},
+		{name: "otp", limit: 5, window: 15 * time.Minute, failuresOnly: true, countedBy: "countedBySigningInUser"},
+		{name: "dcr", limit: 10, window: 2 * time.Hour, countedBy: "countedByIP"},
 	}
 	if !reflect.DeepEqual(read.tiers, wantTiers) {
 		t.Errorf("tiers\n%+v\nwant\n%+v", read.tiers, wantTiers)
@@ -285,7 +345,9 @@ func (m *RateLimiter) LimitDCR(next any) any { return m.limitFailures(next, m.dc
 }
 
 // TestRateLimiterSourceTiers_RefusesWhatItCannotRead is the reader stopping rather than skipping:
-// a window it cannot evaluate, a Limit method reaching no tier, and a source with no constructor.
+// a window or a limit it cannot evaluate, a key kind that is not a constant's name, a builder called
+// with the arguments of another shape, a Limit method reaching no tier, and a source with no
+// constructor.
 func TestRateLimiterSourceTiers_RefusesWhatItCannotRead(t *testing.T) {
 	cases := []struct {
 		name string
@@ -296,7 +358,7 @@ func TestRateLimiterSourceTiers_RefusesWhatItCannotRead(t *testing.T) {
 			name: "a window written as a variable",
 			src: `package middleware
 func NewRateLimiter() *RateLimiter {
-	return &RateLimiter{otp: failure("otp", 5, otpWindow)}
+	return &RateLimiter{otp: failure("otp", countedBySigningInUser, 5, otpWindow)}
 }
 func (m *RateLimiter) LimitOtp(next any) any { _ = m.otp; return next }
 `,
@@ -306,16 +368,34 @@ func (m *RateLimiter) LimitOtp(next any) any { _ = m.otp; return next }
 			name: "a limit written as a constant",
 			src: `package middleware
 func NewRateLimiter() *RateLimiter {
-	return &RateLimiter{otp: failure("otp", otpLimit, time.Minute)}
+	return &RateLimiter{otp: failure("otp", countedBySigningInUser, otpLimit, time.Minute)}
 }
 `,
 			want: "cannot read the limit of the tier otp: otpLimit",
 		},
 		{
+			name: "a key kind written as a call",
+			src: `package middleware
+func NewRateLimiter() *RateLimiter {
+	return &RateLimiter{otp: failure("otp", kindOf("otp"), 5, time.Minute)}
+}
+`,
+			want: `cannot read what the tier otp counts by: kindOf("otp")`,
+		},
+		{
+			name: "a request tier built with no key kind",
+			src: `package middleware
+func NewRateLimiter() *RateLimiter {
+	return &RateLimiter{dcr: request("dcr", "ip", 10, time.Minute)}
+}
+`,
+			want: "request is called with 4 arguments, want 5",
+		},
+		{
 			name: "a Limit method reaching no tier",
 			src: `package middleware
 func NewRateLimiter() *RateLimiter {
-	return &RateLimiter{otp: failure("otp", 5, time.Minute)}
+	return &RateLimiter{otp: failure("otp", countedBySigningInUser, 5, time.Minute)}
 }
 func (m *RateLimiter) LimitOtp(next any) any { return next }
 `,
@@ -415,10 +495,11 @@ type rateLimiterTiers struct {
 }
 
 // rateLimiterSourceTiers reads the tiers out of NewRateLimiter's RateLimiter literal, each built by
-// request(name, keyField, limit, window) or failure(name, limit, window), directly or as an
-// argument of another call such as newAccountTiers, and the tiers each exported Limit method on
-// *RateLimiter reaches through its receiver's fields. It refuses a tier whose name, limit or window
-// is not written as a literal, a Limit method reaching no tier, and a source declaring none.
+// request(name, countedBy, keyField, limit, window) or failure(name, countedBy, limit, window),
+// directly or as an argument of another call such as newAccountTiers, and the tiers each exported
+// Limit method on *RateLimiter reaches through its receiver's fields. It refuses a tier whose name,
+// limit or window is not written as a literal or whose key kind is not a constant's name, a Limit
+// method reaching no tier, and a source declaring none.
 func rateLimiterSourceTiers(filename string, src []byte) (rateLimiterTiers, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, filename, src, 0)
@@ -541,11 +622,12 @@ func tiersBuiltBy(expr ast.Expr) ([]rateLimitTier, error) {
 	return tiers, nil
 }
 
-// tierBuiltBy reads request(name, keyField, limit, window) or failure(name, limit, window).
+// tierBuiltBy reads request(name, countedBy, keyField, limit, window) or
+// failure(name, countedBy, limit, window).
 func tierBuiltBy(builder string, args []ast.Expr) (rateLimitTier, error) {
-	limitAt, want := 2, 4
+	limitAt, want := 3, 5
 	if builder == "failure" {
-		limitAt, want = 1, 3
+		limitAt, want = 2, 4
 	}
 	if len(args) != want {
 		return rateLimitTier{}, fmt.Errorf("%s is called with %d arguments, want %d", builder, len(args), want)
@@ -558,6 +640,10 @@ func tierBuiltBy(builder string, args []ast.Expr) (rateLimitTier, error) {
 	if err != nil {
 		return rateLimitTier{}, err
 	}
+	counted, ok := args[1].(*ast.Ident)
+	if !ok {
+		return rateLimitTier{}, fmt.Errorf("cannot read what the tier %s counts by: %s", name, types.ExprString(args[1]))
+	}
 	limit, ok := intLiteral(args[limitAt])
 	if !ok {
 		return rateLimitTier{}, fmt.Errorf("cannot read the limit of the tier %s: %s", name, types.ExprString(args[limitAt]))
@@ -566,7 +652,8 @@ func tierBuiltBy(builder string, args []ast.Expr) (rateLimitTier, error) {
 	if !ok {
 		return rateLimitTier{}, fmt.Errorf("cannot read the window of the tier %s: %s", name, types.ExprString(args[limitAt+1]))
 	}
-	return rateLimitTier{name: name, limit: limit, window: window, failuresOnly: builder == "failure"}, nil
+	return rateLimitTier{name: name, limit: limit, window: window, failuresOnly: builder == "failure",
+		countedBy: counted.Name}, nil
 }
 
 // intLiteral is the value of an integer literal.
@@ -630,7 +717,8 @@ func assertRateLimitTable(r guard.Reporter, root string, section docSection, tie
 // limit, what it counts and what it counts by, and returns one finding per row that is malformed,
 // names a limiter the auth server does not have, names no endpoint or one its limiter does not
 // guard, lists a limiter on an endpoint a second time, gives a limiter a limit, a window or a
-// counting rule other than its own, or says nothing of what it counts by; then one per tier with no
+// counting rule other than its own, says nothing of what it counts by or counts it by other than the
+// key kind the tier declares, or gives a tier a kind the table has no words for; then one per tier with no
 // row, or with no row for a route it guards. It returns an error, and no findings, for no tiers, or
 // a section not found or holding no table.
 func rateLimitTableFindings(root string, section docSection, tiers []rateLimitTier) ([]string, error) {
@@ -721,6 +809,8 @@ func rateLimitTableFindings(root string, section docSection, tiers []rateLimitTi
 
 		if keyCell == "" {
 			findings = append(findings, where+" says nothing of what "+name+" counts by")
+		} else if finding := docCountedByFinding(keyCell, tier, routes); finding != "" {
+			findings = append(findings, where+finding)
 		}
 	}
 	for _, tier := range tiers {
@@ -735,6 +825,27 @@ func rateLimitTableFindings(root string, section docSection, tiers []rateLimitTi
 		}
 	}
 	return findings, nil
+}
+
+// docCountedByFinding is what is wrong with a row's Counted by cell for tier, whose row names
+// routes, or "" when nothing is: the cell must be the words docCountedBy gives the tier's key kind,
+// with the account named as the route names it, optionally followed by a note of what shares the
+// budget.
+func docCountedByFinding(cell string, tier rateLimitTier, routes []string) string {
+	words, ok := docCountedBy[tier.countedBy]
+	if !ok {
+		return " gives " + tier.name + " the key kind " + tier.countedBy + ", which the table has no words for"
+	}
+	account := "email"
+	if slices.Contains(routes, "POST /auth/token") {
+		account = "username"
+	}
+	want := strings.ReplaceAll(words, "{account}", account)
+	kind, _, _ := strings.Cut(cell, docSharedNote)
+	if kind != want {
+		return fmt.Sprintf(" says %s counts by %q, want %q", tier.name, cell, want)
+	}
+	return ""
 }
 
 // docLimit reads a limit cell: the count, and the window it is spent over.

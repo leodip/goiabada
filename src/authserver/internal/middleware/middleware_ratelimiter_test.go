@@ -2289,9 +2289,10 @@ func TestCollectTierKeyFields_ReachesEveryContainerKind(t *testing.T) {
 // collapsing them would let a later conformant key stand in for an earlier invalid one while the
 // count above still read 13.
 type foundTier struct {
-	where    string
-	name     string
-	keyField string
+	where     string
+	name      string
+	keyField  string
+	countedBy countedBy
 }
 
 // visitedValue bounds the walk. A value that points back at itself, which ratelimit's do, is
@@ -2368,8 +2369,9 @@ func collectTierKeyFields(v reflect.Value, where string, into *[]foundTier, seen
 				seen[mark] = true
 			}
 			*into = append(*into, foundTier{where: where,
-				name:     v.FieldByName("name").String(),
-				keyField: v.FieldByName("keyField").String()})
+				name:      v.FieldByName("name").String(),
+				keyField:  v.FieldByName("keyField").String(),
+				countedBy: countedBy(v.FieldByName("countedBy").Int())})
 			return
 		}
 		for i := 0; i < v.NumField(); i++ {

@@ -87,6 +87,8 @@ const (
 // refused, so every refusal names it (#219).
 type tier struct {
 	name string
+	// countedBy is what the tier counts by, the one thing RateLimiter.bucket derives its key from.
+	countedBy countedBy
 	// keyField is the slog attribute the bucket key is logged under, empty when the key
 	// names a person. The request logger in this package establishes that identifiers are
 	// kept out of logs by allowlist rather than by denylist, and email is deliberately not
@@ -107,6 +109,49 @@ type tier struct {
 	window time.Duration
 }
 
+// countedBy is what a tier counts by: the one thing its bucket key is derived from, declared where
+// the tier is built (#522 decision 11). Every Limit method obtains its keys through
+// RateLimiter.bucket, which reads nothing but this, so a tier cannot be declared as one kind and
+// counted as another; and the rate-limit table's Counted by column is held to the declaration, which
+// the server package's docs test reads out of NewRateLimiter.
+//
+// The zero value is no kind: a tier built without one has no bucket, and the first request through
+// it says so.
+type countedBy int
+
+const (
+	// countedByIP is the client's address block, as clientIPRateLimitKey draws it.
+	countedByIP countedBy = iota + 1
+	// countedByAccount is the account a form names: its email, or on the password grant its
+	// username, through ratelimit.AccountKey.
+	countedByAccount
+	// countedByIPAndAccount is an account as seen from one client block, as
+	// accountNetworkRateLimitKey draws it.
+	countedByIPAndAccount
+	// countedBySigningInUser is the user of the sign-in ceremony the browser is in, whom the
+	// ceremony has already authenticated with a password.
+	countedBySigningInUser
+	// countedByTokenUser is the subject of the access token the API authentication middleware
+	// validated.
+	countedByTokenUser
+)
+
+func (k countedBy) String() string {
+	switch k {
+	case countedByIP:
+		return "IP address"
+	case countedByAccount:
+		return "account"
+	case countedByIPAndAccount:
+		return "IP address and account"
+	case countedBySigningInUser:
+		return "signing-in user"
+	case countedByTokenUser:
+		return "access token's user"
+	}
+	return "no kind (" + strconv.Itoa(int(k)) + ")"
+}
+
 // requestTier is a tier every request spends, admitted or refused by Allow before the
 // handler runs.
 type requestTier struct {
@@ -125,11 +170,12 @@ type requestTier struct {
 // limiter the second write overwrote the first, so /auth/pwd reported the per-email budget as
 // though it were the per-IP one (#219). Retry-After is written by refuse and stays, because
 // RFC 6585 Section 4 names it as what a 429 MAY carry.
-func newTier(name string, keyField string, limit int, window time.Duration) *requestTier {
+func newTier(name string, counted countedBy, keyField string, limit int, window time.Duration) *requestTier {
 	limiter := ratelimit.New(limit, window)
 	return &requestTier{
 		tier: tier{
 			name:      name,
+			countedBy: counted,
 			keyField:  keyField,
 			auditGate: limiter.Gate(),
 			window:    window,
@@ -157,7 +203,7 @@ type failureTier struct {
 // and in this process when store is nil, which is SQLite (#394 decision 2). The shared limiter's
 // gate follows its epoch-aligned windows, and stays per process: at most one audit event per key,
 // per window, per replica.
-func newFailureTier(name string, limit int, window time.Duration, store credentialCounter) *failureTier {
+func newFailureTier(name string, counted countedBy, limit int, window time.Duration, store credentialCounter) *failureTier {
 	limiter := ratelimit.NewFailureLimiter(limit, window)
 	if store != nil {
 		limiter = ratelimit.NewSharedFailureLimiter(store, name, limit, window)
@@ -165,6 +211,7 @@ func newFailureTier(name string, limit int, window time.Duration, store credenti
 	return &failureTier{
 		tier: tier{
 			name:      name,
+			countedBy: counted,
 			auditGate: limiter.Gate(),
 			window:    window,
 		},
@@ -190,21 +237,25 @@ func newAccountTiers(tight, backstop *failureTier) *accountTiers {
 	}
 }
 
-// reserve claims a slot on both tiers, or on neither. It returns the tier that refused and
+// reserveAccount claims a slot on both of a's tiers, or on neither, each keyed through what it
+// counts by, with account the identifier the route names the account by. It returns the tier that refused and
 // the key it refused, so the caller can report the trip and answer with that tier's window;
 // a nil tier and a nil error mean the request may proceed and the reservation is owed a
 // release. An error is a count that could not be read, which holds nothing and which the
 // caller answers as a fault, never as a trip: the limiter fails closed (#276, #394 decision 4).
-func (a *accountTiers) reserve(ctx context.Context, networkKey, accountKey string) (*ratelimit.AccountReservation, *tier, string, error) {
-	reservation, refusal, err := a.limiter.Reserve(ctx, networkKey, accountKey)
+func (m *RateLimiter) reserveAccount(r *http.Request, a *accountTiers, account string) (*ratelimit.AccountReservation, *tier, string, error) {
+	// An account kind always has a bucket: the identifier may be empty, never absent.
+	tightKey, _, _ := m.bucket(r, &a.tight.tier, account)
+	backstopKey, _, _ := m.bucket(r, &a.backstop.tier, account)
+	reservation, refusal, err := a.limiter.Reserve(r.Context(), tightKey, backstopKey)
 	if err != nil {
 		return nil, nil, "", err
 	}
 	switch refusal {
 	case ratelimit.RefusedTight:
-		return nil, &a.tight.tier, networkKey, nil
+		return nil, &a.tight.tier, tightKey, nil
 	case ratelimit.RefusedBackstop:
-		return nil, &a.backstop.tier, accountKey, nil
+		return nil, &a.backstop.tier, backstopKey, nil
 	default:
 		return reservation, nil, "", nil
 	}
@@ -285,13 +336,13 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 	// Every tier is built through one of these two, which is what makes the limiter label's set
 	// every tier's name: a tier built any other way would be counted as other.
 	var tierNames []string
-	request := func(name string, keyField string, limit int, window time.Duration) *requestTier {
+	request := func(name string, counted countedBy, keyField string, limit int, window time.Duration) *requestTier {
 		tierNames = append(tierNames, name)
-		return newTier(name, keyField, limit, window)
+		return newTier(name, counted, keyField, limit, window)
 	}
-	failure := func(name string, limit int, window time.Duration) *failureTier {
+	failure := func(name string, counted countedBy, limit int, window time.Duration) *failureTier {
 		tierNames = append(tierNames, name)
-		return newFailureTier(name, limit, window, credentialCounts)
+		return newFailureTier(name, counted, limit, window, credentialCounts)
 	}
 
 	m := &RateLimiter{
@@ -308,18 +359,18 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// 800-63B §3.2.2 names. Both count failures only, so a user who signs in spends
 		// nothing (#219).
 		pwdAccount: newAccountTiers(
-			failure("pwd_account_net", 10, 15*time.Minute),
-			failure("pwd_account", 100, 60*time.Minute),
+			failure("pwd_account_net", countedByIPAndAccount, 10, 15*time.Minute),
+			failure("pwd_account", countedByAccount, 100, 60*time.Minute),
 		),
 		// per-IP: stops one host hammering many accounts
-		pwdIp: request("pwd_ip", "ip", 30, 1*time.Minute),
+		pwdIp: request("pwd_ip", countedByIP, "ip", 30, 1*time.Minute),
 		// per-user OTP failures. 5 per 15 minutes is 480 guesses a day against the 14,400
 		// the 10 a minute it replaces allowed, which takes the chance of a hit over a
 		// month from 72.6% to 4.2% against an attacker who already holds the password.
 		// Five rather than three because the same limiter covers enrollment, where
 		// pointing the wrong entry in an authenticator app at the form burns codes, and a
 		// resubmitted code is refused as a replay and so counts as a failure too (#219).
-		otp: failure("otp", 5, 15*time.Minute),
+		otp: failure("otp", countedBySigningInUser, 5, 15*time.Minute),
 		// per-subject email verification failures. The code is four letters plus four
 		// digits, 26^4 x 10^4, so 5 failures per 15 minutes puts a hit on the far side of a
 		// human lifetime. It needs a bound at all because the chain in front of it is short:
@@ -328,14 +379,14 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// address the attacker does not control. That change now needs the account password
 		// too (#404), which shortens the chain without removing it. Failures only, so a user reading the code
 		// out of their inbox spends nothing (#219).
-		emailVerification: failure("email_verification", 5, 15*time.Minute),
+		emailVerification: failure("email_verification", countedByTokenUser, 5, 15*time.Minute),
 		// per-subject: verification mails sent, every request counted. The send mails a code to
 		// whatever address the account holds, and the account sets that address itself, so
 		// what this bounds is one account mailing addresses it does not own. The handler's own
 		// cooldown, one code per its five minute lifetime, holds whatever this switch says and
 		// allows 12 an hour; this is 5, which is room for a user whose first code went to spam
 		// or expired before a slow inbox delivered it (#404).
-		emailVerificationSend: request("email_verification_send", "", 5, 60*time.Minute),
+		emailVerificationSend: request("email_verification_send", countedByTokenUser, "", 5, 60*time.Minute),
 		// per-subject account password failures, one bucket for the three routes that check
 		// that password: PUT /api/v1/account/password, PUT /api/v1/account/otp and
 		// PUT /api/v1/account/email (#404). All three verify the same secret, so separate
@@ -347,12 +398,12 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// higher: the password is the only credential guarding the removal of the account's
 		// second factor, since the disable branch takes no OTP code at all. Failures only, so
 		// a user changing their password successfully spends nothing (#113, #219).
-		accountPassword: failure("account_password", 5, 15*time.Minute),
+		accountPassword: failure("account_password", countedByTokenUser, 5, 15*time.Minute),
 		// per-IP: 10 activation operations per 5 minutes, at the three requests an activation
 		// now costs (the link's GET, the clean GET that renders the password form, and its
 		// POST), shared by both methods. resetPwd's budget for the same chain (#112, #207
 		// decision 9)
-		activate: request("activate", "ip", 30, 5*time.Minute),
+		activate: request("activate", countedByIP, "ip", 30, 5*time.Minute),
 		// per-IP: self-registration, 20 per 5 minutes. It bounds what is only harmful across
 		// distinct addresses: the pre_registrations rows and the mail registration with
 		// verification sends to any address given to it, and, without verification, the
@@ -360,31 +411,31 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// which answers every address alike, and cannot be closed without it, where the account
 		// is usable at once (#219, #207 decision 3); this slows it to 240 addresses an hour per
 		// client block.
-		register: request("register", "ip", 20, 5*time.Minute),
+		register: request("register", countedByIP, "ip", 20, 5*time.Minute),
 		// per-email: self-registration, at forgot-password's per-address budget. With
 		// verification a registration for an address that has a verified, enabled account mails
 		// it a notice, so without this tier one host could mail any account holder 20 notices
 		// every 5 minutes, and many hosts without bound. It used to be argued unneeded, when a
 		// second submission for an address stopped at "already registered" before any mail; the
 		// notice ended that (#207 decision 5).
-		registerEmail: request("register_email", "", 5, 5*time.Minute),
+		registerEmail: request("register_email", countedByAccount, "", 5, 5*time.Minute),
 		// per-IP: 10 reset operations per 5 minutes, at the three requests a reset now
 		// costs (the link's GET, the clean GET, the clean POST). Half of what
 		// forgotPwdIp allows, which is the only other endpoint with an IP tier (#112)
-		resetPwd: request("reset_pwd", "ip", 30, 5*time.Minute),
+		resetPwd: request("reset_pwd", countedByIP, "ip", 30, 5*time.Minute),
 		// per-email: mail-bomb protection
-		forgotPwd: request("forgot_pwd_email", "", 5, 5*time.Minute),
+		forgotPwd: request("forgot_pwd_email", countedByAccount, "", 5, 5*time.Minute),
 		// per-IP: resource DoS protection
-		forgotPwdIp: request("forgot_pwd_ip", "ip", 20, 5*time.Minute),
+		forgotPwdIp: request("forgot_pwd_ip", countedByIP, "ip", 20, 5*time.Minute),
 		// RFC 7591 §3 DoS protection
-		dcr: request("dcr", "ip", 10, 1*time.Minute),
+		dcr: request("dcr", countedByIP, "ip", 10, 1*time.Minute),
 		// per-IP: stops one host spraying passwords across many accounts through the
 		// password grant, exactly as pwdIp does for the browser form, and at the same
 		// budget. Its account half is pwdAccount above, shared rather than mirrored: the
 		// composite ropc_<clientId>_<username>_<ip> key this replaces gave every client
 		// and every source address a fresh budget against one account, so the per-account
 		// ceiling RFC 6749 §4.3.2 makes a MUST did not exist at all (#107, #219).
-		ropcIp: request("ropc_ip", "ip", 30, 1*time.Minute),
+		ropcIp: request("ropc_ip", countedByIP, "ip", 30, 1*time.Minute),
 	}
 	m.refusals = reg.Counter("goiabada_rate_limit_refusals_total",
 		"Requests the rate limiter refused, by the limiter that refused them.",
@@ -552,18 +603,16 @@ func (m *RateLimiter) LimitPwd(next http.Handler) http.Handler {
 		}
 
 		// Per-IP ceiling first: stops a single host from hammering many distinct
-		// accounts. The client IP is trustworthy here (resolved by httpmw.RealIP).
-		ipKey := clientIPRateLimitKey(r)
-		if m.tripped(w, r, m.pwdIp, ipKey, rejectBrowser, map[string]interface{}{"ip": ipKey}) {
+		// accounts.
+		ipKey, ipAudited, _ := m.bucket(r, &m.pwdIp.tier, "")
+		if m.tripped(w, r, m.pwdIp, ipKey, rejectBrowser, ipAudited) {
 			return
 		}
 
 		// Per-account limit: bounds password guessing against a single account, in the
 		// two tiers ratelimit.AccountLimiter documents. Only a wrong password spends it, so a
 		// user signing in normally is never refused by it however often they do.
-		accountKey := ratelimit.AccountKey(r.FormValue("email"))
-		networkKey := accountNetworkRateLimitKey(r, accountKey)
-		held, t, key, err := m.pwdAccount.reserve(r.Context(), networkKey, accountKey)
+		held, t, key, err := m.reserveAccount(r, m.pwdAccount, r.FormValue("email"))
 		if err != nil {
 			m.fault(w, r, rejectBrowser, err)
 			return
@@ -589,20 +638,9 @@ func (m *RateLimiter) LimitPwd(next http.Handler) http.Handler {
 	})
 }
 
-// subjectFunc names whose credential a request is about to check. It returns the key of the
-// bucket the check spends, the details the audit event records if that bucket refuses, and
-// false when the request has no subject at all.
-//
-// The key and the recorded identifier are two values because they differ: the OTP bucket is
-// user_<id> while its event records the user id itself, the identifier its neighbours in the
-// audit log already carry for the same user. Details are a fresh map per call, since a refusal
-// adds the limiter's name to the map it is given.
-type subjectFunc func(r *http.Request) (key string, audited map[string]interface{}, ok bool)
-
 // limitFailuresPerSubject writes the body of a limiter only a failed credential check can
-// spend, keyed on whoever subject names, refusing in the shape class names. LimitOtp,
-// LimitEmailVerification and LimitAccountPassword are this over their own tier and subject
-// (#439).
+// spend, keyed on the subject its tier counts by, refusing in the shape class names. LimitOtp,
+// LimitEmailVerification and LimitAccountPassword are this over their own tier (#439).
 //
 // A request with no subject passes through to the handler. No subject means no bucket to key,
 // and each of the three handlers answers that request before reaching the credential: a
@@ -617,9 +655,7 @@ type subjectFunc func(r *http.Request) (key string, audited map[string]interface
 // what ratelimit.FailureLimiter's in-flight count makes safe under concurrency; the handler
 // converts it by calling RecordCredentialFailure. A closure rather than a bare defer call,
 // since the verdict is not known until the handler has returned.
-func (m *RateLimiter) limitFailuresPerSubject(next http.Handler, t *failureTier, class rejectClass,
-	subject subjectFunc) http.Handler {
-
+func (m *RateLimiter) limitFailuresPerSubject(next http.Handler, t *failureTier, class rejectClass) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip rate limiting if disabled
 		if !m.enabled {
@@ -627,7 +663,7 @@ func (m *RateLimiter) limitFailuresPerSubject(next http.Handler, t *failureTier,
 			return
 		}
 
-		key, audited, ok := subject(r)
+		key, audited, ok := m.bucket(r, &t.tier, "")
 		if !ok {
 			next.ServeHTTP(w, r)
 			return
@@ -653,24 +689,15 @@ func (m *RateLimiter) limitFailuresPerSubject(next http.Handler, t *failureTier,
 	})
 }
 
-// LimitOtp rate limits the OTP check, on the user of the sign-in ceremony the browser is in.
-func (m *RateLimiter) LimitOtp(next http.Handler) http.Handler {
-	return m.limitFailuresPerSubject(next, m.otp, rejectBrowser, m.ceremonyUserSubject)
-}
-
-// ceremonyUserSubject is LimitOtp's subject: the user the ceremony has already authenticated
-// with a password. Single tier, unlike the password gate: reaching the OTP form at all requires
-// having already passed the password, so a third party cannot spend this budget without already
-// holding the account's password.
+// LimitOtp rate limits the OTP check, on the user of the sign-in ceremony the browser is in:
+// the user the ceremony has already authenticated with a password. Single tier, unlike the
+// password gate: reaching the OTP form at all requires having already passed the password, so a
+// third party cannot spend this budget without already holding the account's password.
 //
 // No readable auth context means no user to key a bucket on, and the handler rejects that
 // request before reaching the OTP secret or the database.
-func (m *RateLimiter) ceremonyUserSubject(r *http.Request) (string, map[string]interface{}, bool) {
-	authContext, err := m.ceremonyStore.GetAuthContext(r)
-	if err != nil {
-		return "", nil, false
-	}
-	return fmt.Sprintf("user_%d", authContext.UserId), map[string]interface{}{"user_id": authContext.UserId}, true
+func (m *RateLimiter) LimitOtp(next http.Handler) http.Handler {
+	return m.limitFailuresPerSubject(next, m.otp, rejectBrowser)
 }
 
 // LimitEmailVerification rate limits the account's own email verification check, on the
@@ -687,7 +714,7 @@ func (m *RateLimiter) ceremonyUserSubject(r *http.Request) (string, map[string]i
 // the handler, which answers it 500 before touching the code, so the skipped limit costs
 // nothing: LimitOtp's rule from #114, unchanged.
 func (m *RateLimiter) LimitEmailVerification(next http.Handler) http.Handler {
-	return m.limitFailuresPerSubject(next, m.emailVerification, rejectAPI, tokenSubject)
+	return m.limitFailuresPerSubject(next, m.emailVerification, rejectAPI)
 }
 
 // LimitEmailVerificationSend rate limits the account's own verification mail, on the subject of
@@ -699,24 +726,7 @@ func (m *RateLimiter) LimitEmailVerification(next http.Handler) http.Handler {
 // reason LimitRegister gives for keying on the client block. A request with no readable token
 // passes through to the handler, which answers it 500 before sending anything.
 func (m *RateLimiter) LimitEmailVerificationSend(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip rate limiting if disabled
-		if !m.enabled {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		key, audited, ok := tokenSubject(r)
-		if !ok {
-			next.ServeHTTP(w, r)
-			return
-		}
-		if m.tripped(w, r, m.emailVerificationSend, key, rejectAPI, audited) {
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
+	return m.limitRequests(next, m.emailVerificationSend, rejectAPI)
 }
 
 // LimitAccountPassword rate limits the account's own password check, on the subject of the
@@ -739,18 +749,7 @@ func (m *RateLimiter) LimitEmailVerificationSend(next http.Handler) http.Handler
 // for that account. A request with no readable token passes through to the handler, which
 // answers it 500 before touching the password.
 func (m *RateLimiter) LimitAccountPassword(next http.Handler) http.Handler {
-	return m.limitFailuresPerSubject(next, m.accountPassword, rejectAPI, tokenSubject)
-}
-
-// tokenSubject is the subject of the three account API limiters. The token's subject keys the
-// bucket and is what the event records, under logged_in_user, the name the account API's own
-// audit events give the caller.
-func tokenSubject(r *http.Request) (string, map[string]interface{}, bool) {
-	key, ok := tokenSubjectRateLimitKey(r)
-	if !ok {
-		return "", nil, false
-	}
-	return key, map[string]interface{}{"logged_in_user": key}, true
+	return m.limitFailuresPerSubject(next, m.accountPassword, rejectAPI)
 }
 
 // tokenSubjectRateLimitKey buckets by the account a bearer token names. It reads the token
@@ -772,11 +771,14 @@ func tokenSubjectRateLimitKey(r *http.Request) (string, bool) {
 	return subject, true
 }
 
-// limitPerIP writes the body of a limiter every request spends, keyed on the client block and
-// refusing in the shape class names. LimitActivate, LimitResetPwd and LimitDCR are this over
-// their own tier (#439); the event a refusal audits records the block as ip. LimitRegister was
-// too, until it gained a per-address tier (#207).
-func (m *RateLimiter) limitPerIP(next http.Handler, t *requestTier, class rejectClass) http.Handler {
+// limitRequests writes the body of a limiter every request spends, keyed on what its one tier
+// counts by and refusing in the shape class names. LimitActivate, LimitResetPwd and LimitDCR are
+// this over a tier counted by the client block, and LimitEmailVerificationSend over one counted by
+// the token's user (#439). LimitRegister was too, until it gained a per-address tier (#207).
+//
+// A request with no subject of the tier's kind passes through to the handler, which answers it
+// itself, for limitFailuresPerSubject's reason; a client block is never absent.
+func (m *RateLimiter) limitRequests(next http.Handler, t *requestTier, class rejectClass) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip rate limiting if disabled
 		if !m.enabled {
@@ -784,9 +786,12 @@ func (m *RateLimiter) limitPerIP(next http.Handler, t *requestTier, class reject
 			return
 		}
 
-		// The client IP is trustworthy here (resolved by httpmw.RealIP).
-		ipKey := clientIPRateLimitKey(r)
-		if m.tripped(w, r, t, ipKey, class, map[string]interface{}{"ip": ipKey}) {
+		key, audited, ok := m.bucket(r, &t.tier, "")
+		if !ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if m.tripped(w, r, t, key, class, audited) {
 			return
 		}
 
@@ -809,7 +814,7 @@ func (m *RateLimiter) limitPerIP(next http.Handler, t *requestTier, class reject
 // One tier covers the GET and the POST that creates the account, as one covers both reset
 // methods, so the chain is bounded as a whole (#207 decision 9).
 func (m *RateLimiter) LimitActivate(next http.Handler) http.Handler {
-	return m.limitPerIP(next, m.activate, rejectBrowser)
+	return m.limitRequests(next, m.activate, rejectBrowser)
 }
 
 // LimitRegister rate limits self-registration, on the client IP and on the submitted address.
@@ -832,15 +837,14 @@ func (m *RateLimiter) LimitRegister(next http.Handler) http.Handler {
 			return
 		}
 
-		// The client IP is trustworthy here (resolved by httpmw.RealIP).
-		ipKey := clientIPRateLimitKey(r)
-		if m.tripped(w, r, m.register, ipKey, rejectBrowser, map[string]interface{}{"ip": ipKey}) {
+		ipKey, ipAudited, _ := m.bucket(r, &m.register.tier, "")
+		if m.tripped(w, r, m.register, ipKey, rejectBrowser, ipAudited) {
 			return
 		}
 
 		// Normalized as the handler normalizes the address it looks up, so every spelling it
 		// treats as one address spends one budget.
-		emailKey := ratelimit.AccountKey(r.FormValue("email"))
+		emailKey, _, _ := m.bucket(r, &m.registerEmail.tier, r.FormValue("email"))
 		if m.tripped(w, r, m.registerEmail, emailKey, rejectBrowser, map[string]interface{}{
 			"email_digest": typedAddressDigest(strings.TrimSpace(strings.ToLower(r.FormValue("email")))),
 		}) {
@@ -863,7 +867,7 @@ func (m *RateLimiter) LimitRegister(next http.Handler) http.Handler {
 // it; what is left to bound is one host driving unauthenticated work, which an IP key does.
 // Matches the pwdIpLimiter and forgotPwdIpLimiter precedent.
 func (m *RateLimiter) LimitResetPwd(next http.Handler) http.Handler {
-	return m.limitPerIP(next, m.resetPwd, rejectBrowser)
+	return m.limitRequests(next, m.resetPwd, rejectBrowser)
 }
 
 // LimitForgotPwd rate limits the forgot-password POST, which for a real user
@@ -878,15 +882,14 @@ func (m *RateLimiter) LimitForgotPwd(next http.Handler) http.Handler {
 			return
 		}
 
-		// Per-IP ceiling: stops one host from mail-bombing many addresses. The
-		// client IP is trustworthy here (resolved by httpmw.RealIP).
-		ipKey := clientIPRateLimitKey(r)
-		if m.tripped(w, r, m.forgotPwdIp, ipKey, rejectBrowser, map[string]interface{}{"ip": ipKey}) {
+		// Per-IP ceiling: stops one host from mail-bombing many addresses.
+		ipKey, ipAudited, _ := m.bucket(r, &m.forgotPwdIp.tier, "")
+		if m.tripped(w, r, m.forgotPwdIp, ipKey, rejectBrowser, ipAudited) {
 			return
 		}
 
 		// Per-email limit: prevents mail-bombing a specific address.
-		emailKey := ratelimit.AccountKey(r.FormValue("email"))
+		emailKey, _, _ := m.bucket(r, &m.forgotPwd.tier, r.FormValue("email"))
 		if m.tripped(w, r, m.forgotPwd, emailKey, rejectBrowser, map[string]interface{}{
 			"email_digest": typedAddressDigest(strings.ToLower(r.FormValue("email"))),
 		}) {
@@ -907,7 +910,52 @@ func (m *RateLimiter) LimitForgotPwd(next http.Handler) http.Handler {
 // Each registration is bounded whatever the switch says, by the redirect URI count and length and
 // by the request body limit (#219, #426, #428).
 func (m *RateLimiter) LimitDCR(next http.Handler) http.Handler {
-	return m.limitPerIP(next, m.dcr, rejectOAuth)
+	return m.limitRequests(next, m.dcr, rejectOAuth)
+}
+
+// bucket is the bucket r spends on t: its key, derived from what t counts by and from nothing
+// else, and the identity that key stands for as a refusal's audit event records it; or false when
+// r carries no subject of t's kind, which only the two user kinds can lack.
+//
+// The key and the recorded identity differ where the audit log already names the identity
+// another way: the signing-in user's bucket is user_<id> while the event records the user id
+// itself, under the name its neighbours give it, and the token's user is recorded as
+// logged_in_user, the name the account API's own events give the caller. Each is a fresh map, since
+// a refusal adds the limiter's name to the map it is given.
+//
+// account is the identifier the route names an account by, as it was typed: the email on the
+// sign-in, registration and forgot-password forms, the username on the password grant. Only the
+// two account kinds read it, and they record nothing of it here: an address typed into a form is
+// audited as its digest, normalized as that route's own lookup normalizes it, which only the route
+// knows (#522 decision 10).
+//
+// A tier declaring no kind panics, which the recoverer answers 500: keying it on anything would be
+// counting by something nobody declared, and answering no bucket would let every request through
+// it unlimited.
+func (m *RateLimiter) bucket(r *http.Request, t *tier, account string) (string, map[string]interface{}, bool) {
+	switch t.countedBy {
+	case countedByIP:
+		// The client IP is trustworthy here (resolved by httpmw.RealIP).
+		key := clientIPRateLimitKey(r)
+		return key, map[string]interface{}{"ip": key}, true
+	case countedByAccount:
+		return ratelimit.AccountKey(account), nil, true
+	case countedByIPAndAccount:
+		return accountNetworkRateLimitKey(r, ratelimit.AccountKey(account)), nil, true
+	case countedBySigningInUser:
+		authContext, err := m.ceremonyStore.GetAuthContext(r)
+		if err != nil {
+			return "", nil, false
+		}
+		return fmt.Sprintf("user_%d", authContext.UserId), map[string]interface{}{"user_id": authContext.UserId}, true
+	case countedByTokenUser:
+		key, ok := tokenSubjectRateLimitKey(r)
+		if !ok {
+			return "", nil, false
+		}
+		return key, map[string]interface{}{"logged_in_user": key}, true
+	}
+	panic(fmt.Sprintf("the rate limit tier %s declares no key kind", t.name))
 }
 
 // typedAddressDigest is how a trip records an address typed into an unauthenticated form, or named
@@ -1001,9 +1049,9 @@ func (m *RateLimiter) LimitROPC(next http.Handler) http.Handler {
 		}
 
 		// Per-IP ceiling first: stops a single host spraying passwords across many distinct
-		// accounts. The client IP is trustworthy here (resolved by httpmw.RealIP).
-		ipKey := clientIPRateLimitKey(r)
-		if m.tripped(w, r, m.ropcIp, ipKey, rejectOAuth, map[string]interface{}{"ip": ipKey}) {
+		// accounts.
+		ipKey, ipAudited, _ := m.bucket(r, &m.ropcIp.tier, "")
+		if m.tripped(w, r, m.ropcIp, ipKey, rejectOAuth, ipAudited) {
 			return
 		}
 
@@ -1011,9 +1059,7 @@ func (m *RateLimiter) LimitROPC(next http.Handler) http.Handler {
 		// credential spends it, so a machine-driven integration authenticating one account
 		// over and over is never refused by it. client_id is deliberately absent from the
 		// key: a ceiling an attacker escapes by registering a second client is not a ceiling.
-		accountKey := ratelimit.AccountKey(r.PostFormValue("username"))
-		networkKey := accountNetworkRateLimitKey(r, accountKey)
-		held, t, key, err := m.pwdAccount.reserve(r.Context(), networkKey, accountKey)
+		held, t, key, err := m.reserveAccount(r, m.pwdAccount, r.PostFormValue("username"))
 		if err != nil {
 			m.fault(w, r, rejectOAuth, err)
 			return
