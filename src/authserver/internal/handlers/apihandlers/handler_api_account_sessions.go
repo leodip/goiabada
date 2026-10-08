@@ -143,12 +143,11 @@ func HandleAccountSessionDelete(
 		// Both events, after the commit, neither on the error path above: an audited termination
 		// that rolled back would be a false record. deleted_user_session keeps its existing
 		// payload untouched and terminated_user_session carries the security detail (decision 9).
-		loggedInUser := callerSubject(r)
 		auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
 			"user_session_id": sessionId,
-			"logged_in_user":  loggedInUser,
+			"logged_in_user":  subject,
 		})
-		revocation.LogTerminatedUserSession(r.Context(), auditLogger, us, loggedInUser, result)
+		revocation.LogTerminatedUserSession(r.Context(), auditLogger, us, subject, result)
 
 		// Success response
 		resp := api.SuccessResponse{Success: true}

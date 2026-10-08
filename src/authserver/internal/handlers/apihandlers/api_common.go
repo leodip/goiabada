@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -147,11 +146,8 @@ func writeValidationError(w http.ResponseWriter, r *http.Request, err error) {
 // nobody. Do not reintroduce a session read here: this surface is authenticated by bearer
 // token and has no browser session to read (#385).
 func callerSubject(r *http.Request) string {
-	jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
-	if !ok {
-		return ""
-	}
-	return jwtToken.StringClaim("sub")
+	subject, _ := reqctx.ValidatedSubject(r.Context())
+	return subject
 }
 
 // accountCaller is the validated access token of an account API request and its subject, the
@@ -165,16 +161,17 @@ func callerSubject(r *http.Request) string {
 // inline checks that answered such a request 401 with INVALID_SUBJECT or UNAUTHORIZED, codes
 // nothing else wrote (#522 decision 4).
 //
-// The subject is returned as the token carries it; only the blank test trims, as the middleware
-// does.
+// The subject is reqctx.ValidatedSubject's, trimmed, which is the one the bearer middleware looked
+// the user up by and the per-subject rate limiter counted against, so a handler acts as the user
+// those two checked. Every handler takes it from here rather than reading the token's sub again.
 func accountCaller(w http.ResponseWriter, r *http.Request) (oauth.JwtToken, string, bool) {
 	jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 	if !ok {
 		writeInternalServerError(w, r, errs.New("an account API request reached its handler with no validated access token"))
 		return oauth.JwtToken{}, "", false
 	}
-	subject := jwtToken.StringClaim("sub")
-	if strings.TrimSpace(subject) == "" {
+	subject, ok := reqctx.ValidatedSubject(r.Context())
+	if !ok {
 		writeInternalServerError(w, r, errs.New("an account API request reached its handler with a token whose subject is empty"))
 		return oauth.JwtToken{}, "", false
 	}

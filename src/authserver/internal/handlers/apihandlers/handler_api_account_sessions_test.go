@@ -36,52 +36,60 @@ func accountSessionDeleteRequest(sessionId string, subject string) *http.Request
 // self-service half of decision 5. The payload is asserted here too rather than left to the admin
 // site: revocation.LogTerminatedUserSession is shared, but which session row each handler hands it is not, and
 // this is the site that resolves the row through an ownership check first.
+//
+// It runs once more with the token's sub padded with whitespace: the user is looked up, and both
+// events name the caller, by the trimmed subject the bearer middleware checked, which is the one
+// accountCaller returns. The audit used to read the raw claim a second time.
 func TestHandleAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
-	database := datamocks.NewDatabase(t)
-	auditLogger := handlersmocks.NewAuditLogger(t)
-
 	const subject = "the-user"
-	user := &record.User{Id: 42, Enabled: true}
-	userSession := &record.UserSession{Id: 100, SessionIdentifier: "sid-own", UserId: 42}
+	for name, tokenSub := range map[string]string{"as minted": subject, "padded": " " + subject + "\t"} {
+		t.Run(name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
-	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
-	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
-	stubTermination(database, userSession, 1, []*record.RefreshToken{
-		{Id: 1, RefreshTokenJti: "rt-live"},
-	})
+			user := &record.User{Id: 42, Enabled: true}
+			userSession := &record.UserSession{Id: 100, SessionIdentifier: "sid-own", UserId: 42}
 
-	var deletedPayload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, mock.Anything).
-		Run(func(args mock.Arguments) {
-			deletedPayload = args.Get(2).(map[string]interface{})
-		}).Return().Once()
-	var terminatedPayload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, audit.EventTerminatedUserSession, mock.Anything).
-		Run(func(args mock.Arguments) {
-			terminatedPayload = args.Get(2).(map[string]interface{})
-		}).Return().Once()
+			database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
+			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
+			stubTermination(database, userSession, 1, []*record.RefreshToken{
+				{Id: 1, RefreshTokenJti: "rt-live"},
+			})
 
-	rr := httptest.NewRecorder()
-	handler := HandleAccountSessionDelete(database, auditLogger)
-	handler.ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
+			var deletedPayload map[string]interface{}
+			auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, mock.Anything).
+				Run(func(args mock.Arguments) {
+					deletedPayload = args.Get(2).(map[string]interface{})
+				}).Return().Once()
+			var terminatedPayload map[string]interface{}
+			auditLogger.On("Log", mock.Anything, audit.EventTerminatedUserSession, mock.Anything).
+				Run(func(args mock.Arguments) {
+					terminatedPayload = args.Get(2).(map[string]interface{})
+				}).Return().Once()
 
-	assert.Equal(t, http.StatusOK, rr.Code)
-	database.AssertExpectations(t)
-	auditLogger.AssertExpectations(t)
+			rr := httptest.NewRecorder()
+			handler := HandleAccountSessionDelete(database, auditLogger)
+			handler.ServeHTTP(rr, accountSessionDeleteRequest("100", tokenSub))
 
-	require.NotNil(t, deletedPayload)
-	assert.Equal(t, int64(100), deletedPayload["user_session_id"])
-	assert.Equal(t, subject, deletedPayload["logged_in_user"])
-	assert.Len(t, deletedPayload, 2)
+			assert.Equal(t, http.StatusOK, rr.Code)
+			database.AssertExpectations(t)
+			auditLogger.AssertExpectations(t)
 
-	require.NotNil(t, terminatedPayload)
-	assert.Equal(t, int64(42), terminatedPayload["user_id"])
-	assert.Equal(t, int64(100), terminatedPayload["user_session_id"])
-	assert.Equal(t, "sid-own", terminatedPayload["session_identifier"])
-	assert.Equal(t, subject, terminatedPayload["logged_in_user"])
-	assert.Equal(t, int64(1), terminatedPayload["revoked_code_count"])
-	assert.Equal(t, []string{"rt-live"}, terminatedPayload["revoked_refresh_token_jtis"])
-	assert.Len(t, terminatedPayload, 6)
+			require.NotNil(t, deletedPayload)
+			assert.Equal(t, int64(100), deletedPayload["user_session_id"])
+			assert.Equal(t, subject, deletedPayload["logged_in_user"])
+			assert.Len(t, deletedPayload, 2)
+
+			require.NotNil(t, terminatedPayload)
+			assert.Equal(t, int64(42), terminatedPayload["user_id"])
+			assert.Equal(t, int64(100), terminatedPayload["user_session_id"])
+			assert.Equal(t, "sid-own", terminatedPayload["session_identifier"])
+			assert.Equal(t, subject, terminatedPayload["logged_in_user"])
+			assert.Equal(t, int64(1), terminatedPayload["revoked_code_count"])
+			assert.Equal(t, []string{"rt-live"}, terminatedPayload["revoked_refresh_token_jtis"])
+			assert.Len(t, terminatedPayload, 6)
+		})
+	}
 }
 
 // TestHandleAccountSessionDelete_ForbiddenDoesNotTerminate is the row that carries this file.

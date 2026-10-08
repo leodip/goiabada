@@ -134,3 +134,44 @@ func TestReqctx_EachWriterSetsOnlyItsOwnValue(t *testing.T) {
 func TestReqctx_ErrNoSettingsMatchesThroughAWrap(t *testing.T) {
 	assert.True(t, errors.Is(errs.Wrap(ErrNoSettings, "x"), ErrNoSettings))
 }
+
+// TestReqctx_SubjectsAreTrimmedAndBlankIsAbsent: BearerSubject and ValidatedSubject are the one
+// reading of a caller's subject the session check, the per-subject rate limiter and the account
+// handlers share, so a subject with surrounding whitespace names the same user to all three.
+func TestReqctx_SubjectsAreTrimmedAndBlankIsAbsent(t *testing.T) {
+	readers := map[string]struct {
+		write func(context.Context, oauth.JwtToken) context.Context
+		read  func(context.Context) (string, bool)
+	}{
+		"bearer":    {WithBearerToken, BearerSubject},
+		"validated": {WithValidatedToken, ValidatedSubject},
+	}
+	for name, r := range readers {
+		t.Run(name, func(t *testing.T) {
+			subject, ok := r.read(context.Background())
+			assert.False(t, ok, "no token, no subject")
+			assert.Empty(t, subject)
+
+			for _, sub := range []string{"user-1", " user-1", "user-1\t", "\n user-1 "} {
+				subject, ok := r.read(r.write(context.Background(), oauth.JwtToken{Claims: jwt.MapClaims{"sub": sub}}))
+				assert.Truef(t, ok, "sub %q", sub)
+				assert.Equalf(t, "user-1", subject, "sub %q", sub)
+			}
+
+			for _, claims := range []jwt.MapClaims{{}, {"sub": ""}, {"sub": " \t "}, {"sub": 42}} {
+				subject, ok := r.read(r.write(context.Background(), oauth.JwtToken{Claims: claims}))
+				assert.Falsef(t, ok, "claims %v", claims)
+				assert.Emptyf(t, subject, "claims %v", claims)
+			}
+		})
+	}
+
+	t.Run("each reads its own token", func(t *testing.T) {
+		ctx := WithBearerToken(context.Background(), oauth.JwtToken{Claims: jwt.MapClaims{"sub": "bearer-user"}})
+		_, ok := ValidatedSubject(ctx)
+		assert.False(t, ok, "a bearer token alone is not a validated one")
+		subject, ok := BearerSubject(ctx)
+		assert.True(t, ok)
+		assert.Equal(t, "bearer-user", subject)
+	})
+}
