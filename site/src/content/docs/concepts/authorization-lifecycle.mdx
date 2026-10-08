@@ -88,20 +88,7 @@ After validation, Goiabada chooses a path based on the `prompt` parameter and se
 
 ### Branch A: prompt=none (silent authentication)
 
-Goiabada attempts to fulfill the request without any user interaction. It runs these checks in order:
-
-| # | Check | Error on failure |
-|---|-------|-----------------|
-| 1 | User has a session | `login_required` |
-| 2 | Session has not exceeded idle timeout | `login_required` |
-| 3 | Session has not exceeded max lifetime | `login_required` |
-| 4 | `max_age` is satisfied (if provided) | `login_required` |
-| 5 | User account is enabled | `access_denied` |
-| 6 | Session ACR level meets the target | `interaction_required` |
-| 7 | If target is `level2_mandatory`: user has OTP enabled | `interaction_required` |
-| 8 | OTP configuration has not changed since session was created | `interaction_required` |
-| 9 | User is authorized for at least one requested scope | `access_denied` |
-| 10 | Consent is available for all effective scopes (if required) | `consent_required` |
+Goiabada attempts to fulfill the request without any user interaction. The checks it runs, in order, and the error each one answers are on [prompt](/concepts/prompt/#the-silent-checks).
 
 If all checks pass, the response is issued silently (an authorization code for code flow, or tokens directly for implicit flow) and the user is redirected to the client. The session's `last_accessed` timestamp is updated to prevent idle timeout.
 
@@ -137,30 +124,9 @@ The user enters their email and password. If credentials are valid, the flow mov
 
 ### Level 1 completion: deciding if level 2 is needed
 
-Goiabada determines the **target ACR level** and compares it against the session's current ACR. Only a session belonging to the user who just authenticated counts here. If the browser still holds a session for a different user, that session contributes no ACR and the target alone decides, exactly as it would for a user with no session at all.
-
-**How the target ACR is determined:** the target is whichever is higher, the first `acr_values` entry Goiabada recognises or the client's default ACR level.
-
-**Decision logic:**
-
-| Condition | Result |
-|-----------|--------|
-| Target ACR is higher than session ACR | Redirect to level 2 (step-up) |
-| OTP configuration changed since login and target requires level 2 | Redirect to level 2 |
-| Target ACR is `level1`, or session ACR is already sufficient | Skip to post-authentication checks |
-
-See [ACR and AMR](/concepts/acr-and-amr/) for details on ACR levels and step-up authentication.
+Goiabada compares the request's ACR level with the level the user's own session reached, and asks for a one-time code when the session falls short, or when the user's two-factor authentication changed since the session last went through the code step. Which level a request asks for, and what each level asks of a user with and without two-factor authentication, are on [ACR and AMR](/concepts/acr-and-amr/#which-level-a-request-asks-for).
 
 ### Level 2: OTP
-
-If level 2 is needed, the behavior depends on the target ACR:
-
-| Target ACR | User has OTP? | Result |
-|-----------|---------------|--------|
-| `level2_optional` | Yes | Prompt for OTP code |
-| `level2_optional` | No | Skip OTP, proceed to post-authentication |
-| `level2_mandatory` | Yes | Prompt for OTP code |
-| `level2_mandatory` | No | Prompt user to enroll in OTP, then enter code |
 
 An enrolment is stored only while the account's two-factor settings are still the ones the sign-in read. If they change while the user is enrolling, for example because the same account finished enrolling an authenticator in another tab or from its account page, the new secret is not stored and the sign-in ends on a page saying the account's two-factor settings changed during the sign-in. That sign-in cannot be continued: the user goes back to the application and signs in again, which starts from the account's current settings.
 
@@ -255,10 +221,7 @@ A session is valid only if **all three** pass. The `max_age` parameter bounds th
 
 ### acr_values vs client default ACR
 
-| Situation | Target ACR used |
-|-----------|----------------|
-| `acr_values` names at least one recognised value | The higher of the first recognised value and the client's default ACR level |
-| `acr_values` not provided, or none recognised | Client's default ACR level |
+See [ACR and AMR](/concepts/acr-and-amr/#which-level-a-request-asks-for).
 
 ## Quick reference
 
