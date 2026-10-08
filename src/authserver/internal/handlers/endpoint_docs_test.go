@@ -56,6 +56,7 @@ const (
 	logoAndPicturePage = "site/src/content/docs/reference/endpoints/logo-and-picture.mdx"
 	registrationPage   = "site/src/content/docs/reference/endpoints/dynamic-client-registration.mdx"
 	logoutPage         = "site/src/content/docs/reference/endpoints/logout.mdx"
+	userInfoPage       = "site/src/content/docs/reference/endpoints/userinfo.mdx"
 )
 
 var (
@@ -66,6 +67,7 @@ var (
 	registrationAnswerSection  = conceptSection{registrationPage, "### The answer"}
 	registrationErrorsSection  = conceptSection{registrationPage, "### Errors"}
 	hintHeaderSection          = conceptSection{logoutPage, "### Encrypting the hint"}
+	readClaimsSection          = conceptSection{userInfoPage, "## Read a user's claims"}
 )
 
 // discoveryFields is every field the discovery document can carry, as its JSON names it, in the
@@ -308,6 +310,27 @@ func assertSectionSays(r guard.Reporter, root string, section conceptSection, te
 		if !strings.Contains(text, want) {
 			r.Errorf("%s: %s does not say %q", section.page, section.heading, want)
 		}
+	}
+}
+
+// The procedure on UserInfo has a client check the answer's sub against the ID token's before it reads
+// a claim, and discard the answer when they differ, which OpenID Connect Core 5.3.2 requires of every
+// client: the check is its own step, ahead of the step that reads the claims.
+func TestEndpointDocs_TheUserInfoProcedureChecksTheSubjectFirst(t *testing.T) {
+	root := filepath.Dir(guard.SourceRoot(t))
+	check := "**Check `sub` before you use any claim.** It must be exactly the `sub` of the ID token you validated at sign-in."
+	assertSectionSays(t, root, readClaimsSection, []string{
+		check,
+		"discard the whole answer and use none of its claims",
+		"[OpenID Connect Core section 5.3.2](https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse)",
+	})
+
+	text, err := conceptSectionText(root, readClaimsSection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read := strings.Index(text, "Read the claims"); read < 0 || strings.Index(text, check) > read {
+		t.Errorf("%s: %s reads the claims before it checks sub", readClaimsSection.page, readClaimsSection.heading)
 	}
 }
 

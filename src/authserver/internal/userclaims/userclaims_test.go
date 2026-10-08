@@ -3,6 +3,8 @@ package userclaims
 import (
 	"context"
 	"database/sql"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -11,8 +13,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // idTokenMapper is the shape /userinfo and the ID token share: the ID token's include flag and a
@@ -643,4 +647,22 @@ func TestAddOpenIDConnectClaims_AddressScopeWithoutAnAddress(t *testing.T) {
 		AddOpenIDConnectClaims(context.Background(), nil, claims, &record.User{Id: 4}, []string{"openid", "address"})
 
 	assert.NotContains(t, claims, "address")
+}
+
+// The profile claim is the auth server's base URL and /account/profile, a path the auth server
+// serves no page at, and Scopes says so rather than calling it the user's account page (#522).
+func TestAddOpenIDConnectClaims_TheScopesPageSaysWhereProfilePoints(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+	db.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(false, nil)
+	claims := jwt.MapClaims{}
+	Mapper{Database: db, BaseURL: "https://auth.example.com"}.
+		AddOpenIDConnectClaims(context.Background(), nil, claims, &record.User{Id: 1}, []string{"openid", "profile"})
+	assert.Equal(t, "https://auth.example.com/account/profile", claims["profile"])
+
+	const page = "site/src/content/docs/concepts/scopes.mdx"
+	body, err := os.ReadFile(filepath.Join(filepath.Dir(guard.SourceRoot(t)), page))
+	require.NoError(t, err)
+	assert.Containsf(t, string(body),
+		"`profile` is the auth server's base URL followed by `/account/profile`, where the auth server has no page",
+		"%s says where the profile claim points", page)
 }

@@ -64,7 +64,7 @@ Deleting a user deletes everything attached to them: their permissions, their gr
 
 ### Passwords
 
-**Set password** on the **Authentication** tab gives the user a new password. It signs them out of every session, the same way a password they change themselves does. See [credential changes](/concepts/ending-sessions/#credential-changes).
+**Set password** on the **Authentication** tab gives the user a new password. It signs them out of every session and revokes their refresh tokens. A password the user changes themselves does the same, except for the session they change it from. See [credential changes](/concepts/ending-sessions/#credential-changes).
 
 A user who forgot their password can ask for a reset link from the sign-in page: see [Password recovery](/concepts/password-recovery/). The link you email a new user to set up their password is the same kind of link.
 
