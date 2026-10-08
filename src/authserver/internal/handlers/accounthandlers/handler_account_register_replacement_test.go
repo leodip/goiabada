@@ -73,10 +73,10 @@ func TestHandleRegisterPost_WithVerificationARowThatCanStillCompleteIsLeftAlone(
 			h.jobs.runAll(t, afterresponse.ClassRegistration)
 
 			assert.Equal(t, map[string]interface{}{
-				"ip":                testClientIP,
-				"emailDigest":       someoneDigest,
-				"preRegistrationId": int64(42),
-				"outcome":           "link_pending",
+				"ip":                  testClientIP,
+				"email_digest":        someoneDigest,
+				"pre_registration_id": int64(42),
+				"outcome":             "link_pending",
 			}, *details)
 			h.database.AssertNotCalled(t, "TryReplacePreRegistrationCode", mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -136,10 +136,10 @@ func TestHandleRegisterPost_WithVerificationADeadRowIsReplacedWithAFreshLink(t *
 	assert.False(t, issuedAt.Before(before), "the fresh code is issued now, so the row can complete again")
 
 	assert.Equal(t, map[string]interface{}{
-		"ip":                testClientIP,
-		"emailDigest":       someoneDigest,
-		"preRegistrationId": int64(42),
-		"outcome":           "link_issued",
+		"ip":                  testClientIP,
+		"email_digest":        someoneDigest,
+		"pre_registration_id": int64(42),
+		"outcome":             "link_issued",
 	}, *details)
 	assert.Equal(t, []string{"replace", "audit", "send"}, order,
 		"the record is written once the row is replaced, and before the mail is sent")
@@ -169,10 +169,10 @@ func TestHandleRegisterPost_WithVerificationALostReplacementSendsNothing(t *test
 	h.jobs.runAll(t, afterresponse.ClassRegistration)
 
 	assert.Equal(t, map[string]interface{}{
-		"ip":                testClientIP,
-		"emailDigest":       someoneDigest,
-		"preRegistrationId": int64(42),
-		"outcome":           "replacement_lost",
+		"ip":                  testClientIP,
+		"email_digest":        someoneDigest,
+		"pre_registration_id": int64(42),
+		"outcome":             "replacement_lost",
 	}, *details)
 	h.assertNothingWrittenOrSent(t)
 }
@@ -197,10 +197,10 @@ func TestHandleRegisterPost_WithVerificationAFailedReplacementIsAServerError(t *
 
 	assert.Equal(t, http.StatusOK, rr.Code, "the response has gone before the row is replaced")
 	assert.Equal(t, map[string]interface{}{
-		"ip":                testClientIP,
-		"emailDigest":       someoneDigest,
-		"preRegistrationId": int64(42),
-		"outcome":           "server_error",
+		"ip":                  testClientIP,
+		"email_digest":        someoneDigest,
+		"pre_registration_id": int64(42),
+		"outcome":             "server_error",
 	}, *details)
 	h.assertNothingWrittenOrSent(t)
 	assertOneErrorRecordOnRegistration(t, capture)

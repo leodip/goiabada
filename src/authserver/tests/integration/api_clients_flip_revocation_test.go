@@ -152,14 +152,14 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesTheClientsGrants(t *test
 		if err := json.Unmarshal([]byte(entry.Details), &details); err != nil {
 			continue
 		}
-		if int64(details["clientId"].(float64)) != code.ClientId {
+		if int64(details["client_id"].(float64)) != code.ClientId {
 			continue
 		}
 		found = true
 		assert.Equal(t, "client_became_public", details["reason"])
-		assert.GreaterOrEqual(t, details["revokedCodeCount"], float64(1),
+		assert.GreaterOrEqual(t, details["revoked_code_count"], float64(1),
 			"the marker is the durable half of the action and its count belongs in the record")
-		assert.NotEmpty(t, details["revokedRefreshTokenJtis"],
+		assert.NotEmpty(t, details["revoked_refresh_token_jtis"],
 			"the sweep is what gives the event actual JTIs rather than a count")
 	}
 	assert.True(t, found, "the flip must emit %v for this client", audit.EventRevokedClientGrants)

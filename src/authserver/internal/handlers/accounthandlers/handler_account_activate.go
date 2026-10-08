@@ -60,7 +60,7 @@ const (
 //
 // Audited rather than logged, as a refused reset link is, so an administrator sees probing of
 // activation links where they see it for reset links; a Warn record reached the console alone
-// until #435. preRegistrationId is written only when the lookup resolved a pre-registration the
+// until #435. pre_registration_id is written only when the lookup resolved a pre-registration the
 // code matched; on the other branches the key is absent rather than zero, since a payload naming
 // row 0 asserts a row that does not exist.
 //
@@ -74,7 +74,7 @@ func refuseActivationLink(pageRenderer PageRenderer, auditLogger AuditLogger, w 
 		"reason": reason,
 	}
 	if preRegistrationId != 0 {
-		details["preRegistrationId"] = preRegistrationId
+		details["pre_registration_id"] = preRegistrationId
 	}
 
 	auditLogger.Log(r.Context(), audit.EventFailedAccountActivationCode, details)

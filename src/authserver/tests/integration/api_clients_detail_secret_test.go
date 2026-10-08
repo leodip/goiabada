@@ -127,9 +127,9 @@ func TestAPIClientSecretGet_ReturnsTheDecryptedSecretAndRecordsTheRead(t *testin
 	rows := auditRows(t, manageToken, "viewed_client_secret", requestId)
 	require.Len(t, rows, 1, "one viewed_client_secret row for the read")
 	assert.Equal(t, map[string]any{
-		"clientId":         float64(client.Id),
-		"clientIdentifier": client.ClientIdentifier,
-		"loggedInUser":     manageClient.ClientIdentifier,
+		"client_id":         float64(client.Id),
+		"client_identifier": client.ClientIdentifier,
+		"logged_in_user":    manageClient.ClientIdentifier,
 	}, rows[0])
 }
 
@@ -163,7 +163,7 @@ func TestAPIClientSecretGet_AdmitsManageClientsAndManageOnly(t *testing.T) {
 				require.Equal(t, http.StatusOK, resp.StatusCode)
 				assert.Equal(t, clientSecret, body["clientSecret"])
 				require.Len(t, viewed, 1)
-				assert.Equal(t, caller.ClientIdentifier, viewed[0]["loggedInUser"])
+				assert.Equal(t, caller.ClientIdentifier, viewed[0]["logged_in_user"])
 				return
 			}
 			assert.Equal(t, http.StatusForbidden, resp.StatusCode)

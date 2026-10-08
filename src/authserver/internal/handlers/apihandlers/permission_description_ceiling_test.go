@@ -105,11 +105,11 @@ func TestPermissionDescriptionCeiling_EveryCallerBelowManageIsRefused(t *testing
 				assert.Equal(t, "administrator_change_refused", refusal.event)
 				assert.Equal(t, http.MethodPut, refusal.details["method"])
 				assert.Equal(t, "target", refusal.details["ceiling"])
-				assert.Equal(t, "resource", refusal.details["targetKind"])
-				assert.Equal(t, resourcePermsId, refusal.details["targetId"])
-				assert.Equal(t, []int64{descriptionCeilingIdOf(t, stored, identifier)}, refusal.details["permissionIds"])
+				assert.Equal(t, "resource", refusal.details["target_kind"])
+				assert.Equal(t, resourcePermsId, refusal.details["target_id"])
+				assert.Equal(t, []int64{descriptionCeilingIdOf(t, stored, identifier)}, refusal.details["permission_ids"])
 				if caller.scope != "" {
-					assert.Equal(t, grantCaller, refusal.details["loggedInUser"])
+					assert.Equal(t, grantCaller, refusal.details["logged_in_user"])
 				}
 			})
 		}
@@ -142,7 +142,7 @@ func TestPermissionDescriptionCeiling_AnAdministrativeRowTheLoadedListLeavesOutI
 	assertManageScopeRequired(t, rr, status, code, description)
 	assertNotAttemptedOnClientDatabase(t, database, "RunInTransaction")
 	require.Len(t, *records, 1)
-	assert.Equal(t, []int64{manageId}, (*records)[0].details["permissionIds"])
+	assert.Equal(t, []int64{manageId}, (*records)[0].details["permission_ids"])
 }
 
 // The refusal comes after the save's own answers: a built-in renamed or a row that is not the

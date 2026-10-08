@@ -161,7 +161,7 @@ func administrativeScopeRefusedRows(t *testing.T, clientIdentifier string) []map
 	for _, entry := range logs.AuditLogs {
 		var details map[string]any
 		require.NoError(t, json.Unmarshal([]byte(entry.Details), &details))
-		if details["clientIdentifier"] == clientIdentifier {
+		if details["client_identifier"] == clientIdentifier {
 			rows = append(rows, details)
 		}
 	}
@@ -175,11 +175,11 @@ func (f *administrativeScopeFixture) assertRefusedAtAuthorize(t *testing.T) {
 	rows := administrativeScopeRefusedRows(t, f.client.ClientIdentifier)
 	require.Len(t, rows, 1, "one row for the refusal")
 	assert.Equal(t, map[string]any{
-		"clientId":         float64(f.client.Id),
-		"clientIdentifier": f.client.ClientIdentifier,
-		"scopes":           []any{"authserver:manage"},
-		"checkpoint":       "authorize",
-		"userId":           float64(f.user.Id),
+		"client_id":         float64(f.client.Id),
+		"client_identifier": f.client.ClientIdentifier,
+		"scopes":            []any{"authserver:manage"},
+		"checkpoint":        "authorize",
+		"user_id":           float64(f.user.Id),
 	}, rows[0])
 }
 
@@ -240,7 +240,7 @@ func TestAuthorize_AdministrativeScope_RefusedForTheImplicitFlow(t *testing.T) {
 	require.Len(t, rows, 2, "one row for each refusal")
 	for _, row := range rows {
 		assert.Equal(t, "authorize", row["checkpoint"])
-		assert.Equal(t, float64(f.user.Id), row["userId"])
+		assert.Equal(t, float64(f.user.Id), row["user_id"])
 	}
 }
 

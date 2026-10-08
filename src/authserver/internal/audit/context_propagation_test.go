@@ -50,7 +50,7 @@ func TestLogger_Log_ReadsAndWritesUnderTheCallersContext(t *testing.T) {
 	mockDB.On("CreateAuditLog", theCallersContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 
-	NewLogger(mockDB, switches).Log(auditCallersContext(), EventAuthSuccessPwd, map[string]interface{}{"userId": 1})
+	NewLogger(mockDB, switches).Log(auditCallersContext(), EventAuthSuccessPwd, map[string]interface{}{"user_id": 1})
 
 	mockDB.AssertExpectations(t)
 	require.Len(t, switches.asked, 1)
@@ -78,7 +78,7 @@ func TestLogger_Log_ACancelledCallerStillGetsItsEventWritten(t *testing.T) {
 	ctx, cancel := context.WithCancel(auditCallersContext())
 	cancel()
 
-	NewLogger(mockDB, switches).Log(ctx, EventAuthSuccessPwd, map[string]interface{}{"userId": 1})
+	NewLogger(mockDB, switches).Log(ctx, EventAuthSuccessPwd, map[string]interface{}{"user_id": 1})
 
 	mockDB.AssertExpectations(t)
 	require.Len(t, switches.asked, 1)
@@ -98,7 +98,7 @@ func TestLogger_Log_TheDetachedContextCarriesADeadline(t *testing.T) {
 	})
 	mockDB.On("CreateAuditLog", bounded, mock.Anything, mock.Anything).Return(nil).Once()
 
-	NewLogger(mockDB, switches).Log(auditCallersContext(), EventAuthSuccessPwd, map[string]interface{}{"userId": 1})
+	NewLogger(mockDB, switches).Log(auditCallersContext(), EventAuthSuccessPwd, map[string]interface{}{"user_id": 1})
 
 	mockDB.AssertExpectations(t)
 	require.Len(t, switches.asked, 1)
@@ -112,7 +112,7 @@ func TestLogger_Log_TheDetachedContextCarriesADeadline(t *testing.T) {
 func TestLogger_Log_DatabasePersistenceOffReachesNoInsertPort(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 
-	NewLogger(mockDB, noTarget()).Log(auditCallersContext(), EventAuthSuccessPwd, map[string]interface{}{"userId": 1})
+	NewLogger(mockDB, noTarget()).Log(auditCallersContext(), EventAuthSuccessPwd, map[string]interface{}{"user_id": 1})
 
 	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything, mock.Anything)
 }

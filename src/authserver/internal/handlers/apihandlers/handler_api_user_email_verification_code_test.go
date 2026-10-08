@@ -80,7 +80,7 @@ func TestHandleUserEmailVerificationCodePost_StoresTheCodeForTheAddressItRead(t 
 		"expires at %v, want five minutes after %v", resp.VerificationCodeExpiresAt, storedAt)
 
 	assert.Equal(t, codeGenAddress, details["email"])
-	assert.Equal(t, codeGenUserId, details["userId"])
+	assert.Equal(t, codeGenUserId, details["user_id"])
 }
 
 // When the account no longer holds the address the request read, nothing is stored and the

@@ -154,9 +154,9 @@ func TestHandleUserEnabledPut_RevocationConditionality(t *testing.T) {
 			if tc.wantSweep {
 				require.NotNil(t, revocationPayload)
 				assert.Equal(t, "account_disabled", revocationPayload["reason"])
-				assert.Equal(t, adminSubject, revocationPayload["loggedInUser"])
+				assert.Equal(t, adminSubject, revocationPayload["logged_in_user"])
 				// Nothing preserved on this site, reported as "" rather than omitted.
-				value, present := revocationPayload["preservedSessionIdentifier"]
+				value, present := revocationPayload["preserved_session_identifier"]
 				assert.True(t, present)
 				assert.Equal(t, "", value)
 			} else {
@@ -256,9 +256,9 @@ func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 
 	require.NotNil(t, payload)
 	assert.Equal(t, "admin_password_set", payload["reason"])
-	assert.Equal(t, adminSubject, payload["loggedInUser"])
-	assert.Equal(t, userId, payload["userId"])
-	value, present := payload["preservedSessionIdentifier"]
+	assert.Equal(t, adminSubject, payload["logged_in_user"])
+	assert.Equal(t, userId, payload["user_id"])
+	value, present := payload["preserved_session_identifier"]
 	assert.True(t, present)
 	assert.Equal(t, "", value)
 }

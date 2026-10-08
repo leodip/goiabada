@@ -129,7 +129,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["userId"] == user.Id
+			return details["user_id"] == user.Id
 		})).Return()
 
 		jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {

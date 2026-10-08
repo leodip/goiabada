@@ -705,14 +705,14 @@ func TestTargetCeiling_AGranularTokenWritingToAnAdministratorIsRefused(t *testin
 			require.Len(t, *records, 1, "one record per refused request")
 			refusal := (*records)[0]
 			assert.Equal(t, audit.EventAdministratorChangeRefused, refusal.event)
-			assert.Equal(t, grantCaller, refusal.details["loggedInUser"])
+			assert.Equal(t, grantCaller, refusal.details["logged_in_user"])
 			assert.Contains(t, refusal.details, "method")
 			assert.Contains(t, refusal.details, "route")
 			assert.Equal(t, "target", refusal.details["ceiling"])
-			assert.Equal(t, c.write.kind, refusal.details["targetKind"])
-			assert.Equal(t, c.targetId(), refusal.details["targetId"])
-			assert.NotContains(t, refusal.details, "permissionIds", "a target refusal names the target, not permissions")
-			assert.NotContains(t, refusal.details, "groupIds")
+			assert.Equal(t, c.write.kind, refusal.details["target_kind"])
+			assert.Equal(t, c.targetId(), refusal.details["target_id"])
+			assert.NotContains(t, refusal.details, "permission_ids", "a target refusal names the target, not permissions")
+			assert.NotContains(t, refusal.details, "group_ids")
 		})
 	}
 }

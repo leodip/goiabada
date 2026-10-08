@@ -775,7 +775,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(user, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["userId"] == int64(1)
+			return details["user_id"] == int64(1)
 		})).Return()
 
 		// The identifier is replaced the instant the password is accepted, and before the
@@ -877,7 +877,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "disabled@example.com").Return(disabledUser, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["userId"] == int64(2)
+			return details["user_id"] == int64(2)
 		})).Return()
 
 		// mock.Anything for the request: the user-locale refinement fires after

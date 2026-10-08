@@ -666,7 +666,7 @@ func (m *RateLimiter) ceremonyUserSubject(r *http.Request) (string, map[string]i
 	if err != nil {
 		return "", nil, false
 	}
-	return fmt.Sprintf("user_%d", authContext.UserId), map[string]interface{}{"userId": authContext.UserId}, true
+	return fmt.Sprintf("user_%d", authContext.UserId), map[string]interface{}{"user_id": authContext.UserId}, true
 }
 
 // LimitEmailVerification rate limits the account's own email verification check, on the
@@ -739,14 +739,14 @@ func (m *RateLimiter) LimitAccountPassword(next http.Handler) http.Handler {
 }
 
 // tokenSubject is the subject of the three account API limiters. The token's subject keys the
-// bucket and is what the event records, under loggedInUser, the name the account API's own
+// bucket and is what the event records, under logged_in_user, the name the account API's own
 // audit events give the caller.
 func tokenSubject(r *http.Request) (string, map[string]interface{}, bool) {
 	key, ok := tokenSubjectRateLimitKey(r)
 	if !ok {
 		return "", nil, false
 	}
-	return key, map[string]interface{}{"loggedInUser": key}, true
+	return key, map[string]interface{}{"logged_in_user": key}, true
 }
 
 // tokenSubjectRateLimitKey buckets by the account a bearer token names. It reads the token

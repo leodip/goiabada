@@ -79,7 +79,7 @@ func expectAuditFailedCode(auditLogger *handlersmocks.AuditLogger, wantReason st
 			if _, present := details["email"]; present {
 				return false
 			}
-			userId, present := details["userId"]
+			userId, present := details["user_id"]
 			if wantUserId == 0 {
 				return !present
 			}
@@ -1767,14 +1767,14 @@ func TestAuditFailedResetPasswordCode(t *testing.T) {
 		assert.Equal(t, "203.0.113.7", details["ip"])
 		assert.Equal(t, auditReasonUnknownCode, details["reason"])
 		assert.NotContains(t, details, "email")
-		assert.NotContains(t, details, "userId",
+		assert.NotContains(t, details, "user_id",
 			"an unresolved lookup must leave the key absent rather than naming user 0")
 	})
 
 	t.Run("a resolved userId is recorded beside it", func(t *testing.T) {
 		details := capture(t, resetCleanGetRequest(), 42, auditReasonCodeExpired)
 
-		assert.Equal(t, int64(42), details["userId"])
+		assert.Equal(t, int64(42), details["user_id"])
 		assert.NotContains(t, details, "email")
 	})
 

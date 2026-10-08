@@ -238,7 +238,7 @@ func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
 	assert.NotEmpty(t, after)
 	if len(after) > 0 {
 		assert.NotEqual(t, lastIdBefore, after[0].Id, "a new audit entry must have been written")
-		assert.Contains(t, after[0].Details, "auditLogRetentionDays")
+		assert.Contains(t, after[0].Details, "audit_log_retention_days")
 	}
 }
 

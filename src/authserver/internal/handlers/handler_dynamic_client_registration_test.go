@@ -474,7 +474,7 @@ func TestHandleDynamicClientRegistrationPost_AuditsTheClientIPWithoutItsPort(t *
 	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventDynamicClientRegistration,
 		mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["sourceIP"] == "192.0.2.1"
+			return details["ip"] == "192.0.2.1"
 		})).Return().Once()
 
 	rr := serveDCR(t, oidc.DynamicClientRegistrationRequest{

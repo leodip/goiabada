@@ -87,18 +87,18 @@ func TestAdministrativePermissionChanged_APermissionSaveRecordsWhatItGrantsAndRe
 			assert.Equal(t, want, eventNames(*records), "beside the save's own records, after them, one per direction")
 			assert.Equal(t, []map[string]interface{}{
 				{
-					"change":                "granted",
-					"targetKind":            save.kind,
-					"targetId":              grantOwnerId,
-					"permissionIdentifiers": []string{"authserver:manage", "authserver:admin-read"},
-					"loggedInUser":          grantCaller,
+					"change":                 "granted",
+					"target_kind":            save.kind,
+					"target_id":              grantOwnerId,
+					"permission_identifiers": []string{"authserver:manage", "authserver:admin-read"},
+					"logged_in_user":         grantCaller,
 				},
 				{
-					"change":                "revoked",
-					"targetKind":            save.kind,
-					"targetId":              grantOwnerId,
-					"permissionIdentifiers": []string{"authserver:manage-users"},
-					"loggedInUser":          grantCaller,
+					"change":                 "revoked",
+					"target_kind":            save.kind,
+					"target_id":              grantOwnerId,
+					"permission_identifiers": []string{"authserver:manage-users"},
+					"logged_in_user":         grantCaller,
 				},
 			}, administrativeChanges(*records))
 		})
@@ -168,10 +168,10 @@ func TestAdministrativePermissionChanged_TheClientRecordNamesWhatTheSaveChanged(
 
 		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 		assert.Equal(t, map[string]interface{}{
-			"clientId":             grantOwnerId,
-			"grantedPermissionIds": []int64{permManage},
-			"revokedPermissionIds": []int64{3},
-			"loggedInUser":         grantCaller,
+			"client_id":              grantOwnerId,
+			"granted_permission_ids": []int64{permManage},
+			"revoked_permission_ids": []int64{3},
+			"logged_in_user":         grantCaller,
 		}, clientRecord(t, *records))
 	})
 
@@ -190,8 +190,8 @@ func TestAdministrativePermissionChanged_TheClientRecordNamesWhatTheSaveChanged(
 		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 		assert.Equal(t, []string{audit.EventUpdatedClientPermissions}, eventNames(*records))
 		details := clientRecord(t, *records)
-		assert.Equal(t, []int64{}, details["grantedPermissionIds"])
-		assert.Equal(t, []int64{}, details["revokedPermissionIds"])
+		assert.Equal(t, []int64{}, details["granted_permission_ids"])
+		assert.Equal(t, []int64{}, details["revoked_permission_ids"])
 		assertNotAttemptedOnClientDatabase(t, database, "GetResourceByResourceIdentifier", "GetPermissionsByResourceId")
 	})
 }
@@ -250,12 +250,12 @@ func TestAdministrativePermissionChanged_MovingAUserThroughAnAdministrativeGroup
 			database.AssertExpectations(t)
 			auditLogger.AssertExpectations(t)
 			assert.Equal(t, []map[string]interface{}{{
-				"change":                change.change,
-				"targetKind":            "user",
-				"targetId":              ceilingMemberId,
-				"groupId":               administrativeGroupId,
-				"permissionIdentifiers": []string{"authserver:manage"},
-				"loggedInUser":          grantCaller,
+				"change":                 change.change,
+				"target_kind":            "user",
+				"target_id":              ceilingMemberId,
+				"group_id":               administrativeGroupId,
+				"permission_identifiers": []string{"authserver:manage"},
+				"logged_in_user":         grantCaller,
 			}}, changes)
 			assert.Equal(t, "administrative_permission_changed", auditLogger.Calls[len(auditLogger.Calls)-1].Arguments.String(1),
 				"written after the route's own record")
@@ -322,20 +322,20 @@ func TestAdministrativePermissionChanged_AUserGroupsSaveRecordsEachAdministrativ
 	}, eventNames(*records))
 	assert.Equal(t, []map[string]interface{}{
 		{
-			"change":                "granted",
-			"targetKind":            "user",
-			"targetId":              ceilingMemberId,
-			"groupId":               administrativeGroupId,
-			"permissionIdentifiers": []string{"authserver:manage"},
-			"loggedInUser":          grantCaller,
+			"change":                 "granted",
+			"target_kind":            "user",
+			"target_id":              ceilingMemberId,
+			"group_id":               administrativeGroupId,
+			"permission_identifiers": []string{"authserver:manage"},
+			"logged_in_user":         grantCaller,
 		},
 		{
-			"change":                "revoked",
-			"targetKind":            "user",
-			"targetId":              ceilingMemberId,
-			"groupId":               adminReadGroupId,
-			"permissionIdentifiers": []string{"authserver:admin-read"},
-			"loggedInUser":          grantCaller,
+			"change":                 "revoked",
+			"target_kind":            "user",
+			"target_id":              ceilingMemberId,
+			"group_id":               adminReadGroupId,
+			"permission_identifiers": []string{"authserver:admin-read"},
+			"logged_in_user":         grantCaller,
 		},
 	}, administrativeChanges(*records))
 }

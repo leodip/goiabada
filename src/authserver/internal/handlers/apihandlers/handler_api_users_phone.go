@@ -156,8 +156,8 @@ func HandleUserPhonePut(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventUpdatedUserPhone, map[string]interface{}{
-			"userId":       user.Id,
-			"loggedInUser": loggedInUser,
+			"user_id":        user.Id,
+			"logged_in_user": loggedInUser,
 		})
 
 		// Create response

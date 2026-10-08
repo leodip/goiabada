@@ -61,8 +61,8 @@ const (
 	// is NOT the whole token endpoint: it also emits user_disabled, bumped_user_session and
 	// auth_code_reuse_detected, none of which carry the prefix.
 	//
-	// The payload carries clientIdentifier, the string from the request, rather than the numeric
-	// clientId the issuance events use: the validator returns (nil, err) on failure and discards
+	// The payload carries client_identifier, the string from the request, rather than the numeric
+	// client_id the issuance events use: the validator returns (nil, err) on failure and discards
 	// the client model it resolved. What that string attests to varies by grant. Client
 	// credentials authenticates the client itself, so the row does attest to the named client.
 	// ROPC authenticates the USER, and the client only when it is confidential, so for a public
@@ -109,7 +109,7 @@ const (
 	// so replay is overwhelmingly the cause. See TryConsumeUserOTPStep for the full
 	// accounting.
 	//
-	// Payload: userId and the matched time step, so an operator can see which code was
+	// Payload: user_id and the matched time step, so an operator can see which code was
 	// replayed. Never the code itself. The caller learns nothing either way: a replay
 	// renders the same generic incorrect-code response as a wrong code.
 	EventOTPCodeReplayDetected = "otp_code_replay_detected"
@@ -198,7 +198,7 @@ const (
 	// probing activation links looks like. It replaced a Warn record in #435.
 	//
 	// Payload: reason (the reset flow's names for the same states), the client IP, and
-	// preRegistrationId only when the lookup resolved a pre-registration the link's code matched.
+	// pre_registration_id only when the lookup resolved a pre-registration the link's code matched.
 	EventFailedAccountActivationCode = "failed_account_activation_code"
 	// EventRequestedPasswordReset records one forgot-password request, written exactly once for
 	// every POST that reaches the handler, a malformed address included. Every well-formed
@@ -210,10 +210,10 @@ const (
 	// was stored, not that the mail went out: a send failure is an Error log line carrying the
 	// same request id, never a second entry.
 	//
-	// Payload: ip, the client IP truncated as the reset refusals record it; emailDigest, the
+	// Payload: ip, the client IP truncated as the reset refusals record it; email_digest, the
 	// SHA-256 hex of the submitted address normalized as the lookup normalizes it, never the
 	// address itself, so the table does not collect every address typed into an unauthenticated
-	// form; userId, present only when an account matched; and outcome, one of code_issued,
+	// form; user_id, present only when an account matched; and outcome, one of code_issued,
 	// unknown_address, unverified_address, account_disabled, account_changed, invalid_address
 	// or server_error, the last a request the server failed before deciding it (the lookup, or
 	// the code's encryption or store), whose cause is the Error log line on the same request id.
@@ -231,9 +231,9 @@ const (
 	// notice_issued say what was issued, not that the mail went out: a send failure is an Error
 	// log line carrying the same request id, never a second entry.
 	//
-	// Payload: ip, the client IP truncated as the emailed-link records truncate it; emailDigest,
+	// Payload: ip, the client IP truncated as the emailed-link records truncate it; email_digest,
 	// the SHA-256 hex of the submitted address normalized as the lookups normalize it, never the
-	// address itself; userId, present only when an account matched; preRegistrationId, present
+	// address itself; user_id, present only when an account matched; pre_registration_id, present
 	// only when a pending registration was written or found; and outcome, one of link_issued (a
 	// new pending registration, or a dead one given a fresh code, and its link), link_pending (a
 	// pending registration that can still complete; nothing sent), notice_issued (a verified,
@@ -277,8 +277,8 @@ const (
 	// consequence is that both are emitted per action, so THIS is the event to count for
 	// terminations and deleted_user_session is the lifecycle record beside it.
 	//
-	// Its payload carries userId, userSessionId, sessionIdentifier, revokedRefreshTokenJtis and
-	// revokedCodeCount, plus loggedInUser. Codes get a count rather than a list of ids because no
+	// Its payload carries user_id, user_session_id, session_identifier, revoked_refresh_token_jtis and
+	// revoked_code_count, plus logged_in_user. Codes get a count rather than a list of ids because no
 	// event here lists code ids, and a count answers the only question an auditor has, whether
 	// anything was revoked.
 	EventTerminatedUserSession = "terminated_user_session"
@@ -295,8 +295,8 @@ const (
 	// is scoped to one client, so the users of that client stay signed in everywhere else and
 	// their access tokens keep working until they expire.
 	//
-	// Its payload carries clientId, reason, revokedCodeCount and revokedRefreshTokenJtis, plus
-	// loggedInUser. Codes get a count rather than a list of ids, following
+	// Its payload carries client_id, reason, revoked_code_count and revoked_refresh_token_jtis, plus
+	// logged_in_user. Codes get a count rather than a list of ids, following
 	// terminated_user_session, because no event here lists code ids and a count answers the only
 	// question an auditor has, whether anything was revoked.
 	EventRevokedClientGrants = "revoked_client_grants"
@@ -318,8 +318,8 @@ const (
 	// creation instead would leave that failure recorded as a termination with no actor and no
 	// reason.
 	//
-	// Its payload carries userId (the user who just authenticated), previousUserId and
-	// previousSessionIdentifier (the session that was ended) and clientId. previousUserId is the
+	// Its payload carries user_id (the user who just authenticated), previous_user_id and
+	// previous_session_identifier (the session that was ended) and client_id. previous_user_id is the
 	// field that makes this event what it is: without it an operator reading the two older events
 	// cannot tell a browser changing hands from an administrator ending a session, which is why
 	// reusing that pair was rejected. Nothing links them, and they are emitted in that same order
@@ -396,10 +396,10 @@ const (
 	// integration retrying writes one per attempt, which is right for an attempted administrative
 	// act. The route gate's own INSUFFICIENT_SCOPE refusals write none (#402 decision 5).
 	//
-	// Payload: loggedInUser, the token's sub; method and route, the route pattern rather than the
+	// Payload: logged_in_user, the token's sub; method and route, the route pattern rather than the
 	// path; ceiling, the one that refused it (grant is granting or revoking an administrative
-	// permission); targetKind and targetId, where the request has a target; and, for a grant
-	// refusal, permissionIds, the administrative permissions whose change caused it.
+	// permission); target_kind and target_id, where the request has a target; and, for a grant
+	// refusal, permission_ids, the administrative permissions whose change caused it.
 	EventAdministratorChangeRefused = "administrator_change_refused"
 
 	// EventAdministrativePermissionChanged records a committed change to who is an administrator:
@@ -411,10 +411,10 @@ const (
 	// administrative group keeps its own deletion record and writes none of these (#402 decision
 	// 6).
 	//
-	// Payload: change, granted or revoked; targetKind and targetId, the user, group or client
-	// whose permissions changed, the user for a membership change; permissionIdentifiers, the
-	// administrative permissions granted or revoked, as resource:permission; groupId, for a
-	// membership change, the group joined or left; and loggedInUser. A permission save writes at
+	// Payload: change, granted or revoked; target_kind and target_id, the user, group or client
+	// whose permissions changed, the user for a membership change; permission_identifiers, the
+	// administrative permissions granted or revoked, as resource:permission; group_id, for a
+	// membership change, the group joined or left; and logged_in_user. A permission save writes at
 	// most one per direction, a membership change one per administrative group.
 	EventAdministrativePermissionChanged = "administrative_permission_changed"
 
@@ -428,9 +428,9 @@ const (
 	// sign-in, writes a Warn record instead, because that endpoint is unauthenticated and not rate
 	// limited.
 	//
-	// Payload: clientId and clientIdentifier, the client refused; scopes, the administrative scopes
+	// Payload: client_id and client_identifier, the client refused; scopes, the administrative scopes
 	// it asked for, as resource:permission; checkpoint, authorize, issue, authorization_code,
-	// refresh_token or password; and userId, the user the scope was asked for.
+	// refresh_token or password; and user_id, the user the scope was asked for.
 	EventAdministrativeScopeRefused = "administrative_scope_refused"
 
 	// EventUpdatedClientAdministrativeScopes records a client's allowance to request the
@@ -440,8 +440,8 @@ const (
 	// allowed client is an administrator client, so an alert on who is an administrator watches
 	// this beside administrative_permission_changed (#499 decision 9).
 	//
-	// Payload: clientId and clientIdentifier, the client switched; allowed, the new value; and
-	// loggedInUser.
+	// Payload: client_id and client_identifier, the client switched; allowed, the new value; and
+	// logged_in_user.
 	EventUpdatedClientAdministrativeScopes = "updated_client_administrative_scopes"
 
 	// EventViewedClientSecret records a read of a client's secret through GET
@@ -449,7 +449,7 @@ const (
 	// that disclosed a secret writes it: a client holding none is answered an empty one and
 	// records nothing (#402 decision 8, #403).
 	//
-	// Payload: clientId and clientIdentifier, the client whose secret was read, and loggedInUser.
+	// Payload: client_id and client_identifier, the client whose secret was read, and logged_in_user.
 	EventViewedClientSecret = "viewed_client_secret"
 )
 

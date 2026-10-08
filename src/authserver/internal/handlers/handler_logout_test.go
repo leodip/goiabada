@@ -819,7 +819,7 @@ func stubRegisteredURI(database *datamocks.Database, client *record.Client, uri 
 // that endpoint can see. A bare == "" comparison would pass on an absent key too, which is why
 // this reads the second return value.
 func loggedInUserIsPresentAndEmpty(details map[string]interface{}) bool {
-	v, ok := details["loggedInUser"]
+	v, ok := details["logged_in_user"]
 	return ok && v == ""
 }
 
@@ -940,11 +940,11 @@ func TestHandleLogoutPost(t *testing.T) {
 		database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["userSessionId"] == int64(42) && loggedInUserIsPresentAndEmpty(details)
+			return details["user_session_id"] == int64(42) && loggedInUserIsPresentAndEmpty(details)
 		})).Return()
 		auditLogger.On("Log", mock.Anything, audit.EventLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["userId"] == int64(123) &&
-				details["sessionIdentifier"] == "test-session" &&
+			return details["user_id"] == int64(123) &&
+				details["session_identifier"] == "test-session" &&
 				loggedInUserIsPresentAndEmpty(details)
 		})).Return()
 
@@ -1279,10 +1279,10 @@ func TestHandleLogoutPost(t *testing.T) {
 				database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
 				auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
-					return details["userSessionId"] == int64(42) && loggedInUserIsPresentAndEmpty(details)
+					return details["user_session_id"] == int64(42) && loggedInUserIsPresentAndEmpty(details)
 				})).Return()
 				auditLogger.On("Log", mock.Anything, audit.EventLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
-					return details["userId"] == int64(123) && details["sessionIdentifier"] == "test-session"
+					return details["user_id"] == int64(123) && details["session_identifier"] == "test-session"
 				})).Return()
 
 				mockSession := expectCookieWipedBeforeSave(t, httpSession)
@@ -1402,7 +1402,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				tc.stubDB(database)
 
 				auditLogger.On("Log", mock.Anything, audit.EventLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
-					return details["userId"] == int64(0) && details["sessionIdentifier"] == tc.sessionIdentifier
+					return details["user_id"] == int64(0) && details["session_identifier"] == tc.sessionIdentifier
 				})).Return()
 
 				mockSession := expectCookieWipedBeforeSave(t, httpSession)

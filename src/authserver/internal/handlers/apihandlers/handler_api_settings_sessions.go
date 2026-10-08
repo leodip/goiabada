@@ -88,7 +88,7 @@ func HandleSettingsSessionsPut(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventUpdatedSessionsSettings, map[string]interface{}{
-			"loggedInUser": callerSubject(r),
+			"logged_in_user": callerSubject(r),
 		})
 
 		resp := api.SettingsSessionsResponse{

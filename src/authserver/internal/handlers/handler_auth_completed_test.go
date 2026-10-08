@@ -309,26 +309,26 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// The event exists to name both parties: without previousUserId an operator cannot tell
 		// a browser changing hands from an administrator ending a session.
-		assert.Equal(t, int64(2), replacedPayload["userId"])
-		assert.Equal(t, int64(1), replacedPayload["previousUserId"])
-		assert.Equal(t, sessionIdentifier, replacedPayload["previousSessionIdentifier"])
-		assert.Equal(t, int64(1), replacedPayload["clientId"])
+		assert.Equal(t, int64(2), replacedPayload["user_id"])
+		assert.Equal(t, int64(1), replacedPayload["previous_user_id"])
+		assert.Equal(t, sessionIdentifier, replacedPayload["previous_session_identifier"])
+		assert.Equal(t, int64(1), replacedPayload["client_id"])
 
-		// The terminated event reports the session that was ended, and its loggedInUser is
+		// The terminated event reports the session that was ended, and its logged_in_user is
 		// deliberately empty: the cookie still named user 1 at that instant, so recording it
 		// would name the party being terminated as the actor.
-		assert.Equal(t, int64(1), terminatedPayload["userId"])
-		assert.Equal(t, int64(7), terminatedPayload["userSessionId"])
-		assert.Equal(t, sessionIdentifier, terminatedPayload["sessionIdentifier"])
-		assert.Equal(t, "", terminatedPayload["loggedInUser"])
-		assert.Equal(t, int64(2), terminatedPayload["revokedCodeCount"])
-		assert.Equal(t, []string{"rt-of-user-1"}, terminatedPayload["revokedRefreshTokenJtis"])
+		assert.Equal(t, int64(1), terminatedPayload["user_id"])
+		assert.Equal(t, int64(7), terminatedPayload["user_session_id"])
+		assert.Equal(t, sessionIdentifier, terminatedPayload["session_identifier"])
+		assert.Equal(t, "", terminatedPayload["logged_in_user"])
+		assert.Equal(t, int64(2), terminatedPayload["revoked_code_count"])
+		assert.Equal(t, []string{"rt-of-user-1"}, terminatedPayload["revoked_refresh_token_jtis"])
 
 		// deleted_user_session beside it, the lifecycle record every other caller of
 		// revocation.TerminateUserSessionTx writes. Without it a handover is the one termination a consumer
 		// watching that stream never sees. Its loggedInUser is empty for the same reason.
-		assert.Equal(t, int64(7), deletedPayload["userSessionId"])
-		assert.Equal(t, "", deletedPayload["loggedInUser"])
+		assert.Equal(t, int64(7), deletedPayload["user_session_id"])
+		assert.Equal(t, "", deletedPayload["logged_in_user"])
 
 		// No audit event before the commit, and the reason before the replacement. An event
 		// written before the transaction commits would attest to a termination that could still
@@ -536,8 +536,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		var sequence []string
 		recordEvent := func(args mock.Arguments) { sequence = append(sequence, args.Get(1).(string)) }
 		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, map[string]interface{}{
-			"userSessionId": int64(7),
-			"loggedInUser":  "",
+			"user_session_id": int64(7),
+			"logged_in_user":  "",
 		}).Run(recordEvent).Return().Once()
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Run(recordEvent).Return().Once()
 
@@ -652,7 +652,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, mock.Anything).Run(func(args mock.Arguments) {
 				assert.False(t, answered, "every removal is audited before the 500 is written")
 				events = append(events, args.Get(1).(string))
-				auditedIds = append(auditedIds, args.Get(2).(map[string]interface{})["userSessionId"].(int64))
+				auditedIds = append(auditedIds, args.Get(2).(map[string]interface{})["user_session_id"].(int64))
 			}).Return().Maybe()
 
 			startError := errors.New("unable to rotate the browser session identifier")
@@ -2957,7 +2957,7 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 				case !u.user.Enabled:
 					stubRegisteredRedirectURI(database, "https://example.com/callback")
 					auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
-						"userId": int64(1),
+						"user_id": int64(1),
 					}).Return().Once()
 					ceremonyStore.On("ClearAuthContext", rr, req).Return(nil).Once()
 				default:

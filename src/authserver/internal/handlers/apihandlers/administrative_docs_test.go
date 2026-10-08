@@ -80,6 +80,10 @@ type docNames struct {
 	kind string
 	live map[string]bool
 	want []string
+	// skipColumn is the header of a table column whose cells pattern does not read. The alert
+	// section's Details column names payload keys, which are spelled in snake_case as the events
+	// are, so read with the events' pattern they would be taken for events.
+	skipColumn string
 }
 
 // administrativeIdentifiers is the built-in authserver permissions the administrative set names,
@@ -128,7 +132,8 @@ func TestAdministrativeDocs_NameWhatTheModelRestsOn(t *testing.T) {
 		{
 			section: auditAlertSection,
 			pattern: docAuditEvent, kind: "audit event", live: events,
-			want: []string{"administrator_change_refused", "administrative_permission_changed", "viewed_client_secret"},
+			want:       []string{"administrator_change_refused", "administrative_permission_changed", "viewed_client_secret"},
+			skipColumn: "Details",
 		},
 		{
 			section: docSection{apiAdministratorsPage, "## How it works"},
@@ -266,6 +271,42 @@ func TestAdministrativeDocs_ASectionNamingTheWrongNamesFails(t *testing.T) {
 	}
 }
 
+// The Details column of an alert table names payload keys, spelled in snake_case as the events
+// are, so the events' check leaves that column out and reads every other cell and every line
+// outside a table; a table with no Details column is read whole.
+func TestAdministrativeDocs_TheDetailsColumnIsNotReadForEvents(t *testing.T) {
+	root := t.TempDir()
+	writeDocFixture(t, root, "site/audit.mdx", "## Events to alert on\n\n"+
+		"| Event | Written when | Details |\n"+
+		"|---|---|---|\n"+
+		"| `viewed_client_secret` | beside `administrator_changed` | `client_id` and `logged_in_user` |\n\n"+
+		"Prose names `granted_ids`.\n\n"+
+		"| Event | Why it matters |\n"+
+		"|---|---|\n"+
+		"| `rate_limit_exceeded` | keyed by `user_id` |\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertDocNames(r, root, []docNames{{
+			section: docSection{"site/audit.mdx", "## Events to alert on"},
+			pattern: docAuditEvent, kind: "audit event",
+			live: map[string]bool{"viewed_client_secret": true, "rate_limit_exceeded": true},
+			want: []string{"viewed_client_secret", "rate_limit_exceeded"}, skipColumn: "Details",
+		}})
+	})
+
+	if report.Stopped {
+		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
+	}
+	want := []string{
+		"site/audit.mdx: ## Events to alert on names the audit event administrator_changed, which the code does not hold",
+		"site/audit.mdx: ## Events to alert on names the audit event granted_ids, which the code does not hold",
+		"site/audit.mdx: ## Events to alert on names the audit event user_id, which the code does not hold",
+	}
+	if !slices.Equal(report.Errors, want) {
+		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
+	}
+}
+
 func TestAdministrativeDocs_AMissingSectionStops(t *testing.T) {
 	root := t.TempDir()
 	writeDocFixture(t, root, "site/audit.mdx", "## Events worth alerting on\n\n`viewed_client_secret`\n")
@@ -393,6 +434,9 @@ func assertDocNames(r guard.Reporter, root string, checks []docNames) {
 // same way.
 func assertNamesIn(r guard.Reporter, text string, check docNames) {
 	r.Helper()
+	if check.skipColumn != "" {
+		text = withoutTableColumn(text, check.skipColumn)
+	}
 	named := make(map[string]bool)
 	for _, match := range check.pattern.FindAllStringSubmatch(text, -1) {
 		name := match[1]
@@ -483,6 +527,32 @@ func docTableRows(text string) [][]string {
 		rows = append(rows, cells)
 	}
 	return rows
+}
+
+// withoutTableColumn is text with the column headed header left out of every Markdown table that
+// has one, its header and delimiter cells included; every other line is kept as it is.
+func withoutTableColumn(text, header string) string {
+	lines := strings.Split(text, "\n")
+	column := -1
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "|") {
+			column = -1
+			continue
+		}
+		cells := strings.Split(strings.Trim(trimmed, "|"), "|")
+		if column == -1 {
+			column = slices.IndexFunc(cells, func(cell string) bool { return strings.TrimSpace(cell) == header })
+			if column == -1 {
+				column = len(cells) // a table with no such column: no cell is left out
+			}
+		}
+		if column < len(cells) {
+			cells = slices.Delete(cells, column, column+1)
+		}
+		lines[i] = "|" + strings.Join(cells, "|") + "|"
+	}
+	return strings.Join(lines, "\n")
 }
 
 // writeDocFixture writes content to root/name, creating its directory.

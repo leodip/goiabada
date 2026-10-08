@@ -93,7 +93,7 @@ func HandleSettingsEmailPut(
 			}
 
 			auditLogger.Log(r.Context(), audit.EventUpdatedSMTPSettings, map[string]interface{}{
-				"loggedInUser": callerSubject(r),
+				"logged_in_user": callerSubject(r),
 			})
 
 			resp := api.SettingsEmailResponse{
@@ -243,7 +243,7 @@ func HandleSettingsEmailPut(
 		}
 
 		auditLogger.Log(r.Context(), audit.EventUpdatedSMTPSettings, map[string]interface{}{
-			"loggedInUser": callerSubject(r),
+			"logged_in_user": callerSubject(r),
 		})
 
 		resp := api.SettingsEmailResponse{
@@ -308,8 +308,8 @@ func HandleSettingsEmailSendTestPost(
 		}
 
 		auditLogger.Log(r.Context(), audit.EventSentTestEmail, map[string]interface{}{
-			"loggedInUser": callerSubject(r),
-			"to":           req.To,
+			"logged_in_user": callerSubject(r),
+			"to":             req.To,
 		})
 
 		writeJSON(w, r, http.StatusOK, api.SuccessResponse{Success: true})

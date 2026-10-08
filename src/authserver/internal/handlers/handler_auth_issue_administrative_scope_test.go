@@ -32,11 +32,11 @@ func TestHandleIssueGet_AnAdministrativeScopeTheClientMayNotRequestIsAnsweredInv
 
 			var order []string
 			f.auditLogger.On("Log", mock.Anything, audit.EventAdministrativeScopeRefused, map[string]interface{}{
-				"clientId":         int64(1),
-				"clientIdentifier": "test-client",
-				"scopes":           []string{"authserver:admin-read", "authserver:manage"},
-				"checkpoint":       "issue",
-				"userId":           int64(123),
+				"client_id":         int64(1),
+				"client_identifier": "test-client",
+				"scopes":            []string{"authserver:admin-read", "authserver:manage"},
+				"checkpoint":        "issue",
+				"user_id":           int64(123),
 			}).Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
 			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).
 				Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()

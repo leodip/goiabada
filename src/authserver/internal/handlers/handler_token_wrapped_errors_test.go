@@ -85,7 +85,7 @@ func TestHandleTokenPost_WrappedUserDisabledStillAudits(t *testing.T) {
 				errs.Wrap(disabled, "unable to validate the token request"))
 
 			auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
-				"clientId": "test_client",
+				"client_identifier": "test_client",
 			}).Return().Once()
 			captured := expectJSONErrorWithDetail(jsonWriter)
 
@@ -170,7 +170,7 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 	auditLogger.On("Log", mock.Anything, audit.EventAuthCodeReuseDetected, mock.Anything).
 		Run(func(args mock.Arguments) {
 			details, _ := args.Get(2).(map[string]interface{})
-			auditedCodeId, _ = details["codeId"].(int64)
+			auditedCodeId, _ = details["code_id"].(int64)
 		}).Return().Once()
 	captured := expectJSONErrorWithDetail(jsonWriter)
 

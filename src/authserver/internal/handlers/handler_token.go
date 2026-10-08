@@ -209,7 +209,7 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	var userDisabled *protocolvalidation.UserDisabledError
 	if errors.As(err, &userDisabled) {
 		auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
-			"clientId": input.ClientId,
+			"client_identifier": input.ClientId,
 		})
 	}
 
@@ -240,7 +240,7 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	// been proved rather than merely asserted.
 	if errors.Is(err, protocolvalidation.ErrCodeRedirectURIDeregistered) {
 		auditLogger.Log(r.Context(), audit.EventRedemptionRefusedRedirectURI, map[string]interface{}{
-			"clientIdentifier": input.ClientId,
+			"client_identifier": input.ClientId,
 		})
 	}
 
@@ -310,7 +310,7 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 			// EventTokenScopeDenied gives: the validator discards the client model on
 			// failure. A public client's identifier is caller-supplied, so read it as
 			// the client the caller named rather than as proof of who called.
-			"clientIdentifier": input.ClientId,
+			"client_identifier": input.ClientId,
 		})
 	}
 
@@ -319,9 +319,9 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 			// clientIdentifier, the string from the request, not the numeric clientId the
 			// issuance events use: the validator discards the client model on failure. See
 			// the constant's doc comment for what this attests to per grant type.
-			"clientIdentifier": input.ClientId,
-			"grantType":        input.GrantType.String(),
-			"scope":            input.Scope,
+			"client_identifier": input.ClientId,
+			"grant_type":        input.GrantType.String(),
+			"scope":             input.Scope,
 		})
 	}
 

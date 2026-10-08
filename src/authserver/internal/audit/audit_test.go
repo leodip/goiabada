@@ -296,8 +296,8 @@ func TestLogger_AsksTheSwitchesOncePerEventWithTheCallersValues(t *testing.T) {
 	auditLogger := NewLogger(mockDB, switches)
 
 	ctx := requestContext("goiabada/req-0000007")
-	auditLogger.Log(ctx, "auth_success_pwd", map[string]interface{}{"userId": int64(1)})
-	auditLogger.Log(ctx, "auth_failed_pwd", map[string]interface{}{"userId": int64(1)})
+	auditLogger.Log(ctx, "auth_success_pwd", map[string]interface{}{"user_id": int64(1)})
+	auditLogger.Log(ctx, "auth_failed_pwd", map[string]interface{}{"user_id": int64(1)})
 
 	require.Len(t, switches.asked, 2)
 	for _, asked := range switches.asked {

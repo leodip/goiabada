@@ -211,34 +211,34 @@ func TestHandleRegisterPost_WithVerificationTheJobSendsNothingButALinkOrANotice(
 		{
 			name: "an unverified account",
 			user: &record.User{Id: 7, Enabled: true, Email: registerSomeoneEmail},
-			wantDetails: map[string]interface{}{"ip": testClientIP, "emailDigest": someoneDigest,
-				"userId": int64(7), "outcome": "unverified_address"},
+			wantDetails: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest,
+				"user_id": int64(7), "outcome": "unverified_address"},
 		},
 		{
 			name: "a disabled account with a verified address",
 			user: &record.User{Id: 7, Enabled: false, EmailVerified: true, Email: registerSomeoneEmail},
-			wantDetails: map[string]interface{}{"ip": testClientIP, "emailDigest": someoneDigest,
-				"userId": int64(7), "outcome": "account_disabled"},
+			wantDetails: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest,
+				"user_id": int64(7), "outcome": "account_disabled"},
 		},
 		{
 			name: "a disabled account with an unverified address",
 			user: &record.User{Id: 7, Enabled: false, Email: registerSomeoneEmail},
-			wantDetails: map[string]interface{}{"ip": testClientIP, "emailDigest": someoneDigest,
-				"userId": int64(7), "outcome": "account_disabled"},
+			wantDetails: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest,
+				"user_id": int64(7), "outcome": "account_disabled"},
 		},
 		{
 			name:            "a pending registration",
 			preRegistration: pendingRegistrationIssuedAgo(time.Minute),
-			wantDetails: map[string]interface{}{"ip": testClientIP, "emailDigest": someoneDigest,
-				"preRegistrationId": int64(42), "outcome": "link_pending"},
+			wantDetails: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest,
+				"pre_registration_id": int64(42), "outcome": "link_pending"},
 		},
 		{
 			// The account decides, and the pending registration found beside it is named.
 			name:            "an unverified account with a pending registration beside it",
 			user:            &record.User{Id: 7, Enabled: true, Email: registerSomeoneEmail},
 			preRegistration: pendingRegistrationIssuedAgo(time.Minute),
-			wantDetails: map[string]interface{}{"ip": testClientIP, "emailDigest": someoneDigest,
-				"userId": int64(7), "preRegistrationId": int64(42), "outcome": "unverified_address"},
+			wantDetails: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest,
+				"user_id": int64(7), "pre_registration_id": int64(42), "outcome": "unverified_address"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -311,10 +311,10 @@ func TestHandleRegisterPost_WithVerificationANewAddressIsGivenAPendingRegistrati
 		"the stored hash is of the code that was issued, which is how the link finds the row")
 
 	assert.Equal(t, map[string]interface{}{
-		"ip":                testClientIP,
-		"emailDigest":       someoneDigest,
-		"preRegistrationId": int64(42),
-		"outcome":           "link_issued",
+		"ip":                  testClientIP,
+		"email_digest":        someoneDigest,
+		"pre_registration_id": int64(42),
+		"outcome":             "link_issued",
 	}, *details)
 	assert.Equal(t, []string{"create", "audit", "send"}, order,
 		"the record is written once the row is, and before the mail is sent")
@@ -370,10 +370,10 @@ func TestHandleRegisterPost_WithVerificationAVerifiedEnabledAccountIsSentTheNoti
 			h.jobs.runAll(t, afterresponse.ClassRegistration)
 
 			assert.Equal(t, map[string]interface{}{
-				"ip":          testClientIP,
-				"emailDigest": someoneDigest,
-				"userId":      int64(7),
-				"outcome":     "notice_issued",
+				"ip":           testClientIP,
+				"email_digest": someoneDigest,
+				"user_id":      int64(7),
+				"outcome":      "notice_issued",
 			}, *details)
 			assert.Equal(t, []string{"audit", "send"}, order, "the record is written before the mail is sent")
 
@@ -432,9 +432,9 @@ func TestHandleRegisterPost_WithVerificationAnInvalidAddressIsRecordedAndRedrawn
 			assert.Equal(t, http.StatusOK, rr.Code)
 			assert.Equal(t, tc.wantError, bound["error"])
 			assert.Equal(t, map[string]interface{}{
-				"ip":          testClientIP,
-				"emailDigest": tc.wantDigest,
-				"outcome":     "invalid_address",
+				"ip":           testClientIP,
+				"email_digest": tc.wantDigest,
+				"outcome":      "invalid_address",
 			}, *details)
 			assert.Empty(t, h.jobs.jobs, "an invalid address leaves no work for after the response")
 			h.database.AssertNotCalled(t, "GetUserByEmail", mock.Anything, mock.Anything, mock.Anything)
@@ -460,9 +460,9 @@ func TestHandleRegisterPost_WithVerificationAFailedLookupIsAServerError(t *testi
 		h.handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, map[string]interface{}{
-			"ip":          testClientIP,
-			"emailDigest": someoneDigest,
-			"outcome":     "server_error",
+			"ip":           testClientIP,
+			"email_digest": someoneDigest,
+			"outcome":      "server_error",
 		}, *details)
 		assert.Empty(t, h.jobs.jobs)
 		h.database.AssertNotCalled(t, "GetPreRegistrationByEmail", mock.Anything, mock.Anything, mock.Anything)
@@ -486,10 +486,10 @@ func TestHandleRegisterPost_WithVerificationAFailedLookupIsAServerError(t *testi
 		h.handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, map[string]interface{}{
-			"ip":          testClientIP,
-			"emailDigest": someoneDigest,
-			"userId":      int64(7),
-			"outcome":     "server_error",
+			"ip":           testClientIP,
+			"email_digest": someoneDigest,
+			"user_id":      int64(7),
+			"outcome":      "server_error",
 		}, *details)
 		assert.Empty(t, h.jobs.jobs)
 		h.pageRenderer.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -516,9 +516,9 @@ func TestHandleRegisterPost_WithVerificationTheJobsFaultsAreErrorRecords(t *test
 
 		assert.Equal(t, http.StatusOK, rr.Code, "the response has gone before the row is written")
 		assert.Equal(t, map[string]interface{}{
-			"ip":          testClientIP,
-			"emailDigest": someoneDigest,
-			"outcome":     "server_error",
+			"ip":           testClientIP,
+			"email_digest": someoneDigest,
+			"outcome":      "server_error",
 		}, *details)
 		h.pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 		h.emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything, mock.Anything)

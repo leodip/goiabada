@@ -1336,7 +1336,7 @@ func TestLimitEmailVerificationSend_PerSubject(t *testing.T) {
 		if len(auditLog.events) != 1 {
 			t.Fatalf("got %d audit events, want 1", len(auditLog.events))
 		}
-		want := map[string]interface{}{"limiter": "email_verification_send", "loggedInUser": subject}
+		want := map[string]interface{}{"limiter": "email_verification_send", "logged_in_user": subject}
 		if !reflect.DeepEqual(auditLog.events[0].details, want) {
 			t.Errorf("audit details = %v, want %v", auditLog.events[0].details, want)
 		}
@@ -1966,7 +1966,7 @@ func builtLimiters() []builtLimiter {
 			request:  func() *http.Request { return limiterRequest(http.MethodPost, "/auth/otp?userId=7", nil) },
 			failures: true, budget: 5,
 			contentType: "text/html; charset=UTF-8", retryAfter: "900",
-			audited: map[string]interface{}{"limiter": "otp", "userId": int64(7)}, warned: subjectWarned("otp"),
+			audited: map[string]interface{}{"limiter": "otp", "user_id": int64(7)}, warned: subjectWarned("otp"),
 			noSubject: func() (authContextGetter, *http.Request) {
 				return stubCeremonyStore{err: ceremony.ErrNoAuthContext}, limiterRequest(http.MethodPost, "/auth/otp", nil)
 			},
@@ -1976,7 +1976,7 @@ func builtLimiters() []builtLimiter {
 			request:  func() *http.Request { return verificationRequest(subject) },
 			failures: true, budget: 5,
 			contentType: "application/json", retryAfter: "900",
-			audited:   map[string]interface{}{"limiter": "email_verification", "loggedInUser": subject},
+			audited:   map[string]interface{}{"limiter": "email_verification", "logged_in_user": subject},
 			warned:    subjectWarned("email_verification"),
 			noSubject: noToken("/api/v1/account/email/verification"),
 		},
@@ -1985,7 +1985,7 @@ func builtLimiters() []builtLimiter {
 			request:  func() *http.Request { return accountPasswordRequest(accountPasswordRoute, subject) },
 			failures: true, budget: 5,
 			contentType: "application/json", retryAfter: "900",
-			audited:   map[string]interface{}{"limiter": "account_password", "loggedInUser": subject},
+			audited:   map[string]interface{}{"limiter": "account_password", "logged_in_user": subject},
 			warned:    subjectWarned("account_password"),
 			noSubject: noToken(accountOTPRoute),
 		},

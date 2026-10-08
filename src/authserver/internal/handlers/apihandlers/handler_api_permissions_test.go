@@ -202,8 +202,8 @@ func expectResourcePermsAudit(t *testing.T, auditLogger *handlersmocks.AuditLogg
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedResourcePermissions, mock.Anything).
 		Run(func(args mock.Arguments) {
 			details := args.Get(2).(map[string]interface{})
-			assert.Equal(t, resourcePermsId, details["resourceId"])
-			assert.Contains(t, details, "loggedInUser")
+			assert.Equal(t, resourcePermsId, details["resource_id"])
+			assert.Contains(t, details, "logged_in_user")
 			*count++
 			if order != nil {
 				*order = append(*order, "audit")

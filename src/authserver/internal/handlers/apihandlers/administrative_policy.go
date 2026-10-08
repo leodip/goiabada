@@ -119,20 +119,20 @@ type administratorChangeRefusal struct {
 // decisions 4 and 5).
 func refuseAdministratorChange(w http.ResponseWriter, r *http.Request, auditLogger AuditLogger, refusal administratorChangeRefusal) {
 	details := map[string]interface{}{
-		"loggedInUser": callerSubject(r),
-		"method":       r.Method,
-		"route":        routePattern(r),
-		"ceiling":      refusal.ceiling,
+		"logged_in_user": callerSubject(r),
+		"method":         r.Method,
+		"route":          routePattern(r),
+		"ceiling":        refusal.ceiling,
 	}
 	if refusal.targetKind != "" {
-		details["targetKind"] = refusal.targetKind
-		details["targetId"] = refusal.targetId
+		details["target_kind"] = refusal.targetKind
+		details["target_id"] = refusal.targetId
 	}
 	if refusal.permissionIds != nil {
-		details["permissionIds"] = refusal.permissionIds
+		details["permission_ids"] = refusal.permissionIds
 	}
 	if refusal.groupIds != nil {
-		details["groupIds"] = refusal.groupIds
+		details["group_ids"] = refusal.groupIds
 	}
 	auditLogger.Log(r.Context(), audit.EventAdministratorChangeRefused, details)
 
@@ -222,11 +222,11 @@ func recordAdministrativePermissionChanges(r *http.Request, auditLogger AuditLog
 			continue
 		}
 		auditLogger.Log(r.Context(), audit.EventAdministrativePermissionChanged, map[string]interface{}{
-			"change":                direction.change,
-			"targetKind":            targetKind,
-			"targetId":              targetId,
-			"permissionIdentifiers": identifiers,
-			"loggedInUser":          callerSubject(r),
+			"change":                 direction.change,
+			"target_kind":            targetKind,
+			"target_id":              targetId,
+			"permission_identifiers": identifiers,
+			"logged_in_user":         callerSubject(r),
 		})
 	}
 }
@@ -332,12 +332,12 @@ func refusalCauses(groups []administrativeGroup) (groupIds, permissionIds []int6
 func recordMembershipChanges(r *http.Request, auditLogger AuditLogger, userId int64, change string, groups []administrativeGroup) {
 	for _, group := range groups {
 		auditLogger.Log(r.Context(), audit.EventAdministrativePermissionChanged, map[string]interface{}{
-			"change":                change,
-			"targetKind":            targetKindUser,
-			"targetId":              userId,
-			"groupId":               group.id,
-			"permissionIdentifiers": group.identifiers,
-			"loggedInUser":          callerSubject(r),
+			"change":                 change,
+			"target_kind":            targetKindUser,
+			"target_id":              userId,
+			"group_id":               group.id,
+			"permission_identifiers": group.identifiers,
+			"logged_in_user":         callerSubject(r),
 		})
 	}
 }

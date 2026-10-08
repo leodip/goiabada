@@ -179,7 +179,7 @@ func renderResetPasswordCodeInvalid(pageRenderer PageRenderer, w http.ResponseWr
 //
 // It records the client IP rather than the address, because there is no longer an address
 // anywhere in the request to record and putting one back would undo half of what #112 and
-// #201 removed. userId is written only when the lookup actually resolved a user; on the
+// #201 removed. user_id is written only when the lookup actually resolved a user; on the
 // other branches the key is absent rather than zero, since a payload naming user 0 asserts a
 // row that does not exist.
 //
@@ -190,7 +190,7 @@ func auditFailedResetPasswordCode(auditLogger AuditLogger, r *http.Request, user
 		"reason": reason,
 	}
 	if userId != 0 {
-		details["userId"] = userId
+		details["user_id"] = userId
 	}
 
 	auditLogger.Log(r.Context(), audit.EventFailedResetPasswordCode, details)
@@ -340,7 +340,7 @@ func handleResetPasswordLinkFollowed(pageRenderer PageRenderer, httpSession sess
 		return
 	}
 
-	// The index found a candidate; this decides. No userId is audited on this branch: the
+	// The index found a candidate; this decides. No user_id is audited on this branch: the
 	// row matched a hash the supplied code does not reproduce, so nothing about it is
 	// established as the subject of the request.
 	if !emailedCodeMatches(storedCode, code) {
@@ -475,7 +475,7 @@ func HandleResetPasswordPost(
 		// won. emaillinks.SaveLinkMarker cannot cover any of those, because they act after
 		// the write.
 		//
-		// The userId audited is the marker's, which resolved: it names the account this
+		// The user_id audited is the marker's, which resolved: it names the account this
 		// submission would have written into, which is the useful half of the entry.
 		if !continuationMatches(marker.ContinuationId, r.PostFormValue(continuationIdField)) {
 			rejectResetPassword(pageRenderer, auditLogger, w, r, user.Id,

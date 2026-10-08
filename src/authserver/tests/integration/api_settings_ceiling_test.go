@@ -124,12 +124,12 @@ func TestSettingsCeiling_ManageSettingsCannotChangeTheReservedSettings(t *testin
 			rows := refusalRows(t, manageToken, requestId)
 			require.Len(t, rows, 1, "exactly one administrator_change_refused row for the refused request")
 			row := rows[0]
-			assert.Equal(t, caller.ClientIdentifier, row["loggedInUser"], "the caller is the token's sub")
+			assert.Equal(t, caller.ClientIdentifier, row["logged_in_user"], "the caller is the token's sub")
 			assert.Equal(t, http.MethodPut, row["method"])
 			assert.Equal(t, write.route, row["route"])
 			assert.Equal(t, "settings", row["ceiling"])
-			assert.NotContains(t, row, "targetKind", "a settings write has no target")
-			assert.NotContains(t, row, "targetId", "a settings write has no target")
+			assert.NotContains(t, row, "target_kind", "a settings write has no target")
+			assert.NotContains(t, row, "target_id", "a settings write has no target")
 		})
 	}
 }

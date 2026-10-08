@@ -52,9 +52,9 @@ func TestHandleClientSecretGet_AnswersTheDecryptedSecretAndRecordsTheRead(t *tes
 
 	assert.Equal(t, "viewed_client_secret", audit.EventViewedClientSecret, "the stored event name")
 	assert.Equal(t, map[string]interface{}{
-		"clientId":         int64(7),
-		"clientIdentifier": "portal",
-		"loggedInUser":     "the-caller",
+		"client_id":         int64(7),
+		"client_identifier": "portal",
+		"logged_in_user":    "the-caller",
 	}, payload)
 }
 

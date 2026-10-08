@@ -511,13 +511,13 @@ func assertRefusedByTheTargetCeiling(t *testing.T, resp *http.Response, requestI
 	rows := refusalRows(t, readerToken, requestId)
 	require.Len(t, rows, 1, "exactly one administrator_change_refused row for the refused request")
 	row := rows[0]
-	assert.Equal(t, caller.ClientIdentifier, row["loggedInUser"], "the caller is the token's sub")
+	assert.Equal(t, caller.ClientIdentifier, row["logged_in_user"], "the caller is the token's sub")
 	assert.Equal(t, write.method, row["method"])
 	assert.Equal(t, write.route, row["route"])
 	assert.Equal(t, "target", row["ceiling"])
-	assert.Equal(t, write.kind, row["targetKind"])
-	assert.Equal(t, float64(targetId), row["targetId"])
-	assert.NotContains(t, row, "permissionIds")
+	assert.Equal(t, write.kind, row["target_kind"])
+	assert.Equal(t, float64(targetId), row["target_id"])
+	assert.NotContains(t, row, "permission_ids")
 }
 
 func TestTargetCeiling_AGranularTokenCannotWriteToAnAdministratorUser(t *testing.T) {

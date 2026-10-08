@@ -1405,11 +1405,11 @@ func TestLogAuthCodeReuse_Payload(t *testing.T) {
 	require.Equal(t, 1, recorder.calls)
 	assert.Equal(t, audit.EventAuthCodeReuseDetected, recorder.event)
 	assert.Equal(t, map[string]interface{}{
-		"clientId":                int64(7),
-		"userId":                  int64(13),
-		"codeId":                  int64(42),
-		"sessionIdentifier":       reuseSid,
-		"revokedRefreshTokenJtis": []string{"rt-1", "rt-2"},
+		"client_id":                  int64(7),
+		"user_id":                    int64(13),
+		"code_id":                    int64(42),
+		"session_identifier":         reuseSid,
+		"revoked_refresh_token_jtis": []string{"rt-1", "rt-2"},
 	}, recorder.details)
 }
 

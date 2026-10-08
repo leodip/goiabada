@@ -113,8 +113,8 @@ func HandleClientLogoPost(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientLogo, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": loggedInUser,
+			"client_id":      client.Id,
+			"logged_in_user": loggedInUser,
 		})
 
 		response := api.ClientLogoUploadResponse{
@@ -178,8 +178,8 @@ func HandleClientLogoDelete(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventDeletedClientLogo, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": loggedInUser,
+			"client_id":      client.Id,
+			"logged_in_user": loggedInUser,
 		})
 
 		response := api.SuccessResponse{Success: true}

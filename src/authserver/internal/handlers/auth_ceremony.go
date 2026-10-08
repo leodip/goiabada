@@ -65,14 +65,14 @@ func rejectCeremonyMismatch(pageRenderer PageRenderer, auditLogger AuditLogger, 
 	}
 
 	details := map[string]interface{}{
-		"clientId":  authContext.ClientId,
-		"authState": string(authContext.AuthState),
-		"ipAddress": clientIP,
+		"client_identifier": authContext.ClientId,
+		"auth_state":        string(authContext.AuthState),
+		"ip":                clientIP,
 	}
 	// Absent rather than zero when the ceremony has not identified anyone yet, which is every
 	// submission of the password form. A payload naming user 0 asserts a row that does not exist.
 	if authContext.UserId != 0 {
-		details["userId"] = authContext.UserId
+		details["user_id"] = authContext.UserId
 	}
 	auditLogger.Log(r.Context(), audit.EventAuthCeremonyMismatch, details)
 

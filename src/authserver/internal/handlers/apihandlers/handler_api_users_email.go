@@ -114,8 +114,8 @@ func HandleUserEmailPut(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventUpdatedUserEmail, map[string]interface{}{
-			"userId":       user.Id,
-			"loggedInUser": loggedInUser,
+			"user_id":        user.Id,
+			"logged_in_user": loggedInUser,
 		})
 
 		// Create response

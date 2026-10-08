@@ -151,8 +151,8 @@ func HandleUserProfilePut(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventUpdatedUserProfile, map[string]interface{}{
-			"userId":       user.Id,
-			"loggedInUser": loggedInUser,
+			"user_id":        user.Id,
+			"logged_in_user": loggedInUser,
 		})
 
 		// Create response
@@ -251,8 +251,8 @@ func HandleUserAddressPut(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventUpdatedUserAddress, map[string]interface{}{
-			"userId":       user.Id,
-			"loggedInUser": loggedInUser,
+			"user_id":        user.Id,
+			"logged_in_user": loggedInUser,
 		})
 
 		// Create response

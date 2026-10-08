@@ -569,8 +569,8 @@ func TestRejectCeremonyMismatch_AuditsUnderTheRequestsContext(t *testing.T) {
 	}), audit.EventAuthCeremonyMismatch, mock.MatchedBy(func(details map[string]interface{}) bool {
 		// A plain string, not a ceremony.AuthState: the stored audit detail keeps its type
 		// whatever the context's field is declared as (#436).
-		authState, ok := details["authState"].(string)
-		return details["clientId"] == "test-client" && ok && authState == "level1_password"
+		authState, ok := details["auth_state"].(string)
+		return details["client_identifier"] == "test-client" && ok && authState == "level1_password"
 	})).Return().Once()
 	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 		mock.Anything).Return(nil).Once()

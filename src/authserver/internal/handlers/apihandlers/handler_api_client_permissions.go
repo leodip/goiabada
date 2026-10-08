@@ -209,10 +209,10 @@ func HandleClientPermissionsPut(
 		// revoked, where it named only the client and a grant of authserver:manage to a client
 		// left no trace of which permission it was (#402).
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientPermissions, map[string]interface{}{
-			"clientId":             client.Id,
-			"grantedPermissionIds": granted,
-			"revokedPermissionIds": revoked,
-			"loggedInUser":         callerSubject(r),
+			"client_id":              client.Id,
+			"granted_permission_ids": granted,
+			"revoked_permission_ids": revoked,
+			"logged_in_user":         callerSubject(r),
 		})
 		recordAdministrativePermissionChanges(r, auditLogger, administrative, targetKindClient, client.Id, granted, revoked)
 

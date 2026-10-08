@@ -161,7 +161,7 @@ func TestHandleAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 		"a replay must be indistinguishable from a wrong code to the caller")
 
 	require.NotZero(t, claimedStep, "the handler must have matched a step before claiming it")
-	assert.Equal(t, user.Id, payload["userId"])
+	assert.Equal(t, user.Id, payload["user_id"])
 	assert.Equal(t, claimedStep, payload["step"],
 		"the replay event carries the step that was replayed, so an operator can see which code it was")
 

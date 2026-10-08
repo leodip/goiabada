@@ -33,8 +33,8 @@ func (tr tokenResponder) respondPassword(w http.ResponseWriter, r *http.Request,
 	}
 
 	tr.auditLogger.Log(r.Context(), audit.EventTokenIssuedROPCResponse, map[string]interface{}{
-		"userId":   grant.User.Id,
-		"clientId": grant.Client.Id,
+		"user_id":   grant.User.Id,
+		"client_id": grant.Client.Id,
 	})
 
 	tr.writeTokenResponse(w, r, oidc.GrantTypePassword, tokenResponse)

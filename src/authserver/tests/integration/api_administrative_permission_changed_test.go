@@ -63,11 +63,11 @@ func TestAdministrativePermissionChanged_GrantingAndRevokingAnAdministrativePerm
 			rows := administrativeChangeRows(t, manageToken, requestId)
 			require.Len(t, rows, 1, "one row for the grant")
 			assert.Equal(t, map[string]any{
-				"change":                "granted",
-				"targetKind":            target.kind,
-				"targetId":              float64(targetId),
-				"permissionIdentifiers": []any{"authserver:manage", "authserver:manage-clients"},
-				"loggedInUser":          manageClient.ClientIdentifier,
+				"change":                 "granted",
+				"target_kind":            target.kind,
+				"target_id":              float64(targetId),
+				"permission_identifiers": []any{"authserver:manage", "authserver:manage-clients"},
+				"logged_in_user":         manageClient.ClientIdentifier,
 			}, rows[0])
 
 			// Revoking manage and keeping the rest.
@@ -79,11 +79,11 @@ func TestAdministrativePermissionChanged_GrantingAndRevokingAnAdministrativePerm
 			rows = administrativeChangeRows(t, manageToken, requestId)
 			require.Len(t, rows, 1, "one row for the revocation")
 			assert.Equal(t, map[string]any{
-				"change":                "revoked",
-				"targetKind":            target.kind,
-				"targetId":              float64(targetId),
-				"permissionIdentifiers": []any{"authserver:manage"},
-				"loggedInUser":          manageClient.ClientIdentifier,
+				"change":                 "revoked",
+				"target_kind":            target.kind,
+				"target_id":              float64(targetId),
+				"permission_identifiers": []any{"authserver:manage"},
+				"logged_in_user":         manageClient.ClientIdentifier,
 			}, rows[0])
 		})
 	}
@@ -174,10 +174,10 @@ func TestAdministrativePermissionChanged_TheClientPermissionsRowNamesWhatChanged
 	rows := auditRows(t, manageToken, "updated_client_permissions", requestId)
 	require.Len(t, rows, 1)
 	assert.Equal(t, map[string]any{
-		"clientId":             float64(targetId),
-		"grantedPermissionIds": []any{float64(manage)},
-		"revokedPermissionIds": []any{float64(adminRead)},
-		"loggedInUser":         manageClient.ClientIdentifier,
+		"client_id":              float64(targetId),
+		"granted_permission_ids": []any{float64(manage)},
+		"revoked_permission_ids": []any{float64(adminRead)},
+		"logged_in_user":         manageClient.ClientIdentifier,
 	}, rows[0])
 }
 
@@ -216,12 +216,12 @@ func TestAdministrativePermissionChanged_MovingAUserThroughAnAdministrativeGroup
 			rows := administrativeChangeRows(t, manageToken, requestId)
 			require.Len(t, rows, 1)
 			assert.Equal(t, map[string]any{
-				"change":                change[membership.name],
-				"targetKind":            "user",
-				"targetId":              float64(userId),
-				"groupId":               float64(groupId),
-				"permissionIdentifiers": []any{"authserver:manage-users"},
-				"loggedInUser":          manageClient.ClientIdentifier,
+				"change":                 change[membership.name],
+				"target_kind":            "user",
+				"target_id":              float64(userId),
+				"group_id":               float64(groupId),
+				"permission_identifiers": []any{"authserver:manage-users"},
+				"logged_in_user":         manageClient.ClientIdentifier,
 			}, rows[0])
 		})
 

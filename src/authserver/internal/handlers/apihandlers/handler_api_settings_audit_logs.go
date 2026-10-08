@@ -84,10 +84,10 @@ func HandleSettingsAuditLogsPut(
 		}
 
 		auditLogger.Log(r.Context(), audit.EventUpdatedAuditLogsSettings, map[string]interface{}{
-			"loggedInUser":               callerSubject(r),
-			"auditLogsInConsoleEnabled":  updated.AuditLogsInConsoleEnabled,
-			"auditLogsInDatabaseEnabled": updated.AuditLogsInDatabaseEnabled,
-			"auditLogRetentionDays":      updated.AuditLogRetentionDays,
+			"logged_in_user":                 callerSubject(r),
+			"audit_logs_in_console_enabled":  updated.AuditLogsInConsoleEnabled,
+			"audit_logs_in_database_enabled": updated.AuditLogsInDatabaseEnabled,
+			"audit_log_retention_days":       updated.AuditLogRetentionDays,
 		})
 
 		resp := api.SettingsAuditLogsResponse{

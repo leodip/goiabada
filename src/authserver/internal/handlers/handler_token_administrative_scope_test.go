@@ -85,11 +85,11 @@ func TestHandleTokenPost_AdministrativeScopeRefusalIsAudited(t *testing.T) {
 				Return(nil, errs.Wrap(refusal, "unable to validate the token request"))
 
 			auditLogger.On("Log", mock.Anything, audit.EventAdministrativeScopeRefused, map[string]interface{}{
-				"clientId":         int64(3),
-				"clientIdentifier": "app",
-				"scopes":           []string{"authserver:manage"},
-				"checkpoint":       tc.checkpoint,
-				"userId":           int64(7),
+				"client_id":         int64(3),
+				"client_identifier": "app",
+				"scopes":            []string{"authserver:manage"},
+				"checkpoint":        tc.checkpoint,
+				"user_id":           int64(7),
 			}).Return().Once()
 			if tc.scopeDenied {
 				auditLogger.On("Log", mock.Anything, audit.EventTokenScopeDenied, mock.Anything).Return().Once()

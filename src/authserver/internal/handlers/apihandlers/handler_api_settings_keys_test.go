@@ -63,7 +63,7 @@ func rotateRequest() *http.Request {
 	r := httptest.NewRequest(http.MethodPost, "/api/v1/admin/settings/keys/rotate", nil)
 	r = r.WithContext(context.WithValue(r.Context(), middleware.RequestIDKey, rotateKeysRequestId))
 	// The validated bearer token the chain puts on the context, which is where the audit
-	// payload's "loggedInUser" comes from. It used to come from a mocked
+	// payload's "logged_in_user" comes from. It used to come from a mocked
 	// AuthHelper.GetLoggedInSubject, which is why nothing here noticed the real accessor read a
 	// session key no auth server middleware writes and returned "" at every such site (#385).
 	return setTokenContextWithClaims(r, map[string]interface{}{"sub": adminSubject})
@@ -102,7 +102,7 @@ func TestHandleSettingsKeysRotatePost_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.JSONEq(t, `{"success":true}`, rr.Body.String())
 	require.NotNil(t, payload)
-	assert.Equal(t, adminSubject, payload["loggedInUser"])
+	assert.Equal(t, adminSubject, payload["logged_in_user"])
 	assert.NoError(t, stub.BodyErr, "the body asked the helper to commit")
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)

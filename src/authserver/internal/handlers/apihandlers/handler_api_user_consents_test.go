@@ -128,8 +128,8 @@ func TestHandleUserConsentDelete_Success(t *testing.T) {
 	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(&record.UserConsent{Id: 5, UserId: 7}, nil)
 	database.On("DeleteUserConsent", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(nil)
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserConsent, mock.MatchedBy(func(details map[string]interface{}) bool {
-		return details["userId"] == int64(7) && details["consentId"] == int64(5) &&
-			details["loggedInUser"] == "admin-subject-1"
+		return details["user_id"] == int64(7) && details["consent_id"] == int64(5) &&
+			details["logged_in_user"] == "admin-subject-1"
 	})).Return()
 
 	handler.ServeHTTP(rr, req)

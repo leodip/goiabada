@@ -318,17 +318,17 @@ func TestMembershipCeiling_AGranularTokenMovingAUserThroughAnAdministrativeGroup
 			require.Len(t, *records, 1, "one record per refused request")
 			refusal := (*records)[0]
 			assert.Equal(t, "administrator_change_refused", refusal.event)
-			assert.Equal(t, grantCaller, refusal.details["loggedInUser"])
+			assert.Equal(t, grantCaller, refusal.details["logged_in_user"])
 			assert.Contains(t, refusal.details, "method")
 			assert.Contains(t, refusal.details, "route")
 			assert.Equal(t, "grant", refusal.details["ceiling"])
-			assert.Equal(t, change.targetKind, refusal.details["targetKind"])
-			assert.Equal(t, change.targetId(administrativeGroupId), refusal.details["targetId"])
-			assert.Equal(t, []int64{permManage}, refusal.details["permissionIds"], "the administrative permission the group holds, and not its other one")
+			assert.Equal(t, change.targetKind, refusal.details["target_kind"])
+			assert.Equal(t, change.targetId(administrativeGroupId), refusal.details["target_id"])
+			assert.Equal(t, []int64{permManage}, refusal.details["permission_ids"], "the administrative permission the group holds, and not its other one")
 			if change.namesGroups {
-				assert.Equal(t, []int64{administrativeGroupId}, refusal.details["groupIds"])
+				assert.Equal(t, []int64{administrativeGroupId}, refusal.details["group_ids"])
 			} else {
-				assert.NotContains(t, refusal.details, "groupIds")
+				assert.NotContains(t, refusal.details, "group_ids")
 			}
 		})
 	}
@@ -365,7 +365,7 @@ func TestMembershipCeiling_EveryOtherCallerIsHeldToIt(t *testing.T) {
 				assertNotAttemptedOnClientDatabase(t, database, change.writes...)
 				require.Len(t, *records, 1)
 				assert.Equal(t, "administrator_change_refused", (*records)[0].event)
-				assert.Equal(t, []int64{permAdminRead}, (*records)[0].details["permissionIds"])
+				assert.Equal(t, []int64{permAdminRead}, (*records)[0].details["permission_ids"])
 			})
 		}
 	}
@@ -490,8 +490,8 @@ func TestMembershipCeiling_AUserGroupsSaveIsJudgedOnEveryGroupItChanges(t *testi
 	database.AssertExpectations(t)
 	assertNotAttemptedOnClientDatabase(t, database, "RunInTransaction", "CreateUserGroup", "DeleteUserGroup")
 	require.Len(t, *records, 1)
-	assert.Equal(t, []int64{administrativeGroupId, adminReadGroupId}, (*records)[0].details["groupIds"])
-	assert.Equal(t, []int64{permManage, permAdminRead}, (*records)[0].details["permissionIds"])
+	assert.Equal(t, []int64{administrativeGroupId, adminReadGroupId}, (*records)[0].details["group_ids"])
+	assert.Equal(t, []int64{permManage, permAdminRead}, (*records)[0].details["permission_ids"])
 }
 
 // A removal the user's stored memberships do not hold removes nothing if the save commits, since

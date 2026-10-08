@@ -200,10 +200,10 @@ func HandleGroupAttributeCreatePost(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventAddedGroupAttribute, map[string]interface{}{
-			"groupAttributeId": groupAttribute.Id,
-			"groupId":          group.Id,
-			"groupIdentifier":  group.GroupIdentifier,
-			"loggedInUser":     callerSubject(r),
+			"group_attribute_id": groupAttribute.Id,
+			"group_id":           group.Id,
+			"group_identifier":   group.GroupIdentifier,
+			"logged_in_user":     callerSubject(r),
 		})
 
 		// Return created attribute
@@ -309,10 +309,10 @@ func HandleGroupAttributeUpdatePut(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventUpdatedGroupAttribute, map[string]interface{}{
-			"groupAttributeId": attribute.Id,
-			"groupId":          attribute.GroupId,
-			"groupIdentifier":  group.GroupIdentifier,
-			"loggedInUser":     callerSubject(r),
+			"group_attribute_id": attribute.Id,
+			"group_id":           attribute.GroupId,
+			"group_identifier":   group.GroupIdentifier,
+			"logged_in_user":     callerSubject(r),
 		})
 
 		// Return updated attribute
@@ -380,10 +380,10 @@ func HandleGroupAttributeDelete(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventDeleteGroupAttribute, map[string]interface{}{
-			"groupAttributeId": id,
-			"groupId":          attribute.GroupId,
-			"groupIdentifier":  group.GroupIdentifier,
-			"loggedInUser":     callerSubject(r),
+			"group_attribute_id": id,
+			"group_id":           attribute.GroupId,
+			"group_identifier":   group.GroupIdentifier,
+			"logged_in_user":     callerSubject(r),
 		})
 
 		// Return success response

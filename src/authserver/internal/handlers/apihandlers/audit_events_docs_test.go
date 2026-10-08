@@ -49,6 +49,7 @@ func TestAuditLogDocs_TheAlertSectionNamesTheAttackSignals(t *testing.T) {
 	assertDocNames(t, filepath.Dir(guard.SourceRoot(t)), []docNames{{
 		section: auditAlertSection,
 		pattern: docAuditEvent, kind: "audit event", live: events,
+		skipColumn: "Details",
 		want: []string{
 			audit.EventRefreshTokenReplayDetected, audit.EventAuthCodeReuseDetected,
 			audit.EventOTPCodeReplayDetected, audit.EventRateLimitExceeded,

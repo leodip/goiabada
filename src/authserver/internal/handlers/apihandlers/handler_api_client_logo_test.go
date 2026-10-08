@@ -276,7 +276,7 @@ func TestHandleClientLogoPost_CreateNew(t *testing.T) {
 	})).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
-		return details["clientId"] == client.Id && details["loggedInUser"] == adminSub
+		return details["client_id"] == client.Id && details["logged_in_user"] == adminSub
 	})).Return()
 
 	handler.ServeHTTP(rr, req)
@@ -318,7 +318,7 @@ func TestHandleClientLogoPost_UpdateExisting(t *testing.T) {
 	})).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
-		return details["clientId"] == client.Id && details["loggedInUser"] == adminSub
+		return details["client_id"] == client.Id && details["logged_in_user"] == adminSub
 	})).Return()
 
 	handler.ServeHTTP(rr, req)
@@ -416,7 +416,7 @@ func TestHandleClientLogoDelete_Success(t *testing.T) {
 	database.On("DeleteClientLogo", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
-		return details["clientId"] == client.Id && details["loggedInUser"] == adminSub
+		return details["client_id"] == client.Id && details["logged_in_user"] == adminSub
 	})).Return()
 
 	handler.ServeHTTP(rr, req)

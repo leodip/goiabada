@@ -90,7 +90,7 @@ var grantSaves = []grantSave{
 		addedEvent:          audit.EventAddedUserPermission,
 		deletedEvent:        audit.EventDeletedUserPermission,
 		locksAdministrators: true,
-		ownerKey:            "userId",
+		ownerKey:            "user_id",
 		handler: func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.HandlerFunc {
 			return HandleUserPermissionsPut(database, auditLogger)
 		},
@@ -124,7 +124,7 @@ var grantSaves = []grantSave{
 		addedEvent:          audit.EventAddedGroupPermission,
 		deletedEvent:        audit.EventDeletedGroupPermission,
 		locksAdministrators: true,
-		ownerKey:            "groupId",
+		ownerKey:            "group_id",
 		handler: func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.HandlerFunc {
 			return HandleGroupPermissionsPut(database, auditLogger)
 		},
@@ -158,7 +158,7 @@ var grantSaves = []grantSave{
 			return cp.ClientId, cp.PermissionId
 		},
 		consolidatedEvent: audit.EventUpdatedClientPermissions,
-		ownerKey:          "clientId",
+		ownerKey:          "client_id",
 		handler: func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.HandlerFunc {
 			return HandleClientPermissionsPut(database, auditLogger)
 		},
@@ -259,12 +259,12 @@ func (s grantSave) recordAudits(t *testing.T, auditLogger *handlersmocks.AuditLo
 		Run(func(args mock.Arguments) {
 			details := args.Get(2).(map[string]interface{})
 			assert.Equal(t, grantOwnerId, details[s.ownerKey])
-			assert.Contains(t, details, "loggedInUser")
+			assert.Contains(t, details, "logged_in_user")
 			if s.consolidatedEvent != "" {
-				assert.NotContains(t, details, "permissionId")
+				assert.NotContains(t, details, "permission_id")
 				*records = append(*records, auditRecord(args.String(1)))
 			} else {
-				*records = append(*records, audited(args.String(1), details["permissionId"].(int64)))
+				*records = append(*records, audited(args.String(1), details["permission_id"].(int64)))
 			}
 			if order != nil {
 				*order = append(*order, "audit")

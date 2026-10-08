@@ -339,7 +339,7 @@ func TestHandleAccountProfilePicturePost_CreateNew(t *testing.T) {
 	})).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
-		return details["userId"] == user.Id
+		return details["user_id"] == user.Id
 	})).Return()
 
 	handler.ServeHTTP(rr, req)
@@ -380,7 +380,7 @@ func TestHandleAccountProfilePicturePost_UpdateExisting(t *testing.T) {
 	})).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
-		return details["userId"] == user.Id
+		return details["user_id"] == user.Id
 	})).Return()
 
 	handler.ServeHTTP(rr, req)
@@ -444,7 +444,7 @@ func TestHandleAccountProfilePictureDelete_Success(t *testing.T) {
 	database.On("DeleteUserProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedOwnProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
-		return details["userId"] == user.Id
+		return details["user_id"] == user.Id
 	})).Return()
 
 	handler.ServeHTTP(rr, req)

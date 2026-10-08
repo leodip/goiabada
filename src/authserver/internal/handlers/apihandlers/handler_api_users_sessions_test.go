@@ -56,7 +56,7 @@ func stubTermination(database *datamocks.Database, userSession *record.UserSessi
 // adminSessionDeleteRequest builds the DELETE with the chi URL parameter the handler reads and
 // the validated bearer token the chain puts on the context.
 //
-// The token is what the audit payload's "loggedInUser" now comes from. It used to come from a
+// The token is what the audit payload's "logged_in_user" now comes from. It used to come from a
 // mocked AuthHelper.GetLoggedInSubject, which is why nothing here noticed that the real accessor
 // read a session key no auth server middleware writes and returned "" at every one of these sites
 // (#385). A caller with no token is a separate case, covered below.
@@ -106,20 +106,20 @@ func TestHandleUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
 	// compatibility grounds, so an external consumer parsing this one strictly must keep working:
 	// exactly two keys, and neither renamed.
 	require.NotNil(t, deletedPayload)
-	assert.Equal(t, int64(100), deletedPayload["userSessionId"])
-	assert.Equal(t, adminSubject, deletedPayload["loggedInUser"])
+	assert.Equal(t, int64(100), deletedPayload["user_session_id"])
+	assert.Equal(t, adminSubject, deletedPayload["logged_in_user"])
 	assert.Len(t, deletedPayload, 2)
 
 	// The new event's payload, field by field. Asserted here rather than trusted because it is the
 	// only durable record of what a termination revoked, and a missing or renamed field is invisible
 	// to every other test.
 	require.NotNil(t, terminatedPayload)
-	assert.Equal(t, int64(42), terminatedPayload["userId"])
-	assert.Equal(t, int64(100), terminatedPayload["userSessionId"])
-	assert.Equal(t, "sid-terminated", terminatedPayload["sessionIdentifier"])
-	assert.Equal(t, adminSubject, terminatedPayload["loggedInUser"])
-	assert.Equal(t, int64(3), terminatedPayload["revokedCodeCount"])
-	assert.Equal(t, []string{"rt-live"}, terminatedPayload["revokedRefreshTokenJtis"])
+	assert.Equal(t, int64(42), terminatedPayload["user_id"])
+	assert.Equal(t, int64(100), terminatedPayload["user_session_id"])
+	assert.Equal(t, "sid-terminated", terminatedPayload["session_identifier"])
+	assert.Equal(t, adminSubject, terminatedPayload["logged_in_user"])
+	assert.Equal(t, int64(3), terminatedPayload["revoked_code_count"])
+	assert.Equal(t, []string{"rt-live"}, terminatedPayload["revoked_refresh_token_jtis"])
 	// Exactly these six keys. A seventh would go unnoticed, and more importantly this pins that none
 	// of the six was dropped, which an assertion on a nil map value cannot do.
 	assert.Len(t, terminatedPayload, 6)
@@ -161,7 +161,7 @@ func TestHandleUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 	require.Len(t, payloads, 2)
 	for i := range payloads {
-		actor, ok := payloads[i]["loggedInUser"]
+		actor, ok := payloads[i]["logged_in_user"]
 		assert.True(t, ok, "the key is present even with no caller to name")
 		assert.Equal(t, "", actor)
 	}
