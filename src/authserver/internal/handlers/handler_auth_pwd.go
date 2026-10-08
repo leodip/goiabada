@@ -77,8 +77,11 @@ func HandleAuthPwdGet(
 			// second /auth/authorize replaced the auth context would finish that other request's
 			// authorization instead, and where that client requires no consent the code is issued
 			// without the user seeing any screen at all (#79).
-			"ceremonyId":              authContext.CeremonyId,
-			"smtpEnabled":             settings.SMTPEnabled,
+			"ceremonyId":  authContext.CeremonyId,
+			"smtpEnabled": settings.SMTPEnabled,
+			// The Register link goes to a page that answers not-found while self-registration is
+			// off, so the form offers it only while it is on, as the setting's tooltip says.
+			"selfRegistrationEnabled": settings.SelfRegistrationEnabled,
 			"layoutShowClientSection": displayInfo.ShowSection,
 			"layoutClientName":        displayInfo.ClientName,
 			"layoutHasClientLogo":     displayInfo.HasLogo,
@@ -165,6 +168,7 @@ func HandleAuthPwdPost(
 				// would end the ceremony: the retry would name no ceremony and be refused.
 				"ceremonyId":              authContext.CeremonyId,
 				"smtpEnabled":             settings.SMTPEnabled,
+				"selfRegistrationEnabled": settings.SelfRegistrationEnabled,
 				"email":                   email,
 				"layoutShowClientSection": displayInfo.ShowSection,
 				"layoutClientName":        displayInfo.ClientName,

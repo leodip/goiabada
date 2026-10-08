@@ -43,9 +43,11 @@
 
         <button class="w-full mt-2 btn btn-primary">{{ T $.ctx "auth.pwd.button" }}</button>
 
+        {{if .selfRegistrationEnabled}}
         <div class='mt-4 text-center'>{{ T $.ctx "auth.pwd.no_account_prompt" }} <a href="/account/register?ceremony={{.ceremonyId}}"><span
                     class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer">{{ T $.ctx "auth.pwd.register_link" }}</span></a>
         </div>
+        {{end}}
 
     </form>
 
