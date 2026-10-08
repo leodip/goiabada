@@ -136,11 +136,11 @@ Each server can serve Prometheus metrics on a listener of its own, which answers
 
 | Variable | Flag | Default | Read by | What it does |
 |---|---|---|---|---|
-| `GOIABADA_AUTHSERVER_STATICDIR` | `--authserver-staticdir` | empty | auth server | A directory to serve the auth server's static files from, instead of the built-in ones. See [Customizations](/guides/customizations/). |
+| `GOIABADA_AUTHSERVER_STATICDIR` | `--authserver-staticdir` | empty | auth server | A directory to serve the auth server's static files from, instead of the built-in ones. See [Change the templates](/guides/customize-and-translate-the-pages/#change-the-templates). |
 | `GOIABADA_AUTHSERVER_TEMPLATEDIR` | `--authserver-templatedir` | empty | auth server | A directory to load the auth server's page templates from, instead of the built-in ones. |
 | `GOIABADA_ADMINCONSOLE_STATICDIR` | `--adminconsole-staticdir` | empty | admin console | The same, for the admin console's static files. |
 | `GOIABADA_ADMINCONSOLE_TEMPLATEDIR` | `--adminconsole-templatedir` | empty | admin console | The same, for the admin console's page templates. |
-| `GOIABADA_I18N_OVERRIDES_DIR` | none | empty | both | A directory of message catalogs that replace the built-in text. Set it on both servers. See [Localization](/guides/localization/). |
+| `GOIABADA_I18N_OVERRIDES_DIR` | none | empty | both | A directory of message catalogs that replace the built-in text. Set it on both servers. See [Add a language](/guides/customize-and-translate-the-pages/#add-a-language). |
 | `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` | none | `3145728` | auth server | The largest profile picture or client logo the API accepts, in bytes. The default is 3 MiB. The admin console's upload form stops at 3 MiB, whatever this says. |
 
 ### Rate limiting

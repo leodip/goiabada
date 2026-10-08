@@ -85,7 +85,7 @@ The image names them by number, so a platform that refuses a root container, suc
 
 A file you mount into a container must be readable by uid 10001 or gid 10001: the certificate and
 key named by `GOIABADA_AUTHSERVER_CERTFILE` and `GOIABADA_AUTHSERVER_KEYFILE` (and the admin
-console's pair), and the templates and static files of a [customization](/guides/customizations/).
+console's pair), and the templates and static files of a [customization](/guides/customize-and-translate-the-pages/#change-the-templates).
 A key file left at mode `0600` and owned by root cannot be read; give it to the user, or to the group
 with mode `0640`:
 

@@ -1,0 +1,95 @@
+---
+title: Require two-factor authentication
+description: Make users enter a one-time code from an authenticator app as well as their password, for your app or for the admin console.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This guide makes everyone who signs in to your app enter a one-time code as well as their password.
+
+That's [two-factor authentication](/concepts/glossary/#two-factor-authentication): the code is six digits from an authenticator app on the user's phone, such as Google Authenticator, Microsoft Authenticator or FreeOTP, and it changes every 30 seconds. How strongly a user must sign in to a client is the client's [ACR level](/concepts/acr-and-amr/), and the strongest one asks for a code every time.
+
+## Require a code for your app
+
+<Steps>
+
+1. In the admin console, open your client under **Admin**, **Clients**. On the **Settings** tab, set **Default ACR level** to **ACR level 3 - password + mandatory OTP**, which is `urn:goiabada:level2_mandatory`, and save. Sign-ins that start after the change use it.
+
+2. Sign in to your app as a user with no authenticator. After the password, the sign-in page asks you to set one up: scan the QR code with an authenticator app, then enter the code it shows. From then on, every sign-in to your app asks for a code after the password.
+
+3. In your app, check how the user signed in before you let them in. The ID token says it in two claims, `acr`, the level, and `amr`, the methods the user used:
+
+   ```json
+   {
+     "acr": "urn:goiabada:level2_mandatory",
+     "amr": ["pwd", "otp"]
+   }
+   ```
+
+   Accept the sign-in only when `amr` has `otp`. The client's setting already makes the auth server ask for the code, so this check is what keeps your app safe if someone lowers that setting later.
+
+4. If your app calls an API of yours, the access token carries the same `acr` and `amr`, so the API can make the same check. See [Protect an API](/guides/protect-an-api/).
+
+</Steps>
+
+To ask for a code only before one sensitive operation, such as a payment, leave the client's level as it is and send `acr_values=urn:goiabada:level2_mandatory` on that one authorization request. [ACR and AMR](/concepts/acr-and-amr/#require-a-level) shows how.
+
+## Require a code for administrators
+
+The admin console signs administrators in through its own client, `admin-console-client`, so the same setting makes every administrator use a code.
+
+<Steps>
+
+1. Set up an authenticator for yourself first, under **Account**, **Two-factor authentication**. That way you know it works before it's required.
+
+2. Open **Admin**, **Clients**, `admin-console-client`, and on the **Settings** tab set **Default ACR level** to **ACR level 3 - password + mandatory OTP**, then save. Only an administrator with `authserver:manage` can change this client.
+
+3. The next time each administrator signs in to the admin console, they're asked for a code, and one without an authenticator sets one up first.
+
+</Steps>
+
+<Aside type="danger">
+**There are no backup codes.** An administrator who loses their authenticator needs another administrator to turn it off for them. Give `authserver:manage` to at least two people before you require a code, or you can **never** sign in again once the only one loses their phone. See [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-last-administrator-cant-sign-in).
+</Aside>
+
+## How it works
+
+### Setting up an authenticator
+
+A user can set up an authenticator before any client requires one, in the admin console under **Account**, **Two-factor authentication**: they scan the QR code, enter their password and the code the app shows, and click **Enable OTP**. A client at level 2, the level new clients start with, then asks them for a code too.
+
+At level 3, a user with no authenticator sets one up during the sign-in, on the page that asks for the code. Nothing is stored if their two-factor settings changed while they were doing it, for example in another tab: the sign-in ends, and they sign in again. See [ACR and AMR](/concepts/acr-and-amr/#setting-up-two-factor-authentication-during-a-sign-in).
+
+The authenticator app lists the account under the auth server's **App name** and the user's email address.
+
+### The code
+
+The code is a time-based one-time password ([RFC 6238](https://www.rfc-editor.org/rfc/rfc6238)): six digits, a new one every 30 seconds. The auth server also accepts the code from the 30 seconds before and after, so a phone whose clock is a little off still works.
+
+Each code works once. Sent again, it's refused, and the [audit log](/concepts/audit-log/) records `otp_code_replay_detected`. With the rate limiter on, each user gets 5 wrong codes in 15 minutes, and then waits. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
+
+### Users who are already signed in
+
+A user who signed in to another app with a password alone isn't asked for their password again. They're asked only for the code, which is a [step-up](/concepts/acr-and-amr/#a-session-thats-already-there), and their session keeps the higher level from then on.
+
+When a user sets up or removes an authenticator, every session of theirs goes through the code step again before it's used for a level above `urn:goiabada:level1`.
+
+### A user who lost their authenticator
+
+An administrator opens **Admin**, **Users**, the user, and their **Authentication** tab, turns off **Two-factor authentication enabled**, and saves. At level 3, the user sets up a new authenticator at their next sign-in.
+
+A user who still has their authenticator can turn it off themselves, with their password, under **Account**, **Two-factor authentication** and **Disable OTP**. At level 3, they then set up a new one at their next sign-in to your app.
+
+### What a code can't protect
+
+- **A silent request** (`prompt=none`) can't show the code page. When a code is due, it gets `interaction_required`. See [prompt](/concepts/prompt/#the-silent-checks).
+- **The password grant** ([ROPC](/legacy-flows/ropc/)) can't ask for a code, so it refuses every user who has an authenticator.
+- **The client credentials flow** has no user, so nothing asks for a code.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="ACR and AMR" description="Every level, and what each sign-in ends with." href="/concepts/acr-and-amr/" />
+  <LinkCard title="Single sign-on across clients" description="What a user signed in to another app is asked for." href="/guides/single-sign-on-across-clients/" />
+  <LinkCard title="Locked out of the admin console" description="What works when the only administrator loses their authenticator." href="/troubleshooting/locked-out-of-the-admin-console/" />
+</CardGrid>
