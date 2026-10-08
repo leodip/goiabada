@@ -83,10 +83,13 @@ func startSQLite(t *testing.T, dsn string) error {
 // cannot create the WAL's files in fails the connection; a file it cannot write, beside a directory
 // it can, connects read-only and fails the first write, which on an upgrade is the migration's
 // version marker. With nothing to migrate the start writes nothing and succeeds, which the page says
-// too. The permissions are the file owner's own, so the test means nothing as root and skips there.
+// too. The permissions are the file owner's own, and root writes a file whatever its mode, so as
+// root the test runs itself again as an unprivileged user. It used to skip there, and since the dev
+// container and CI's test containers run as root, no automated run checked the page.
 func TestReadonlyDatabasePage_QuotesWhatAStartAnswers(t *testing.T) {
 	if os.Geteuid() == 0 {
-		t.Skip("root writes a file whatever its mode, so no permission here makes it read-only")
+		runAsUnprivileged(t, "TestReadonlyDatabasePage_QuotesWhatAStartAnswers")
+		return
 	}
 	page := troubleshootingPage(t, readonlyDatabasePage)
 
