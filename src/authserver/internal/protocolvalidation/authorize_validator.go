@@ -289,7 +289,7 @@ var supportedResponseTypes = []string{"code", "token", "id_token", "id_token tok
 // thing, as ROPCNotAuthorizedErrorMsg does for its two (#197).
 const ImplicitNotAuthorizedErrorMsg = "The client is not authorized to use the implicit grant type. " +
 	"To enable it, go to the client's settings in the admin console under 'OAuth2 flows', " +
-	"or enable it globally in 'Settings > General'."
+	"or enable it globally in 'Admin > General'."
 
 // SupportedResponseTypes is the discovery document's response_types_supported. It lists every
 // response type the server implements whatever the implicit switch says, as OIDC Discovery 1.0
