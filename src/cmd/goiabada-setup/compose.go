@@ -59,8 +59,8 @@ func generateDBService(config *Config) string {
 	fmt.Fprintf(&sb, "      - %s:%s\n", e.volume, e.mount)
 	if len(e.composeEnvironment) > 0 {
 		sb.WriteString("    environment:\n")
-		for _, line := range e.composeEnvironment {
-			fmt.Fprintf(&sb, "      %s\n", line)
+		for _, v := range e.composeEnvironment {
+			writeComposeMapping(&sb, v.name, v.value)
 		}
 	}
 	sb.WriteString("    healthcheck:\n")
@@ -123,17 +123,17 @@ func generateAuthServerService(config *Config) string {
 	}
 
 	sb.WriteString("    environment:\n")
-	sb.WriteString("      - TZ=UTC\n")
+	writeComposeVariable(&sb, "TZ", "UTC")
 	writeComposeVariable(&sb, "GOIABADA_ADMIN_EMAIL", config.AdminEmail)
-	sb.WriteString("      - GOIABADA_APPNAME=Goiabada\n")
+	writeComposeVariable(&sb, "GOIABADA_APPNAME", "Goiabada")
 	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_BASEURL", config.AuthServerURL)
 	writeComposeInternalURL(&sb, authInternalURL)
-	sb.WriteString("      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=0.0.0.0\n")
-	sb.WriteString("      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090\n")
-	sb.WriteString("      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS=\n")
-	sb.WriteString("      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=\n")
-	sb.WriteString("      - GOIABADA_AUTHSERVER_CERTFILE=\n")
-	sb.WriteString("      - GOIABADA_AUTHSERVER_KEYFILE=\n")
+	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "0.0.0.0")
+	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", "9090")
+	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "")
+	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", "")
+	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_CERTFILE", "")
+	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_KEYFILE", "")
 	writeComposeTrust(&sb, behindProxy, "AUTHSERVER")
 	if config.Deployment.asksRateLimiter {
 		for _, line := range config.rateLimiterComment() {
@@ -141,20 +141,20 @@ func generateAuthServerService(config *Config) string {
 		}
 		writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_RATELIMITER_ENABLED", strconv.FormatBool(config.RateLimiter))
 	}
-	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true\n")
-	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_LEVEL=info\n")
-	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_FORMAT=text\n")
-	sb.WriteString("      - GOIABADA_AUTHSERVER_LOG_SQL=false\n")
-	sb.WriteString("      - GOIABADA_AUTHSERVER_STATICDIR=\n")
-	sb.WriteString("      - GOIABADA_AUTHSERVER_TEMPLATEDIR=\n")
-	sb.WriteString("      - GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS=false\n")
+	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS", "true")
+	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_LOG_LEVEL", "info")
+	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_LOG_FORMAT", "text")
+	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_LOG_SQL", "false")
+	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_STATICDIR", "")
+	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_TEMPLATEDIR", "")
+	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS", "false")
 	writeComposeVariable(&sb, "GOIABADA_DB_TYPE", config.Engine.name)
 
 	if config.Engine.hasServer {
 		writeComposeVariable(&sb, "GOIABADA_DB_USERNAME", config.Engine.defaultUser)
 		writeComposeVariable(&sb, "GOIABADA_DB_HOST", config.Engine.composeService)
 		writeComposeVariable(&sb, "GOIABADA_DB_PORT", config.Engine.defaultPort)
-		sb.WriteString("      - GOIABADA_DB_NAME=goiabada\n")
+		writeComposeVariable(&sb, "GOIABADA_DB_NAME", "goiabada")
 	} else {
 		writeComposeVariable(&sb, "GOIABADA_DB_DSN", config.Engine.mount+"/goiabada.db")
 	}
@@ -195,20 +195,20 @@ func generateAdminConsoleService(config *Config) string {
 	sb.WriteString("    networks:\n")
 	sb.WriteString("      - goiabada-network\n")
 	sb.WriteString("    environment:\n")
-	sb.WriteString("      - TZ=UTC\n")
+	writeComposeVariable(&sb, "TZ", "UTC")
 	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_BASEURL", config.AdminConsoleURL)
-	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=0.0.0.0\n")
-	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091\n")
-	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS=\n")
-	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS=\n")
-	sb.WriteString("      - GOIABADA_ADMINCONSOLE_CERTFILE=\n")
-	sb.WriteString("      - GOIABADA_ADMINCONSOLE_KEYFILE=\n")
+	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "0.0.0.0")
+	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", "9091")
+	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "")
+	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", "")
+	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_CERTFILE", "")
+	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_KEYFILE", "")
 	writeComposeTrust(&sb, behindProxy, "ADMINCONSOLE")
-	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true\n")
-	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LOG_LEVEL=info\n")
-	sb.WriteString("      - GOIABADA_ADMINCONSOLE_LOG_FORMAT=text\n")
-	sb.WriteString("      - GOIABADA_ADMINCONSOLE_STATICDIR=\n")
-	sb.WriteString("      - GOIABADA_ADMINCONSOLE_TEMPLATEDIR=\n")
+	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS", "true")
+	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_LOG_LEVEL", "info")
+	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_LOG_FORMAT", "text")
+	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_STATICDIR", "")
+	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_TEMPLATEDIR", "")
 	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_BASEURL", config.AuthServerURL)
 	writeComposeInternalURL(&sb, authInternalURL)
 	sb.WriteString("\n")
@@ -243,7 +243,7 @@ func generateComposeOverride(config *Config, paths outputPaths) string {
 	if e := config.Engine; e.hasServer {
 		fmt.Fprintf(&sb, "\n  %s:\n", e.composeService)
 		sb.WriteString("    environment:\n")
-		fmt.Fprintf(&sb, "      %s: %s\n", e.composePasswordVariable, composeQuote(config.DBPassword))
+		writeComposeMapping(&sb, e.composePasswordVariable, config.DBPassword)
 	}
 
 	sb.WriteString("\n  goiabada-authserver:\n")
@@ -335,7 +335,19 @@ func writeComposeInternalURL(sb *strings.Builder, url string) {
 
 // writeComposeVariable writes one entry of a service's list-form environment, quoted whole, so
 // the `=` is inside the scalar and the value is read back as it is (compose-spec, services.
-// environment; composeQuote).
+// environment; composeQuote). Every entry goes through here, the fixed ones as well as those the
+// wizard fills in, so the file writes them all one way.
 func writeComposeVariable(sb *strings.Builder, name, value string) {
 	fmt.Fprintf(sb, "      - %s\n", composeQuote(name+"="+value))
+}
+
+// composeEnvVar is one variable of a database service's environment.
+type composeEnvVar struct {
+	name, value string
+}
+
+// writeComposeMapping writes one entry of a service's mapping-form environment, the form the
+// database services use, its value quoted as writeComposeVariable quotes a whole entry.
+func writeComposeMapping(sb *strings.Builder, name, value string) {
+	fmt.Fprintf(sb, "      %s: %s\n", name, composeQuote(value))
 }
