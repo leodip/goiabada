@@ -43,6 +43,7 @@ const (
 var (
 	registrationExampleSection = conceptSection{registrationGuide, "## Register your app"}
 	alreadySignedInSection     = conceptSection{twoFactorGuide, "### Users who are already signed in"}
+	requireACodeSection        = conceptSection{twoFactorGuide, "## Require a code for your app"}
 )
 
 // registrationExample is the request a section shows and the answer it shows for it.
@@ -104,6 +105,54 @@ func TestGuideDocs_ASessionAtTheLevelIsReusedWithoutACode(t *testing.T) {
 	assertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), alreadySignedInSection, []string{
 		"A user whose session already reached the client's level isn't asked for anything: the session is reused",
 	})
+}
+
+// Require two-factor authentication promises a code at a sign-in that starts a session, not at every
+// sign-in with a password. A request with prompt=login asks for the password again over the user's
+// own level 3 session, and HandleAuthLevel1CompletedGet then decides with StepUpOwed over that
+// session, which owes nothing while its two-factor settings are unchanged; with no session to reuse,
+// the code is owed (#522 decision 13).
+func TestGuideDocs_APasswordOverASessionAtTheLevelAsksForNoCode(t *testing.T) {
+	session := &record.UserSession{
+		AcrLevel:            record.AcrLevel2Mandatory,
+		OtpConfigGeneration: 2,
+		User:                record.User{OTPEnabled: true, OtpConfigGeneration: 2},
+	}
+	step, err := ceremony.StepUpOwed(record.AcrLevel2Mandatory, session)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if step != ceremony.StepUpNone {
+		t.Fatalf("a password over a level 3 session owes %v at level 3, so the guide's sentences no longer hold", step)
+	}
+	step, err = ceremony.StepUpOwed(record.AcrLevel2Mandatory, nil)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if step == ceremony.StepUpNone {
+		t.Fatalf("a sign-in with no session to reuse owes no code at level 3, so the guide's sentences no longer hold")
+	}
+
+	root := filepath.Dir(guard.SourceRoot(t))
+	assertSectionSays(t, root, requireACodeSection, []string{
+		"From then on, a sign-in that starts a new session asks for your password and then a code.",
+		"a request that asks for the password again, such as one with `prompt=login`, doesn't ask for a code",
+	})
+	assertSectionSays(t, root, alreadySignedInSection, []string{
+		"That holds even when your app sends `prompt=login`: the user enters their password, but the code their session already gave still counts",
+	})
+	page, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(twoFactorGuide)))
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	for _, promise := range []string{
+		"whenever a user signs in with their password",
+		"each time you sign in with your password",
+	} {
+		if strings.Contains(string(page), promise) {
+			t.Errorf("%s says a code is asked %q, which a password over a session at the level does not", twoFactorGuide, promise)
+		}
+	}
 }
 
 // The registration on Let clients register themselves (DCR) is answered with the status and exactly
