@@ -28,7 +28,7 @@ Goiabada handles:
 - **Two-factor authentication & step-up auth** - Extra security with one-time passwords (OTP). Step-up authentication for sensitive operations.
 - **Fine-grained permissions** - Define exactly who can access what in your applications.
 - **Self-service account management** - Users can update their own profiles, change passwords, and manage their security settings.
-- **Dynamic client registration** - Apps can self-register via RFC 7591. Useful for MCP servers and native applications.
+- **Dynamic client registration** - Apps can self-register via RFC 7591. Useful for MCP clients and native applications.
 - **Multiple database support** - Choose your database: MySQL, PostgreSQL, Microsoft SQL Server, or SQLite.
 - **Built with Go** - Fast, lightweight, and resource-efficient. Low resource usage means lower hosting costs.
 - **Multi-architecture Docker images** - Run on Intel/AMD (x86_64) or ARM64 (Raspberry Pi, Apple Silicon, AWS Graviton).
