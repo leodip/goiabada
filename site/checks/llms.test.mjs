@@ -144,7 +144,7 @@ Every page below, in full and as Markdown, is in one file: [llms-full.txt](https
 ## Other pages
 
 - [Welcome](https://goiabada.dev/): The home page.
-- [Orphan](https://goiabada.dev/reference/orphan/)
+- [Orphan](https://goiabada.dev/reference/orphan/): A page no sidebar lists.
 `,
 	);
 	assert.ok(logged.includes('llms.txt and llms-full.txt hold all 6 pages'), logged.join('\n'));
@@ -195,6 +195,33 @@ Source: https://goiabada.dev/reference/orphan/
 
 A page no sidebar lists.
 `,
+	);
+});
+
+// An operation page as starlight-openapi renders one: no description meta tag,
+// the method and path, a URL in a popover, the code samples, the operation's
+// description, and its parameters, each with a description of its own.
+const operationPage = page({
+	title: 'Search users',
+	withSidebar: false,
+	body: `<div class="not-content sl-openapi-operation-description"><div class="sl-openapi-operation-description-header"><button aria-label="Toggle operation URLs" class="sl-openapi-operation-description-button"></button><div class="sl-openapi-operation-method"><div class="sl-openapi-operation-method-badge get">GET</div><div class="sl-openapi-operation-method-path">/api/v1/admin/users/search</div></div></div>
+<div class="sl-openapi-snippets"><div class="sl-openapi-snippet" data-openapi-snippet-id="shell:curl"><div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="sh"><code><div class="ec-line"><div class="code"><span>curl --request GET</span></div></div></code></pre></figure></div></div></div></div>
+<div id="sl-openapi-operation-description-popover" popover><ul class="sl-openapi-operation-description-urls"><li class="sl-openapi-operation-url"><label>Auth server base URL<input readonly type="text" value="{baseUrl}/api/v1/admin/users/search"></label></li></ul></div>
+<div class="sl-openapi-markdown"><p>Search for users with pagination. Each returned user can be annotated against one group (e.g. admins) or one permission.</p>
+<p>Sending both annotations is refused.</p></div>
+<section class="sl-openapi-section"><div class="sl-heading-wrapper level-h2"><h2 id="parameters">Parameters</h2></div><div class="sl-openapi-markdown"><p>Search term (matches email, username, name)</p></div></section>`,
+});
+
+test('a generated API page with no description meta tag is listed with the first sentence it renders', async (t) => {
+	const root = builtSite({ 'reference/api/admin/operations/searchusers/index.html': operationPage });
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+
+	const { error } = await runBuild(root, 'https://goiabada.dev/reference/api/admin/operations/searchusers/');
+
+	assert.equal(error, undefined);
+	assert.match(
+		read(root, 'llms.txt'),
+		/\n- \[Search users\]\(https:\/\/goiabada\.dev\/reference\/api\/admin\/operations\/searchusers\/\): Search for users with pagination\.\n/,
 	);
 });
 
@@ -290,7 +317,7 @@ Everything: [llms-full.txt](https://goiabada.dev/llms-full.txt)
 
 - [Welcome](https://goiabada.dev/): The home page.
 - [Proxy](https://goiabada.dev/guides/proxy/): Run behind a proxy.
-- [Errors](https://goiabada.dev/reference/errors/)
+- [Errors](https://goiabada.dev/reference/errors/): Every error code.
 `;
 
 const welcomeEntry = `# Welcome
@@ -384,6 +411,33 @@ test('an llms.txt entry without its page title or description is a finding', (t)
 	assert.deepEqual(problems(root), [
 		'llms.txt: the entry https://goiabada.dev/ lacks the description its page renders: "The home page."',
 		'llms.txt: the entry https://goiabada.dev/guides/proxy/ lacks the title its page renders: "Proxy"',
+	]);
+});
+
+test('an llms.txt entry without the description of a page that has no description meta tag is a finding', (t) => {
+	const root = checkedSite({
+		index: goodIndex.replace('[Errors](https://goiabada.dev/reference/errors/): Every error code.', '[Errors](https://goiabada.dev/reference/errors/)'),
+	});
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+
+	assert.deepEqual(problems(root), [
+		'llms.txt: the entry https://goiabada.dev/reference/errors/ lacks the description its page renders: "Every error code."',
+	]);
+});
+
+test('a page that renders no description is a finding', (t) => {
+	const root = checkedSite({
+		pages: {
+			...checkedPages,
+			'reference/errors/index.html': page({ title: 'Errors', body: '<ul><li>INVALID_REQUEST</li></ul>' }),
+		},
+		index: goodIndex.replace('[Errors](https://goiabada.dev/reference/errors/): Every error code.', '[Errors](https://goiabada.dev/reference/errors/)'),
+		full: [welcomeEntry, proxyEntry, errorsEntry.replace('Every error code.', '- INVALID_REQUEST')].join('\n'),
+	});
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+
+	assert.deepEqual(problems(root), [
+		'llms.txt: the page https://goiabada.dev/reference/errors/ renders no description, neither a description meta tag nor a paragraph',
 	]);
 });
 

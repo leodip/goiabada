@@ -53,7 +53,10 @@ const droppedElements = new Set(['script', 'style', 'svg', 'template', 'button']
 // { url, title, description, content, tree }. content is the page's main
 // content as hast, without what Starlight renders around it (the page footer)
 // or for screen readers and controls only, and without the title heading, which
-// heads the page's entry instead.
+// heads the page's entry instead. description is the page's description meta
+// tag, or, on a page with none, as on every page of the generated API
+// reference, the first sentence of the first paragraph it renders; it is empty
+// on a page with neither, which the sync check refuses.
 function readPages(distDir, site) {
 	const pages = [];
 	for (const file of htmlFiles(distDir)) {
@@ -62,9 +65,9 @@ function readPages(distDir, site) {
 		const url = new URL(`/${path.replace(/(^|\/)index\.html$/, '$1')}`, site).href;
 		const tree = fromHtml(readFileSync(file, 'utf8'));
 		const title = metaContent(tree, 'meta[property="og:title"]') ?? oneLine(textOf(select('h1#_top', tree)));
-		const description = metaContent(tree, 'meta[name="description"]');
 		const main = select('main', tree) ?? select('body', tree) ?? tree;
 		const content = { type: 'root', children: prune(main.children, title, false) };
+		const description = metaContent(tree, 'meta[name="description"]') || firstSentence(oneLine(textOf(select('p', content))));
 		pages.push({ url, title, description, content, tree });
 	}
 	return pages.sort((a, b) => (a.url < b.url ? -1 : a.url > b.url ? 1 : 0));
@@ -111,6 +114,12 @@ function textOf(node) {
 
 function oneLine(text) {
 	return text.replace(/\s+/g, ' ').trim();
+}
+
+// A text up to the first full stop, question or exclamation mark that ends a
+// word, or the whole text when none does.
+function firstSentence(text) {
+	return /^.*?[.!?](?=\s|$)/.exec(text)?.[0] ?? text;
 }
 
 // The letters and digits of a text, which is what the sync check compares:
@@ -388,7 +397,9 @@ export function findLlmsProblems({ distDir, site }) {
 	};
 
 	check(indexFile, indexEntries(readText(join(distDir, indexFile))), (entry, page) => {
-		if (page.description && entry.description !== page.description) {
+		if (!page.description) {
+			findings.push(`llms.txt: the page ${page.url} renders no description, neither a description meta tag nor a paragraph`);
+		} else if (entry.description !== page.description) {
 			findings.push(`llms.txt: the entry ${page.url} lacks the description its page renders: "${page.description}"`);
 		}
 	});

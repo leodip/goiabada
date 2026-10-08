@@ -12,9 +12,9 @@ import { pathToFileURL } from 'node:url';
 import buildChecks from './build-checks.mjs';
 import { findShippedLinks } from './shipped-links.mjs';
 
-// A built page as Starlight renders one: the title as h1, the sections as h2
-// and h3, and an element with an id that is not a heading.
-const guidePage = `<!doctype html><html><body>
+// A built page as Starlight renders one: its description, the title as h1, the
+// sections as h2 and h3, and an element with an id that is not a heading.
+const guidePage = `<!doctype html><html><head><meta name="description" content="Run behind a proxy."/></head><body>
 <h1 id="_top">A guide</h1>
 <div class="sl-heading-wrapper level-h2"><h2 id="client-ip-resolution">Client IP resolution</h2></div>
 <div class="sl-heading-wrapper level-h3"><h3 id="security-settings" class="x">Security settings</h3></div>
@@ -33,7 +33,7 @@ function fixture(files) {
 
 function builtSite(extraSource) {
 	return fixture({
-		'site/dist/index.html': '<!doctype html><h1 id="_top">Home</h1>',
+		'site/dist/index.html': '<!doctype html><meta name="description" content="The home page."/><h1 id="_top">Home</h1>',
 		'site/dist/guides/proxy/index.html': guidePage,
 		'site/dist/404.html': '<!doctype html><h1 id="_top">404</h1>',
 		...extraSource,
