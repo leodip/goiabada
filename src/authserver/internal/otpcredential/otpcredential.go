@@ -9,11 +9,12 @@
 // and the seed's cipher sits here rather than on record.User, which is a persistence record (#387).
 //
 // **The audit call stays at the caller**, as revocation requires of its own callers and for the
-// same reason: the three verification sites raise deliberately different event sets. The browser
-// raises EventAuthFailedOtp on a wrong code and EventAuthSuccessOtp on a good one; the account
-// API raises neither, because enabling an authenticator is not an authentication ceremony; all
-// three raise EventOTPCodeReplayDetected. That is what VerifyResult reports an outcome for
-// instead of deciding anything itself.
+// same reason: the two verification sites raise deliberately different event sets. The browser,
+// which verifies a stored authenticator or one being enrolled, raises EventAuthFailedOtp on a
+// wrong code and EventAuthSuccessOtp on a good one; the account API raises neither, because
+// enabling an authenticator is not an authentication ceremony; both raise
+// EventOTPCodeReplayDetected. That is what VerifyResult reports an outcome for instead of deciding
+// anything itself.
 //
 // Deliberately outside it (#387 decision 4), the account API's pending-enrolment mint, its
 // compare-and-set install and its expiry read stay in apihandlers: one caller, one storage shape,
@@ -62,7 +63,7 @@ type Database interface {
 
 // VerifyOutcome is what a passcode check concluded. The three values are the three arms every
 // verification site already had, and they are distinguished because the audit sets differ: a
-// replay raises an event of its own at all three, where a wrong code raises one at the browser
+// replay raises an event of its own at both sites, where a wrong code raises one at the browser
 // and nothing at the account API.
 type VerifyOutcome int
 
@@ -83,7 +84,7 @@ const (
 
 // VerifyResult is the outcome and the time step it was decided on, following
 // revocation.UserAuthStateResult's shape rather than returning a bare bool the callers would each
-// interpret. Step is the matched step, which the replay audit record at all three sites carries;
+// interpret. Step is the matched step, which the replay audit record at both sites carries;
 // it is zero when nothing matched, since there is no step to name.
 type VerifyResult struct {
 	Outcome VerifyOutcome

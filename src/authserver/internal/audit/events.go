@@ -259,14 +259,17 @@ const (
 	// pre-flight that refuses to migrate rather than disabling an account nobody asked about.
 	//
 	// Deliberately NOT EventUserDisabled, which already means "a disabled user was rejected"
-	// and is emitted from six auth paths; overloading it would make that event ambiguous.
+	// and is emitted wherever an auth path refuses one: /auth/authorize, the password and OTP
+	// steps, /auth/completed, /auth/issue, the token endpoint and /userinfo. Overloading it would
+	// make that event ambiguous.
 	EventRevokedUserAuthState = "revoked_user_auth_state"
-	// EventTerminatedUserSession records that an explicit "end this session" action durably cut
-	// off the grants that session authorized: the authorization codes issued through it are
-	// marked revoked, its refresh tokens including offline ones are revoked, and the session row
-	// is deleted. Emitted by the two session-termination endpoints AFTER their transaction
-	// commits, on success only, and emitted even when nothing was found to revoke, so the event
-	// attests that the action happened (#129 decision 9).
+	// EventTerminatedUserSession records that ending a session durably cut off the grants that
+	// session authorized: the authorization codes issued through it are marked revoked, its
+	// refresh tokens including offline ones are revoked, and the session row is deleted. Emitted
+	// AFTER the termination's transaction commits, on success only, by the account API's and the
+	// admin API's session-termination endpoints and by /auth/completed, which ends the session of
+	// another user the browser arrived with (#133), and emitted even when nothing was found to
+	// revoke, so the event attests that the action happened (#129 decision 9).
 	//
 	// It accompanies EventDeletedUserSession rather than replacing it. The two carry different
 	// meanings, one a session-lifecycle fact and one a security action, and leaving the older
@@ -333,10 +336,11 @@ const (
 	EventUpdatedClientLogo              = "updated_client_logo"
 	EventDeletedClientLogo              = "deleted_client_logo"
 	EventGeneratedEmailVerificationCode = "generated_email_verification_code"
-	// EventAuthCeremonyMismatch records a form in the authorization flow submitted with a
-	// ceremony id the browser's auth context no longer holds, which means a second
-	// /auth/authorize replaced the ceremony the page was rendered for. The submission is
-	// refused with a 400 and the current ceremony is left alone (#79).
+	// EventAuthCeremonyMismatch records a step of the authorization flow requested with a
+	// ceremony id the browser's auth context does not hold, or with none: a form submitted with
+	// its ceremonyId field, or a page loaded with the ceremony query parameter, from a ceremony a
+	// second /auth/authorize has since replaced. The request is refused with a 400 and the current
+	// ceremony is left alone (#79 for the forms, #246 and #437 for the pages).
 	//
 	// Ordinary in a browser the user runs two authorizations in, so a row on its own is not an
 	// attack. A run of them against one client is worth looking at: this is the event that
