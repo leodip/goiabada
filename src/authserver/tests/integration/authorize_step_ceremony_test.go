@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"testing"
@@ -149,6 +150,36 @@ func TestAuthorize_AStepThatNamesNoCeremonyOrAnotherIsRefused(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.Equal(t, ceremonyId, getCeremonyIdFromPage(t, resp))
 	})
+}
+
+// TestAuthorize_ThePasswordPageOffersRegisterOnlyWhileSelfRegistrationIsOn: the Register link goes
+// to /account/register, which answers the not-found page while self-registration is off, so the
+// password page shows it only while it is on, as the setting's tooltip says. The re-render after a
+// refused password is checked too, because it is a second render with its own data.
+func TestAuthorize_ThePasswordPageOffersRegisterOnlyWhileSelfRegistrationIsOn(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("self-registration %v", enabled), func(t *testing.T) {
+			changeSettings(t, func(settings *record.Settings) {
+				settings.SelfRegistrationEnabled = enabled
+			})
+
+			client, redirectUri := createLevel1Client(t, false)
+			httpClient := createHttpClient(t)
+			pwdUrl, pwdPage := walkToPasswordPage(t, httpClient, client, redirectUri, fake.LetterN(8))
+			defer func() { _ = pwdPage.Body.Close() }()
+			require.Equal(t, http.StatusOK, pwdPage.StatusCode)
+
+			links := parseHTMLResponse(t, pwdPage).Find(`a[href^="/account/register"]`).Length()
+			assert.Equal(t, map[bool]int{true: 1, false: 0}[enabled], links, "Register links on the password page")
+
+			refused := authenticateWithPassword(t, httpClient, pwdUrl, pwdPage, fake.Email(), fake.LetterN(16))
+			defer func() { _ = refused.Body.Close() }()
+			require.Equal(t, http.StatusOK, refused.StatusCode, "a refused password re-renders the form")
+
+			links = parseHTMLResponse(t, refused).Find(`a[href^="/account/register"]`).Length()
+			assert.Equal(t, map[bool]int{true: 1, false: 0}[enabled], links, "Register links on the form's re-render")
+		})
+	}
 }
 
 // TestAuthorize_TheRegistrationLinksCarryTheSignInThroughAndBack is the one path into a step that is

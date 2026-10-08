@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -18,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
@@ -239,6 +241,88 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
+}
+
+// TestHandleAuthPwd_OffersRegisterOnlyWhileSelfRegistrationIsOn: the password form's Register link
+// goes to /account/register, which answers the not-found page while self-registration is off, and
+// the setting's tooltip promises the link shows only while it is on. The form, and its re-render
+// after a refused submission, carry the setting for the template to decide by; the integration
+// tier's TestAuthorize_ThePasswordPageOffersRegisterOnlyWhileSelfRegistrationIsOn reads the
+// rendered page.
+func TestHandleAuthPwd_OffersRegisterOnlyWhileSelfRegistrationIsOn(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		authContext := func() *ceremony.AuthContext {
+			return &ceremony.AuthContext{
+				AuthState:  ceremony.AuthStateLevel1Password,
+				CeremonyId: testCeremonyId,
+				ClientId:   "my-app",
+			}
+		}
+		settings := &record.Settings{SelfRegistrationEnabled: enabled}
+
+		t.Run(fmt.Sprintf("the form, self-registration %v", enabled), func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			database := datamocks.NewDatabase(t)
+			handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, handlersmocks.NewAuditLogger(t), testAdminConsoleBaseURL)
+
+			req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
+			require.NoError(t, err)
+			req = req.WithContext(reqctx.WithSettings(req.Context(), settings))
+			rr := httptest.NewRecorder()
+
+			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext(), nil)
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "my-app").
+				Return(&record.Client{ClientIdentifier: "my-app"}, nil)
+
+			var rendered map[string]interface{}
+			pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html",
+				mock.MatchedBy(func(data map[string]interface{}) bool {
+					rendered = data
+					return true
+				})).Return(nil)
+
+			handler.ServeHTTP(rr, req)
+
+			require.NotNil(t, rendered)
+			assert.Equal(t, enabled, rendered["selfRegistrationEnabled"])
+		})
+
+		t.Run(fmt.Sprintf("the re-render after a refusal, self-registration %v", enabled), func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			database := datamocks.NewDatabase(t)
+			handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, handlersmocks.NewAuditLogger(t),
+				noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+
+			form := url.Values{}
+			form.Add(ceremonyIdField, testCeremonyId)
+			form.Add("password", "testpassword")
+			req, err := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
+			require.NoError(t, err)
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			req = req.WithContext(reqctx.WithSettings(req.Context(), settings))
+			rr := httptest.NewRecorder()
+
+			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext(), nil)
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "my-app").
+				Return(&record.Client{ClientIdentifier: "my-app"}, nil)
+
+			var rendered map[string]interface{}
+			pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html",
+				mock.MatchedBy(func(data map[string]interface{}) bool {
+					rendered = data
+					return true
+				})).Return(nil)
+
+			handler.ServeHTTP(rr, req)
+
+			require.NotNil(t, rendered)
+			assert.Equal(t, "Email is required.", rendered["error"], "the refusal this case drives")
+			assert.Equal(t, enabled, rendered["selfRegistrationEnabled"],
+				"a mistyped address must not bring back a link the form left out")
+		})
+	}
 }
 
 func TestHandleAuthPwdPost(t *testing.T) {
