@@ -97,9 +97,89 @@ Each stored event is one row:
 
 ### Details
 
-The details are a JSON object saying who and what. Their fields depend on the event. `logged_in_user` is the subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow.
+The details are a JSON object saying who and what. Which keys an entry has depends on its event, and the table below lists every key the auth server writes.
 
-Events are about people and clients, so details carry ids, not secrets. A refresh token appears only as its `jti`, an authenticator code only as its time step, and the forgot-password and registration events store a SHA-256 digest of the email address instead of the address itself.
+Every key is snake_case, and a key means the same thing in every event that carries it. Where the auth server's own log records name the same value, the key uses their name, so `client_id`, `client_identifier`, `user_id`, `group_id`, `session_identifier` and `ip` read the same in both. `client_id` is always the client's row id, and `client_identifier` always the identifier the client is known by.
+
+Events are about people and clients, so details carry ids, not secrets. A refresh token appears only as its `jti`, and an authenticator code only as its time step.
+
+An email address typed into a form nobody has signed in to is recorded only as `email_digest`, the SHA-256 hex digest of the address as that form looks it up. That covers a failed sign-in, a refused password grant, a registration, a forgot-password request, and a rate limit on any of them. The digest lets you match attempts on one address, and check an address you know against them. Anyone holding a candidate address can do the same, so treat it as a pseudonym, not a secret. An address an account holds is recorded as it is, since administrators already see it in the users list, and so is the address an administrator sends a test email to.
+
+| Key | Meaning |
+|---|---|
+| `allowed` | Whether the client may now ask for the administrative scopes. |
+| `audit_log_retention_days` | The new audit log retention, in days. |
+| `audit_logs_in_console_enabled` | Whether events are now written to the console log. |
+| `audit_logs_in_database_enabled` | Whether events are now stored in the database. |
+| `auth_state` | The step the browser's sign-in was on when a page from another sign-in, or from none, was refused. |
+| `ceiling` | Which rule refused an administrator change: `grant`, `target` or `settings`. |
+| `change` | `granted` or `revoked`. |
+| `checkpoint` | Where an administrative scope was refused: `authorize`, `issue`, or the token endpoint's `authorization_code`, `refresh_token` or `password` grant. |
+| `client_id` | The client's row id, the id in the Admin API's client paths. |
+| `client_identifier` | The identifier the client is known by, sent as `client_id` in OAuth requests. On a refusal at the token endpoint, it's the one the request named. |
+| `code_id` | The row id of an authorization code. |
+| `consent_id` | The row id of a consent a user gave a client. |
+| `email` | The address of an account: the one created, activated, or given an email verification code. |
+| `email_destination` | The address an email verification code was sent to. |
+| `email_digest` | The SHA-256 hex digest of an address typed into a form nobody has signed in to, or named by a password grant. |
+| `first_refresh_token_jti` | The `jti` of the first refresh token in a replayed token's family. |
+| `flow` | How a refresh token's family began: `auth_code` or `ropc`. |
+| `grant_type` | The `grant_type` of a token request. |
+| `grant_types` | The grant types a client asked for when it registered itself. |
+| `granted_permission_ids` | The row ids of the permissions a client permission save granted. |
+| `group_attribute_id` | The row id of a group's custom attribute. |
+| `group_id` | The group's row id. |
+| `group_identifier` | The identifier the group is known by. |
+| `group_ids` | The row ids of the administrative groups a refused membership change would have moved the user into or out of. |
+| `include_open_id_connect_claims_in_access_token` | Under `old` and `new`: whether OpenID Connect claims go in access tokens by default. |
+| `include_open_id_connect_claims_in_id_token` | Under `old` and `new`: whether OpenID Connect claims go in ID tokens by default. |
+| `ip` | The client's IP address, as the auth server resolved it. On `rate_limit_exceeded`, the block the limiter counts: the address for IPv4, its /64 for IPv6. |
+| `is_public` | Whether a client that registered itself is public, with no secret. |
+| `issue_access_token` | Whether the implicit flow issued an access token. |
+| `issue_id_token` | Whether the implicit flow issued an ID token. |
+| `key_id` | The key id (`kid`) of a deleted signing key. |
+| `limiter` | The name of the rate limiter that refused. |
+| `logged_in_user` | The subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow. Empty on the entries a sign-out or a sign-in writes, which no token makes. |
+| `method` | The HTTP method of a refused Admin API request. |
+| `new` | The default token settings after the change, keyed as below. |
+| `new_generation` | The user's authentication generation after their sessions and tokens were revoked. |
+| `new_ui_theme` | The UI theme after the change. |
+| `old` | The default token settings before the change, keyed as below. |
+| `old_generation` | The user's authentication generation before their sessions and tokens were revoked. |
+| `old_ui_theme` | The UI theme before the change. |
+| `outcome` | What a registration or forgot-password request led to, such as `link_issued`, `code_issued` or `unknown_address`. |
+| `permission_id` | The row id of a permission. |
+| `permission_identifiers` | The administrative permissions changed, such as `authserver:manage`. |
+| `permission_ids` | The row ids of the administrative permissions a refused request would have changed. |
+| `pre_registration_id` | The row id of a registration waiting for its activation link. |
+| `presented_refresh_token_jti` | The `jti` of the refresh token that came back after it was rotated. |
+| `preserved_session_identifier` | The session a password change kept, the one the user changed it from. Empty when none was kept. |
+| `previous_session_identifier` | The session of the other user that a sign-in on the same browser ended. |
+| `previous_user_id` | The user whose session a sign-in on the same browser ended. |
+| `reason` | Why a link was refused, such as `code_expired`, or why sessions and tokens were revoked, such as `account_disabled`. |
+| `refresh_token_jti` | The `jti` of the refresh token issued. |
+| `refresh_token_offline_idle_timeout_in_seconds` | Under `old` and `new`: the default idle timeout of an offline refresh token, in seconds. |
+| `refresh_token_offline_max_lifetime_in_seconds` | Under `old` and `new`: the default maximum lifetime of an offline refresh token, in seconds. |
+| `resource_id` | The resource's row id. |
+| `resource_identifier` | The identifier the resource is known by. |
+| `response_type` | The `response_type` of an implicit flow request. |
+| `revoked_code_count` | How many authorization codes were revoked. |
+| `revoked_count` | How many refresh tokens of a replayed token's family were revoked. |
+| `revoked_permission_ids` | The row ids of the permissions a client permission save revoked. |
+| `revoked_refresh_token_jtis` | The `jti` of each refresh token revoked. |
+| `route` | The route pattern of a refused Admin API request, such as `/api/v1/admin/users/{id}/permissions`. |
+| `scope` | The scope issued, or the scope a token request asked for and was refused. |
+| `scopes` | The administrative scopes a client asked for and was refused. |
+| `session_identifier` | The identifier of a user's session. |
+| `step` | The time step of an authenticator code that was sent again. |
+| `target_id` | The row id of the user, group, client or resource a request acted on. |
+| `target_kind` | What `target_id` names: `user`, `group`, `client` or `resource`. |
+| `terminated_session_identifiers` | The identifier of each session ended. |
+| `to` | The address an administrator sent a test email to. |
+| `token_expiration_in_seconds` | Under `old` and `new`: the default access token lifetime, in seconds. |
+| `user_attribute_id` | The row id of a user's custom attribute. |
+| `user_id` | The user's row id. |
+| `user_session_id` | The row id of a user's session. |
 
 ### The Admin API
 

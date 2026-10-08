@@ -93,11 +93,11 @@ func HandleSettingsTokensPut(
 
 		// Capture old values for auditing
 		oldVals := map[string]interface{}{
-			"tokenExpirationInSeconds":                currentSettings.TokenExpirationInSeconds,
-			"refreshTokenOfflineIdleTimeoutInSeconds": currentSettings.RefreshTokenOfflineIdleTimeoutInSeconds,
-			"refreshTokenOfflineMaxLifetimeInSeconds": currentSettings.RefreshTokenOfflineMaxLifetimeInSeconds,
-			"includeOpenIDConnectClaimsInAccessToken": currentSettings.IncludeOpenIDConnectClaimsInAccessToken,
-			"includeOpenIDConnectClaimsInIdToken":     currentSettings.IncludeOpenIDConnectClaimsInIdToken,
+			"token_expiration_in_seconds":                    currentSettings.TokenExpirationInSeconds,
+			"refresh_token_offline_idle_timeout_in_seconds":  currentSettings.RefreshTokenOfflineIdleTimeoutInSeconds,
+			"refresh_token_offline_max_lifetime_in_seconds":  currentSettings.RefreshTokenOfflineMaxLifetimeInSeconds,
+			"include_open_id_connect_claims_in_access_token": currentSettings.IncludeOpenIDConnectClaimsInAccessToken,
+			"include_open_id_connect_claims_in_id_token":     currentSettings.IncludeOpenIDConnectClaimsInIdToken,
 		}
 
 		// Apply updates
@@ -114,11 +114,11 @@ func HandleSettingsTokensPut(
 
 		// Audit with old/new values
 		newVals := map[string]interface{}{
-			"tokenExpirationInSeconds":                currentSettings.TokenExpirationInSeconds,
-			"refreshTokenOfflineIdleTimeoutInSeconds": currentSettings.RefreshTokenOfflineIdleTimeoutInSeconds,
-			"refreshTokenOfflineMaxLifetimeInSeconds": currentSettings.RefreshTokenOfflineMaxLifetimeInSeconds,
-			"includeOpenIDConnectClaimsInAccessToken": currentSettings.IncludeOpenIDConnectClaimsInAccessToken,
-			"includeOpenIDConnectClaimsInIdToken":     currentSettings.IncludeOpenIDConnectClaimsInIdToken,
+			"token_expiration_in_seconds":                    currentSettings.TokenExpirationInSeconds,
+			"refresh_token_offline_idle_timeout_in_seconds":  currentSettings.RefreshTokenOfflineIdleTimeoutInSeconds,
+			"refresh_token_offline_max_lifetime_in_seconds":  currentSettings.RefreshTokenOfflineMaxLifetimeInSeconds,
+			"include_open_id_connect_claims_in_access_token": currentSettings.IncludeOpenIDConnectClaimsInAccessToken,
+			"include_open_id_connect_claims_in_id_token":     currentSettings.IncludeOpenIDConnectClaimsInIdToken,
 		}
 		auditLogger.Log(r.Context(), audit.EventUpdatedTokensSettings, map[string]interface{}{
 			"logged_in_user": callerSubject(r),
