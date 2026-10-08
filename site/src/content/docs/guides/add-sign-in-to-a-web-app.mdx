@@ -1,0 +1,125 @@
+---
+title: Add sign-in to a web app
+description: Let users sign in to a web app that runs on a server, with the authorization code flow and PKCE.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This guide adds sign-in to a web app that runs on a server, so your users sign in with Goiabada and your app knows who they are.
+
+Here's the whole trip. Your app sends the browser to the auth server, the user signs in there, and the browser comes back to your app with an [authorization code](/concepts/glossary/#authorization-code): a one-time code your server trades for tokens. That's the authorization code flow, and [PKCE](/concepts/pkce/) ties the code to your app so nobody who intercepts it can use it. Your server can keep a secret, so your app is a [confidential client](/concepts/clients/#public-or-confidential).
+
+Most OpenID Connect libraries do every step below once you give them the discovery URL, `https://auth.example.com/.well-known/openid-configuration`, your client identifier and your client secret. The steps show what they send, so you know what to configure and what to look for when something goes wrong.
+
+## Sign users in
+
+<Steps>
+
+1. Register your app. In the admin console, open **Admin**, **Clients** and click **Create new**. Enter a **Client identifier**, such as `my-web-app`, turn on **Authorization code flow with PKCE**, and click **Create**.
+
+2. Click **Manage** beside your new client. On **Authentication**, click **Reveal** and copy the **Client secret** to your server's configuration. On **Redirect URIs**, add the address your app receives the code at, such as `https://app.example.com/callback`, and click **Save**.
+
+3. When a user clicks your app's sign-in button, make three random values: a `state`, a `nonce` and a PKCE code verifier, with the challenge made from it. Keep all three in the user's session on your server, then send the browser to the auth server:
+
+   ```http
+   GET /auth/authorize?client_id=my-web-app&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback&response_type=code&scope=openid%20email&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256&state=af0ifjsldkj&nonce=n-0S6_WzA2Mj HTTP/1.1
+   Host: auth.example.com
+   ```
+
+4. The user signs in, and the browser comes back to your redirect URI:
+
+   ```http
+   GET /callback?code=SplxlOBeZQQYbYS6WxSbIA&state=af0ifjsldkj HTTP/1.1
+   Host: app.example.com
+   ```
+
+   Check that `state` is the one you kept. If it isn't, stop: the request didn't come from your app. If the browser brings `error` and `error_description` instead of `code`, the sign-in was refused, and the description says why.
+
+5. From your server, redeem the code at the token endpoint within 60 seconds, with your client secret and the code verifier:
+
+   ```bash
+   curl -X POST https://auth.example.com/auth/token \
+     -u my-web-app:CLIENT_SECRET \
+     -d grant_type=authorization_code \
+     -d code=SplxlOBeZQQYbYS6WxSbIA \
+     -d redirect_uri=https://app.example.com/callback \
+     -d code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+   ```
+
+   The answer carries an `id_token`, an `access_token` and a `refresh_token`.
+
+6. Check the ID token, as [Tokens](/concepts/tokens/#check-a-token) describes: its signature against the keys at `/certs`, `iss`, `exp`, an `aud` equal to your client identifier, and a `nonce` equal to the one you kept.
+
+7. Sign the user in to your app as the user its `sub` names, and keep the tokens on your server. When the access token expires, trade the refresh token for new ones, as [Refresh tokens](/concepts/refresh-tokens/#refresh-a-token) shows.
+
+</Steps>
+
+That's sign-in done. The next thing your users will want is a way to sign out: see [Sign users out](/guides/sign-users-out/).
+
+## How it works
+
+### What the ID token says
+
+The ID token is a signed JWT, a set of claims about the sign-in. Decoded, the one from the sign-in above looks like this:
+
+```json
+{
+  "iss": "https://auth.example.com",
+  "sub": "c5b9b6a2-4b39-4b8e-9a8e-6f7f2b3a1d10",
+  "aud": "my-web-app",
+  "iat": 1760000000,
+  "nbf": 1760000000,
+  "exp": 1760000300,
+  "jti": "9a6f1c1e-2d0b-4f3e-8a55-0c1b7a3e2f44",
+  "auth_time": 1759999950,
+  "acr": "urn:goiabada:level2_optional",
+  "amr": ["pwd"],
+  "sid": "0b7e6a31-5f2c-4d8e-9c1a-3e4f5a6b7c8d",
+  "nonce": "n-0S6_WzA2Mj",
+  "email": "alice@example.com",
+  "email_verified": true
+}
+```
+
+Identify the user by `sub`, the user's [subject](/concepts/glossary/#subject). It never changes, where an email address can. `email` and `email_verified` are there because the request asked for the `email` scope. Each [scope](/concepts/scopes/) brings its own claims, and they're in the ID token while **Include OpenID Connect claims in the ID token** is on, as it is in a new install. `acr` and `amr` say how the user signed in: see [ACR and AMR](/concepts/acr-and-amr/). Keep the ID token itself: signing the user out sends it back.
+
+### state, nonce and PKCE
+
+Each of the three values you made in step 3 guards against something different, so send all three, new for every sign-in:
+
+- **`state`** comes back unchanged with the code or the error. Checking it tells your app the answer is to a request it made, not one an attacker started in the user's browser.
+- **`nonce`** comes back inside the ID token. Checking it tells your app the ID token was issued for this sign-in, not replayed from an earlier one.
+- **PKCE**: the auth server redeems the code only with the verifier the challenge was made from, and only your server has it.
+
+The auth server requires PKCE from a confidential client while **PKCE required for confidential clients using the authorization code flow** is on, under **Admin**, **General**, as it is in a new install. Send it anyway: [PKCE](/concepts/pkce/) explains why, and how to make the challenge.
+
+### The client secret
+
+Your server proves who it is when it redeems the code. Step 5 sends the secret in an `Authorization: Basic` header, which curl's `-u` builds. Sending `client_id` and `client_secret` in the body works too, but not both ways in one request. See [client authentication](/reference/endpoints/token/#client-authentication).
+
+<Aside type="danger">
+**Never** send the client secret to the browser, or put it in your app's front-end code. Anyone who has it can redeem codes as your app.
+</Aside>
+
+### Staying signed in
+
+Your app's session and the auth server's are two things. Once a user has signed in, the auth server keeps a [session](/concepts/sessions/) of its own. While it lasts, the next time your app, or another app using Goiabada, sends them to sign in, they don't enter their password again. That's [single sign-on](/concepts/glossary/#single-sign-on-sso).
+
+Access tokens last 5 minutes in a new install. The refresh token gets your app new ones without the user, while the user's session lasts. Ask for the `offline_access` scope as well when your app needs to work while the user is away. See [Refresh tokens](/concepts/refresh-tokens/).
+
+### When something goes wrong
+
+- The sign-in page says "Invalid redirect_uri parameter.": see [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/).
+- The browser never comes back with an error: see [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/).
+- The browser comes back with `error=invalid_scope`: see [invalid_scope](/troubleshooting/invalid-scope/).
+- A refresh answers "This refresh token has been revoked.": see [This refresh token has been revoked](/troubleshooting/this-refresh-token-has-been-revoked/).
+
+The [authorize](/reference/endpoints/authorize/) and [token](/reference/endpoints/token/) endpoint pages list every parameter and every refusal.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Sign users out" description="End the user's session from your app, and bring them back." href="/guides/sign-users-out/" />
+  <LinkCard title="Protect an API" description="Let your app call your API with the user's access token." href="/guides/protect-an-api/" />
+  <LinkCard title="Tokens" description="What each token carries, and how long it lasts." href="/concepts/tokens/" />
+</CardGrid>

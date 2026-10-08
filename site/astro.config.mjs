@@ -94,8 +94,10 @@ export default defineConfig({
 				{
 					label: 'Guides',
 					items: [
-						{ label: 'Authorization code', slug: 'guides/authorization-code' },
-						{ label: 'Client credentials', slug: 'guides/client-credentials' },
+						{ label: 'Add sign-in to a web app', slug: 'guides/add-sign-in-to-a-web-app' },
+						{ label: 'Add sign-in to a SPA or mobile app', slug: 'guides/add-sign-in-to-a-spa-or-mobile-app' },
+						{ label: 'Sign users out', slug: 'guides/sign-users-out' },
+						{ label: 'Protect an API', slug: 'guides/protect-an-api' },
 						{ label: 'Localization', slug: 'guides/localization' },
 						{ label: 'Customizations', slug: 'guides/customizations' },
 					],

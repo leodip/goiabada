@@ -1,0 +1,95 @@
+---
+title: Add sign-in to a SPA or mobile app
+description: Let users sign in to a single-page app, a mobile app or a desktop app, which can't keep a secret.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This guide adds sign-in to an app whose code runs on the user's device: a single-page app (SPA) in the browser, a mobile app, or a desktop app.
+
+It's the same trip as [a web app's](/guides/add-sign-in-to-a-web-app/): the browser goes to the auth server, the user signs in, and your app gets an authorization code it trades for tokens. The difference is that anyone can read your app's code, so it can't keep a client secret. It's registered as a [public client](/concepts/clients/#public-or-confidential), with no secret at all, and [PKCE](/concepts/pkce/) is what ties each code to the app that asked for it.
+
+## Sign users in
+
+<Steps>
+
+1. Register your app. In the admin console, open **Admin**, **Clients** and click **Create new**. Enter a **Client identifier**, such as `my-spa`, turn on **Authorization code flow with PKCE**, and click **Create**.
+
+2. Click **Manage** beside your new client. On **Authentication**, choose **Public client** and click **Save**.
+
+3. On **Redirect URIs**, add the address your app receives the code at, and click **Save**:
+
+   | Your app | Redirect URI |
+   |---|---|
+   | A SPA | A page of your app, such as `https://app.example.com/callback` |
+   | A mobile app | A URI with your app's own scheme, such as `com.example.app:/oauth2redirect` |
+   | A desktop app | A loopback address, such as `http://127.0.0.1/callback`. Any port matches. |
+
+4. A SPA only: on **Web origins**, add your app's origin, such as `https://app.example.com`, and click **Save**. Without it, the browser blocks your app's call to the token endpoint.
+
+5. When a user signs in, make a `state`, a `nonce` and a PKCE code verifier, with the challenge made from it, and keep them until the browser comes back. Then open the authorization request in the browser. A mobile or desktop app opens it in the system browser:
+
+   ```http
+   GET /auth/authorize?client_id=my-spa&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback&response_type=code&scope=openid%20email&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256&state=af0ifjsldkj&nonce=n-0S6_WzA2Mj HTTP/1.1
+   Host: auth.example.com
+   ```
+
+6. The user signs in, and the browser comes back to your redirect URI with `code` and `state`. Check that `state` is the one you kept, then redeem the code within 60 seconds. A public client sends its `client_id` and no secret:
+
+   ```bash
+   curl -X POST https://auth.example.com/auth/token \
+     -d grant_type=authorization_code \
+     -d client_id=my-spa \
+     -d code=SplxlOBeZQQYbYS6WxSbIA \
+     -d redirect_uri=https://app.example.com/callback \
+     -d code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+   ```
+
+7. Check the ID token as [a web app does](/guides/add-sign-in-to-a-web-app/#what-the-id-token-says), `nonce` included, and the user is signed in as its `sub`. When the access token expires, refresh it with your `client_id` and no secret:
+
+   ```bash
+   curl -X POST https://auth.example.com/auth/token \
+     -d grant_type=refresh_token \
+     -d client_id=my-spa \
+     -d refresh_token=eyJhbGciOiJSUzI1NiIs...
+   ```
+
+</Steps>
+
+## How it works
+
+### No secret, always PKCE
+
+A public client has no secret, so nothing it sends to the token endpoint proves who it is. PKCE makes up for that: your app sends a hash of a fresh secret with each authorization request, and the code is redeemed only with the secret itself. A code someone intercepts on its way back is no use without it.
+
+So a public client **always** uses PKCE, and the auth server refuses a public client's authorization request without a `code_challenge`. There's no setting to turn it off. A public client also can't use the client credentials flow, and a request that sends it a `client_secret` is refused with `invalid_request`. See [Clients](/concepts/clients/#public-and-confidential-clients).
+
+### In the browser
+
+Your SPA calls the token endpoint from JavaScript, from another origin than the auth server's, so the browser lets it read the answer only when the auth server allows that origin (CORS). The auth server allows every origin registered as a [web origin](/concepts/clients/#web-origins), at `/userinfo` and `/auth/logout` too. A web origin is permitted server-wide, for every client, whichever client you register it on.
+
+Keep the tokens where other sites can't reach them. Keeping them in memory is the safest: the user signs in again when the page reloads, which single sign-on usually makes a redirect and back, with no password.
+
+<Aside type="caution">
+Refresh from **one** place. When two tabs refresh with the same refresh token, the second can look like a stolen token being replayed, and the auth server then revokes every refresh token of the sign-in, so the user has to sign in again. See [Rotation](/concepts/refresh-tokens/#rotation).
+</Aside>
+
+### On a phone or a desktop
+
+Open the authorization request in the system browser, never in a web view inside your app. [RFC 8252](https://www.rfc-editor.org/rfc/rfc8252.html#section-8.12) says a native app must not use one, since your app could read the password the user types into it. The system browser also shares the auth server's session with every other app, so a user who's already signed in isn't asked for their password again.
+
+A mobile app's redirect URI uses a scheme of its own, such as `com.example.app:/oauth2redirect`, which the phone hands to your app. Use a reverse domain name you control, so no other app claims it. A custom scheme needs no host.
+
+A desktop app can receive the code on a local server it starts on a free port. For an `http` redirect URI on `127.0.0.1`, `[::1]` or `localhost`, the auth server ignores the port when it compares, as RFC 8252 asks: register `http://127.0.0.1/callback`, and `http://127.0.0.1:54321/callback` matches. Prefer `127.0.0.1` to `localhost`. See [loopback redirect URIs](/concepts/clients/#loopback-redirect-uris).
+
+### Refresh tokens
+
+A public client gets a refresh token like any other, and it works the same way: every refresh hands your app a new refresh token and retires the one it sent, so store each new one before you use the rest of the answer. See [Refresh tokens](/concepts/refresh-tokens/).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Sign users out" description="End the user's session from your app, and bring them back." href="/guides/sign-users-out/" />
+  <LinkCard title="Protect an API" description="Let your app call your API with the user's access token." href="/guides/protect-an-api/" />
+  <LinkCard title="PKCE" description="How the challenge is made, and what the auth server checks." href="/concepts/pkce/" />
+</CardGrid>

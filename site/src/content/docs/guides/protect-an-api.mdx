@@ -1,0 +1,130 @@
+---
+title: Protect an API
+description: Decide who may call your API, and check the access token on every request, for users and for services.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This guide protects your API with Goiabada, so it answers only callers holding the right permission, whether an app calls it for a user or a service calls it on its own.
+
+Callers show what they may do with an [access token](/concepts/tokens/): a signed JWT the auth server issues, which carries the [permission scopes](/concepts/scopes/#permission-scopes) its holder was granted. Your API checks the token on every request, on its own, with the auth server's public keys. It never has to call the auth server to do that.
+
+## Let users call your API
+
+<Steps>
+
+1. Describe your API. In the admin console, open **Admin**, **Resources and permissions** and click **Create new**. Enter a **Resource identifier**, such as `product-api`, and a **Description**, and click **Create**.
+
+2. Open the resource's **Permissions** tab, add a permission for each thing your API lets callers do, such as `read` and `write`, and click **Save**. Each one is a scope your app can ask for, `product-api:read` and `product-api:write`. See [Resources and permissions](/concepts/resources-and-permissions/).
+
+3. Give the permissions to the users who need them, on each user's **Permissions** tab, or to a group, on the group's **Permissions** tab, so every member gets them.
+
+4. Have your app ask for the scope when it signs the user in, beside the OpenID Connect scopes it already asks for, as in [Add sign-in to a web app](/guides/add-sign-in-to-a-web-app/):
+
+   ```http
+   GET /auth/authorize?client_id=my-web-app&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback&response_type=code&scope=openid%20email%20product-api%3Aread&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256&state=af0ifjsldkj&nonce=n-0S6_WzA2Mj HTTP/1.1
+   Host: auth.example.com
+   ```
+
+5. Your app sends the access token it gets to your API, in the `Authorization` header:
+
+   ```bash
+   curl https://api.example.com/products \
+     -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9..."
+   ```
+
+6. Your API checks the token before it answers, as [Tokens](/concepts/tokens/#check-a-token) describes: its signature against the keys at `https://auth.example.com/certs`, an `iss` equal to the auth server's issuer, an `exp` that hasn't passed, `product-api` among its `aud`, and the permission the operation needs in its `scope`.
+
+</Steps>
+
+A token that fails a check gets `401 Unauthorized`, and one that's valid but lacks the permission gets `403 Forbidden`, as [RFC 6750 section 3.1](https://www.rfc-editor.org/rfc/rfc6750.html#section-3.1) describes for an API answering bearer tokens.
+
+## Let a service call your API
+
+A service that calls your API on its own, with no user, such as a nightly job, gets its own token with the client credentials flow.
+
+<Steps>
+
+1. Register the service. In the admin console, open **Admin**, **Clients** and click **Create new**. Enter a **Client identifier**, such as `billing-service`, turn on **Client credentials flow**, and click **Create**.
+
+2. Click **Manage** beside it. On **Permissions**, choose the **Resource** and the **Permission** the service needs, click **Grant permission**, and click **Save**. On **Authentication**, click **Reveal** and copy the **Client secret** to the service's configuration.
+
+3. From the service, ask the token endpoint for a token:
+
+   ```bash
+   curl -X POST https://auth.example.com/auth/token \
+     -u billing-service:CLIENT_SECRET \
+     -d grant_type=client_credentials \
+     -d scope=product-api:read
+   ```
+
+4. Read the access token from the answer:
+
+   ```json
+   {
+     "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...",
+     "token_type": "Bearer",
+     "expires_in": 300,
+     "scope": "product-api:read"
+   }
+   ```
+
+5. Call your API with it, as step 5 above does. When it expires, ask for a new one: there's no refresh token.
+
+</Steps>
+
+## How it works
+
+### What a user's token carries
+
+An access token from a sign-in names the user in `sub`, and carries in `scope` the permission scopes your app asked for that the user holds, directly or through a group. A permission the user doesn't hold is left out without an error, so check `scope` rather than assuming your app got what it asked for. Its `aud` names the resource of each permission scope, and `authserver` too when the token carries an OpenID Connect scope, since the auth server's own `/userinfo` accepts it. [Tokens](/concepts/tokens/#the-access-token) lists every claim.
+
+### What a service's token carries
+
+A token from the client credentials flow names no user. Decoded, the one from the steps above looks like this:
+
+```json
+{
+  "iss": "https://auth.example.com",
+  "sub": "billing-service",
+  "aud": "product-api",
+  "scope": "product-api:read",
+  "typ": "Bearer",
+  "iat": 1760000000,
+  "nbf": 1760000000,
+  "exp": 1760000300,
+  "jti": "9a6f1c1e-2d0b-4f3e-8a55-0c1b7a3e2f44"
+}
+```
+
+`sub` is the client identifier, and there's no `auth_time`, `acr`, `amr` or `sid`, since nobody signed in. Your API checks it exactly as it checks a user's token.
+
+The scope is the client's own permissions, never a user's. Leave `scope` out of the request to get every permission the client holds. A scope the client doesn't hold is refused with `invalid_scope`, and an OpenID Connect scope such as `openid` with `invalid_request`, since there's no user for it to describe. [Token](/reference/endpoints/token/#client-credentials-grant) lists every refusal.
+
+Only a confidential client can use the flow, since its client secret is all it proves itself with. Keep the secret in the service's secret store or environment, never in code, and give each service a client of its own, so you can replace one's secret without touching the others.
+
+### The keys
+
+Fetch the key set from `/certs` once and cache it, then pick the key whose `kid` matches the one in the token's header. When a token names a `kid` your cache doesn't have, fetch the set again: the auth server publishes the next signing key before it signs anything with it, so a fresh copy has it. See [the key set](/reference/endpoints/discovery-and-jwks/#the-key-set).
+
+### What your API can't see
+
+Your API trusts a valid token until it expires. Ending the user's session, disabling them or changing their password stops the next refresh, not a token already issued. That's why access tokens are short, 5 minutes in a new install.
+
+<Aside type="caution">
+If an operation must stop the moment a user is disabled or their session is ended, check the signature and also call [`/userinfo`](/reference/endpoints/userinfo/) with the token: the auth server refuses it from then on. That works for a token carrying `openid`. See [what ending a session doesn't reach](/concepts/ending-sessions/#what-it-doesnt-reach).
+</Aside>
+
+### When something goes wrong
+
+- The app gets `error=invalid_scope`, or a token without the permission: see [invalid_scope](/troubleshooting/invalid-scope/).
+- The service gets `unauthorized_client`: **Client credentials flow** is off for its client, or the client is public.
+- The service gets `invalid_client`: the client identifier or secret is wrong, or the client is disabled.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Resources and permissions" description="Who holds a permission, and the authserver resource." href="/concepts/resources-and-permissions/" />
+  <LinkCard title="Tokens" description="Every claim an access token carries, and how long it lasts." href="/concepts/tokens/" />
+  <LinkCard title="Token" description="The token endpoint's grants, answers and errors." href="/reference/endpoints/token/" />
+</CardGrid>

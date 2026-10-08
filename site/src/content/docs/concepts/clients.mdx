@@ -76,8 +76,8 @@ Switching a client from confidential to public deletes its secret, turns off the
 
 The **OAuth2 flows** tab turns each flow on or off for the client.
 
-- **Authorization code with PKCE** signs users in. Your app sends the browser to `/auth/authorize`, the user signs in, and the auth server sends back an authorization code, which your app exchanges at `/auth/token` for tokens. See [Authorization code](/guides/authorization-code/).
-- **Client credentials** lets a confidential client get an access token for itself, with no user involved. See [Client credentials](/guides/client-credentials/).
+- **Authorization code with PKCE** signs users in. Your app sends the browser to `/auth/authorize`, the user signs in, and the auth server sends back an authorization code, which your app exchanges at `/auth/token` for tokens. See [Add sign-in to a web app](/guides/add-sign-in-to-a-web-app/) and [Add sign-in to a SPA or mobile app](/guides/add-sign-in-to-a-spa-or-mobile-app/).
+- **Client credentials** lets a confidential client get an access token for itself, with no user involved. See [Protect an API](/guides/protect-an-api/#let-a-service-call-your-api).
 - **Implicit flow** and **Resource Owner Password Credentials (ROPC)** are legacy flows, deprecated in OAuth 2.1. Each one is on for a client or off, or inherits the global setting under **Admin**, **General**, which is off in a new install. Leave them off unless an old app needs one. See [Implicit](/legacy-flows/implicit/) and [ROPC](/legacy-flows/ropc/).
 
 The same tab sets **PKCE requirement for this client?** for a confidential client: **Required**, **Optional (not recommended)**, or inherit **PKCE required for confidential clients using the authorization code flow** under **Admin**, **General**, which is on in a new install. New clients inherit it.
@@ -273,6 +273,6 @@ A single-page app can't register itself, since it needs an `https` redirect URI 
 ## Next steps
 
 <CardGrid>
-  <LinkCard title="Authorization code" description="Sign users in to your app." href="/guides/authorization-code/" />
+  <LinkCard title="Add sign-in to a web app" description="Sign users in to your app." href="/guides/add-sign-in-to-a-web-app/" />
   <LinkCard title="Resources and permissions" description="Decide what each client and user can do." href="/concepts/resources-and-permissions/" />
 </CardGrid>
