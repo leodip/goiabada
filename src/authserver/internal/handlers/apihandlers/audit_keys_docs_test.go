@@ -896,9 +896,9 @@ func (x *auditDetailsIndex) isAuditLogCall(call *ast.CallExpr) bool {
 	if !ok || sel.Sel.Name != "Log" || len(call.Args) != 3 {
 		return false
 	}
-	if event, ok := ast.Unparen(call.Args[1]).(*ast.SelectorExpr); ok {
-		if pkgId, ok := event.X.(*ast.Ident); ok {
-			if pkgName, ok := x.info.Uses[pkgId].(*types.PkgName); ok && pkgName.Imported().Path() == auditImportPath {
+	if event, isSelector := ast.Unparen(call.Args[1]).(*ast.SelectorExpr); isSelector {
+		if pkgId, isIdent := event.X.(*ast.Ident); isIdent {
+			if pkgName, isPkg := x.info.Uses[pkgId].(*types.PkgName); isPkg && pkgName.Imported().Path() == auditImportPath {
 				return true
 			}
 		}
@@ -1039,6 +1039,7 @@ func (t *auditDetailsTrace) variable(v *types.Var, at ast.Expr) {
 // keysAssignedInto records every key assigned into v, and into each parameter of this package's
 // functions v is passed as.
 func (t *auditDetailsTrace) keysAssignedInto(v *types.Var) {
+	//nolint:unused // map key, read whole by the map's equality, never by selector
 	type into struct{ v *types.Var }
 	if !t.once(into{v}) {
 		return
@@ -1121,6 +1122,7 @@ func (t *auditDetailsTrace) result(call *ast.CallExpr, index int) {
 // returns follows the index-th result of every return statement in body, a function's whose
 // signature is sig, leaving out those of the function literals inside it.
 func (t *auditDetailsTrace) returns(body *ast.BlockStmt, sig *types.Signature, index int) {
+	//nolint:unused // map key, read whole by the map's equality, never by selector
 	type result struct {
 		body  *ast.BlockStmt
 		index int
@@ -1152,6 +1154,7 @@ func (t *auditDetailsTrace) returns(body *ast.BlockStmt, sig *types.Signature, i
 // functionValues follows v, a variable of function type called at fun, to each function it can
 // hold, and the index-th result of each.
 func (t *auditDetailsTrace) functionValues(v *types.Var, fun ast.Expr, index int) {
+	//nolint:unused // map key, read whole by the map's equality, never by selector
 	type held struct {
 		v     *types.Var
 		index int

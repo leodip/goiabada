@@ -25,7 +25,6 @@ import (
 // /auth/completed.
 type signedInUpToCompleted struct {
 	httpClient   *http.Client
-	client       *record.Client
 	redirectURI  *record.RedirectURI
 	user         *record.User
 	state        string
@@ -96,7 +95,6 @@ func signInUpToCompleted(t *testing.T) *signedInUpToCompleted {
 
 	return &signedInUpToCompleted{
 		httpClient:       httpClient,
-		client:           client,
 		redirectURI:      redirectURI,
 		user:             user,
 		state:            state,
