@@ -22,7 +22,7 @@ import (
 // the authserver module (#250).
 const ROPCNotAuthorizedErrorMsg = "The client is not authorized to use the resource owner password credentials grant type. " +
 	"To enable it, go to the client's settings in the admin console under 'OAuth2 flows', " +
-	"or enable it globally in 'Settings > General'."
+	"or enable it globally in 'Admin > General'."
 
 // PasswordGrant is a validated resource owner password credentials request: the client, the user
 // whose password was just checked, and the scope granted to them.
