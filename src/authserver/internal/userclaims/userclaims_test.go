@@ -199,7 +199,7 @@ func TestAddOpenIDConnectClaims(t *testing.T) {
 // TestAddOpenIDConnectClaims_UpdatedAtRidesWithTheProfileScope is the one rule, where there were
 // two gates. updated_at is a profile-scope claim: OIDC Core 5.4 lists it with name, family_name,
 // birthdate and the rest, and this repository's own documentation has always assigned it there
-// (site/src/content/docs/concepts/scopes.mdx, reference/endpoints.mdx). /userinfo
+// (site/src/content/docs/concepts/scopes.mdx, reference/endpoints/userinfo.mdx). /userinfo
 // already gated on profile; issuance emitted it for any scope but a lone openid, so "openid email"
 // carried it with no profile scope granted.
 //

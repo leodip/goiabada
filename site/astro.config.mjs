@@ -137,7 +137,17 @@ export default defineConfig({
 				{
 					label: 'Reference',
 					items: [
-						{ label: 'Endpoints', slug: 'reference/endpoints' },
+						{
+							label: 'Endpoints',
+							items: [
+								{ label: 'Authorize', slug: 'reference/endpoints/authorize' },
+								{ label: 'Token', slug: 'reference/endpoints/token' },
+								{ label: 'Logout', slug: 'reference/endpoints' },
+								{ label: 'UserInfo', slug: 'reference/endpoints/userinfo' },
+								{ label: 'Discovery and JWKS', slug: 'reference/endpoints/discovery-and-jwks' },
+								{ label: 'Logo and picture', slug: 'reference/endpoints/logo-and-picture' },
+							],
+						},
 						{
 							label: 'API',
 							items: [

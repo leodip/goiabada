@@ -25,7 +25,7 @@ Decide what to do from the HTTP status first: a `4xx` is something your request 
 - **`error_code`** is a stable identifier for the failure. It's either an `UPPER_SNAKE` code from the table below, or, for a refused field the auth server can describe in several languages, a catalog key in dotted lowercase, such as `validator.email.invalid_format`.
 - **`error_description`** is a sentence for people. For a catalog key it's in the request's language; otherwise it's in English. Don't match on it: the wording can change, the code won't.
 
-The protocol endpoints, `/auth/authorize`, `/auth/token`, `/connect/register` and `/userinfo`, answer errors in the format their standards define, not this one. [Endpoints](/reference/endpoints/) covers them.
+The protocol endpoints, `/auth/authorize`, `/auth/token`, `/connect/register` and `/userinfo`, answer errors in the format their standards define, not this one. [Authorize](/reference/endpoints/authorize/), [Token](/reference/endpoints/token/) and [UserInfo](/reference/endpoints/userinfo/) cover theirs, and [self-registered clients](/concepts/clients/#self-registered-clients) the registration endpoint's.
 
 ### Error codes
 

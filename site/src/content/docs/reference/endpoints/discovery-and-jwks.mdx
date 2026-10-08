@@ -1,0 +1,117 @@
+---
+title: Discovery and JWKS
+description: Read the auth server's endpoints and capabilities from its discovery document, and the keys that check its tokens' signatures from /certs.
+---
+
+import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you configure a client or an API from the auth server's discovery document, and check the signature of a token it issued.
+
+Two endpoints do this, and neither needs a token:
+
+- **`GET /.well-known/openid-configuration`**, the discovery document: where every endpoint is and what the auth server supports. Most OpenID Connect libraries need nothing else to configure themselves.
+- **`GET /certs`**, the JSON Web Key Set (JWKS): the public keys the auth server signs tokens with. Its URL is the discovery document's `jwks_uri`.
+
+## Configure from discovery
+
+<Steps>
+
+1. Give your library the auth server's base URL, or the discovery URL itself:
+
+   ```bash
+   curl https://auth.example.com/.well-known/openid-configuration
+   ```
+
+2. It reads the endpoints and the issuer from the answer:
+
+   ```json
+   {
+     "issuer": "https://auth.example.com",
+     "authorization_endpoint": "https://auth.example.com/auth/authorize",
+     "token_endpoint": "https://auth.example.com/auth/token",
+     "userinfo_endpoint": "https://auth.example.com/userinfo",
+     "end_session_endpoint": "https://auth.example.com/auth/logout",
+     "jwks_uri": "https://auth.example.com/certs",
+     ...
+   }
+   ```
+
+3. To check a token's signature, it fetches the key set and picks the key whose `kid` matches the one in the token's header:
+
+   ```bash
+   curl https://auth.example.com/certs
+   ```
+
+   ```json
+   {
+     "keys": [
+       {
+         "alg": "RS256",
+         "kid": "0e0c3f6a-...",
+         "kty": "RSA",
+         "use": "sig",
+         "n": "w8Zk...",
+         "e": "AQAB"
+       }
+     ]
+   }
+   ```
+
+</Steps>
+
+Then it checks the token's `iss` against the discovery document's `issuer`, and its `aud` and `exp`. See [Tokens](/concepts/tokens/).
+
+## How it works
+
+### The discovery document
+
+The auth server describes what it implements, which no setting changes but two: the issuer, and whether `registration_endpoint` is there. Every grant and response type is listed even while the implicit flow or the password grant is off, as OpenID Connect Discovery 1.0 and RFC 8414 define these fields: a client that isn't allowed one is refused at the endpoint.
+
+| Field | Value |
+|---|---|
+| `issuer` | **Issuer**, under **Admin**, **General** in the admin console. A new installation starts with the auth server's base URL. Every token's `iss` is this value. |
+| `authorization_endpoint` | `/auth/authorize`, the [authorization endpoint](/reference/endpoints/authorize/) |
+| `token_endpoint` | `/auth/token`, the [token endpoint](/reference/endpoints/token/) |
+| `userinfo_endpoint` | `/userinfo`, the [UserInfo endpoint](/reference/endpoints/userinfo/) |
+| `end_session_endpoint` | `/auth/logout`, the [logout endpoint](/reference/endpoints/) |
+| `jwks_uri` | `/certs`, the key set below |
+| `registration_endpoint` | `/connect/register`, only while dynamic client registration is on. See [self-registered clients](/concepts/clients/#self-registered-clients). |
+| `grant_types_supported` | `authorization_code`, `refresh_token`, `client_credentials`, `password` and `implicit` |
+| `response_types_supported` | `code`, `token`, `id_token` and `id_token token` |
+| `response_modes_supported` | `query`, `fragment` and `form_post` |
+| `prompt_values_supported` | `none`, `login` and `consent`. See [prompt](/concepts/prompt/). |
+| `acr_values_supported` | `urn:goiabada:level1`, `urn:goiabada:level2_optional` and `urn:goiabada:level2_mandatory`. See [ACR and AMR](/concepts/acr-and-amr/). |
+| `subject_types_supported` | `public`: a user's `sub` is the same for every client |
+| `id_token_signing_alg_values_supported` | `RS256` |
+| `scopes_supported` | `openid`, `profile`, `email`, `address`, `phone`, `groups`, `attributes` and `offline_access`. Permission scopes aren't listed. See [Scopes](/concepts/scopes/). |
+| `claims_supported` | Every claim the auth server writes into a token or answers from `/userinfo` |
+| `token_endpoint_auth_methods_supported` | `client_secret_post`, `client_secret_basic` and `none`, the last for a public client |
+| `code_challenge_methods_supported` | `S256`. See [PKCE](/concepts/pkce/). |
+| `request_parameter_supported` | `false`: a `request` object is refused |
+| `request_uri_parameter_supported` | `false`: a `request_uri` is refused |
+
+Each endpoint is the auth server's base URL, `GOIABADA_AUTHSERVER_BASEURL`, followed by its path. The admin console's home page links to the document.
+
+### The key set
+
+`/certs` answers with the public half of every signing key the auth server keeps, in this order:
+
+- **The next key**, which will sign tokens after the next rotation. It's published before it signs anything, so a client that caches the set already has it when it starts being used.
+- **The current key**, which signs every token now.
+- **The previous key**, while there is one: it signed tokens before the last rotation, and some of them may still be valid.
+
+Each key is a 4096-bit RSA key with `alg` `RS256`, `use` `sig`, and a `kid` that the header of every token it signs carries.
+
+To rotate, choose **Rotate key** under **Admin**, **Keys** in the admin console. The next key becomes the current one, the current one becomes the previous one, the old previous key is deleted, and a new next key is created. A token signed by the deleted key no longer verifies, refresh tokens included, so don't rotate twice within the lifetime of your longest-lived token.
+
+### Calling them from a browser
+
+Both endpoints answer cross-origin requests from any origin, with nothing to register, so JavaScript in a browser can read them. See [web origins](/concepts/clients/#web-origins) for the endpoints that need one.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Tokens" description="What's in each token, and how to validate one." href="/concepts/tokens/" />
+  <LinkCard title="Authorize" description="Start a sign-in at the authorization endpoint." href="/reference/endpoints/authorize/" />
+  <LinkCard title="Token" description="Exchange a code, refresh, or get a client's own token." href="/reference/endpoints/token/" />
+</CardGrid>

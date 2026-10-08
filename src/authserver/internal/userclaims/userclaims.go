@@ -100,7 +100,7 @@ type Mapper struct {
 // AddOpenIDConnectClaims writes the profile, email, address and phone claims the given scopes ask
 // for. updated_at rides inside the profile arm with the rest of the claims OIDC Core 5.4 lists
 // under that scope, which is also what this repository's own documentation has always said
-// (site/src/content/docs/concepts/scopes.mdx and reference/endpoints.mdx).
+// (site/src/content/docs/concepts/scopes.mdx and reference/endpoints/userinfo.mdx).
 //
 // A failed picture lookup is not an error here and never has been: the claim is omitted and the
 // rest of the response stands, because a user who cannot be told whether they have a picture still

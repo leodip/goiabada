@@ -4,14 +4,16 @@ package apihandlers
 // decisions 5, 7, 9 and 11).
 //
 // An operator learns from the clients page and the API reference which clients may request the six
-// administrative scopes and how to allow one, an integrator learns from the endpoints page what a
+// administrative scopes and how to allow one, an integrator learns from the endpoint pages what a
 // refused client is answered, and an alert rule is written from the audit-log page. What the route
 // that switches the allowance does is in its own description in openapi.yaml, which the reference
 // renders (#519 decision 7). Each names facts
 // the code owns, the scopes, the route, the response field, the error codes, the refusal's sentence
 // and the audit events, and a page naming one the code does not hold, or leaving out one the
 // allowance rests on, misleads with nothing going red. The Account API setup is held too: it told
-// the reader to obtain a token with client credentials, which the Account API refuses.
+// the reader to obtain a token with client credentials, which the Account API refuses. Each
+// endpoint's answers are on its own reference page, since the Endpoints page was split into one page
+// per endpoint (#522).
 //
 // It reads files and nothing else.
 
@@ -39,7 +41,8 @@ import (
 // The pages, relative to the repository root, beside administrative_docs_test.go's.
 const (
 	clientsPage   = "site/src/content/docs/concepts/clients.mdx"
-	endpointsPage = "site/src/content/docs/reference/endpoints.mdx"
+	authorizePage = "site/src/content/docs/reference/endpoints/authorize.mdx"
+	tokenPage     = "site/src/content/docs/reference/endpoints/token.mdx"
 )
 
 // The sections the allowance is described in.
@@ -48,8 +51,8 @@ var (
 	allowanceClientsSection = docSection{clientsPage, "### Administrative scopes"}
 	accountAPISetupSection  = docSection{apiAuthenticationPage, "## Call the Account API"}
 	clientCredentialsSetup  = docSection{apiAuthenticationPage, "## Call the Admin API"}
-	authorizeSection        = docSection{endpointsPage, "## /auth/authorize (GET or POST)"}
-	tokenSection            = docSection{endpointsPage, "## /auth/token (POST)"}
+	authorizeSection        = docSection{authorizePage, "### Administrative scopes"}
+	tokenSection            = docSection{tokenPage, "### Administrative scopes"}
 )
 
 // allowanceRoute is the route that switches a client's allowance, as openapi.yaml spells it.
@@ -187,11 +190,11 @@ func TestAdministrativeScopesDocs_TheClientsPageNamesTheSwitchAndTheRefusal(t *t
 		[]string{"**" + label + "**", "`invalid_scope`", "`invalid_grant`"}, nil)
 }
 
-// The endpoints page quotes what a client that may not request an administrative scope is answered,
-// as the code answers it: the authorization endpoint's invalid_scope, and on the token endpoint the
-// password grant's invalid_scope, the authorization code grant's invalid_grant with the same
-// sentence, and the refresh token grant's invalid_grant carrying it (#499 decision 7).
-func TestAdministrativeScopesDocs_TheEndpointsPageQuotesTheRefusal(t *testing.T) {
+// The Authorize and Token pages quote what a client that may not request an administrative scope is
+// answered, as the code answers it: the authorization endpoint's invalid_scope, and on the token
+// endpoint the password grant's invalid_scope, the authorization code grant's invalid_grant with the
+// same sentence, and the refresh token grant's invalid_grant carrying it (#499 decision 7).
+func TestAdministrativeScopesDocs_TheEndpointPagesQuoteTheRefusal(t *testing.T) {
 	refusal := protocolvalidation.AdministrativeScopeRefusal([]string{"authserver:manage"}).Description()
 	root := filepath.Dir(guard.SourceRoot(t))
 

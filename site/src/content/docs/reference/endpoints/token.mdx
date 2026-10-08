@@ -1,0 +1,245 @@
+---
+title: Token
+description: Exchange an authorization code for tokens, refresh them, or get a client's own token at POST /auth/token.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you get tokens from the token endpoint, `POST /auth/token`.
+
+Your app calls it directly, not through the browser, with a `grant_type` saying what it's trading for tokens:
+
+| `grant_type` | What your app sends | What it's for |
+|---|---|---|
+| `authorization_code` | The code the [authorization endpoint](/reference/endpoints/authorize/) gave it | Signing a user in |
+| `refresh_token` | A refresh token | New tokens without asking the user again |
+| `client_credentials` | Nothing but its own credentials | A client acting for itself, such as a service calling an API |
+| `password` | A user's email and password | The deprecated [ROPC](/legacy-flows/ropc/) flow, off unless an administrator turns it on |
+
+## Redeem an authorization code
+
+<Steps>
+
+1. Send the code, the redirect URI it was issued for and your PKCE code verifier, with your client's credentials. A [public client](/concepts/clients/#public-and-confidential-clients) leaves `client_secret` out:
+
+   ```bash
+   curl -X POST https://auth.example.com/auth/token \
+     -d grant_type=authorization_code \
+     -d client_id=my-app \
+     -d client_secret=my-secret \
+     -d code=SplxlOBeZQQYbYS6WxSbIA \
+     -d redirect_uri=https://app.example.com/callback \
+     -d code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+   ```
+
+2. Read the tokens from the answer:
+
+   ```http
+   HTTP/1.1 200 OK
+   Content-Type: application/json
+   Cache-Control: no-store
+   Pragma: no-cache
+
+   {
+     "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...",
+     "id_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...",
+     "token_type": "Bearer",
+     "expires_in": 300,
+     "refresh_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...",
+     "refresh_expires_in": 1800,
+     "scope": "openid profile email"
+   }
+   ```
+
+3. Send the access token to your API as `Authorization: Bearer ...`, and keep the refresh token for when it expires.
+
+</Steps>
+
+Redeem the code straight away: it works once, and for 60 seconds.
+
+## How it works
+
+### The request
+
+The parameters go in an `application/x-www-form-urlencoded` body, as RFC 6749 asks. The auth server reads nothing from the query string. Each parameter goes in once: one sent twice is refused with `invalid_request`, "The '*name*' parameter was included more than once.", even when both copies agree.
+
+A body that can't be read, such as one with a broken `%` escape or one over 64 KiB, is refused with `invalid_request`, "The request body could not be parsed."
+
+### Client authentication
+
+A [confidential client](/concepts/clients/#public-and-confidential-clients) proves who it is with its client secret, in one of two ways:
+
+- **`client_secret_basic`**: an `Authorization: Basic` header holding `client_id:client_secret` in Base64. curl builds it with `-u my-app:my-secret`.
+- **`client_secret_post`**: `client_id` and `client_secret` in the body.
+
+Use one. Sending a secret both ways is refused with `invalid_request`. With the header, the auth server reads the client from it and ignores a `client_id` in the body.
+
+A public client sends `client_id` in the body and no secret, which discovery calls `none`. Sending a secret for a public client is refused with `invalid_request`, since it has none to check.
+
+Client identifiers and secrets hold only letters, digits and `-`, `_` or `.`, which form-encoding leaves as they are, so encoding them first, as RFC 6749 section 2.3.1 describes, changes nothing.
+
+When the client can't be authenticated, the answer is `401 Unauthorized` with `invalid_client` and a `WWW-Authenticate: Basic realm="goiabada"` header, whichever way the credentials came:
+
+| `error_description` | Why |
+|---|---|
+| "Client does not exist." | No client has that identifier |
+| "Client is disabled." | An administrator disabled the client |
+| "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed." | A confidential client sent no secret |
+| "Client authentication failed. Please review your client_secret." | The secret is wrong |
+
+A request with no `client_id` at all is refused with `invalid_request`, "Missing required client_id parameter.", before `grant_type` is read.
+
+### Authorization code grant
+
+| Parameter | Required | |
+|---|---|---|
+| `code` | Yes | The code from the authorization response |
+| `redirect_uri` | Yes | The `redirect_uri` of the authorization request, character for character |
+| `code_verifier` | When the request sent a `code_challenge` | The string the challenge was made from. See [PKCE](/concepts/pkce/). |
+
+There's no `scope` parameter: the tokens get the scope the user granted when the code was issued, and one sent here is ignored.
+
+A code is spent the first time it's redeemed. Redeeming it again is refused, and revokes the tokens the first redemption issued, since a code presented twice may have been stolen, as RFC 6749 section 4.1.2 recommends.
+
+A code the auth server doesn't know, one already redeemed or revoked, and one whose user has since been disabled or had their credentials changed are all refused with `invalid_grant`, "Code is invalid.", so the answer says nothing more about the code. The other refusals:
+
+| `error` | `error_description` | Why |
+|---|---|---|
+| `unauthorized_client` | "The client associated with the provided client_id does not support authorization code flow." | The flow is off for the client |
+| `invalid_grant` | "Invalid redirect_uri." | `redirect_uri` differs from the authorization request's |
+| `invalid_grant` | "The client_id provided does not match the client_id from code." | The code was issued to another client |
+| `invalid_grant` | "Code has expired." | More than 60 seconds have passed |
+| `invalid_request` | "Missing required code_verifier parameter." | The request sent a challenge, and this one sends no verifier |
+| `invalid_grant` | "Invalid code_verifier (PKCE)." | The verifier doesn't match the challenge |
+| `invalid_grant` | "The code_verifier parameter is incorrect. It should be 43 to 128 characters long and may only contain A-Z, a-z, 0-9, '-', '.', '_' and '~'." | The verifier isn't one PKCE allows |
+| `invalid_grant` | "This code was issued without PKCE, and public clients are required to use PKCE. Please start a new authorization request with a code_challenge." | A public client's code has no challenge |
+| `invalid_request` | "The code_verifier parameter was provided, but PKCE was not used during authorization." | A verifier for a code issued without a challenge |
+| `invalid_grant` | "The redirect URI recorded on this authorization code is no longer registered on the client, so the code can no longer be redeemed." | An administrator removed the redirect URI after the code was issued |
+
+### Refresh token grant
+
+| Parameter | Required | |
+|---|---|---|
+| `refresh_token` | Yes | The refresh token |
+| `scope` | No | A narrower scope for this access token, out of the refresh token's own |
+
+Every refresh rotates the token: the answer carries a new refresh token, and the one you sent stops working. Store the new one before you use the answer. Presenting a refresh token that was already rotated is treated as a replay: it revokes the live tokens of its rotation family, the one your app holds now included, and is refused with `invalid_grant`, "This refresh token has been revoked." See [This refresh token has been revoked](/troubleshooting/this-refresh-token-has-been-revoked/).
+
+`scope` narrows only the access token of this answer. The new refresh token keeps the original scope, so a later refresh can ask for all of it again. A scope the refresh token doesn't hold is refused with `invalid_scope`.
+
+The refresh is refused with `invalid_grant` when the token can't be used any more, with a description saying why: the user's session has ended or expired, the user was disabled or their credentials changed, an offline refresh token reached its maximum lifetime, or the user withdrew their consent. A refresh token issued to another client is refused with `invalid_request`, "The refresh token is invalid because it does not belong to the client." [Tokens](/concepts/tokens/) explains how long each kind of refresh token lasts.
+
+### Client credentials grant
+
+| Parameter | Required | |
+|---|---|---|
+| `scope` | No | One or more [permission scopes](/concepts/scopes/#permission-scopes) the client holds. Leave it out to get every permission the client holds. |
+
+Only a confidential client with **Client credentials** turned on can use it. The token is the client's own: it names no user, and gets no ID token and no refresh token.
+
+| `error` | Why |
+|---|---|
+| `unauthorized_client` | The flow is off for the client, or it's a public client |
+| `invalid_request` | `scope` holds an OpenID Connect scope, such as `openid`, or `offline_access`: there's no user to describe |
+| `invalid_scope` | A scope isn't `resource:permission`, names a resource or permission that doesn't exist, or names a permission the client doesn't hold |
+
+### Password grant
+
+| Parameter | Required | |
+|---|---|---|
+| `username` | Yes | The user's email address |
+| `password` | Yes | The user's password |
+| `scope` | No | `openid` when left out |
+
+It's refused with `unauthorized_client` unless the flow is on for the client, and with `invalid_grant` for a user with two-factor authentication. See [ROPC](/legacy-flows/ropc/) for every rule.
+
+### Administrative scopes
+
+On the grants where a client acts for a user, a client that isn't [allowed to request the administrative scopes](/concepts/clients/#administrative-scopes) is refused one, never handed a narrower token, and the refusal leaves an `administrative_scope_refused` entry in the [audit log](/concepts/audit-log/#events-to-alert-on). The client credentials grant isn't affected.
+
+The **password grant** answers `invalid_scope`, as it answers a scope the user doesn't hold:
+
+```json
+{
+  "error": "invalid_scope",
+  "error_description": "The client is not allowed to request the administrative scope 'authserver:manage'."
+}
+```
+
+The **authorization code grant** answers `invalid_grant` when the code carries an administrative scope and the client is no longer allowed one. The allowance is read when the code is redeemed, so a code issued just before an operator switched the client's allowance off isn't exchanged for tokens:
+
+```json
+{
+  "error": "invalid_grant",
+  "error_description": "The client is not allowed to request the administrative scope 'authserver:manage'."
+}
+```
+
+Start a new authorization request without the administrative scope.
+
+The **refresh token grant** answers `invalid_grant`, in the shape of its other per-scope checks. It judges the scope the refresh would issue, read now rather than when the token was issued, so a refresh token issued before an operator switched the client's allowance off isn't renewed with an administrative scope:
+
+```json
+{
+  "error": "invalid_grant",
+  "error_description": "Scope 'authserver:manage' is not recognized. The client is not allowed to request the administrative scope 'authserver:manage'."
+}
+```
+
+The refresh token isn't spent: refresh again with a `scope` that leaves every administrative scope out, which [RFC 6749 section 6](https://www.rfc-editor.org/rfc/rfc6749#section-6) allows as a narrower request.
+
+### The answer
+
+A successful answer is `200 OK` with a JSON body, `Cache-Control: no-store` and `Pragma: no-cache`, as RFC 6749 section 5.1 requires. A field with no value is left out.
+
+| Field | |
+|---|---|
+| `access_token` | The access token, a signed JWT |
+| `token_type` | Always `Bearer` |
+| `expires_in` | Seconds until the access token expires: the client's own setting, or the server-wide one |
+| `id_token` | When the scope has `openid` and a user signed in |
+| `refresh_token` | On every grant but client credentials |
+| `refresh_expires_in` | Seconds until the refresh token expires if it isn't used |
+| `scope` | The scope the access token carries |
+
+### Errors
+
+An error is a JSON body with `error` and `error_description`, as RFC 6749 section 5.2 defines, with `Cache-Control: no-store` and `Pragma: no-cache`:
+
+```http
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+Cache-Control: no-store
+Pragma: no-cache
+
+{
+  "error": "invalid_grant",
+  "error_description": "Code has expired."
+}
+```
+
+| `error` | Status | |
+|---|---|---|
+| `invalid_request` | 400 | A parameter is missing, repeated or not allowed for this client |
+| `invalid_client` | 401 | The client couldn't be authenticated, with `WWW-Authenticate: Basic realm="goiabada"` |
+| `invalid_grant` | 400 | The code, refresh token or user's credentials can't be used |
+| `unauthorized_client` | 400 | The grant is off for this client |
+| `unsupported_grant_type` | 400 | `grant_type` is missing or isn't one of the four: "Unsupported grant_type." |
+| `invalid_scope` | 400 | A scope is malformed, unknown, or more than the client or user may have |
+| `server_error` | 500 | Something failed on the server. The description ends with a request id to find it in the logs |
+
+`error_description` is English, with no character outside the ones RFC 6749 allows in it, and at most 512 bytes.
+
+With rate limiting on, the password grant is limited per IP address and per account, and a request over the limit is answered `429 Too Many Requests` with a `Retry-After` header. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/). The other grants aren't limited.
+
+### Calling it from a browser
+
+JavaScript in a browser, such as a single-page app, can call the token endpoint when its origin is registered as a [web origin](/concepts/clients/#web-origins) on a client. Without one, the browser blocks the call.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Tokens" description="What each token carries, and how long it lasts." href="/concepts/tokens/" />
+  <LinkCard title="Authorize" description="Get the code this endpoint redeems." href="/reference/endpoints/authorize/" />
+  <LinkCard title="UserInfo" description="Read the signed-in user's claims with the access token." href="/reference/endpoints/userinfo/" />
+</CardGrid>

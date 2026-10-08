@@ -126,6 +126,32 @@ func TestHandleClientLogoGet_Success(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
+// A client's logo is public whatever the client's state: it is served while the client is disabled
+// and while Show logo is off, which decides only whether the sign-in screens display it (#522
+// decision 2). The admin console's Logo tab previews the image through this same URL.
+func TestHandleClientLogoGet_ServedWhileTheClientIsDisabledAndItsLogoHidden(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
+
+	handler := HandleClientLogoGet(pageRenderer, database)
+
+	logoData := createTestLogoData(100, 100)
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app", Enabled: false, ShowLogo: false}
+	clientLogo := &record.ClientLogo{Id: 1, ClientId: 123, Logo: logoData, ContentType: "image/png"}
+
+	req, _ := http.NewRequest("GET", "/client/logo/my-app", nil)
+	req = setChiURLParamForHandlers(req, "clientIdentifier", "my-app")
+	rr := httptest.NewRecorder()
+
+	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
+	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.True(t, bytes.Equal(logoData, rr.Body.Bytes()))
+}
+
 func TestHandleClientLogoGet_ETagMatch_304(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	database := datamocks.NewDatabase(t)
