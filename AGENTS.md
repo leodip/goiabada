@@ -161,7 +161,7 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 | State | Assigned by | When |
 |---|---|---|
 | `requires_level_1` | `HandleAuthorizeGet` | four conditions: a deferred error is parked; `prompt=login`; `id_token_hint` names another user; no valid session |
-| | `HandleAuthCompletedGet` | no reusable session and `!Level1AuthCompleted` (restart route 1, through `Restart()`) |
+| | `HandleAuthCompletedGet` | no reusable session and `!Level1AuthCompleted`, or the user's authentication generation moved on since the ceremony authenticated, checked before any session is bound (restart route 1, through `Restart()`) |
 | | `refuseIssuanceUnusableSession` | bound session gone, expired or foreign, or the user's authentication generation moved on since the ceremony authenticated, and not `prompt=none` (restart route 2, through `Restart()`) |
 | `level1_password` | `HandleAuthLevel1Get` | unconditional |
 | `level1_password_completed` | `HandleAuthPwdPost` | password verified, user enabled |
@@ -208,7 +208,7 @@ the "no longer active" page, 400. Each route then gates on the state it finds th
 | `/auth/level1completed` | `handler_auth_level1.go` | Delivers a deferred authorization error if one is parked (see below), else decides if level2 needed based on ACR and session state |
 | `/auth/level2` | `handler_auth_level2.go` | Selects level2 auth method. If `level2_optional` + no OTP → skip to completed |
 | `/auth/otp` | `handler_auth_otp.go` | OTP verification (or enrollment if user doesn't have OTP yet) |
-| `/auth/completed` | `handler_auth_completed.go` | Final auth check, scope filtering, consent check, session bump/create |
+| `/auth/completed` | `handler_auth_completed.go` | Final auth check (a disabled user refused, a moved-on generation restarted, both before any session is bound), session bump/create, scope filtering, consent check |
 | `/auth/consent` | `handler_consent.go` | User consent screen (if required) |
 | `/auth/issue` | `handler_auth_issue.go` | Issues authorization code, redirects to client |
 
@@ -219,7 +219,8 @@ user holds; the attempt is everything an authentication writes. A restart keeps 
 discards the attempt: `AuthContext.Restart()` zeroes every attempt field, puts `Scope` back from
 `RequestedScope` and sets `requires_level_1`, so the second pass earns its own `amr`, scope and
 consent (#140, #436). There are two restart routes: `HandleAuthCompletedGet` when no session is
-reusable and level 1 was never completed, and `refuseIssuanceUnusableSession` at `/auth/issue` when the
+reusable and level 1 was never completed, or when the user's generation has moved on, decided before
+it binds a session (#522), and `refuseIssuanceUnusableSession` at `/auth/issue` when the
 bound session is gone, expired or foreign, or the user's generation has moved on, and the request is not `prompt=none`. The split is held by
 `TestAuthContextFields_EveryFieldIsClassifiedOnce` in `ceremony`, which fails on a field in neither
 list. Request fields are written only in `HandleAuthorizeGet`, which
