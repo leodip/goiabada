@@ -44,22 +44,19 @@ func sqliteAt(t *testing.T, dir string, version int) string {
 	return dsn
 }
 
-// sqliteHead is the version this binary migrates a SQLite database to.
+// sqliteHead is the version this binary migrates a SQLite database to, read from the migration
+// set it embeds rather than from the source tree, which the unprivileged run of
+// TestReadonlyDatabasePage_QuotesWhatAStartAnswers may not be able to reach.
 func sqliteHead(t *testing.T) int {
 	t.Helper()
-	head, _ := sqliteMigrationSet(t)
-	return head
+	return sqliteMigrator(t, filepath.Join(t.TempDir(), "probe.db")).Head()
 }
 
 // sqliteBelowHead is the version the SQLite set carries just under head, so a start has one
 // migration to run.
 func sqliteBelowHead(t *testing.T) int {
 	t.Helper()
-	database, err := sqlitedb.New(context.Background(), filepath.Join(t.TempDir(), "probe.db"), false)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = database.DB.Close() })
-	m, err := database.NewMigrator(context.Background(), nil)
-	require.NoError(t, err)
+	m := sqliteMigrator(t, filepath.Join(t.TempDir(), "probe.db"))
 	plan, err := m.Plan(context.Background(), m.Head())
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(plan), 2, "the SQLite set carries more than one migration")
@@ -84,14 +81,20 @@ func startSQLite(t *testing.T, dsn string) error {
 // it can, connects read-only and fails the first write, which on an upgrade is the migration's
 // version marker. With nothing to migrate the start writes nothing and succeeds, which the page says
 // too. The permissions are the file owner's own, and root writes a file whatever its mode, so as
-// root the test runs itself again as an unprivileged user. It used to skip there, and since the dev
-// container and CI's test containers run as root, no automated run checked the page.
+// root the test runs itself again as an unprivileged user, handing it the page, since that user
+// may not be able to reach the checkout. It used to skip there, and since the dev container and
+// CI's test containers run as root, no automated run checked the page.
 func TestReadonlyDatabasePage_QuotesWhatAStartAnswers(t *testing.T) {
+	const pageFile = "page.mdx"
 	if os.Geteuid() == 0 {
-		runAsUnprivileged(t, "TestReadonlyDatabasePage_QuotesWhatAStartAnswers")
+		runAsUnprivileged(t, "TestReadonlyDatabasePage_QuotesWhatAStartAnswers",
+			map[string]string{pageFile: troubleshootingPage(t, readonlyDatabasePage)})
 		return
 	}
-	page := troubleshootingPage(t, readonlyDatabasePage)
+	page, handed := unprivilegedChildFile(t, pageFile)
+	if !handed {
+		page = troubleshootingPage(t, readonlyDatabasePage)
+	}
 
 	t.Run("a directory the server cannot write", func(t *testing.T) {
 		dir := t.TempDir()
