@@ -238,7 +238,7 @@ const richPage = page({
 <aside aria-label="Caution" class="starlight-aside starlight-aside--caution"><p class="starlight-aside__title" aria-hidden="true"><svg aria-hidden="true" class="starlight-aside__icon"><path d="M1"/></svg>Caution</p><div class="starlight-aside__content"><p>Not for production.</p></div></aside>
 <table><thead><tr><th>Variable</th><th>Default</th></tr></thead><tbody><tr><td><code dir="auto">GOIABADA_PORT</code></td><td>9090 | 9091</td></tr></tbody></table>
 <div class="sl-link-card"><span class="sl-flex stack"><a href="/concepts/clients/"><span class="title">Clients</span></a><span class="description">Applications that request access.</span></span><svg aria-hidden="true" class="icon"><path d="M17"/></svg></div>
-<p><img src="/_astro/logo.png" alt="The logo"> Escapes: 1 * 2 and a_b.</p>`,
+<p><img src="/_astro/logo.png" alt="The logo"> Escapes: 1 * 2 and _b_, but not snake_case.</p>`,
 });
 
 test('a page is converted to Markdown: links absolute, code as fences, tabs labeled, controls left out', async (t) => {
@@ -287,7 +287,7 @@ Run it on Windows.
 
 [Clients](https://goiabada.dev/concepts/clients/): Applications that request access.
 
-![The logo](https://goiabada.dev/_astro/logo.png) Escapes: 1 \\* 2 and a\\_b.
+![The logo](https://goiabada.dev/_astro/logo.png) Escapes: 1 \\* 2 and \\_b\\_, but not snake_case.
 `,
 	);
 });
