@@ -69,17 +69,17 @@ When that isn't enough, encrypt the hop with the auth server's own HTTPS listene
 2. Turn on the auth server's HTTPS listener, in its `environment`:
 
    ```yaml
-   - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS=0.0.0.0
-   - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=9443
-   - GOIABADA_AUTHSERVER_CERTFILE=/certs/goiabada-authserver.pem
-   - GOIABADA_AUTHSERVER_KEYFILE=/certs/goiabada-authserver-key.pem
+   - "GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS=0.0.0.0"
+   - "GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=9443"
+   - "GOIABADA_AUTHSERVER_CERTFILE=/certs/goiabada-authserver.pem"
+   - "GOIABADA_AUTHSERVER_KEYFILE=/certs/goiabada-authserver-key.pem"
    ```
 
 3. Mount your certificate authority's certificate into the admin console's container, then point the admin console at the listener and have it trust that authority, in its `environment`:
 
    ```yaml
-   - GOIABADA_AUTHSERVER_INTERNALBASEURL=https://goiabada-authserver:9443
-   - SSL_CERT_FILE=/certs/ca.pem
+   - "GOIABADA_AUTHSERVER_INTERNALBASEURL=https://goiabada-authserver:9443"
+   - "SSL_CERT_FILE=/certs/ca.pem"
    ```
 
    `SSL_CERT_FILE`, or `SSL_CERT_DIR` for a directory of certificates, replaces the system's certificate authorities rather than adding to them, so the file must hold every authority the admin console needs.

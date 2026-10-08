@@ -14,7 +14,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql
     environment:
-      POSTGRES_DB: goiabada
+      POSTGRES_DB: "goiabada"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 1s
@@ -57,18 +57,18 @@ services:
       # failures in that window do not count, and the first success ends it.
       start_period: 300s
     environment:
-      - TZ=UTC
+      - "TZ=UTC"
       - "GOIABADA_ADMIN_EMAIL=admin@example.com"
-      - GOIABADA_APPNAME=Goiabada
+      - "GOIABADA_APPNAME=Goiabada"
       - "GOIABADA_AUTHSERVER_BASEURL=https://auth.example.com"
       # Plain HTTP: the admin console's secret and tokens cross this hop unencrypted, so it assumes a network you trust.
       - "GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090"
-      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=0.0.0.0
-      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090
-      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS=
-      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=
-      - GOIABADA_AUTHSERVER_CERTFILE=
-      - GOIABADA_AUTHSERVER_KEYFILE=
+      - "GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=0.0.0.0"
+      - "GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090"
+      - "GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS="
+      - "GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS="
+      - "GOIABADA_AUTHSERVER_CERTFILE="
+      - "GOIABADA_AUTHSERVER_KEYFILE="
       # The reverse proxy on this host, nginx or a Cloudflare Tunnel, appends the address it
       # received each connection from to X-Forwarded-For, so trusting one hop, the rightmost
       # entry, resolves the client with no list. Set the list only for a second proxy hop in
@@ -85,18 +85,18 @@ services:
       # With it on, the auth server logs a warning at every start that it trusts one proxy hop
       # with no list; behind the one reverse proxy on this host, that is expected.
       - "GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=false"
-      - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true
-      - GOIABADA_AUTHSERVER_LOG_LEVEL=info
-      - GOIABADA_AUTHSERVER_LOG_FORMAT=text
-      - GOIABADA_AUTHSERVER_LOG_SQL=false
-      - GOIABADA_AUTHSERVER_STATICDIR=
-      - GOIABADA_AUTHSERVER_TEMPLATEDIR=
-      - GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS=false
+      - "GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true"
+      - "GOIABADA_AUTHSERVER_LOG_LEVEL=info"
+      - "GOIABADA_AUTHSERVER_LOG_FORMAT=text"
+      - "GOIABADA_AUTHSERVER_LOG_SQL=false"
+      - "GOIABADA_AUTHSERVER_STATICDIR="
+      - "GOIABADA_AUTHSERVER_TEMPLATEDIR="
+      - "GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS=false"
       - "GOIABADA_DB_TYPE=postgres"
       - "GOIABADA_DB_USERNAME=postgres"
       - "GOIABADA_DB_HOST=postgres-server"
       - "GOIABADA_DB_PORT=5432"
-      - GOIABADA_DB_NAME=goiabada
+      - "GOIABADA_DB_NAME=goiabada"
       - "GOIABADA_ADMINCONSOLE_BASEURL=https://admin.example.com"
 
   goiabada-adminconsole:
@@ -124,14 +124,14 @@ services:
     networks:
       - goiabada-network
     environment:
-      - TZ=UTC
+      - "TZ=UTC"
       - "GOIABADA_ADMINCONSOLE_BASEURL=https://admin.example.com"
-      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=0.0.0.0
-      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091
-      - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS=
-      - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS=
-      - GOIABADA_ADMINCONSOLE_CERTFILE=
-      - GOIABADA_ADMINCONSOLE_KEYFILE=
+      - "GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=0.0.0.0"
+      - "GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091"
+      - "GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS="
+      - "GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS="
+      - "GOIABADA_ADMINCONSOLE_CERTFILE="
+      - "GOIABADA_ADMINCONSOLE_KEYFILE="
       # The reverse proxy on this host, nginx or a Cloudflare Tunnel, appends the address it
       # received each connection from to X-Forwarded-For, so trusting one hop, the rightmost
       # entry, resolves the client with no list. Set the list only for a second proxy hop in
@@ -141,11 +141,11 @@ services:
       # https://goiabada.dev/deploy/client-ip-and-proxy-trust/#cloudflare--nginx shows.
       - "GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=true"
       - "GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES="
-      - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true
-      - GOIABADA_ADMINCONSOLE_LOG_LEVEL=info
-      - GOIABADA_ADMINCONSOLE_LOG_FORMAT=text
-      - GOIABADA_ADMINCONSOLE_STATICDIR=
-      - GOIABADA_ADMINCONSOLE_TEMPLATEDIR=
+      - "GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true"
+      - "GOIABADA_ADMINCONSOLE_LOG_LEVEL=info"
+      - "GOIABADA_ADMINCONSOLE_LOG_FORMAT=text"
+      - "GOIABADA_ADMINCONSOLE_STATICDIR="
+      - "GOIABADA_ADMINCONSOLE_TEMPLATEDIR="
       - "GOIABADA_AUTHSERVER_BASEURL=https://auth.example.com"
       # Plain HTTP: the admin console's secret and tokens cross this hop unencrypted, so it assumes a network you trust.
       - "GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090"

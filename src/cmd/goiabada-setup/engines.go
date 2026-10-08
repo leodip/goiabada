@@ -38,10 +38,10 @@ type engine struct {
 	// server's for an engine with no server.
 	volume string
 	mount  string
-	// composeEnvironment is the database service's environment lines but its password, in order,
-	// each a mapping entry. composePasswordVariable is the variable its password is set in, which
-	// the override file writes, since the Compose file holds no secret (#396 decision 14).
-	composeEnvironment      []string
+	// composeEnvironment is the database service's environment but its password, in order, each
+	// written as a mapping entry. composePasswordVariable is the variable its password is set in,
+	// which the override file writes, since the Compose file holds no secret (#396 decision 14).
+	composeEnvironment      []composeEnvVar
 	composePasswordVariable string
 	// healthcheck is the shell command the database service's CMD-SHELL healthcheck runs. It
 	// carries no password: one that needs it reads composePasswordVariable, from the
@@ -113,7 +113,7 @@ var engines = []*engine{
 		composeService:          "postgres-server",
 		volume:                  "postgres-data",
 		mount:                   "/var/lib/postgresql",
-		composeEnvironment:      []string{"POSTGRES_DB: goiabada"},
+		composeEnvironment:      []composeEnvVar{{name: "POSTGRES_DB", value: "goiabada"}},
 		composePasswordVariable: "POSTGRES_PASSWORD",
 		healthcheck:             "pg_isready -U postgres",
 		healthInterval:          "1s",
@@ -138,7 +138,7 @@ var engines = []*engine{
 		composeService:          "mssql-server",
 		volume:                  "mssql-data",
 		mount:                   "/var/opt/mssql",
-		composeEnvironment:      []string{"ACCEPT_EULA: Y"},
+		composeEnvironment:      []composeEnvVar{{name: "ACCEPT_EULA", value: "Y"}},
 		composePasswordVariable: "MSSQL_SA_PASSWORD",
 		healthcheck:             `/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "${MSSQL_SA_PASSWORD}" -C -Q 'SELECT 1' || exit 1`,
 		healthInterval:          "10s",

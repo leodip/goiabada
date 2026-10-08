@@ -93,16 +93,16 @@ To change the layout of a page, or an email's body, you give a server its own co
        - ./authserver-web/template:/app/web/template:ro
        - ./authserver-web/static:/app/web/static:ro
      environment:
-       - GOIABADA_AUTHSERVER_STATICDIR=/app/web/static
-       - GOIABADA_AUTHSERVER_TEMPLATEDIR=/app/web/template
+       - "GOIABADA_AUTHSERVER_STATICDIR=/app/web/static"
+       - "GOIABADA_AUTHSERVER_TEMPLATEDIR=/app/web/template"
 
    goiabada-adminconsole:
      volumes:
        - ./adminconsole-web/template:/app/web/template:ro
        - ./adminconsole-web/static:/app/web/static:ro
      environment:
-       - GOIABADA_ADMINCONSOLE_STATICDIR=/app/web/static
-       - GOIABADA_ADMINCONSOLE_TEMPLATEDIR=/app/web/template
+       - "GOIABADA_ADMINCONSOLE_STATICDIR=/app/web/static"
+       - "GOIABADA_ADMINCONSOLE_TEMPLATEDIR=/app/web/template"
    ```
 
    Leave a server's pair empty if you haven't changed its files. Then run `docker compose up -d`. With the native binaries, set the same variables in the env file, naming directories the binaries' user can read.
