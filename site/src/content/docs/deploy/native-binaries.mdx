@@ -1,271 +1,137 @@
 ---
 title: Native binaries
-description: Run Goiabada without Docker using pre-built binaries.
+description: Run the auth server and the admin console as two processes on your own server, without Docker.
 ---
 
-import { Steps, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-Run Goiabada without Docker using pre-built binaries from the [releases page](https://github.com/leodip/goiabada/releases).
+This page helps you run Goiabada without Docker: the two binaries from a release, one configuration file, and systemd to keep them running.
 
-## Download
+You need a Linux server, a database (a MySQL, PostgreSQL or SQL Server you run, or SQLite for a single server), two hostnames under one domain, such as `auth.example.com` and `admin.example.com`, and the [setup wizard](/get-started/setup-wizard/). Both hostnames must share a registrable domain: see [What every method needs](/deploy/choose-a-method/#what-every-method-needs). A reverse proxy on the same machine, such as Nginx, serves HTTPS in front of them.
 
-Download the ZIP for your platform from the [releases page](https://github.com/leodip/goiabada/releases). Each ZIP contains both the auth server and admin console binaries:
+## Set it up
 
-| Platform | ZIP file | Contains |
-|----------|----------|----------|
-| Linux (x64) | `goiabada-VERSION-linux-amd64.zip` | `goiabada-authserver`, `goiabada-adminconsole` |
-| Linux (ARM) | `goiabada-VERSION-linux-arm64.zip` | `goiabada-authserver`, `goiabada-adminconsole` |
-| macOS (Intel) | `goiabada-VERSION-darwin-amd64.zip` | `goiabada-authserver`, `goiabada-adminconsole` |
-| macOS (Apple Silicon) | `goiabada-VERSION-darwin-arm64.zip` | `goiabada-authserver`, `goiabada-adminconsole` |
-| Windows | `goiabada-VERSION-windows-amd64.zip` | `goiabada-authserver.exe`, `goiabada-adminconsole.exe` |
+<Steps>
+
+1. **Download the release** for your platform from the [releases page](https://github.com/leodip/goiabada/releases). Each ZIP holds both binaries:
+
+   | Platform | ZIP |
+   |---|---|
+   | Linux, x86-64 | `goiabada-<version>-linux-amd64.zip` |
+   | Linux, ARM64 | `goiabada-<version>-linux-arm64.zip` |
+   | macOS, Intel | `goiabada-<version>-darwin-amd64.zip` |
+   | macOS, Apple silicon | `goiabada-<version>-darwin-arm64.zip` |
+   | Windows | `goiabada-<version>-windows-amd64.zip` |
+
+   ```bash
+   unzip goiabada-<version>-linux-amd64.zip
+   ```
+
+2. **Run the setup wizard, and choose Native binaries.** Give it the two public URLs, the database, and whether a reverse proxy on this machine forwards to Goiabada (yes by default). Or answer with flags:
+
+   ```bash
+   ./goiabada-setup-linux-amd64 --type=native --db=postgres \
+     --auth-url=https://auth.example.com --admin-url=https://admin.example.com \
+     --db-host=127.0.0.1
+   ```
+
+   It writes one file, `goiabada.env`, which both servers read. It holds every secret, so **never** commit it, and [back up the AES key](/deploy/secrets/#back-up-the-aes-key) in it before anything else.
+
+3. **Install the binaries and the file,** under a user of their own:
+
+   ```bash
+   sudo useradd --system --shell /usr/sbin/nologin goiabada
+   sudo install -d -o goiabada -g goiabada -m 0750 /var/lib/goiabada
+   sudo install -d -m 0755 /opt/goiabada /etc/goiabada
+   sudo install -m 0755 goiabada-authserver goiabada-adminconsole /opt/goiabada/
+   sudo install -o goiabada -g goiabada -m 0600 goiabada.env /etc/goiabada/goiabada.env
+   ```
+
+4. **Add a systemd unit for each server.** `/etc/systemd/system/goiabada-authserver.service`:
+
+   ```ini
+   [Unit]
+   Description=Goiabada auth server
+   After=network-online.target
+   Wants=network-online.target
+
+   [Service]
+   User=goiabada
+   Group=goiabada
+   WorkingDirectory=/var/lib/goiabada
+   EnvironmentFile=/etc/goiabada/goiabada.env
+   ExecStart=/opt/goiabada/goiabada-authserver
+   Restart=on-failure
+   RestartSec=5s
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+   `/etc/systemd/system/goiabada-adminconsole.service` is the same, with its own description, `ExecStart=/opt/goiabada/goiabada-adminconsole`, and `After=goiabada-authserver.service` added to its `[Unit]`.
+
+5. **Start both:**
+
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now goiabada-authserver goiabada-adminconsole
+   curl http://127.0.0.1:9090/health   # healthy
+   curl http://127.0.0.1:9091/health   # healthy
+   ```
+
+   The first start seeds the database. `sudo journalctl -u goiabada-authserver -f` follows its log.
+
+6. **Put the reverse proxy in front.** Proxy `auth.example.com` to `http://127.0.0.1:9090` and `admin.example.com` to `http://127.0.0.1:9091`, with the Nginx configuration and certificates of [Reverse proxy](/deploy/reverse-proxy/#set-it-up), steps 3 to 6.
+
+7. **Sign in** at `https://admin.example.com`, as [First sign-in](/get-started/first-sign-in/) describes.
+
+</Steps>
+
+To try the binaries before installing them, load the file into a shell and start each one, as the wizard's last message shows:
 
 ```bash
-# Example for Linux amd64 - download from the releases page
-# https://github.com/leodip/goiabada/releases
-unzip goiabada-VERSION-linux-amd64.zip
-chmod +x goiabada-authserver goiabada-adminconsole
+set -a && . ./goiabada.env && set +a && ./goiabada-authserver
 ```
 
-## Prerequisites
+## How it works
 
-- A database server (MySQL, PostgreSQL, SQL Server) or SQLite
-- SSL certificates for HTTPS
-- A reverse proxy (Nginx recommended) or direct HTTPS configuration
+### What the wizard's answers set
 
-## Configuration
+- **With a reverse proxy on this machine,** both servers listen on `127.0.0.1` alone, so nothing past the proxy reaches the plain HTTP they serve, and they trust the forwarded headers of a connection from `127.0.0.1` alone: see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#native-binaries).
+- **With none** (`--local-proxy=false`), both servers listen on every interface and trust no forwarded header. They serve plain HTTP until you [serve HTTPS directly](#serve-https-without-a-proxy).
+- **The rate limiter** is on unless you answered no (`--rate-limiter=false`). See [Rate limits](/reference/environment-variables/#rate-limits).
+- **With SQLite,** the database is `goiabada.db` in the auth server's working directory, `/var/lib/goiabada` with the unit above. SQLite suits one auth server: see [Database](/deploy/database/).
 
-Configure via environment variables. You can export them directly or use an environment file.
+### The hop to the auth server
 
-### Auth server configuration
+The admin console calls the auth server at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, which the wizard sets to the auth server's public URL. So the admin console goes out through your reverse proxy and back in, over HTTPS, and its client secret and administrators' tokens are encrypted on the way.
+
+With both servers on one machine, you can point it at `http://127.0.0.1:9090` instead, to skip the proxy. That hop is plain HTTP, but it never leaves the machine.
+
+### Serve HTTPS without a proxy
+
+Each server serves HTTPS itself once it has a certificate and a key. Set both in `goiabada.env`, and set each HTTP listen host empty to stop serving plain HTTP:
 
 ```bash
-# Admin user (created on first startup)
-export GOIABADA_ADMIN_EMAIL="admin@example.com"
-# Required on the first start: at least 15 characters, and not changeme
-export GOIABADA_ADMIN_PASSWORD="<admin-password>"
-export GOIABADA_APPNAME="Goiabada"
+GOIABADA_AUTHSERVER_CERTFILE="/etc/goiabada/auth.example.com.pem"
+GOIABADA_AUTHSERVER_KEYFILE="/etc/goiabada/auth.example.com-key.pem"
+GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=""
 
-# Server URLs
-export GOIABADA_AUTHSERVER_BASEURL="https://auth.example.com"
-export GOIABADA_AUTHSERVER_INTERNALBASEURL="http://127.0.0.1:9090"
-
-# Listener configuration
-export GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP="0.0.0.0"
-export GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP="9090"
-
-# Session keys (generate: openssl rand -hex 64 and openssl rand -hex 32)
-export GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY="<64-byte-hex>"
-export GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY="<32-byte-hex>"
-
-# Data encryption key (generate: openssl rand -hex 32). Back it up apart from the database
-export GOIABADA_AES_ENCRYPTION_KEY="<32-byte-hex>"
-
-# Database (MySQL example)
-export GOIABADA_DB_TYPE="mysql"
-export GOIABADA_DB_USERNAME="goiabada"
-export GOIABADA_DB_PASSWORD="your-password"
-export GOIABADA_DB_HOST="localhost"
-export GOIABADA_DB_PORT="3306"
-export GOIABADA_DB_NAME="goiabada"
-
-# Admin console URLs
-export GOIABADA_ADMINCONSOLE_BASEURL="https://admin.example.com"
-
-# OAuth client secret for seeding
-export GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET="<generated-secret>"
+GOIABADA_ADMINCONSOLE_CERTFILE="/etc/goiabada/admin.example.com.pem"
+GOIABADA_ADMINCONSOLE_KEYFILE="/etc/goiabada/admin.example.com-key.pem"
+GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=""
 ```
 
-### Admin console configuration
+The auth server then listens on port 9443 and the admin console on 9444, on every interface; `GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS` and `GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS` change them. Your public URLs must name those ports, or something must forward 443 to them. The `goiabada` user must be able to read both keys. Renewing a certificate takes a restart, since each server reads its files when it starts.
 
-```bash
-# Server URLs
-export GOIABADA_ADMINCONSOLE_BASEURL="https://admin.example.com"
-
-# Listener configuration
-export GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP="0.0.0.0"
-export GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP="9091"
-
-# OAuth credentials
-export GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET="<same-secret-as-above>"
-
-# Session keys
-export GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY="<64-byte-hex>"
-export GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY="<32-byte-hex>"
-
-# Auth server URLs
-export GOIABADA_AUTHSERVER_BASEURL="https://auth.example.com"
-export GOIABADA_AUTHSERVER_INTERNALBASEURL="http://127.0.0.1:9090"
-```
-
-<Aside type="tip">
-Use the [setup wizard](/get-started/setup-wizard/) and select **"4. Native binaries"** to automatically generate a `goiabada.env` file with all keys and secrets pre-configured.
+<Aside type="note" title="macOS and Windows">
+The releases include macOS and Windows binaries, which read the same variables. Load `goiabada.env` into their environment and run them under the service manager you use there.
 </Aside>
 
-## Secrets
+## Next steps
 
-The wizard's `goiabada.env` holds the configuration and every secret. [Secrets](/deploy/secrets/)
-says what each one protects, how to keep the file, and how to back up the AES key, and [Rotate
-secrets](/deploy/rotate-secrets/) how to replace them. [Upgrade Goiabada](/deploy/upgrade-goiabada/)
-covers moving to a new release.
-
-## Running on Linux with systemd
-
-### 1. Create a dedicated user
-
-```bash
-sudo useradd -r -s /bin/false goiabada
-sudo mkdir -p /opt/goiabada
-sudo mkdir -p /etc/goiabada
-sudo mkdir -p /var/lib/goiabada
-
-sudo mv goiabada-authserver goiabada-adminconsole /opt/goiabada/
-sudo chmod +x /opt/goiabada/goiabada-*
-sudo chown -R goiabada:goiabada /opt/goiabada
-sudo chown -R goiabada:goiabada /var/lib/goiabada
-```
-
-### 2. Create environment files
-
-```bash
-# Auth server environment
-sudo nano /etc/goiabada/authserver.env
-
-# Admin console environment
-sudo nano /etc/goiabada/adminconsole.env
-```
-
-### 3. Create systemd service files
-
-**Auth server** (`/etc/systemd/system/goiabada-authserver.service`):
-
-```ini
-[Unit]
-Description=Goiabada Auth Server
-After=network.target mysql.service
-
-[Service]
-Type=simple
-User=goiabada
-Group=goiabada
-WorkingDirectory=/opt/goiabada
-EnvironmentFile=/etc/goiabada/authserver.env
-ExecStart=/opt/goiabada/goiabada-authserver
-Restart=on-failure
-RestartSec=5s
-
-[Install]
-WantedBy=multi-user.target
-```
-
-**Admin console** (`/etc/systemd/system/goiabada-adminconsole.service`):
-
-```ini
-[Unit]
-Description=Goiabada Admin Console
-After=network.target goiabada-authserver.service
-Requires=goiabada-authserver.service
-
-[Service]
-Type=simple
-User=goiabada
-Group=goiabada
-WorkingDirectory=/opt/goiabada
-EnvironmentFile=/etc/goiabada/adminconsole.env
-ExecStart=/opt/goiabada/goiabada-adminconsole
-Restart=on-failure
-RestartSec=5s
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### 4. Enable and start services
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable goiabada-authserver
-sudo systemctl enable goiabada-adminconsole
-sudo systemctl start goiabada-authserver
-sudo systemctl start goiabada-adminconsole
-```
-
-### 5. Check status and logs
-
-```bash
-sudo systemctl status goiabada-authserver
-sudo systemctl status goiabada-adminconsole
-
-# View logs
-sudo journalctl -u goiabada-authserver -f
-sudo journalctl -u goiabada-adminconsole -f
-```
-
-## Running on macOS/Windows
-
-<Tabs>
-  <TabItem label="macOS">
-For production on macOS, consider using launchd:
-
-```bash
-# Run manually for testing
-./goiabada-authserver &
-./goiabada-adminconsole &
-```
-
-For persistent services, create launchd plist files in `~/Library/LaunchAgents/`.
-  </TabItem>
-  <TabItem label="Windows">
-For production on Windows, use NSSM (Non-Sucking Service Manager):
-
-```powershell
-# Install NSSM, then:
-nssm install GoiabadaAuthServer "C:\goiabada\goiabada-authserver.exe"
-nssm install GoiabadaAdminConsole "C:\goiabada\goiabada-adminconsole.exe"
-nssm start GoiabadaAuthServer
-nssm start GoiabadaAdminConsole
-```
-  </TabItem>
-</Tabs>
-
-## Reverse proxy
-
-For production, use Nginx as a reverse proxy (see [reverse proxy guide](/deploy/reverse-proxy/)). Configure Nginx to proxy to:
-
-- Auth server: `http://127.0.0.1:9090`
-- Admin console: `http://127.0.0.1:9091`
-
-The setup wizard asks whether a reverse proxy on the same machine forwards to Goiabada (`--local-proxy`, yes by default). On yes, `goiabada.env` has both servers listen on `127.0.0.1` alone and trust the forwarded headers of a connection from `127.0.0.1` alone:
-
-```bash
-GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP="127.0.0.1"
-GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS="true"
-GOIABADA_AUTHSERVER_TRUSTED_PROXIES="127.0.0.1"
-
-GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP="127.0.0.1"
-GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS="true"
-GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES="127.0.0.1"
-```
-
-Nothing outside the machine reaches the plain HTTP listeners, and Goiabada takes the client from the `X-Forwarded-For` entry Nginx appends. For a proxy on another host, set each listen host to an address that host reaches and each list to that host's address, and keep the ports closed to everything else.
-
-On no (`--local-proxy=false`), both servers listen on every interface and trust no forwarded header, so each client is the address it connects from. They serve plain HTTP until you configure direct HTTPS, below.
-
-The wizard also asks whether to turn on the auth server's [rate limiter](/reference/environment-variables/#rate-limits), yes by default, and writes `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` either way (`--rate-limiter=false` answers no). Behind a reverse proxy on the same machine, the `127.0.0.1` list keeps the auth server's startup warnings about proxy trust silent. With no proxy, the auth server logs a warning at every start that it trusts no forwarded header and that, behind a proxy, everyone would share one per-IP bucket; with nothing in front of it, that is expected.
-
-## Direct HTTPS (optional)
-
-If you prefer not to use a reverse proxy, configure direct HTTPS. Setting the certificate and key turns on the HTTPS listener; set `LISTEN_HOST_HTTP` empty as well to stop serving plain HTTP:
-
-```bash
-# Auth server
-export GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS="0.0.0.0"
-export GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS="8443"
-export GOIABADA_AUTHSERVER_CERTFILE="/path/to/fullchain.pem"
-export GOIABADA_AUTHSERVER_KEYFILE="/path/to/privkey.pem"
-
-# Admin console
-export GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS="0.0.0.0"
-export GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS="9444"
-export GOIABADA_ADMINCONSOLE_CERTFILE="/path/to/fullchain.pem"
-export GOIABADA_ADMINCONSOLE_KEYFILE="/path/to/privkey.pem"
-```
+<CardGrid>
+  <LinkCard title="Reverse proxy" description="Nginx and Let's Encrypt in front of Goiabada." href="/deploy/reverse-proxy/" />
+  <LinkCard title="Secrets" description="What goiabada.env protects, and backing up the AES key." href="/deploy/secrets/" />
+  <LinkCard title="Upgrade Goiabada" description="Install a new release, and roll back." href="/deploy/upgrade-goiabada/" />
+</CardGrid>

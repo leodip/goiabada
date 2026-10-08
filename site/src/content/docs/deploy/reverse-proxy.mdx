@@ -1,311 +1,170 @@
 ---
-title: Reverse proxy (no Cloudflare)
-description: Deploy Goiabada with Nginx or Traefik for SSL termination without Cloudflare.
+title: Reverse proxy
+description: Run Goiabada with Docker Compose behind Nginx on the same host, with Let's Encrypt certificates.
 ---
 
-import { Steps, Aside } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-Use this setup if you're not using Cloudflare and want to manage SSL certificates yourself.
+This page helps you put Goiabada on the internet behind Nginx, with certificates from Let's Encrypt and no Cloudflare.
 
-## Architecture
-
-```
-Internet → Nginx (HTTPS port 443) → {
-    auth.example.com    → goiabada-authserver:9090 (HTTP)
-    admin.example.com   → goiabada-adminconsole:9091 (HTTP)
-}
-```
-
-Nginx handles HTTPS termination with Let's Encrypt certificates. Goiabada runs on HTTP internally.
-
-## Prerequisites
-
-- Two domain names (subdomains) for auth and admin console
-- Nginx installed
-- Docker and docker-compose installed
-
-## Setup
-
-### 1. Configure DNS records
-
-At your DNS provider, add A records for both domains pointing to your server's IP address:
+Nginx answers HTTPS on ports 80 and 443 and forwards each request to the Docker Compose file the setup wizard writes, which publishes the two servers on `127.0.0.1` alone:
 
 ```
-Type: A    Name: auth    Content: <your-server-ip>
-Type: A    Name: admin   Content: <your-server-ip>
+Browser ── HTTPS ──▶ Nginx on the host ── HTTP ──▶ auth.example.com   → 127.0.0.1:9090
+                                                   admin.example.com  → 127.0.0.1:9091
 ```
 
-<Aside type="tip">
-DNS propagation can take up to 48 hours, but usually completes within minutes. You can verify with `dig auth.example.com` or `nslookup auth.example.com`.
-</Aside>
+You need a server with Docker and Nginx, two hostnames under one domain, such as `auth.example.com` and `admin.example.com`, and the [setup wizard](/get-started/setup-wizard/). Both hostnames must share a registrable domain: see [What every method needs](/deploy/choose-a-method/#what-every-method-needs).
 
-### 2. Start Goiabada containers
-
-Use the [setup wizard](/get-started/setup-wizard/) to generate your `docker-compose.yml`:
-
-1. Select **"2. Production with reverse proxy"** when prompted
-2. Enter your domain names (e.g., `https://auth.example.com` and `https://admin.example.com`)
-3. The wizard automatically sets `TRUST_PROXY_HEADERS=true` with `TRUSTED_PROXIES` empty, trusting Nginx as the one proxy hop (see [client IP resolution](#client-ip-resolution-and-spoofing-protection)); and because your base URLs are `https://`, cookies get the `Secure` flag automatically
-
-Then start the containers:
-
-```bash
-docker compose up -d
-```
-
-Verify containers are running:
-
-```bash
-# Check containers are running
-docker ps | grep goiabada
-
-# Test auth server health (should return: healthy)
-curl http://localhost:9090/health && echo
-
-# Test admin console health (should return: healthy)
-curl http://localhost:9091/health && echo
-```
-
-### 3. Get SSL certificates
+## Set it up
 
 <Steps>
-1. Install certbot (Ubuntu/Debian):
+
+1. **Point both hostnames at the server.** At your DNS provider, add an `A` record for each, with the server's IP address:
+
+   ```
+   auth    A    <your-server-ip>
+   admin   A    <your-server-ip>
+   ```
+
+   `dig +short auth.example.com` shows the address once the record has spread.
+
+2. **Generate and start Goiabada.** Run the setup wizard, choose **Production with reverse proxy**, enter `https://auth.example.com` and `https://admin.example.com`, then start the files it wrote, as [Docker Compose](/deploy/docker-compose/) describes:
+
    ```bash
-   sudo apt-get update
-   sudo apt-get install certbot
+   docker compose up -d
+   curl http://127.0.0.1:9090/health   # healthy
+   ```
+
+3. **Get the certificates.** Install certbot and give Nginx a temporary site that answers Let's Encrypt's challenge for both hostnames:
+
+   ```bash
+   sudo apt-get update && sudo apt-get install certbot
    sudo mkdir -p /var/www/certbot
    ```
 
-2. Create a temporary Nginx config for certificate acquisition:
-   ```bash
-   sudo nano /etc/nginx/sites-available/goiabada
-   ```
-
-3. Add temporary HTTP config:
-
-   <Aside type="caution">
-   Replace `auth.example.com` and `admin.example.com` with your actual domain names throughout this configuration.
-   </Aside>
+   Write `/etc/nginx/sites-available/goiabada`, with your own hostnames:
 
    ```nginx
    server {
        listen 80;
-       server_name auth.example.com;
+       server_name auth.example.com admin.example.com;
 
        location /.well-known/acme-challenge/ {
            root /var/www/certbot;
-       }
-
-       location / {
-           proxy_pass http://127.0.0.1:9090;
-       }
-   }
-
-   server {
-       listen 80;
-       server_name admin.example.com;
-
-       location /.well-known/acme-challenge/ {
-           root /var/www/certbot;
-       }
-
-       location / {
-           proxy_pass http://127.0.0.1:9091;
        }
    }
    ```
 
-4. Enable and reload:
+   Enable it, and ask for one certificate per hostname:
+
    ```bash
    sudo ln -s /etc/nginx/sites-available/goiabada /etc/nginx/sites-enabled/
    sudo nginx -t && sudo nginx -s reload
-   ```
-
-5. Get certificates:
-   ```bash
    sudo certbot certonly --webroot -w /var/www/certbot -d auth.example.com
    sudo certbot certonly --webroot -w /var/www/certbot -d admin.example.com
    ```
+
+4. **Proxy both hostnames to Goiabada.** Replace `/etc/nginx/sites-available/goiabada` with the full site:
+
+   ```nginx
+   # Auth server
+   server {
+       listen 443 ssl http2;
+       listen [::]:443 ssl http2;
+       server_name auth.example.com;
+
+       ssl_certificate /etc/letsencrypt/live/auth.example.com/fullchain.pem;
+       ssl_certificate_key /etc/letsencrypt/live/auth.example.com/privkey.pem;
+       ssl_protocols TLSv1.2 TLSv1.3;
+
+       location / {
+           proxy_pass http://127.0.0.1:9090;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+
+       location /.well-known/acme-challenge/ {
+           root /var/www/certbot;
+       }
+   }
+
+   # Admin console
+   server {
+       listen 443 ssl http2;
+       listen [::]:443 ssl http2;
+       server_name admin.example.com;
+
+       ssl_certificate /etc/letsencrypt/live/admin.example.com/fullchain.pem;
+       ssl_certificate_key /etc/letsencrypt/live/admin.example.com/privkey.pem;
+       ssl_protocols TLSv1.2 TLSv1.3;
+
+       location / {
+           proxy_pass http://127.0.0.1:9091;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+
+       location /.well-known/acme-challenge/ {
+           root /var/www/certbot;
+       }
+   }
+
+   # HTTP: Let's Encrypt's challenge, and a redirect to HTTPS for everything else
+   server {
+       listen 80;
+       listen [::]:80;
+       server_name auth.example.com admin.example.com;
+
+       location /.well-known/acme-challenge/ {
+           root /var/www/certbot;
+       }
+
+       location / {
+           return 301 https://$host$request_uri;
+       }
+   }
+   ```
+
+   ```bash
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
+5. **Open only 80 and 443.**
+
+   ```bash
+   sudo ufw allow 80/tcp
+   sudo ufw allow 443/tcp
+   ```
+
+   **Never** open 9090 or 9091: a caller that reaches Goiabada around Nginx picks the IP address it's rate limited and audited under.
+
+6. **Check the renewals.** Let's Encrypt certificates last 90 days, and the certbot package renews them on a timer:
+
+   ```bash
+   sudo certbot renew --dry-run
+   systemctl list-timers | grep certbot
+   ```
+
+7. **Sign in** at `https://admin.example.com`, as [First sign-in](/get-started/first-sign-in/) describes.
+
 </Steps>
 
-### 4. Configure Nginx
+## How it works
 
-Create `/etc/nginx/sites-available/goiabada`:
+- **Nginx terminates TLS.** Goiabada serves plain HTTP on `127.0.0.1`, which only processes on the host reach. Goiabada marks its cookies `Secure` because its URLs are `https://`, whatever Nginx speaks to it.
+- **Each server sees the client's address,** from the `X-Forwarded-For` entry Nginx appends: see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#reverse-proxy).
+- **The admin console reaches the auth server inside the Compose network,** not through Nginx: see [The hop to the auth server](/deploy/docker-compose/#the-hop-to-the-auth-server).
+- **Goiabada sets its own security headers,** `Strict-Transport-Security` included once its URLs are `https://`, so Nginx adds none. A header Nginx added as well would reach the browser twice.
 
-```nginx
-# Auth Server
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name auth.example.com;
+## Next steps
 
-    ssl_certificate /etc/letsencrypt/live/auth.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/auth.example.com/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:9090;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-}
-
-# Admin Console
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name admin.example.com;
-
-    ssl_certificate /etc/letsencrypt/live/admin.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/admin.example.com/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:9091;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-}
-
-# HTTP to HTTPS redirect
-server {
-    listen 80;
-    listen [::]:80;
-    server_name auth.example.com admin.example.com;
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    location / {
-        return 301 https://$host$request_uri;
-    }
-}
-```
-
-Enable and reload:
-
-```bash
-sudo ln -s /etc/nginx/sites-available/goiabada /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### 5. Configure firewall
-
-```bash
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-# Do NOT expose 9090 or 9091 to the internet
-```
-
-### 6. Set up certificate auto-renewal
-
-Let's Encrypt certificates expire after 90 days. Set up auto-renewal:
-
-```bash
-# Test renewal
-sudo certbot renew --dry-run
-
-# Auto-renewal is typically configured automatically via cron or systemd timer
-sudo systemctl status certbot.timer
-```
-
-## Access your deployment
-
-- Auth server: `https://auth.example.com`
-- Admin console: `https://admin.example.com`
-
-## Client IP resolution and spoofing protection
-
-Goiabada resolves the real client IP for rate limiting (auth server) and audit
-logging. Behind a reverse proxy the direct connection comes from the proxy, so
-Goiabada must read the forwarded headers to recover the original client IP.
-
-- Setting `TRUST_PROXY_HEADERS=true` tells Goiabada to read `X-Forwarded-For` /
-  `X-Real-IP` when resolving the client IP. With `TRUSTED_PROXIES` empty, it
-  trusts a **single** proxy hop: the client is the rightmost `X-Forwarded-For`
-  entry (or `X-Real-IP` when there is no `X-Forwarded-For`). The setup wizard
-  writes both settings side by side, `TRUSTED_PROXIES` explicitly empty, under a
-  comment saying why.
-- One hop is sound behind any proxy that **sets or appends** `X-Forwarded-For`.
-  The Nginx config above appends: `$proxy_add_x_forwarded_for` adds the address
-  Nginx received the connection from to the right of whatever the client sent, so
-  a value the client injects ends up on the left and is never read. Envoy and a
-  Cloudflare Tunnel append the same way.
-- What one hop does not survive is a caller that reaches Goiabada **without
-  passing the proxy**: it connects directly and can send any `X-Forwarded-For` it
-  likes, choosing the address it is rate limited and audited under. The wizard's
-  Compose file publishes both ports on `127.0.0.1` alone, so only processes on
-  this host can do that; keep it that way, and keep ports 9090 and 9091 closed in
-  the firewall.
-
-<Aside type="caution" title="A second proxy hop in front">
-If a second proxy that appends `X-Forwarded-For` sits in front of the one that
-connects to Goiabada (a load balancer in front of Nginx, for example), the
-rightmost entry is that second proxy's address. Set `TRUSTED_PROXIES` to the
-addresses of every hop you control, **including the one that connects to
-Goiabada**: Goiabada reads the forwarded headers only from a connection whose
-address is in the list, and walks `X-Forwarded-For` from the right past each
-listed address to the first one that is not, the client.
-
-For Cloudflare's proxy in front of Nginx, have Nginx resolve Cloudflare instead,
-as the [Cloudflare + Nginx guide](/deploy/cloudflare-nginx/#client-ip-behind-cloudflare)
-does, so Goiabada still sees one hop and needs no list.
-</Aside>
-
-```bash
-# Example: Nginx on the internal network plus an upstream load balancer
-GOIABADA_AUTHSERVER_TRUSTED_PROXIES=10.0.0.0/8,192.168.1.5
-GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES=10.0.0.0/8,192.168.1.5
-```
-
-<Aside type="note" title="Under Docker Compose the peer is not 127.0.0.1">
-Nginx connects to `127.0.0.1:9090`, but the connection a Compose service sees
-comes from the Compose network's gateway, an address such as `172.21.0.1`. A list
-naming `127.0.0.1` therefore makes Goiabada ignore the forwarded headers and
-resolve every request to the gateway, putting everyone in one rate-limit bucket.
-With one proxy, leave the list empty. The [native binaries](/deploy/native-binaries/#reverse-proxy),
-which Nginx reaches over loopback directly, are different: there the wizard
-writes `TRUSTED_PROXIES=127.0.0.1`.
-</Aside>
-
-If you turn the rate limiter on while trusting one hop with no list, the auth
-server logs a warning at every start saying so. The setup wizard's production
-Compose file turns the limiter on unless you answer no (`--rate-limiter=false`),
-so with it, expect this warning at every start: one hop is what that file trusts,
-and is correct behind the one proxy on the host. The server cannot tell a proxy that
-appends from one that passes the header through untouched, nor see whether
-anything reaches it around the proxy. Once you have checked both against your
-setup, the warning is expected and can be left as it is.
-
-<Aside type="tip">
-If you enable a reverse proxy but forget `TRUST_PROXY_HEADERS=true`, every
-request will appear to originate from the proxy's IP, so rate limits and audit
-logs will attribute all traffic to a single address. This fails safe (it
-throttles rather than opens a bypass), but it is a sign the flag is missing.
-</Aside>
+<CardGrid>
+  <LinkCard title="Client IP and proxy trust" description="How Goiabada reads the client's address behind Nginx." href="/deploy/client-ip-and-proxy-trust/" />
+  <LinkCard title="Secrets" description="Back up the AES key, and keep the override file safe." href="/deploy/secrets/" />
+  <LinkCard title="Production checklist" description="What to check before going live." href="/deploy/production-checklist/" />
+</CardGrid>

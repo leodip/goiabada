@@ -31,7 +31,7 @@ You don't migrate the database yourself. The auth server brings the schema up to
        A setup wizard built from source writes the moving `latest` tag instead of a version, so `docker compose pull` fetches whatever release `latest` names that day. Replace it with a [release version](https://github.com/leodip/goiabada/releases), so that you choose when to upgrade.
      </TabItem>
      <TabItem label="Native binaries">
-       Download the release's ZIP for your platform from the [releases page](https://github.com/leodip/goiabada/releases), put both binaries where the old ones are, and restart. With the layout on [Native binaries](/deploy/native-binaries/#running-on-linux-with-systemd):
+       Download the release's ZIP for your platform from the [releases page](https://github.com/leodip/goiabada/releases), put both binaries where the old ones are, and restart. With the layout on [Native binaries](/deploy/native-binaries/#set-it-up):
 
        ```bash
        unzip goiabada-<version>-linux-amd64.zip

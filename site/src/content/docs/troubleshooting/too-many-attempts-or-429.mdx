@@ -49,7 +49,7 @@ If everyone is refused behind a proxy, tell the auth server to read the client's
 Trust forwarded headers only when the proxy is the **only** way to reach the auth server. A client that connects directly can send any `X-Forwarded-For` it likes, and picks the address it's limited under.
 </Aside>
 
-[Client IP addresses](/reference/environment-variables/#client-ip-addresses) has the precise rules, and [client IP resolution](/deploy/reverse-proxy/#client-ip-resolution-and-spoofing-protection) shows them behind Nginx.
+[Client IP addresses](/reference/environment-variables/#client-ip-addresses) has the precise rules, and [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/) shows them for each setup.
 
 ## How it works
 
