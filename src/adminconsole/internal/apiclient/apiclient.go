@@ -30,9 +30,8 @@ type AuthServerClient struct {
 // error_code and error_description fields respectively. Consumers route
 // on StatusCode (4xx vs 5xx) rather than on an in-body category.
 type APIError struct {
-	Code       string         // "error_code" — stable identifier (UPPER_SNAKE for legacy, dotted lowercase for catalog-keyed)
-	ErrorArgs  map[string]any // "error_args" — substitutions for the localized message
-	Message    string         // "error_description" — rendered English text
+	Code       string // "error_code" — stable identifier (UPPER_SNAKE for legacy, dotted lowercase for catalog-keyed)
+	Message    string // "error_description" — the sentence for people to read, localized when Code is a catalog key
 	StatusCode int
 }
 
@@ -46,7 +45,6 @@ func parseAPIError(resp *http.Response, body []byte) *APIError {
 	if err := json.Unmarshal(body, &errorResp); err == nil && (errorResp.ErrorCode != "" || errorResp.ErrorDescription != "") {
 		return &APIError{
 			Code:       errorResp.ErrorCode,
-			ErrorArgs:  errorResp.ErrorArgs,
 			Message:    errorResp.ErrorDescription,
 			StatusCode: resp.StatusCode,
 		}

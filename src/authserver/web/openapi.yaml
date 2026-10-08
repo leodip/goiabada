@@ -4178,8 +4178,8 @@ components:
         Admin/account API error envelope. Routing by HTTP status code:
         4xx is a client-correctable failure (validation, not found,
         permission denied, rate limited); 5xx is a server-side problem.
-        The body provides a stable error_code, optional error_args, and
-        an error_description for people to read.
+        The body provides a stable error_code and an error_description
+        for people to read.
         Protocol endpoints (/auth/token, /auth/authorize, /connect/register,
         /userinfo) use their RFC-defined error envelopes instead of this one.
       properties:
@@ -4189,10 +4189,6 @@ components:
             Stable identifier for the failure. UPPER_SNAKE for legacy codes
             (e.g. VALIDATION_ERROR), dotted lowercase for catalog-keyed
             localized codes (e.g. validator.email.required).
-        error_args:
-          type: object
-          additionalProperties: true
-          description: Substitution values for the localized message template.
         error_description:
           type: string
           description: |
