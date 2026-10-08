@@ -63,3 +63,13 @@ updates:
       interval: weekly
     commit-message:
       prefix: deps
+
+  # The docs site's build: Astro, Starlight and their plugins. Nothing here
+  # reaches the docs image, which serves the built files with nginx, but the
+  # build runs in CI and on every contributor's machine.
+  - package-ecosystem: npm
+    directory: /site
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
