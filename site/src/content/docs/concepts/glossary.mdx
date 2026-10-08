@@ -105,6 +105,10 @@ The address the auth server sends the browser back to after sign-in, carrying th
 
 A token a client exchanges for new tokens without asking the user to sign in again. A client that asks for the `offline_access` scope gets an offline refresh token, which keeps working after the user's session expires. See [Refresh tokens](/concepts/refresh-tokens/).
 
+### Refresh-token rotation
+
+What happens to a refresh token when it's used: the auth server retires it and hands back a new one, so each refresh token is good for one refresh. A retired one sent again is a replay, which revokes every live refresh token from the same sign-in. Not to be confused with [secret rotation](#secret-rotation) or [signing-key rotation](#signing-key-rotation). See [Refresh tokens](/concepts/refresh-tokens/#rotation).
+
 ### Resource
 
 Something you protect, usually an API, and the permissions that go with it. Goiabada's own resource is `authserver`. See [Resources and permissions](/concepts/resources-and-permissions/).
@@ -113,13 +117,13 @@ Something you protect, usually an API, and the permissions that go with it. Goia
 
 A deprecated flow, also called the password grant, in which a client sends a user's email and password to the token endpoint for tokens. It's off by default. See [ROPC](/legacy-flows/ropc/).
 
-### Rotation
-
-What happens to a refresh token when it's used: the auth server retires it and hands back a new one, so each refresh token is good for one refresh. A retired one sent again is a replay, which revokes every live refresh token from the same sign-in. See [Refresh tokens](/concepts/refresh-tokens/#rotation).
-
 ### Scope
 
 What a client asks for when it requests a token. There are two kinds: OpenID Connect scopes, such as `openid`, `profile` and `email`, which give access to the user's information, and permission scopes, written `resource:permission`. See [Scopes](/concepts/scopes/).
+
+### Secret rotation
+
+Replacing one of the secrets your deployment holds with a new one: a server's session keys, the AES key, the database password or the admin console's client secret, each without signing anybody out or with the shortest interruption that secret allows. See [Rotate secrets](/deploy/rotate-secrets/).
 
 ### Self-registration
 
@@ -128,6 +132,10 @@ A user creating their own account from the sign-in page's **Register** link, ins
 ### Session
 
 What lets a user sign in once and use several clients. After the user signs in, the auth server keeps a session for their browser, so the next client they use doesn't ask for the password again. A session ends when it has been idle too long, when it reaches its maximum lifetime, or when it's ended: by the user or an administrator, by signing out, or by a change to the user's credentials. See [Sessions](/concepts/sessions/) and [Ending sessions](/concepts/ending-sessions/).
+
+### Signing-key rotation
+
+What **Rotate key** under **Admin**, **Keys** does: the next signing key starts signing tokens, the current one becomes the previous one, and the old previous one is deleted, so a token it signed no longer verifies. See [The key set](/reference/endpoints/discovery-and-jwks/#the-key-set).
 
 ### Silent request
 
