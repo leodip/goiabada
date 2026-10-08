@@ -1,0 +1,36 @@
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+{/* The setup wizard's downloads, one tab per platform. The Quickstart and the Setup wizard page both
+    start with them, so they are written once, here. */}
+
+<Tabs>
+  <TabItem label="Linux (x86_64)">
+    ```bash
+    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-amd64
+    chmod +x goiabada-setup-linux-amd64
+    ```
+  </TabItem>
+  <TabItem label="Linux (ARM64)">
+    ```bash
+    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-arm64
+    chmod +x goiabada-setup-linux-arm64
+    ```
+  </TabItem>
+  <TabItem label="macOS (Apple Silicon)">
+    ```bash
+    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-arm64
+    chmod +x goiabada-setup-darwin-arm64
+    ```
+  </TabItem>
+  <TabItem label="macOS (Intel)">
+    ```bash
+    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-amd64
+    chmod +x goiabada-setup-darwin-amd64
+    ```
+  </TabItem>
+  <TabItem label="Windows">
+    ```bash
+    curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-windows-amd64.exe
+    ```
+  </TabItem>
+</Tabs>

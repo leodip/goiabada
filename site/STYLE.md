@@ -62,10 +62,10 @@ The sidebar is in `astro.config.mjs`, and a page's URL is its group's path follo
 label, so the two read alike: Deploy > Monitoring is `/deploy/monitoring/`. The groups, in order:
 
 ```
-Get started      Introduction, quickstart, setup wizard, first sign-in
+Get started      Introduction, quickstart, first sign-in
 Guides           One task end to end: add sign-in to an app, protect an API, ...
 Concepts         What each thing is and how it behaves, and the glossary
-Deploy           Running Goiabada in production
+Deploy           Running Goiabada in production: choosing a method, the setup wizard, ...
 Reference        Endpoints, the API, environment variables, security
 Troubleshooting  One short page per problem
 Legacy flows     Implicit, ROPC
