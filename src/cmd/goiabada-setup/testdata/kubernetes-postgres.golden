@@ -31,6 +31,7 @@ metadata:
   namespace: "goiabada"
 data:
   GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com"
+  # Plain HTTP: the admin console's secret and tokens cross this hop unencrypted, so it assumes a network you trust.
   GOIABADA_AUTHSERVER_INTERNALBASEURL: "http://goiabada-authserver:9090"
   GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com"
   GOIABADA_APPNAME: "Goiabada"
@@ -72,6 +73,7 @@ metadata:
   namespace: "goiabada"
 data:
   GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com"
+  # Plain HTTP: the admin console's secret and tokens cross this hop unencrypted, so it assumes a network you trust.
   GOIABADA_AUTHSERVER_INTERNALBASEURL: "http://goiabada-authserver:9090"
   GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com"
   # Envoy, the one gateway in front, appends the address it received each connection from
