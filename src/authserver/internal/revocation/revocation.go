@@ -414,7 +414,8 @@ type TerminationResult struct {
 func TerminateUserSessionTx(ctx context.Context, db Database, userSession *record.UserSession) (TerminationResult, error) {
 	// Both sweeps key on the session identifier and the delete keys on the id, so this takes the
 	// loaded row rather than two loose values: from one row they cannot describe two different
-	// sessions, and both call sites already load it for their own not-found and ownership checks.
+	// sessions, and every call site already holds it: the two endpoints load it for their own
+	// not-found and ownership checks, and /auth/completed is ending the session it arrived with.
 	if userSession == nil {
 		return TerminationResult{}, errs.New("terminating a user session requires the session to terminate")
 	}
@@ -869,14 +870,14 @@ func LogAuthCodeReuse(ctx context.Context, auditLogger AuditLogger, code *record
 }
 
 // LogTerminatedUserSession emits EventTerminatedUserSession, the security record of an explicit
-// "end this session" action (#129 decision 9). One function rather than a literal at each of the
-// two endpoints, following LogRevokedUserAuthState: the payload cannot then differ between sites,
-// and there is a single place to assert its shape field by field.
+// "end this session" action (#129 decision 9). One function rather than a literal at each of its
+// three call sites, the two session-termination endpoints and /auth/completed's handover (#133),
+// following LogRevokedUserAuthState: the payload cannot then differ between sites, and there is a
+// single place to assert its shape field by field.
 //
 // It takes the loaded session row for the same reason TerminateUserSessionTx does. userId,
 // userSessionId and sessionIdentifier all come off that one row, so they cannot end up describing
-// two different sessions, and both call sites already hold it for their own not-found and
-// ownership checks.
+// two different sessions, and every call site already holds it.
 //
 // Call this only after TerminateUserSessionTx returned without error, and beside rather than
 // instead of EventDeletedUserSession, whose payload decision 9 leaves untouched.
