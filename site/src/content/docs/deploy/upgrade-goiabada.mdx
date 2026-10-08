@@ -125,9 +125,10 @@ The `migrate` command steps the schema without starting the server, against the 
      </TabItem>
      <TabItem label="Native binaries">
        ```bash
-       set -a && . /etc/goiabada/authserver.env && set +a
-       /opt/goiabada/goiabada-authserver migrate to <version>
+       sudo -u goiabada sh -c 'cd /var/lib/goiabada && set -a && . /etc/goiabada/goiabada.env && set +a && exec /opt/goiabada/goiabada-authserver migrate to <version>'
        ```
+
+       It runs as the service's user, from its working directory and with its `goiabada.env`, as the unit on [Native binaries](/deploy/native-binaries/#set-it-up) does, so a SQLite database named by a relative path is the one the service uses. If the file can't be read, nothing runs.
      </TabItem>
      <TabItem label="Kubernetes">
        ```bash

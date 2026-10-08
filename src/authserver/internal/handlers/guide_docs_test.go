@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -33,10 +34,16 @@ import (
 	"github.com/leodip/goiabada/core/guard"
 )
 
-// registrationGuide is the guide, relative to the repository root.
-const registrationGuide = "site/src/content/docs/guides/let-clients-register-themselves-dcr.mdx"
+// The guides, relative to the repository root.
+const (
+	registrationGuide = "site/src/content/docs/guides/let-clients-register-themselves-dcr.mdx"
+	twoFactorGuide    = "site/src/content/docs/guides/require-two-factor-authentication.mdx"
+)
 
-var registrationExampleSection = conceptSection{registrationGuide, "## Register your app"}
+var (
+	registrationExampleSection = conceptSection{registrationGuide, "## Register your app"}
+	alreadySignedInSection     = conceptSection{twoFactorGuide, "### Users who are already signed in"}
+)
 
 // registrationExample is the request a section shows and the answer it shows for it.
 type registrationExample struct {
@@ -76,6 +83,27 @@ func sortedNames(object map[string]json.RawMessage) []string {
 	}
 	slices.Sort(names)
 	return names
+}
+
+// Require two-factor authentication says that a session which already reached the client's level is
+// reused without asking for a code, which is what StepUpOwed decides for a level 3 sign-in over a
+// level 3 session whose two-factor settings are unchanged (#522 decision 13).
+func TestGuideDocs_ASessionAtTheLevelIsReusedWithoutACode(t *testing.T) {
+	session := &record.UserSession{
+		AcrLevel:            record.AcrLevel2Mandatory,
+		OtpConfigGeneration: 2,
+		User:                record.User{OtpConfigGeneration: 2},
+	}
+	step, err := ceremony.StepUpOwed(record.AcrLevel2Mandatory, session)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if step != ceremony.StepUpNone {
+		t.Fatalf("a level 3 session owes %v at level 3, so the guide's sentence no longer holds", step)
+	}
+	assertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), alreadySignedInSection, []string{
+		"A user whose session already reached the client's level isn't asked for anything: the session is reused",
+	})
 }
 
 // The registration on Let clients register themselves (DCR) is answered with the status and exactly

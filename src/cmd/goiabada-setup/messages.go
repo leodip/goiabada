@@ -292,6 +292,10 @@ func printEnvoyProxyPrerequisite(out *console, policy trafficPolicy) {
 	out.printf("             externalTrafficPolicy: %s\n", policy)
 }
 
+// nativeReleaseArchive is the archive a release publishes for one platform, as build-binaries.sh
+// names it, with the parts that vary in angle brackets.
+const nativeReleaseArchive = "goiabada-<version>-<os>-<arch>.zip"
+
 func printNativeInstructions(out *console, config *Config, paths outputPaths) {
 	out.println("To run Goiabada with native binaries:")
 	out.println()
@@ -301,7 +305,7 @@ func printNativeInstructions(out *console, config *Config, paths outputPaths) {
 	out.printf("  %shttps://github.com/leodip/goiabada/releases%s\n", out.cyan, out.reset)
 	out.println()
 	out.println("  Extract the binaries:")
-	out.printf("  %star -xzf goiabada-<version>-<os>-<arch>.tar.gz%s\n", out.cyan, out.reset)
+	out.printf("  %sunzip %s%s\n", out.cyan, nativeReleaseArchive, out.reset)
 	out.println()
 	out.printf("%s%s2. START THE SERVERS%s\n", out.bold, out.yellow, out.reset)
 	out.println()

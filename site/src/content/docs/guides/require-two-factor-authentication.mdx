@@ -7,7 +7,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 
 This guide makes everyone who signs in to your app enter a one-time code as well as their password.
 
-That's [two-factor authentication](/concepts/glossary/#two-factor-authentication): the code is six digits from an authenticator app on the user's phone, such as Google Authenticator, Microsoft Authenticator or FreeOTP, and it changes every 30 seconds. How strongly a user must sign in to a client is the client's [ACR level](/concepts/acr-and-amr/), and the strongest one asks for a code every time.
+That's [two-factor authentication](/concepts/glossary/#two-factor-authentication): the code is six digits from an authenticator app on the user's phone, such as Google Authenticator, Microsoft Authenticator or FreeOTP, and it changes every 30 seconds. How strongly a user must sign in to a client is the client's [ACR level](/concepts/acr-and-amr/), and the strongest one asks for a code whenever a user signs in with their password.
 
 ## Require a code for your app
 
@@ -15,7 +15,7 @@ That's [two-factor authentication](/concepts/glossary/#two-factor-authentication
 
 1. In the admin console, open your client under **Admin**, **Clients**. On the **Settings** tab, set **Default ACR level** to **ACR level 3 - password + mandatory OTP**, which is `urn:goiabada:level2_mandatory`, and save. Sign-ins that start after the change use it.
 
-2. Sign in to your app as a user with no authenticator. After the password, the sign-in page asks you to set one up: scan the QR code with an authenticator app, then enter the code it shows. From then on, every sign-in to your app asks for a code after the password.
+2. Sign in to your app as a user with no authenticator. After the password, the sign-in page asks you to set one up: scan the QR code with an authenticator app, then enter the code it shows. From then on, each time you sign in with your password, a code is asked for after it. While your session lasts, signing in to your app again, or to another app at the same level, reuses it and asks for neither: see [Users who are already signed in](#users-who-are-already-signed-in).
 
 3. In your app, check how the user signed in before you let them in. The ID token says it in two claims, `acr`, the level, and `amr`, the methods the user used:
 
@@ -32,7 +32,7 @@ That's [two-factor authentication](/concepts/glossary/#two-factor-authentication
 
 </Steps>
 
-To ask for a code only before one sensitive operation, such as a payment, leave the client's level as it is and send `acr_values=urn:goiabada:level2_mandatory` on that one authorization request. [ACR and AMR](/concepts/acr-and-amr/#require-a-level) shows how.
+To ask for a code only before one sensitive operation, such as a payment, leave the client's level as it is and send `acr_values=urn:goiabada:level2_mandatory` on that one authorization request. [ACR and AMR](/concepts/acr-and-amr/#require-a-level) shows how. It asks for a level, not for a new code: a user whose session already reached that level isn't asked again. To require a recent sign-in as well, add `max_age`, as [Sessions](/concepts/sessions/) explains.
 
 ## Require a code for administrators
 
@@ -69,6 +69,8 @@ The code is a time-based one-time password ([RFC 6238](https://www.rfc-editor.or
 Each code works once. Sent again, it's refused, and the [audit log](/concepts/audit-log/) records `otp_code_replay_detected`. With the rate limiter on, each user gets 5 wrong codes in 15 minutes, and then waits. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
 
 ### Users who are already signed in
+
+A user whose session already reached the client's level isn't asked for anything: the session is reused, and the tokens say `urn:goiabada:level2_mandatory` and `["pwd", "otp"]` from the sign-in that earned it.
 
 A user who signed in to another app with a password alone isn't asked for their password again. They're asked only for the code, which is a [step-up](/concepts/acr-and-amr/#a-session-thats-already-there), and their session keeps the higher level from then on.
 

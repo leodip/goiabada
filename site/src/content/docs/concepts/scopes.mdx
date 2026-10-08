@@ -46,11 +46,11 @@ Ask only for what you use: the user sees the list on the consent screen, when th
 | `attributes` | `attributes`, the user's attributes and those of their groups, as keys and values |
 | `offline_access` | No claim. It gets your app an offline refresh token, which keeps working after the user's session ends. |
 
-A claim with no value is left out rather than sent empty: a user with no nickname has no `nickname`. `email_verified` and `phone_number_verified` are always sent with their scope, `address` only when some part of the address is set, and `picture` only when the user has a profile picture. `profile` links to the user's account page, and `locale` is the language the user chose.
+A claim with no value is left out rather than sent empty: a user with no nickname has no `nickname`. `email_verified` and `phone_number_verified` are always sent with their scope, `address` only when some part of the address is set, and `picture` only when the user has a profile picture. `profile` is the auth server's base URL followed by `/account/profile`, where the auth server has no page: a user's own profile is in the admin console, under **Account**, **Profile**, so don't send users to the claim's URL. `locale` is the language the user chose.
 
 `groups` lists only the groups set to be included, and `attributes` only the attributes set to be included: see [Users and groups](/concepts/users-and-groups/#groups).
 
-`groups`, `attributes` and `offline_access` are Goiabada's own. The rest are defined by [OpenID Connect Core, section 5.4](https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims).
+`groups` and `attributes` are Goiabada's own. `offline_access` is defined by [OpenID Connect Core, section 11](https://openid.net/specs/openid-connect-core-1_0.html#OfflineAccess), and the rest by [section 5.4](https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims).
 
 ### Where the claims go
 

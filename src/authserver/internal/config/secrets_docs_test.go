@@ -757,3 +757,240 @@ func createSecretCommands(section string) []createCommand {
 	}
 	return commands
 }
+
+// secretKeyDocs is every page whose commands write or read a key of a Kubernetes Secret: each
+// rotation, the Kubernetes Secrets page with its sealed and operator-owned rotations, the AES key's
+// backup, and the pages that read the admin password or restore the admin console's client secret.
+var secretKeyDocs = []docSection{
+	{rotatePage, ""},
+	{kubernetesSecretsPage, ""},
+	{secretsPage, ""},
+	{"site/src/content/docs/troubleshooting/locked-out-of-the-admin-console.mdx", ""},
+	{"site/src/content/docs/get-started/first-sign-in.mdx", ""},
+	{"site/src/content/docs/deploy/kubernetes/gateway-and-certificates.mdx", ""},
+}
+
+// Every Secret key the docs' commands patch, read or seal is one a generated manifest references,
+// optional ones included. A rotation's patch writing a misspelt -previous key leaves the pods
+// without the fallback the procedure relies on, and still succeeds, since kubectl writes whatever
+// key it is given; the pods then start without it, because the reference is optional, and every
+// session sealed under the old pair is lost at the swap (#522 decision 15).
+func TestKubernetesDocs_TheCommandsNameOnlyKeysTheManifestsRead(t *testing.T) {
+	assertSecretKeyCommands(t, filepath.Dir(guard.SourceRoot(t)), secretKeyDocs)
+}
+
+// secretKeyFixture names keys every way the docs do, each once correctly and, where marked, once
+// misspelt.
+const secretKeyFixture = "Prose naming the key the database is under is no command.\n\n" +
+	"```bash\nkubectl patch secret goiabada-encryption-key -n goiabada --type=merge --patch-file=/dev/stdin <<EOF\n" +
+	"{\"data\": {\"aes-encryption-key-previous\": \"$(kubectl get secret goiabada-encryption-key -n goiabada -o jsonpath='{.data.aes-encryption-key}')\"},\n" +
+	" \"stringData\": {\"aes-encryption-key-previus\": \"$(openssl rand -hex 32)\"}}\nEOF\n```\n\n" +
+	"```bash\nkubectl patch secret goiabada-encryption-key -n goiabada --type=json \\\n" +
+	"  -p='[{\"op\": \"remove\", \"path\": \"/data/aes-encryption-kye\"}]'\n```\n\n" +
+	"```bash\nkey() { kubectl get secret goiabada-secrets -n goiabada -o \"jsonpath={.data.$1}\"; }\n" +
+	"kubectl patch secret goiabada-secrets -n goiabada --type=merge --patch-file=/dev/stdin <<EOF\n" +
+	"{\"data\": {\"oauth-client-secret\": \"$(key db-pasword)\"}}\nEOF\n```\n\n" +
+	"```bash\ndigest() { kubectl get secret \"$1\" -n goiabada -o \"jsonpath={.data.$2}\" | base64 -d | sha256sum; }\n" +
+	"digest goiabada-encryption-key aes-encryption-key-previous\n```\n\n" +
+	"```bash\nseal() { kubectl create secret generic goiabada-secrets -n goiabada --dry-run=client -o json \"$@\" \\\n" +
+	"  | kubeseal --format yaml --merge-into goiabada-secrets.sealed.yaml; }\n" +
+	"seal --from-file=oauth-client-secrt=<(key db-password)\n```\n\n" +
+	"Read it back with `kubectl get secret goiabada-secret -n goiabada -o jsonpath='{.data.db-password}'`.\n"
+
+func TestKubernetesDocs_ACommandNamingAKeyNoManifestReadsFails(t *testing.T) {
+	root := t.TempDir()
+	writeManifestFixture(t, root, "src/cmd/goiabada-setup/testdata/kubernetes-postgres.golden", contractManifest)
+	writeManifestFixture(t, root, "site/rotate.mdx", secretKeyFixture)
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertSecretKeyCommands(r, root, []docSection{{"site/rotate.mdx", ""}})
+	})
+
+	if report.Stopped {
+		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
+	}
+	want := []string{
+		"site/rotate.mdx names goiabada-encryption-key/aes-encryption-key-previus, which no generated manifest reads",
+		"site/rotate.mdx names goiabada-encryption-key/aes-encryption-kye, which no generated manifest reads",
+		"site/rotate.mdx names goiabada-secret/db-password, which no generated manifest reads",
+		"site/rotate.mdx names goiabada-secrets/db-pasword, which no generated manifest reads",
+		"site/rotate.mdx names goiabada-secrets/oauth-client-secrt, which no generated manifest reads",
+	}
+	if strings.Join(report.Errors, "\n") != strings.Join(want, "\n") {
+		t.Errorf("failures\n%s\nwant\n%s", strings.Join(report.Errors, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+func TestKubernetesDocs_CommandsNamingKeysTheManifestsReadPass(t *testing.T) {
+	root := t.TempDir()
+	writeManifestFixture(t, root, "src/cmd/goiabada-setup/testdata/kubernetes-postgres.golden", contractManifest)
+	writeManifestFixture(t, root, "site/rotate.mdx", strings.NewReplacer(
+		"aes-encryption-key-previus", "aes-encryption-key",
+		"aes-encryption-kye", "aes-encryption-key-previous",
+		"db-pasword", "db-password",
+		"oauth-client-secrt", "oauth-client-secret",
+		"goiabada-secret ", "goiabada-secrets ",
+	).Replace(secretKeyFixture))
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertSecretKeyCommands(r, root, []docSection{{"site/rotate.mdx", ""}})
+	})
+
+	if report.Stopped || len(report.Errors) != 0 {
+		t.Errorf("commands naming keys the manifests read failed: %+v", report)
+	}
+}
+
+func TestKubernetesDocs_PagesWithNoSecretCommandStop(t *testing.T) {
+	root := t.TempDir()
+	writeManifestFixture(t, root, "src/cmd/goiabada-setup/testdata/kubernetes-postgres.golden", contractManifest)
+	writeManifestFixture(t, root, "site/rotate.mdx", "## Rotate\n\nRestart the pods.\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertSecretKeyCommands(r, root, []docSection{{"site/rotate.mdx", ""}})
+	})
+
+	if !report.Stopped || !strings.Contains(report.Fatal, "read nothing") {
+		t.Errorf("pages naming no Secret key did not stop the check: %+v", report)
+	}
+}
+
+// assertSecretKeyCommands is the reporting half of the command keys check.
+func assertSecretKeyCommands(r guard.Reporter, root string, sections []docSection) {
+	r.Helper()
+	findings, err := secretKeyCommandFindings(root, sections)
+	if err != nil {
+		r.Fatalf("%v", err)
+	}
+	for _, finding := range findings {
+		r.Errorf("%s", finding)
+	}
+}
+
+var (
+	// patchSecret opens a `kubectl patch secret`, whose patch runs to the end of its code block.
+	patchSecret = regexp.MustCompile("kubectl patch secret ([a-z0-9-]+)([^`]*)")
+	// patchedKey is a key a merge patch writes under data or stringData, or a JSON patch's path.
+	patchedKey = regexp.MustCompile(`"([a-z0-9-]+)":|"/data/([a-z0-9-]+)"`)
+	// getSecretKey is a `kubectl get secret` reading one key it names.
+	getSecretKey = regexp.MustCompile(`kubectl get secret ([a-z0-9-]+)[^\n]*?\{\.data\.([a-z0-9-]+)\}`)
+	// secretHelper is a shell function over one Secret, or over the one its first argument names.
+	secretHelper = regexp.MustCompile(`(?m)^\s*([a-z_]+)\(\) \{ kubectl (get|create) secret (?:generic )?("\$1"|[a-z0-9-]+)`)
+)
+
+// notSecretKeys are the JSON names a patch spells that are no key of the Secret.
+var notSecretKeys = map[string]bool{"data": true, "stringData": true, "op": true, "path": true}
+
+// secretKeyCommandFindings returns one line per Secret key a section's commands name that no
+// generated manifest references from that Secret: a key a `kubectl patch secret` writes or removes,
+// one a `kubectl get secret` reads, one a `kubectl create secret generic` creates or seals, and one
+// a helper over those commands is called with. Sections naming no key at all are an error, since
+// the check would then read nothing.
+func secretKeyCommandFindings(root string, sections []docSection) ([]string, error) {
+	referenced, err := manifestSecretKeys(root)
+	if err != nil {
+		return nil, err
+	}
+	var findings []string
+	named := 0
+	for _, s := range sections {
+		text, err := docSectionText(root, s)
+		if err != nil {
+			return nil, err
+		}
+		text = strings.ReplaceAll(text, "\\\n", " ")
+		seen := map[string]bool{}
+		name := func(secret, key string) {
+			named++
+			ref := secret + "/" + key
+			if referenced[secret][key] || seen[ref] {
+				return
+			}
+			seen[ref] = true
+			findings = append(findings, fmt.Sprintf("%s names %s, which no generated manifest reads", s, ref))
+		}
+		for _, patch := range patchSecret.FindAllStringSubmatch(text, -1) {
+			for _, key := range patchedKey.FindAllStringSubmatch(patch[2], -1) {
+				if k := key[1] + key[2]; !notSecretKeys[k] {
+					name(patch[1], k)
+				}
+			}
+		}
+		for _, get := range getSecretKey.FindAllStringSubmatch(text, -1) {
+			name(get[1], get[2])
+		}
+		for _, command := range createSecretCommands(text) {
+			for key := range command.keys {
+				name(command.secret, key)
+			}
+		}
+		for _, helper := range secretHelper.FindAllStringSubmatch(text, -1) {
+			fn, verb, secret := helper[1], helper[2], helper[3]
+			switch {
+			case verb == "create":
+				calls := regexp.MustCompile(`(?m)^\s*` + fn + ` ([^\n]*)`)
+				for _, call := range calls.FindAllStringSubmatch(text, -1) {
+					for _, key := range createKey.FindAllStringSubmatch(call[1], -1) {
+						name(secret, key[1])
+					}
+				}
+			case secret == `"$1"`:
+				calls := regexp.MustCompile(`(?m)(?:^\s*|\$\(|<\()` + fn + ` ([a-z0-9-]+) ([a-z0-9-]+)`)
+				for _, call := range calls.FindAllStringSubmatch(text, -1) {
+					name(call[1], call[2])
+				}
+			default:
+				calls := regexp.MustCompile(`(?m)(?:^\s*|\$\(|<\()` + fn + ` ([a-z0-9-]+)`)
+				for _, call := range calls.FindAllStringSubmatch(text, -1) {
+					name(secret, call[1])
+				}
+			}
+		}
+	}
+	if named == 0 {
+		return nil, fmt.Errorf("no command in %v names a Secret key, so this check read nothing", sections)
+	}
+	sort.Strings(findings)
+	return findings, nil
+}
+
+// manifestSecretKeys is every key each Secret is referenced by in a Kubernetes golden running the
+// auth server, optional references included.
+func manifestSecretKeys(root string) (map[string]map[string]bool, error) {
+	paths, err := filepath.Glob(filepath.Join(root, "src", filepath.FromSlash(kubernetesManifests)))
+	if err != nil {
+		return nil, err
+	}
+	keys := map[string]map[string]bool{}
+	examined := 0
+	for _, path := range paths {
+		if strings.HasSuffix(path, ".secrets.golden") {
+			continue
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		if !bytes.Contains(content, []byte(authServerImage)) {
+			continue
+		}
+		read, deployments, err := secretReferences(content)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", filepath.Base(path), err)
+		}
+		if deployments == 0 {
+			continue
+		}
+		examined++
+		for ref := range read {
+			if keys[ref.secret] == nil {
+				keys[ref.secret] = map[string]bool{}
+			}
+			keys[ref.secret][ref.key] = true
+		}
+	}
+	if examined == 0 {
+		return nil, fmt.Errorf("no file matching %s holds a Deployment, so this check read nothing", kubernetesManifests)
+	}
+	return keys, nil
+}

@@ -22,7 +22,9 @@ It's the OpenID Connect endpoint for a user's [claims](/concepts/glossary/#claim
      -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9..."
    ```
 
-3. Read the claims:
+3. **Check `sub` before you use any claim.** It must be exactly the `sub` of the ID token you validated at sign-in. If it isn't, discard the whole answer and use none of its claims: the answer is about another user than the one who signed in. [OpenID Connect Core section 5.3.2](https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse) requires this check.
+
+4. Read the claims:
 
    ```json
    {
