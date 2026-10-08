@@ -135,6 +135,7 @@ export default defineConfig({
 						{ label: 'Rotate secrets', slug: 'deploy/rotate-secrets' },
 						{ label: 'Upgrade Goiabada', slug: 'deploy/upgrade-goiabada' },
 						{ label: 'Monitoring', slug: 'deploy/monitoring' },
+						{ label: 'Logs', slug: 'deploy/logs' },
 						{ label: 'Production checklist', slug: 'deploy/production-checklist' },
 					],
 				},
