@@ -1,0 +1,77 @@
+---
+title: Logo and picture
+description: Show a client's logo or a user's profile picture from the auth server's two public image endpoints.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you show a client's logo or a user's profile picture in your app.
+
+The auth server serves both images, with no sign-in and no token:
+
+- **`GET /client/logo/{clientIdentifier}`**, the logo an administrator uploaded for a client.
+- **`GET /userinfo/picture/{subject}`**, a user's profile picture. It's the URL in the user's `picture` claim.
+
+## Show a profile picture
+
+<Steps>
+
+1. Sign the user in with the `profile` scope, and read the `picture` claim from the ID token or [`/userinfo`](/reference/endpoints/userinfo/). It's there only when the user has a picture:
+
+   ```json
+   {
+     "sub": "2bd9ff17-7cb1-4c11-8d6d-6a3e1a0f5a6b",
+     "picture": "https://auth.example.com/userinfo/picture/2bd9ff17-7cb1-4c11-8d6d-6a3e1a0f5a6b"
+   }
+   ```
+
+2. Use the URL as it is, in an `<img>` tag:
+
+   ```html
+   <img src="https://auth.example.com/userinfo/picture/2bd9ff17-7cb1-4c11-8d6d-6a3e1a0f5a6b" alt="">
+   ```
+
+</Steps>
+
+A client's logo works the same way: `<img src="https://auth.example.com/client/logo/my-app">`.
+
+## How it works
+
+### The client logo
+
+`GET /client/logo/{clientIdentifier}` answers with the client's logo, under the image type it was uploaded as, such as `image/png`.
+
+The logo is public whatever the client's state. It's served while the client is disabled, and while **Show logo** is off: that switch decides whether the sign-in screens show the logo, not whether anyone may fetch it. The admin console's **Logo** tab previews it through this same URL.
+
+The answer carries an `ETag` and `Cache-Control: public, max-age=300, must-revalidate`, so a browser or a proxy keeps it for five minutes and then asks again. A request with an `If-None-Match` naming the current `ETag`, or `*`, is answered `304 Not Modified` with no body.
+
+A client that doesn't exist, or has no logo, is answered `404 Not Found`. The identifier is matched exactly, case included.
+
+### The profile picture
+
+`GET /userinfo/picture/{subject}` answers with the picture of the user whose [subject](/concepts/glossary/#subject) is in the path, under the image type it was uploaded as.
+
+It's served whatever the user's state, a disabled user included, with `Cache-Control: no-store, no-cache, must-revalidate` and no `ETag`, so a browser fetches it again every time and a user who replaces their picture never keeps showing the old one.
+
+A subject that names no user, or a user with no picture, is answered `404 Not Found`.
+
+<Aside>
+Anyone who knows a user's subject can fetch their picture. A subject is a random identifier nobody can guess, but every client the user signs in to receives it, so treat a profile picture as visible to all of them.
+</Aside>
+
+### Uploading
+
+An administrator uploads a client's logo on the client's **Logo** tab, and a user's picture on the user's **Picture** tab. Users upload their own under **Picture** on their account pages in the admin console. See [Clients](/concepts/clients/#display-name-description-and-logo) and [Users and groups](/concepts/users-and-groups/).
+
+Both take a JPEG, PNG, GIF or WebP image, from 10x10 to 512x512 pixels, and up to 3MB. `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` sets that limit, for logos too. The image type is read from the file's content, not its name.
+
+### Calling them from a browser
+
+Both endpoints work in an `<img>` tag from any site, which needs nothing more. They send no CORS headers, so JavaScript on another origin can't read the image's bytes with `fetch`.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="UserInfo" description="Read the picture claim and the user's other claims." href="/reference/endpoints/userinfo/" />
+  <LinkCard title="Clients" description="A client's display name, description and logo." href="/concepts/clients/#display-name-description-and-logo" />
+</CardGrid>

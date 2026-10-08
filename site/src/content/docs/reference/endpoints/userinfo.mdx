@@ -1,0 +1,113 @@
+---
+title: UserInfo
+description: Read the signed-in user's claims from /userinfo with their access token.
+---
+
+import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you read what the auth server knows about a signed-in user, from the UserInfo endpoint, `/userinfo`.
+
+It's the OpenID Connect endpoint for a user's [claims](/concepts/glossary/#claim): your app calls it with the user's access token, and gets back the claims of the scopes that token carries.
+
+## Read a user's claims
+
+<Steps>
+
+1. Sign the user in with a scope that has `openid`, plus the scopes for the claims you want, such as `openid profile email`. See [Authorize](/reference/endpoints/authorize/).
+
+2. Call `/userinfo` with the access token:
+
+   ```bash
+   curl https://auth.example.com/userinfo \
+     -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9..."
+   ```
+
+3. Read the claims:
+
+   ```json
+   {
+     "email": "jane@example.com",
+     "email_verified": true,
+     "family_name": "Doe",
+     "given_name": "Jane",
+     "name": "Jane Doe",
+     "picture": "https://auth.example.com/userinfo/picture/2bd9ff17-7cb1-4c11-8d6d-6a3e1a0f5a6b",
+     "preferred_username": "jane",
+     "profile": "https://auth.example.com/account/profile",
+     "sub": "2bd9ff17-7cb1-4c11-8d6d-6a3e1a0f5a6b",
+     "updated_at": 1759900000
+   }
+   ```
+
+</Steps>
+
+## How it works
+
+### The request
+
+Send the access token one way:
+
+- **In the `Authorization` header,** as `Bearer` and the token, on a GET or a POST. This is the way to use.
+- **In a POST body,** as the `access_token` parameter, with `Content-Type: application/x-www-form-urlencoded`, as [RFC 6750 section 2.2](https://www.rfc-editor.org/rfc/rfc6750#section-2.2) defines.
+
+A token in the query string isn't read, since it would end up in logs and the browser's history. Sending the token twice, in two headers, two parameters or both ways, is refused with `invalid_request`.
+
+The token must be an access token the auth server issued for a user, with `openid` in its scope. A client credentials token never has `openid`, and an ID token or a refresh token isn't accepted.
+
+### The answer
+
+The answer is `200 OK` with the claims as a JSON object. `sub`, the user's [subject](/concepts/glossary/#subject), is always there. The rest come from the token's scope:
+
+| Scope | Claims |
+|---|---|
+| `profile` | `name`, `given_name`, `middle_name`, `family_name`, `nickname`, `preferred_username`, `profile`, `picture`, `website`, `gender`, `birthdate`, `zoneinfo`, `locale` and `updated_at` |
+| `email` | `email` and `email_verified` |
+| `address` | `address`, an object with `street_address`, `locality`, `region`, `postal_code`, `country` and, when the country is set, `formatted` |
+| `phone` | `phone_number` and `phone_number_verified` |
+| `groups` | `groups`, the identifiers of the user's groups set to be included in the ID token |
+| `attributes` | `attributes`, the user's attributes and their groups' set to be included in the ID token, as keys and values |
+
+A claim with no value is left out, as [Scopes](/concepts/scopes/#openid-connect-scopes-and-their-claims) explains. `profile` is `/account/profile` and `picture` the user's [profile picture](/reference/endpoints/logo-and-picture/), both on the auth server's base URL. `updated_at` is the last time the user's details changed, in seconds since 1970.
+
+The claims are read when you call, so they're current even when the token is older than the user's last change. The answer is plain JSON, never a signed JWT.
+
+### Errors
+
+An error is answered with a `WWW-Authenticate: Bearer realm="goiabada"` header naming the `error` and its `error_description`, and the same two in a JSON body, as [RFC 6750 section 3](https://www.rfc-editor.org/rfc/rfc6750#section-3) defines:
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer realm="goiabada", error="invalid_token", error_description="Session has been terminated"
+Content-Type: application/json
+Cache-Control: no-store
+Pragma: no-cache
+
+{
+  "error": "invalid_token",
+  "error_description": "Session has been terminated"
+}
+```
+
+| Status | `error` | `error_description` | Why |
+|---|---|---|---|
+| 401 | none | none | No token was sent. The answer has only `WWW-Authenticate: Bearer realm="goiabada"` and no body. |
+| 400 | `invalid_request` | "The Authorization header must be sent once.", "The access_token parameter must be sent once." or "The access token must be sent by one method only." | The token was sent twice |
+| 400 | `invalid_request` | "The request body could not be parsed." | A POST body that can't be read |
+| 401 | `invalid_token` | "The access token is invalid." | The token is expired, its signature doesn't verify, or it isn't an access token |
+| 403 | `insufficient_scope` | "Insufficient scope." | The token's scope has no `openid` |
+| 401 | `invalid_token` | "Session has been terminated" | The user signed out, was disabled or deleted, or their credentials changed |
+| 401 | `invalid_token` | "Session has expired" | The session the token was issued in reached its idle timeout or maximum lifetime |
+
+The last two make `/userinfo` stricter than the token's own `exp`: an access token stops working here as soon as the session it came from ends. A token with no session, from an offline refresh token or the password grant, stops when the user is disabled or their credentials change. See [Sessions](/concepts/sessions/).
+
+### Calling it from a browser
+
+JavaScript in a browser can call `/userinfo` when its origin is registered as a [web origin](/concepts/clients/#web-origins) on a client. Without one, the browser blocks the call.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Scopes" description="Which scope gets your app which claims." href="/concepts/scopes/" />
+  <LinkCard title="Logo and picture" description="Show a user's profile picture or a client's logo." href="/reference/endpoints/logo-and-picture/" />
+  <LinkCard title="Token" description="Get the access token this endpoint takes." href="/reference/endpoints/token/" />
+</CardGrid>

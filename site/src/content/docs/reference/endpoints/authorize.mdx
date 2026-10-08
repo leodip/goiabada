@@ -1,0 +1,152 @@
+---
+title: Authorize
+description: Send a user to sign in at /auth/authorize, and read the code or the error that comes back.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you send a user to sign in at the authorization endpoint, `/auth/authorize`, and read what comes back.
+
+Your app doesn't call this endpoint itself: it sends the user's browser there. The auth server signs the user in, asks for a one-time code or their consent when it needs to, and sends the browser back to your redirect URI with an authorization code, which your app redeems at the [token endpoint](/reference/endpoints/token/).
+
+## Send an authorization request
+
+<Steps>
+
+1. Send the browser to `/auth/authorize` with your request in the query string. Make a new random `state` and [PKCE](/concepts/pkce/) code verifier for each request, and keep both:
+
+   ```http
+   GET /auth/authorize?client_id=my-app&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback&response_type=code&scope=openid%20profile%20email&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256&state=af0ifjsldkj&nonce=n-0S6_WzA2Mj HTTP/1.1
+   Host: auth.example.com
+   ```
+
+2. The user signs in. When the browser comes back, check that `state` is the one you sent:
+
+   ```http
+   HTTP/1.1 302 Found
+   Location: https://app.example.com/callback?code=SplxlOBeZQQYbYS6WxSbIA&state=af0ifjsldkj
+   ```
+
+3. Redeem the code at the [token endpoint](/reference/endpoints/token/) within 60 seconds, with the same `redirect_uri` and your code verifier.
+
+</Steps>
+
+If the request is refused, the browser comes back with `error` and `error_description` in place of `code`, for example `?error=invalid_scope&error_description=...&state=af0ifjsldkj`. Some refusals never come back: see [When an error reaches your app](#when-an-error-reaches-your-app).
+
+## How it works
+
+### GET or POST
+
+Both work, as OpenID Connect requires. A GET carries the parameters in the query string. A POST carries them in an `application/x-www-form-urlencoded` body and is answered with a `303 See Other` to a GET that carries a one-time `request_handle` in their place. The browser follows it on its own, and the sign-in continues from that GET.
+
+The link works once, for five minutes, and only on its own: a `request_handle` sent twice, or beside any of the parameters below, is refused on a page at `400 Bad Request` with "This sign-in link is no longer valid. It may have expired, it may have been used already, or it may have been changed. Go back to the application you were signing in to and start again."
+
+### Parameters
+
+| Parameter | Required | |
+|---|---|---|
+| `client_id` | Yes | The client's identifier |
+| `redirect_uri` | Yes | One of the client's [redirect URIs](/concepts/clients/#redirect-uris), matched exactly |
+| `response_type` | Yes | `code`. The legacy [implicit flow](/legacy-flows/implicit/) takes `token`, `id_token` or `id_token token` instead. |
+| `scope` | Yes | One or more [scopes](/concepts/scopes/), separated by single spaces, at most 2048 bytes. Include `openid` to get an ID token. |
+| `code_challenge` | When PKCE is required | 43 to 128 characters of `A-Z`, `a-z`, `0-9`, `-`, `.`, `_` and `~`. See [PKCE](/concepts/pkce/). |
+| `code_challenge_method` | With `code_challenge` | `S256`, the only method supported |
+| `state` | Recommended | Any value up to 2048 bytes. It comes back unchanged with the code or the error, so your app can check the answer is to its own request. |
+| `nonce` | Recommended | Any value up to 2048 bytes. The ID token carries it in its `nonce` claim. |
+| `response_mode` | No | `query`, `fragment` or `form_post`. See [The response](#the-response). |
+| `prompt` | No | `none`, `login` or `consent`. See [prompt](/concepts/prompt/). |
+| `max_age` | No | A number of seconds. A user who signed in longer ago than that signs in again. |
+| `acr_values` | No | The level of authentication to ask for. See [ACR and AMR](/concepts/acr-and-amr/#which-level-a-request-asks-for). |
+| `id_token_hint` | No | An ID token naming the user your app expects. See [id_token_hint](/concepts/id-token-hint/). |
+| `ui_locales` | No | The languages for the sign-in pages, as space-separated language tags in order of preference, such as `pt-BR en` |
+
+PKCE is required for every [public client](/concepts/clients/#public-and-confidential-clients), and for a confidential one unless an administrator made it optional.
+
+`acr_values` and `ui_locales` are never refused. An `acr_values` with no level the auth server knows is ignored, and so is a malformed `ui_locales`; beyond ten language tags or 256 bytes, the rest is ignored. A parameter the auth server doesn't read, such as `login_hint`, `display` or `claims`, is ignored too.
+
+### What the auth server checks
+
+The auth server checks the request before it shows the user anything. A check it can't answer by sending the browser back to your app is answered on a page, with nothing sent to your app. Those come first, in this order:
+
+| Check | Status | What the page says |
+|---|---|---|
+| The parameters can be read | 400 | "The authorization request could not be read: one of its parameters is not correctly encoded." |
+| `client_id`, `redirect_uri`, `response_type` and `response_mode` are each sent once | 400 | "The *name* parameter was included more than once." |
+| `client_id` names a client that exists, is enabled and has the authorization code flow on (for the implicit flow, it's checked later) | 200 | "Invalid client_id parameter." and why |
+| `redirect_uri` is absolute and registered on the client | 200 | "Invalid redirect_uri parameter." and why. See [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/). |
+| `response_mode` is `query`, `fragment` or `form_post` | 400 | "Invalid response_mode parameter. Supported values are: query, fragment, form_post." |
+
+A missing `client_id` or `redirect_uri` is refused the same way. The page is shown in the language `ui_locales` asks for.
+
+An unsupported `response_mode` gets no error response at all, whoever is signed in. Understanding the mode is what tells the auth server how to encode a response, so it answers `400 Bad Request` with no `error`, `error_description` or `state`, as [OpenID Connect Core 1.0 section 3.1.2.6](https://openid.net/specs/openid-connect-core-1_0.html#AuthError) requires.
+
+Every other check is answered with an error response to your redirect URI, carrying your `state`. The first that fails is the answer:
+
+| Check | `error` |
+|---|---|
+| Every other parameter is sent once. A repeated `state` is dropped, so that error comes back with no `state`. | `invalid_request` |
+| There's no `request` or `request_uri`: request objects aren't supported | `request_not_supported`, `request_uri_not_supported` |
+| `response_type` is there, separated by single spaces, and one the auth server supports | `invalid_request`, `unsupported_response_type` |
+| The implicit flow is on for the client, when `response_type` asks for it | `unauthorized_client` |
+| `scope` has `openid`, when `response_type` asks for an ID token | `invalid_request` |
+| `nonce` is there, when the implicit flow asks for an ID token | `invalid_request` |
+| `state` and `nonce` are at most 2048 bytes | `invalid_request` |
+| `code_challenge` and `code_challenge_method` are there when PKCE is required, and right when they're sent | `invalid_request` |
+| The implicit flow doesn't ask for `response_mode=query`, since tokens never travel in the query | `invalid_request` |
+| `max_age` is digits only | `invalid_request` |
+| `scope` is there, separated by single spaces, at most 2048 bytes, more than `offline_access` alone, and every scope in it exists | `invalid_scope` |
+| The client may ask for each [administrative scope](#administrative-scopes) in it | `invalid_scope` |
+| `prompt` is separated by single spaces, has only `none`, `login` and `consent`, and `none` alone | `invalid_request`, `account_selection_required` for `select_account` |
+| `id_token_hint` is an ID token this auth server signed | `invalid_request`. See [id_token_hint](/concepts/id-token-hint/#what-the-auth-server-checks). |
+
+Once the request passes, the user signs in, unless the browser's session is enough, and goes through the one-time code and consent steps the request needs. See [prompt](/concepts/prompt/), [ACR and AMR](/concepts/acr-and-amr/) and [Sessions](/concepts/sessions/).
+
+### When an error reaches your app
+
+The auth server never sends a browser to a client's redirect URI with an error before the person at that browser has signed in, as [RFC 9700 section 4.11.2](https://www.rfc-editor.org/rfc/rfc9700.html#section-4.11.2) requires. Otherwise a link carrying one bad parameter would turn the auth server into a redirector, sending anyone who clicked it to an address of the client's choosing. So an error from the second table above reaches your app in one of these ways, the first that applies:
+
+| When | What happens |
+|---|---|
+| The client [registered itself](/concepts/clients/#self-registered-clients) | No error is sent, ever. The user sees a page naming the address the client asked to send them to, and the request stops there. |
+| The request has `prompt=none` | The error is sent at once, since a [silent request](/concepts/glossary/#silent-request) must never show a page |
+| The browser has a valid session, and the request doesn't have `prompt=login` | The error is sent at once |
+| Anything else, `prompt=login` included | The user is asked for their password, and the error is sent once they've entered it, before any one-time code. That sign-in creates no session. |
+
+The error, its description, the response mode and `state` are the same whichever way it's sent. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/) for what each case looks like.
+
+### Administrative scopes
+
+Only a client [allowed to request the administrative scopes](/concepts/clients/#administrative-scopes), the admin console's own client or one an operator has allowed, may ask for `authserver:manage`, `authserver:admin-read`, `authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings` or `authserver:browser-sessions`. Any other client asking for one is refused with `invalid_scope`, naming the first such scope it asked for, and gets no code and no token. The request is refused, never narrowed to the scopes that remain:
+
+```
+error=invalid_scope
+error_description=The client is not allowed to request the administrative scope 'authserver:manage'.
+```
+
+It's delivered as every other refusal above is, in the response mode the request asked for, the implicit flow's fragment included. When the browser has a valid session, the refusal also leaves an `administrative_scope_refused` entry in the [audit log](/concepts/audit-log/#events-to-alert-on). Without one, it leaves a log record but no audit entry, since anyone can reach this endpoint.
+
+The allowance is read again just before the code or the implicit flow's tokens are issued, so a sign-in under way when an operator switches a client's allowance off ends with the same answer.
+
+### The response
+
+A successful response carries `code`, and `state` when your app sent one. An error response carries `error`, `error_description`, and `state` when your app sent one. `error_description` is English, holds no character outside those RFC 6749 allows in it, and is at most 512 bytes.
+
+`response_mode` says how they travel:
+
+| `response_mode` | How the browser comes back |
+|---|---|
+| `query`, the default for `response_type=code` | A `302 Found` to the redirect URI with the parameters in its query string. The redirect URI's own query is kept. |
+| `fragment`, the default for the implicit flow | A `302 Found` to the redirect URI with the parameters after `#`. The browser keeps them away from your server, so your page's JavaScript reads them. |
+| `form_post` | A page that posts the parameters to the redirect URI as a form, on its own, as [OAuth 2.0 Form Post Response Mode](https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html) defines |
+
+The implicit flow's tokens and errors never travel in the query. See [Implicit](/legacy-flows/implicit/).
+
+The code works once, for 60 seconds, and only with the `redirect_uri` it was issued for.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Token" description="Redeem the code for tokens." href="/reference/endpoints/token/" />
+  <LinkCard title="The app gets no error back" description="Why a refused request doesn't come back to your app." href="/troubleshooting/the-app-gets-no-error-back/" />
+  <LinkCard title="Scopes" description="What to ask for, and what each scope gets your app." href="/concepts/scopes/" />
+</CardGrid>

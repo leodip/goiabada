@@ -35,52 +35,9 @@ This page focuses on the authorization code flow (`response_type=code`), which i
 
 ## Stage 1: Request validation
 
-These checks run first. Three of them are also *answered* first, on a page: the client, the `redirect_uri` and the response mode. The rest are answered by a redirect to the client, and a redirect is never sent to a browser that has not authenticated (see [Deferred error redirects](#deferred-error-redirects) below).
+The checks run first, before the user sees anything. Which they are, the order they run in and the answer to each are on [Authorize](/reference/endpoints/authorize/#what-the-auth-server-checks). Goiabada never redirects to a `redirect_uri` that isn't registered on the client, and an error reaches the client only once the user has signed in, unless the request is silent or the browser already has a session: see [When an error reaches your app](/reference/endpoints/authorize/#when-an-error-reaches-your-app).
 
-| What's checked | On failure |
-|----------------|------------|
-| `client_id` exists and is enabled | Error page (not a redirect) |
-| `redirect_uri` is registered for this client | Error page (not a redirect) |
-| Response mode is one Goiabada supports (`query`, `fragment`, or `form_post`) | Error page at `400 Bad Request` (not a redirect) |
-| `response_type` is present and valid | `invalid_request` or `unsupported_response_type` |
-| Scopes are valid (OIDC scopes or existing `resource:permission` pairs) | `invalid_scope` |
-| PKCE is correct (required by default; configurable per client or globally) | `invalid_request` |
-| `prompt` values are valid and not conflicting | `invalid_request` |
-| `max_age` is a non-negative integer | `invalid_request` |
-
-An unsupported `response_mode` is the one failure that never reaches the client, for any request, signed in or not. Understanding the requested mode is what tells the server how to encode a response, so there is no way to send an error to a client that asked for a mode Goiabada does not implement: the answer is a page at `400 Bad Request` with no `error`, `error_description` or `state`, per [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html) section 3.1.2.6. Asking for `query` on an implicit request is a different thing: it is a mode Goiabada implements but tokens may not travel in, so such a request is refused by the ordinary validation above and that refusal reaches the client as an error redirect, in the fragment.
-
-<Aside type="caution">
-If the client or redirect URI is invalid, the error is shown on a page. Goiabada will **never** redirect to an unregistered URI. All other validation errors reach the client at its `redirect_uri`, apart from the unsupported response mode above, but not necessarily straight away.
-
-That has two exceptions: a client that [registered itself](/concepts/clients/#self-registered-clients) never receives an error redirect, silent requests included, and no client receives one at an address it no longer has registered. Goiabada shows the user a page naming the address the client asked to send them to, and the request stops there. See [Declining](#declining).
-</Aside>
-
-### Deferred error redirects
-
-An error redirect is a redirect, and Goiabada does not redirect a browser to an address a client chose until the person driving that browser has signed in. This closes the case where a link carrying one bad parameter, sent to somebody who is not logged in, makes the authorization server itself forward them to a host of the client's choosing.
-
-So a validation failure from the table above, other than the three that are answered on a page, is answered one of two ways:
-
-| Situation | What happens |
-|-----------|--------------|
-| The browser already holds a valid session | The error redirect is sent immediately, exactly as before |
-| `prompt=none` | The error redirect is sent immediately: a silent request must never show UI |
-| The redirect would be withheld anyway (a self-registered client, or a `redirect_uri` that cannot name a host or is no longer registered) | The refusal page is shown immediately, with no login |
-| Anything else, including `prompt=login` | The error is held, the user is sent to the login page, and the error redirect is delivered once they have entered their password |
-
-The client receives the same error code, description, response mode and `state` either way. The only difference is when.
-
-Two consequences worth knowing. A developer debugging a malformed authorization request has to log in before seeing the error come back. And a user who signs in only to receive an error is not left with a session: the deferred error ends the ceremony before a session is created, so the next authorization request asks for a password again.
-
-`prompt=login` defers even when a session exists, because the client asked not to be answered on the strength of one. It costs nothing in practice: such a request was going to show the login page regardless.
-
-This is [RFC 9700](https://www.rfc-editor.org/rfc/rfc9700.html) section 4.11.2, which requires the authorization server to "always authenticate the user first and, with the exception of the silent authentication use case, prompt the user for credentials when needed, before redirecting the user".
-
-Key details:
-- **Scopes**: `openid`, `profile`, `email`, `address`, `phone`, `groups`, `attributes`, and `offline_access` are always allowed. Custom scopes must be in `resource:permission` format. Scope *validation* (does it exist?) happens here; scope *authorization* (is this user allowed?) happens later in [post-authentication checks](#stage-4-post-authentication-checks).
-- **PKCE**: Required by default (`S256` only). Can be made optional globally in Settings or per client. When optional, PKCE parameters are still validated if provided. See [PKCE](/concepts/pkce/) for details.
-- **Prompt**: `none`, `login`, and `consent` are supported. `none` cannot be combined with other values. Validation happens *before* prompt-specific logic, so `prompt=none login` returns `invalid_request`, not `login_required`. See [Prompt parameter](/concepts/prompt/) for details.
+Scope *validation* (does it exist?) happens here; scope *authorization* (is this user allowed?) happens later in [post-authentication checks](#stage-4-post-authentication-checks).
 
 ## Stage 2: Routing
 
