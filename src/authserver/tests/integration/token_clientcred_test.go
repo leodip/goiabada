@@ -211,12 +211,12 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 	}{
 		{
 			scope:            "openid",
-			errorCode:        "invalid_request",
+			errorCode:        "invalid_scope",
 			errorDescription: "Id token scopes (such as 'openid') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.",
 		},
 		{
 			scope:            "groups",
-			errorCode:        "invalid_request",
+			errorCode:        "invalid_scope",
 			errorDescription: "Id token scopes (such as 'groups') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.",
 		},
 		{

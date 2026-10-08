@@ -360,7 +360,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		assert.Error(t, err)
 		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_request", customErr.Code())
+		assert.Equal(t, "invalid_scope", customErr.Code())
 		assert.Contains(t, customErr.Description(), "Id token scopes (such as 'openid') are not supported in the client credentials flow")
 	})
 
@@ -747,21 +747,21 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 			name:        "openid is rejected for this grant",
 			clientPerms: []record.Permission{billingRead},
 			scope:       "openid",
-			wantCode:    "invalid_request",
+			wantCode:    "invalid_scope",
 			wantDesc:    "are not supported in the client credentials flow",
 		},
 		{
 			name:        "offline_access is rejected for this grant",
 			clientPerms: []record.Permission{billingRead},
 			scope:       "offline_access",
-			wantCode:    "invalid_request",
+			wantCode:    "invalid_scope",
 			wantDesc:    "are not supported in the client credentials flow",
 		},
 		{
 			name:        "an OIDC scope alongside a granted one is still rejected",
 			clientPerms: []record.Permission{billingRead},
 			scope:       "openid billing-api:read",
-			wantCode:    "invalid_request",
+			wantCode:    "invalid_scope",
 			wantDesc:    "are not supported in the client credentials flow",
 		},
 		// Scope values are case-sensitive (RFC 6749 section 3.3), so neither uppercase

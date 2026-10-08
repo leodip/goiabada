@@ -53,10 +53,10 @@ const (
 	// Not every row is an authorization denial. The predicate covers every authenticated
 	// invalid_scope failure, of which only "not granted to the client", "the user does not have
 	// permission" and a refresh asking for a scope its grant does not hold are authorization
-	// decisions; malformed format, unknown resource or permission, and a client credentials
-	// request that omits scope from a client holding no permissions (recorded with an empty
-	// scope) usually mean a misconfigured client. See the call site for the full accounting,
-	// including the two branches outside it.
+	// decisions; malformed format, unknown resource or permission, an OpenID Connect scope on the
+	// client credentials grant, and a client credentials request that omits scope from a client
+	// holding no permissions (recorded with an empty scope) usually mean a misconfigured client.
+	// See the call site for the full accounting, including the one branch outside it.
 	//
 	// The name is deliberately grant-agnostic and sorts immediately after the five
 	// token_issued_* events, so a token_* filter groups token issuance with scope denials. That

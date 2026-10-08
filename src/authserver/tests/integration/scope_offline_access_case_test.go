@@ -177,7 +177,7 @@ func TestClientCredentials_OfflineAccessIsCaseSensitive(t *testing.T) {
 		{
 			name:      "offline_access is refused for this grant",
 			scope:     "offline_access",
-			wantError: "invalid_request",
+			wantError: "invalid_scope",
 			wantDesc:  "Id token scopes (such as 'offline_access') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.",
 		},
 	} {
