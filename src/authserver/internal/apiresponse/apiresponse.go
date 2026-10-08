@@ -49,7 +49,7 @@ func WriteJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
 // and message. Consumers route on the HTTP status code, not on the body.
 //
 // It buffers like WriteJSON but takes no request, because it needs no 500 fallback to reach for: an
-// api.ErrorResponse is two strings and a nil map, which encoding/json cannot fail on. Keeping the
+// api.ErrorResponse is two strings, which encoding/json cannot fail on. Keeping the
 // request out of the signature is what lets the ~700 4xx call sites stay as they are.
 func WriteError(w http.ResponseWriter, message, code string, statusCode int) {
 	buf, err := encode(api.ErrorResponse{

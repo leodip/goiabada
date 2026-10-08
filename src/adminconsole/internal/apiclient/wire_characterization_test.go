@@ -197,8 +197,7 @@ func TestAuthServerClient_EveryMethodAcceptsOnlyTheSuccessStatusItWasWrittenFor(
 }
 
 func TestAuthServerClient_EveryMethodClassifiesANonSuccessThroughParseAPIError(t *testing.T) {
-	const errorBody = `{"error_code":"the.error.code","error_description":"the description",` +
-		`"error_args":{"name":"a value"}}`
+	const errorBody = `{"error_code":"the.error.code","error_description":"the description"}`
 
 	for _, tc := range wireCharacterization() {
 		t.Run(tc.name, func(t *testing.T) {
@@ -211,7 +210,6 @@ func TestAuthServerClient_EveryMethodClassifiesANonSuccessThroughParseAPIError(t
 			require.True(t, errors.As(err, &apiErr))
 			assert.Equal(t, "the.error.code", apiErr.Code)
 			assert.Equal(t, "the description", apiErr.Message)
-			assert.Equal(t, map[string]any{"name": "a value"}, apiErr.ErrorArgs)
 			assert.Equal(t, http.StatusUnprocessableEntity, apiErr.StatusCode)
 		})
 	}
