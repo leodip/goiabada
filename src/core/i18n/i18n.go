@@ -330,8 +330,8 @@ func (b *bundle) localizerFor(tags []string) *translator {
 
 // lookup finds key in the translator's own locale, then in English. The
 // English hop is what makes a locale that is missing a key render the English
-// text rather than the key itself, as guides/localization.mdx promises
-// (#273).
+// text rather than the key itself, as guides/customize-and-translate-the-pages.mdx
+// promises (#273).
 func (l *translator) lookup(key string) (*message, bool) {
 	if l == nil || l.bundle == nil {
 		return nil, false

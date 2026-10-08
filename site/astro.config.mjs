@@ -98,8 +98,10 @@ export default defineConfig({
 						{ label: 'Add sign-in to a SPA or mobile app', slug: 'guides/add-sign-in-to-a-spa-or-mobile-app' },
 						{ label: 'Sign users out', slug: 'guides/sign-users-out' },
 						{ label: 'Protect an API', slug: 'guides/protect-an-api' },
-						{ label: 'Localization', slug: 'guides/localization' },
-						{ label: 'Customizations', slug: 'guides/customizations' },
+						{ label: 'Require two-factor authentication', slug: 'guides/require-two-factor-authentication' },
+						{ label: 'Single sign-on across clients', slug: 'guides/single-sign-on-across-clients' },
+						{ label: 'Let clients register themselves (DCR)', slug: 'guides/let-clients-register-themselves-dcr' },
+						{ label: 'Customize and translate the pages', slug: 'guides/customize-and-translate-the-pages' },
 					],
 				},
 				{

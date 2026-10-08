@@ -1,0 +1,177 @@
+---
+title: Customize and translate the pages
+description: Put your name and colors on the sign-in pages and the admin console, add a language, reword any text, and change the templates.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This guide makes the pages your users see look and read like your product, in their language.
+
+There are three levels, from a setting in the admin console to your own copy of the pages. Start with the first: most deployments need nothing more.
+
+## Brand the pages
+
+<Steps>
+
+1. In the admin console, open **Admin**, **General** and set **App name**, up to 30 characters. It's the heading of the sign-in pages and the start of their titles, it signs every email, and it's the name authenticator apps list your users' accounts under.
+
+2. Open **Admin**, **UI theme** and choose a color theme under **Theme selection**. It applies to the sign-in pages and the admin console alike. **Default** is the dark theme; the others are [daisyUI](https://daisyui.com/docs/themes/)'s built-in themes, such as `light`, `corporate` and `emerald`.
+
+3. Give each client a display name and a logo, so users see which app they're signing in to. See [Clients](/concepts/clients/#display-name-description-and-logo).
+
+</Steps>
+
+## Add a language
+
+The pages come in English and Portuguese (Brazil). To add another language, you translate one file of text and point both servers at it, with no rebuild.
+
+<Steps>
+
+1. Get the English text of the release you run: `src/core/i18n/catalogs/active.en.toml` in [the source](https://github.com/leodip/goiabada) at that release's tag, such as `v1.6.0`. The release is in the image tag and in the `build information` line each server logs when it starts.
+
+2. Copy it into a folder named `catalogs`, as `active.<language>.toml`, named with the language's [BCP 47](https://www.rfc-editor.org/info/bcp47) tag: `active.es.toml` for Spanish. Translate the text on the right of each `=` and leave the keys on the left as they are:
+
+   ```toml title="catalogs/active.es.toml"
+   "auth.pwd.title" = "Iniciar sesión"
+   "auth.pwd.email_label" = "Correo electrónico"
+   "auth.pwd.password_label" = "Contraseña"
+   "auth.pwd.button" = "Entrar"
+   ```
+
+   Keep a placeholder such as `{{.appName}}` exactly as it is: the server writes the value there. A key you leave out, or leave empty, shows in English.
+
+3. Make the folder that holds `catalogs` readable by both servers, and set `GOIABADA_I18N_OVERRIDES_DIR` to it on the auth server and on the admin console. In a container, mount it read-only, as the [templates are mounted](#change-the-templates) below.
+
+4. Restart both servers. Each reads the catalogs once, at start, and refuses to start when one doesn't parse, naming the file.
+
+5. Users choose the language under **Account**, **Profile** in the admin console, and your app can ask for it on the sign-in pages with `ui_locales`. See [how the language is chosen](#how-the-language-is-chosen).
+
+</Steps>
+
+## Change a few words
+
+To reword a page in a language Goiabada already has, override only the keys you change, in the same folder:
+
+```toml title="catalogs/active.en.toml"
+"auth.pwd.title" = "Sign in to Acme"
+```
+
+Every key you don't name keeps the built-in text. Set `GOIABADA_I18N_OVERRIDES_DIR` and restart, as in [Add a language](#add-a-language).
+
+## Change the templates
+
+To change the layout of a page, or an email's body, you give a server its own copy of the templates. The templates and static files are compiled into each server's binary, and the images hold the binary alone, so there's no `web` folder inside a container to copy out.
+
+<Steps>
+
+1. Copy the web files from the source of the release you run, since a template from another release may use data the server no longer passes to it:
+
+   ```bash
+   git clone --depth 1 --branch v1.6.0 https://github.com/leodip/goiabada.git goiabada-source
+
+   mkdir authserver-web adminconsole-web
+   cp -r goiabada-source/src/authserver/web/{template,static,tailwindcss} authserver-web/
+   cp -r goiabada-source/src/adminconsole/web/{template,static,tailwindcss} adminconsole-web/
+   ```
+
+   `tailwindcss` isn't served: it's what [regenerating the CSS](#regenerate-the-css) reads.
+
+2. Edit the templates. They're Go [`html/template`](https://pkg.go.dev/html/template) files. Keep the element IDs and the scripts the pages use, or the forms stop working.
+
+3. Make the files readable by the containers. Both images run as uid 10001 and gid 10001 (see [the user the images run as](/deploy/docker-compose/#the-user-the-images-run-as)), and a page whose template the server can't read fails with a 500:
+
+   ```bash
+   chmod -R a+rX authserver-web adminconsole-web
+   ```
+
+4. Mount each directory read-only and point its server at it. In the generated `docker-compose.yml`, which already lists the four variables empty:
+
+   ```yaml
+   goiabada-authserver:
+     volumes:
+       - sqlite-data:/data   # keep the volumes the service already has
+       - ./authserver-web/template:/app/web/template:ro
+       - ./authserver-web/static:/app/web/static:ro
+     environment:
+       - GOIABADA_AUTHSERVER_STATICDIR=/app/web/static
+       - GOIABADA_AUTHSERVER_TEMPLATEDIR=/app/web/template
+
+   goiabada-adminconsole:
+     volumes:
+       - ./adminconsole-web/template:/app/web/template:ro
+       - ./adminconsole-web/static:/app/web/static:ro
+     environment:
+       - GOIABADA_ADMINCONSOLE_STATICDIR=/app/web/static
+       - GOIABADA_ADMINCONSOLE_TEMPLATEDIR=/app/web/template
+   ```
+
+   Leave a server's pair empty if you haven't changed its files. Then run `docker compose up -d`. With the native binaries, set the same variables in the env file, naming directories the binaries' user can read.
+
+5. Open every page you changed. A mistake in a template shows only when its page is rendered.
+
+</Steps>
+
+<Aside type="caution">
+A directory replaces the built-in set **whole**, so it must hold every file of that set, not only the ones you change. When you upgrade Goiabada, copy the new release's files again and redo your changes on them.
+</Aside>
+
+## Regenerate the CSS
+
+The pages are styled with [Tailwind CSS](https://tailwindcss.com/), and `main.css` holds only the classes the templates used when it was generated. A class you add to a template does nothing until you regenerate it.
+
+<Steps>
+
+1. Download the standalone Tailwind CLI for your platform from [Tailwind's releases](https://github.com/tailwindlabs/tailwindcss/releases), at the version the release you copied pins: `tools.tailwind` in `goiabada-source/src/authserver/versions.yaml`. Rename it to `tailwindcss` and make it executable.
+
+2. Run it in each web directory whose templates you changed. Add `--minify` for a smaller file:
+
+   ```bash
+   cd authserver-web
+   tailwindcss -i ./tailwindcss/input.css -o ./static/main.css
+   ```
+
+   `input.css` looks for class names in `../template` and in the JavaScript in `../static`, so keep the three folders side by side.
+
+3. The new `main.css` is in the static directory you mounted, so the server serves it at once. Browsers may keep the previous one for up to five minutes: reload without the cache to check.
+
+</Steps>
+
+## How it works
+
+### How the language is chosen
+
+On the auth server's pages, the sign-in, one-time code, consent, sign-out, registration and password reset pages, the language is the first of these that names one:
+
+1. The `ui_locales` parameter of the authorization request, or of the [sign-out](/reference/endpoints/logout/): one or more language tags in your order of preference, separated by single spaces, such as `ui_locales=es pt-BR`. It's kept for the rest of that sign-in, and applies to the error page the auth server shows when it refuses the request outright.
+2. The browser's `Accept-Language` header.
+3. English.
+
+In the admin console, the user's own choice comes first: the **Locale** they picked under **Account**, **Profile**, which reaches the console as the `locale` claim of their ID token. The console picks a change up the next time it refreshes the user's tokens, within five minutes with the default token lifetime. Without one, the browser's `Accept-Language` decides, then English.
+
+Whichever of these decides, it gets the first of its languages Goiabada has text for, or English when it has none of them: `ui_locales=fr es` shows Spanish when you've added Spanish but not French, and `ui_locales=fr` alone shows English.
+
+An email is written in its recipient's language: the **Locale** on their profile, or English when they haven't picked one. The activation link and the welcome email a user gets when they register are written in the language of the page they registered on, since their account has no language yet.
+
+### Catalogs
+
+The text of every page, message and email subject is in two built-in catalogs, English, which is complete, and Portuguese (Brazil). A key with no text in the chosen language shows in English.
+
+`GOIABADA_I18N_OVERRIDES_DIR` names a folder whose `catalogs` subfolder holds `active.<language>.toml` files. Nothing else in the folder is read. Each file is merged over the built-in catalog of its language, key by key, and the file wins. A value left empty removes the built-in text, so the key shows in English. Every value is a plain string: a `[table]` section stops the server at start.
+
+The names of countries and phone country codes, and the country in each time zone's label, come from Unicode's CLDR data, in the page's language, and each language on the **Locale** list is named in itself and in English, so none of them needs translating.
+
+### Email bodies
+
+An email's subject is in the catalogs, and its body is a template under `emails/` in the auth server's templates. To translate a body, add a copy beside the English one named with the language, such as `emails/email_forgot_password.es.html`, in your own [templates directory](#change-the-templates). The auth server uses it for a recipient whose language is exactly that tag, `es` here, and the English template for everyone else.
+
+### Templates and static files
+
+A server reads a template each time it renders the page, so an edited template shows on the next request with no restart. Static files are served with `Cache-Control: public, max-age=300`. The four directory variables are on [Environment variables](/reference/environment-variables/#customization).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Clients" description="Each client's display name, description and logo." href="/concepts/clients/#display-name-description-and-logo" />
+  <LinkCard title="Environment variables" description="The template, static and catalog directories." href="/reference/environment-variables/#customization" />
+  <LinkCard title="Docker Compose" description="The user the images run as, and what a mounted file needs." href="/deploy/docker-compose/" />
+</CardGrid>

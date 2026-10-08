@@ -1,0 +1,124 @@
+---
+title: Let clients register themselves (DCR)
+description: Turn on dynamic client registration so tools such as MCP clients can register themselves, and review what registered.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This guide lets apps you don't build register themselves as clients, and shows you how to keep an eye on what registered.
+
+Some apps can't be set up by hand. A command-line tool or an AI assistant connecting through MCP (the Model Context Protocol) is installed by its users, each copy on its own machine, and expects to get a client of its own. Dynamic client registration (DCR) lets it: the app calls `POST /connect/register`, as [RFC 7591](https://www.rfc-editor.org/rfc/rfc7591) defines, and gets a client identifier back, with nobody creating it in the admin console.
+
+## Let clients register themselves
+
+<Steps>
+
+1. In the admin console, open **Admin**, **General**, turn on **Dynamic client registration enabled**, and save.
+
+2. Limit who can reach `/connect/register`. While DCR is on, anyone who can reach it can create a client, with no token and no sign-in. Turn on the rate limiter with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`, which then allows 10 registrations a minute from each IP address, or limit the endpoint at your reverse proxy. See [rate limits](/reference/environment-variables/#rate-limits).
+
+3. Check that the auth server now advertises it. The [discovery document](/reference/endpoints/discovery-and-jwks/) carries `registration_endpoint`, which is how an app finds out it may register:
+
+   ```bash
+   curl https://auth.example.com/.well-known/openid-configuration
+   ```
+
+   ```json
+   {
+     "issuer": "https://auth.example.com",
+     "registration_endpoint": "https://auth.example.com/connect/register"
+   }
+   ```
+
+   That's two fields of many. While DCR is off, `registration_endpoint` isn't there.
+
+</Steps>
+
+<Aside type="caution">
+A self-registered client has no permissions and can't ask for the administrative scopes, so on its own it can't do much. But it can show your users a sign-in page that names any app it likes. That's why each one starts with consent on, and why it's worth [reviewing what registered](#review-what-registered).
+</Aside>
+
+## Register your app
+
+If you're writing the tool, this is what it does the first time it runs.
+
+<Steps>
+
+1. Read `registration_endpoint` from the discovery document. If it isn't there, the auth server doesn't take registrations: ask its administrator for a client instead.
+
+2. Register, naming your app and where the browser comes back to. A tool on the user's machine is a public client, with no secret, and receives its callback on a loopback address:
+
+   ```http
+   POST /connect/register HTTP/1.1
+   Host: auth.example.com
+   Content-Type: application/json
+
+   {
+     "client_name": "Report builder",
+     "redirect_uris": ["http://127.0.0.1/callback"],
+     "token_endpoint_auth_method": "none",
+     "grant_types": ["authorization_code", "refresh_token"]
+   }
+   ```
+
+3. Keep the `client_id` from the answer. It's yours for good: there's no endpoint to read or change a registration later, so register again only if you lose it.
+
+   ```http
+   HTTP/1.1 201 Created
+   Content-Type: application/json
+   Cache-Control: no-store
+
+   {
+     "client_id": "dcr_6f1c2a9e-3b7d-4e0a-9c55-2d8b1e4f7a10",
+     "client_id_issued_at": 1759900000,
+     "client_secret_expires_at": 0,
+     "redirect_uris": ["http://127.0.0.1/callback"],
+     "token_endpoint_auth_method": "none",
+     "grant_types": ["authorization_code", "refresh_token"],
+     "client_name": "Report builder"
+   }
+   ```
+
+4. Sign the user in with the authorization code flow and PKCE, as [Add sign-in to a SPA or mobile app](/guides/add-sign-in-to-a-spa-or-mobile-app/) shows. Start a local server on any free port and send that port in `redirect_uri`, such as `http://127.0.0.1:53682/callback`: for a loopback address the port isn't compared.
+
+</Steps>
+
+<Aside type="caution">
+A self-registered client is never sent an error. When a sign-in fails, the user sees a page on the auth server and nothing comes back to your app, so give up waiting for the callback after a while and let the user start over. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/).
+</Aside>
+
+## Review what registered
+
+<Steps>
+
+1. Open **Admin**, **Clients**. Each client that registered itself carries a **Self-registered** badge.
+
+2. Open one you recognize and fix how your users see it. On the **Settings** tab, give it a **Display name** and turn on **Show display name**, which replaces the name it gave itself and the consent screen's note that it hasn't been verified. Once you trust it, you can turn **Consent required** off.
+
+3. For one you don't recognize, untick **Enabled** to stop it signing anyone in, or delete it from the list.
+
+</Steps>
+
+Every registration leaves a `dynamic_client_registration` entry in the [audit log](/concepts/audit-log/), with the new client, its grant types, whether it's public, and the IP address it came from.
+
+## How it works
+
+### What a registration may ask for
+
+The auth server reads four fields, `redirect_uris`, `token_endpoint_auth_method`, `grant_types` and `client_name`, and ignores the rest. A registration can't ask for the [legacy flows](/legacy-flows/implicit/), and a public client can't ask for `client_credentials`. Redirect URIs follow stricter rules than for clients you create, since nobody has checked who's asking: a public client gets loopback `http` and custom schemes such as `myapp://callback`, and a confidential one `https` and loopback `http`. So a single-page app can't register itself: create it in the admin console. [Dynamic client registration](/reference/endpoints/dynamic-client-registration/) has every field, rule and error.
+
+### What a self-registered client gets
+
+It's enabled straight away, with an identifier made up of `dcr_` and a UUID that can't be changed later. Consent is on, its ACR level is `urn:goiabada:level2_optional`, and a public one always uses PKCE. A confidential one gets a secret, which the answer carries once, and which an administrator can read later on the client's **Authentication** tab. Its token lifetimes are copied from the server's settings when it registers. Apart from its identifier, an administrator can change any of it like any other client's. See [Self-registered clients](/concepts/clients/#self-registered-clients).
+
+### Turning it off
+
+Turning **Dynamic client registration enabled** off stops new registrations: `/connect/register` answers `403` with `access_denied`, and discovery stops carrying `registration_endpoint`. Clients that already registered keep working. To stop one, disable or delete it.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Dynamic client registration" description="Every field, answer and error of /connect/register." href="/reference/endpoints/dynamic-client-registration/" />
+  <LinkCard title="Self-registered clients" description="How a self-registered client is treated, and why." href="/concepts/clients/#self-registered-clients" />
+  <LinkCard title="Add sign-in to a SPA or mobile app" description="Sign users in with a public client." href="/guides/add-sign-in-to-a-spa-or-mobile-app/" />
+</CardGrid>
