@@ -25,7 +25,7 @@ An administrator is a user, group or client holding any of the six administrativ
 - A **group** is one when it holds one of them.
 - A **client** is one when it holds one of them, when it's the admin console's own client, whatever it holds, or when it's [allowed to request the administrative scopes](/reference/api/scopes/#administrative-scopes-on-a-users-behalf).
 
-`manage-account` and the permissions you add to the `authserver` resource yourself aren't administrative. [Resources and permissions](/concepts/resources-and-permissions/#administrators) shows the built-in permissions.
+`manage-account` and the permissions you add to the `authserver` resource yourself aren't administrative. [Resources and permissions](/concepts/resources-and-permissions/#the-authserver-resource) lists the built-in permissions.
 
 ### What only `authserver:manage` does
 
@@ -56,7 +56,9 @@ Don't confuse it with `INSUFFICIENT_SCOPE`. That one means the token lacks the s
 
 A token with `authserver:manage` passes every rule above, but meets one more. A change that would leave no enabled user holding `authserver:manage`, directly or through a group, is answered `409` with the error code `LAST_ADMINISTRATOR`, and nothing changes. A client holding the permission doesn't count, and neither does a disabled user.
 
-Seven operations can meet it: setting a user's permissions, setting a group's permissions, removing a group member, setting a user's groups, deleting a group, disabling a user and deleting a user. Grant `authserver:manage` to another user first, then repeat the request. [Users and groups](/concepts/users-and-groups/#the-last-administrator) covers it from the admin console.
+Seven operations can meet it: setting a user's permissions, setting a group's permissions, removing a group member, setting a user's groups, deleting a group, disabling a user and deleting a user. In the admin console, that's revoking `manage` from a user or a group, removing a user from a group that gives it, deleting such a group, and disabling or deleting a user. The console shows the refusal's sentence on the page you made the change from: "This change would leave no enabled user holding authserver:manage. Grant it to another user first." Grant `authserver:manage` to another user first, then repeat the request.
+
+What has to survive is a person who can sign in to the admin console and repair things, which is why a client doesn't count. The check reads permissions, not whether that person can still sign in: a sole administrator who has forgotten their password or lost their authenticator still counts. Keep `manage` on at least two people you trust, so one can always let the other back in. [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-last-administrator-cant-sign-in) covers what to do when that's already happened.
 
 ### What the audit log records
 

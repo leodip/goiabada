@@ -1,0 +1,75 @@
+---
+title: Self-registration
+description: Let people create their own accounts from the sign-in page, with or without email verification.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you decide whether people can create their own accounts, and how they prove their email address when they do.
+
+Self-registration is a user creating their own account, from the **Register** link on the sign-in page, instead of an administrator creating it. It's on in a new installation. Turn it off if only your administrators should create users.
+
+## Turn on email verification
+
+With email verification, a new account's address is proven before the account exists: the person who registers gets a link by email, and chooses their password only after following it.
+
+<Steps>
+
+1. Set up email under **Admin**, **Email - SMTP**, and send yourself a test message from the **Send test email** tab.
+
+2. Open **Admin**, **General**.
+
+3. Turn on **User self registration enabled** and **User self registration requires email verification**, and click **Save**.
+
+</Steps>
+
+To turn self-registration off, turn off **User self registration enabled** on the same page. Only administrators can then create users.
+
+## How it works
+
+### Without email verification
+
+The registration form asks for an email address and a password, twice. The password must meet the **Password policy** on **Admin**, **General**. When the form is sent, the account is created at once, with its address not verified, and the page says "Your account has been created." When email is set up, the user also gets a "Welcome!" email.
+
+An address that already has an account is refused with "Apologies, but this email address is already registered."
+
+That's also what happens when email verification is on but email isn't set up: the setting needs SMTP to do anything.
+
+<Aside type="caution">
+Without email verification, anyone can find out whether an address has an account, by trying to register it. The answer can't be hidden, because the account the form creates is usable at once: signing in with the chosen password would fail for an address that was already taken. Turn on email verification if the list of addresses with an account shouldn't be discoverable.
+</Aside>
+
+### With email verification
+
+The registration form asks for the email address alone, and every well-formed address gets the same "Check your email" page, whether or not it has an account. What happens next travels by email:
+
+- **A new address** gets an "Activate your account" email with a link, valid for 5 minutes. Following it opens a "Choose your password" form, which can be sent for 5 minutes more. Sending it creates the account, with its address verified.
+- **An address with an account** gets a "You already have an account" email instead, pointing at the forgot-password page, when the account is enabled and its address verified, the same rule [password recovery](/concepts/password-recovery/) uses. Any other account gets nothing.
+- **An address with a registration still pending** gets nothing. Its link is still the one that works. Once both 5-minute windows have passed, registering again sends a new link.
+
+Following the link creates nothing by itself. Only sending the form does, so a mail scanner or link previewer that opens the link can't complete a registration, and someone who registers an address that isn't theirs never gets to choose its password.
+
+If the address gains an account before the form is sent, because an administrator created one, the registration is refused and discarded. While self-registration is off, the registration page and every link already sent lead to a not-found page.
+
+An expired or used link shows "Unable to activate the account. The verification code appears to be expired." The person registers again to get a new one.
+
+### What a new account has
+
+A user who registers gets what every new user gets: the `authserver:manage-account` permission, so they can manage their own account in the admin console's **Account** pages, and nothing else. See [Users and groups](/concepts/users-and-groups/#users).
+
+### Limits and the audit log
+
+With the rate limiter on, an address can register 5 times every 5 minutes, and an IP address 20 times, and following links and sending the password form is limited per IP address. Past that, the page shows "Too many attempts": see [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
+
+Every registration with email verification leaves a `requested_registration` entry in the [audit log](/concepts/audit-log/), whose `outcome` says what it led to, such as `link_issued` or `notice_issued`. The address is recorded only as a digest. An account created leaves `created_user`, an activated one `activated_account`, and a refused link `failed_account_activation_code`.
+
+<Aside type="tip">
+Self-registration is for people. [Dynamic client registration](/concepts/clients/#self-registered-clients) is different: it lets applications register themselves as clients.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Password recovery" description="How users who forgot their password set a new one." href="/concepts/password-recovery/" />
+  <LinkCard title="Users and groups" description="Manage the accounts people create." href="/concepts/users-and-groups/" />
+</CardGrid>

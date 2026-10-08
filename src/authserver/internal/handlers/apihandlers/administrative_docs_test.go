@@ -36,7 +36,6 @@ const (
 	apiAdministratorsPage    = "site/src/content/docs/reference/api/administrators.mdx"
 	apiErrorsPage            = "site/src/content/docs/reference/api/errors.mdx"
 	resourcesPermissionsPage = "site/src/content/docs/concepts/resources-and-permissions.mdx"
-	usersGroupsPage          = "site/src/content/docs/concepts/users-and-groups.mdx"
 	auditLogPage             = "site/src/content/docs/concepts/audit-log.mdx"
 	lockedOutPage            = "site/src/content/docs/troubleshooting/locked-out-of-the-admin-console.mdx"
 )
@@ -100,10 +99,12 @@ func administrativeIdentifiers() map[string]bool {
 
 // The built-in permission table says, for each built-in authserver permission, the description it
 // is seeded with and whether it is administrative, as the policy's set has it: an operator choosing
-// a permission to grant reads the boundary there (#402 decisions 2, 3 and 15).
+// a permission to grant reads the boundary there (#402 decisions 2, 3 and 15). It is on Resources and
+// permissions, with the rest of what the authserver resource is; who an administrator is and what
+// only authserver:manage does are on the Administrators reference page, which it links to (#522).
 func TestAdministrativeDocs_TheBuiltInPermissionTableIsTheSeedAndThePolicy(t *testing.T) {
 	assertBuiltInPermissionTable(t, filepath.Dir(guard.SourceRoot(t)),
-		docSection{resourcesPermissionsPage, "## System-level resource"},
+		docSection{resourcesPermissionsPage, "### The authserver resource"},
 		builtin.AuthServerPermissionIdentifiers(), seededPermissionDescriptions, administrativeIdentifiers())
 }
 
@@ -111,7 +112,8 @@ func TestAdministrativeDocs_TheBuiltInPermissionTableIsTheSeedAndThePolicy(t *te
 // live, and each section names those the model rests on: the three events an operator alerts on,
 // the two codes the policy and the guard answer, and every scope the granular-scope section
 // describes (#402 decision 15). The errors page's catalog, which lists every code, the route gate's
-// INSUFFICIENT_SCOPE among them, is held whole by error_codes_docs_test.go. The one operation that answers a client
+// INSUFFICIENT_SCOPE among them, is held whole by error_codes_docs_test.go. The last administrator
+// is the Administrators reference page's alone, which the concept pages link to (#522). The one operation that answers a client
 // secret names its audit event in its own description in openapi.yaml, which the API reference
 // renders (#519 decision 7).
 func TestAdministrativeDocs_NameWhatTheModelRestsOn(t *testing.T) {
@@ -149,7 +151,7 @@ func TestAdministrativeDocs_NameWhatTheModelRestsOn(t *testing.T) {
 			},
 		},
 		{
-			section: docSection{usersGroupsPage, "## The last administrator"},
+			section: docSection{apiAdministratorsPage, "### The last administrator"},
 			pattern: docErrorCode, kind: "error code", live: codes,
 			want: []string{"LAST_ADMINISTRATOR"},
 		},
@@ -175,6 +177,63 @@ func TestAdministrativeDocs_TheConsoleLockoutRecoveryRequestsManage(t *testing.T
 	assertScopeRequests(t, filepath.Dir(guard.SourceRoot(t)),
 		docSection{lockedOutPage, "## The admin console's client secret changed"},
 		builtin.AuthServerResourceIdentifier+":"+builtin.ManagePermissionIdentifier)
+}
+
+// The admin console shows the auth server's last-administrator refusal as it is sent, so the sentence
+// the Administrators page tells an operator to expect is the refusal's own description. It moved
+// there from Users and groups, which now links to it (#522).
+func TestAdministrativeDocs_TheLastAdministratorSectionQuotesTheRefusal(t *testing.T) {
+	assertSectionQuotes(t, filepath.Dir(guard.SourceRoot(t)),
+		docSection{apiAdministratorsPage, "### The last administrator"}, lastAdministratorDescription)
+}
+
+func TestAdministrativeDocs_ASectionNotQuotingTheSentenceFails(t *testing.T) {
+	root := t.TempDir()
+	writeDocFixture(t, root, "site/admins.mdx", "### The last administrator\n\n"+
+		"The console says \"Grant it to someone first.\"\n\n"+
+		"### Next\n\nThis change would leave nobody. Grant it first.\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertSectionQuotes(r, root, docSection{"site/admins.mdx", "### The last administrator"},
+			"This change would leave nobody. Grant it first.")
+	})
+
+	if report.Stopped {
+		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
+	}
+	want := []string{`site/admins.mdx: ### The last administrator does not quote "This change would leave nobody. Grant it first."`}
+	if !slices.Equal(report.Errors, want) {
+		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
+	}
+}
+
+func TestAdministrativeDocs_ASectionQuotingTheSentencePasses(t *testing.T) {
+	root := t.TempDir()
+	writeDocFixture(t, root, "site/admins.mdx", "### The last administrator\n\n"+
+		"The console shows \"This change would leave nobody. Grant it first.\"\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertSectionQuotes(r, root, docSection{"site/admins.mdx", "### The last administrator"},
+			"This change would leave nobody. Grant it first.")
+	})
+
+	if report.Stopped || len(report.Errors) > 0 {
+		t.Errorf("a section quoting the sentence was refused: %+v", report)
+	}
+}
+
+func TestAdministrativeDocs_AQuoteCheckWithoutItsSectionStops(t *testing.T) {
+	root := t.TempDir()
+	writeDocFixture(t, root, "site/admins.mdx", "### The final administrator\n\nThis change would leave nobody.\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertSectionQuotes(r, root, docSection{"site/admins.mdx", "### The last administrator"},
+			"This change would leave nobody.")
+	})
+
+	if !report.Stopped || !strings.Contains(report.Fatal, "### The last administrator") {
+		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
+	}
 }
 
 func TestAdministrativeDocs_ARecoveryRequestingAGranularScopeFails(t *testing.T) {
@@ -411,6 +470,20 @@ func assertScopeRequests(r guard.Reporter, root string, section docSection, want
 		if match[1] != want {
 			r.Errorf("%s: %s requests scope=%s, want %s", section.page, section.heading, match[1], want)
 		}
+	}
+}
+
+// assertSectionQuotes is the reporting half of a quoted sentence's check: one failure when the
+// section does not hold want word for word; a stop for a section not found.
+func assertSectionQuotes(r guard.Reporter, root string, section docSection, want string) {
+	r.Helper()
+	text, err := docSectionText(root, section)
+	if err != nil {
+		r.Fatalf("%v", err)
+		return
+	}
+	if !strings.Contains(text, want) {
+		r.Errorf("%s: %s does not quote %q", section.page, section.heading, want)
 	}
 }
 

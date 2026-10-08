@@ -1,58 +1,74 @@
 ---
 title: Resources and permissions
-description: Define fine-grained access control with resources and permissions.
+description: Describe what your APIs protect, and decide which users, groups and clients may do what.
 ---
 
-In Goiabada, you can define both resources and permissions. Each resource can have multiple permissions associated with it.
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-You can assign these permissions to users, groups, or clients as needed.
+This page helps you describe what your APIs protect, and give users, groups and clients permission to use it.
 
-## Scope format
+A **resource** is something you protect, usually an API, such as `product-api`. A **permission** is something a resource lets you do, such as `read` or `delete-product`. Together they make a scope, written `resource:permission`: `product-api:read` is the permission `read` on the resource `product-api`. That's what your app asks for, and what the token it gets back carries.
 
-When you pair a resource with a permission, it forms a **scope**, both in the authorization request and within the tokens.
+## Create a resource and its permissions
 
-**Format:** `resource-identifier:permission-identifier`, both halves case-sensitive
+<Steps>
 
-**Example:**
+1. In the admin console, open **Admin**, **Resources and permissions** and click **Create new**.
 
-If you have:
+2. Enter a **Resource identifier**, such as `product-api`, and a **Description**. Click **Create**.
 
-- A resource with identifier: `product-api`
-- A permission with identifier: `delete-product`
+3. Open the resource's **Permissions** tab. For each thing your API lets callers do, enter a **Permission identifier**, such as `read`, and a **Permission description**, and click **Create permission**. Click **Save** when the list is done.
 
-The resulting scope will be: `product-api:delete-product`
+4. Give each permission to whoever needs it:
 
-This scope can then be requested in authorization requests and will appear in access tokens, allowing fine-grained access control to your APIs and resources.
+   - a **user**, on the user's **Permissions** tab, or on the resource's **Users with permission** tab;
+   - a **group**, on the group's **Permissions** tab, or on the resource's **Groups with permission** tab, and every member gets it;
+   - a **client**, on the client's **Permissions** tab, for a service that calls your API on its own behalf.
 
-### Permission identifiers are scoped to their resource
+</Steps>
 
-A permission identifier only has meaning within the resource it belongs to. Two resources can each
-define a permission called `read`, and those are **two distinct permissions**: granting one conveys
-nothing about the other.
+Your app then asks for `product-api:read` in its `scope`, beside any OpenID Connect scopes, and your API checks the access token's `scope` before it answers. See [Scopes](/concepts/scopes/).
 
-So if you have `product-api:read` and `reports-api:read`, a client or user granted
-`product-api:read` cannot use `reports-api:read`. You must grant each one separately.
+## How it works
 
-This is worth knowing because reusing short identifiers like `read`, `write` and `delete` across
-resources is normal and expected, and it is what makes the resource half of the scope load-bearing
-rather than decorative. It applies to the `authserver` resource too: a `manage` permission you
-create on your own resource is unrelated to the built-in `authserver:manage`.
+### Identifiers
 
-## System-level resource
+A resource identifier and a permission identifier are each 3 to 38 characters long. They start with a letter, end with a letter or digit, and use only letters, digits, `-` and `_`, with no `--` or `__`. They're case-sensitive, so the scope is too: `product-api:read` isn't `Product-API:read`.
 
-The `authserver` resource is a **system-level resource** used internally by Goiabada. It has special protections:
+A description is at most 100 characters, and can't contain `<` or `>`.
 
-- Its **resource identifier cannot be changed** (renaming is blocked)
-- It **cannot be deleted**
-- Its **description can be modified**
-- New permissions **can be added** to it
-- Its **built-in permission identifiers cannot be renamed or deleted**
-- The **descriptions of its six administrative permissions** are changed only by `authserver:manage` (see [Administrators](#administrators))
+Two resources can't share an identifier, and neither can two permissions of one resource.
 
-The built-in permissions under the `authserver` resource, with the description each is seeded with:
+### A permission belongs to its resource
+
+A permission identifier only means something on its own resource. Two resources can each have a permission called `read`, and they're two different permissions: someone holding `product-api:read` can't use `reports-api:read`. Grant each one separately.
+
+So reusing short names like `read`, `write` and `delete` on every resource is normal, and it's what makes the resource half of the scope matter. It goes for the `authserver` resource too: a `manage` permission on your own resource has nothing to do with `authserver:manage`.
+
+### Who holds a permission
+
+A **user** holds the permissions given to them and those of every group they're in. When your app signs a user in, the token carries only the permissions the user holds out of those it asked for. The others are left out without an error, as [invalid_scope](/troubleshooting/invalid-scope/#the-user-doesnt-hold-it) explains.
+
+A **client's** own permissions are for the client credentials flow alone, when the client gets a token for itself. A token a client gets for a user carries the user's permissions, never the client's.
+
+### Renaming and deleting
+
+Renaming a resource or a permission changes its scope, so every app asking for the old one starts getting refused. The admin console asks you to confirm a renamed resource identifier.
+
+Deleting a permission takes it away from every user, group and client that held it. Deleting a resource deletes all its permissions too, with the same effect.
+
+### The authserver resource
+
+`authserver` is Goiabada's own resource. Its permissions decide who can manage their own account and who can administer Goiabada, so it's protected:
+
+- its identifier can't be changed, and it can't be deleted;
+- its built-in permissions can't be renamed or deleted;
+- its description can be changed, and you can add permissions of your own to it.
+
+These are its built-in permissions, with the description each starts with:
 
 | Permission identifier | Description | Administrative |
-|----------------------|-------------|----------------|
+|---|---|---|
 | `manage-account` | View and update user account data for the current user | No |
 | `manage` | Full administration, including administrators and administrative permissions | Yes |
 | `admin-read` | Read-only access to all admin API endpoints | Yes |
@@ -61,39 +77,15 @@ The built-in permissions under the `authserver` resource, with the description e
 | `manage-settings` | Manage system settings, except email and audit logging, and signing keys | Yes |
 | `browser-sessions` | Read and write admin console browser sessions | Yes |
 
-You can create additional custom permissions on the `authserver` resource if needed, but the built-in ones listed above are protected.
+Every user gets `manage-account` when they're created. A user, group or client holding any of the six administrative ones is an administrator, and only `authserver:manage` can grant one, revoke one, or change its description. [Administrators](/reference/api/administrators/) has the whole rule.
 
-An installation upgraded from an earlier version gets these descriptions too, except where an operator had already edited one: an edited description is kept as it is.
+<Aside type="caution">
+Granting an administrative permission is how you make someone an administrator. Grant one as carefully as you'd hand out the admin console's password. Each grant and revocation leaves an `administrative_permission_changed` entry in the [audit log](/concepts/audit-log/#events-to-alert-on) you can alert on.
+</Aside>
 
-### Administrators
+## Next steps
 
-The six permissions marked **Administrative** confer power over this server. A user, group or client holding any of them is an **administrator**: a user directly or through any of its groups. The admin console's own client is always an administrator, whatever it holds, and so is any client an operator has allowed to request these six permissions as scopes on a signed-in user's behalf (see [Clients › Administrative scopes](/concepts/clients/#administrative-scopes)), since it can obtain a signed-in administrator's authority. `manage-account`, which every user receives at creation, and any custom permission you add to the `authserver` resource confer no power here and make nobody an administrator.
-
-**Only `authserver:manage` creates an administrator, changes one, or changes what reaches one.** The granular scopes `manage-users`, `manage-clients` and `manage-settings` keep full control of everyone else, and every scope that reads still reads administrators, but none of them can:
-
-- grant or revoke an administrative permission, add a user to or remove one from a group holding one, or delete such a group;
-- write to an administrator, or read an administrator client's secret;
-- change the description of an administrative permission, which is what an operator reads before granting it;
-- change the email or the audit-log settings.
-
-So `manage-users` can still grant and revoke `manage-account` and your own custom permissions, to anyone who is not an administrator, and `manage-settings` can still add custom permissions to the `authserver` resource and change the description of `manage-account` and of your own permissions. These rules judge the object a request writes: a change to an ordinary group or resource still reaches an administrator who is a member of the group or holds one of the resource's permissions, but it cannot make or unmake an administrator, because neither holds an administrative permission. A refused request changes nothing, answers `403` with the error code `MANAGE_SCOPE_REQUIRED`, and leaves an `administrator_change_refused` entry in the [audit log](/concepts/audit-log/#events-to-alert-on). See [Scopes](/reference/api/scopes/) for each scope in detail, and [Administrators](/reference/api/administrators/) for the whole rule.
-
-Granting an administrative permission is how an administrator is made, so grant one as deliberately as you would hand out the admin console's password. Every grant or revocation of one, and every user joining or leaving a group that holds one, leaves an `administrative_permission_changed` entry an operator can alert on. Goiabada also refuses any change that would leave no enabled user holding `manage`: see [the last administrator](/concepts/users-and-groups/#the-last-administrator).
-
-## How to use scopes
-
-1. **Define resources** - In the admin console, create resources that represent your APIs or protected areas (e.g., `product-api`, `user-service`)
-
-2. **Create permissions** - For each resource, define the actions users or clients can perform (e.g., `read`, `write`, `delete`)
-
-3. **Assign permissions** - Grant these permissions to:
-   - Individual users
-   - Groups (all members inherit the permissions)
-   - Clients (for server-to-server access)
-
-4. **Request scopes** - When initiating an authorization request, include the scopes your application needs:
-   ```
-   scope=openid product-api:read product-api:write
-   ```
-
-5. **Validate access** - In your API, check the access token for the required scopes before allowing access to resources
+<CardGrid>
+  <LinkCard title="Scopes" description="How your app asks for a permission, and what else it can ask for." href="/concepts/scopes/" />
+  <LinkCard title="Administrators" description="Who can administer Goiabada, and what each scope may do." href="/reference/api/administrators/" />
+</CardGrid>

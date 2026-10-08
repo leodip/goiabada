@@ -34,6 +34,10 @@ Authentication Context Class Reference: how strongly the user signed in. Goiabad
 
 The web app where you manage clients, users, groups, resources, permissions and settings. It's a client of the auth server and reaches the database only through the auth server.
 
+### Administrator
+
+A user, group or client holding one of the administrative permissions on the `authserver` resource, such as `authserver:manage`. Only `authserver:manage` can make someone an administrator or change one. See [Administrators](/reference/api/administrators/).
+
 ### AMR
 
 Authentication Methods References: which methods the user signed in with. Goiabada uses `pwd` (password) and `otp` (one-time code). See [ACR and AMR](/concepts/acr-and-amr/).
@@ -105,6 +109,10 @@ Something you protect, usually an API, and the permissions that go with it. Goia
 
 What a client asks for when it requests a token. There are two kinds: OpenID Connect scopes, such as `openid`, `profile` and `email`, which give access to the user's information, and permission scopes, written `resource:permission`. See [Scopes](/concepts/scopes/).
 
+### Self-registration
+
+A user creating their own account from the sign-in page's **Register** link, instead of an administrator creating it. See [Self-registration](/concepts/self-registration/).
+
 ### Session
 
 What lets a user sign in once and use several clients. After the user signs in, the auth server keeps a session for their browser, so the next client they use doesn't ask for the password again. A session ends when it has been idle too long, when it reaches its maximum lifetime, or when the user or an administrator ends it. See [Sessions](/concepts/sessions/).
@@ -112,6 +120,10 @@ What lets a user sign in once and use several clients. After the user signs in, 
 ### Single sign-on (SSO)
 
 Signing in once and using several clients without signing in again, which the session makes possible.
+
+### Subject
+
+The identifier the auth server gives each user when they're created. It never changes, and it's the `sub` claim in every token about the user. See [Users and groups](/concepts/users-and-groups/#users).
 
 ### Two-factor authentication
 
