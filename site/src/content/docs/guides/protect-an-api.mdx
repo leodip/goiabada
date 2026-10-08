@@ -99,7 +99,7 @@ A token from the client credentials flow names no user. Decoded, the one from th
 
 `sub` is the client identifier, and there's no `auth_time`, `acr`, `amr` or `sid`, since nobody signed in. Your API checks it exactly as it checks a user's token.
 
-The scope is the client's own permissions, never a user's. Leave `scope` out of the request to get every permission the client holds. A scope the client doesn't hold is refused with `invalid_scope`, and an OpenID Connect scope such as `openid` with `invalid_request`, since there's no user for it to describe. [Token](/reference/endpoints/token/#client-credentials-grant) lists every refusal.
+The scope is the client's own permissions, never a user's. Leave `scope` out of the request to get every permission the client holds, as long as it holds one. A scope the client doesn't hold is refused with `invalid_scope`, and an OpenID Connect scope such as `openid` with `invalid_request`, since there's no user for it to describe. [Token](/reference/endpoints/token/#client-credentials-grant) lists every refusal.
 
 Only a confidential client can use the flow, since its client secret is all it proves itself with. Keep the secret in the service's secret store or environment, never in code, and give each service a client of its own, so you can replace one's secret without touching the others.
 

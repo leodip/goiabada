@@ -96,10 +96,14 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 			arrange: func(t *testing.T, _ *datamocks.Database, client *record.Client, _ *ValidateTokenRequestInput) {
 				client.ClientCredentialsEnabled = true
 			},
-			passed: func(t *testing.T, mockDB *datamocks.Database, client *record.Client, result TokenGrant, err error) {
-				require.NoError(t, err)
-				require.NotNil(t, result)
-				assert.Same(t, client, grantAs[*ClientCredentialsGrant](t, result).Client)
+			// The client holds no permissions and the request names no scope, so the first answer
+			// past authentication is the refusal of an empty default (RFC 6749 section 3.3), which
+			// a client that failed authentication never reaches.
+			passed: func(t *testing.T, _ *datamocks.Database, _ *record.Client, result TokenGrant, err error) {
+				assert.Nil(t, result)
+				refusedWith(t, err, refusal{"invalid_scope",
+					"The client holds no permissions, so a request without a scope has nothing to grant.",
+					http.StatusBadRequest, ""})
 			},
 		},
 		{

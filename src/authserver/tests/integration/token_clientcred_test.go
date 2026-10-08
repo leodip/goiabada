@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
@@ -259,6 +261,40 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 
 			assert.Equal(t, testCase.errorCode, data["error"])
 			assert.Equal(t, testCase.errorDescription, data["error_description"])
+		})
+	}
+}
+
+// TestToken_ClientCred_NoScopeFromAClientHoldingNothing: with scope omitted the grant's default is
+// every permission the client holds, so a client holding none has no default, and RFC 6749
+// section 3.3 says the request fails as invalid_scope. It reached the issuer with an empty scope
+// and was answered 500 server_error. An explicitly empty scope is the same request, since a
+// parameter sent without a value counts as omitted (RFC 6749 section 3.1).
+func TestToken_ClientCred_NoScopeFromAClientHoldingNothing(t *testing.T) {
+	clientSecret := fake.Password(32)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
+	require.NoError(t, err)
+
+	client := &record.Client{
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
+		Enabled:                  true,
+		ClientCredentialsEnabled: true,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	require.NoError(t, database.CreateClient(context.Background(), nil, client))
+
+	for name, form := range map[string]url.Values{
+		"scope omitted":  {"grant_type": {"client_credentials"}},
+		"scope is empty": {"grant_type": {"client_credentials"}, "scope": {""}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			refusal := postTokenRequest(t, form, true, client.ClientIdentifier, clientSecret)
+
+			assert.Equal(t, http.StatusBadRequest, refusal.status)
+			assert.Equal(t, "invalid_scope", refusal.body["error"])
+			assert.Equal(t, "The client holds no permissions, so a request without a scope has nothing to grant.",
+				refusal.body["error_description"])
 		})
 	}
 }

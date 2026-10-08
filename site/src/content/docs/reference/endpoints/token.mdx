@@ -133,7 +133,7 @@ The refresh is refused with `invalid_grant` when the token can't be used any mor
 
 | Parameter | Required | |
 |---|---|---|
-| `scope` | No | One or more [permission scopes](/concepts/scopes/#permission-scopes) the client holds. Leave it out to get every permission the client holds. |
+| `scope` | No | One or more [permission scopes](/concepts/scopes/#permission-scopes) the client holds. Leave it out to get every permission the client holds, which a client holding none is refused. |
 
 Only a confidential client with **Client credentials** turned on can use it. The token is the client's own: it names no user, and gets no ID token and no refresh token.
 
@@ -141,7 +141,7 @@ Only a confidential client with **Client credentials** turned on can use it. The
 |---|---|
 | `unauthorized_client` | The flow is off for the client, or it's a public client |
 | `invalid_request` | `scope` holds an OpenID Connect scope, such as `openid`, or `offline_access`: there's no user to describe |
-| `invalid_scope` | A scope isn't `resource:permission`, names a resource or permission that doesn't exist, or names a permission the client doesn't hold |
+| `invalid_scope` | A scope isn't `resource:permission`, names a resource or permission that doesn't exist, or names a permission the client doesn't hold. Or `scope` is left out and the client holds no permissions, so there's nothing to grant |
 
 ### Password grant
 
