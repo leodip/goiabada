@@ -416,6 +416,7 @@ func writeConfigMapHead(sb *strings.Builder, ns, name, whose string) {
 // them from, so the two cannot disagree.
 func writeSharedURLs(sb *strings.Builder, config *Config) {
 	fmt.Fprintf(sb, "  GOIABADA_AUTHSERVER_BASEURL: %s\n", yamlQuote(config.AuthServerURL))
+	fmt.Fprintf(sb, "  %s\n", internalHopComment)
 	sb.WriteString("  GOIABADA_AUTHSERVER_INTERNALBASEURL: \"http://goiabada-authserver:9090\"\n")
 	fmt.Fprintf(sb, "  GOIABADA_ADMINCONSOLE_BASEURL: %s\n", yamlQuote(config.AdminConsoleURL))
 }

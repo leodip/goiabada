@@ -58,6 +58,7 @@ services:
       - "GOIABADA_ADMIN_EMAIL=a\"b$$c`d\\e #f'g@example.com"
       - GOIABADA_APPNAME=Goiabada
       - "GOIABADA_AUTHSERVER_BASEURL=https://auth.example.com/p\"a$$HOME #x: y"
+      # Plain HTTP: the admin console's secret and tokens cross this hop unencrypted, so it assumes a network you trust.
       - "GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090"
       - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=0.0.0.0
       - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090
@@ -141,6 +142,7 @@ services:
       - GOIABADA_ADMINCONSOLE_STATICDIR=
       - GOIABADA_ADMINCONSOLE_TEMPLATEDIR=
       - "GOIABADA_AUTHSERVER_BASEURL=https://auth.example.com/p\"a$$HOME #x: y"
+      # Plain HTTP: the admin console's secret and tokens cross this hop unencrypted, so it assumes a network you trust.
       - "GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090"
 
 

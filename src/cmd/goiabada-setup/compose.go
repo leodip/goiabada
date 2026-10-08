@@ -127,7 +127,7 @@ func generateAuthServerService(config *Config) string {
 	writeComposeVariable(&sb, "GOIABADA_ADMIN_EMAIL", config.AdminEmail)
 	sb.WriteString("      - GOIABADA_APPNAME=Goiabada\n")
 	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_BASEURL", config.AuthServerURL)
-	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_INTERNALBASEURL", authInternalURL)
+	writeComposeInternalURL(&sb, authInternalURL)
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=0.0.0.0\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090\n")
 	sb.WriteString("      - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS=\n")
@@ -210,7 +210,7 @@ func generateAdminConsoleService(config *Config) string {
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_STATICDIR=\n")
 	sb.WriteString("      - GOIABADA_ADMINCONSOLE_TEMPLATEDIR=\n")
 	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_BASEURL", config.AuthServerURL)
-	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_INTERNALBASEURL", authInternalURL)
+	writeComposeInternalURL(&sb, authInternalURL)
 	sb.WriteString("\n")
 
 	return sb.String()
@@ -319,6 +319,17 @@ func writeHardening(sb *strings.Builder, tmpComment ...string) {
 	sb.WriteString("    read_only: true\n")
 	sb.WriteString("    tmpfs:\n")
 	sb.WriteString("      - /tmp\n")
+}
+
+// internalHopComment is the line above every GOIABADA_AUTHSERVER_INTERNALBASEURL the Compose file and
+// the Kubernetes manifest write: the URL is plain HTTP, and the admin console's client secret,
+// refresh token and administrators' tokens cross it unencrypted (#505).
+const internalHopComment = "# Plain HTTP: the admin console's secret and tokens cross this hop unencrypted, so it assumes a network you trust."
+
+// writeComposeInternalURL writes the internal URL's entry under internalHopComment.
+func writeComposeInternalURL(sb *strings.Builder, url string) {
+	fmt.Fprintf(sb, "      %s\n", internalHopComment)
+	writeComposeVariable(sb, "GOIABADA_AUTHSERVER_INTERNALBASEURL", url)
 }
 
 // writeComposeVariable writes one entry of a service's list-form environment, quoted whole, so
