@@ -1,210 +1,99 @@
 ---
-title: Prompt parameter
-description: Control authentication and consent behavior using the OIDC prompt parameter.
+title: prompt
+description: Check for a session without showing the user anything, always ask for their password, or always show the consent screen.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-The `prompt` parameter is an OpenID Connect parameter that allows clients to control whether the authorization server should prompt the user for re-authentication or consent. It is included in the authorization request to `/auth/authorize`.
+This page helps you control what the user sees when your app sends them to sign in.
 
-## Supported values
+`prompt` is an OpenID Connect parameter of the authorization request. It takes three values:
 
-Goiabada supports the following `prompt` values:
+| Value | What the auth server does |
+|---|---|
+| `none` | Shows the user nothing. It answers with a code if the browser's session is enough, and with an error if it isn't. This is a silent request. |
+| `login` | Asks the user to sign in, even when the browser has a session. |
+| `consent` | Shows the consent screen, even when the user has already approved what your app asks for. |
 
-| Value | Behavior |
-|-------|----------|
-| `none` | Silent authentication. Must not display any UI. Returns an error if the user is not authenticated or consent is not available. |
-| `login` | Force re-authentication. The user must log in again even if they have a valid session. |
-| `consent` | Force consent. The user must see and confirm the consent screen even if they have already consented. |
+Leave `prompt` out and the auth server decides: it uses the browser's session when there's a valid one, which is [single sign-on](/concepts/glossary/#single-sign-on-sso), and asks the user to sign in when there isn't.
 
-<Aside>
-The `select_account` value defined in the OIDC specification is not currently supported. A request carrying it is refused with `account_selection_required`.
-</Aside>
+## Check for a session silently
 
-## Combination rules
+<Steps>
 
-- `prompt=none` **cannot** be combined with any other value. Using `prompt=none login` or `prompt=none consent` will result in an `invalid_request` error.
-- `login` and `consent` **can** be combined: `prompt=login consent` forces both re-authentication and a consent screen.
-- If the `prompt` parameter is omitted or empty, the normal authentication flow applies (SSO session reuse when available).
+1. Send the authorization request with `prompt=none`. Add [`id_token_hint`](/concepts/id-token-hint/) when you know which user to expect:
 
-## prompt=none (silent authentication)
+   ```http
+   GET /auth/authorize?client_id=my-app&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback&response_type=code&scope=openid%20profile&prompt=none&code_challenge=...&code_challenge_method=S256&state=... HTTP/1.1
+   Host: auth.example.com
+   ```
 
-Use `prompt=none` when you want to check if the user has an active session without showing any UI. This is useful for:
+2. If the session is enough, the browser comes straight back to your redirect URI with a code, and the user sees no page:
 
-- **Session polling** - Periodically checking if the user is still logged in
-- **Iframe-based session checks** - Silent renewal of tokens in SPAs
-- **Background token refresh** - Obtaining new tokens without interrupting the user
+   ```http
+   HTTP/1.1 302 Found
+   Location: https://app.example.com/callback?code=...&state=...
+   ```
 
-### How it works
+   Redeem it at the token endpoint as usual.
 
-When `prompt=none` is included in the authorization request, Goiabada will:
+3. If it isn't, the browser comes back with an `error` instead, such as `login_required`. Send the user through the same request without `prompt=none`, so they can sign in. See [login_required](/troubleshooting/login-required/).
 
-1. Check if the user has a valid session (not expired by idle timeout or max lifetime)
-2. Check if `max_age` is satisfied (if provided)
-3. Verify the session's ACR level meets the request requirements
-4. Verify the user account is enabled
-5. Check that the user is authorized for the requested scopes
-6. Verify that consent is already available (if required by the client)
-
-If all checks pass, an authorization code is issued silently and the user is redirected back to the client. The `auth_time` claim in the resulting ID token will reflect the original authentication time from the session, not the time of the silent authentication.
-
-If any check fails, the user is redirected back to the client with an error — no login or consent screens are shown.
-
-<Aside type="tip">
-`prompt=none` is most commonly paired with [`id_token_hint`](/concepts/id-token-hint/) for silent token renewal in single page apps. The hint pins the request to a specific user, so a session belonging to a different user won't satisfy the silent flow.
-</Aside>
-
-### Example
-
-```
-GET /auth/authorize?
-  client_id=my-app&
-  redirect_uri=https://my-app.com/callback&
-  response_type=code&
-  scope=openid profile&
-  prompt=none&
-  state=abc123
-```
-
-**Success response:**
-
-```
-https://my-app.com/callback?code=SplxlOBeZQQYbYS6WxSbIA&state=abc123
-```
-
-**Error response (no session):**
-
-```
-https://my-app.com/callback?error=login_required&error_description=User+authentication+is+required&state=abc123
-```
-
-### Error codes for prompt=none
-
-| Error | When it occurs |
-|-------|---------------|
-| `login_required` | No valid session, session expired (idle or max lifetime), or `max_age` exceeded |
-| `consent_required` | Client requires consent but no pre-existing consent covers the requested scopes |
-| `interaction_required` | ACR step-up is needed, OTP enrollment is required, or OTP configuration has changed |
-| `access_denied` | User account is disabled, or the user is not authorized for any of the requested scopes |
+</Steps>
 
 <Aside type="caution">
-**A self-registered client gets no error back at all.** A client that registered itself through [dynamic client registration](/concepts/clients/#self-registered-clients) requires consent by default, so its first silent request for a user cannot be completed, and Goiabada [withholds its error redirects](/concepts/clients/#self-registered-clients) rather than delivering any of the errors above. The request simply does not come back.
-
-Treat a silent request that does not return as "send the user through an ordinary authorization". Do that once, without `prompt=none`, and silent renewal works from then on for the scopes they consented to. Clients an administrator registered are unaffected, unless the `redirect_uri` has since been removed from the client: that withholds the error too.
+A client that [registered itself](/concepts/clients/#self-registered-clients) gets no error back from a silent request: the auth server never redirects an error to one. Treat a silent request that doesn't come back as "send the user through an ordinary sign-in". See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/).
 </Aside>
 
-## prompt=login (force re-authentication)
+## How it works
 
-Use `prompt=login` when you want to ensure the user actively authenticates, regardless of their current session. This is useful for:
+### Values
 
-- **Sensitive operations** - Confirming identity before a high-risk action (e.g., changing password, transferring funds)
-- **Session freshness** - Ensuring the person at the keyboard is the account owner
-- **Compliance requirements** - Meeting regulatory requirements for recent authentication
+Separate values with a single space. `login` and `consent` go together: `prompt=login consent` asks the user to sign in and then shows the consent screen. `none` goes alone, and `none` with anything else is refused with `invalid_request`, as is a value Goiabada doesn't know.
 
-### How it works
+`select_account` is defined by OpenID Connect, but the auth server can't ask a user to choose an account, so it's refused with `account_selection_required`. Discovery lists the three values it supports in `prompt_values_supported`.
 
-When `prompt=login` is included, Goiabada never uses an existing session to skip authentication. Whoever is at the keyboard has to enter their credentials.
+### The silent checks
 
-After re-authentication, the `auth_time` claim in the ID token will reflect the new authentication time, which will be later than any previous `auth_time`.
+With `prompt=none`, the auth server makes the checks it would otherwise show the user a page for, in this order, and answers with the first that fails:
 
-What happens to the session that was already in the browser depends on who signs in:
+| Check | `error` | `error_description` |
+|---|---|---|
+| The browser has a session | `login_required` | "User authentication is required" |
+| The session is within its idle timeout and maximum lifetime | `login_required` | "User session has expired" |
+| The user signed in within the request's `max_age`, when it has one | `login_required` | "Session age exceeds max_age" |
+| The user is enabled | `access_denied` | "The user account is disabled" |
+| The session's user is the one the `id_token_hint` names, when there's a hint | `login_required` | "The current session user does not match the id_token_hint" |
+| The session reached the request's [ACR level](/concepts/acr-and-amr/) | `interaction_required` | "Higher authentication level required" |
+| The user has two-factor authentication, when the level is `urn:goiabada:level2_mandatory` | `interaction_required` | "Additional authentication setup required" |
+| The user's two-factor authentication hasn't changed since the session last went through the code step, when the level is above `urn:goiabada:level1` | `interaction_required` | "Authentication configuration has changed" |
+| The user holds at least one of the scopes asked for | `access_denied` | "The user is not authorized to access any of the requested scopes" |
+| The user has consented to the client, when it requires consent or the request asks for `offline_access` | `consent_required` | "User consent is required" |
+| That consent covers every scope the user would get | `consent_required` | "Additional consent is required" |
 
-| Who signs in | What happens to the existing session |
-| ------------ | ------------------------------------ |
-| The same user | It is kept and reused, as long as it is still valid. Its `auth_time` is refreshed to this authentication. A session that has already idled out, reached its maximum lifetime, or fallen outside a requested `max_age` is replaced by a new one, with nothing revoked |
-| A different user | It is ended and replaced by a session for the new user |
+When every check passes, the auth server issues the code and records the session's activity, so it doesn't idle out. The ID token's `auth_time` is when the user last signed in, not the time of the silent request, and its `acr` is the session's level when that's higher than the one asked for.
 
-Ending it is a full termination rather than a plain delete: the refresh tokens and the unredeemed authorization codes that came from that session are revoked with it. The browser has changed hands, so the grants that browser was holding are now in someone else's reach. Sessions the previous user has on other devices are untouched. See [User sessions](/concepts/sessions/).
+The auth server redirects each error to your redirect URI with your `state`, in the request's response mode. A request with `prompt=none` that fails validation, such as one with a scope that doesn't exist, is answered at once too, rather than after a sign-in.
 
-<Aside type="tip">
-When the **same** user re-authenticates and their session is still valid, it is not invalidated: other clients using it will continue to work, and only the current authorization request requires fresh authentication. A session that is no longer valid for this request is replaced by a new one instead, as the table above describes, so that assurance does not apply to it.
-</Aside>
+### prompt=login
 
-### Example
+The auth server doesn't use the browser's session to skip the sign-in: whoever is at the browser enters a password. They're asked for a one-time code too when the request's level needs one that the user's session hasn't already given. The ID token's `auth_time` is this sign-in.
 
-```
-GET /auth/authorize?
-  client_id=my-app&
-  redirect_uri=https://my-app.com/callback&
-  response_type=code&
-  scope=openid profile&
-  prompt=login&
-  state=abc123&
-  code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&
-  code_challenge_method=S256
-```
+What happens to the session that was in the browser depends on who signs in:
 
-### prompt=login vs max_age
+- **The same user.** Their session is kept and its sign-in time updated, as long as it's still valid. A session that has idled out, reached its maximum lifetime or fallen outside the request's `max_age` is replaced by a new one, with nothing revoked.
+- **Someone else.** The other user's session is ended, as described in [A different user signs in on the same browser](/concepts/sessions/#a-different-user-signs-in-on-the-same-browser).
 
-Both `prompt=login` and `max_age` can force re-authentication, but they work differently:
+`max_age` can ask for a sign-in too, but only when the last one is older than the number of seconds it gives. Use `prompt=login` when you always want a fresh sign-in, and `max_age` when a recent one is enough. With both, `prompt=login` wins.
 
-| Parameter | Behavior |
-|-----------|----------|
-| `prompt=login` | **Always** forces re-authentication, regardless of session age |
-| `max_age=N` | Forces re-authentication only if the user last signed in more than N seconds ago |
+### prompt=consent
 
-Use `prompt=login` when you always need fresh credentials. Use `max_age` when you only need re-authentication if the last sign-in is too old.
+The auth server shows the consent screen after the sign-in, even when the user has already approved every scope your app asks for. Use it when your app should hear the user's answer again, for example after it starts asking for more. See [Consent required](/concepts/clients/#consent-required).
 
-## prompt=consent (force consent screen)
+## Next steps
 
-Use `prompt=consent` when you want the user to explicitly review and confirm the permissions being granted, even if they have already consented in the past. This is useful for:
-
-- **Scope changes** - When your application requests new permissions
-- **Periodic re-confirmation** - Ensuring users are aware of what they are granting
-- **Regulatory compliance** - Meeting requirements for explicit user consent
-
-### How it works
-
-When `prompt=consent` is included, Goiabada will always show the consent screen after authentication completes, even if the user has already granted consent for all requested scopes.
-
-### Example
-
-```
-GET /auth/authorize?
-  client_id=my-app&
-  redirect_uri=https://my-app.com/callback&
-  response_type=code&
-  scope=openid profile email&
-  prompt=consent&
-  state=abc123&
-  code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&
-  code_challenge_method=S256
-```
-
-## Combining prompt=login consent
-
-You can combine `login` and `consent` to force both re-authentication and a consent screen:
-
-```
-GET /auth/authorize?
-  client_id=my-app&
-  redirect_uri=https://my-app.com/callback&
-  response_type=code&
-  scope=openid profile email&
-  prompt=login consent&
-  state=abc123&
-  code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&
-  code_challenge_method=S256
-```
-
-The user will first be asked to log in, then shown the consent screen, regardless of existing session or prior consent.
-
-## Error response format
-
-Errors from `prompt=none` are returned to the `redirect_uri` using the appropriate response mode:
-
-| Response mode | Error delivery |
-|---------------|----------------|
-| `query` (default for `response_type=code`) | `?error=...&error_description=...&state=...` |
-| `fragment` (default for implicit flow) | `#error=...&error_description=...&state=...` |
-| `form_post` | HTML form POST with error fields |
-
-## Discovery
-
-The OIDC discovery document at `/.well-known/openid-configuration` includes the supported prompt values:
-
-```json
-{
-  "prompt_values_supported": ["none", "login", "consent"]
-}
-```
+<CardGrid>
+  <LinkCard title="login_required" description="Why a silent request came back with an error, and what to do." href="/troubleshooting/login-required/" />
+  <LinkCard title="id_token_hint" description="Make sure a sign-in comes back for the user you expect." href="/concepts/id-token-hint/" />
+  <LinkCard title="Sessions" description="How long a session lasts, and what ends it." href="/concepts/sessions/" />
+</CardGrid>

@@ -117,9 +117,17 @@ A user creating their own account from the sign-in page's **Register** link, ins
 
 What lets a user sign in once and use several clients. After the user signs in, the auth server keeps a session for their browser, so the next client they use doesn't ask for the password again. A session ends when it has been idle too long, when it reaches its maximum lifetime, or when the user or an administrator ends it. See [Sessions](/concepts/sessions/).
 
+### Silent request
+
+An authorization request with `prompt=none`, which checks for a session without showing the user anything. It comes back with a code when the session is enough, and with an error, such as `login_required`, when it isn't. See [prompt](/concepts/prompt/).
+
 ### Single sign-on (SSO)
 
 Signing in once and using several clients without signing in again, which the session makes possible.
+
+### Step-up
+
+Asking a user who already has a session for more, usually a one-time code, because a client needs a stronger ACR level than the session reached. The session moves up to that level. See [ACR and AMR](/concepts/acr-and-amr/#a-session-thats-already-there).
 
 ### Subject
 

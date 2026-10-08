@@ -1,101 +1,69 @@
 ---
-title: ID Token Hint
-description: Use the id_token_hint parameter to improve security and user experience in SSO scenarios.
+title: id_token_hint
+description: Tell the auth server which user your app expects, so a sign-in never comes back for someone else.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-The `id_token_hint` parameter allows clients to pass a previously issued ID token as a hint about which user should be authenticated. Include it in authorization requests to `/auth/authorize`.
+This page helps your app make sure a sign-in comes back for the user it expects.
 
-## Why use it
+`id_token_hint` is an OpenID Connect parameter of the authorization request. Its value is an ID token the auth server gave your app earlier, and it names the user your app expects by that token's subject, its `sub`. The auth server never gives your app a code for anyone else.
 
-**Security**: Prevents session fixation attacks. If the hint identifies user A, only user A can complete the authorization — even if user B has an active session or successfully authenticates.
+## Send a hint
 
-**User Experience**: Enables seamless SSO by indicating which user the client expects to authenticate.
+<Steps>
+
+1. Keep the ID token from the user's last sign-in.
+
+2. Send it, URL-encoded, as `id_token_hint`. It's most useful with [`prompt=none`](/concepts/prompt/), to renew the user's tokens without showing them anything:
+
+   ```http
+   GET /auth/authorize?client_id=my-app&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback&response_type=code&scope=openid%20profile&prompt=none&id_token_hint=eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...&code_challenge=...&code_challenge_method=S256&state=... HTTP/1.1
+   Host: auth.example.com
+   ```
+
+3. If the browser's session is the hinted user's, a code comes back as usual. If it isn't, `error=login_required` comes back: send the user to sign in again, without the hint if someone else may sign in. See [login_required](/troubleshooting/login-required/).
+
+</Steps>
 
 ## How it works
 
-When you provide `id_token_hint`, Goiabada:
+### What the auth server checks
 
-1. Validates the token signature and issuer
-2. Accepts expired tokens (per OIDC spec)
-3. Extracts the `sub` claim
-4. Enforces that only the specified user can receive tokens
+The hint must be an ID token the auth server signed, with its issuer in `iss` and a `sub`. Access tokens and refresh tokens are refused, although the same key signs them.
 
-<Aside type="caution">
-**Critical**: If the `id_token_hint` identifies user A, Goiabada will **never** issue tokens for user B, even if user B successfully authenticates. The server returns `login_required` instead.
-</Aside>
+Two things aren't checked. The token can be expired, as OpenID Connect recommends, since a hint usually comes from a sign-in some time ago. And it doesn't have to have been issued to the client that sends it.
 
-## Common usage
+A hint that fails a check is refused with `invalid_request`:
 
-### Silent token renewal (prompt=none)
+| `error_description` | Why |
+|---|---|
+| "The id_token_hint is invalid." | It isn't a token the auth server signed, or it's an access or refresh token. |
+| "The id_token_hint was not issued by this server." | Its `iss` isn't the auth server's issuer. |
+| "The id_token_hint does not contain a valid sub claim." | It has no `sub`. |
 
-```
-GET /auth/authorize?
-  client_id=my-spa&
-  redirect_uri=https://my-spa.com/callback&
-  response_type=code&
-  scope=openid profile&
-  prompt=none&
-  id_token_hint=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...&
-  state=abc123
-```
+That error reaches your app like any other error in the request: at once when the request has `prompt=none`, or when the browser has a valid session and the request doesn't have `prompt=login`, and otherwise after the user signs in. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/).
 
-If the user has a valid session matching the hint's `sub`, authorization succeeds silently. Otherwise, returns `login_required`.
+### What the hint changes
 
-### Re-authentication (prompt=login)
+| The browser has | With `prompt=none` | Without it |
+|---|---|---|
+| A session of the hinted user | A code, silently | A code, with single sign-on |
+| A session of someone else | `login_required`: "The current session user does not match the id_token_hint" | The user is asked to sign in |
+| No session | `login_required`: "User authentication is required" | The user is asked to sign in |
 
-```
-GET /auth/authorize?
-  client_id=my-app&
-  redirect_uri=https://my-app.com/callback&
-  response_type=code&
-  scope=openid profile&
-  prompt=login&
-  id_token_hint=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...&
-  state=abc123
-```
+Without `prompt=none`, whoever then signs in has to be the hinted user. If someone else does, the request ends with `login_required`: "The authenticated user does not match the id_token_hint". When the hinted user signs in over someone else's session, that session is ended, as [Sessions](/concepts/sessions/#a-different-user-signs-in-on-the-same-browser) describes.
 
-Forces re-authentication, but only the user specified in the hint can complete it. If they authenticate as a different user, authorization fails.
+With [`prompt=login`](/concepts/prompt/#promptlogin), the user signs in again even over their own session, and it still has to be the hinted user. Send the two together to confirm it's still the same person before a sensitive operation.
 
-### SSO with hint
+### Signing out
 
-```
-GET /auth/authorize?
-  client_id=my-app&
-  redirect_uri=https://my-app.com/callback&
-  response_type=code&
-  scope=openid profile&
-  id_token_hint=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...&
-  state=abc123
-```
+`/auth/logout` takes an `id_token_hint` too, with rules of its own, an encrypted hint among them. See [/auth/logout](/reference/endpoints/#rp-initiated-logout-with-parameters).
 
-- If the user has a session matching the hint → SSO succeeds
-- If the user has a session for a different user → re-authentication required, and once the hinted user signs in, the session that was in the browser is ended and replaced (see [User sessions](/concepts/sessions/))
-- If no session → normal login flow (only hinted user can complete)
+## Next steps
 
-## Error responses
-
-When subject mismatch is detected, Goiabada returns:
-
-```
-https://my-app.com/callback?
-  error=login_required&
-  error_description=The+authenticated+user+does+not+match+the+id_token_hint&
-  state=abc123
-```
-
-Invalid hints (bad signature, wrong issuer, missing sub) return `invalid_request`.
-
-## OIDC compliance
-
-Goiabada follows [OIDC Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html) Section 3.1.2.1:
-
-- ✅ Validates issuer
-- ✅ Accepts expired tokens
-- ✅ Enforces subject matching (MUST NOT issue tokens for different user)
-- ✅ Does not validate audience (per spec exemption)
-
-<Aside type="tip">
-Always URL-encode the `id_token_hint` value when including it in the authorization URL.
-</Aside>
+<CardGrid>
+  <LinkCard title="prompt" description="Silent requests, and asking for a fresh sign-in." href="/concepts/prompt/" />
+  <LinkCard title="login_required" description="Why a request with a hint came back with an error." href="/troubleshooting/login-required/" />
+  <LinkCard title="Sessions" description="What a session is, and what ends it." href="/concepts/sessions/" />
+</CardGrid>
