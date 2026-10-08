@@ -17,6 +17,8 @@ var monitoringDocs = []docSection{
 	{"site/src/content/docs/deploy/monitoring.mdx", "## Suggested alerts"},
 	{"site/src/content/docs/deploy/monitoring.mdx", "## What to watch in the logs"},
 	{"site/src/content/docs/deploy/kubernetes.mdx", "## Metrics"},
+	{"site/src/content/docs/troubleshooting/metrics-are-not-scraped.mdx", "## Why it happens"},
+	{"site/src/content/docs/troubleshooting/metrics-are-not-scraped.mdx", "## Fix it"},
 }
 
 // The monitoring docs name only admin console variables this console reads. A misspelt switch is

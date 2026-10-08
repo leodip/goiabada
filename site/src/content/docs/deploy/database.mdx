@@ -58,7 +58,7 @@ To refuse an absent file instead of creating one, put `mode=rw` in `GOIABADA_DB_
 
 The auth server runs as uid 10001, so the directory holding the file must be writable by it. In
 Docker, mount the volume at `/data`, which the image creates owned by that user; a volume written by
-the root images of earlier releases needs a [one-time `chown`](/deploy/docker-compose/#upgrading-a-compose-deployment-that-uses-sqlite).
+the root images of earlier releases needs a [one-time `chown`](/troubleshooting/attempt-to-write-a-readonly-database/).
 
 ## Schema migrations and rollback
 
@@ -119,7 +119,8 @@ period the platform allows a stop (`terminationGracePeriodSeconds` in Kubernetes
 in Compose): the platform then ends it with SIGKILL, which no process can intercept. That file is
 left marked dirty, and on MySQL and SQL Server, which run each file without an enclosing transaction,
 partly applied, and the next start refuses until the schema is repaired by hand, as its error
-explains. Before an upgrade carrying such a migration, raise the startup budget so the platform does
+explains and [Waiting for the migration lock, or marked
+dirty](/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/#a-migration-was-cut-short) walks through. Before an upgrade carrying such a migration, raise the startup budget so the platform does
 not stop the start mid-file, and do not stop it yourself.
 
 The commands below run against the database in `GOIABADA_DB_*` and do not start the server. The

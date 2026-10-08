@@ -1,0 +1,127 @@
+---
+title: Waiting for the migration lock, or marked dirty
+description: A start waits at "waiting for the migration lock", or refuses a database that is marked dirty or that a newer release migrated.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you when the auth server's start stops at the database schema: it waits for another process, or it refuses to migrate.
+
+Find your case first:
+
+- **The start's last record is `waiting for the migration lock`:** [another process is migrating](#another-process-is-migrating).
+- **The start stops with `is marked dirty, so a migration did not finish`:** [a migration was cut short](#a-migration-was-cut-short).
+- **The start stops with `which this release of Goiabada does not carry`:** [a newer release migrated the database](#a-newer-release-migrated-the-database).
+
+## Another process is migrating
+
+### What you see
+
+The auth server's last record is `waiting for the migration lock`, a few lines after `opening the database`. It doesn't listen yet, so `/health` doesn't answer, and on Kubernetes the pod isn't ready.
+
+### Why it happens
+
+Only one process migrates a database at a time, and it holds the migration lock while it does. Another process got there first: another auth server replica starting on the new release, or a `goiabada-authserver migrate` command. A waiting start waits for as long as the lock is held, and then finds the schema current and starts, with `no need to migrate the database`.
+
+So a start that writes `waiting for the migration lock` and nothing more is waiting, not hung. SQLite never writes it: its lock covers one process.
+
+### Fix it
+
+Usually, wait. Find the process holding the lock: its log has `migrating the database`, with how many files it has to run, and `database migrated` once it's done. Every waiting replica starts within moments of that.
+
+The lock belongs to the holder's database session, so a holder that dies releases it. If the holder is stuck rather than slow, stop it, and the next waiting process takes the lock and migrates.
+
+<Aside type="caution">
+On Kubernetes, the startup probe has to cover the wait. The generated manifest allows 5 minutes, 60 failures 5 seconds apart. When an upgrade's migrations take longer, Kubernetes restarts the container before they finish. Raise the auth server's startup probe `failureThreshold` until `failureThreshold × periodSeconds` covers them.
+</Aside>
+
+## A migration was cut short
+
+### What you see
+
+The auth server stops at start, and its log has `unable to create the database connection`, with an `error` that starts like this, with your own version number:
+
+```
+unable to migrate the database: the database records version 000047 and is marked dirty, so a migration did not finish.
+```
+
+The rest of the message says which versions the schema can be at, and what to record once you've repaired it.
+
+### Why it happens
+
+Before each migration file runs, the auth server marks the version it's applying as dirty in the `schema_migrations` table, and clears the mark once the file has run. A mark left in place means a file started and didn't finish, so the schema sits somewhere between two versions. The auth server won't guess how far it got, so it refuses to migrate.
+
+A file stops partway when:
+
+- **The file failed,** on one of its statements or on a lost connection to the database. The start that ran it said so: its `error` names the migration file that failed and the database's own error, before the dirty refusal.
+- **The process was killed mid-file,** by SIGKILL or a crash. A stop signal doesn't do it: the auth server lets the running file finish first. But when the platform's grace period runs out, `terminationGracePeriodSeconds` on Kubernetes or `stop_grace_period` in Compose, the platform kills it.
+
+On MySQL and SQL Server a file doesn't run inside one transaction, so some of its statements may have applied.
+
+### Fix it
+
+<Steps>
+
+1. Back up the database.
+
+2. Read the whole message. It names the migration that was running, or the two it could have been, and the version the schema is at if its statements applied and if they didn't.
+
+3. Look at the schema by hand, and compare it with the migration file the message names, in the source of the release you run, under `src/authserver/internal/data/<engine>db/migrations`. Then either finish the file's statements or undo the ones that applied, so the schema matches one of the two versions.
+
+4. Record that version, clean, as the only row in `schema_migrations`. For version 47:
+
+   ```sql
+   DELETE FROM schema_migrations;
+   INSERT INTO schema_migrations (version, dirty) VALUES (47, false);
+   ```
+
+   On SQL Server, write `0` in place of `false`. When the state is a database that was never migrated, delete the row and insert none.
+
+5. Start the auth server. It carries on from the version you recorded.
+
+</Steps>
+
+<Aside type="caution">
+Before an upgrade carrying a long migration, raise the startup budget so the platform doesn't stop the start mid-file, and don't stop it yourself.
+</Aside>
+
+## A newer release migrated the database
+
+### What you see
+
+The auth server stops at start, and its `error` starts like this:
+
+```
+unable to migrate the database: this database records schema version 999999, which this release of Goiabada does not carry
+```
+
+It goes on to name the highest migration this release has and the release itself.
+
+### Why it happens
+
+The database is at a schema version this release has no migration for, so a newer release migrated it. That happens when an earlier release starts after a later one has migrated the database, such as when you roll an upgrade back by installing the earlier release again. This release can't know what the newer one changed, so it refuses to touch it.
+
+### Fix it
+
+Install the newer release again. To go back to this release for good, run the newer release's `goiabada-authserver migrate to <version>` first, naming the version the message gives, then install this one. [Schema migrations and rollback](/deploy/database/#schema-migrations-and-rollback) has the rollback procedure.
+
+## How it works
+
+A starting auth server opens the database, takes the migration lock, runs every migration its release carries that the database hasn't had, and releases the lock, all before it listens. It writes these records on the way:
+
+| Record | When |
+|---|---|
+| `waiting for the migration lock` | Another process holds the lock, written once before the wait |
+| `migrating the database` | Before the first migration runs, with `from_version`, `to_version` and `pending` |
+| `database migrated` | After the last one, with `applied` and `duration` |
+| `no need to migrate the database` | The schema is already current |
+| `database migration stopped` | A stop signal arrived between two files |
+
+A stop signal during a start ends a wait at once and lets a running file finish, so the schema is left clean at the version it reached, and the next start carries on from there.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Schema migrations and rollback" description="The lock, the records and the migrate command." href="/deploy/database/#schema-migrations-and-rollback" />
+  <LinkCard title="First start and upgrades" description="The startup probe and how long a start may take on Kubernetes." href="/deploy/kubernetes/#first-start-and-upgrades" />
+</CardGrid>

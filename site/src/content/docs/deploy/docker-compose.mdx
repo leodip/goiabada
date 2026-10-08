@@ -261,8 +261,8 @@ values the wizard generated:
 - The four session keys, unless everybody signing in again is acceptable.
 
 Then run `docker compose up -d`, and keep the old `docker-compose.yml` as carefully as the override,
-or delete it. A deployment on SQLite also needs the one-time `chown` of [Upgrading a Compose deployment
-that uses SQLite](#upgrading-a-compose-deployment-that-uses-sqlite).
+or delete it. A deployment on SQLite also needs the one-time `chown` of [attempt to write a readonly
+database](/troubleshooting/attempt-to-write-a-readonly-database/).
 
 ## The user the images run as
 
@@ -296,23 +296,8 @@ The auth server writes to two directories, and its image creates both owned by 1
 
 ### Upgrading a Compose deployment that uses SQLite
 
-The images of earlier releases ran as root, so a SQLite volume they wrote belongs to root, and the
-auth server now stops at start with `unable to migrate the database: unable to clear
-schema_migrations: attempt to write a readonly database`. Give the volume to uid 10001 once, from
-the directory holding your `docker-compose.yml`, before starting the new image:
+A SQLite volume whose files belong to another user, such as one written by an image that ran as root,
+stops the auth server at start with `attempt to write a readonly database`. [attempt to write a
+readonly database](/troubleshooting/attempt-to-write-a-readonly-database/) gives the volume to uid
+10001 once.
 
-```bash
-docker compose stop goiabada-authserver
-docker compose run --rm --no-deps --user 0:0 --cap-add CHOWN --entrypoint chown \
-  goiabada-authserver -R 10001:10001 /data
-docker compose up -d
-```
-
-This runs `chown` once as root, in a throwaway container of the auth server's service, so it reaches
-the volume wherever that service mounts it. `--cap-add CHOWN` is what lets root change the owner in
-a service that drops every capability; where the service drops none, it changes nothing. Use the
-path your file mounts the volume at: `/data` in the generated file and in the current SQLite
-sample, while the sample of earlier releases mounted it at `/app/data`.
-
-Nothing else needs this step. MySQL, PostgreSQL and SQL Server keep their data in their own
-containers, which run their own images, and the Kubernetes manifest mounts no volume.

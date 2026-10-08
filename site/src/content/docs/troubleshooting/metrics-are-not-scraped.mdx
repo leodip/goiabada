@@ -1,0 +1,78 @@
+---
+title: Metrics are not scraped
+description: Prometheus or another scraper shows Goiabada's targets down, or doesn't list them at all.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you when your scraper doesn't collect Goiabada's metrics.
+
+## What you see
+
+One of these:
+
+- **Goiabada isn't among the scraper's targets,** and no `goiabada_` series exist.
+- **The targets are there, but down:** Prometheus's `up` is `0` for them, with a connection refused, a timeout or a `404` as the error.
+
+## Why it happens
+
+Each server serves its metrics on a listener of its own, `GET /metrics` on port 9190 for the auth server and 9191 for the admin console, and the listener is off until you turn it on. Most failures are one of these:
+
+- **The listener is off.** Every start writes a `metrics listener configuration` record with `enabled`, and only an enabled listener writes `starting the metrics listener`. The Docker Compose files and the native env file the setup wizard writes leave both off, and so does a Kubernetes manifest generated without metrics.
+- **The scraper calls the wrong port or path.** Any path but `/metrics` answers `404`, and the application's own port, 9090 or 9091, serves no metrics.
+- **The listener only listens on `127.0.0.1`,** because `GOIABADA_AUTHSERVER_LISTEN_HOST_METRICS` or `GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS` says so, and the scraper runs elsewhere.
+- **The scraper doesn't read what the manifest gives it.** kube-prometheus-stack ignores the `prometheus.io/scrape` pod annotations and scrapes only what a PodMonitor or ServiceMonitor names. The prometheus-community `prometheus` chart reads the annotations.
+- **No Prometheus selects the PodMonitor.** A Prometheus the Prometheus Operator runs scrapes only the PodMonitors its `podMonitorSelector` matches, in the namespaces its `podMonitorNamespaceSelector` matches. kube-prometheus-stack, by default, only those labeled `release: <its release name>`.
+- **A NetworkPolicy refuses the scraper.** With the generated NetworkPolicies, only the namespace you named for the scraper, `monitoring` unless you named another, reaches the metrics ports.
+
+## Fix it
+
+<Steps>
+
+1. Check the listener answers, from beside the server. On Kubernetes:
+
+   ```bash
+   kubectl port-forward -n goiabada deploy/goiabada-authserver 9190:9190
+   curl -s http://localhost:9190/metrics | grep goiabada_build_info
+   ```
+
+   With Docker Compose, from a container on the Compose network, `curl -s http://goiabada-authserver:9190/metrics`.
+
+   If nothing answers, turn the listener on: set `GOIABADA_AUTHSERVER_METRICS_ENABLED` to `true` on the auth server and `GOIABADA_ADMINCONSOLE_METRICS_ENABLED` to `true` on the admin console, and restart them. On Kubernetes, also give each container its `metrics` port, as [Metrics](/deploy/kubernetes/#metrics) shows, or run the setup wizard again with metrics on and compare.
+
+2. If the listener answers but the scraper can't reach it, check the listen host. Leave `GOIABADA_AUTHSERVER_LISTEN_HOST_METRICS` and `GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS` unset, which listens on every address, unless the scraper runs on the same host.
+
+3. On Kubernetes, match the manifest to what scrapes your cluster. For kube-prometheus-stack, or any Prometheus the Operator runs, use a PodMonitor and give it the labels your Prometheus selects by:
+
+   ```bash
+   kubectl get prometheus -A -o jsonpath='{..podMonitorSelector}'
+   ```
+
+   Add them under the PodMonitor's `metadata.labels`, or answer the setup wizard's labels question with them. For the prometheus-community chart, use the pod annotations. For Grafana Alloy or the OpenTelemetry Collector, keep the targets on the `metrics` container port and let the scraper's service account list and watch pods in the `goiabada` namespace.
+
+4. With the NetworkPolicies on, check the namespace your scraper's pods actually run in:
+
+   ```bash
+   kubectl get pods -A | grep -i -e prometheus -e alloy -e collector
+   ```
+
+   If it isn't the one the policies admit, change the `kubernetes.io/metadata.name` in the second rule of both `goiabada-authserver` and `goiabada-adminconsole` NetworkPolicies to it, or run the setup wizard again with the right namespace.
+
+</Steps>
+
+<Aside type="caution">
+Don't publish the metrics ports to fix a scrape. The listener has no authentication, so keep it off every Service, route, proxy and Compose `ports:` entry, and let only your scraper reach it.
+</Aside>
+
+## How it works
+
+The metrics listener answers only `GET /metrics`, and isn't part of the application's routes. A scrape is neither logged nor counted in the request metrics, so the server's own logs don't show your scraper's attempts. A port it can't bind stops the server at start, as the other listeners' do.
+
+Alert on the scrape itself failing, Prometheus's `up` at `0` for Goiabada's targets, so a broken scrape doesn't go unnoticed.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Monitoring" description="Turning the metrics on, scraping them and what to alert on." href="/deploy/monitoring/" />
+  <LinkCard title="Metrics on Kubernetes" description="What the setup wizard writes for each answer." href="/deploy/kubernetes/#metrics" />
+</CardGrid>

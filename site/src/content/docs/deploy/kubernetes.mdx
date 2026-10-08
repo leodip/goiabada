@@ -356,73 +356,11 @@ goiabada-adminconsole-xxxxx-xxxxx        1/1     Running   0          1m
 
 ## Troubleshooting
 
-### Certificates not issuing
-
-```bash
-# Check certificate status
-kubectl describe certificate -n goiabada
-
-# Check challenges
-kubectl get challenges -n goiabada
-kubectl describe challenges -n goiabada
-```
-
-| Problem | Solution |
-|---------|----------|
-| DNS not resolving | Verify DNS A records point to the Gateway's address |
-| Port 80 not accessible | Check firewall rules; ACME HTTP-01 needs port 80 |
-| Challenge timeout | See "Connectivity Issues" below |
-
-### Connectivity issues (port 80 not responding)
-
-Under `externalTrafficPolicy: Local`, a node with no Envoy pod drops what the load balancer sends
-it, so a single Envoy pod leaves most nodes answering nothing. Under the `Cluster` EnvoyProxy of Step
-1 that cannot happen. Under the `Local` one, check that the DaemonSet runs a pod on every node:
-
-```bash
-kubectl get daemonset -n envoy-gateway-system
-```
-
-If your load balancer still cannot reach Envoy under `Local`, switch to the `Cluster` file of Step 1,
-which has no `envoyDaemonSet`; Goiabada then sees a node's address for every client.
-
-If your `eg` GatewayClass has no `parametersRef` to the EnvoyProxy, apply Step 1's file:
-
-```bash
-kubectl apply -f gatewayclass.yaml
-```
-
-Then delete any failed certificate challenges to trigger a retry:
-
-```bash
-kubectl delete challenges -n goiabada --all
-```
-
-### OAuth "Invalid redirect_uri" error
-
-See [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/).
-
-### Database connection errors
-
-```bash
-# Check pod logs
-kubectl logs -n goiabada deployment/goiabada-authserver
-
-# Test connectivity from within cluster
-kubectl run -it --rm debug --image=busybox --restart=Never -- \
-  nc -zv your-db-host 5432
-```
-
-### Pods in CrashLoopBackOff
-
-```bash
-kubectl logs -n goiabada deployment/goiabada-authserver --previous
-```
-
-Common causes:
-- Database connection failed
-- Invalid configuration values
-- Database not empty with mismatched URLs
+- The certificates stay not ready: [Certificates are not issued](/troubleshooting/certificates-are-not-issued/).
+- The auth server's pod is in `CrashLoopBackOff`, or can't reach the database: [CrashLoopBackOff or unable to create the database connection](/troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection/).
+- A start waits for the migration lock, or refuses a dirty schema: [Waiting for the migration lock, or marked dirty](/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/).
+- Signing in fails with "Invalid redirect_uri": [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/).
+- Your scraper doesn't collect the metrics: [Metrics are not scraped](/troubleshooting/metrics-are-not-scraped/).
 
 ## High availability
 
@@ -1542,4 +1480,4 @@ database password does not match the database user's, and new session keys sign 
 
 The images now run as uid 10001 rather than root. That changes nothing for a Kubernetes deployment,
 which mounts no volume; a Compose deployment on SQLite needs [a one-time
-`chown`](/deploy/docker-compose/#upgrading-a-compose-deployment-that-uses-sqlite).
+`chown`](/troubleshooting/attempt-to-write-a-readonly-database/).
