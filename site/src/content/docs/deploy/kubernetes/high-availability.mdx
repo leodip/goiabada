@@ -1,0 +1,102 @@
+---
+title: High availability
+description: Run more than one Goiabada pod on Kubernetes, size the database's connections for them, and keep serving through drains and rollouts.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you run more than one pod of each Goiabada server, so a node going away doesn't take sign-ins with it.
+
+The manifest the setup wizard generates runs one replica of each server. At one replica, a node drain or a node failure stops that server until its replacement is ready.
+
+## Scale out
+
+<Steps>
+
+1. **Check the database can take the connections.** Every auth server pod opens a pool of its own, of at most `GOIABADA_DB_MAX_OPEN_CONNS` connections, 20 unless you set it, against the one database they share. The pods must fit under the database's connection limit:
+
+   ```text
+   (replicas + surge) × GOIABADA_DB_MAX_OPEN_CONNS + headroom < max_connections
+   ```
+
+   [Connections](#connections) explains each term. With the defaults, three replicas make 4 × 20 = 80 connections. A stock PostgreSQL allows 100, 3 of them reserved for superusers, which leaves 17 for the headroom; a stock MySQL allows 151. Until the sum holds, lower `GOIABADA_DB_MAX_OPEN_CONNS` in the auth server's ConfigMap, or raise the database's `max_connections`.
+
+2. **Scale the Deployments:**
+
+   ```bash
+   kubectl scale deployment goiabada-authserver -n goiabada --replicas=3
+   kubectl scale deployment goiabada-adminconsole -n goiabada --replicas=2
+   ```
+
+   To keep the count across a reapply of the manifest, change `replicas` in `goiabada-k8s.yaml` too.
+
+3. **Decide on the rate limiter,** whose per-pod limits multiply with the replicas: see [Rate limiting across replicas](#rate-limiting-across-replicas).
+
+</Steps>
+
+## How it works
+
+### Connections
+
+- **Surge** is the extra pod a rolling update runs beside the old ones. The generated Deployments set `maxSurge: 1` and `maxUnavailable: 0`: a rollout starts one new pod, waits for it to be ready, and only then stops an old one, so three replicas briefly run four, and never fewer than three.
+- **Headroom** is every other connection the database must accept: the `migrate` subcommand, the maintenance connection a starting pod opens to create the database when `GOIABADA_DB_CREATE` is on, your own sessions, and any other application on the same server. The admin console opens none.
+- **With a HorizontalPodAutoscaler, replicas is its `maxReplicas`,** not today's count, since it may scale out to it under load, at the worst moment.
+
+A capped pool trades one failure for another, on purpose. When every connection of a pod is busy, its next request waits for one to be released, until the client or the gateway gives up, rather than the database refusing a new connection to every pod at once. Raising replicas without raising `max_connections` adds no capacity at the database: it moves the bottleneck from the pods' queues to the database's refusals. The pool's settings are in [Environment variables](/reference/environment-variables/#database).
+
+### Disruptions and spread
+
+Each Deployment has a PodDisruptionBudget with `maxUnavailable: 1`, so a voluntary disruption, such as a `kubectl drain`, a node pool upgrade or an autoscaler removing a node, evicts at most one of its pods at a time. At one replica that one is the only pod, and the server is down until its replacement is scheduled elsewhere and ready; the rolling update doesn't help, because an eviction starts no surge pod first. Run at least two replicas to keep serving through a drain. The same budget then keeps all but one pod serving at any count, so it needs no change when you scale.
+
+Each pod template also spreads its pods over nodes, with a `topologySpreadConstraints` on `kubernetes.io/hostname`, `maxSkew: 1` and `whenUnsatisfiable: ScheduleAnyway`. At three replicas on three nodes it places one per node, so losing a node takes one pod rather than all of them. On fewer nodes than replicas it still schedules every pod rather than leave one pending.
+
+### Autoscaling
+
+The manifest emits no HorizontalPodAutoscaler. You can add one; settle two things first:
+
+- **The database's connections,** sized for `maxReplicas` plus the surge pod, as [Connections](#connections) says.
+- **What to scale on.** CPU is the auth server's bottleneck under a burst of sign-ins (see [Resource limits](#resource-limits)), so a CPU target relative to its `100m` request is a reasonable signal. The admin console checks no passwords and rarely needs more than one or two replicas.
+
+### Rate limiting across replicas
+
+The auth server's rate limiter is off unless you turn it on, with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`. The wizard asks, and writes the answer into the auth server's ConfigMap either way; `--rate-limiter=true` or `=false` answers without the prompt. Its default follows the [gateway's traffic policy](/deploy/kubernetes/gateway-and-certificates/#the-gateways-traffic-policy):
+
+- **Under `Cluster`, off.** Goiabada sees a node's address for every client, so a per-IP limit counts together every user the load balancer sends through one node: 30 password posts a minute and 20 forgot-password requests per 5 minutes per node, for example, which throttles sign-ins on a busy site. Turn it on anyway if the limits on failed passwords and codes, which don't depend on the address, matter more to you.
+- **Under `Local`, on.** Goiabada sees each client's address, so each per-IP limit counts one client.
+
+With the limiter on, not every limit holds across replicas:
+
+- **Shared:** the limits on guessing credentials, which count failed passwords (at sign-in and through the password grant), failed OTP codes, failed account password checks and failed email verification codes. They're counted in the database every pod shares, so three replicas still allow one budget, and a rollout doesn't reset it. If the database can't answer such a check within 5 seconds, the request is answered with a server error rather than let through.
+- **Per pod:** every other limit, the per-IP limits and the limits on outgoing mail. Behind the Service, three replicas give a client up to three times each budget, and a rollout resets them. For a limit across the whole deployment, use the gateway's own rate limiting.
+
+The budgets are in [Rate limits](/reference/environment-variables/#rate-limits). With the limiter on, the auth server also logs a warning at every start that it trusts one proxy hop with no list; behind Envoy alone that's expected, as [The startup warnings](/deploy/client-ip-and-proxy-trust/#the-startup-warnings) explains.
+
+### Resource limits
+
+Both containers request `100m` of CPU and `128Mi` of memory, and are limited to `500m` and `512Mi`:
+
+```yaml
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+```
+
+For the auth server, the CPU numbers come down to one operation. A sign-in costs one bcrypt password check at cost 10, about 35 ms of CPU on a modern core, which no limit slows when it runs alone. Under the `500m` limit a pod checks about 14 passwords a second, and a burst queues behind that: measured, 16 sign-ins arriving at once took about 1.2 s to complete, and every other request on that pod waited with them. Cloud vCPUs are often slower than the core measured, and the `100m` request is all the scheduler guarantees on a busy node. If your sign-in peak is higher, raise the CPU limit or add replicas.
+
+<Aside type="caution">
+Keep a CPU limit on the auth server. Anyone can make it spend CPU by sending passwords to check, and the limit bounds what one pod spends.
+</Aside>
+
+The admin console checks no passwords and needs less; it carries the same numbers for simplicity.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Probes and shutdown" description="How a pod starts, how long it may take, and how it stops." href="/deploy/kubernetes/probes-and-shutdown/" />
+  <LinkCard title="Database" description="Prepare the database every pod shares." href="/deploy/database/" />
+  <LinkCard title="Monitoring" description="Watch the pool waits and rate-limit refusals." href="/deploy/monitoring/" />
+</CardGrid>

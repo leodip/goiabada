@@ -19,10 +19,10 @@ import (
 // level, and a section with no heading is the whole page. The auth server's tier reads the same
 // sections.
 const (
-	kubernetesPage = "site/src/content/docs/deploy/kubernetes.mdx"
-	secretsPage    = "site/src/content/docs/deploy/secrets.mdx"
-	rotatePage     = "site/src/content/docs/deploy/rotate-secrets.mdx"
-	upgradePage    = "site/src/content/docs/deploy/upgrade-goiabada.mdx"
+	kubernetesSecretsPage = "site/src/content/docs/deploy/kubernetes/secrets.mdx"
+	secretsPage           = "site/src/content/docs/deploy/secrets.mdx"
+	rotatePage            = "site/src/content/docs/deploy/rotate-secrets.mdx"
+	upgradePage           = "site/src/content/docs/deploy/upgrade-goiabada.mdx"
 )
 
 type docSection struct{ page, heading string }
@@ -35,7 +35,7 @@ func (s docSection) String() string {
 }
 
 var secretsDocs = []docSection{
-	{kubernetesPage, "## Secrets"},
+	{kubernetesSecretsPage, ""},
 	{secretsPage, ""},
 	{rotatePage, ""},
 	{upgradePage, "## Update to a new release"},

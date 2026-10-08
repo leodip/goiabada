@@ -87,7 +87,7 @@ A waiting process waits for as long as the lock is held, on every engine; nothin
 
 Your platform decides how long a start may take:
 
-- **Kubernetes:** the generated manifest's startup probe allows 5 minutes, and restarts the container after that. An upgrade whose migrations take longer needs a higher `failureThreshold`, as [First start and upgrades](/deploy/kubernetes/#first-start-and-upgrades) explains.
+- **Kubernetes:** the generated manifest's startup probe allows 5 minutes, and restarts the container after that. An upgrade whose migrations take longer needs a higher `failureThreshold`, as [First start and upgrades](/deploy/kubernetes/probes-and-shutdown/#first-start-and-upgrades) explains.
 - **Docker Compose:** the auth server's healthcheck gives a start 5 minutes, `start_period: 300s`, before its failures count, and the admin console waits for that healthcheck to pass before it starts.
 
 ### A start that's stopped

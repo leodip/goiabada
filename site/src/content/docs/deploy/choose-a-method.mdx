@@ -14,7 +14,7 @@ Most people want **Cloudflare Tunnel**: no open port, no certificate to renew an
 | [Cloudflare Tunnel](/deploy/cloudflare-tunnel/) | Cloudflare's certificates | Nothing: `cloudflared` connects out | Least | Production with reverse proxy | MySQL, PostgreSQL, SQL Server or SQLite, in the Compose file | One server, with your domain on Cloudflare |
 | [Cloudflare + Nginx](/deploy/cloudflare-nginx/) | Cloudflare's, and Let's Encrypt's on Nginx | Ports 80 and 443 | Some | Production with reverse proxy | The same | A server already running Nginx, with your domain on Cloudflare |
 | [Reverse proxy](/deploy/reverse-proxy/) | Let's Encrypt's on Nginx | Ports 80 and 443 | Some | Production with reverse proxy | The same | One server, without Cloudflare |
-| [Kubernetes](/deploy/kubernetes/) | cert-manager's, on the Gateway | The Gateway's load balancer | Most | Kubernetes cluster | MySQL, PostgreSQL or SQL Server, run by you | Several replicas, on a cluster you already run |
+| [Kubernetes](/deploy/kubernetes/overview/) | cert-manager's, on the Gateway | The Gateway's load balancer | Most | Kubernetes cluster | MySQL, PostgreSQL or SQL Server, run by you | Several replicas, on a cluster you already run |
 | [Native binaries](/deploy/native-binaries/) | Your reverse proxy's, or each server's own | Your proxy's ports, or each server's | Some | Native binaries | MySQL, PostgreSQL or SQL Server run by you, or SQLite | A server without Docker |
 
 The first three run the [Docker Compose](/deploy/docker-compose/) files the setup wizard writes, and differ only in what sits in front of them.
@@ -33,7 +33,7 @@ Every method runs the same two servers. The auth server answers sign-ins, tokens
 Two things change from method to method, and each has a page:
 
 - **How Goiabada learns the client's IP address** through whatever is in front of it, which decides what the rate limiter counts: [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/).
-- **How the admin console reaches the auth server.** It calls the auth server's API at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, and that hop carries its client secret and administrators' tokens. The generated Compose files and Kubernetes manifests point it at the auth server's container or Service over plain HTTP, inside the deployment's own network; native binaries go through the public URL. [Docker Compose](/deploy/docker-compose/#the-hop-to-the-auth-server) and the [production checklist](/deploy/production-checklist/#the-hop-from-the-admin-console-to-the-auth-server) say when that's enough and how to encrypt it.
+- **How the admin console reaches the auth server.** It calls the auth server's API at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, and that hop carries its client secret and administrators' tokens. The generated Compose files and Kubernetes manifests point it at the auth server's container or Service over plain HTTP, inside the deployment's own network; native binaries go through the public URL. [Docker Compose](/deploy/docker-compose/#the-hop-to-the-auth-server), [Kubernetes](/deploy/kubernetes/security/#encrypt-the-hop-to-the-auth-server) and the [production checklist](/deploy/production-checklist/#the-hop-from-the-admin-console-to-the-auth-server) say when that's enough and how to encrypt it.
 
 <Aside type="caution">
 The wizard's **Local testing** choice serves plain HTTP on `localhost`, for the [Quickstart](/get-started/quickstart/). **Never** use it for a deployment other people reach.

@@ -23,11 +23,15 @@ const adminConsoleImage = "leodip/goiabada:adminconsole-"
 
 // The pages that document the deployment's secrets, relative to the repository root.
 const (
-	kubernetesPage = "site/src/content/docs/deploy/kubernetes.mdx"
-	secretsPage    = "site/src/content/docs/deploy/secrets.mdx"
-	rotatePage     = "site/src/content/docs/deploy/rotate-secrets.mdx"
-	upgradePage    = "site/src/content/docs/deploy/upgrade-goiabada.mdx"
+	kubernetesSecretsPage = "site/src/content/docs/deploy/kubernetes/secrets.mdx"
+	secretsPage           = "site/src/content/docs/deploy/secrets.mdx"
+	rotatePage            = "site/src/content/docs/deploy/rotate-secrets.mdx"
+	upgradePage           = "site/src/content/docs/deploy/upgrade-goiabada.mdx"
 )
+
+// contractSection is the section of the Kubernetes Secrets page holding the Secret contract: the
+// Secrets, keys and variables the generated manifests read.
+const contractSection = "### The Secrets the manifest reads"
 
 // docSection is one section of a page: the lines after its heading up to the next heading of the
 // same or a higher level. A section with no heading is the whole page.
@@ -43,7 +47,7 @@ func (s docSection) String() string {
 // secretsDocs is every section that names the deployment's secrets: what each protects, where
 // Kubernetes keeps them, how each rotates, and the update that must leave them alone.
 var secretsDocs = []docSection{
-	{kubernetesPage, "## Secrets"},
+	{kubernetesSecretsPage, ""},
 	{secretsPage, ""},
 	{rotatePage, ""},
 	{upgradePage, "## Update to a new release"},
@@ -69,7 +73,7 @@ func TestRotateSecretsDocs_EveryPlatformTellsEveryRotation(t *testing.T) {
 	assertRotationTabs(t, filepath.Dir(guard.SourceRoot(t)), rotatePage, rotationPlatforms, readVariables())
 }
 
-// The Secret contract in kubernetes.mdx is what the generated manifests read: every Secret, key
+// The Secret contract on the Kubernetes Secrets page is what the generated manifests read: every Secret, key
 // and variable, which server reads it, and whether its reference is optional, row for row in both
 // directions. Every `kubectl create secret generic` the secrets docs print creates exactly the
 // keys the manifests require from that Secret, so a Secret created by any route the docs show is
@@ -258,21 +262,25 @@ spec:
               key: oauth-client-secret
 `
 
-const contractPage = "## Secrets\n\n" +
+const contractPage = contractSection + "\n\n" +
 	"| Secret | Key | Variable | Read by | Value |\n" +
 	"|--------|-----|----------|---------|-------|\n" +
 	"| `goiabada-secrets` | `db-password` | `GOIABADA_DB_PASSWORD` | auth server | the password |\n" +
 	"| `goiabada-secrets` | `oauth-client-secret` | `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` | both | a secret |\n" +
 	"| `goiabada-encryption-key` | `aes-encryption-key` | `GOIABADA_AES_ENCRYPTION_KEY` | auth server | a key |\n" +
 	"| `goiabada-encryption-key` | `aes-encryption-key-previous` | `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` | auth server | Optional. A key |\n\n" +
+	"## Create the Secrets another way\n\n" +
 	"```bash\nkubectl create secret generic goiabada-secrets -n goiabada \\\n" +
 	"  --from-file=db-password=<(printf %s \"$DB_PASSWORD\") \\\n" +
 	"  --from-file=oauth-client-secret=<(openssl rand -hex 32)\n```\n\n" +
 	"A rotation step merges one key into a sealed file, creating no Secret:\n\n" +
 	"```bash\nkubectl create secret generic goiabada-secrets -n goiabada --dry-run=client -o json \\\n" +
 	"  --from-file=db-password-previous=<(openssl rand -hex 32) \\\n" +
-	"  | kubeseal --format yaml --merge-into goiabada-secrets.sealed.yaml\n```\n\n" +
-	"## After\n\n" +
+	"  | kubeseal --format yaml --merge-into goiabada-secrets.sealed.yaml\n```\n"
+
+// contractGatewayPage is a Kubernetes page outside the secrets docs, whose create command the
+// contract does not hold.
+const contractGatewayPage = "## Deploy\n\n" +
 	"```bash\nkubectl create secret generic goiabada-secrets -n goiabada --from-file=outside=x\n```\n"
 
 // contractRotatePage and contractUpgradePage each print a create command the contract holds.
@@ -283,7 +291,8 @@ const (
 
 func writeContractPages(t *testing.T, root, kubernetes, upgrade string) {
 	t.Helper()
-	writeManifestFixture(t, root, kubernetesPage, kubernetes)
+	writeManifestFixture(t, root, kubernetesSecretsPage, kubernetes)
+	writeManifestFixture(t, root, "site/src/content/docs/deploy/kubernetes/gateway-and-certificates.mdx", contractGatewayPage)
 	writeManifestFixture(t, root, rotatePage, contractRotatePage)
 	writeManifestFixture(t, root, upgradePage, upgrade)
 }
@@ -348,7 +357,7 @@ func TestKubernetesDocs_AMatchingContractPasses(t *testing.T) {
 func TestKubernetesDocs_AContractWithNoTableStops(t *testing.T) {
 	root := t.TempDir()
 	writeManifestFixture(t, root, "src/cmd/goiabada-setup/testdata/kubernetes-postgres.golden", contractManifest)
-	writeContractPages(t, root, "## Secrets\n\nNo table.\n", contractUpgradePage)
+	writeContractPages(t, root, contractSection+"\n\nNo table.\n", contractUpgradePage)
 
 	report := guard.Run(func(r guard.Reporter) { assertSecretContract(r, root) })
 
@@ -530,18 +539,18 @@ func assertSecretContract(r guard.Reporter, root string) {
 }
 
 // createCommandDocs is every section whose `kubectl create secret generic` commands the contract
-// holds: the Kubernetes page's Secrets, every rotation, and the update.
+// holds: the Kubernetes Secrets page, every rotation, and the update.
 var createCommandDocs = []docSection{
-	{kubernetesPage, "## Secrets"},
+	{kubernetesSecretsPage, ""},
 	{rotatePage, ""},
 	{upgradePage, ""},
 }
 
-// secretContractFindings holds the contract table in kubernetes.mdx's Secrets section to every
-// Kubernetes golden, and each `kubectl create secret generic` in createCommandDocs to the keys the
-// goldens read from that Secret.
+// secretContractFindings holds the contract table, in the Kubernetes Secrets page's
+// contractSection, to every Kubernetes golden, and each `kubectl create secret generic` in
+// createCommandDocs to the keys the goldens read from that Secret.
 func secretContractFindings(root string) ([]string, error) {
-	section, err := docSectionText(root, docSection{kubernetesPage, "## Secrets"})
+	section, err := docSectionText(root, docSection{kubernetesSecretsPage, contractSection})
 	if err != nil {
 		return nil, err
 	}
@@ -645,7 +654,7 @@ func contractTable(section string) (map[secretRef]secretReader, error) {
 		rows[secretRef{cell(0), cell(1), cell(2)}] = secretReader{cell(3), strings.HasPrefix(cell(4), "Optional")}
 	}
 	if len(rows) == 0 {
-		return nil, fmt.Errorf("%s: ## Secrets holds no table headed %s", kubernetesPage, contractHeader)
+		return nil, fmt.Errorf("%s: %s holds no table headed %s", kubernetesSecretsPage, contractSection, contractHeader)
 	}
 	return rows, nil
 }

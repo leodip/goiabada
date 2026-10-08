@@ -1,0 +1,86 @@
+---
+title: Probes and shutdown
+description: What Goiabada's health endpoint tells Kubernetes, how long a pod may take to start, and how it stops within its grace period.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you understand how Kubernetes checks, starts and stops Goiabada's pods, and when to change the manifest's numbers.
+
+The manifest the setup wizard generates sets every probe, the stop pause and the grace period already. You change them in two cases: an upgrade whose migrations take longer than five minutes, and a different stop pause.
+
+## Give a long migration more time
+
+<Steps>
+
+1. **Find out how long the migration takes.** The release notes announce a long one, and running the new release against a copy of your database shows it: the `database migrated` record carries its `duration`.
+
+2. **Raise the auth server's startup budget** until `failureThreshold × periodSeconds` covers it. In `goiabada-k8s.yaml`, on the auth server's container, the default allows 60 × 5 = 300 seconds:
+
+   ```yaml
+   startupProbe:
+     httpGet:
+       path: /health
+       port: 9090
+     periodSeconds: 5
+     timeoutSeconds: 1
+     failureThreshold: 120   # 10 minutes
+   ```
+
+   Leave liveness and readiness as they are.
+
+3. **Apply the manifest,** then upgrade as [Upgrade Goiabada](/deploy/upgrade-goiabada/) describes.
+
+</Steps>
+
+## How it works
+
+### Health endpoints
+
+Both servers answer a health endpoint, and every probe in the manifest points at it:
+
+- Auth server: `http://goiabada-authserver:9090/health`
+- Admin console: `http://goiabada-adminconsole:9091/health`
+
+`/health` answers `200` with the body `healthy` whenever the process is up and listening. That's all it tells you. It doesn't read the database, the settings or the session, and the admin console's doesn't call the auth server, so it keeps answering `200` while the database or the auth server is down. Watch the servers' error records, your database's monitoring and the [metrics](/deploy/monitoring/) for those.
+
+That's on purpose. Every auth server pod shares one database, and every admin console pod one auth server, so a probe that checked either would fail on every pod at the same moment. A liveness probe would restart them all at once, and a readiness probe would take every pod out of the Service together, so clients would get the gateway's "no healthy upstream" in place of Goiabada's own error, and recovery would wait a probe period longer.
+
+### First start and upgrades
+
+The auth server does its database work before it listens: it opens the database, runs every outstanding migration, and on a first start seeds the empty database. Until that's done `/health` doesn't answer, so a pod that can't reach the database never answers it at all. Each container has a startup probe on `/health`, every 5 seconds with 60 failures allowed: up to 5 minutes to start. Liveness and readiness wait for the startup probe's first success, so neither counts a slow start against the pod, and once it succeeds they take over at their own periods. The admin console gets the same probe, and starts in seconds.
+
+With several replicas, the first pod to start takes the migration lock and migrates; the others wait for the lock, then find the schema current and start. Every pod's wait counts against its own startup budget, so the budget must exceed the longest migration an upgrade runs. Otherwise Kubernetes restarts the container before the migration finishes, which is why a long one needs [more time](#give-a-long-migration-more-time).
+
+A pod stopped while it starts, because it was deleted or its startup budget ran out, stops cleanly: a wait for the database or the migration lock ends at once, a migration file already running runs to its end and the next doesn't start, and the auth server exits 0 with the schema clean at the version it reached, which the next start carries on from. [A start that's stopped](/deploy/upgrade-goiabada/#a-start-thats-stopped) has the details and the records. The grace period below bounds that too: a single migration file running longer than 65 seconds is ended by SIGKILL mid-file, leaving the schema dirty. So it's the startup budget, not the grace period, that has to cover the longest migration.
+
+### Stopping and the grace period
+
+When a pod is deleted, by a rollout, a scale-down or a node drain, Kubernetes removes it from the Service and starts stopping its containers at the same moment. Both servers close their listening socket the moment the signal arrives, so a connection the gateway opens before it has learned the pod is gone would be refused, and its client answered 503. The manifest gives both containers a five-second pause before they're signalled, through Kubernetes' native `preStop` sleep action, which keeps the pod serving while the gateway catches up. The sleep action is on by default from Kubernetes 1.30, and generally available from 1.34.
+
+Once signalled, the auth server stops in three steps, each bounded:
+
+1. up to 15 seconds for requests in flight to finish,
+2. up to 15 seconds for the work handlers hand off after answering, such as a forgot-password request's code, audit record and email,
+3. up to 20 seconds for the background cleanup worker.
+
+The admin console only drains its requests, within 15 seconds. Both pods get the same grace period, `terminationGracePeriodSeconds: 65`, from this sum:
+
+```
+terminationGracePeriodSeconds = preStop pause + auth server's stop + headroom
+                           65 =              5 +       (15 + 15 + 20) +       10
+```
+
+The grace period is a ceiling, not a wait: a container that exits sooner isn't held, so the admin console loses nothing by sharing the auth server's value. Kubernetes counts the `preStop` pause against it, so if you change the pause, change the grace period by the same amount.
+
+<Aside type="caution">
+**Never** set the grace period lower. Kubernetes' default is 30 seconds, and whatever is left of the stop when the grace period runs out is ended by SIGKILL: the cleanup worker, the last step, is cut short first, then the handed-off work, then requests still in flight.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Upgrade Goiabada" description="Move to a new release, and back again." href="/deploy/upgrade-goiabada/" />
+  <LinkCard title="Monitoring" description="Watch what /health doesn't tell you." href="/deploy/monitoring/" />
+  <LinkCard title="High availability" description="Run more than one pod, and keep serving through drains." href="/deploy/kubernetes/high-availability/" />
+</CardGrid>
