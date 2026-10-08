@@ -1,16 +1,37 @@
 ---
-title: Database setup
-description: Pre-create the Goiabada database and run with a least-privilege database user.
+title: Database
+description: Prepare the database Goiabada stores everything in, on PostgreSQL, MySQL, SQL Server or SQLite, and run it with a least-privilege login.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-By default Goiabada creates its database at startup if it is not already there, which requires a
-login allowed to create databases on the server. Set `GOIABADA_DB_CREATE=false` when you have
-created the database yourself, or when the login is not allowed to: Goiabada then issues no
-`CREATE DATABASE` and opens no connection to `master` or `postgres`.
+This page helps you prepare the database Goiabada keeps everything in: users, clients, sessions, tokens and settings.
 
-Create the database with the statement for your engine, then give the login full rights inside it.
+Only the auth server talks to the database. Goiabada supports PostgreSQL, MySQL, SQL Server and SQLite, and the setup wizard asks which one you use. You set the connection through the `GOIABADA_DB_*` [environment variables](/reference/environment-variables/#database).
+
+## Create the database yourself
+
+By default the auth server creates its database at its first start, which needs a login allowed to create databases. To run with a login that isn't, create the database once yourself:
+
+<Steps>
+
+1. Create the database with your engine's statement, from its section below.
+
+2. Give the login Goiabada uses full rights inside that database, and nothing outside it.
+
+3. Set `GOIABADA_DB_CREATE=false`. The auth server then issues no `CREATE DATABASE`, and opens no connection to `master` or `postgres`.
+
+</Steps>
+
+The auth server creates every table itself, at each start, as [Upgrade Goiabada](/deploy/upgrade-goiabada/#how-migrations-run) describes.
+
+## Where the database sits
+
+<Aside type="caution" title="The connection to the database isn't protected">
+Goiabada has no setting that encrypts its connection to the database and checks whose server it reached. On MySQL and SQL Server the connection is plain text. On PostgreSQL it's encrypted when the server offers TLS, without checking the server's certificate.
+</Aside>
+
+So keep the database where nobody else can read or change that traffic: on the same host as the auth server, or on a private network that only the auth server and your administrators reach. The connection carries the database password and everything Goiabada stores, apart from the secrets the [AES key](/deploy/secrets/#what-each-secret-protects) encrypts.
 
 ## PostgreSQL
 
@@ -18,12 +39,9 @@ Create the database with the statement for your engine, then give the login full
 CREATE DATABASE goiabada ENCODING 'UTF8';
 ```
 
-Make the login the owner, or grant it full rights in the database. It needs no `CREATEDB`
-attribute and no access to the `postgres` database.
+Make the login the owner, or grant it full rights in the database. It needs no `CREATEDB` attribute and no access to the `postgres` database.
 
-Quote the name if `GOIABADA_DB_NAME` is not all lower case. PostgreSQL folds an unquoted
-identifier, so `CREATE DATABASE Goiabada` makes a database called `goiabada`, which is not the one
-Goiabada connects to.
+Quote the name if `GOIABADA_DB_NAME` isn't all lower case. PostgreSQL folds an unquoted identifier, so `CREATE DATABASE Goiabada` makes a database called `goiabada`, which isn't the one Goiabada connects to.
 
 ## MySQL
 
@@ -31,8 +49,7 @@ Goiabada connects to.
 CREATE DATABASE goiabada CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs;
 ```
 
-`GRANT ALL PRIVILEGES ON goiabada.* TO 'goiabada'@'%';` is enough. No server-wide privilege is
-needed.
+`GRANT ALL PRIVILEGES ON goiabada.* TO 'goiabada'@'%';` is enough. No server-wide privilege is needed.
 
 ## SQL Server
 
@@ -43,22 +60,16 @@ CREATE DATABASE goiabada COLLATE Latin1_General_100_CS_AS_KS_WS_SC_UTF8;
 Map the login into the database and add it to `db_owner`. It needs no access to `master`.
 
 <Aside type="caution">
-On SQL Server, spell the `COLLATE` clause. A database default cannot be changed afterwards, because
-`ALTER DATABASE ... COLLATE` blocks while the application is connected, and every text column a
-future Goiabada migration adds inherits it.
+On SQL Server, spell out the `COLLATE` clause. A database's default can't be changed afterwards, because `ALTER DATABASE ... COLLATE` blocks while the application is connected, and every text column a future migration adds inherits it.
 </Aside>
 
-`READ_COMMITTED_SNAPSHOT` is supported, on or off, and both settings are tested. Goiabada never
-requests `SNAPSHOT` isolation, so `ALLOW_SNAPSHOT_ISOLATION` has no effect on it either way.
+`READ_COMMITTED_SNAPSHOT` is supported, on or off, and both settings are tested. Goiabada never asks for `SNAPSHOT` isolation, so `ALLOW_SNAPSHOT_ISOLATION` makes no difference to it either way.
 
 ## SQLite
 
-There is nothing to pre-create, and `GOIABADA_DB_CREATE` does not apply: the driver creates the file.
-To refuse an absent file instead of creating one, put `mode=rw` in `GOIABADA_DB_DSN`.
+There's nothing to create, and `GOIABADA_DB_CREATE` doesn't apply: the driver creates the file. To refuse a missing file instead of creating one, put `mode=rw` in `GOIABADA_DB_DSN`. [SQLite](/reference/environment-variables/#sqlite) has the connection string for a file that survives restarts.
 
-The auth server runs as uid 10001, so the directory holding the file must be writable by it. In
-Docker, mount the volume at `/data`, which the image creates owned by that user; a volume written by
-the root images of earlier releases needs a [one-time `chown`](/troubleshooting/attempt-to-write-a-readonly-database/).
+The auth server runs as uid 10001, so the directory holding the file must be writable by it. In Docker, mount the volume at `/data`, which the image creates owned by that user. A volume whose files belong to another user needs a [one-time `chown`](/troubleshooting/attempt-to-write-a-readonly-database/).
 
 ## Refresh token storage
 
@@ -83,92 +94,10 @@ When importing refresh tokens from another system, fill in `expires_at`. A row w
 comparison can find it expired, and removing it takes an explicit statement.
 </Aside>
 
-## Schema migrations and rollback
+## Next steps
 
-Goiabada migrates its own schema. The auth server applies whatever migrations its release carries
-when it starts, so the schema needs no step of its own during an upgrade. Anything more a release
-asks of an upgrade, its release notes state. It refuses to start on a database that is half
-migrated, and on one a newer release has already migrated, since it cannot know what that release
-changed. The admin console holds no database
-connection of its own and reaches the auth server through its API, so restarting it migrates
-nothing.
-
-Only one process migrates a database at a time. A process takes the migration lock before it
-migrates and releases it when it is done, so with several replicas the first to start migrates and
-the others wait for it. A waiting process waits for as long as the lock is held, on every engine;
-nothing in Goiabada gives up, and the startup budget your platform gives the container (the
-Kubernetes startup probe, or the Compose healthcheck's start period) is what limits how long a start
-may take. The lock belongs to the holder's database session, so a holder that dies releases it and
-cannot strand the others. Once a waiting process has the lock, it finds the schema already current
-and starts. The `migrate` command takes the same lock and waits the same way. On SQLite the lock
-covers one process only, so a starting auth server never reports waiting for it there.
-
-A starting auth server writes these Info records about the schema, between `opening the database`
-and the listeners starting:
-
-| Record | When | Attributes |
-|---|---|---|
-| `waiting for the migration lock` | Another process holds the lock. Written once, before the wait | none |
-| `migrating the database` | Before the first migration runs | `from_version`, `to_version`, `pending` |
-| `database migrated` | After the last migration has run | `from_version`, `to_version`, `applied`, `duration` |
-| `no need to migrate the database` | The schema is already current | none |
-| `database migration stopped` | A shutdown signal stopped the migrations between two files | `from_version`, `reached_version`, `applied`, `remaining` |
-
-`from_version` is the schema version the database recorded, 0 for one that was never migrated, and
-`to_version` the one this release expects. `pending` and `applied` count migration files. A replica
-that waited behind another one's migration writes `waiting for the migration lock` and then `no
-need to migrate the database`. A start that writes `waiting for the migration lock` and nothing more
-is waiting for a process that is still migrating, not hung.
-
-A shutdown signal (SIGTERM, which Kubernetes and Compose send, or SIGINT) that reaches the auth
-server while it is still starting stops it cleanly, whatever it is doing:
-
-- A wait ends at once: for the database connection, for the database to be created, or for the
-  migration lock.
-- A migration file already running runs to its end, and the next one does not start. The lock is
-  released and the schema is left clean at the version it reached, which the next start carries on
-  from, so a start stopped repeatedly still advances file by file.
-- The data-key rotation and a first start's seed each commit whole: one under way completes, and one
-  not yet begun does not begin.
-
-The auth server then writes `shutdown signal received`, `database migration stopped` if migrations
-were under way (`reached_version` is where the schema now is, `remaining` how many files the next
-start will run), and `auth server stopped`, and exits 0. This happens whenever a pod is deleted while
-it starts (a second rollout, a scale-down, a node drain), when its startup budget runs out, and on
-`docker compose stop` during a first start.
-
-The one thing the auth server cannot finish is a migration file that runs longer than the grace
-period the platform allows a stop (`terminationGracePeriodSeconds` in Kubernetes, `stop_grace_period`
-in Compose): the platform then ends it with SIGKILL, which no process can intercept. That file is
-left marked dirty, and on MySQL and SQL Server, which run each file without an enclosing transaction,
-partly applied, and the next start refuses until the schema is repaired by hand, as its error
-explains and [Waiting for the migration lock, or marked
-dirty](/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/#a-migration-was-cut-short) walks through. Before an upgrade carrying such a migration, raise the startup budget so the platform does
-not stop the start mid-file, and do not stop it yourself.
-
-The commands below run against the database in `GOIABADA_DB_*` and do not start the server. The
-`--db-*` flags override those variables, given before or after `migrate`; any other flag goes before
-it. A mistyped command, such as `migrat`, is refused rather than starting the server.
-
-| Command | What it does |
-|---|---|
-| `goiabada-authserver migrate version` | Prints the schema version this binary expects and the one the database records |
-| `goiabada-authserver migrate to <version>` | Steps the schema to that version, up or down |
-
-Ctrl-C (SIGINT) or SIGTERM stops `migrate to` the way it stops a starting auth server: a wait for
-the database connection or for the migration lock ends at once, a migration file already running
-runs to its end, and the next one does not start, so the schema is left clean. The command then
-prints the schema version the database is at and how many migrations it applied and how many
-remain, and exits 1, because the version asked for was not reached. Running the same command again
-carries on from there. `migrate version` only reads, so Ctrl-C simply ends it.
-
-To roll a deployment back to an earlier release, back the database up first, then run
-`goiabada-authserver migrate to <version>` on the **current** binary, naming the schema version the
-target release expects, which its release notes state. Install the target release afterwards. The
-current binary is the one that must run the step down, because it is the only one carrying the
-migrations being rolled back.
-
-A rollback discards whatever the newer release wrote into columns and tables the older one does not
-have. Rollback is supported between releases from this one onwards: `migrate to` refuses any version
-below the schema version this release ships with, because earlier releases changed stored data in
-ways no migration reverses. `migrate version` prints that number.
+<CardGrid>
+  <LinkCard title="Upgrade Goiabada" description="How migrations run at start, and how to roll back." href="/deploy/upgrade-goiabada/" />
+  <LinkCard title="Secrets" description="What the database password and the AES key protect." href="/deploy/secrets/" />
+  <LinkCard title="Unable to create the database connection" description="When the auth server can't reach the database." href="/troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection/" />
+</CardGrid>

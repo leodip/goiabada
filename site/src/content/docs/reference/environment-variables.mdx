@@ -234,7 +234,7 @@ To rotate the keys without signing anyone out:
 3. Restart both servers. They seal new sessions with the new pair and still open sessions sealed with the old one.
 4. Once the longest session lifetime has passed, remove the `_PREVIOUS` variables.
 
-A sign-in still in progress when you remove them may have to start again. Skip the `_PREVIOUS` variables altogether and everyone simply signs in again once.
+A sign-in still in progress when you remove them may have to start again. Skip the `_PREVIOUS` variables altogether and everyone simply signs in again once. [Rotate secrets](/deploy/rotate-secrets/#the-session-keys) has the commands for each platform.
 
 ### The data encryption key
 
@@ -248,7 +248,7 @@ openssl rand -hex 32
 If you lose this key, every secret and signing key in the database is lost with it, and nothing can decrypt them. **Never** keep the key only beside the database it protects.
 </Aside>
 
-To rotate it, set `GOIABADA_AES_ENCRYPTION_KEY` to a new key and `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` to the old one, then restart the auth server. At start, it re-encrypts everything under the new key in one transaction. Leaving the previous key set across restarts is harmless, but remove it once the rotation is done. If the data decrypts under neither key, the auth server refuses to start rather than risk damaging it.
+To rotate it, set `GOIABADA_AES_ENCRYPTION_KEY` to a new key and `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` to the old one, then restart the auth server. At start, it re-encrypts everything under the new key in one transaction. Leaving the previous key set across restarts is harmless, but remove it once the rotation is done. If the data decrypts under neither key, the auth server refuses to start rather than risk damaging it. [Rotate secrets](/deploy/rotate-secrets/#the-aes-key) has the procedure for each platform, and [Back up the AES key](/deploy/secrets/#back-up-the-aes-key) where to keep the key.
 
 ### The first start
 

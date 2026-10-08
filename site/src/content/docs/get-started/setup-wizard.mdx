@@ -108,7 +108,7 @@ The wizard keeps every secret in one file, and the rest of the configuration in 
 - **Native binaries:** `goiabada.env` is a single file that holds everything, secrets included.
 
 <Aside type="danger">
-**Never** commit the secrets file. It holds the AES encryption key, which encrypts the client secrets, SMTP credentials, two-factor seeds and signing keys in the database. Back the key up somewhere other than the database's backups: without it, that data can't be recovered.
+**Never** commit the secrets file. It holds the AES encryption key, which encrypts the client secrets, SMTP credentials, two-factor seeds and signing keys in the database. [Back the key up](/deploy/secrets/#back-up-the-aes-key) somewhere other than the database's backups: without it, that data can't be recovered.
 </Aside>
 
 Every file the wizard writes can be read by its owner only. When it writes into a Git working tree, it warns you and prints the line to add to `.gitignore`. It never edits `.gitignore` itself.
