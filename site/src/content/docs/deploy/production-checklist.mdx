@@ -1,124 +1,72 @@
 ---
 title: Production checklist
-description: Security and configuration checklist before deploying Goiabada to production.
+description: What to check before a Goiabada deployment goes live, with a link to where each item is explained.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Before deploying Goiabada to production, verify each item on this checklist.
+This page helps you check a deployment before people start signing in to it.
 
-## Security essentials
+Each item links to the page that explains it. A deployment the [setup wizard](/get-started/setup-wizard/) generated already meets several of them, but check them all anyway: a file edited by hand can undo any of them.
 
-- [ ] **HTTPS enabled** - Either direct HTTPS or behind a reverse proxy with SSL termination
-- [ ] **Secure cookies** - Automatic when the base URLs are `https://` (the `Secure` flag is derived from the base URL scheme; there is no separate setting)
-- [ ] **Admin password not published** - `GOIABADA_ADMIN_PASSWORD` has no default; set it to a password of your own, at least 15 characters. If the deployment was started from an earlier sample or guide that set `changeme`, change the administrator's password in the admin console
-- [ ] **Strong database password** - Use a randomly generated password (16+ characters)
-- [ ] **Unique session keys** - Generate fresh keys, never use examples or defaults
+## Secrets
 
-## Session keys
+- [ ] **The AES key is backed up,** apart from the database backups. Without it, a restored database decrypts nothing. See [Back up the AES key](/deploy/secrets/#back-up-the-aes-key).
+- [ ] **Every secret is your own,** generated for this deployment and never copied from an example. See [What each secret protects](/deploy/secrets/#what-each-secret-protects).
+- [ ] **The secrets are readable only by what needs them:** out of version control and shared directories. See [Where your setup keeps them](/deploy/secrets/#where-your-setup-keeps-them).
+- [ ] **The administrator's password is strong,** at least 15 characters. Changing `GOIABADA_ADMIN_PASSWORD` after the first start does nothing; see [The admin password](/deploy/rotate-secrets/#the-admin-password).
+- [ ] **The administrator has two-factor authentication,** set up from their account in the admin console.
 
-Generate cryptographically secure session keys:
+## Network
 
-```bash
-# Authentication key (64 bytes = 128 hex characters)
-openssl rand -hex 64
+- [ ] **Both public URLs are `https://`.** `GOIABADA_AUTHSERVER_BASEURL` and `GOIABADA_ADMINCONSOLE_BASEURL` decide whether each server marks its cookies `Secure`, and there's no other setting for it. See [URLs and listeners](/reference/environment-variables/#urls-and-listeners).
+- [ ] **Only your proxy reaches ports 9090 and 9091.** Publish 443, and 80 if you redirect it, and nothing else.
+- [ ] **The metrics ports, 9190 and 9191, are published nowhere.** Only your scraper reaches them. See [Monitoring](/deploy/monitoring/#turn-the-metrics-on).
+- [ ] **Forwarded headers are trusted only from your proxy.** Turn on `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS` and `GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS` only behind a proxy, and list your proxies in `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` and `GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES` when there's more than one hop. Otherwise anyone can choose the address Goiabada rate limits and audits them under. See [client IP resolution](/deploy/reverse-proxy/#client-ip-resolution-and-spoofing-protection).
+- [ ] **Certificates renew themselves,** whatever issues them.
 
-# Encryption key (32 bytes = 64 hex characters)
-openssl rand -hex 32
-```
+## The hop from the admin console to the auth server
 
-<Aside type="caution">
-Never reuse session keys between deployments or share them publicly.
-</Aside>
+- [ ] **The admin console reaches the auth server over a network you trust.** With an `http` internal URL, the hop is plain HTTP, and it carries the admin console's client secret, its refresh token and administrators' tokens.
 
-## Network configuration
-
-- [ ] **Ports 9090/9091 NOT exposed** - These should only be accessible from localhost or your internal network
-- [ ] **Only expose 443 (and optionally 80)** - All traffic should go through your reverse proxy
-- [ ] **Firewall configured** - Block all unnecessary ports
-
-## Proxy configuration
-
-If behind a reverse proxy (Nginx, Cloudflare, etc.):
-
-- [ ] **Trust proxy headers enabled** - Set `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true`
-- [ ] **Proxy headers configured** - Ensure your proxy sends `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Real-IP`
-- [ ] **Trusted proxies set for multi-hop / CDN** - If more than one proxy sits in front of Goiabada (e.g. a CDN plus Nginx), set `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` (and the admin-console equivalent) to your proxy IPs/CIDRs so the client IP cannot be spoofed. See [Reverse proxy: client IP resolution](/deploy/reverse-proxy/#client-ip-resolution-and-spoofing-protection)
-
-<Aside type="danger">
-Only enable `TRUST_PROXY_HEADERS=true` if Goiabada is actually behind a trusted proxy. Otherwise, clients can spoof their IP addresses.
+<Aside type="caution" title="The internal hop isn't encrypted">
+The Docker Compose files and Kubernetes manifests the setup wizard generates set `GOIABADA_AUTHSERVER_INTERNALBASEURL` to a plain HTTP address. That's sound on a network only your deployment uses, such as a Docker Compose network or a cluster's pod network. When it isn't, encrypt the hop: a network plugin that encrypts pod traffic, a service mesh with mutual TLS, or an `https://` internal URL to the auth server's own HTTPS listener on port 9443, whose certificate names the host the admin console calls. The admin console trusts the system's certificate authorities, or the ones `SSL_CERT_FILE` and `SSL_CERT_DIR` name, which replace them.
 </Aside>
 
 ## Database
 
-- [ ] **Production database** - Use MySQL or PostgreSQL for production (not SQLite)
-- [ ] **Dedicated database user** - Don't use root/admin accounts; see [database setup](/deploy/database/)
-- [ ] **Database backups configured** - Regular automated backups with tested restore procedures
-- [ ] **Database encryption** - Enable TLS for database connections if over network
+- [ ] **The database sits where nobody else can read its traffic:** on the auth server's host, or on a private network only the auth server and your administrators reach.
 
-## SSL certificates
+<Aside type="caution" title="The database connection isn't encrypted">
+No setting encrypts Goiabada's connection to the database and checks the server it reached, so don't count on TLS there. See [Where the database sits](/deploy/database/#where-the-database-sits).
+</Aside>
 
-- [ ] **Valid SSL certificates** - Use Let's Encrypt or a trusted CA
-- [ ] **Auto-renewal configured** - Let's Encrypt certificates expire after 90 days
+- [ ] **The database login has rights in Goiabada's database and nowhere else.** See [Create the database yourself](/deploy/database/#create-the-database-yourself).
+- [ ] **The database is backed up,** and you've restored a backup at least once, with the AES key it was taken under.
+- [ ] **One auth server, if you use SQLite.** SQLite is a file on one host, used through one connection. For several instances, use PostgreSQL, MySQL or SQL Server. See [Database](/deploy/database/).
 
-```bash
-# Test auto-renewal
-sudo certbot renew --dry-run
+## Abuse
 
-# Verify timer is active
-sudo systemctl status certbot.timer
-```
+- [ ] **The rate limiter is on,** `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=true`. It's off unless you turn it on, and the setup wizard asks. See [Rate limits](/reference/environment-variables/#rate-limits).
 
-## Monitoring
+## Monitoring and logs
 
-- [ ] **Health checks configured** - Monitor `/health` endpoints. They say the process is up, not that the database or the auth server answers
-- [ ] **Metrics scraped** - Both servers' metrics listeners turned on and scraped, with their ports published nowhere. See [Monitoring](/deploy/monitoring/#turning-the-endpoint-on)
-- [ ] **Alerting set up** - At least on server errors, database pool waits, rate-limit refusals and the cleanup run. See [suggested alerts](/deploy/monitoring/#suggested-alerts)
-- [ ] **Logging configured** - Both servers' logs captured, with request logging on and the error records counted. See [what to watch in the logs](/deploy/monitoring/#what-to-watch-in-the-logs)
-- [ ] **Audit log retention reviewed** - Confirm the **Audit log settings** page reflects your compliance and storage requirements (defaults: console and database both enabled, 180 day retention). See [Audit log](/concepts/audit-log/).
+- [ ] **Something checks `/health` on both servers.** It says the process is up, not that the database or the auth server answers.
+- [ ] **Both servers' metrics are scraped.** See [Monitoring](/deploy/monitoring/).
+- [ ] **Alerts fire** at least on server errors, database pool waits, rate-limit refusals and the cleanup run. See [Set up alerts](/deploy/monitoring/#set-up-alerts).
+- [ ] **Both servers' logs are collected,** standard error included, with request logging on. See [Collect the logs](/deploy/logs/#collect-the-logs).
+- [ ] **The audit log goes where you need it, for as long as you need it.** New installations write it to the logs and the database and keep it 180 days; change that on the **Audit log settings** page. See [Audit log](/concepts/audit-log/).
 
-Health check URLs:
-- Auth server: `https://auth.example.com/health`
-- Admin console: `https://admin.example.com/health`
+## After it's live
 
-## Environment variables checklist
+- [ ] **Sign in to the admin console,** with the administrator's account.
+- [ ] **Add sign-in to a test client** and run its whole flow, from the sign-in page to the token.
+- [ ] **Write down** how the deployment is configured, where its secrets are kept, and how it's backed up.
 
-### Auth server
+## Next steps
 
-| Variable | Required | Notes |
-|----------|----------|-------|
-| `GOIABADA_AUTHSERVER_BASEURL` | Yes | Public URL (https://auth.example.com) |
-| `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY` | Yes | 64-byte hex key |
-| `GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY` | Yes | 32-byte hex key |
-| `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS` | Yes | `true` if behind proxy |
-| `GOIABADA_DB_TYPE` | Yes | mysql, postgres, mssql, sqlite |
-| `GOIABADA_DB_PASSWORD` | Yes | Strong password |
-
-### Admin console
-
-| Variable | Required | Notes |
-|----------|----------|-------|
-| `GOIABADA_ADMINCONSOLE_BASEURL` | Yes | Public URL (https://admin.example.com) |
-| `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` | Yes | Generated secret |
-| `GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY` | Yes | 64-byte hex key |
-| `GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY` | Yes | 32-byte hex key |
-| `GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS` | Yes | `true` if behind proxy |
-
-## Post-deployment
-
-After deploying:
-
-1. [ ] **Test login flow** - Verify you can log in to the admin console
-2. [ ] **Test OAuth flow** - Create a test client and verify the full OAuth flow
-3. [ ] **Enable 2FA for admin** - Add extra security to the admin account
-4. [ ] **Document your deployment** - Record configuration for your team
-
-## Common mistakes to avoid
-
-- Exposing ports 9090/9091 directly to the internet
-- Using HTTP in production
-- Not changing default passwords
-- Reusing session keys from examples
-- Not setting up SSL certificate renewal
-- Using SQLite for high-traffic production sites
-- Enabling `TRUST_PROXY_HEADERS` without an actual proxy
+<CardGrid>
+  <LinkCard title="Secrets" description="What each secret protects, and backing up the AES key." href="/deploy/secrets/" />
+  <LinkCard title="Monitoring" description="Turn on the metrics, scrape them and set up alerts." href="/deploy/monitoring/" />
+  <LinkCard title="Upgrade Goiabada" description="Move to a new release, and back again." href="/deploy/upgrade-goiabada/" />
+</CardGrid>

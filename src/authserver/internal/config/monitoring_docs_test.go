@@ -10,18 +10,22 @@ import (
 
 const (
 	monitoringPage        = "site/src/content/docs/deploy/monitoring.mdx"
+	logsPage              = "site/src/content/docs/deploy/logs.mdx"
+	productionChecklist   = "site/src/content/docs/deploy/production-checklist.mdx"
 	metricsNotScrapedPage = "site/src/content/docs/troubleshooting/metrics-are-not-scraped.mdx"
 )
 
-// The sections that tell an operator how to turn the metrics listener on and what to read beside
-// it. The admin console's tier reads the same sections.
+// The sections that tell an operator how to turn the metrics listener on, how to scrape it, what to
+// alert on and what to read beside it, and the checklist that sends them there. The admin console's
+// tier reads the same sections.
 var monitoringDocs = []docSection{
-	{monitoringPage, "## Turning the endpoint on"},
-	{monitoringPage, "## Scraping the endpoint"},
-	{monitoringPage, "## Metrics catalog"},
-	{monitoringPage, "## Suggested alerts"},
-	{monitoringPage, "## What to watch in the logs"},
-	{kubernetesPage, "## Metrics"},
+	{monitoringPage, "## Turn the metrics on"},
+	{monitoringPage, "## Scrape on Kubernetes"},
+	{monitoringPage, "## Scrape outside Kubernetes"},
+	{monitoringPage, "## Set up alerts"},
+	{monitoringPage, "## How it works"},
+	{logsPage, ""},
+	{productionChecklist, ""},
 	{metricsNotScrapedPage, "## Why it happens"},
 	{metricsNotScrapedPage, "## Fix it"},
 }
@@ -36,20 +40,20 @@ func TestMonitoringDocs_NameOnlyVariablesTheServerReads(t *testing.T) {
 
 func TestMonitoringDocs_AnUnreadVariableFails(t *testing.T) {
 	root := t.TempDir()
-	writeManifestFixture(t, root, "site/monitoring.mdx", "## Turning the endpoint on\n\n"+
+	writeManifestFixture(t, root, "site/monitoring.mdx", "## Turn the metrics on\n\n"+
 		"Set GOIABADA_AUTHSERVER_METRICS_ENABLE, and GOIABADA_ADMINCONSOLE_METRICS_ENABLED for the console.\n\n"+
 		"```bash\nGOIABADA_AUTHSERVER_LISTEN_PORT_METRICS=9190 ./goiabada-authserver\n```\n\n"+
 		"## Next\n\nGOIABADA_AFTER_THE_SECTION\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertDocsNameOnlyReadVariables(r, root, []docSection{{"site/monitoring.mdx", "## Turning the endpoint on"}},
+		assertDocsNameOnlyReadVariables(r, root, []docSection{{"site/monitoring.mdx", "## Turn the metrics on"}},
 			map[string]bool{"GOIABADA_AUTHSERVER_METRICS_ENABLED": true, "GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS": true})
 	})
 
 	if report.Stopped {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
-	want := "site/monitoring.mdx: ## Turning the endpoint on names GOIABADA_AUTHSERVER_METRICS_ENABLE, which this server does not read"
+	want := "site/monitoring.mdx: ## Turn the metrics on names GOIABADA_AUTHSERVER_METRICS_ENABLE, which this server does not read"
 	if len(report.Errors) != 1 || report.Errors[0] != want {
 		t.Errorf("failures %q, want exactly %q", report.Errors, want)
 	}
@@ -60,11 +64,11 @@ func TestMonitoringDocs_AMissingSectionStops(t *testing.T) {
 	writeManifestFixture(t, root, "site/monitoring.mdx", "## Turning it on\n\nGOIABADA_AUTHSERVER_METRICS_ENABLED\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertDocsNameOnlyReadVariables(r, root, []docSection{{"site/monitoring.mdx", "## Turning the endpoint on"}},
+		assertDocsNameOnlyReadVariables(r, root, []docSection{{"site/monitoring.mdx", "## Turn the metrics on"}},
 			map[string]bool{"GOIABADA_AUTHSERVER_METRICS_ENABLED": true})
 	})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, "## Turning the endpoint on") {
+	if !report.Stopped || !strings.Contains(report.Fatal, "## Turn the metrics on") {
 		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
 	}
 }
@@ -85,7 +89,7 @@ func assertDocsNameOnlyReadVariables(r guard.Reporter, root string, sections []d
 				continue
 			}
 			seen[name] = true
-			r.Errorf("%s: %s names %s, which this server does not read", s.page, s.heading, name)
+			r.Errorf("%s names %s, which this server does not read", s, name)
 		}
 	}
 }

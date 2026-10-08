@@ -1,0 +1,89 @@
+---
+title: Logs
+description: Collect Goiabada's logs, find the records worth knowing, and see what the logs leave out.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you collect Goiabada's logs and find what you need in them.
+
+The [metrics](/deploy/monitoring/) count; the logs say which request and why. Both servers write one record per line to standard error.
+
+## Collect the logs
+
+<Steps>
+
+1. **Capture standard error.** Every record goes there, request records included. If your setup captures only standard output, you'll see nothing, and silence looks like no traffic rather than a stream nobody reads.
+
+2. **Write JSON,** which most log pipelines parse without a pattern: set `GOIABADA_AUTHSERVER_LOG_FORMAT=json` and `GOIABADA_ADMINCONSOLE_LOG_FORMAT=json`. The default, `text`, writes one `key=value` line per record.
+
+3. **Log each request,** with `GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true` and `GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true`. Every deployment the setup wizard generates already sets both.
+
+4. **Count the `ERROR` records.** Each one is something that went wrong on Goiabada's side, so put their rate on the same dashboard as the [5xx rate](/deploy/monitoring/#set-up-alerts).
+
+5. **Send the audit log to your pipeline** if you alert on security events, as [the audit log](#the-audit-log) below describes.
+
+</Steps>
+
+Every record written while serving a request carries its `request_id`, so you can gather the records of one request. It's the `X-Request-Id` your client or proxy sent, or one Goiabada made up.
+
+## Records worth knowing
+
+The level says who should look: `ERROR` means someone must act, `WARN` a request that was refused or handled, `INFO` startup, shutdown and the records below, and `DEBUG` per-request tracing.
+
+| Record (`msg`) | Level | What it says |
+|---|---|---|
+| `http request` | `INFO` | One per request, with its `method`, `target`, `ip`, `status`, `bytes` and `duration`. Written only with request logging on |
+| `audit event` | `INFO` | One audit event, with its `event` name and `details`, written when the audit log's console target is on |
+| `worker task completed` | `INFO` | A cleanup run that reached every step, with its `duration`. A failed step writes an `ERROR` record first |
+| `a job to run after its response was dropped, too many in flight` | `WARN` | A forgot-password, registration or email-change mail that wasn't sent |
+| `cross-origin request refused` | `WARN` | A state-changing request the CSRF check refused as cross-origin, with its `explanation` and `remedy`. A run of them after a change of hostname or proxy is a misconfiguration rather than an attack |
+| `database migrated` | `INFO` | How many migrations a starting auth server `applied`, and their `duration` |
+
+## The audit log
+
+The security events are in the [audit log](/concepts/audit-log/), not the metrics: every sign-in, failed password, token issued, rate-limit refusal and administrative change, each with who did it. It goes to standard error as the `audit event` records above, to the database, where the admin console browses it, or to both, as the **Audit log settings** page in the admin console says. New installations start with both.
+
+Watch for a run of `auth_failed_pwd` or `ropc_auth_failed` events against one account, and for `rate_limit_exceeded`, which each pod writes at most once per key and window, so it shows which accounts and addresses the rate limiter's refusals were about.
+
+## How it works
+
+### Levels
+
+Each server writes records at its level and above: `GOIABADA_AUTHSERVER_LOG_LEVEL` and `GOIABADA_ADMINCONSOLE_LOG_LEVEL`, `info` by default, or `debug`, `warn` or `error`. A level or format spelled any other way, uppercase included, stops the server at start. The [environment variables](/reference/environment-variables/#logging) list every logging setting.
+
+### Request records
+
+With request logging on, every request gets a record but three kinds, which are never logged: health checks (`/health`), static files (`/static/`) and `/favicon.ico`. A record's `request_id`, `method` and `ip` are each clipped at 128 bytes, with the true length in a marker, so a very long request id sent by a proxy shows up shortened rather than missing.
+
+### What a request record leaves out
+
+A request record names every query parameter that arrived, but not every value. Every query value is replaced by `[redacted]`, apart from those of these names, whose value is kept: `client_id`, `response_type`, `response_mode`, `scope`, `prompt`, `max_age`, `acr_values`, `code_challenge_method`, `ui_locales`, `error`, `page` and `size`.
+
+That keeps an `id_token_hint`, an activation code and a password reset code out of the log, along with anything a client puts in a parameter nobody has assessed. Names are matched exactly, so `Client_ID` is redacted like any other unknown name. Activation and password reset links reach the log once each: following one checks the code and redirects to the same page with no query string, so the code never reaches the address bar, the browser's history or the `Referer` of anything the page loads.
+
+<Aside type="caution" title="A bound, not a promise">
+A value kept under one of those names is written whatever it holds. If a client misbuilds its request and puts a token where `client_id` goes, the log gets up to 512 bytes of it.
+</Aside>
+
+The recorded target is an inventory, not a copy:
+
+- **It's re-encoded.** The query is parsed and written back, so parameters appear in alphabetical order and escaping is canonical: `scope=openid%20profile` is recorded as `scope=openid+profile`.
+- **It's bounded.** Each parameter name and each kept value is clipped at 512 bytes, and the whole target at 4096, each with a marker giving the true length. A target past 4096 bytes loses its later parameters.
+- **A query that can't be parsed isn't guessed at.** It's recorded as `?[unparsable query, N bytes]`, with no names at all.
+
+### Verbose API logging
+
+`GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS=true` writes the request and response bodies of every `/api/v1/admin` and `/api/v1/account` call to the auth server's log. It's off by default and meant for development.
+
+Credential values are replaced by `[redacted]` before anything is written: passwords, OTP codes and secrets, the authenticator enrollment image, client secrets, the SMTP password, email verification codes, the logout URL carrying a signed `id_token_hint`, and any field whose name contains `password`, `secret`, `otp` or `token`. Field names are kept, so the body's shape is still readable. The `Authorization` header is written as `Bearer [redacted]`, and the URL's query is redacted as in a request record.
+
+A body that isn't valid JSON, is larger than 256 KB, or nests more than 32 levels deep is replaced by a one-line note giving its size and why it wasn't logged.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Monitoring" description="Turn on the metrics, scrape them and set up alerts." href="/deploy/monitoring/" />
+  <LinkCard title="Audit log" description="Every security event, and where it goes." href="/concepts/audit-log/" />
+  <LinkCard title="Production checklist" description="Everything to check before going live." href="/deploy/production-checklist/" />
+</CardGrid>

@@ -8,15 +8,17 @@ import (
 	"github.com/leodip/goiabada/core/guard"
 )
 
-// The sections that tell an operator how to turn the metrics listener on and what to read beside
-// it. The auth server's tier reads the same sections.
+// The sections that tell an operator how to turn the metrics listener on, how to scrape it, what to
+// alert on and what to read beside it, and the checklist that sends them there. The auth server's
+// tier reads the same sections.
 var monitoringDocs = []docSection{
-	{"site/src/content/docs/deploy/monitoring.mdx", "## Turning the endpoint on"},
-	{"site/src/content/docs/deploy/monitoring.mdx", "## Scraping the endpoint"},
-	{"site/src/content/docs/deploy/monitoring.mdx", "## Metrics catalog"},
-	{"site/src/content/docs/deploy/monitoring.mdx", "## Suggested alerts"},
-	{"site/src/content/docs/deploy/monitoring.mdx", "## What to watch in the logs"},
-	{"site/src/content/docs/deploy/kubernetes.mdx", "## Metrics"},
+	{"site/src/content/docs/deploy/monitoring.mdx", "## Turn the metrics on"},
+	{"site/src/content/docs/deploy/monitoring.mdx", "## Scrape on Kubernetes"},
+	{"site/src/content/docs/deploy/monitoring.mdx", "## Scrape outside Kubernetes"},
+	{"site/src/content/docs/deploy/monitoring.mdx", "## Set up alerts"},
+	{"site/src/content/docs/deploy/monitoring.mdx", "## How it works"},
+	{"site/src/content/docs/deploy/logs.mdx", ""},
+	{"site/src/content/docs/deploy/production-checklist.mdx", ""},
 	{"site/src/content/docs/troubleshooting/metrics-are-not-scraped.mdx", "## Why it happens"},
 	{"site/src/content/docs/troubleshooting/metrics-are-not-scraped.mdx", "## Fix it"},
 }
@@ -31,20 +33,20 @@ func TestMonitoringDocs_NameOnlyVariablesTheConsoleReads(t *testing.T) {
 
 func TestMonitoringDocs_AnUnreadVariableFails(t *testing.T) {
 	root := t.TempDir()
-	writeManifestFixture(t, root, "site/monitoring.mdx", "## Turning the endpoint on\n\n"+
+	writeManifestFixture(t, root, "site/monitoring.mdx", "## Turn the metrics on\n\n"+
 		"Set GOIABADA_ADMINCONSOLE_METRICS_ENABLE, and GOIABADA_AUTHSERVER_METRICS_ENABLED for the auth server.\n\n"+
 		"```bash\nGOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS=9191 ./goiabada-adminconsole\n```\n\n"+
 		"## Next\n\nGOIABADA_ADMINCONSOLE_AFTER_THE_SECTION\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertDocsNameOnlyReadVariables(r, root, []docSection{{"site/monitoring.mdx", "## Turning the endpoint on"}},
+		assertDocsNameOnlyReadVariables(r, root, []docSection{{"site/monitoring.mdx", "## Turn the metrics on"}},
 			map[string]bool{"GOIABADA_ADMINCONSOLE_METRICS_ENABLED": true, "GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS": true})
 	})
 
 	if report.Stopped {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
-	want := "site/monitoring.mdx: ## Turning the endpoint on names GOIABADA_ADMINCONSOLE_METRICS_ENABLE, which this console does not read"
+	want := "site/monitoring.mdx: ## Turn the metrics on names GOIABADA_ADMINCONSOLE_METRICS_ENABLE, which this console does not read"
 	if len(report.Errors) != 1 || report.Errors[0] != want {
 		t.Errorf("failures %q, want exactly %q", report.Errors, want)
 	}
@@ -55,11 +57,11 @@ func TestMonitoringDocs_AMissingSectionStops(t *testing.T) {
 	writeManifestFixture(t, root, "site/monitoring.mdx", "## Turning it on\n\nGOIABADA_ADMINCONSOLE_METRICS_ENABLED\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertDocsNameOnlyReadVariables(r, root, []docSection{{"site/monitoring.mdx", "## Turning the endpoint on"}},
+		assertDocsNameOnlyReadVariables(r, root, []docSection{{"site/monitoring.mdx", "## Turn the metrics on"}},
 			map[string]bool{"GOIABADA_ADMINCONSOLE_METRICS_ENABLED": true})
 	})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, "## Turning the endpoint on") {
+	if !report.Stopped || !strings.Contains(report.Fatal, "## Turn the metrics on") {
 		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
 	}
 }
@@ -80,7 +82,7 @@ func assertDocsNameOnlyReadVariables(r guard.Reporter, root string, sections []d
 				continue
 			}
 			seen[name] = true
-			r.Errorf("%s: %s names %s, which this console does not read", s.page, s.heading, name)
+			r.Errorf("%s names %s, which this console does not read", s, name)
 		}
 	}
 }

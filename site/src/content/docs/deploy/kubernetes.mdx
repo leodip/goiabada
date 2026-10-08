@@ -968,55 +968,7 @@ database before it listens.
 
 ## Metrics
 
-Both servers can serve Prometheus metrics on a port of their own, 9190 for the auth server and 9191
-for the admin console, which no Service, HTTPRoute or Gateway publishes. The setup wizard asks
-whether to expose them, **Expose Prometheus metrics?**, with three answers:
-
-| Answer | Flag | What the manifest gets |
-|--------|------|------------------------|
-| No (default) | `--metrics=none` | Nothing: the metrics listeners stay off |
-| Pod annotations | `--metrics=annotations` | Both listeners on, a container port named `metrics` on each server, and the `prometheus.io/scrape`, `port` and `path` annotations on both pod templates |
-| PodMonitor | `--metrics=podmonitor` | Both listeners on, the `metrics` container ports, and one `monitoring.coreos.com/v1` PodMonitor selecting both Deployments by that port |
-
-Which one works depends on what scrapes your cluster. The annotations are read by the
-prometheus-community `prometheus` chart, and ignored by kube-prometheus-stack, which scrapes only
-what a PodMonitor or ServiceMonitor names. Choosing the PodMonitor asks one more thing, the labels
-your Prometheus selects PodMonitors by, such as `release=kube-prometheus-stack`
-(`--podmonitor-labels`), blank for none: a PodMonitor no Prometheus selects scrapes nothing. On a
-cluster without the Prometheus Operator's CRDs, `kubectl apply` exits 1 on the PodMonitor after
-applying everything else. For Grafana Alloy, the OpenTelemetry Collector or another scraper that
-discovers pods itself, answer pod annotations, which turns the listeners on and names the port, and
-see [scraping the endpoint](/deploy/monitoring/#scraping-the-endpoint).
-
-The listeners are turned on by `GOIABADA_AUTHSERVER_METRICS_ENABLED` and
-`GOIABADA_ADMINCONSOLE_METRICS_ENABLED`, each in its server's ConfigMap. To expose the metrics from a
-manifest generated without them, run the wizard again with the answer you want and compare, or set
-those two to `"true"` and add the `metrics` port to each container yourself, here the auth server's,
-with 9191 for the admin console:
-
-```yaml
-ports:
-- containerPort: 9090
-- name: metrics
-  containerPort: 9190
-```
-
-With the NetworkPolicies on, the wizard also asks which namespace the scraper runs in
-(`--metrics-namespace`, `monitoring` by default), and each policy gains a second ingress rule
-admitting that namespace to its server's metrics port alone. Give it the namespace your scraper's
-pods actually run in, which `kubectl get pods -A` shows: a policy naming any other admits nothing,
-and every scrape is refused. The first rule, for Envoy and the admin console, is unchanged and does
-not open the metrics port. To admit a scraper in another namespace, add its `namespaceSelector` to
-that second rule's `from`.
-Without the NetworkPolicies, any pod in the cluster can read the metrics; they hold no user data, but
-see [Who can reach Goiabada](#who-can-reach-goiabada).
-
-Every generated manifest also turns request logging on, `GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS` and
-`GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS` set to `"true"` in the two ConfigMaps, so each request
-writes one `http request` record to the pod's log.
-
-See [Monitoring](/deploy/monitoring/) for what the metrics report, what to alert on and
-what to watch in the logs.
+Both servers can serve Prometheus metrics on ports of their own, which no Service, HTTPRoute or Gateway publishes. The setup wizard asks whether to expose them; [Scrape on Kubernetes](/deploy/monitoring/#scrape-on-kubernetes) has its answers, what each writes into the manifest, and how each scraper finds the pods. Every generated manifest also turns request logging on, so each request writes one record to the pod's log: see [Logs](/deploy/logs/).
 
 ## First start and upgrades
 

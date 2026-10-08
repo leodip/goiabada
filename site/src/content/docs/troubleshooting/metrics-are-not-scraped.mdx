@@ -38,7 +38,7 @@ Each server serves its metrics on a listener of its own, `GET /metrics` on port 
 
    With Docker Compose, from a container on the Compose network, `curl -s http://goiabada-authserver:9190/metrics`.
 
-   If nothing answers, turn the listener on: set `GOIABADA_AUTHSERVER_METRICS_ENABLED` to `true` on the auth server and `GOIABADA_ADMINCONSOLE_METRICS_ENABLED` to `true` on the admin console, and restart them. On Kubernetes, also give each container its `metrics` port, as [Metrics](/deploy/kubernetes/#metrics) shows, or run the setup wizard again with metrics on and compare.
+   If nothing answers, turn the listener on: set `GOIABADA_AUTHSERVER_METRICS_ENABLED` to `true` on the auth server and `GOIABADA_ADMINCONSOLE_METRICS_ENABLED` to `true` on the admin console, and restart them. On Kubernetes, also give each container its `metrics` port, as [A manifest generated without metrics](/deploy/monitoring/#a-manifest-generated-without-metrics) shows, or run the setup wizard again with metrics on and compare.
 
 2. If the listener answers but the scraper can't reach it, check the listen host. Leave `GOIABADA_AUTHSERVER_LISTEN_HOST_METRICS` and `GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS` unset, which listens on every address, unless the scraper runs on the same host.
 
@@ -74,5 +74,5 @@ Alert on the scrape itself failing, Prometheus's `up` at `0` for Goiabada's targ
 
 <CardGrid>
   <LinkCard title="Monitoring" description="Turning the metrics on, scraping them and what to alert on." href="/deploy/monitoring/" />
-  <LinkCard title="Metrics on Kubernetes" description="What the setup wizard writes for each answer." href="/deploy/kubernetes/#metrics" />
+  <LinkCard title="Scrape on Kubernetes" description="What the setup wizard writes for each answer." href="/deploy/monitoring/#scrape-on-kubernetes" />
 </CardGrid>
