@@ -63,7 +63,7 @@ Goiabada writes each event to two places, and **Audit log settings** has a switc
 - **Log audit events to console** writes one log record per event, with the message `audit event`, the event's name in `event`, its details in `details`, and the `request_id`. Your container or host log pipeline picks it up.
 - **Persist audit logs to database** stores the event in the `audit_logs` table. The viewer and the Admin API read it from there.
 
-Turn both off and nothing is recorded. Changing either switch, or the retention, needs `authserver:manage`. The request is recorded before it's saved, under the old settings, so turning logging off still leaves an entry saying who did it. That also means the entry is there even if the save then fails, so it tells you what an administrator asked for, not what's in effect: the settings page shows that.
+Turn both off and nothing is recorded. Changing either switch, or the retention, needs `authserver:manage`. The change is recorded once it's saved, under the settings it replaced, so turning logging off still leaves an entry saying who did it.
 
 Recording an event never fails the request that raised it. If an event can't be written, the server logs an error and carries on.
 
@@ -273,7 +273,7 @@ These come from the Account API, which users reach through the admin console's a
 | `updated_tokens_settings` | An administrator changed the default token settings. The entry holds the old and the new values. |
 | `updated_smtp_settings` | An administrator changed the **Email - SMTP** settings, including turning email on or off. |
 | `sent_test_email` | An administrator sent a test email, and the mail server accepted it. |
-| `updated_audit_logs_settings` | An administrator asked to change where audit events go or how long they're kept. It's recorded before the save, so it holds the requested values and is there even if the save failed. |
+| `updated_audit_logs_settings` | An administrator changed where audit events go or how long they're kept. It holds the new values, and is recorded under the old ones, so turning logging off is recorded too. |
 | `rotated_keys` | An administrator rotated the signing keys: the next key became the current one, and a new next key was generated. |
 | `revoked_key` | An administrator deleted a previous signing key. |
 

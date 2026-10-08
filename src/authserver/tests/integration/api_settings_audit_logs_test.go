@@ -209,7 +209,8 @@ func TestAPISettingsAuditLogsPut_InvalidBody(t *testing.T) {
 }
 
 // Changing these settings is itself an audited action, and the handler logs it
-// before saving precisely so that turning logging off is still recorded.
+// under the settings the request started with, so that turning logging off is
+// still recorded.
 func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
 	// Database logging must be on for the event to be queryable.
 	changeSettings(t, func(settings *record.Settings) { settings.AuditLogsInDatabaseEnabled = true })
