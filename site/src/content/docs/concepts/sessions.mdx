@@ -1,143 +1,113 @@
 ---
-title: User sessions
-description: Session management and single sign-on (SSO) functionality.
+title: Sessions
+description: How single sign-on works, how long a session lasts, and how to ask a user to sign in again.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-User sessions facilitate the single sign-on (SSO) functionality of Goiabada. Once a user logs in, a new session starts. If they try to log in again and their session is still good, they don't need to go through the authentication process again.
+This page helps you understand when users are asked to sign in, and when they go straight through.
 
-## Session configuration
+When a user signs in, the auth server starts a session for their browser and names it in a cookie. The next time any client sends that browser to sign in, the session is enough: the user isn't asked for their password again. That's [single sign-on](/concepts/glossary/#single-sign-on-sso). The session remembers who signed in, when, and how strongly, as its [ACR level](/concepts/acr-and-amr/).
 
-There are two configurations related to user sessions:
+Each user can see their sessions under **Account**, **Sessions** in the admin console, and an administrator sees them on the user's **Sessions** tab and on a client's **User sessions** tab.
 
-| Property | Description |
-| --------- | ----------- |
-| User session idle timeout in seconds | If there is no activity from the user within this timeframe, the session will be terminated. This checks the `last_accessed` timestamp of the session. |
-| User session max lifetime in seconds | The maximum duration a user session can last, irrespective of user activity. This is checked against the `started` timestamp of the session. |
+## Ask for a recent sign-in
 
-## Session refresh
+A session can be hours old. When an operation needs the user to have signed in recently, such as changing their payment details, ask for it.
 
-A user session is "bumped" (receives a new `last_accessed` timestamp) in two situations:
+<Steps>
 
-1. When a new authorization request completes
-2. When a refresh token associated with the session is used to request a new access token
+1. Add `max_age` to the authorization request, in seconds. This asks for a sign-in within the last five minutes:
 
-## Closing the browser
+   ```http
+   GET /auth/authorize?client_id=my-app&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback&response_type=code&scope=openid&max_age=300&code_challenge=...&code_challenge_method=S256&state=... HTTP/1.1
+   Host: auth.example.com
+   ```
 
-Closing the browser does not end a session at the login server, so reopening it within the idle timeout signs the person straight back in and a restarted machine or a laptop shut for lunch costs nobody a password. The admin console does the opposite on purpose: closing the browser signs an administrator out of it, and reopening it asks them to sign in again even while the login server still remembers them. An administrator's browser reaches every part of the deployment, so one extra sign-in is worth paying to keep a machine that is lost or left behind from still holding that access. Some browsers restore what was open after a crash or an update, and that can bring an admin console session back with it.
+   A user who signed in longer ago than that enters their password again. One who signed in within it goes straight through.
 
-## Credential changes and live sessions
+2. Check `auth_time` in the ID token before you allow the operation. It's when the user last entered a credential, so it's no older than `max_age` allows:
 
-When a user's credentials change, their existing sessions and refresh tokens stop being usable. This applies to:
+   ```json
+   {
+     "sub": "c5b9b6a2-4b39-4b8e-9a8e-6f7f2b3a1d10",
+     "auth_time": 1760000000,
+     "acr": "urn:goiabada:level1"
+   }
+   ```
 
-| Action | Effect |
-| ------ | ------ |
-| A user resets a forgotten password | All of that user's sessions are terminated and all of their refresh tokens are revoked |
-| A user changes their own password | Same, except the session they are doing it from, which is preserved |
-| An administrator sets a user's password | All of that user's sessions are terminated and all of their refresh tokens are revoked |
-| An administrator disables a user | Same. Re-enabling the account does not restore the old sessions |
+</Steps>
 
-This covers every kind of grant, including offline refresh tokens whose browser session has already expired, and tokens obtained through the resource owner password credentials flow. An authorization code that was issued but not yet redeemed also stops being redeemable.
+To ask for a password every time, whatever the session, send [`prompt=login`](/concepts/prompt/#promptlogin) instead. With both, `prompt=login` wins.
 
-Each of these writes a `revoked_user_auth_state` entry to the [audit log](/concepts/audit-log/), recording which sessions were terminated and which refresh tokens were revoked.
+## How it works
 
-A user changing their own email address is not on this list, and ends nothing: no session is terminated and no refresh token is revoked. The change already requires the current password, so signing other devices out would protect nothing that person could not do again. Tokens issued before the change carry the old `email` claim until they expire or are refreshed.
+### How long a session lasts
 
-<Aside type="note">
-A user changing their own password normally stays signed in on the client they are using. If a token refresh happens at the same moment as the change, that client may still be asked to sign in again.
+A session's lifetimes are under **Admin**, **Sessions** in the admin console, and apply to every client:
+
+| Setting | Default |
+|---|---|
+| **User session - idle timeout in seconds** | 7200 (2 hours) |
+| **User session - max lifetime in seconds** | 86400 (24 hours) |
+
+A session can be used only while all of these hold:
+
+| Check | Measured from | Set by |
+|---|---|---|
+| Idle timeout | The session's last activity | **User session - idle timeout in seconds** |
+| Maximum lifetime | When the session started, so activity never extends it | **User session - max lifetime in seconds** |
+| `max_age` | When the user last entered a credential, which is `auth_time` | The authorization request, when it has one |
+
+Each bound includes its last second: a session idle for exactly the idle timeout still counts, and so does a sign-in exactly `max_age` seconds ago, as [OpenID Connect Core 1.0 section 3.1.2.1](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest) describes. The idle timeout can't be longer than the maximum lifetime.
+
+A session that fails one of them isn't used, and the user signs in again. It isn't ended either: a session that has merely expired revokes nothing, and its offline refresh tokens keep working. A background job removes idle and expired sessions every 12 hours.
+
+### What keeps a session alive
+
+A session's last activity moves forward whenever it's used:
+
+- a sign-in to any client completes through it, a [silent request](/concepts/glossary/#silent-request) included;
+- a client refreshes with a [normal refresh token](/concepts/refresh-tokens/) from it.
+
+Neither moves its maximum lifetime.
+
+### Single sign-on
+
+When a browser arrives with a session that's valid and belongs to the user signing in, the user isn't asked for their password, and goes on with the session's ACR level. They're asked for a one-time code only when the client needs a higher level than the session reached, which is a [step-up](/concepts/acr-and-amr/#a-session-thats-already-there). A request whose `id_token_hint` names someone else, or with `prompt=login`, asks for a password whatever the session.
+
+A user who has been disabled can't use their session: the request ends with `access_denied` and "The user account is disabled."
+
+### At the end of a sign-in
+
+Once the user has signed in, the auth server checks them again before it records anything:
+
+- **A disabled user** is refused with `access_denied`, and no session is written.
+- **A user whose credentials changed** while they were signing in, because their password was changed or reset, signs in again from the password, with nothing written.
+
+Then it records the sign-in in a session:
+
+- **The browser's session is valid and the user's own.** It's reused: its last activity moves forward, and its ACR level goes up when this sign-in reached a higher one. A session's level never goes down. When the user entered a credential in this sign-in, its `auth_time` is updated to then.
+- **Otherwise, a new session starts.** It replaces the user's own session the browser had, if it had one that's no longer valid, and the user's other sessions from the same device, which means the same browser `User-Agent` and the same IP address. Nothing those sessions handed out is revoked, though their normal refresh tokens stop working with them. A session the browser had for **another** user is ended, as [Ending sessions](/concepts/ending-sessions/#a-different-user-signs-in-on-the-same-browser) describes.
+
+A new session needs a password entered in this sign-in. A sign-in that was relying on a session that ended partway through goes back to the password step rather than starting one from nothing.
+
+The cookie's identifier changes whenever a session starts and whenever its ACR level goes up, so an identifier copied before the sign-in names nothing afterwards.
+
+### Closing the browser
+
+Closing the browser doesn't end a session with the auth server. The cookie lasts as long as the session does, so reopening the browser within the idle timeout signs the user straight back in, and a restarted machine or a laptop shut for lunch costs nobody a password.
+
+The admin console does the opposite on purpose. Its own cookie lasts only until the browser closes, so reopening the browser asks an administrator to sign in to it again, even while the auth server still has their session. An administrator's browser reaches every part of the deployment, so one more sign-in is worth it to keep a lost or forgotten machine from still holding that access. Some browsers restore what was open after a crash or an update, and that can bring an admin console session back with it.
+
+<Aside>
+To end a session rather than leave it to expire, sign out or end it from the sessions page. See [Ending sessions](/concepts/ending-sessions/).
 </Aside>
 
-### What this does not cover
+## Next steps
 
-Access tokens are self-contained and are not checked against a database by the applications that consume them, so a credential change cannot reach one that has already been issued:
-
-- Goiabada's **own** endpoints, `/userinfo` and the account and admin APIs, reject a token from a superseded session on the very next request.
-- A **third-party resource server** validating an access token by signature alone has no way to know, and will keep accepting that token until it expires.
-
-This is inherent to stateless tokens rather than a limitation of the revocation itself. It is the main reason to keep access tokens short-lived: the default expiration is 5 minutes, and that value is the upper bound on how long a revoked user's access token can still be accepted elsewhere. If you have raised **Token expiration** substantially, you have widened that window.
-
-<Aside type="caution">
-If your resource servers must reject access immediately after a credential change, they need to verify the token against Goiabada on each request rather than relying on signature validation alone.
-</Aside>
-
-## Ending a session
-
-A session can be ended explicitly: a user ends one from their own sessions page, or an administrator ends one from the user or client pages. That is a security action rather than housekeeping, so it also cuts off what the session authorized.
-
-| What | Effect |
-| ---- | ------ |
-| The session | Deleted. That device has to sign in again |
-| Refresh tokens from that session | Revoked, including offline ones that were still working in the background |
-| Authorization codes from that session | Revoked, so a code that was issued but not yet redeemed can no longer be exchanged |
-
-This is what separates ending a session from a session merely expiring. An offline refresh token is meant to outlive the browser session it came from, so it keeps working when that session times out. Ending the session revokes it deliberately.
-
-A sign-in that was still in progress cannot slip past this. If someone was partway through signing in to an application and was relying on the session you ended rather than typing a password, that sign-in does not quietly become a replacement session. Goiabada sends them back to the login page instead.
-
-Nor can a sign-in that had already reached the consent screen. Goiabada checks the session once more at the very last step, just before it hands the application its authorization code, so a sign-in left waiting on that screen is sent back to the login page as well rather than collecting a code on a session that is no longer there, or on one that timed out while the screen was open.
-
-An application renewing quietly in the background with [`prompt=none`](/concepts/prompt/) hits the same check and is told rather than shown: it gets a `login_required` error back, never a login page, so it can decide when to ask the person to sign in again. A client that [registered itself](/concepts/clients/#self-registered-clients) is one exception, and a `redirect_uri` no longer registered on the client is the other: Goiabada withholds the error redirect, so a silent request that does not return is itself the signal to send the person through an ordinary sign-in.
-
-Logging out is not the same thing. It revokes nothing: no refresh token is marked revoked and no authorization code is touched. It can still end the session itself, and a normal refresh token stops working once the session behind it is gone. Offline refresh tokens are not tied to a session and keep working either way. See [/auth/logout](/reference/endpoints/) for which logout requests end the whole session.
-
-Each termination writes two entries to the [audit log](/concepts/audit-log/): `terminated_user_session`, recording what was revoked, and `deleted_user_session`, the lifecycle record beside it. Count `terminated_user_session` if you want to know how many sessions were ended.
-
-### What ending a session does not cover
-
-An access token that was already issued for an offline grant keeps working until it expires, even at Goiabada's own endpoints. Offline access tokens carry no reference to a session, so there is nothing for Goiabada to match against the session you ended. This differs from a credential change, where Goiabada's own endpoints reject the old token on the very next request.
-
-The bound is the access token's own expiration, 5 minutes by default. If you have raised **Token expiration** substantially, you have widened it.
-
-## A different user signs in on the same browser
-
-Sessions belong to a browser as much as to a person, so a shared or borrowed browser can arrive at the login page still carrying someone else's session. That happens whenever a client sends [`prompt=login`](/concepts/prompt/) or [`id_token_hint`](/concepts/id-token-hint/), and whenever the session that was there has simply stopped being valid.
-
-When the person who then signs in is a **different** user, Goiabada treats it as the browser changing hands:
-
-| What | Effect |
-| ---- | ------ |
-| The previous session | Ended, exactly as if it had been ended explicitly: deleted, with its refresh tokens and unredeemed authorization codes revoked |
-| The new sign-in | Gets a session of its own. It never reuses the one that was there |
-| The previous user's other devices | Untouched. Only grants that came from this browser's session are revoked |
-
-The reason for revoking rather than simply deleting is that the browser is now in someone else's hands, and the grants it was holding were reachable from it. An offline refresh token obtained through that session would otherwise keep working in the background indefinitely.
-
-Nothing is inherited across the handover. The new user's authentication stands on its own: if the client asks for a second factor, they are asked for it, regardless of how the previous user had authenticated, and the `acr` and `amr` claims in their tokens describe only what they proved.
-
-Each handover writes a `cross_user_session_replaced` entry to the [audit log](/concepts/audit-log/), naming both users and the session that was ended, alongside the `terminated_user_session` and `deleted_user_session` entries for the session itself and the `started_new_user_session` entry for its replacement. It is the entry that distinguishes a browser changing hands from an administrator ending a session.
-
-<Aside type="note">
-When the **same** user signs in again, none of this applies. Their existing session is reused for as long as it is still valid, and re-authenticating simply refreshes it. If it has already idled out, reached its maximum lifetime, or fallen outside a requested `max_age`, they get a new session like anyone else, and nothing is revoked.
-</Aside>
-
-## Forcing re-authentication
-
-There are two ways to force re-authentication in an authorization request:
-
-### Using max_age
-
-Include the `max_age` parameter to define the maximum acceptable time (in seconds) since the user last signed in.
-
-For instance, if you add `max_age=120` to the authentication request, the user needs to re-authenticate if they last entered their credentials more than 120 seconds (2 minutes) ago, regardless of having a valid session or recent activity.
-
-This is useful when the client needs to ensure that the user authenticated within a specific timeframe. Unlike the session idle timeout (which resets with activity), `max_age` is measured from the user's last sign-in, the `auth_time` claim in the ID token.
-
-### Using prompt=login
-
-Include `prompt=login` in the authorization request to **always** force re-authentication, regardless of session age. Unlike `max_age`, which only triggers re-authentication when the last sign-in is too old, `prompt=login` will require the user to log in again every time.
-
-See [Prompt parameter](/concepts/prompt/) for details on all supported `prompt` values.
-
-## Example
-
-```
-GET /auth/authorize?
-  client_id=my-app&
-  redirect_uri=https://my-app.com/callback&
-  response_type=code&
-  scope=openid&
-  max_age=120&
-  code_challenge=...&
-  code_challenge_method=S256
-```
+<CardGrid>
+  <LinkCard title="Ending sessions" description="What ends a session, and what that revokes." href="/concepts/ending-sessions/" />
+  <LinkCard title="prompt" description="Check for a session silently, or always ask for a password." href="/concepts/prompt/" />
+  <LinkCard title="ACR and AMR" description="How strongly a session's user signed in." href="/concepts/acr-and-amr/" />
+</CardGrid>

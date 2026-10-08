@@ -88,6 +88,10 @@ When a user sets up or removes two-factor authentication, each of their sessions
 
 `acr` and `max_age` are separate checks. A session at a high enough level still asks for a sign-in when the user signed in longer ago than `max_age` allows. See [Sessions](/concepts/sessions/).
 
+### Setting up two-factor authentication during a sign-in
+
+At `urn:goiabada:level2_mandatory`, a user with no authenticator sets one up before they enter a code. The new authenticator is stored only while the account's two-factor settings are still the ones the sign-in read. If they change meanwhile, for example because the same user finished setting one up in another tab or on their account page, nothing is stored, and the sign-in ends on a page saying "Your two-factor authentication settings changed". That sign-in can't go on: the user goes back to the app and signs in again, which starts from the account's current settings.
+
 ## Next steps
 
 <CardGrid>

@@ -1,152 +1,143 @@
 ---
 title: Tokens
-description: Access tokens, ID tokens, and refresh token management.
+description: What your app gets when a user signs in, what's in each token, how long it lasts, and how to check one.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-## Token expiration
+This page helps you understand the tokens your app gets, and check one before you trust it.
 
-You can customize the expiration (in seconds) for access tokens and ID tokens on the **Settings → Tokens** page. These configurations apply globally to all clients. However, individual clients can override the global settings in their specific client configurations.
+Your app gets up to three tokens from the [token endpoint](/reference/endpoints/token/):
 
-The default token expiration is set to 5 minutes. Access tokens are intentionally kept short-lived for security reasons.
+- **An access token**, which your app sends to an API in an `Authorization: Bearer` header. It says what your app may do there.
+- **An ID token**, which tells your app who signed in and how. Your app gets one only when it asks for the `openid` scope.
+- **A refresh token**, which your app trades for new tokens without asking the user to sign in again. See [Refresh tokens](/concepts/refresh-tokens/).
 
-## OIDC claims in ID tokens
+Each one is a JWT (JSON Web Token): a set of claims, statements like "the user is `sub`", signed by the auth server. The access token and the ID token are for your app and your APIs to read. The refresh token is for the auth server alone, so treat it as an opaque string.
 
-By default, Goiabada includes OpenID Connect scope claims (from `profile`, `email`, `phone`, `address` scopes) in ID tokens. This behavior matches industry standards (Auth0, Microsoft, Keycloak) and provides immediate access to user information without an additional API call.
+## Check a token
 
-However, you can configure this behavior globally or per-client to support different use cases:
+Your API checks every access token it's sent, and your app checks the ID token before it trusts who signed in. Most JWT and OpenID Connect libraries do all of this for you once they know the auth server's discovery URL.
 
-### Global configuration
+<Steps>
 
-Navigate to **Settings → Tokens** in the admin console:
+1. Check the signature. Take the key whose `kid` matches the one in the token's header from the key set at `/certs`, and verify the token with it. Tokens are signed with RS256. See [Discovery and JWKS](/reference/endpoints/discovery-and-jwks/).
 
-- **Include OpenID Connect claims in ID tokens**: Controls whether OIDC scope claims are included in ID tokens by default
-- Default: **Enabled** (claims included)
-- When disabled: Applications must use the `/userinfo` endpoint to retrieve user claims
+2. Check `iss` is the `issuer` from the discovery document, and that `exp` hasn't passed.
 
-### Per-client configuration
+3. Check `aud`. An ID token's is your client identifier. An access token's names the resource of each permission it carries, such as `product-api`, so your API checks its own resource identifier is there.
 
-In each client's **Tokens** settings, you can override the global behavior:
+4. Check what the token is for:
+   - An ID token's `nonce` is the one your app sent in the authorization request.
+   - An access token's `scope` holds the permission the operation needs, such as `product-api:read`.
 
-- **Include OIDC claims in ID tokens**: Three options
-  - `Default` - Use the global setting
-  - `On` - Always include claims in ID tokens for this client
-  - `Off` - Never include claims in ID tokens for this client
+</Steps>
 
-This per-client control allows you to:
-- Enable strict OIDC conformance for specific applications
-- Optimize token size for performance-critical applications
-- Meet different security requirements across your application portfolio
+A decoded access token looks like this:
 
-### What's always included
-
-Regardless of this setting, ID tokens always contain:
-- Core OpenID claims: `sub`, `iss`, `aud`, `exp`, `iat`, `auth_time`, `nonce`, `acr`, `amr`
-- Goiabada-specific scopes (`groups`, `attributes`) follow their own inclusion rules
-
-All claims are **always** available via the `/userinfo` endpoint, regardless of whether they're included in the ID token.
-
-### OIDC specification compliance
-
-According to [OIDC Core 5.4](https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims), scope-related claims **MAY** be included in ID tokens but **SHOULD** be retrieved from the `/userinfo` endpoint for strict conformance.
-
-For more details on this feature and when to use it, see [where the claims go](/concepts/scopes/#where-the-claims-go).
-
-## Claims in access tokens
-
-Two claims in access tokens are worth knowing about when you validate tokens yourself.
-
-### The `sid` claim is conditional
-
-An access token carries a `sid` (session identifier) claim only when the grant it came from is tied to a user session. Access tokens issued for an `offline_access` grant, or through the resource owner password credentials flow, carry **no** `sid`, because those grants deliberately outlive the browser session that started them.
-
-Do not treat a missing `sid` as an invalid token, and do not require it when validating. ID tokens on authorization code grants still carry `sid`, which is what [RP-initiated logout](/reference/endpoints/#authlogout-get-or-post) matches on.
-
-### The `auth_state_generation` claim is reserved
-
-Access tokens carry an `auth_state_generation` claim, an integer that Goiabada uses internally to tell whether a token was issued before the user's credentials last changed. See [credential changes and live sessions](/concepts/sessions/#credential-changes-and-live-sessions).
-
-Treat it as **opaque and reserved**. Do not parse it, compare it between tokens, or build logic on its value: it is an implementation detail whose meaning may change, and it is not a version number you can reason about.
-
-## Refresh tokens
-
-Refresh tokens are used in the authorization code flow with PKCE and in the resource owner password credentials flow (the client credentials flow doesn't use refresh tokens).
-
-Goiabada supports two types of refresh tokens: **normal** and **offline**.
-
-### Normal refresh tokens
-
-Normal tokens are linked to the user session. They can be used to get a new access token as long as there's an active user session.
-
-- When a normal refresh token is used, the user session `last_accessed` timestamp is bumped
-- The expiration time of a normal refresh token is the same as the user session idle timeout (default is 2 hours)
-- If the user session is terminated, it automatically invalidates the refresh tokens linked to that session
-
-### Offline refresh tokens
-
-Offline refresh tokens don't depend on an active user session. They can be used to obtain a new access token even when the user is not actively using the application, and they keep working after the browser session that created them has expired.
-
-- They are governed by two limits, both configurable on **Settings → Tokens**: an idle timeout (defaults to 30 days) and a maximum lifetime (defaults to 1 year)
-- Useful for background tasks or applications that need to access resources on behalf of users without their immediate interaction
-
-A session expiring and a session being ended are not the same thing, and only the first leaves an offline token working. When somebody explicitly ends the session an offline token was authorized through, that token is revoked. See [ending a session](/concepts/sessions/#ending-a-session).
-
-Because an offline refresh token can remain usable for a long time, it is also the grant most worth thinking about when a user's credentials change. See [credential changes and live sessions](/concepts/sessions/#credential-changes-and-live-sessions).
-
-### Requesting offline tokens
-
-In your authorization request, when you ask for the `offline_access` scope, your refresh token will be classified as **offline**. Otherwise, if you don't include the `offline_access` scope, your refresh token will be considered **normal**.
-
-```
-scope=openid offline_access
+```json
+{
+  "iss": "https://auth.example.com",
+  "sub": "c5b9b6a2-4b39-4b8e-9a8e-6f7f2b3a1d10",
+  "aud": ["authserver", "product-api"],
+  "scope": "openid profile product-api:read",
+  "typ": "Bearer",
+  "iat": 1760000000,
+  "nbf": 1760000000,
+  "exp": 1760000300,
+  "jti": "9a6f1c1e-2d0b-4f3e-8a55-0c1b7a3e2f44",
+  "auth_time": 1759999950,
+  "acr": "urn:goiabada:level2_optional",
+  "amr": ["pwd"],
+  "sid": "0b7e6a31-5f2c-4d8e-9c1a-3e4f5a6b7c8d",
+  "auth_state_generation": 1
+}
 ```
 
-## Refresh token rotation
+## How it works
 
-Upon each usage of a refresh token, the refresh token passed to the `/auth/token` endpoint becomes inactive, and a new refresh token is provided in the token response.
+### How long tokens last
 
-In other words, a refresh token is a one-time-use token; once used, it must be substituted with the new refresh token obtained from the response.
+These settings are under **Admin**, **Tokens** in the admin console, and apply to every client:
 
-Single use is enforced atomically. Across concurrent requests presenting the same refresh token, **at most one** can receive a token set; two can never succeed. If the token is live and issuance succeeds, one wins and the rest are refused with `invalid_grant`. If it was already retired, or issuance fails, none succeeds.
+| Setting | Default |
+|---|---|
+| **Token expiration in seconds** | 300 (5 minutes) |
+| **Include OpenID Connect claims in the access token** | Off |
+| **Include OpenID Connect claims in the ID token** | On |
 
-### What your client must do
+The first sets how long both the access token and the ID token last. The other two decide whether user claims such as `email` or `name` go in each token, as [Scopes](/concepts/scopes/#where-the-claims-go) describes. A client can override all three on its own **Tokens** tab: a lifetime of 0 there uses this setting, and each claims switch can be on, off, or left to this setting. See [Clients](/concepts/clients/#tokens).
 
-<Aside type="caution">
-Serialize your refresh requests, and **atomically** persist the refresh token from each successful response in place of the old one before using the rest of that response.
+Keep the lifetime short. An access token can't be taken back once it's issued: an API checking it by signature alone accepts it until `exp`, whatever happens to the user's session meanwhile. The lifetime is the longest that can last. See [what ending a session doesn't reach](/concepts/ending-sessions/#what-it-doesnt-reach).
 
-Presenting a refresh token that rotation has already retired revokes **the family's live tokens**, including the one your application is currently using, and the user has to authorize again. That happens whether the retired token was replayed by an attacker or by your own client.
+An authorization code works once, for 60 seconds. [Refresh tokens](/concepts/refresh-tokens/#how-long-a-refresh-token-lasts) have lifetimes of their own.
+
+### The access token
+
+| Claim | |
+|---|---|
+| `iss` | The issuer |
+| `sub` | The user's [subject](/concepts/glossary/#subject). In a token from the client credentials flow, the client identifier |
+| `aud` | The resource of each permission scope, and `authserver` when the scope has an OpenID Connect scope, since `/userinfo` belongs to it. A string when there's one, an array when there are more |
+| `scope` | The scopes the token carries |
+| `typ` | `Bearer` |
+| `iat`, `nbf`, `exp` | When it was issued, when it becomes valid, which is the same moment, and when it expires |
+| `jti` | The token's own identifier |
+| `auth_time`, `acr`, `amr` | When and how the user signed in. See [ACR and AMR](/concepts/acr-and-amr/) |
+| `sid` | The session the token came from, when there is one. See below |
+| `auth_state_generation` | Reserved. See below |
+| `nonce` | The `nonce` of the authorization request, when it had one |
+
+User claims, `groups` and `attributes` come on top, as [Scopes](/concepts/scopes/#where-the-claims-go) describes. A token from the client credentials flow names no user, so it carries none of `auth_time`, `acr`, `amr`, `sid`, `auth_state_generation` or `nonce`.
+
+**`sid` isn't always there.** It's in an access token only when the grant it came from is tied to a session. A token from an `offline_access` grant has none, nor does one from the [password grant](/legacy-flows/ropc/): those grants are meant to outlive the browser session that started them. Don't treat a missing `sid` as an invalid token.
+
+**`auth_state_generation` is reserved.** It's how the auth server tells a token issued before the user's credentials last changed from one issued after. Don't parse it, compare it between tokens or build anything on it: its meaning can change.
+
+### The ID token
+
+| Claim | |
+|---|---|
+| `iss` | The issuer |
+| `sub` | The user's subject |
+| `aud` | Your client identifier |
+| `iat`, `nbf`, `exp` | When it was issued, when it becomes valid, and when it expires |
+| `jti` | The token's own identifier |
+| `auth_time` | When the user last entered a credential, a password or a one-time code |
+| `acr`, `amr` | How the user signed in. See [ACR and AMR](/concepts/acr-and-amr/) |
+| `sid` | The session the user signed in with, when there is one. [`/auth/logout`](/reference/endpoints/) matches on it |
+| `nonce` | The `nonce` of the authorization request, when it had one |
+| `at_hash` | A hash of the access token issued beside it, in the [implicit flow](/legacy-flows/implicit/) only |
+
+User claims, `groups` and `attributes` come on top, as [Scopes](/concepts/scopes/#where-the-claims-go) describes. `auth_time` is never simply when the token was issued: a sign-in that reused a session, [`prompt=none`](/concepts/prompt/) included, keeps the time the user last signed in, which is what `max_age` is measured against.
+
+### Which scopes a token gets
+
+The scope your app asks for isn't always the scope it gets. Once the user has signed in, the auth server drops every [permission scope](/concepts/scopes/#permission-scopes) the user doesn't hold, directly or through a group, without an error. OpenID Connect scopes and `offline_access` are always kept. If that leaves nothing, the request ends with `access_denied`, "The user is not authorized to access any of the requested scopes".
+
+What's left is what the [consent screen](/concepts/clients/#consent-required) asks about, when it's shown. The user can untick scopes there, and the tokens carry only the ones they approved.
+
+### Checked again before a code is issued
+
+A user can sit on the consent screen for as long as they like, so just before it issues the code, or the implicit flow's tokens, the auth server checks the request again, in this order:
+
+1. The redirect URI is still registered on the client. If it isn't, the user sees a page, and nothing reaches your app.
+2. The client is still enabled, or the user sees an error page. The flow is still on for it, or your app gets `unauthorized_client`. It's still [allowed to request](/concepts/clients/#administrative-scopes) any administrative scope it asked for, or it gets `invalid_scope`.
+3. The user who signed in is the one the [`id_token_hint`](/concepts/id-token-hint/) names, when there was one, or your app gets `login_required`, "The authenticated user does not match the id_token_hint".
+4. The user's session is still there, still valid, and still theirs, or the sign-in starts again from the password.
+5. The user is still enabled, or your app gets `access_denied` with "The user account is disabled." Their credentials haven't changed since they signed in, or the sign-in starts again from the password.
+6. The user still holds at least one of the scopes, or your app gets `access_denied`.
+
+A [silent request](/concepts/glossary/#silent-request) can't start a sign-in again, so it gets `login_required`, "User authentication is required", instead.
+
+<Aside>
+Each error reaches your app the way [Authorize](/reference/endpoints/authorize/#when-an-error-reaches-your-app) describes, and a client that registered itself is never sent one.
 </Aside>
 
-Two shapes cause this by accident:
+## Next steps
 
-- **Parallel refreshes.** Two threads, tabs or instances notice the access token has expired and each presents the same refresh token. One wins. Whether the other is quietly refused or treated as a replay depends on whether its database lookup saw the token as still live, which is not something either side can control. Refresh through a single shared path instead.
-- **Retrying after a lost response.** The server rotated the token and the response never arrived. Retrying with the old token presents a retired one. Persist the new token before acting on the response, and treat a lost response as "reauthorize", not "retry".
-
-## Refresh token replay
-
-When a refresh token that rotation has already retired is presented again, Goiabada revokes every member of that token's **rotation family** that is still live and committed at the moment containment runs. In practice that is the successor issued when the presented token was rotated, plus any further descendants of the same original grant. The presented token itself is already retired, which is what identified it as a replay.
-
-Containment also records the family as revoked, and the record stays as long as any of the family's tokens is stored. A rotation still in flight when containment runs therefore yields nothing usable: it either fails, or the token it returns is refused the first time it is presented, so the family cannot keep rotating.
-
-This follows the strict rotation model in [RFC 9700 section 4.14.2](https://www.rfc-editor.org/rfc/rfc9700.html#section-4.14.2), which is explicit that the server cannot identify which presenter is legitimate. Goiabada therefore treats a retired token coming back as reason to invalidate the chain, without claiming to know that the token was copied: a delayed request from your own client produces exactly the same signal. Leaving the chain alive instead would mean that someone who did steal a refresh token and lost the race to use it could simply wait and keep rotating, while the legitimate user is the one locked out.
-
-**What containment does not touch.** Only the rotation family is revoked. The browser session survives, other clients the user is signed in to are unaffected, and other grants belonging to the same user keep working, including a separate grant created from the same browser session. A refresh token replay implicates one grant's client-side storage, not the sign-in itself.
-
-Access tokens already issued are **not** revoked. They are short-lived signed JWTs with no revocation list, so containment stops the next rotation rather than cutting short an access token already handed out. This is the main reason to keep access token lifetimes short.
-
-The incident is recorded as a `refresh_token_replay_detected` [audit event](/concepts/audit-log/) **when containment changes something**: it revokes at least one live member, or it records the family as revoked for the first time. The second happens even when no member was live, such as when the only successor was still being minted, and the event then reports zero tokens revoked. A repeated presentation that does neither emits no event, so one incident does not produce a row per attempt. A repeat that finds a member still live, such as a child committed after the earlier containment, revokes it and is recorded. The payload carries the presented token's `jti`, the family identifier, how many tokens were revoked, the client and user involved, and which flow created the grant. It never contains the refresh token itself.
-
-The event does not by itself prove an attack: a client that refreshes in parallel can trigger it, which is one more reason to serialize.
-
-### Storage
-
-Revoked refresh token rows are retained until the token itself expires, rather than being deleted as soon as they are revoked. The stored row is what lets the server recognise a replayed token at all; deleting it early means a replay is refused but the live family is never contained.
-
-This makes the `refresh_tokens` table grow with refresh frequency and your configured lifetimes. With the default 30-day offline idle timeout, a grant refreshed every five minutes accumulates roughly 8,600 rows before the oldest start ageing out. Background cleanup runs every 12 hours and deletes a row only once its expiration or maximum lifetime has passed.
-
-Worth monitoring if you issue many long-lived offline grants that refresh frequently. Both the offline idle timeout and the maximum lifetime are configurable on **Settings → Tokens**, but only whichever of the two actually bounds your grants affects the count: lowering a maximum lifetime that never binds changes nothing. Reduce the effective retention lifetime and the retained rows fall with it.
-
-<Aside type="caution">
-If you import refresh tokens from another system, populate `expires_at`. A row with both `expires_at` and `max_lifetime` empty is never reaped by the background cleanup, because neither comparison can decide it has expired, and removing such rows needs an explicit operator action.
-</Aside>
+<CardGrid>
+  <LinkCard title="Refresh tokens" description="Get new tokens without asking the user to sign in again." href="/concepts/refresh-tokens/" />
+  <LinkCard title="Scopes" description="What to ask for, and which claims each scope brings." href="/concepts/scopes/" />
+  <LinkCard title="Token" description="The token endpoint's parameters, answers and errors." href="/reference/endpoints/token/" />
+</CardGrid>

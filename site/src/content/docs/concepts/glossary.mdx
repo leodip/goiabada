@@ -99,11 +99,15 @@ The address the auth server sends the browser back to after sign-in, carrying th
 
 ### Refresh token
 
-A token a client exchanges for new tokens without asking the user to sign in again. A client that asks for the `offline_access` scope gets an offline refresh token, which keeps working after the user's session expires. See [Tokens](/concepts/tokens/).
+A token a client exchanges for new tokens without asking the user to sign in again. A client that asks for the `offline_access` scope gets an offline refresh token, which keeps working after the user's session expires. See [Refresh tokens](/concepts/refresh-tokens/).
 
 ### Resource
 
 Something you protect, usually an API, and the permissions that go with it. Goiabada's own resource is `authserver`. See [Resources and permissions](/concepts/resources-and-permissions/).
+
+### Rotation
+
+What happens to a refresh token when it's used: the auth server retires it and hands back a new one, so each refresh token is good for one refresh. A retired one sent again is a replay, which revokes every live refresh token from the same sign-in. See [Refresh tokens](/concepts/refresh-tokens/#rotation).
 
 ### Scope
 
@@ -115,7 +119,7 @@ A user creating their own account from the sign-in page's **Register** link, ins
 
 ### Session
 
-What lets a user sign in once and use several clients. After the user signs in, the auth server keeps a session for their browser, so the next client they use doesn't ask for the password again. A session ends when it has been idle too long, when it reaches its maximum lifetime, or when the user or an administrator ends it. See [Sessions](/concepts/sessions/).
+What lets a user sign in once and use several clients. After the user signs in, the auth server keeps a session for their browser, so the next client they use doesn't ask for the password again. A session ends when it has been idle too long, when it reaches its maximum lifetime, or when it's ended: by the user or an administrator, by signing out, or by a change to the user's credentials. See [Sessions](/concepts/sessions/) and [Ending sessions](/concepts/ending-sessions/).
 
 ### Silent request
 
