@@ -456,7 +456,10 @@ func EventTypes() []string {
 	return slices.Clone(auditEventTypes)
 }
 
-// auditEventTypes is the catalog EventTypes copies.
+// auditEventTypes is the catalog EventTypes copies, sorted by identifier: the admin API's
+// event-types operation says so in openapi.yaml, and TestEventTypes_Alphabetical here and the
+// integration tier's api_audit_event_types_test.go, which compares the response with EventTypes in
+// order, hold it.
 var auditEventTypes = []string{
 	EventActivatedAccount,
 	EventAddedGroupAttribute,

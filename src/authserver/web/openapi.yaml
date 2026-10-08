@@ -3093,7 +3093,7 @@ paths:
         Get the catalog of audit event names this server can write, which is the set the
         auditEvent filter on GET /api/v1/admin/audit-logs accepts. The list is fixed at build
         time, not derived from the rows present, so it includes events that have not yet
-        occurred on this deployment.
+        occurred on this deployment. The names are sorted by identifier.
       operationId: getAuditEventTypes
       responses:
         '200':
