@@ -1,80 +1,169 @@
 ---
-title: Development
-description: Set up a development environment for contributing to Goiabada.
+title: Contributing
+description: Set up the dev container, run Goiabada from source, run the tests and send a change.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-Goiabada was developed in [Go](https://go.dev/) using Linux. The [GitHub repository](https://github.com/leodip/goiabada) includes a VS Code dev container with all dependencies pre-configured.
+This page helps you build Goiabada from source, test a change and send it as a pull request.
 
-## Quick start
+Bug reports and pull requests are welcome. Not sure where to start? Pick something from the [GitHub issues](https://github.com/leodip/goiabada/issues).
 
-1. Clone the repository
-2. Install [Microsoft's Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-3. Open the repository in the dev container
-4. Run `make serve` from the `src/authserver` directory
-5. Run `make serve` from the `src/adminconsole` directory (in another terminal)
+## Open the dev container
 
-You now have a running Goiabada instance accessible at:
+Everything you need, Go, the linters, the Tailwind CLI and the four databases, runs in a dev container, so the only thing your machine needs is Docker and an editor that opens dev containers, such as VS Code with the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension.
 
-- **Auth server**: http://localhost:19090
-- **Admin console**: http://localhost:19091
+<Steps>
 
-The dev container sets the first administrator's credentials, which the auth server seeds on its first start:
+1. Clone the repository:
 
-- **Email**: admin@example.com
-- **Password**: devcontainer-admin-password
+   ```sh
+   git clone https://github.com/leodip/goiabada.git
+   ```
 
-These are published development values. CI and the test stack use the same ones; never use them in a deployment.
+2. Open the repository's `src` folder in your editor, not the repository itself. The dev container is defined in `src/.devcontainer`, and an editor looks for it in the folder you open.
 
-## AI-assisted development
+3. Reopen the folder in the container. In VS Code, that's **Dev Containers: Reopen in Container** from the command palette. The first build takes a few minutes.
 
-The repository includes a `CLAUDE.md` file at the root with detailed architecture documentation, authentication flow state machines, OAuth2 implementation details, and coding patterns. This file is designed to help AI coding assistants (like Claude, Cursor, or GitHub Copilot) understand the codebase quickly.
+</Steps>
 
-## Project structure
+Every command below runs inside the container, from the directory it names.
 
-```
-src/
-├── authserver/         # Auth server application
-│   ├── cmd/           # Entry point
-│   ├── internal/      # Internal packages
-│   ├── tests/         # Integration tests
-│   └── web/           # Templates and static files
-├── adminconsole/       # Admin console application
-│   ├── cmd/           # Entry point
-│   ├── internal/      # Internal packages
-│   └── web/           # Templates and static files
-├── core/               # Shared code between applications
-└── build/              # Docker and build scripts
-```
+## Run Goiabada from source
 
+<Steps>
 
-## Running tests
+1. Start the auth server, from `src/authserver`:
 
-To run the complete test suite (100% of tests):
+   ```sh
+   make serve
+   ```
 
-```bash
-cd src/authserver
+2. Start the admin console in a second terminal, from `src/adminconsole`:
+
+   ```sh
+   make serve
+   ```
+
+3. Open the admin console at http://localhost:19091 and sign in as the first administrator: email `admin@example.com`, password `devcontainer-admin-password`. The auth server is at http://localhost:19090.
+
+</Steps>
+
+Both rebuild and restart when you save a Go file or a template.
+
+<Aside type="danger">
+The dev container's administrator password, keys and secrets are published in the repository. **Never** use them in a deployment.
+</Aside>
+
+## Run the tests
+
+The test suite is one script, `run-tests.sh`. Run all of it, from `src/authserver`:
+
+```sh
 ./run-tests.sh
 ```
 
-This script will:
-- Run unit tests for authserver, adminconsole, and core modules
-- Run data layer tests against all supported databases (MySQL, PostgreSQL, SQL Server, SQLite)
-- Run integration tests against all supported databases
-- Automatically handle server startup/shutdown and cleanup
+That's every tier below, the data and integration tiers on all four databases, so it takes a while. While you work, run the tier your change touches with `--type`:
 
-## Technology stack
+| Tier (`--type`) | What it runs |
+|---|---|
+| `internal` | The auth server's unit tests |
+| `core` | The core module's unit tests |
+| `adminconsole` | The admin console's unit tests |
+| `setup` | The setup wizard's tests |
+| `modules` | `internal`, `core` and `adminconsole` together |
+| `data` | The data layer against a real database |
+| `integration` | End-to-end tests against a running auth server, which the script builds, starts and stops |
+| `lint` | The linters, and the checks that generated files are committed |
+| `all` | Everything. The default |
 
-| Component | Technology |
-|-----------|------------|
-| Language | Go |
-| HTTP Router | [Chi](https://github.com/go-chi/chi) |
-| SQL Builder | [go-sqlbuilder](https://github.com/huandu/go-sqlbuilder) |
-| CSS Framework | [Tailwind CSS](https://tailwindcss.com/) with [DaisyUI](https://daisyui.com/) |
-| Database | MySQL, PostgreSQL, SQL Server, SQLite |
+For example, the three unit tiers:
 
-## Contributing
+```sh
+./run-tests.sh --type modules
+```
 
-Bug reports and pull requests are encouraged. Looking to contribute? Pick an issue from the [GitHub issues page](https://github.com/leodip/goiabada/issues) and get started. You can reach out at [contact@leodip.com](mailto:contact@leodip.com).
+Three more options narrow a run:
 
+- **`--db`** picks the database for `data` and `integration`: `mysql`, `postgres`, `mssql`, `sqlite`, or `all`, the default. SQLite is the quickest.
+- **`--run`** takes a `go test -run` pattern. A pattern that matches no test fails the run, so a typo doesn't pass as green.
+- **`--race`** runs the unit tiers and the setup wizard's tests under Go's race detector.
+
+```sh
+./run-tests.sh --type integration --db sqlite --run 'TestToken_'
+```
+
+`./run-tests.sh --help` lists every option.
+
+## Commit what you generate
+
+Some committed files are written by a tool. When your change touches what one is written from, run its command and commit what it changes:
+
+| When you change | Run | From |
+|---|---|---|
+| A database migration | `go run ./cmd/schemadump` | `src/authserver` |
+| An exported symbol in a core package | `go run ./cmd/ownershipdump` | `src/core` |
+| An interface a mock is generated for | `./generate-mocks.sh` | `src/authserver` |
+| A template's CSS classes | `./build.sh` | `src/authserver` or `src/adminconsole`, whichever owns the template |
+| A tool version in `versions.yaml` | `./version-manager.sh update` | `src/authserver` |
+
+`schemadump` regenerates the `schema.golden` file of all four databases, which the data tier compares against a freshly migrated database. The `lint` tier reruns the mocks, the ownership table and the CSS, and fails when any of them differs from what's committed.
+
+## Write docs
+
+The docs site is in `site/`, and every page follows [`site/STYLE.md`](https://github.com/leodip/goiabada/blob/main/site/STYLE.md): the voice, the shape of a page and the words the [glossary](/concepts/glossary/) gives each concept.
+
+The dev container has no Node.js, so build the site on your own machine, with Node.js 22 or later, from `site/`:
+
+```sh
+npm ci
+npm run dev
+```
+
+That serves a live preview at http://localhost:4321. Before you send a change, build the site and run its checks' tests:
+
+```sh
+npm run build
+npm test
+```
+
+The build fails on a broken link, including a link to the site from the Go code under `src/`, so move a page or rename a heading in the same change as every link to it.
+
+## How it works
+
+### The project
+
+Goiabada is three Go modules and the setup wizard:
+
+```
+src/
+├── authserver/          The auth server: OAuth2 and OpenID Connect, sign-in, the APIs
+├── adminconsole/        The admin console, a client of the auth server
+├── core/                What both servers share
+├── cmd/goiabada-setup/  The setup wizard, a module of its own
+└── build/               The release Dockerfiles and build scripts
+```
+
+`ARCHITECTURE.md` at the repository root says which module owns what, and the unit tiers hold the code to it. `AGENTS.md` describes the code in depth: the sign-in state machine, the patterns every handler follows and every guard the tests run. It's written for AI coding assistants, and reads just as well for people. `CLAUDE.md` is the same file.
+
+### Many checks are tests
+
+Much of what a reviewer would otherwise check is a test that fails: the architecture rules, the logging convention, gofmt, the API error codes and audit events listed in the docs, and the docs pages that state a fact the code decides, this one included. When you change one of those facts, change the page in the same pull request.
+
+### The databases and mail
+
+The dev container runs MySQL, PostgreSQL and SQL Server beside it, and `make serve` uses SQL Server. The tests leave that database alone: each data and integration run starts from an empty database of its own.
+
+Mailpit runs beside them too. Under **Email - SMTP** in the admin console's settings, turn on **SMTP enabled** and set the host to `mailpit`, the port to 1025 and the encryption to **None**. Every mail Goiabada sends then lands in Mailpit, at http://localhost:8025.
+
+### CI
+
+CI runs the same tiers on every pull request, a job each, and builds the site. The data and integration tiers wait until the pull request is out of draft.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="GitHub issues" description="Find something to work on, or report a bug." href="https://github.com/leodip/goiabada/issues" />
+  <LinkCard title="Security" description="How to report a vulnerability privately." href="/reference/security/#report-a-vulnerability" />
+  <LinkCard title="Glossary" description="The one name for each concept, in the code and the docs." href="/concepts/glossary/" />
+</CardGrid>

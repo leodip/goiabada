@@ -1,18 +1,30 @@
 ---
 title: About
-description: About Goiabada and its creator.
+description: Why Goiabada exists, where its name comes from, and who makes it.
 ---
 
-import { Aside, Card } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Goiabada was developed to be an easy-to-use solution for user management. Plenty of alternatives exist, but this is my personal take on the concept.
+This page tells you why Goiabada exists and where its name comes from.
 
-I'm committed to making Goiabada forever free and open source. I want you to self-host it and have total control over the code and data.
+Goiabada is an auth server you run yourself, made to be easy to set up and easy to live with. There are plenty of alternatives; this is one person's take on how it should work.
+
+It's free and open source, and it'll stay that way. You host it, so the code and the data are yours.
 
 ## The name
 
-The name is inspired by a Brazilian sweet made with guava. I was keen on choosing a word that started with "Go" 😉
+Goiabada is a Brazilian sweet made from guava. It also starts with "Go", the language Goiabada is written in. 😉
 
-![Goiabada - Brazilian guava sweet](/img/about1.png)
+![A block of goiabada, the Brazilian guava sweet](/img/about1.png)
 
-— Leonardo D'Ippolito
+## Who makes it
+
+Goiabada is created and maintained by Leonardo D'Ippolito, with fixes and ideas from the people who use it. You can join them: see [Contributing](/about/contributing/).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Introduction" description="What Goiabada does for your apps." href="/get-started/introduction/" />
+  <LinkCard title="Contributing" description="Build Goiabada from source and send a change." href="/about/contributing/" />
+  <LinkCard title="Contact" description="Report a bug, or get in touch." href="/about/contact/" />
+</CardGrid>
