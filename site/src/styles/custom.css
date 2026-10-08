@@ -1,0 +1,7 @@
+/* Starlight lets a list item's text break anywhere, and a table inside a step inherits
+   that, so its columns are sized as if a word could split between any two letters:
+   "Deployment" became "Deployme" and "nt". In a table a word wraps whole, and splits
+   only when it would overflow. */
+.sl-markdown-content table {
+	overflow-wrap: break-word;
+}

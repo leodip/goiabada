@@ -61,6 +61,7 @@ export default defineConfig({
 			],
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/leodip/goiabada' }],
 			favicon: '/favicon.ico',
+			customCss: ['./src/styles/custom.css'],
 			head: [
 				{
 					tag: 'script',
