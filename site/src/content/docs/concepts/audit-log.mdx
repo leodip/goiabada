@@ -234,7 +234,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `token_issued_client_credentials_response` | The token endpoint issued an access token to a client through the client credentials flow. |
 | `token_issued_ropc_response` | The token endpoint issued tokens for a username and password, through the password grant. |
 | `token_issued_implicit_response` | The authorization endpoint issued tokens straight to a client, through the implicit flow. |
-| `token_scope_denied` | The token endpoint refused a request for a scope the client or user may not have. |
+| `token_scope_denied` | The token endpoint refused a request for a scope the client or user may not have, or a client credentials request that left `scope` out from a client holding no permissions, recorded with an empty `scope`. |
 | `ropc_auth_failed` | The token endpoint refused a password grant, because the email or password was wrong, or the user was disabled or has two-factor authentication on. |
 | `auth_code_reuse_detected` | A client redeemed an authorization code a second time. The refresh tokens issued through that code's session were revoked, and the session ended. |
 | `refresh_token_replay_detected` | A refresh token that had already been rotated came back, so the rest of its family was revoked. |

@@ -103,8 +103,16 @@ func (val *TokenValidator) validateClientCredentialsGrant(ctx context.Context, c
 
 func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, scope string, client *record.Client) error {
 
+	// An empty scope here is an omitted one the expansion above found nothing for: an explicit
+	// `scope=` reaches the validator as omitted. RFC 6749 section 3.3 says a request that omits
+	// scope is processed with a pre-defined default or failed as invalid_scope, and the default
+	// is every permission the client holds, so a client holding none has none. This returned
+	// nil, and the issuer split the empty scope into one empty element and refused it as a plain
+	// error, which answered the client's own mistake 500 server_error.
 	if len(scope) == 0 {
-		return nil
+		return oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
+			"The client holds no permissions, so a request without a scope has nothing to grant.",
+			http.StatusBadRequest)
 	}
 
 	for _, scopeStr := range oidc.SplitScope(scope) {

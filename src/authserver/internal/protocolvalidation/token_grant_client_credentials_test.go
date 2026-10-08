@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
@@ -885,13 +886,6 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
 			resourcesLookedUp: []record.Resource{billingResource, reportsResource},
 		},
 		{
-			// Empty scope short-circuits validateClientCredentialsScopes, so nothing is looked up.
-			name:              "a client holding nothing yields an empty scope",
-			clientPerms:       nil,
-			wantScope:         "",
-			resourcesLookedUp: nil,
-		},
-		{
 			name:              "a single grant yields a single scope",
 			clientPerms:       []record.Permission{billingRead},
 			wantScope:         "billing-api:read",
@@ -948,4 +942,39 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestValidateTokenRequest_ClientCredentials_NoScopeFromAClientHoldingNothingIsInvalidScope: with
+// scope omitted the grant's default is every permission the client holds, so a client holding none
+// has no default, and RFC 6749 section 3.3 says such a request fails as invalid_scope. It used to
+// pass the validator with an empty scope and reach the issuer, which refused it as a plain error,
+// answered 500 server_error. Nothing is resolved: the refusal comes before any scope is looked up.
+func TestValidateTokenRequest_ClientCredentials_NoScopeFromAClientHoldingNothingIsInvalidScope(t *testing.T) {
+	mockDB := datamocks.NewDatabase(t)
+	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
+
+	clientSecretEncrypted, err := testDataCipher.Encrypt("valid_secret")
+	require.NoError(t, err)
+	client := &record.Client{
+		ClientIdentifier:         "cc_client",
+		Enabled:                  true,
+		ClientCredentialsEnabled: true,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "cc_client").Return(client, nil)
+	mockDB.On("ClientLoadPermissions", mock.Anything, mock.Anything, client).Return(nil)
+	mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]record.Permission")).Return(nil)
+
+	result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{
+		GrantType:    "client_credentials",
+		ClientId:     "cc_client",
+		ClientSecret: "valid_secret",
+	})
+
+	assert.Nil(t, result)
+	var detail *oauth.ErrorDetail
+	require.True(t, errors.As(err, &detail), "the client's mistake is an OAuth error, not a server fault: %v", err)
+	assert.Equal(t, "invalid_scope", detail.Code())
+	assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
+	assert.Equal(t, "The client holds no permissions, so a request without a scope has nothing to grant.", detail.Description())
 }
