@@ -133,7 +133,7 @@ Direct username/password exchange for tokens. **Deprecated in OAuth 2.1** due to
 - Implementation: `handler_token_password.go`, `protocolvalidation/token_grant_password.go`, `issuance/grant_password.go`
 
 ### Dynamic Client Registration (RFC 7591)
-Programmatic client registration for MCP servers, native apps, etc.
+Programmatic client registration for MCP clients, native apps, etc.
 - Endpoint: `POST /connect/register`
 - Disabled by default. Enable via `Settings.DynamicClientRegistrationEnabled`
 - Creates public or confidential clients based on `token_endpoint_auth_method`
