@@ -49,6 +49,31 @@ func TestNew_AnUnopenableFileIsAConnectionError(t *testing.T) {
 	assert.Equal(t, sqliteCantOpen, sqliteErr.Code(), "the driver's code survives the wrap")
 }
 
+// sqliteReadonlyDirectory is SQLITE_READONLY_DIRECTORY, SQLITE_READONLY (8) with 6 in its high
+// byte, the extended code SQLite answers at connection for a database whose directory the server
+// cannot write. The readonly-database troubleshooting page quotes the refusal it produces.
+const sqliteReadonlyDirectory = 1544
+
+// sqliteIOErrRead is SQLITE_IOERR_READ, an extended code the driver does name.
+const sqliteIOErrRead = 266
+
+// TestCodeName_AnExtendedCodeTheDriverLeavesOutIsNamedByItsPrimaryCode: the connection refusal
+// names SQLite's code, and the driver's table names only some extended codes, so 1544 printed as
+// "unable to connect to database: : attempt to write a readonly database (1544)", an empty name
+// between two colons. A code the table does name, primary or extended, keeps its own name.
+func TestCodeName_AnExtendedCodeTheDriverLeavesOutIsNamedByItsPrimaryCode(t *testing.T) {
+	_, listed := sqlitedriver.ErrorCodeString[sqliteReadonlyDirectory]
+	require.False(t, listed, "the driver now names 1544 itself, so this case no longer exercises the fallback")
+
+	assert.Equal(t, "Attempt to write a readonly database (SQLITE_READONLY)", codeName(sqliteReadonlyDirectory))
+	assert.Equal(t, "Unable to open the database file (SQLITE_CANTOPEN)", codeName(sqliteCantOpen))
+
+	require.Contains(t, sqlitedriver.ErrorCodeString, sqliteIOErrRead)
+	assert.Equal(t, sqlitedriver.ErrorCodeString[sqliteIOErrRead], codeName(sqliteIOErrRead),
+		"an extended code the driver names keeps its own name rather than its primary code's")
+	assert.NotEqual(t, sqlitedriver.ErrorCodeString[sqliteIOErrRead&0xff], codeName(sqliteIOErrRead))
+}
+
 // TestNew_ARefusedPragmaClosesThePool is the input that gets past the ping and is then refused: a
 // real file in SQLite's default DELETE journal mode, opened read-only, connects and cannot be
 // switched to WAL. The constructor returns no database, so the caller has nothing to close, and

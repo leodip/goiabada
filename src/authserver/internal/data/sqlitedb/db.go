@@ -78,7 +78,7 @@ func New(ctx context.Context, dsn string, logSQL bool) (*Database, error) {
 		_ = db.Close()
 		var sqliteErr *sqlitedriver.Error
 		if errors.As(err, &sqliteErr) {
-			return nil, errs.Wrapf(err, "unable to connect to database: %s", sqlitedriver.ErrorCodeString[sqliteErr.Code()])
+			return nil, errs.Wrapf(err, "unable to connect to database: %s", codeName(sqliteErr.Code()))
 		}
 		return nil, errs.Wrap(err, "unable to connect to database")
 	}
@@ -100,6 +100,18 @@ func New(ctx context.Context, dsn string, logSQL bool) (*Database, error) {
 	}
 
 	return &sqliteDb, nil
+}
+
+// codeName is SQLite's name for a result code as the driver spells it, e.g. "Unable to open the
+// database file (SQLITE_CANTOPEN)". The driver names every primary code but only some extended
+// ones, so an extended code it leaves out, such as 1544 (SQLITE_READONLY_DIRECTORY) for a
+// directory the server cannot write, is named by its primary code, the low byte, instead of
+// printing as nothing.
+func codeName(code int) string {
+	if name, ok := sqlitedriver.ErrorCodeString[code]; ok {
+		return name
+	}
+	return sqlitedriver.ErrorCodeString[code&0xff]
 }
 
 // applyPragmas sets the PRAGMAs Goiabada requires on db and reads each back, refusing a value

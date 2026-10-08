@@ -11,7 +11,7 @@ This page helps you when the auth server can't write its SQLite database.
 
 The auth server stops right after it opens the database, and its log has `unable to create the database connection`, with one of these as its `error`:
 
-- `unable to connect to database: : attempt to write a readonly database (1544)`, when it can't write the **directory** holding the database file, where SQLite creates the files it keeps beside it.
+- `unable to connect to database: Attempt to write a readonly database (SQLITE_READONLY): attempt to write a readonly database (1544)`, when it can't write the **directory** holding the database file, where SQLite creates the files it keeps beside it.
 - `unable to migrate the database: unable to clear schema_migrations: attempt to write a readonly database (8)`, when it can't write the **file**, and the new release has a migration to run.
 
 Under Docker Compose, the container restarts and stops again with the same record.
