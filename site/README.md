@@ -73,7 +73,8 @@ site/checks/docs-image.sh goiabada-docs
 
 `checks/docs-image.sh` starts the image and asserts nginx's answers: 200 for a page, 404 with the
 site's 404 page, with its search and sidebar, for any other path, a 301 to the relative path with the slash for a page asked
-without it, and `charset=utf-8` on text. The 404 page's text is `src/content/docs/404.md`.
+without it, `charset=utf-8` on text, and `X-Frame-Options` and `X-Content-Type-Options` on every answer, static
+assets included. The 404 page's text is `src/content/docs/404.md`.
 
 CI's Check workflow runs the checks' tests, the build and the image's answers on every pull
 request. The Docs workflow builds and pushes the image when `site/` or

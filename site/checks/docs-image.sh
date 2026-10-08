@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Asserts what a built docs image answers over HTTP: 200 for a page, 404 with the
 # site's 404 page, its search and its sidebar, for any path that is not a built file, a 301 to the relative
-# path with the slash for a page asked without it, and UTF-8 text. These answers
-# are nginx's, so only a running image shows them.
+# path with the slash for a page asked without it, UTF-8 text, and the security
+# headers on every answer, static assets included. These answers are nginx's, so
+# only a running image shows them.
 #
 #   site/checks/docs-image.sh <image>
 #
@@ -34,11 +35,14 @@ fail() {
 }
 
 # Requests a path, leaving its status, Location and Content-Type in the variables
-# of those names and its body in $tmp/body.
+# of those names and its body in $tmp/body, and asserts the security headers,
+# which every answer carries.
 request() {
 	status=$(curl -s -o "$tmp/body" -D "$tmp/headers" -w '%{http_code}' "$base$1")
 	location=$(header Location)
 	content_type=$(header Content-Type)
+	expect "GET $1 X-Frame-Options" "$(header X-Frame-Options)" SAMEORIGIN
+	expect "GET $1 X-Content-Type-Options" "$(header X-Content-Type-Options)" nosniff
 }
 header() {
 	grep -i "^$1:" "$tmp/headers" | head -n 1 | cut -d: -f2- | sed 's/^ *//; s/\r$//' || true
@@ -91,6 +95,17 @@ for path in /no/such/page/ /no/such/page /getting-started/no-such-page/ /404 /40
 	expect_body "GET $path" 'id="starlight__sidebar"'
 	expect_body "GET $path" 'href="/get-started/introduction/"'
 	expect_body "GET $path" 'href="/"'
+done
+
+# A stylesheet and a script the build wrote, and the site's icon: nginx answers
+# these from the asset location, which drops every add_header of the server
+# block it does not repeat.
+assets=$(docker exec "$container" sh -c 'cd /usr/share/nginx/html && { find ./_astro -name "*.css" | sort | head -n 1; find ./_astro -name "*.js" | sort | head -n 1; }' | sed 's|^\.||')
+[ "$(echo "$assets" | grep -c .)" = 2 ] || fail "the image holds no stylesheet or no script under /_astro/"
+for path in $assets /favicon.ico; do
+	request "$path"
+	expect "GET $path status" "$status" 200
+	grep -qi '^Cache-Control:.*immutable' "$tmp/headers" || fail "GET $path: not answered from the asset location"
 done
 
 # A text file the image is given here, with non-ASCII text, and every text file
