@@ -11,20 +11,20 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.42.0",
-    "astro": "^7.3.2",
+    "@astrojs/starlight": "^0.42.5",
+    "astro": "^7.3.7",
     "hast-util-from-html": "^2.0.3",
     "hast-util-select": "^6.0.4",
     "hast-util-to-mdast": "^10.1.2",
-    "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-from-markdown": "^2.1.0",
     "mdast-util-gfm-strikethrough": "^2.0.1",
     "mdast-util-gfm-table": "^2.0.0",
     "mdast-util-gfm-task-list-item": "^2.0.0",
-    "mdast-util-to-markdown": "^2.1.2",
+    "mdast-util-to-markdown": "^2.2.0",
     "mdast-util-to-string": "^4.0.0",
     "sharp": "^0.35.5",
     "starlight-links-validator": "^0.26.0",
-    "starlight-openapi": "^0.26.2",
+    "starlight-openapi": "^0.27.0",
     "yaml": "^2.9.1"
   }
 }
