@@ -865,7 +865,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			assert.Nil(t, result)
 			customErr, ok := err.(*oauth.ErrorDetail)
 			if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
-				assert.Equal(t, "invalid_request", customErr.Code())
+				assert.Equal(t, "invalid_grant", customErr.Code())
 				assert.Equal(t, "The refresh token is invalid because it does not belong to the client.",
 					customErr.Description())
 			}

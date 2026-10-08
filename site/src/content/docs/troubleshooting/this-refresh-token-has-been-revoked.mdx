@@ -60,6 +60,7 @@ Other reasons a refresh answers `invalid_grant`:
 | "The refresh token is invalid because the associated session has expired or been terminated." | The session it was issued through ended, or the client was made public. |
 | "The refresh token is invalid because it has expired (offline_access_max_lifetime)." | An offline refresh token reached its maximum lifetime. |
 | "The refresh token is invalid." | The user is disabled, or the token is unknown or in a revoked family. |
+| "The refresh token is invalid because it does not belong to the client." | The request named a client other than the one the token was issued to. Each client refreshes only its own tokens. |
 
 ## Next steps
 

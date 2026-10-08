@@ -365,7 +365,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 
 	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	assert.Equal(t, "invalid_request", data["error"])
+	assert.Equal(t, "invalid_grant", data["error"])
 	assert.Equal(t, "The refresh token is invalid because it does not belong to the client.", data["error_description"])
 }
 

@@ -43,7 +43,7 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 			// Ownership comes first, so another client presenting a pre-000051 token learns only
 			// that it is not theirs.
 			{"another client's token recording none is refused as not its own", sql.NullTime{}, 2,
-				"invalid_request", "The refresh token is invalid because it does not belong to the client."},
+				"invalid_grant", "The refresh token is invalid because it does not belong to the client."},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				mockDB := datamocks.NewDatabase(t)

@@ -410,7 +410,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		assert.Error(t, err)
 		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_request", customErr.Code())
+		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Contains(t, customErr.Description(), "The refresh token is invalid because it does not belong to the client")
 	})
 

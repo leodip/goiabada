@@ -127,7 +127,7 @@ Every refresh rotates the token: the answer carries a new refresh token, and the
 
 `scope` narrows only the access token of this answer. The new refresh token keeps the original scope, so a later refresh can ask for all of it again. A scope the refresh token doesn't hold is refused with `invalid_scope`.
 
-The refresh is refused with `invalid_grant` when the token can't be used any more, with a description saying why: the user's session has ended or expired, the user was disabled or their credentials changed, an offline refresh token reached its maximum lifetime, or the user withdrew their consent. A refresh token issued to another client is refused with `invalid_request`, "The refresh token is invalid because it does not belong to the client." [Refresh tokens](/concepts/refresh-tokens/#how-long-a-refresh-token-lasts) explains how long each kind lasts.
+The refresh is refused with `invalid_grant` when the token can't be used any more, with a description saying why: the user's session has ended or expired, the user was disabled or their credentials changed, an offline refresh token reached its maximum lifetime, or the user withdrew their consent. So is a refresh token issued to another client, with "The refresh token is invalid because it does not belong to the client." [Refresh tokens](/concepts/refresh-tokens/#how-long-a-refresh-token-lasts) explains how long each kind lasts.
 
 ### Client credentials grant
 

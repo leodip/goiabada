@@ -83,7 +83,7 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 			// recorded, because the record is never read.
 			name: "another client's token, family recorded", clientIdentifier: "client2",
 			userEnabled: true, familyRevoked: true,
-			want: &wantRefusal{code: "invalid_request", description: "The refresh token is invalid because it does not belong to the client.", status: http.StatusBadRequest},
+			want: &wantRefusal{code: "invalid_grant", description: "The refresh token is invalid because it does not belong to the client.", status: http.StatusBadRequest},
 		},
 		{
 			name: "wrong secret, family recorded", clientIdentifier: "client1", clientSecret: "not_the_secret",

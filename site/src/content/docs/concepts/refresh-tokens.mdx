@@ -85,7 +85,7 @@ A refresh is refused with `invalid_grant` when the token can't be used any more:
 - the user no longer holds a permission the token carries;
 - the user withdrew their consent to your app, when it has **Consent required** on or the token is an offline one from a sign-in.
 
-A token issued to another client is refused with `invalid_request`. The [token endpoint](/reference/endpoints/token/#refresh-token-grant) lists every answer, and `scope` can narrow one refresh's access token. [This refresh token has been revoked](/troubleshooting/this-refresh-token-has-been-revoked/#how-it-works) gives each `error_description` and why it happens.
+A token issued to another client is refused with `invalid_grant`. The [token endpoint](/reference/endpoints/token/#refresh-token-grant) lists every answer, and `scope` can narrow one refresh's access token. [This refresh token has been revoked](/troubleshooting/this-refresh-token-has-been-revoked/#how-it-works) gives each `error_description` and why it happens.
 
 ### Rotation
 

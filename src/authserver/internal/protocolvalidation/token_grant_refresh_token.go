@@ -148,8 +148,12 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		tokenUser = &refreshToken.Code.User
 	}
 
+	// RFC 6749 section 5.2 names this case under invalid_grant: a refresh token "issued to another
+	// client". It was invalid_request, the code for a malformed request, so a client following the
+	// RFC read its own bug where there was a token to throw away. The authorization code arm
+	// answers the same situation with invalid_grant.
 	if tokenClientId != client.Id {
-		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"The refresh token is invalid because it does not belong to the client.", http.StatusBadRequest)
 	}
 

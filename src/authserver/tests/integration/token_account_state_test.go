@@ -142,7 +142,7 @@ func TestToken_Refresh_AccountStateReadAfterOwnership(t *testing.T) {
 				"client_id":     {otherClient.ClientIdentifier},
 				"refresh_token": {refreshToken},
 			})
-			assertTokenRefusal(t, status, body, http.StatusBadRequest, "invalid_request",
+			assertTokenRefusal(t, status, body, http.StatusBadRequest, "invalid_grant",
 				"The refresh token is invalid because it does not belong to the client.")
 
 			status, body = postFormToTokenEndpoint(t, url.Values{
