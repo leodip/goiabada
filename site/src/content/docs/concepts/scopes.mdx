@@ -1,153 +1,86 @@
 ---
-title: OpenID Connect scopes
-description: Standard OIDC scopes for retrieving identity information.
+title: Scopes
+description: What your app can ask for, which claims each scope gives it, and where those claims appear.
 ---
 
-Besides the authorization scopes that are formed by resources and permissions (as explained in [Resources and permissions](/concepts/resources-and-permissions/)), Goiabada supports typical OpenID Connect scopes.
+import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-## Available OIDC scopes
+This page helps your app ask for the right scopes, and tells you which claims about the user each one gets you.
 
-<table>
-  <thead>
-    <tr>
-      <th style="white-space: nowrap;">OIDC scope</th>
-      <th>Description</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="white-space: nowrap;"><code>openid</code></td>
-      <td>Will include an <code>id_token</code> in the token response, with the subject identifier (<code>sub</code> claim)</td>
-    </tr>
-    <tr>
-      <td style="white-space: nowrap;"><code>profile</code></td>
-      <td>Access to claims: <code>name</code>, <code>family_name</code>, <code>given_name</code>, <code>middle_name</code>, <code>nickname</code>, <code>preferred_username</code>, <code>profile</code>, <code>picture</code>, <code>website</code>, <code>gender</code>, <code>birthdate</code>, <code>zoneinfo</code>, <code>locale</code>, and <code>updated_at</code></td>
-    </tr>
-    <tr>
-      <td style="white-space: nowrap;"><code>email</code></td>
-      <td>Access to claims: <code>email</code>, <code>email_verified</code></td>
-    </tr>
-    <tr>
-      <td style="white-space: nowrap;"><code>address</code></td>
-      <td>Access to the <code>address</code> claim</td>
-    </tr>
-    <tr>
-      <td style="white-space: nowrap;"><code>phone</code></td>
-      <td>Access to claims: <code>phone_number</code> and <code>phone_number_verified</code></td>
-    </tr>
-    <tr>
-      <td style="white-space: nowrap;"><code>groups</code></td>
-      <td>Access to the list of groups the user belongs to</td>
-    </tr>
-    <tr>
-      <td style="white-space: nowrap;"><code>attributes</code></td>
-      <td>Access to the attributes assigned to the user by an admin, stored as key-value pairs</td>
-    </tr>
-    <tr>
-      <td style="white-space: nowrap;"><code>offline_access</code></td>
-      <td>Access to a refresh token of the type <code>Offline</code>, allowing the client to obtain a new access token without requiring immediate user interaction</td>
-    </tr>
-  </tbody>
-</table>
+A scope is something a client asks for when it requests a token. There are two kinds:
 
-## Example usage
+- **OpenID Connect scopes**, such as `openid`, `profile` and `email`, which give your app information about the user, as claims.
+- **Permission scopes**, written `resource:permission`, such as `product-api:read`, which let your app call an API. See [Resources and permissions](/concepts/resources-and-permissions/).
 
-When making an authorization request, include the scopes you need:
+## Ask for scopes
 
-```
-GET /auth/authorize?
-  client_id=my-app&
-  redirect_uri=https://my-app.com/callback&
-  response_type=code&
-  scope=openid profile email groups&
-  code_challenge=...&
-  code_challenge_method=S256
-```
+<Steps>
 
-The claims corresponding to the requested scopes are always available via the `/userinfo` endpoint. By default, they are also included in the ID token, but this can be configured globally or per-client (see [OIDC claims in tokens](#oidc-claims-in-tokens) below). The `locale` claim (in the `profile` scope) reflects the user's chosen language — see [Localization](/guides/localization/).
+1. Decide what your app needs. To know who the user is, ask for `openid`. Add `profile`, `email` or another scope below for each piece of information you'll use, and a permission scope for each API call.
 
-## Scope to claims mapping
+2. Put them in the `scope` parameter of the authorization request, separated by single spaces:
 
-When you request a scope, the following claims become available:
+   ```http
+   GET /auth/authorize?client_id=my-app&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback&response_type=code&scope=openid%20profile%20email%20product-api%3Aread&code_challenge=...&code_challenge_method=S256&state=... HTTP/1.1
+   Host: auth.example.com
+   ```
 
-<table>
-  <thead>
-    <tr>
-      <th style="white-space: nowrap;">Scope</th>
-      <th>Claims in UserInfo response / ID token (if enabled)</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="white-space: nowrap;"><code>openid</code></td>
-      <td><code>sub</code> (always included)</td>
-    </tr>
-    <tr>
-      <td style="white-space: nowrap;"><code>profile</code></td>
-      <td><code>name</code>, <code>given_name</code>, <code>middle_name</code>, <code>family_name</code>, <code>nickname</code>, <code>preferred_username</code>, <code>profile</code>, <code>picture</code>, <code>website</code>, <code>gender</code>, <code>birthdate</code>, <code>zoneinfo</code>, <code>locale</code>, <code>updated_at</code></td>
-    </tr>
-    <tr>
-      <td style="white-space: nowrap;"><code>email</code></td>
-      <td><code>email</code>, <code>email_verified</code></td>
-    </tr>
-    <tr>
-      <td style="white-space: nowrap;"><code>address</code></td>
-      <td><code>address</code> (structured object with <code>formatted</code>, <code>street_address</code>, <code>locality</code>, <code>region</code>, <code>postal_code</code>, <code>country</code>)</td>
-    </tr>
-    <tr>
-      <td style="white-space: nowrap;"><code>phone</code></td>
-      <td><code>phone_number</code>, <code>phone_number_verified</code></td>
-    </tr>
-    <tr>
-      <td style="white-space: nowrap;"><code>groups</code></td>
-      <td><code>groups</code> (array of group identifiers)</td>
-    </tr>
-    <tr>
-      <td style="white-space: nowrap;"><code>attributes</code></td>
-      <td><code>attributes</code> (key-value map of custom attributes)</td>
-    </tr>
-  </tbody>
-</table>
+3. Read the `scope` in the token response. It's what was granted, which can be less than you asked for.
 
-## OIDC claims in tokens
+</Steps>
 
-### ID token vs UserInfo endpoint
+Ask only for what you use: the user sees the list on the consent screen, when the client asks for consent.
 
-According to the OpenID Connect specification ([OIDC Core 5.4](https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims)), scope-related claims (from `profile`, `email`, `phone`, `address` scopes) **MAY** be included in ID tokens but **SHOULD** be retrieved from the `/userinfo` endpoint for strict conformance.
+## How it works
 
-Goiabada gives you control over this behavior:
+### OpenID Connect scopes and their claims
 
-- **Default**: Claims are included in ID tokens (matches industry practice - Auth0, Microsoft, Keycloak)
-- **Strict OIDC conformance**: Disable claims in ID tokens, forcing applications to use `/userinfo`
-- **Hybrid approach**: Configure per-client based on application requirements
+| Scope | Claims |
+|---|---|
+| `openid` | `sub`, the user's subject. It also gets your app an ID token, and lets it call `/userinfo`. |
+| `profile` | `name`, `given_name`, `middle_name`, `family_name`, `nickname`, `preferred_username`, `profile`, `picture`, `website`, `gender`, `birthdate`, `zoneinfo`, `locale` and `updated_at` |
+| `email` | `email` and `email_verified` |
+| `address` | `address`, an object with `formatted`, `street_address`, `locality`, `region`, `postal_code` and `country` |
+| `phone` | `phone_number` and `phone_number_verified` |
+| `groups` | `groups`, the identifiers of the user's groups |
+| `attributes` | `attributes`, the user's attributes and those of their groups, as keys and values |
+| `offline_access` | No claim. It gets your app an offline refresh token, which keeps working after the user's session ends. |
 
-### Configuration
+A claim with no value is left out rather than sent empty: a user with no nickname has no `nickname`. `email_verified` and `phone_number_verified` are always sent with their scope, `address` only when some part of the address is set, and `picture` only when the user has a profile picture. `profile` links to the user's account page, and `locale` is the language the user chose.
 
-**Global setting** - Navigate to **Settings → Tokens** in the admin console:
-- **Include OIDC claims in ID tokens**: Controls default behavior for all clients
-- Default: Enabled (matches industry standards)
+`groups` lists only the groups set to be included, and `attributes` only the attributes set to be included: see [Users and groups](/concepts/users-and-groups/#groups).
 
-**Per-client override** - In the client's **Tokens** settings:
-- **Include OIDC claims in ID tokens**: Three options
-  - `default` - Use the global setting
-  - `on` - Always include claims in ID tokens for this client
-  - `off` - Never include claims in ID tokens for this client (use `/userinfo` only)
+`groups`, `attributes` and `offline_access` are Goiabada's own. The rest are defined by [OpenID Connect Core, section 5.4](https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims).
 
-### When to disable
+### Where the claims go
 
-Consider disabling OIDC claims in ID tokens when:
+Your app can read the claims in three places.
 
-- **Strict OIDC conformance required** - Regulatory or security requirements mandate standard-compliant behavior
-- **Token size concerns** - ID tokens are included in every redirect, smaller tokens improve performance
-- **Claim freshness important** - Force applications to fetch current data from `/userinfo` instead of cached token claims
-- **Security policy** - Separation of authentication (ID token) from user data (UserInfo endpoint)
+- **`/userinfo`** answers with the claims of every OpenID Connect scope in the access token you call it with. The token must carry `openid`.
+- **The ID token** carries them when **Include OpenID Connect claims in the ID token** is on, under **Admin**, **Tokens**. It's on in a new installation.
+- **The access token** carries them when **Include OpenID Connect claims in the access token** is on, on the same page, and the token carries `openid`. It's off in a new installation.
 
-### Important notes
+A client can override either setting on its own **Tokens** tab. Turn ID token claims off for a client that expects them only from `/userinfo`, as OpenID Connect describes when an access token is issued, or that needs a small ID token. Turn access token claims on when your API should read the user's details from the token without calling `/userinfo`.
 
-import { Aside } from '@astrojs/starlight/components';
+Neither setting decides `groups` and `attributes`. Each group and attribute has its own two settings instead: **Include in access token** for the access token, and **Include in id token** for the ID token and `/userinfo`.
 
-<Aside type="note">
-- Core OpenID claims (`sub`, `iss`, `aud`, `exp`, `iat`, `auth_time`, `nonce`, `acr`, `amr`) are **always** included in ID tokens regardless of this setting
-- The `groups` and `attributes` scopes are Goiabada-specific extensions and follow their own inclusion rules
-- Claims are **always** available via the `/userinfo` endpoint regardless of this setting
-</Aside>
+The claims about the sign-in itself, such as `sub`, `iss`, `aud`, `exp`, `auth_time` and `acr`, are always in the ID token. See [Tokens](/concepts/tokens/).
+
+### Permission scopes
+
+A permission scope names a permission: `product-api:read` is the permission `read` on the resource `product-api`.
+
+- When your app signs a user in, the token carries the permissions the user holds, directly or through a group, out of those it asked for. The rest are left out without an error.
+- With the client credentials flow, the token carries the permissions the client itself holds. Leave `scope` out to get all of them.
+- The administrative scopes, such as `authserver:manage`, need the client to be allowed to request them. See [administrative scopes](/concepts/clients/#administrative-scopes).
+
+### Rules
+
+Scopes are case-sensitive and separated by exactly one space, with none at either end. Asking for `offline_access` alone is refused, since it grants nothing by itself. A scope the auth server doesn't know, or a permission the client may not have, is refused with `invalid_scope`: see [invalid_scope](/troubleshooting/invalid-scope/).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Resources and permissions" description="Create the permissions your permission scopes name." href="/concepts/resources-and-permissions/" />
+  <LinkCard title="Tokens" description="What each token carries, and how long it lasts." href="/concepts/tokens/" />
+</CardGrid>

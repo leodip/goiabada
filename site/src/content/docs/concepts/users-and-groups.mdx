@@ -1,96 +1,106 @@
 ---
 title: Users and groups
-description: User management, groups, and self-registration settings.
+description: Create users, organize them in groups, and give them permissions and attributes.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-## User management
+This page helps you create users, put them in groups, and decide what a client learns about them.
 
-As an administrator of Goiabada, you can create users and configure their properties:
+A user is a person who signs in. A group is a set of users: the permissions and attributes you give a group apply to every user in it, so you set them once instead of on each user.
 
-- Profile information (name, nickname, etc.)
-- Address
-- Phone
-- Email
+## Create a user
 
-You also have the capability to:
+<Steps>
 
-- Modify user credentials
-- Terminate active user sessions
-- Revoke consents
+1. In the admin console, open **Admin**, **Users** and click **Create new**.
 
-## Password recovery
+2. Enter the user's **Email**, and their **Given name**, **Middle name** and **Family name** if you like. Turn on **Email verified** if you know the address is theirs.
 
-A user who forgot their password can ask for a reset link from the login form. The link is sent only when the account is **enabled** and its email address is **verified**. For any other account (one whose address was never verified, or one an administrator disabled) nothing is sent and no code is stored, and the page says exactly what it says for an address with no account, so it cannot be used to find out which addresses are registered.
+3. Choose how the user gets a password:
 
-A reset link stops working as soon as its account is disabled, or as soon as the account's email address is changed, by the user or by an administrator, since the link belongs to the address it was mailed to: following it, opening the form and submitting it are each refused with the same "invalid or expired" message any other dead link gets. Correcting a mistyped address after sending a new user the email to set a password therefore retires the link sent to the mistyped address; send the email again. Sending a reset link also needs SMTP to be configured in the admin console.
+   - **Set password now**, and type it in. Tell the user what it is.
+   - **Email the user a link to set up their password.** The user chooses the password themselves. This choice appears only when email is set up, under **Email - SMTP**.
 
-<Aside type="caution">
-On the default settings, self-registration does not require email verification, and a user an administrator creates starts with the address unverified. Those users cannot recover a password on their own until they verify their address while signed in (offered in the account pages whenever SMTP is configured), or until an administrator marks the address verified or sets a new password for them.
-</Aside>
+4. Click **Create**. The user's page opens on its **Details** tab.
 
-## Permissions and attributes
+</Steps>
 
-You can assign permissions and attributes to individual users.
+Users can also create their own accounts from the sign-in page: see [Self-registration](/concepts/self-registration/).
 
-**Attributes** are key-value pairs of arbitrary information that can be included in the access token or ID token. When creating an attribute, you can choose to include it either in the access token or the ID token.
+## Create a group
 
-## Groups
+<Steps>
 
-To facilitate user management, you can create groups of users.
+1. Open **Admin**, **Groups** and click **Create new**.
 
-When you give a permission to a group, it's given to all group members. The same applies to attributes - group attributes will be included for all group members.
+2. Enter a **Group identifier**, such as `editors`, and a **Description**.
 
-Groups are useful for:
+3. Leave **Include group in access token if requested** and **Include group in id token if requested** on if clients should see that a user is in this group. Click **Create**.
 
-- Role-based access control (e.g., `admins`, `editors`, `viewers`)
-- Department-based permissions
-- Feature flags for specific user segments
+4. Open the group's **Members** tab, click **Add member**, search for a user and click **Add to group**.
 
-A group holding one of the [administrative permissions](/concepts/resources-and-permissions/#administrators) makes every member an administrator. Adding a user to such a group, removing one from it, or deleting it therefore needs `authserver:manage`, just as granting the permission directly does.
+</Steps>
 
-## The last administrator
+Now give the group what its members need: permissions on its **Permissions** tab, and attributes on its **Attributes** tab.
 
-Goiabada refuses a change that would leave nobody able to administer it. An administrator remains while at least one **enabled** user holds `authserver:manage`, directly or through a group. Six changes can end that, and each is refused when it would bring the number of such users to zero:
+## How it works
 
-- revoking `manage` from a user;
-- revoking `manage` from a group;
-- removing a user from a group that gives them `manage`, from the group's members or from the user's groups;
-- deleting a group that gives `manage`;
-- disabling a user;
-- deleting a user.
+### Users
 
-The refusal changes nothing and answers `409` with the error code `LAST_ADMINISTRATOR`, and the admin console shows its sentence on the page you made the change from: "This change would leave no enabled user holding authserver:manage. Grant it to another user first." Grant `manage` to another user, then repeat the change. Removing one of several administrators works as before.
+Each user has a **subject**, a random identifier the auth server gives them when they're created. It never changes, and it's the `sub` claim in every token about them, so key your app's records on it rather than on the email address, which can change.
 
-A client holding `manage` does not count, because what has to survive is a person who can sign in to the admin console and repair things; neither does a disabled user. The check reads permissions, not whether the person can still sign in: a sole administrator who has lost their authenticator, forgotten their password with no SMTP configured, or lost their mailbox still counts, and nothing in Goiabada gives them their access back. Keep `manage` on at least two people you trust, so that one can always restore the other.
+The email address is the user's sign-in name. Two users can't share one, it's stored in lowercase, and it's at most 60 characters long.
 
-## User self-registration
+Every new user gets the `authserver:manage-account` permission, which lets them manage their own account in the admin console's **Account** pages. Nothing else: a new user holds no other permission and is in no group.
 
-When the **User self-registration** setting is activated, end-users gain the ability to independently register their user accounts using a link on the login form.
+The user's page has these tabs: **Details**, **Profile**, **Picture**, **Email**, **Phone**, **Address**, **Authentication**, **Consents**, **Sessions**, **Attributes**, **Permissions** and **Groups**. The profile, email, phone and address are what a client reads through [scopes](/concepts/scopes/).
 
-If this setting is disabled, only administrators can create new user accounts through the admin console.
+### Enabled and disabled
 
-### Email verification
+A disabled user can't sign in. Turning off **Enabled** on the **Details** tab also ends every session the user has and revokes their refresh tokens, so no client can get a new token for them. Turning it back on lets them sign in again, and gives back nothing that was revoked.
 
-For user self-registrations, there's an option to require email verification for new accounts.
+Deleting a user deletes everything attached to them: their permissions, their group memberships and their attributes.
 
-With it enabled, and SMTP configured, the registration form asks for the email address only, and every well-formed address gets the same "check your email" page, whether or not it already has an account. What happens next travels in the mail. A new address is sent a link, valid for 5 minutes. Following it opens a form where the person who received the message chooses the account's password, and the account is created, with its address marked verified, only when that form is submitted. Opening the link alone creates nothing, so a mail scanner or link previewer that fetches it cannot complete a registration, and someone who registers an address that is not theirs never chooses the password the account gets.
+### Passwords
 
-An address that already has an account is sent a notice instead, saying that no new account was created and pointing at the forgot-password page, if the account is enabled and its address verified (the rule [password recovery](#password-recovery) applies). Any other account is sent nothing, and so is an address whose registration is still pending. Each such request leaves one `requested_registration` entry in the audit log, recording what it led to, with the address digested rather than stored.
+**Set password** on the **Authentication** tab gives the user a new password. It signs them out of every session, the same way a password they change themselves does. See [credential changes](/concepts/sessions/#credential-changes-and-live-sessions).
 
-If the address has meanwhile gained an account, for instance because an administrator created one, following the link is refused and the pending registration is discarded.
+A user who forgot their password can ask for a reset link from the sign-in page: see [Password recovery](/concepts/password-recovery/). The link you email a new user to set up their password is the same kind of link.
 
-Without email verification, the registration form asks for the password too, and the account is created at once, with its address unverified.
+The **Authentication** tab also shows whether the user has two-factor authentication, and lets you turn it off for a user who lost their authenticator. They can set it up again under **Account**.
 
-<Aside type="caution">
-Only registration with email verification hides whether an address has an account. Without it, the form tells the visitor when an address is already registered: the account it creates is usable at once, so answering a taken address the same way would hide nothing, since signing in with the chosen password would fail. Enable email verification if the list of registered addresses should not be discoverable from the registration form.
-</Aside>
+### Groups
 
-<Aside>
-To use email verification, be sure to configure your SMTP settings in the admin console.
-</Aside>
+A group identifier is 3 to 38 characters long. It starts with a letter, ends with a letter or digit, and uses only letters, digits, `-` and `_`, with no `--` or `__`. A description is at most 100 characters.
+
+A user can be in any number of groups. They hold every permission each of their groups holds, as well as their own. Deleting a group takes nobody's account with it: its members just lose what the group gave them.
+
+A group is listed in the `groups` claim when the client asks for the `groups` scope. **Include group in access token if requested** puts it in the access token, and **Include group in id token if requested** puts it in the ID token and in the `/userinfo` answer. Turn either off for a group a client has no business seeing.
+
+### Attributes
+
+An attribute is a key and a value you attach to a user or a group, such as `department` and `sales`. A client gets them in the `attributes` claim when it asks for the `attributes` scope.
+
+- A **key** is 1 to 38 characters long, with the same characters as a group identifier.
+- A **value** is at most 250 characters, and can't contain `<` or `>`.
+- **Include attribute in access token if requested** and **Include attribute in id token if requested** work as they do for groups.
+
+A user's claim holds their own attributes and those of every group they're in. When a user and one of their groups both have an attribute with the same key, the group's value wins.
+
+### Administrators
+
+A user who holds one of the administrative permissions on the `authserver` resource, directly or through a group, is an administrator. So a group holding one makes every member an administrator, and adding a user to it, removing one, or deleting it needs `authserver:manage`, just as granting the permission directly does.
+
+Goiabada also refuses any change that would leave no enabled user holding `authserver:manage`. [Administrators](/reference/api/administrators/) has the whole rule, including [the last administrator](/reference/api/administrators/#the-last-administrator).
 
 <Aside type="tip">
-This is different from [dynamic client registration](/concepts/clients/#self-registered-clients), which allows applications (not users) to self-register as OAuth clients.
+Keep `authserver:manage` on at least two people you trust, so one can always let the other back in.
 </Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Resources and permissions" description="Decide what each user and group can do." href="/concepts/resources-and-permissions/" />
+  <LinkCard title="Scopes" description="Which of a user's details a client gets." href="/concepts/scopes/" />
+</CardGrid>
