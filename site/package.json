@@ -26,5 +26,8 @@
     "starlight-links-validator": "^0.26.0",
     "starlight-openapi": "^0.27.0",
     "yaml": "^2.9.1"
+  },
+  "overrides": {
+    "form-data": "^4.0.6"
   }
 }
