@@ -203,7 +203,7 @@ func TestValidateTokenRequest_RefreshGrantAccountStateAfterProof(t *testing.T) {
 	proofs := []proof{
 		{
 			name: "another client's token", clientIdentifier: "client2",
-			refusal: &wantRefusal{code: "invalid_request", description: "The refresh token is invalid because it does not belong to the client.", status: http.StatusBadRequest},
+			refusal: &wantRefusal{code: "invalid_grant", description: "The refresh token is invalid because it does not belong to the client.", status: http.StatusBadRequest},
 		},
 		{
 			name: "wrong secret", clientIdentifier: "client1", clientSecret: "not_the_secret",
