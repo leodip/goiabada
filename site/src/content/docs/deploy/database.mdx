@@ -60,6 +60,29 @@ The auth server runs as uid 10001, so the directory holding the file must be wri
 Docker, mount the volume at `/data`, which the image creates owned by that user; a volume written by
 the root images of earlier releases needs a [one-time `chown`](/troubleshooting/attempt-to-write-a-readonly-database/).
 
+## Refresh token storage
+
+The `refresh_tokens` table keeps a revoked refresh token until the token itself would have expired,
+rather than deleting it once it is revoked. The stored row is what lets the auth server recognize a
+[replayed refresh token](/concepts/refresh-tokens/#replay) at all: without it a replay would be
+refused, but the rest of its family would never be revoked.
+
+So the table grows with how often clients refresh and how long their refresh tokens live. With the
+default 30-day offline idle timeout, a grant refreshed every five minutes holds about 8,600 rows
+before the oldest start to age out. A background job runs every 12 hours and deletes a row once its
+expiry or its maximum lifetime has passed.
+
+Watch the table if clients hold many offline grants that refresh often. The offline idle timeout and
+maximum lifetime, under **Admin**, **Tokens** and on each client's **Tokens** tab, bound how long
+rows are kept, but only the one that actually ends your grants changes the count: lowering a maximum
+lifetime that the idle timeout always reaches first changes nothing.
+
+<Aside type="caution">
+When importing refresh tokens from another system, fill in `expires_at`. A row with both
+`expires_at` and `max_lifetime` empty is never deleted by the background job, since neither
+comparison can find it expired, and removing it takes an explicit statement.
+</Aside>
+
 ## Schema migrations and rollback
 
 Goiabada migrates its own schema. The auth server applies whatever migrations its release carries

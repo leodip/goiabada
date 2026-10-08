@@ -52,7 +52,7 @@ That error reaches your app like any other error in the request: at once when th
 | A session of someone else | `login_required`: "The current session user does not match the id_token_hint" | The user is asked to sign in |
 | No session | `login_required`: "User authentication is required" | The user is asked to sign in |
 
-Without `prompt=none`, whoever then signs in has to be the hinted user. If someone else does, the request ends with `login_required`: "The authenticated user does not match the id_token_hint". When the hinted user signs in over someone else's session, that session is ended, as [Sessions](/concepts/sessions/#a-different-user-signs-in-on-the-same-browser) describes.
+Without `prompt=none`, whoever then signs in has to be the hinted user. If someone else does, the request ends with `login_required`: "The authenticated user does not match the id_token_hint". When the hinted user signs in over someone else's session, that session is ended, as [Ending sessions](/concepts/ending-sessions/#a-different-user-signs-in-on-the-same-browser) describes.
 
 With [`prompt=login`](/concepts/prompt/#promptlogin), the user signs in again even over their own session, and it still has to be the hinted user. Send the two together to confirm it's still the same person before a sensitive operation.
 

@@ -1,0 +1,125 @@
+---
+title: Refresh tokens
+description: Get new tokens without asking the user to sign in again, and keep your app's refresh token working.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you keep users signed in to your app with a refresh token, and keep that token working.
+
+A refresh token is what your app trades for a new access token when the old one expires, without sending the user back to sign in. Your app gets one every time it redeems an authorization code, and there are two kinds:
+
+- **A normal refresh token** is tied to the user's [session](/concepts/sessions/), and stops working when the session does.
+- **An offline refresh token** is what your app gets when it asks for the `offline_access` scope. It keeps working after the user's session expires, so a background job can call an API for the user while they're away.
+
+## Refresh a token
+
+<Steps>
+
+1. If your app needs to work while the user is away, add `offline_access` to the scope of the authorization request. The user is then shown the [consent screen](/concepts/clients/#consent-required), so they can see your app is asking for it:
+
+   ```http
+   GET /auth/authorize?client_id=my-app&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback&response_type=code&scope=openid%20offline_access%20product-api%3Aread&code_challenge=...&code_challenge_method=S256&state=... HTTP/1.1
+   Host: auth.example.com
+   ```
+
+2. When the access token expires, send the refresh token to the token endpoint:
+
+   ```bash
+   curl -X POST https://auth.example.com/auth/token \
+     -u my-app:CLIENT_SECRET \
+     -d grant_type=refresh_token \
+     -d refresh_token=eyJhbGciOiJSUzI1NiIs...
+   ```
+
+   A public client sends `client_id` in the body instead of the `-u` line.
+
+3. The answer carries new tokens, a new refresh token among them:
+
+   ```json
+   {
+     "access_token": "eyJhbGciOiJSUzI1NiIs...",
+     "token_type": "Bearer",
+     "expires_in": 300,
+     "refresh_token": "eyJhbGciOiJSUzI1NiIs...",
+     "refresh_expires_in": 2592000,
+     "scope": "openid offline_access product-api:read"
+   }
+   ```
+
+   Store the new refresh token in place of the old one **before** you use anything else in the answer. The one you sent is spent.
+
+</Steps>
+
+## How it works
+
+### How long a refresh token lasts
+
+An offline refresh token's lifetimes are under **Admin**, **Tokens** in the admin console:
+
+| Setting | Default |
+|---|---|
+| **Offline refresh token - idle timeout in seconds** | 2592000 (30 days) |
+| **Offline refresh token - max lifetime in seconds** | 31536000 (1 year) |
+
+The idle timeout is how long the token keeps working unused: each refresh hands your app a new token with the full idle timeout ahead of it. The maximum lifetime counts from the first token of the grant, when the user signed in, and no refresh goes past it. A client can override both on its own **Tokens** tab, where 0 uses these settings.
+
+A normal refresh token follows the session it's tied to instead: it stops working unused after the session's idle timeout, and at the latest when the session reaches its maximum lifetime. Both are under **Admin**, **Sessions**, and no client overrides them. See [how long a session lasts](/concepts/sessions/#how-long-a-session-lasts). Each refresh with a normal refresh token counts as activity, so it keeps the session from idling out.
+
+`refresh_expires_in` in the answer is how many seconds the new refresh token has left if it isn't used.
+
+| | Normal | Offline |
+|---|---|---|
+| Your app gets it | Without `offline_access` | With `offline_access`, and always from the [password grant](/legacy-flows/ropc/), which has no session |
+| When the session expires | It stops working | It keeps working |
+| When someone [ends the session](/concepts/ending-sessions/#end-a-session) | It's revoked | It's revoked |
+| When the user's [credentials change](/concepts/ending-sessions/#credential-changes) | It's revoked | It's revoked |
+
+### What a refresh checks
+
+A refresh is refused with `invalid_grant` when the token can't be used any more:
+
+- it expired, or the offline grant reached its maximum lifetime;
+- a normal refresh token's session ended or expired;
+- the user was disabled, or their password changed or was reset;
+- the user no longer holds a permission the token carries;
+- the user withdrew their consent to your app, when it has **Consent required** on or the token is an offline one from a sign-in.
+
+A token issued to another client is refused with `invalid_request`. The [token endpoint](/reference/endpoints/token/#refresh-token-grant) lists every answer, and `scope` can narrow one refresh's access token. [This refresh token has been revoked](/troubleshooting/this-refresh-token-has-been-revoked/#how-it-works) gives each `error_description` and why it happens.
+
+### Rotation
+
+Every refresh rotates the token: the one your app sent is retired, and the answer carries its replacement. A refresh token is good for one refresh.
+
+That's enforced atomically. When several requests present the same refresh token at once, at most one gets new tokens: if the token is live and issuance succeeds, one wins and the others are refused with `invalid_grant`. If it was already retired, or issuance fails, none does.
+
+<Aside type="caution">
+Refresh through **one** path at a time, and store each new refresh token in place of the old one before you use the rest of the answer.
+
+A retired refresh token sent again revokes every live refresh token of its grant, the one your app holds now included, and the user has to sign in again. That happens whether an attacker sent it or your own app did.
+</Aside>
+
+Two things send a retired token by accident:
+
+- **Parallel refreshes.** Two threads, tabs or instances notice the access token has expired, and each refreshes with the same refresh token. One wins. The other is either refused, or, when it reads the token after the winner retired it, treated as a replay. Share one refresh between them instead.
+- **Retrying after a lost answer.** The auth server rotated the token, but the answer never reached your app. Retrying sends the retired token. Treat a lost answer as "sign in again", not "retry".
+
+### Replay
+
+A retired refresh token coming back is a replay. The auth server can't tell whether an attacker copied it or your app sent it twice, so it assumes the worst, as [RFC 9700 section 4.14.2](https://www.rfc-editor.org/rfc/rfc9700.html#section-4.14.2) describes: it revokes every live token of the token's rotation family, which is every refresh token descended from the same sign-in, and records the family as revoked. A refresh still under way when that happens yields nothing usable, so the family can't keep rotating. Someone who stole a refresh token and lost the race to use it can't wait and rotate later.
+
+Only that family is revoked. The user's session, their sign-ins to other clients and their other grants keep working, a second grant from the same session included.
+
+Access tokens already issued aren't revoked: they're signed JWTs your APIs check on their own, so revoking the family stops the next refresh, not an access token already handed out. That's one more reason to keep [access tokens short-lived](/concepts/tokens/#how-long-tokens-last).
+
+A replay leaves a `refresh_token_replay_detected` entry in the [audit log](/concepts/audit-log/) when it changes something: it revokes at least one live token, or records the family as revoked for the first time. A repeat that does neither leaves no entry, so one incident isn't a row per attempt. The entry never holds the refresh token itself. It doesn't prove an attack either: an app that refreshes in parallel causes one too.
+
+The auth server keeps a revoked refresh token until it would have expired, which is what lets it recognize a replay at all. See [refresh token storage](/deploy/database/#refresh-token-storage).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="This refresh token has been revoked" description="Why a refresh failed and took the newest token with it." href="/troubleshooting/this-refresh-token-has-been-revoked/" />
+  <LinkCard title="Sessions" description="How long a session lasts, and what keeps it alive." href="/concepts/sessions/" />
+  <LinkCard title="Ending sessions" description="What ending a session revokes, and what it leaves." href="/concepts/ending-sessions/" />
+</CardGrid>

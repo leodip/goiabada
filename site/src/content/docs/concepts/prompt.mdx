@@ -82,7 +82,7 @@ The auth server doesn't use the browser's session to skip the sign-in: whoever i
 What happens to the session that was in the browser depends on who signs in:
 
 - **The same user.** Their session is kept and its sign-in time updated, as long as it's still valid. A session that has idled out, reached its maximum lifetime or fallen outside the request's `max_age` is replaced by a new one, with nothing revoked.
-- **Someone else.** The other user's session is ended, as described in [A different user signs in on the same browser](/concepts/sessions/#a-different-user-signs-in-on-the-same-browser).
+- **Someone else.** The other user's session is ended, as described in [A different user signs in on the same browser](/concepts/ending-sessions/#a-different-user-signs-in-on-the-same-browser).
 
 `max_age` can ask for a sign-in too, but only when the last one is older than the number of seconds it gives. Use `prompt=login` when you always want a fresh sign-in, and `max_age` when a recent one is enough. With both, `prompt=login` wins.
 

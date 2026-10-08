@@ -52,7 +52,7 @@ See the [PKCE documentation](/concepts/pkce/) for details on generating these va
 |-----------|-------------|
 | `state` | Recommended. Random string to prevent CSRF attacks |
 | `nonce` | Recommended. Random string included in the ID token to prevent replay attacks |
-| `prompt` | Controls authentication and consent behavior (`none`, `login`, `consent`). See [Prompt parameter](/concepts/prompt/) |
+| `prompt` | Controls authentication and consent behavior (`none`, `login`, `consent`). See [prompt](/concepts/prompt/) |
 | `max_age` | Maximum acceptable time in seconds since the user last authenticated |
 | `ui_locales` | Preferred languages for the login and consent screens (space-separated BCP 47 tags, e.g. `pt-BR en`). See [Localization](/guides/localization/) |
 | `acr_values` | Requested authentication level. See [ACR and AMR](/concepts/acr-and-amr/) |
@@ -164,7 +164,7 @@ curl -X POST https://auth.example.com/auth/token \
 ```
 
 <Aside>
-Refresh tokens are always issued in the authorization code flow. Including the `offline_access` scope makes the refresh token an **offline token** (long-lived, not tied to user session). Without it, you get a **normal refresh token** (tied to user session). See [Tokens](/concepts/tokens/) for details.
+Refresh tokens are always issued in the authorization code flow. Including the `offline_access` scope makes the refresh token an **offline token** (long-lived, not tied to user session). Without it, you get a **normal refresh token** (tied to user session). See [Refresh tokens](/concepts/refresh-tokens/) for details.
 </Aside>
 
 

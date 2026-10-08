@@ -129,6 +129,20 @@ You usually don't need it for your own clients. Turn it on for third-party ones,
 
 Clients you create start with consent off. Clients that register themselves start with it on, since nobody has reviewed them yet.
 
+Whether a sign-in shows the consent screen depends on the setting, the request, and what the user approved before:
+
+| **Consent required** | `offline_access` asked for | `prompt=consent` | The user approved every scope before | Consent screen |
+|---|---|---|---|---|
+| Off | No | No | Either | Skipped |
+| Either | Yes | Either | Either | Shown |
+| Either | Either | Yes | Either | Shown |
+| On | No | No | No | Shown |
+| On | No | No | Yes | Skipped |
+
+The scopes are the ones left once the auth server has dropped those the user doesn't hold, as [Tokens](/concepts/tokens/#which-scopes-a-token-gets) describes. On the screen the user can untick scopes, and the tokens carry only those they approved. Their answer is kept, so the next sign-in skips the screen while it covers every scope, and a user can withdraw it under **Account**, **Manage consents**.
+
+Choosing **Cancel** ends the sign-in. A client you created gets `access_denied`, "The user did not provide consent", at its redirect URI. A client that [registered itself](#self-registered-clients) gets nothing: the user sees a page naming the app and the address it asked to send them to, and the request stops there. So does a client whose redirect URI has been removed since the request began.
+
 ### Default ACR level
 
 The ACR level is how strongly a user must sign in to use the client:

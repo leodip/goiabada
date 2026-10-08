@@ -98,7 +98,7 @@ Pragma: no-cache
 | 401 | `invalid_token` | "Session has been terminated" | The user signed out, was disabled or deleted, or their credentials changed |
 | 401 | `invalid_token` | "Session has expired" | The session the token was issued in reached its idle timeout or maximum lifetime |
 
-The last two make `/userinfo` stricter than the token's own `exp`: an access token stops working here as soon as the session it came from ends. A token with no session, from an offline refresh token or the password grant, stops when the user is disabled or their credentials change. See [Sessions](/concepts/sessions/).
+The last two make `/userinfo` stricter than the token's own `exp`: an access token stops working here as soon as the session it came from ends. A token with no session, from an offline refresh token or the password grant, stops when the user is disabled or their credentials change. See [Ending sessions](/concepts/ending-sessions/#what-it-doesnt-reach).
 
 ### Calling it from a browser
 

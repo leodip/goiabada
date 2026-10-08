@@ -1,0 +1,120 @@
+---
+title: Ending sessions
+description: End a user's session, and know what ending one, signing out, a credential change or another user signing in revokes.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you end a user's session, and know what that cuts off.
+
+A [session](/concepts/sessions/) ends in one of four ways: someone ends it from the admin console or the API, the user signs out, the user's credentials change, or a different user signs in on the same browser. Each is a security action rather than housekeeping, so each one decides what happens to the tokens the session handed out. A session that merely expires is different: it revokes nothing.
+
+## End a session
+
+<Steps>
+
+1. Find the session. A user sees their own under **Account**, **Sessions** in the admin console. An administrator sees a user's on the user's **Sessions** tab, and every session signed in to a client on the client's **User sessions** tab.
+
+2. Choose **End session** beside it, and confirm.
+
+   The same goes through the API: an administrator calls [`DELETE /api/v1/admin/user-sessions/{id}`](/reference/api/admin/operations/deleteusersession/), and a user calls [`DELETE /api/v1/account/sessions/{id}`](/reference/api/account/operations/deleteaccountsession/) for one of their own.
+
+3. The browser that held the session has to sign in again, and the tokens the session handed out stop working, as below.
+
+</Steps>
+
+## How it works
+
+### What ending a session revokes
+
+| What | What happens |
+|---|---|
+| The session | It's deleted. The browser that held it has to sign in again |
+| Refresh tokens from it | Revoked, offline ones included |
+| Authorization codes from it | Revoked, so a code that was issued but not redeemed yet can't be exchanged |
+| The user's other sessions | Untouched |
+
+That's what sets ending a session apart from one expiring. An [offline refresh token](/concepts/refresh-tokens/) is meant to outlive the session it came from, so it keeps working when that session times out. Ending the session revokes it on purpose.
+
+Each one leaves two entries in the [audit log](/concepts/audit-log/): `terminated_user_session`, which records what was revoked, and `deleted_user_session`, the record that the session is gone. Count `terminated_user_session` to know how many sessions were ended.
+
+### A sign-in under way
+
+A sign-in can't slip past an ended session. If someone was partway through signing in to an app on the strength of the session you ended, the sign-in goes back to the password step rather than quietly starting a new session. That holds on the consent screen too: just before it issues the code, the auth server checks the session again, so a sign-in left waiting there goes back to the password step as well, and so does one whose session timed out while the screen was open.
+
+A [silent request](/concepts/glossary/#silent-request) can't show a page, so it gets `login_required` instead, and your app decides when to send the user to sign in. Two things withhold that error: a client that [registered itself](/concepts/clients/#self-registered-clients) is never sent one, and neither is a redirect URI no longer registered on the client. A silent request that doesn't come back is then the signal. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/).
+
+### Signing out
+
+Your app signs a user out by sending them to [`/auth/logout`](/reference/endpoints/). Signing out revokes nothing: no refresh token and no authorization code is revoked. What it ends depends on what the request carries:
+
+- **With an `id_token_hint`**, the auth server removes your app from the session the hint names. The session itself ends only when no other client is using it, so the user stays signed in to the others.
+- **Without one**, once the user confirms on the sign-out page, the whole session ends.
+
+Either way the browser's cookie is cleared, so its next sign-in starts from the password. A normal refresh token stops working once the session behind it has ended. Offline refresh tokens aren't tied to a session and keep working.
+
+A sign-out that ends the session leaves a `logout` entry in the audit log, and one that removes your app from a session other clients still use leaves `deleted_user_session_client`.
+
+### Credential changes
+
+When a user's credentials change, their sessions and refresh tokens stop being usable:
+
+| Action | What happens | `reason` |
+|---|---|---|
+| The user resets a forgotten password | Every session of theirs is ended and every refresh token revoked | `password_reset` |
+| The user changes their own password | The same, except the session they're changing it from | `password_change` |
+| An administrator sets the user's password | Every session of theirs is ended and every refresh token revoked | `admin_password_set` |
+| An administrator disables the user | The same. Enabling them again doesn't bring the sessions back | `account_disabled` |
+
+That covers every grant, offline refresh tokens whose session has already expired and tokens from the [password grant](/legacy-flows/ropc/) included, and an authorization code that was issued but not redeemed yet can't be exchanged any more. Each change leaves a `revoked_user_auth_state` entry in the audit log, with the `reason` above and the sessions and refresh tokens it ended.
+
+A user changing their own password normally stays signed in to the app they did it from. If that app refreshes at the same moment as the change, it may be asked to sign in again.
+
+These end nothing:
+
+- **Changing an email address.** The change already asks for the current password, so signing other devices out would protect nothing that person couldn't do again. Tokens issued before it carry the old `email` claim until they're refreshed or expire.
+- **Setting up or removing two-factor authentication.** Each session goes through the one-time code step again before it's used for a level above `urn:goiabada:level1`. See [ACR and AMR](/concepts/acr-and-amr/#a-session-thats-already-there).
+
+### A different user signs in on the same browser
+
+A shared or borrowed browser can reach the sign-in page still holding someone else's session. That happens whenever a client sends [`prompt=login`](/concepts/prompt/) or an [`id_token_hint`](/concepts/id-token-hint/) naming another user, and whenever the session there has stopped being valid.
+
+When the person who signs in is a **different** user, the browser has changed hands:
+
+| What | What happens |
+|---|---|
+| The previous user's session | Ended, as if someone had ended it: deleted, with its refresh tokens and unredeemed authorization codes revoked |
+| The new user | Gets a session of their own, never the one that was there |
+| The previous user's other devices | Untouched. Only what this browser's session handed out is revoked |
+
+The grants that session held were reachable from this browser, and the browser is now someone else's. An offline refresh token from it would otherwise keep working in the background indefinitely.
+
+Nothing carries over. If the client asks for a one-time code, the new user is asked for one, however the previous user signed in, and the `acr` and `amr` in their tokens describe only what they did.
+
+Each handover leaves a `cross_user_session_replaced` entry in the audit log, naming both users and the session that was ended, beside the `terminated_user_session` and `deleted_user_session` entries for that session and the `started_new_user_session` entry for the new one. It's the entry that tells a browser changing hands apart from an administrator ending a session.
+
+<Aside>
+When the **same** user signs in again, none of this applies. Their session is reused while it's still valid. When it isn't, they get a new session, and nothing is revoked.
+</Aside>
+
+### What it doesn't reach
+
+An access token is checked by signature, and an API doesn't ask the auth server about it, so nothing on this page can take back one already issued:
+
+- **The auth server's own endpoints**, [`/userinfo`](/reference/endpoints/userinfo/) and the Admin and Account APIs, refuse an access token whose session has ended or expired, or whose user was disabled or changed their credentials, on the very next request.
+- **An access token from an offline grant** carries no `sid`, so ending the session it came from doesn't reach it, even at the auth server's own endpoints. A credential change does.
+- **Your own APIs**, checking the signature alone, accept the token until it expires.
+
+That's inherent to signed tokens, and it's the main reason to keep [access tokens short-lived](/concepts/tokens/#how-long-tokens-last): the token lifetime, 5 minutes in a new install, is the longest a token can outlive any of this.
+
+<Aside type="caution">
+If an API must refuse access the moment a session ends or a user's credentials change, it has to ask the auth server on every request rather than check the signature alone. A token carrying `openid` can be checked by calling [`/userinfo`](/reference/endpoints/userinfo/) with it.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Sessions" description="How long a session lasts, and what keeps it alive." href="/concepts/sessions/" />
+  <LinkCard title="Refresh tokens" description="The two kinds, and which one outlives a session." href="/concepts/refresh-tokens/" />
+  <LinkCard title="Audit log" description="The entries each ending leaves." href="/concepts/audit-log/" />
+</CardGrid>
