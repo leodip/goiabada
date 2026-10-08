@@ -115,7 +115,8 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 }
 
 // newFlagSet declares every flag the wizard reads, each writing into flags, with the usage text -h
-// prints. The setup wizard's docs page lists the same flags, and a test holds the two together.
+// prints. The usage text and the setup wizard's docs page each list the same flags, and a test holds
+// each to them.
 func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 	fs.SetOutput(stderr)

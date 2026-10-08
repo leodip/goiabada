@@ -56,6 +56,8 @@ type wizardStep struct {
 	run     func(w *wizard) error
 }
 
+// wizardSteps is every step in the order the wizard runs them. The setup wizard's docs page lists the
+// questions in the same order under the same titles, and a test holds the two together.
 var wizardSteps = []wizardStep{
 	{title: "Deployment type", run: (*wizard).chooseDeployment},
 	{title: "Database type", run: (*wizard).chooseEngine},
