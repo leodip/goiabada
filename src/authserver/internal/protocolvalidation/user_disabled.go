@@ -17,6 +17,9 @@ import (
 // audit row for a superseded generation or a revoked code as well.
 type UserDisabledError struct {
 	Detail *oauth.ErrorDetail
+	// UserId is the user refused, whom the token handler's user_disabled record names as the
+	// event's other sites do (#522 decision 7).
+	UserId int64
 }
 
 func (e *UserDisabledError) Error() string {
@@ -29,10 +32,11 @@ func (e *UserDisabledError) Unwrap() error {
 	return e.Detail
 }
 
-// userDisabled refuses a grant whose user is disabled, answering the client with description as
-// invalid_grant (RFC 6749 section 5.2: the grant is no longer valid).
-func userDisabled(description string) *UserDisabledError {
+// userDisabled refuses a grant whose user, userId, is disabled, answering the client with
+// description as invalid_grant (RFC 6749 section 5.2: the grant is no longer valid).
+func userDisabled(description string, userId int64) *UserDisabledError {
 	return &UserDisabledError{
 		Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant", description, http.StatusBadRequest),
+		UserId: userId,
 	}
 }

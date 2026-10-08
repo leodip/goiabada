@@ -357,6 +357,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 				ClientIdentifier: "client1",
 			},
 			User: record.User{
+				Id:      53,
 				Enabled: false,
 			},
 		}
@@ -373,6 +374,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		// writes EventUserDisabled from.
 		var disabled *UserDisabledError
 		require.ErrorAs(t, err, &disabled)
+		// The code's user, which the handler's user_disabled record names (#522 decision 7).
+		assert.Equal(t, int64(53), disabled.UserId)
 		var customErr *oauth.ErrorDetail
 		require.ErrorAs(t, err, &customErr)
 		assert.Equal(t, "invalid_grant", customErr.Code())

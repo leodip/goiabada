@@ -283,7 +283,8 @@ func HandleUserOTPPut(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventDisabledOTP, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id":        user.Id,
+			"logged_in_user": callerSubject(r),
 		})
 
 		// Get the updated user to return

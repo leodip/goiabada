@@ -766,9 +766,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
-		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["user_id"] == int64(123)
-		})).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
+			"user_id": int64(123),
+		}).Return()
 
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 

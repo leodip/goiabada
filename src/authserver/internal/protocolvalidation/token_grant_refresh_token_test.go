@@ -454,7 +454,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			Code: record.Code{
 				ClientId: 1,
 				User: record.User{
-					Id:      1,
+					Id:      61,
 					Enabled: false, // User is disabled
 				},
 			},
@@ -474,6 +474,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		// type is what the handler writes EventUserDisabled from.
 		var disabled *UserDisabledError
 		require.ErrorAs(t, err, &disabled)
+		// The token's user, which the handler's user_disabled record names (#522 decision 7).
+		assert.Equal(t, int64(61), disabled.UserId)
 		var customErr *oauth.ErrorDetail
 		require.ErrorAs(t, err, &customErr)
 		assert.Equal(t, "invalid_grant", customErr.Code())

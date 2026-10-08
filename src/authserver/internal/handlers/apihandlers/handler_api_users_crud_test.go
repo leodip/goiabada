@@ -290,7 +290,12 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, userId).Return(int64(1), nil).
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 
-	auditLogger.On("Log", mock.Anything, audit.EventDisabledOTP, mock.Anything).Return().Once()
+	// The administrator who removed it, as every other administrative event names them (#522
+	// decision 7).
+	auditLogger.On("Log", mock.Anything, audit.EventDisabledOTP, map[string]interface{}{
+		"user_id":        userId,
+		"logged_in_user": adminSubject,
+	}).Return().Once()
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).
 		Return(&record.User{Id: userId, Enabled: true}, nil).Once()
 

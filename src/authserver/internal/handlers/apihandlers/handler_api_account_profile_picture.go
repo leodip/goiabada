@@ -88,7 +88,8 @@ func HandleAccountProfilePicturePost(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventUpdatedOwnProfilePicture, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id":        user.Id,
+			"logged_in_user": sub,
 		})
 
 		response := api.ProfilePictureUploadResponse{
@@ -132,7 +133,8 @@ func HandleAccountProfilePictureDelete(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventDeletedOwnProfilePicture, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id":        user.Id,
+			"logged_in_user": sub,
 		})
 
 		response := api.SuccessResponse{Success: true}

@@ -349,9 +349,9 @@ func TestHandleIssueGet_ADisabledUserIsAnsweredAccessDenied(t *testing.T) {
 			f.user.Enabled = false
 
 			var order []string
-			f.auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
-				return details["user_id"] == int64(123) && len(details) == 1
-			})).Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
+			f.auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
+				"user_id": int64(123),
+			}).Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
 			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).
 				Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()
 

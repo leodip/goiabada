@@ -524,7 +524,7 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &record.User{
-		Id:           1,
+		Id:           47,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
 		Enabled:      false, // Disabled
@@ -555,6 +555,8 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 	// has just proved the password. The type is what the handler writes EventUserDisabled from.
 	var disabled *UserDisabledError
 	require.ErrorAs(t, err, &disabled)
+	// The user refused, which the handler's user_disabled record names (#522 decision 7).
+	assert.Equal(t, int64(47), disabled.UserId)
 	var customErr *oauth.ErrorDetail
 	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "invalid_grant", customErr.Code())

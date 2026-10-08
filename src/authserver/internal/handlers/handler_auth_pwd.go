@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -196,6 +197,12 @@ func HandleAuthPwdPost(
 			return
 		}
 
+		// The address typed into the form is recorded only as its digest, of the address as the
+		// lookup above normalized it: the form collects whatever anyone types, an attacker's
+		// address list or a password pasted into the wrong field, and the audit table would
+		// otherwise keep every one of them in plain text (#522 decision 10).
+		emailDigest := hashutil.HashString(email)
+
 		// "Authentication failed." stays on the request's existing locale
 		// (we don't yet know whether this email belongs to a real user —
 		// switching to user.Locale here would side-channel disclose whether
@@ -214,7 +221,7 @@ func HandleAuthPwdPost(
 			// enumerate addresses than the branch below.
 			credentialFailures.RecordCredentialFailure(r)
 			auditLogger.Log(r.Context(), audit.EventAuthFailedPwd, map[string]interface{}{
-				"email": email,
+				"email_digest": emailDigest,
 			})
 			renderError(authFailed)
 			return
@@ -222,8 +229,11 @@ func HandleAuthPwdPost(
 
 		if !passwordhash.Verify(user.PasswordHash, password) {
 			credentialFailures.RecordCredentialFailure(r)
+			// The account the guess was against, which the audit log's readers can already
+			// see; nothing here reaches the visitor, who is answered as for an unknown address.
 			auditLogger.Log(r.Context(), audit.EventAuthFailedPwd, map[string]interface{}{
-				"email": email,
+				"email_digest": emailDigest,
+				"user_id":      user.Id,
 			})
 			renderError(authFailed)
 			return

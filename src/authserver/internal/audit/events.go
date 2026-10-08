@@ -61,9 +61,9 @@ const (
 	// is NOT the whole token endpoint: it also emits user_disabled, bumped_user_session and
 	// auth_code_reuse_detected, none of which carry the prefix.
 	//
-	// The payload carries client_identifier, the string from the request, rather than the numeric
-	// client_id the issuance events use: the validator returns (nil, err) on failure and discards
-	// the client model it resolved. What that string attests to varies by grant. Client
+	// The payload carries client_identifier, the string from the request, and no client_id, the
+	// client's row id: the validator returns (nil, err) on failure and discards the client model it
+	// resolved. What that string attests to varies by grant. Client
 	// credentials authenticates the client itself, so the row does attest to the named client.
 	// ROPC authenticates the USER, and the client only when it is confidential, so for a public
 	// ROPC client the identifier is caller-supplied request context rather than proof that the
@@ -110,7 +110,7 @@ const (
 	// accounting.
 	//
 	// Payload: user_id and the matched time step, so an operator can see which code was
-	// replayed. Never the code itself. The caller learns nothing either way: a replay
+	// replayed, plus logged_in_user when the account API raised it. Never the code itself. The caller learns nothing either way: a replay
 	// renders the same generic incorrect-code response as a wrong code.
 	EventOTPCodeReplayDetected = "otp_code_replay_detected"
 	// EventRateLimitExceeded records that a rate limiter refused a request. It exists
@@ -128,8 +128,10 @@ const (
 	// guarantee is exactly one event per key per window (#276).
 	//
 	// Payload: the limiter name, plus the identifier that limiter's neighbours already
-	// carry, which is the email for account tiers, the user id for the OTP tier and the
-	// client block for IP tiers.
+	// carry: email_digest, the digest of the address typed into the sign-in, registration or
+	// forgot-password form or named by the password grant, never the address itself (#522
+	// decision 10), with the client block beside it on the password tiers; the user id for
+	// the OTP tier; the caller for the account API's tiers; and the client block for IP tiers.
 	EventRateLimitExceeded = "rate_limit_exceeded"
 
 	EventCreatedUser              = "created_user"

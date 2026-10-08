@@ -258,6 +258,7 @@ func HandleIssueGet(
 
 			auditLogger.Log(r.Context(), audit.EventIssuanceRefusedScopeDenied, map[string]interface{}{
 				"user_id":           authContext.UserId,
+				"client_id":         issuingClient.Id,
 				"client_identifier": authContext.ClientId,
 			})
 
@@ -566,10 +567,16 @@ func refuseIssuanceUnregisteredRedirect(
 	slog.WarnContext(r.Context(), "the redirect URI this ceremony would be answered at is no longer registered on the client, so nothing is issued and nothing is emitted",
 		"client_identifier", authContext.ClientId)
 
-	auditLogger.Log(r.Context(), audit.EventIssuanceRefusedRedirectURI, map[string]interface{}{
+	details := map[string]interface{}{
 		"user_id":           authContext.UserId,
 		"client_identifier": authContext.ClientId,
-	})
+	}
+	// Absent rather than zero when the client could not be loaded, which is how a deleted client
+	// reaches this gate: a payload naming client 0 asserts a row that does not exist.
+	if issuingClient != nil {
+		details["client_id"] = issuingClient.Id
+	}
+	auditLogger.Log(r.Context(), audit.EventIssuanceRefusedRedirectURI, details)
 
 	// The clear goes FIRST, the order every refusal in this handler uses: ClearAuthContext persists
 	// the deletion through a Set-Cookie on w, and the render below commits the response, so
@@ -825,6 +832,7 @@ func refuseIssuanceUnusableSession(
 	if shape == sessionExpired {
 		auditLogger.Log(r.Context(), audit.EventIssuanceRefusedSessionInvalid, map[string]interface{}{
 			"user_id":            authContext.UserId,
+			"client_id":          issuingClient.Id,
 			"client_identifier":  authContext.ClientId,
 			"session_identifier": sessionIdentifier,
 		})

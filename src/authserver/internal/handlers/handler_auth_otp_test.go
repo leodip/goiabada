@@ -647,7 +647,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
+			"user_id": int64(1),
+		}).Return()
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html", mock.Anything).Return(nil)
 
@@ -1607,7 +1609,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
+			"user_id": int64(1),
+		}).Return()
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html", mock.Anything).Return(nil)
 

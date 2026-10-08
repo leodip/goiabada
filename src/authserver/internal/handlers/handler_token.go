@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -210,6 +211,7 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	if errors.As(err, &userDisabled) {
 		auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
 			"client_identifier": input.ClientId,
+			"user_id":           userDisabled.UserId,
 		})
 	}
 
@@ -233,11 +235,11 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	// invalid_grant, which 22 unrelated failures also carry, so a bare code test would
 	// name the wrong ones; the value is unique to this refusal.
 	//
-	// clientIdentifier, the string from the request, rather than the numeric clientId
-	// the issuance events use, for the reason EventTokenScopeDenied gives: the
-	// validator discards the client model on failure. Unlike that event, this one is
-	// reached only below client authentication and PKCE, so the identifier here has
-	// been proved rather than merely asserted.
+	// client_identifier, the string from the request, and no client_id, the client's row
+	// id, for the reason EventTokenScopeDenied gives: the validator discards the client
+	// model on failure. Unlike that event, this one is reached only below client
+	// authentication and PKCE, so the identifier here has been proved rather than merely
+	// asserted.
 	if errors.Is(err, protocolvalidation.ErrCodeRedirectURIDeregistered) {
 		auditLogger.Log(r.Context(), audit.EventRedemptionRefusedRedirectURI, map[string]interface{}{
 			"client_identifier": input.ClientId,
@@ -303,10 +305,12 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 
 		credentialFailures.RecordCredentialFailure(r)
 		auditLogger.Log(r.Context(), audit.EventROPCAuthFailed, map[string]interface{}{
-			// Normalized to what the limiter keyed its bucket on and to what every
-			// write path stores, so the audit row and the budget name one account.
-			"email": strings.ToLower(strings.TrimSpace(input.Username)),
-			// clientIdentifier, the string from the request, for the reason
+			// The address the caller typed, recorded only as its digest, as every address
+			// typed into an unauthenticated form is (#522 decision 10). Normalized to what
+			// the limiter keyed its bucket on and to what every write path stores, so the
+			// row and the budget name one account.
+			"email_digest": hashutil.HashString(strings.ToLower(strings.TrimSpace(input.Username))),
+			// client_identifier, the string from the request, for the reason
 			// EventTokenScopeDenied gives: the validator discards the client model on
 			// failure. A public client's identifier is caller-supplied, so read it as
 			// the client the caller named rather than as proof of who called.
@@ -316,9 +320,9 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 
 	if errors.As(err, &errDetail) && errDetail.Code() == "invalid_scope" {
 		auditLogger.Log(r.Context(), audit.EventTokenScopeDenied, map[string]interface{}{
-			// clientIdentifier, the string from the request, not the numeric clientId the
-			// issuance events use: the validator discards the client model on failure. See
-			// the constant's doc comment for what this attests to per grant type.
+			// client_identifier, the string from the request, and no client_id, the client's
+			// row id: the validator discards the client model on failure. See the constant's
+			// doc comment for what this attests to per grant type.
 			"client_identifier": input.ClientId,
 			"grant_type":        input.GrantType.String(),
 			"scope":             input.Scope,

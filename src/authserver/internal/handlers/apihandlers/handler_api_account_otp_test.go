@@ -161,9 +161,13 @@ func TestHandleAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 		"a replay must be indistinguishable from a wrong code to the caller")
 
 	require.NotZero(t, claimedStep, "the handler must have matched a step before claiming it")
-	assert.Equal(t, user.Id, payload["user_id"])
-	assert.Equal(t, claimedStep, payload["step"],
-		"the replay event carries the step that was replayed, so an operator can see which code it was")
+	// The step that was replayed, so an operator can see which code it was, and the caller, as
+	// every event a signed-in user causes through the account API names them (#522 decision 7).
+	assert.Equal(t, map[string]interface{}{
+		"user_id":        user.Id,
+		"step":           claimedStep,
+		"logged_in_user": subject,
+	}, payload)
 
 	// No enable write. TryEstablishUserOTP is not registered on the mock, so reaching it would fail
 	// the test as an unexpected call; asserting it explicitly says that is the point rather than an
@@ -261,7 +265,10 @@ func TestHandleAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T) {
 		Run(func(mock.Arguments) { calls = append(calls, "clear") }).Once()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
-	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, map[string]interface{}{
+		"user_id":        user.Id,
+		"logged_in_user": subject,
+	}).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
@@ -375,7 +382,10 @@ func TestHandleAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T) {
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
-	auditLogger.On("Log", mock.Anything, audit.EventDisabledOTP, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventDisabledOTP, map[string]interface{}{
+		"user_id":        user.Id,
+		"logged_in_user": subject,
+	}).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
