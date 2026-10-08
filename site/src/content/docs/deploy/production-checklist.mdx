@@ -22,7 +22,7 @@ Each item links to the page that explains it. A deployment the [setup wizard](/g
 - [ ] **Both public URLs are `https://`.** `GOIABADA_AUTHSERVER_BASEURL` and `GOIABADA_ADMINCONSOLE_BASEURL` decide whether each server marks its cookies `Secure`, and there's no other setting for it. See [URLs and listeners](/reference/environment-variables/#urls-and-listeners).
 - [ ] **Only your proxy reaches ports 9090 and 9091.** Publish 443, and 80 if you redirect it, and nothing else.
 - [ ] **The metrics ports, 9190 and 9191, are published nowhere.** Only your scraper reaches them. See [Monitoring](/deploy/monitoring/#turn-the-metrics-on).
-- [ ] **Forwarded headers are trusted only from your proxy.** Turn on `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS` and `GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS` only behind a proxy, and list your proxies in `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` and `GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES` when there's more than one hop. Otherwise anyone can choose the address Goiabada rate limits and audits them under. See [client IP resolution](/deploy/reverse-proxy/#client-ip-resolution-and-spoofing-protection).
+- [ ] **Forwarded headers are trusted only from your proxy.** Turn on `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS` and `GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS` only behind a proxy, and list your proxies in `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` and `GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES` when there's more than one hop. Otherwise anyone can choose the address Goiabada rate limits and audits them under. See [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/).
 - [ ] **Certificates renew themselves,** whatever issues them.
 
 ## The hop from the admin console to the auth server

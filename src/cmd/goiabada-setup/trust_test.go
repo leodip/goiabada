@@ -201,6 +201,56 @@ func TestEveryOutput_PairsTrustWithTheProxiesItTrusts(t *testing.T) {
 	}
 }
 
+// cloudflareNginxTrustDocs is the section saying how nginx resolves Cloudflare's proxy, so that
+// one hop still resolves the client behind both.
+const cloudflareNginxTrustDocs = "https://goiabada.dev/deploy/client-ip-and-proxy-trust/#cloudflare--nginx"
+
+// Every Compose file for the reverse proxy on the host, generated or hand-written, sends an
+// operator with Cloudflare's proxy in front of nginx to the section saying how nginx resolves
+// Cloudflare, in the comment above each server's trust, rather than to a list of Cloudflare's
+// ranges that would make Goiabada ignore the forwarded headers.
+func TestComposeBehindAProxy_LinksCloudflareInFrontOfNginxToItsSection(t *testing.T) {
+	outputs := map[string]string{}
+	for _, testCase := range goldenCases() {
+		config := testCase.config()
+		if config.Deployment.kind == deploymentProduction {
+			outputs[testCase.name] = descriptionOf(config)
+		}
+	}
+	sample, err := os.ReadFile(reverseProxySample)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputs[reverseProxySample] = string(sample)
+
+	linked := 0
+	for name, content := range outputs {
+		t.Run(name, func(t *testing.T) {
+			lines := strings.Split(content, "\n")
+			for _, server := range []string{"AUTHSERVER", "ADMINCONSOLE"} {
+				trustName := "GOIABADA_" + server + "_TRUST_PROXY_HEADERS"
+				found := false
+				for i, line := range lines {
+					if !strings.Contains(line, trustName) {
+						continue
+					}
+					found = true
+					if comment := commentAbove(lines, i); !strings.Contains(comment, cloudflareNginxTrustDocs) {
+						t.Errorf("line %d sets %s under a comment that does not link %s: %q", i+1, trustName, cloudflareNginxTrustDocs, comment)
+					}
+					linked++
+				}
+				if !found {
+					t.Errorf("no line names %s", trustName)
+				}
+			}
+		})
+	}
+	if len(outputs) < 2 || linked == 0 {
+		t.Fatalf("%d outputs and %d trust lines, so this checked nothing", len(outputs), linked)
+	}
+}
+
 // Behind a reverse proxy on the same machine both servers listen on 127.0.0.1 alone, the address
 // the native docs proxy to, so nothing past the proxy reaches the plain HTTP it serves; with none
 // they listen on every interface, and a comment names the settings that serve HTTPS directly

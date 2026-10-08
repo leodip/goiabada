@@ -128,12 +128,14 @@ export default defineConfig({
 				{
 					label: 'Deploy',
 					items: [
+						{ label: 'Choose a method', slug: 'deploy/choose-a-method' },
 						{ label: 'Docker Compose', slug: 'deploy/docker-compose' },
 						{ label: 'Cloudflare Tunnel', slug: 'deploy/cloudflare-tunnel' },
 						{ label: 'Cloudflare + Nginx', slug: 'deploy/cloudflare-nginx' },
 						{ label: 'Reverse proxy', slug: 'deploy/reverse-proxy' },
 						{ label: 'Kubernetes', slug: 'deploy/kubernetes' },
 						{ label: 'Native binaries', slug: 'deploy/native-binaries' },
+						{ label: 'Client IP and proxy trust', slug: 'deploy/client-ip-and-proxy-trust' },
 						{ label: 'Database', slug: 'deploy/database' },
 						{ label: 'Secrets', slug: 'deploy/secrets' },
 						{ label: 'Rotate secrets', slug: 'deploy/rotate-secrets' },

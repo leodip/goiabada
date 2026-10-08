@@ -1,0 +1,165 @@
+---
+title: Client IP and proxy trust
+description: Make Goiabada see each client's own IP address behind a reverse proxy, a Cloudflare Tunnel, Cloudflare and Nginx, or a Kubernetes gateway.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you make Goiabada see each client's own IP address when a proxy sits in front of it.
+
+Goiabada counts [rate limits](/reference/environment-variables/#rate-limits) by client IP address, and records the address in the [audit log](/concepts/audit-log/), in each user's sessions and in the request log. Behind a proxy, the connection comes from the proxy, so Goiabada has to read the client's address from the `X-Forwarded-For` header the proxy adds. Get it wrong and either every user shares one rate limit, or a caller picks the address it's counted under.
+
+## Set it up
+
+<Steps>
+
+1. **Turn on forwarded headers** on both servers, behind a proxy and only behind one:
+
+   ```bash
+   GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true
+   GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=true
+   ```
+
+2. **Leave the trusted proxy lists empty when one proxy connects to Goiabada.** That's every setup on this page but [a second proxy hop](#a-second-proxy-hop). The setup wizard writes them empty, side by side with the switch:
+
+   ```bash
+   GOIABADA_AUTHSERVER_TRUSTED_PROXIES=
+   GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES=
+   ```
+
+3. **Make the proxy the only way in.** Nothing but the proxy may reach ports 9090 and 9091. The section for [your setup](#your-setup) says how.
+
+4. **Check it.** Open the sign-in page from your own browser, then read the auth server's request log. The `ip` of your request should be your own public address, not your proxy's or Cloudflare's.
+
+</Steps>
+
+## Your setup
+
+### Reverse proxy
+
+The [Reverse proxy](/deploy/reverse-proxy/) setup has Nginx on the host in front of the Docker Compose file. Its `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` line appends the address Nginx received the connection from, so the rightmost entry is the client's. The wizard's Compose file trusts one hop with empty lists, which is right here.
+
+The Compose file publishes 9090 and 9091 on `127.0.0.1` alone, so nothing outside the host reaches them. Keep it that way.
+
+<Aside type="caution" title="Never list 127.0.0.1 under Docker Compose">
+Nginx connects to `127.0.0.1:9090`, but a Compose service sees the connection come from the Compose network's gateway, an address such as `172.21.0.1`. Goiabada reads forwarded headers only from an address in its list, so a list naming `127.0.0.1` makes it ignore them, and every user shares one rate limit. Leave the list empty.
+</Aside>
+
+### Cloudflare Tunnel
+
+With a [Cloudflare Tunnel](/deploy/cloudflare-tunnel/), Cloudflare appends the address each request came from to `X-Forwarded-For`, and `cloudflared` on the host passes it on. One hop with empty lists is right, as for a reverse proxy, and so is the caution above about `127.0.0.1`. Nothing is published to the internet: `cloudflared` connects out to Cloudflare.
+
+### Cloudflare + Nginx
+
+With [Cloudflare + Nginx](/deploy/cloudflare-nginx/), every request reaches Nginx from a Cloudflare address. Left alone, Nginx appends that address, and Goiabada sees Cloudflare's edge as the client: not forgeable, but shared by everyone that edge serves, so many users count against one rate limit.
+
+Have Nginx resolve Cloudflare instead, so that Goiabada still sees one hop and needs no list. Nginx's `real_ip` module replaces the address of a connection from one of Cloudflare's published ranges with the one in the `CF-Connecting-IP` header. Write those ranges into a file Nginx loads in its `http` context:
+
+```bash
+{
+  echo "# Cloudflare's ranges, from https://www.cloudflare.com/ips/ ($(date -I))"
+  for range in $(curl -fsS https://www.cloudflare.com/ips-v4) $(curl -fsS https://www.cloudflare.com/ips-v6); do
+    echo "set_real_ip_from $range;"
+  done
+  echo "real_ip_header CF-Connecting-IP;"
+} | sudo tee /etc/nginx/conf.d/cloudflare-real-ip.conf
+```
+
+The file looks like this, with every range Cloudflare lists:
+
+```nginx
+# Cloudflare's ranges, from https://www.cloudflare.com/ips/ (2026-10-04)
+set_real_ip_from 173.245.48.0/20;
+set_real_ip_from 103.21.244.0/22;
+# ...
+set_real_ip_from 2400:cb00::/32;
+# ...
+real_ip_header CF-Connecting-IP;
+```
+
+Then test and reload:
+
+```bash
+sudo nginx -t && sudo nginx -s reload
+```
+
+Debian's and Ubuntu's Nginx packages load `/etc/nginx/conf.d/*.conf` in the `http` context and include the `real_ip` module: `nginx -V 2>&1 | grep -o with-http_realip_module` shows it. Cloudflare changes its ranges rarely; run the command again when it does, or from a monthly cron job.
+
+Now Nginx's `$remote_addr` is the client's address, and the `$proxy_add_x_forwarded_for` line of the Nginx configuration passes it on. A request that reaches Nginx from outside Cloudflare's ranges keeps its own address, so a forged `CF-Connecting-IP` changes nothing.
+
+**Never** list Cloudflare's ranges in `TRUSTED_PROXIES`. Under Docker Compose, Goiabada's peer is the Compose network's gateway, not Cloudflare, so the list would make it ignore the forwarded headers altogether.
+
+### Native binaries
+
+With the [native binaries](/deploy/native-binaries/) and a reverse proxy on the same machine, Nginx reaches each server over loopback, with no Compose network between them. Here the wizard lists `127.0.0.1`, and has both servers listen on it alone:
+
+```bash
+GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP="127.0.0.1"
+GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS="true"
+GOIABADA_AUTHSERVER_TRUSTED_PROXIES="127.0.0.1"
+```
+
+The admin console's three variables are the same. For a proxy on another host, set each listen host to an address that host reaches and each list to that host's address, and keep the ports closed to everything else.
+
+With no proxy in front (`--local-proxy=false`), the wizard turns forwarded headers off, and each client is the address it connects from.
+
+### Kubernetes
+
+The [Kubernetes](/deploy/kubernetes/) manifests the wizard generates trust one hop, the gateway, with empty lists. Envoy appends the address it received each connection from to `X-Forwarded-For`, so whatever a client sends ends up to the left of Envoy's entry and is never read.
+
+Which address Envoy sees depends on the gateway's external traffic policy. Under `Cluster`, it's a node's address, so the clients a node forwards share one rate limit. Under `Local`, with Envoy on every node, it's the client's. The comment above each pair in the manifest says which, following your answer to the wizard.
+
+Leave the lists empty. The lists that come to mind for a cluster both go wrong: the private ranges hold the node addresses Envoy records under `Cluster`, so Goiabada would walk past Envoy's entry and adopt whatever the client wrote to its left, and the pod range does the same on clusters where pods and nodes share a subnet.
+
+A pod that calls the `goiabada-authserver` or `goiabada-adminconsole` Service directly, around Envoy, can send any `X-Forwarded-For` it likes. No list stops that, since Envoy's pods are pods too. A NetworkPolicy admitting only Envoy does: see [Who can reach Goiabada](/deploy/kubernetes/#who-can-reach-goiabada).
+
+### A second proxy hop
+
+When a second proxy that appends `X-Forwarded-For` sits in front of the one that connects to Goiabada, such as a load balancer in front of Nginx, or a CDN in front of Envoy, the rightmost entry is that second proxy's address. List every hop you control in `TRUSTED_PROXIES`, **including the one that connects to Goiabada**:
+
+```bash
+# Nginx on the internal network, and a load balancer in front of it
+GOIABADA_AUTHSERVER_TRUSTED_PROXIES=10.0.0.0/8,192.168.1.5
+GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES=10.0.0.0/8,192.168.1.5
+```
+
+Under Docker Compose, the one that connects to Goiabada is the Compose network's gateway, so list the network's range. For Cloudflare in front of Nginx, [resolve Cloudflare in Nginx](#cloudflare--nginx) instead.
+
+## How it works
+
+Both servers resolve the client's address the same way, each from its own two variables. The auth server's rate limiter, audit records, session records and request log, and the admin console's request log, all read the one address it resolves.
+
+### Forwarded headers off
+
+With `TRUST_PROXY_HEADERS` off, the default, the client is the address that connected. That's right with nothing in front of Goiabada. Behind a proxy, it's the proxy, so every request looks the same: see [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/). It fails safe, throttling everyone rather than letting anyone through.
+
+### One hop
+
+With `TRUST_PROXY_HEADERS` on and `TRUSTED_PROXIES` empty, the client is the rightmost `X-Forwarded-For` entry, or `X-Real-IP` when there's no `X-Forwarded-For`. An entry that isn't an IP address is skipped.
+
+That's sound behind one proxy that sets or appends `X-Forwarded-For`, as Nginx, Envoy and Cloudflare do: the rightmost entry is the address that proxy received the connection from, and anything the client sent sits to its left.
+
+What one hop doesn't survive is a caller that reaches Goiabada **without passing the proxy**. It connects directly, sends any `X-Forwarded-For` it likes, and chooses the address it's rate limited and audited under. No setting can tell that caller from the proxy, which is why each setup above closes the ports instead.
+
+### A list of trusted proxies
+
+With `TRUSTED_PROXIES` set, Goiabada reads the forwarded headers only from a connection whose address is in the list, and ignores them from anywhere else. It then walks `X-Forwarded-For` from the right, past each listed address, to the first one that isn't listed: the client. A forged entry to the left of that one is never reached.
+
+Each entry is an IP address or a CIDR range, separated by commas. An entry that's neither stops the server at start, even with `TRUST_PROXY_HEADERS` off.
+
+### The startup warnings
+
+With the [rate limiter](/reference/environment-variables/#rate-limits) on, the auth server logs a warning at every start about two settings it can't check from the inside:
+
+- **Forwarded headers off.** Behind a proxy, every request resolves to the proxy, and everyone shares one rate limit. With nothing in front of the auth server, as for native binaries with no proxy, the warning is expected.
+- **One hop with no list.** It's sound behind one proxy that sets or appends `X-Forwarded-For`, and defeated by a caller that reaches the auth server around it. The setup wizard's Compose file and Kubernetes manifests trust one hop on purpose, so expect this warning with either.
+
+The auth server can't tell a proxy that appends from one that passes the header through untouched, nor see whether anything reaches it around the proxy. Once you've checked both against your setup, leave the warning as it is.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Environment variables" description="The proxy and rate limiter settings, and the limits." href="/reference/environment-variables/#proxies" />
+  <LinkCard title="Too many attempts or 429" description="When every user shares one rate limit." href="/troubleshooting/too-many-attempts-or-429/" />
+  <LinkCard title="Production checklist" description="What to check before going live." href="/deploy/production-checklist/" />
+</CardGrid>

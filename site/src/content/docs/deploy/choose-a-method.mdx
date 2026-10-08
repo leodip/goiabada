@@ -1,0 +1,48 @@
+---
+title: Choose a method
+description: Compare the ways to run Goiabada in production, by how each handles TLS, what it exposes and what it suits.
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page helps you pick how to run Goiabada in production.
+
+Most people want **Cloudflare Tunnel**: no open port, no certificate to renew and no Nginx. Already run Nginx, or don't use Cloudflare? Pick by what you have:
+
+| Method | TLS | Exposed to the internet | Effort | Setup wizard | Database | Suits |
+|---|---|---|---|---|---|---|
+| [Cloudflare Tunnel](/deploy/cloudflare-tunnel/) | Cloudflare's certificates | Nothing: `cloudflared` connects out | Least | Production with reverse proxy | MySQL, PostgreSQL, SQL Server or SQLite, in the Compose file | One server, with your domain on Cloudflare |
+| [Cloudflare + Nginx](/deploy/cloudflare-nginx/) | Cloudflare's, and Let's Encrypt's on Nginx | Ports 80 and 443 | Some | Production with reverse proxy | The same | A server already running Nginx, with your domain on Cloudflare |
+| [Reverse proxy](/deploy/reverse-proxy/) | Let's Encrypt's on Nginx | Ports 80 and 443 | Some | Production with reverse proxy | The same | One server, without Cloudflare |
+| [Kubernetes](/deploy/kubernetes/) | cert-manager's, on the Gateway | The Gateway's load balancer | Most | Kubernetes cluster | MySQL, PostgreSQL or SQL Server, run by you | Several replicas, on a cluster you already run |
+| [Native binaries](/deploy/native-binaries/) | Your reverse proxy's, or each server's own | Your proxy's ports, or each server's | Some | Native binaries | MySQL, PostgreSQL or SQL Server run by you, or SQLite | A server without Docker |
+
+The first three run the [Docker Compose](/deploy/docker-compose/) files the setup wizard writes, and differ only in what sits in front of them.
+
+## What every method needs
+
+- **Two hostnames,** one for the auth server and one for the admin console, such as `auth.example.com` and `admin.example.com`. Each server answers on its own.
+- **One registrable domain for both.** `auth.example.com` and `admin.example.com` work; `auth.example.com` and `admin.example.net` don't. The admin console's sign-in ends with the auth server posting the answer back to the admin console, and a browser sends the admin console's session cookie on that post only when both are on the same site. On two sites, every sign-in to the admin console stops at "This sign-in can't be finished".
+- **HTTPS on both public URLs.** Each server marks its cookies `Secure` only when its URL is `https://`.
+- **An empty database on the first start,** which the auth server seeds with the administrator and the admin console's client, for the URLs you gave. Changing the URLs later means changing that client's redirect URIs too: see [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/).
+
+## How it works
+
+Every method runs the same two servers. The auth server answers sign-ins, tokens and the API on port 9090, and the admin console answers administrators on port 9091. Each serves plain HTTP by default, and something in front of it serves HTTPS: Cloudflare, Nginx, a Kubernetes Gateway, or the server itself with a certificate of its own.
+
+Two things change from method to method, and each has a page:
+
+- **How Goiabada learns the client's IP address** through whatever is in front of it, which decides what the rate limiter counts: [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/).
+- **How the admin console reaches the auth server.** It calls the auth server's API at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, and that hop carries its client secret and administrators' tokens. The generated Compose files and Kubernetes manifests point it at the auth server's container or Service over plain HTTP, inside the deployment's own network; native binaries go through the public URL. [Docker Compose](/deploy/docker-compose/#the-hop-to-the-auth-server) and the [production checklist](/deploy/production-checklist/#the-hop-from-the-admin-console-to-the-auth-server) say when that's enough and how to encrypt it.
+
+<Aside type="caution">
+The wizard's **Local testing** choice serves plain HTTP on `localhost`, for the [Quickstart](/get-started/quickstart/). **Never** use it for a deployment other people reach.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Setup wizard" description="Generate the files for the method you picked." href="/get-started/setup-wizard/" />
+  <LinkCard title="Cloudflare Tunnel" description="The simplest way in: no open port, no certificate." href="/deploy/cloudflare-tunnel/" />
+  <LinkCard title="Production checklist" description="What to check before going live." href="/deploy/production-checklist/" />
+</CardGrid>

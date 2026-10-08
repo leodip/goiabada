@@ -213,7 +213,7 @@ Turn `TRUST_PROXY_HEADERS` on behind a proxy. With `TRUSTED_PROXIES` empty, the 
 Once you set `TRUSTED_PROXIES`, it must include the proxy that connects to Goiabada: forwarded headers from any other address are ignored. An entry that's neither an IP address nor a CIDR range stops the server at start, even with `TRUST_PROXY_HEADERS` off.
 
 <Aside type="caution">
-A client that reaches Goiabada without going through your proxy can claim any address it likes. Make sure the proxy is the only way in. See [client IP resolution](/deploy/reverse-proxy/#client-ip-resolution-and-spoofing-protection).
+A client that reaches Goiabada without going through your proxy can claim any address it likes. Make sure the proxy is the only way in. See [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/).
 </Aside>
 
 ### Session keys

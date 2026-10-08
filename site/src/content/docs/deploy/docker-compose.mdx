@@ -1,93 +1,100 @@
 ---
-title: Production deployment
-description: Deploy Goiabada to production with HTTPS and proper security.
+title: Docker Compose
+description: Run the Docker Compose files the setup wizard generates for production, and what they set up.
 ---
 
-import { LinkCard, CardGrid, Aside } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-Before deploying Goiabada to production, choose your deployment method based on your infrastructure.
+This page helps you run Goiabada in production from the Docker Compose files the setup wizard writes.
 
-## Deployment options
+The Compose files run the auth server, the admin console and the database on one host, and publish the two servers on `127.0.0.1` alone. A proxy on the same host puts them on the internet: [Cloudflare Tunnel](/deploy/cloudflare-tunnel/), [Cloudflare + Nginx](/deploy/cloudflare-nginx/) or [Reverse proxy](/deploy/reverse-proxy/). Each of those pages runs this one first.
 
-<CardGrid>
-  <LinkCard
-    title="Cloudflare Tunnel"
-    description="Simplest setup. No SSL certificates, no open ports, no Nginx."
-    href="/deploy/cloudflare-tunnel/"
-  />
-  <LinkCard
-    title="Cloudflare + Nginx"
-    description="For servers already running Nginx with other sites."
-    href="/deploy/cloudflare-nginx/"
-  />
-  <LinkCard
-    title="Reverse proxy (no Cloudflare)"
-    description="Standard Nginx/Traefik setup with Let's Encrypt SSL."
-    href="/deploy/reverse-proxy/"
-  />
-  <LinkCard
-    title="Kubernetes"
-    description="Deploy to a Kubernetes cluster with Gateway API."
-    href="/deploy/kubernetes/"
-  />
-  <LinkCard
-    title="Native binaries"
-    description="Run without Docker using pre-built binaries."
-    href="/deploy/native-binaries/"
-  />
-</CardGrid>
+## Run the wizard's files
 
-## Quick comparison
+<Steps>
 
-| Method | SSL management | Complexity | Best for |
-|--------|---------------|------------|----------|
-| Cloudflare Tunnel | Cloudflare handles it | ⭐ Easiest | Most users |
-| Cloudflare + Nginx | Cloudflare + local certs | ⭐⭐ Medium | Existing Nginx servers |
-| Reverse proxy | Let's Encrypt | ⭐⭐ Medium | Non-Cloudflare users |
-| Kubernetes | cert-manager | ⭐⭐⭐ Advanced | Kubernetes environments |
-| Native binaries | Manual | ⭐⭐⭐ Advanced | No-Docker environments |
+1. **Run the [setup wizard](/get-started/setup-wizard/)** in an empty directory, and choose **Production with reverse proxy**. Give it the two public URLs, such as `https://auth.example.com` and `https://admin.example.com`, and a database. Or answer with flags:
 
-## Using the setup wizard
+   ```bash
+   ./goiabada-setup-linux-amd64 --type=production --db=postgres \
+     --auth-url=https://auth.example.com --admin-url=https://admin.example.com
+   ```
 
-The [setup wizard](/get-started/setup-wizard/) can generate production-ready configurations:
+   It writes `docker-compose.yml`, which you can commit, and `docker-compose.override.yml` beside it, which holds every secret. **Never** commit the override.
 
-```bash
-./goiabada-setup-linux-amd64
-```
+2. **Back up the AES key** from the override before anything else: see [Back up the AES key](/deploy/secrets/#back-up-the-aes-key).
 
-Choose the deployment type that matches your setup:
+3. **Start Goiabada** with the command the wizard printed. With both files in the current directory, under their own names, it's:
 
-| Option | Use case | Output |
-|--------|----------|--------|
-| **2. Production with reverse proxy** | Docker with Nginx/Cloudflare | `docker-compose.yml`, and its secrets in `docker-compose.override.yml` |
-| **3. Kubernetes cluster** | Kubernetes deployment | `goiabada-k8s.yaml`, and its Secrets in `goiabada-secrets.yaml` |
-| **4. Native binaries** | Running without Docker | `goiabada.env` |
+   ```bash
+   docker compose up -d
+   ```
 
-The wizard will ask for your domain names, generate all credentials (session keys, OAuth secrets), and create the appropriate configuration file.
+   Docker Compose reads the override without being asked. The first start seeds the database, which can take a minute.
 
-For Docker Compose, every secret goes into `docker-compose.override.yml` and none into
-`docker-compose.yml`, so you can commit `docker-compose.yml` but must keep the override to yourself. [Secrets](/deploy/secrets/) says what each one protects and how to
-back up the AES key, and [Rotate secrets](/deploy/rotate-secrets/) how to replace them.
-[Upgrade Goiabada](/deploy/upgrade-goiabada/) covers moving to a new release.
+4. **Check both servers answer** on the host:
 
-You still need to set up SSL termination using one of the methods above (except for Kubernetes, where the wizard configures cert-manager).
+   ```bash
+   curl http://127.0.0.1:9090/health   # healthy
+   curl http://127.0.0.1:9091/health   # healthy
+   ```
 
-<Aside type="tip">
-Before going live, review the [production checklist](/deploy/production-checklist/) for security and configuration requirements.
-</Aside>
+5. **Put a proxy in front,** with one of the three pages above, and then [sign in](/get-started/first-sign-in/).
 
-## The user the images run as
+</Steps>
 
-Both images run as uid 10001 and gid 10001, a user and group named `goiabada`, and never as root.
-The image names them by number, so a platform that refuses a root container, such as Kubernetes with
-`runAsNonRoot`, can verify the user without reading the image's `/etc/passwd`. The binary and the
-`/app` directory holding it belong to root, so the process cannot replace what its next start runs.
+## How it works
 
-A file you mount into a container must be readable by uid 10001 or gid 10001: the certificate and
-key named by `GOIABADA_AUTHSERVER_CERTFILE` and `GOIABADA_AUTHSERVER_KEYFILE` (and the admin
-console's pair), and the templates and static files of a [customization](/guides/customize-and-translate-the-pages/#change-the-templates).
-A key file left at mode `0600` and owned by root cannot be read; give it to the user, or to the group
-with mode `0640`:
+### What the files run
+
+- **The database runs beside Goiabada,** in a container of its own for MySQL, PostgreSQL and SQL Server, with its data in a named volume. With SQLite, the auth server keeps the database file in the `sqlite-data` volume. [Database](/deploy/database/) covers using a database server of your own instead.
+- **The auth server starts once the database answers,** and the admin console once the auth server does. A first start or an upgrade has up to five minutes to seed or migrate the database before Docker Compose counts the auth server unhealthy.
+- **Both servers publish their ports on `127.0.0.1` alone,** 9090 for the auth server and 9091 for the admin console. Nothing outside the host reaches them, so your proxy is the only way in.
+- **Both servers trust one proxy hop** to tell them the client's IP address: see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#reverse-proxy).
+- **Each server gets up to 60 seconds to stop** when you run `docker compose down` or `restart`, so requests in flight finish.
+- **The wizard's rate limiter answer,** yes unless you said no, is written as `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`. See [Rate limits](/reference/environment-variables/#rate-limits).
+
+### The hop to the auth server
+
+The admin console calls the auth server at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, which the wizard sets to `http://goiabada-authserver:9090`: straight to the auth server's container, over the Compose network, without passing your proxy.
+
+That hop is plain HTTP, and it carries the admin console's client secret, its refresh token and administrators' tokens. A Compose network never leaves the host, so the hop is as safe as the host is. The generated file says so in a comment above the variable.
+
+When that isn't enough, encrypt the hop with the auth server's own HTTPS listener:
+
+<Steps>
+
+1. Make a certificate for the name the admin console calls, `goiabada-authserver`, from a certificate authority of your own, and mount it into the auth server's container, readable by [the user the images run as](#the-user-the-images-run-as).
+
+2. Turn on the auth server's HTTPS listener, in its `environment`:
+
+   ```yaml
+   - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS=0.0.0.0
+   - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=9443
+   - GOIABADA_AUTHSERVER_CERTFILE=/certs/goiabada-authserver.pem
+   - GOIABADA_AUTHSERVER_KEYFILE=/certs/goiabada-authserver-key.pem
+   ```
+
+3. Mount your certificate authority's certificate into the admin console's container, then point the admin console at the listener and have it trust that authority, in its `environment`:
+
+   ```yaml
+   - GOIABADA_AUTHSERVER_INTERNALBASEURL=https://goiabada-authserver:9443
+   - SSL_CERT_FILE=/certs/ca.pem
+   ```
+
+   `SSL_CERT_FILE`, or `SSL_CERT_DIR` for a directory of certificates, replaces the system's certificate authorities rather than adding to them, so the file must hold every authority the admin console needs.
+
+4. Restart both servers with `docker compose up -d`.
+
+</Steps>
+
+If the admin console then can't reach the auth server, see [Unable to load the configuration from the auth server](/troubleshooting/unable-to-load-the-configuration-from-the-auth-server/).
+
+### The user the images run as
+
+Both images run as uid 10001 and gid 10001, a user and group named `goiabada`, and never as root. The image names them by number, so a platform that refuses a root container, such as Kubernetes with `runAsNonRoot`, can verify the user without reading the image's `/etc/passwd`. The binary and the `/app` directory holding it belong to root, so the process can't replace what its next start runs.
+
+A file you mount into a container must be readable by uid 10001 or gid 10001: the certificate and key named by `GOIABADA_AUTHSERVER_CERTFILE` and `GOIABADA_AUTHSERVER_KEYFILE` (and the admin console's pair), and the templates and static files of a [customization](/guides/customize-and-translate-the-pages/#change-the-templates). A key file left at mode `0600` and owned by root can't be read; give it to the user, or to the group with mode `0640`:
 
 ```bash
 sudo chown 10001:10001 key.pem
@@ -97,11 +104,19 @@ sudo chgrp 10001 key.pem && sudo chmod 0640 key.pem
 
 The auth server writes to two directories, and its image creates both owned by 10001:
 
-- `/data`, where the generated Compose file and the hand-written SQLite sample mount the SQLite
-  volume. Docker copies a mount point's ownership into an empty named volume, so a new volume
-  mounted here is writable from the first start. A volume mounted at a path the image lacks gets a directory Docker creates owned by root,
-  where the server can write nothing.
-- `/bootstrap`, where the legacy bootstrap writes `bootstrap.env` when
-  `GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE` names a file in it. Mount a named volume there, and
-  read the file with `docker compose cp goiabada-authserver:/bootstrap/bootstrap.env .`. A bind mount
-  of a host directory that does not exist yet is created owned by root, and the write is refused.
+- `/data`, where the generated Compose file and the hand-written SQLite sample mount the SQLite volume. Docker copies a mount point's ownership into an empty named volume, so a new volume mounted here is writable from the first start. A volume mounted at a path the image lacks gets a directory Docker creates owned by root, where the server can write nothing.
+- `/bootstrap`, where the legacy bootstrap writes `bootstrap.env` when `GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE` names a file in it. Mount a named volume there, and read the file with `docker compose cp goiabada-authserver:/bootstrap/bootstrap.env .`. A bind mount of a host directory that doesn't exist yet is created owned by root, and the write is refused.
+
+The generated file also drops every capability, keeps the root file system read-only and gives each server a `/tmp` in memory.
+
+<Aside type="note" title="Local testing">
+The wizard's **Local testing** choice writes Compose files too, serving plain HTTP on `localhost`, published on every interface, with no proxy. It's for the [Quickstart](/get-started/quickstart/), never for a deployment other people reach.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Choose a method" description="Which proxy to put in front of these files." href="/deploy/choose-a-method/" />
+  <LinkCard title="Secrets" description="What the override file protects, and backing up the AES key." href="/deploy/secrets/" />
+  <LinkCard title="Upgrade Goiabada" description="Move to a new release, and back again." href="/deploy/upgrade-goiabada/" />
+</CardGrid>
