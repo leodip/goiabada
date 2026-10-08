@@ -24,6 +24,11 @@ type clientSettingsAPI interface {
 // ClientSettings is what the Settings tab is drawn from. AdministrativeScopesAllowed is shown
 // beside the settings, under Consent required, but saved by a form of its own on a route of its
 // own, so the settings save never carries it (#499 decision 5).
+//
+// The tab binds two: "client", the values its inputs show, and "storedClient", the client as the
+// auth server holds it, which the page title and the confirmation dialogs' original identifier and
+// enabled state are drawn from. They differ only when a refused save is drawn again, with the
+// inputs keeping what was typed (#522).
 type ClientSettings struct {
 	ClientId                    int64
 	ClientIdentifier            string
@@ -40,6 +45,7 @@ type ClientSettings struct {
 	AuthorizationCodeEnabled    bool
 	DefaultAcrLevel             string
 	IsSystemLevelClient         bool
+	CreatedViaDCR               bool
 }
 
 // clientSettingsFrom draws the Settings tab from the client as the auth server answers it.
@@ -60,6 +66,7 @@ func clientSettingsFrom(c *api.ClientResponse) ClientSettings {
 		AuthorizationCodeEnabled:    c.AuthorizationCodeEnabled,
 		DefaultAcrLevel:             c.DefaultAcrLevel,
 		IsSystemLevelClient:         c.IsSystemLevelClient,
+		CreatedViaDCR:               c.CreatedViaDCR,
 	}
 }
 
@@ -119,6 +126,7 @@ func HandleSettingsGet(
 
 		bind := map[string]interface{}{
 			"client":                    adminClientSettings,
+			"storedClient":              adminClientSettings,
 			"savedSuccessfully":         savedSuccessfully,
 			"administrativeScopesSaved": administrativeScopesSaved,
 		}
@@ -193,12 +201,17 @@ func HandleSettingsPost(
 			AuthorizationCodeEnabled:    clientResp.AuthorizationCodeEnabled,
 			DefaultAcrLevel:             r.FormValue("defaultAcrLevel"),
 			IsSystemLevelClient:         isSystemLevelClient,
+			CreatedViaDCR:               clientResp.CreatedViaDCR,
 		}
 
+		// A refusal draws the tab again with the inputs as typed, and the title and the dialogs'
+		// original values from the client as stored, so a second save of the same rename or
+		// disable still asks first.
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"client": adminClientSettings,
-				"error":  message,
+				"client":       adminClientSettings,
+				"storedClient": clientSettingsFrom(clientResp),
+				"error":        message,
 			}
 
 			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind)

@@ -1,11 +1,21 @@
 package renderintegration
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminclienthandlers"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
+	web "github.com/leodip/goiabada/adminconsole/web"
+	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,7 +32,7 @@ var allowanceSaveRe = regexp.MustCompile(`<button id="btnSaveAdministrativeScope
 
 func renderClientSettings(t *testing.T, client adminclienthandlers.ClientSettings, extra map[string]interface{}) string {
 	t.Helper()
-	bind := map[string]interface{}{"client": client, "savedSuccessfully": false}
+	bind := map[string]interface{}{"client": client, "storedClient": client, "savedSuccessfully": false}
 	for k, v := range extra {
 		bind[k] = v
 	}
@@ -126,4 +136,139 @@ func TestRender_AdminClientSettings_TheAllowanceAnswersBesideItsOwnSave(t *testi
 
 	settingsSaved := renderClientSettings(t, client, map[string]interface{}{"savedSuccessfully": true})
 	assert.NotContains(t, settingsSaved, "Autorização para escopos administrativos salva com sucesso")
+}
+
+// identifierInputRe matches the client identifier input, whatever order its attributes come in.
+var identifierInputRe = regexp.MustCompile(`<input id="clientIdentifier"[^>]*>`)
+
+// selfRegisteredIdentifierLine is the line beneath the identifier of a self-registered client, in pt-BR.
+const selfRegisteredIdentifierLine = "Um cliente autorregistrado mantém o identificador com que se registrou."
+
+// The identifier input is read-only for a client whose identifier the API refuses to change: the
+// system-level client, and a self-registered one, which also says why beneath it. An ordinary
+// client's identifier stays editable, with no line.
+func TestRender_AdminClientSettings_TheIdentifierIsReadOnlyWhereItCannotChange(t *testing.T) {
+	testCases := []struct {
+		name         string
+		client       adminclienthandlers.ClientSettings
+		wantReadOnly bool
+		wantLine     bool
+	}{
+		{
+			name:   "an ordinary client",
+			client: adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "portal"},
+		},
+		{
+			name: "a self-registered client",
+			client: adminclienthandlers.ClientSettings{ClientId: 8,
+				ClientIdentifier: "dcr_3f6c1d2e-8a4b-4c5d-9e0f-1a2b3c4d5e6f", CreatedViaDCR: true},
+			wantReadOnly: true,
+			wantLine:     true,
+		},
+		{
+			name: "the admin console's client",
+			client: adminclienthandlers.ClientSettings{ClientId: 1, ClientIdentifier: "admin-console-client",
+				AdministrativeScopesAllowed: true, IsSystemLevelClient: true},
+			wantReadOnly: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			out := renderClientSettings(t, tc.client, nil)
+
+			input := identifierInputRe.FindString(out)
+			require.NotEmpty(t, input, "the identifier input is rendered")
+			assert.Contains(t, input, `value="`+tc.client.ClientIdentifier+`"`)
+			assert.Equal(t, tc.wantReadOnly, strings.Contains(input, "readonly"), "readonly: %s", input)
+			assert.Equal(t, tc.wantLine, strings.Contains(out, selfRegisteredIdentifierLine))
+		})
+	}
+}
+
+// settingsTabAPI is the auth server as the Settings tab reaches it: the client as stored, and a
+// save it refuses with a 400 the administrator can act on.
+type settingsTabAPI struct {
+	stored  *api.ClientResponse
+	refusal string
+}
+
+func (s *settingsTabAPI) GetClientById(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
+	return s.stored, nil
+}
+
+func (s *settingsTabAPI) UpdateClient(_ context.Context, _ string, _ int64,
+	_ *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
+	return nil, &apiclient.APIError{Code: "VALIDATION_ERROR", Message: s.refusal, StatusCode: http.StatusBadRequest}
+}
+
+// postClientSettings drives the Settings tab's save through the real renderer, in pt-BR, and
+// returns the page it answers with.
+func postClientSettings(t *testing.T, apiClient *settingsTabAPI, form url.Values) string {
+	t.Helper()
+	req := handlertest.Request(http.MethodPost, "/admin/clients/7/settings",
+		handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "7"),
+		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark"}),
+		handlertest.WithForm(form))
+	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
+	rec := httptest.NewRecorder()
+
+	adminclienthandlers.HandleSettingsPost(render.New(web.TemplateFS()), nil, apiClient, "https://console.example").
+		ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, "the refused save is drawn again, not redirected: %s", rec.Body.String())
+	return rec.Body.String()
+}
+
+// A refused save draws the tab again with the inputs as the administrator typed them, and
+// everything that stands for the client as it is from the stored client: the page title, and the
+// original identifier and enabled state the confirmation dialogs compare against. Drawn from the
+// submission instead, a second save of the same rename or the same disable would ask nothing.
+func TestRender_AdminClientSettings_ARefusedSaveKeepsTheStoredClient(t *testing.T) {
+	const refusal = "The client identifier is already in use."
+	apiClient := &settingsTabAPI{
+		stored:  &api.ClientResponse{Id: 7, ClientIdentifier: "portal", DisplayName: "Portal", Enabled: true},
+		refusal: refusal,
+	}
+
+	out := postClientSettings(t, apiClient, url.Values{
+		"clientIdentifier": {"portal-renamed"},
+		"displayName":      {"Renamed portal"},
+	})
+
+	assert.Contains(t, out, refusal)
+
+	assert.Contains(t, out, `<span class="text-accent">portal</span>`, "the page title names the stored client")
+	assert.NotContains(t, out, `<span class="text-accent">portal-renamed</span>`)
+	assert.Contains(t, out, `var originalClientIdentifier = "portal";`)
+	assert.Contains(t, out, `var originallyEnabled = true;`)
+
+	input := identifierInputRe.FindString(out)
+	require.NotEmpty(t, input)
+	assert.Contains(t, input, `value="portal-renamed"`, "the input keeps what was typed")
+	assert.Contains(t, out, `value="Renamed portal"`)
+	enabled := regexp.MustCompile(`<input id="enabledDisabled"[^>]*>`).FindString(out)
+	require.NotEmpty(t, enabled)
+	assert.NotContains(t, enabled, "checked", "the switch keeps what was submitted: off")
+}
+
+// A self-registered client's identifier stays read-only, with its line, when a refused save draws
+// the tab again.
+func TestRender_AdminClientSettings_ARefusedSaveKeepsASelfRegisteredIdentifierReadOnly(t *testing.T) {
+	const identifier = "dcr_3f6c1d2e-8a4b-4c5d-9e0f-1a2b3c4d5e6f"
+	apiClient := &settingsTabAPI{
+		stored:  &api.ClientResponse{Id: 7, ClientIdentifier: identifier, Enabled: true, CreatedViaDCR: true},
+		refusal: "Invalid website URL.",
+	}
+
+	out := postClientSettings(t, apiClient, url.Values{
+		"clientIdentifier": {identifier},
+		"enabled":          {"on"},
+		"websiteUrl":       {"not a url"},
+	})
+
+	input := identifierInputRe.FindString(out)
+	require.NotEmpty(t, input)
+	assert.Contains(t, input, "readonly")
+	assert.Contains(t, out, selfRegisteredIdentifierLine)
 }

@@ -98,6 +98,24 @@ func TestHandleSettingsGet_BindsTheAdministrativeScopesAllowance(t *testing.T) {
 	}
 }
 
+// The tab is told whether the client registered itself, so the template can keep its identifier
+// read-only: on for a self-registered client, off for one an administrator created.
+func TestHandleSettingsGet_BindsWhetherTheClientRegisteredItself(t *testing.T) {
+	for _, createdViaDCR := range []bool{true, false} {
+		httpHelper := &stubHttpHelper{}
+		req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings",
+			handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "7"))
+		client := &api.ClientResponse{Id: 7, ClientIdentifier: "dcr_a3f9e1b2", CreatedViaDCR: createdViaDCR}
+
+		HandleSettingsGet(httpHelper, newTestSessionStore(), &stubAdministrativeScopesApiClient{client: client}).
+			ServeHTTP(httptest.NewRecorder(), req)
+
+		require.NoError(t, httpHelper.err)
+		require.NotNil(t, httpHelper.bind, "the handler rendered nothing")
+		assert.Equal(t, createdViaDCR, reflect.ValueOf(httpHelper.bind["client"]).FieldByName("CreatedViaDCR").Bool())
+	}
+}
+
 // The allowance's form posts the switch alone, and the handler sends the API what it says: on is
 // allowed, and a switch left off, which a browser does not submit at all, is not allowed. It is sent
 // for the client the route names, with the administrator's own token, and the settings save is not

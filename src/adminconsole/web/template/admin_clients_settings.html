@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.settings.page_title_prefix" }}{{.client.ClientIdentifier}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.settings.page_title_prefix" }}<span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.settings.page_title_prefix" }}{{.storedClient.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.settings.page_title_prefix" }}<span class="text-accent">{{.storedClient.ClientIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -9,8 +9,8 @@
 
 <script>
 
-    var originalClientIdentifier = "{{.client.ClientIdentifier}}";
-    var originallyEnabled = {{if .client.Enabled}}true{{else}}false{{end}};
+    var originalClientIdentifier = "{{.storedClient.ClientIdentifier}}";
+    var originallyEnabled = {{if .storedClient.Enabled}}true{{else}}false{{end}};
     var isSystemLevel = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
     var originallyAllowedAdministrativeScopes = {{if .client.AdministrativeScopesAllowed}}true{{else}}false{{end}};
 
@@ -117,7 +117,10 @@
                     </span>
                 </label>
                 <input id="clientIdentifier" type="text" name="clientIdentifier" value="{{.client.ClientIdentifier}}"
-                    class="w-full input input-bordered " autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}} />
+                    class="w-full input input-bordered " autocomplete="off" {{if or .client.IsSystemLevelClient .client.CreatedViaDCR}}readonly{{end}} />
+                {{if .client.CreatedViaDCR}}
+                <p class="mt-1 text-sm">{{ T $.ctx "adminconsole.admin_clients.settings.field.identifier_self_registered" }}</p>
+                {{end}}
             </div>
 
             <div class="w-full mt-6 form-control">
