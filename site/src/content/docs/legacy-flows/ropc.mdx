@@ -8,7 +8,7 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 The Resource Owner Password Credentials (ROPC) flow allows applications to directly exchange a user's username and password for tokens. It's defined in [RFC 6749 Section 4.3](https://datatracker.ietf.org/doc/html/rfc6749#section-4.3).
 
 <Aside type="danger">
-The ROPC flow is **deprecated** in OAuth 2.1 and should only be used when absolutely necessary. It requires the application to handle user credentials directly, which creates significant security risks. For new applications, use the [Authorization Code flow with PKCE](/guides/authorization-code/) instead.
+The ROPC flow is **deprecated** in OAuth 2.1 and should only be used when absolutely necessary. It requires the application to handle user credentials directly, which creates significant security risks. For new applications, use the [authorization code flow with PKCE](/guides/add-sign-in-to-a-web-app/) instead.
 </Aside>
 
 ## When to use ROPC
