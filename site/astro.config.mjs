@@ -147,8 +147,9 @@ export default defineConfig({
 							items: [
 								{ label: 'Authorize', slug: 'reference/endpoints/authorize' },
 								{ label: 'Token', slug: 'reference/endpoints/token' },
-								{ label: 'Logout', slug: 'reference/endpoints' },
+								{ label: 'Logout', slug: 'reference/endpoints/logout' },
 								{ label: 'UserInfo', slug: 'reference/endpoints/userinfo' },
+								{ label: 'Dynamic client registration', slug: 'reference/endpoints/dynamic-client-registration' },
 								{ label: 'Discovery and JWKS', slug: 'reference/endpoints/discovery-and-jwks' },
 								{ label: 'Logo and picture', slug: 'reference/endpoints/logo-and-picture' },
 							],

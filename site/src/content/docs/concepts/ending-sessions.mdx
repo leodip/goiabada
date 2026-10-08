@@ -46,7 +46,7 @@ A [silent request](/concepts/glossary/#silent-request) can't show a page, so it 
 
 ### Signing out
 
-Your app signs a user out by sending them to [`/auth/logout`](/reference/endpoints/). Signing out revokes nothing: no refresh token and no authorization code is revoked. What it ends depends on what the request carries:
+Your app signs a user out by sending them to [`/auth/logout`](/reference/endpoints/logout/). Signing out revokes nothing: no refresh token and no authorization code is revoked. What it ends depends on what the request carries:
 
 - **With an `id_token_hint`**, the auth server removes your app from the session the hint names. The session itself ends only when no other client is using it, so the user stays signed in to the others.
 - **Without one**, once the user confirms on the sign-out page, the whole session ends.

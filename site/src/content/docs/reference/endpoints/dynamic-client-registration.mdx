@@ -1,0 +1,144 @@
+---
+title: Dynamic client registration
+description: Let an app register itself as a client with POST /connect/register.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you register an app as a client by calling the auth server, rather than creating it in the admin console.
+
+That's dynamic client registration (DCR), `POST /connect/register`, as [RFC 7591](https://www.rfc-editor.org/rfc/rfc7591) defines it. It's how tools like MCP clients get a client of their own. What a self-registered client may do once it exists is on [Clients](/concepts/clients/#self-registered-clients).
+
+## Register a client
+
+<Steps>
+
+1. In the admin console, turn on **Dynamic client registration enabled** under **Admin**, **General**. It's off until you do.
+
+2. Send the app's metadata as JSON:
+
+   ```bash
+   curl -X POST https://auth.example.com/connect/register \
+     -H 'Content-Type: application/json' \
+     -d '{
+       "client_name": "My CLI tool",
+       "redirect_uris": ["http://127.0.0.1/callback"],
+       "token_endpoint_auth_method": "none",
+       "grant_types": ["authorization_code"]
+     }'
+   ```
+
+3. Keep the `client_id` from the answer. Your app signs users in with it, as any other client does:
+
+   ```http
+   HTTP/1.1 201 Created
+   Content-Type: application/json
+   Cache-Control: no-store
+
+   {
+     "client_id": "dcr_6f1c2a9e-3b7d-4e0a-9c55-2d8b1e4f7a10",
+     "client_id_issued_at": 1759900000,
+     "client_secret_expires_at": 0,
+     "redirect_uris": ["http://127.0.0.1/callback"],
+     "token_endpoint_auth_method": "none",
+     "grant_types": ["authorization_code"],
+     "client_name": "My CLI tool"
+   }
+   ```
+
+</Steps>
+
+<Aside type="caution">
+While DCR is on, **anyone** who can reach `/connect/register` can create a client, with no token and no sign-in. Limit the endpoint at your reverse proxy, or turn on the rate limiter, which then allows 10 registrations a minute from each IP address. See [rate limits](/reference/environment-variables/#rate-limits).
+</Aside>
+
+## How it works
+
+### The request
+
+The body is a JSON object. The auth server reads four fields and ignores every other one, as RFC 7591 asks:
+
+| Field | What it does |
+|---|---|
+| `redirect_uris` | Where the auth server may send the browser back. Required when the client uses the authorization code flow. See [redirect URIs](#redirect-uris) below. |
+| `token_endpoint_auth_method` | `none` makes a public client, with no secret. `client_secret_basic`, the default, or `client_secret_post` makes a confidential one, with a secret. |
+| `grant_types` | Any of `authorization_code`, the default, `refresh_token` and `client_credentials`. A public client can't ask for `client_credentials`, and the [legacy flows](/legacy-flows/implicit/) can't be asked for at all. |
+| `client_name` | The name the consent screen shows, up to 128 characters, with no `<` or `>`. |
+
+`refresh_token` is accepted and sets nothing of its own: a client that may use the authorization code flow can redeem the refresh tokens it gets.
+
+A body larger than 64 KiB is refused as one that can't be read.
+
+### Redirect URIs
+
+A self-registered client's redirect URIs follow the [rules for every client](/concepts/clients/#redirect-uris), and the stricter ones on [Redirect URIs for self-registered clients](/concepts/clients/#redirect-uris-for-self-registered-clients): a public client gets loopback `http` and custom schemes, a confidential one `https` and loopback `http`. On top of those, a registration holds at most 60 redirect URIs, each up to 2,048 bytes, and none listed twice.
+
+### The client it creates
+
+The new client is enabled straight away, and:
+
+- **Its identifier is generated,** `dcr_` followed by a UUID, and can't be changed later.
+- **A confidential client gets a secret** of 60 characters, which the answer carries once. A public client gets none.
+- **Consent is on,** so users see what it asks for before it gets a token.
+- **Its sign-in level is `urn:goiabada:level2_optional`,** so a user with two-factor authentication set up is asked for their code. See [ACR and AMR](/concepts/acr-and-amr/).
+- **A public client always uses [PKCE](/concepts/pkce/).**
+- **Its token lifetimes are copied** from **Admin**, **Tokens** onto its own **Tokens** tab when it registers, so a later change to the server's settings doesn't reach it.
+
+It starts with no permissions, and isn't allowed to request the administrative scopes. In the admin console it's marked **Self-registered**, and an administrator can change its settings like any other client's once they've reviewed it.
+
+There's no endpoint to read, update or delete a registration afterwards, so the answer carries no `registration_access_token`. To change a self-registered client, an administrator does it in the admin console.
+
+Each registration leaves a `dynamic_client_registration` entry in the [audit log](/concepts/audit-log/).
+
+### The answer
+
+A registration is answered `201 Created`, with `Cache-Control: no-store`, and the client's metadata as JSON:
+
+| Field | What it holds |
+|---|---|
+| `client_id` | The client's identifier, `dcr_` followed by a UUID |
+| `client_secret` | The client's secret, for a confidential client only. It isn't sent again: an administrator can read it later on the client's **Authentication** tab. |
+| `client_id_issued_at` | When the client was created, in seconds since 1970 |
+| `client_secret_expires_at` | Always `0`: the secret never expires |
+| `redirect_uris` | The redirect URIs, as registered |
+| `token_endpoint_auth_method` | The method, with the default filled in |
+| `grant_types` | The grant types, with the default filled in |
+| `client_name` | The name, when one was sent |
+
+### Errors
+
+An error is answered with a JSON body holding `error` and `error_description`, as RFC 7591 section 3.2.2 defines:
+
+```http
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+Cache-Control: no-store
+
+{
+  "error": "invalid_redirect_uri",
+  "error_description": "redirect_uris required for authorization_code grant type"
+}
+```
+
+| `error` | Status | Why |
+|---|---|---|
+| `access_denied` | 403 | DCR is off: "Dynamic client registration is not enabled" |
+| `invalid_client_metadata` | 400 | The body isn't JSON or is too large, or a field holds a value the auth server doesn't take: an unknown `token_endpoint_auth_method` or grant type, `client_credentials` on a public client, or a `client_name` too long or holding `<` or `>` |
+| `invalid_redirect_uri` | 400 | A redirect URI is missing, malformed, refused for this kind of client, too long, listed twice, or one too many |
+| `server_error` | 500 | The auth server couldn't save the client. Nothing was registered. |
+
+The `error_description` says which value was refused, so it's worth showing to whoever is setting the app up.
+
+With the rate limiter on, an IP address past its budget is answered `429 Too Many Requests` with `invalid_request`, "Too many requests. Please wait and try again later."
+
+### Discovery
+
+While DCR is on, the [discovery document](/reference/endpoints/discovery-and-jwks/) carries `registration_endpoint`, the URL of `/connect/register`. While it's off, the field isn't there, so an app can tell from discovery whether it may register.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Self-registered clients" description="What a self-registered client may do, and how it's treated." href="/concepts/clients/#self-registered-clients" />
+  <LinkCard title="Authorize" description="Sign users in with the new client." href="/reference/endpoints/authorize/" />
+  <LinkCard title="The app gets no error back" description="Why a self-registered client is never sent an error." href="/troubleshooting/the-app-gets-no-error-back/" />
+</CardGrid>

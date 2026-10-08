@@ -1,70 +1,113 @@
 ---
 title: Security
-description: Security practices and reporting vulnerabilities.
+description: Report a vulnerability, and see how Goiabada protects sign-ins, tokens, sessions and the data it stores.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-Security is a top priority for Goiabada. This page covers security practices and how to report vulnerabilities.
+This page helps you report a security issue in Goiabada, and shows what it does to keep sign-ins, tokens and sessions safe.
 
-## Reporting vulnerabilities
+## Report a vulnerability
 
-If you discover a security issue, please report it via email to [contact@leodip.com](mailto:contact@leodip.com).
+<Steps>
 
-<Aside type="caution">
-Please do not report security vulnerabilities through public GitHub issues. Use the private email channel to allow time for a fix before public disclosure.
+1. Email [contact@leodip.com](mailto:contact@leodip.com) with what you found: what an attacker can do, how to reproduce it, and the Goiabada version you tried it on.
+
+2. Keep it private until a fix is released, so people running Goiabada can upgrade before the details are public.
+
+</Steps>
+
+<Aside type="danger">
+**Never** report a vulnerability in a public GitHub issue or discussion. Anyone can read it there, before there's a fix.
 </Aside>
 
-## Security assessment
+## How it works
 
-We're very thankful to [Adrean Boyadzhiev](https://www.linkedin.com/in/adrean-boyadzhiev/) from [Lambda Bit](https://www.lambdabit.io/), who provided a security assessment and consultancy for Goiabada. Adrean's work focused on an earlier version (0.0.3), and while much has changed since, his insights were invaluable.
+### Sign-in
 
-If you're looking for a security expert, we recommend reaching out to Adrean.
+- **Passwords are hashed** with bcrypt, and never stored or logged as typed. See [passwords](/concepts/users-and-groups/#passwords).
+- **Two-factor authentication** uses one-time codes from an authenticator app, optional or required per client. See [ACR and AMR](/concepts/acr-and-amr/).
+- **A one-time code works once.** Once a code has been accepted, it's refused everywhere, at sign-in, while setting up an authenticator and through the account API, with the same error a wrong code gets. Two submissions of the same code at the same moment get at most one success. A refused replay leaves an `otp_code_replay_detected` entry in the [audit log](/concepts/audit-log/). Removing an authenticator clears that history.
+- **[PKCE](/concepts/pkce/) is required** for every public client, and by default for every other one.
+- **Guessing is rate limited** when you turn the rate limiter on: sign-in, one-time codes, the password grant, password reset, registration, email verification, credential changes and dynamic client registration each get a fixed budget. It's off by default. See [rate limits](/reference/environment-variables/#rate-limits).
+- **No error is redirected before the user signs in.** A request that fails while nobody is signed in sends the user to sign in first, and the error reaches the client afterwards, so one crafted link can't send a visitor straight to any address a client has registered, as [RFC 9700](https://www.rfc-editor.org/rfc/rfc9700.html) section 4.11.2 requires. A silent request, which must never show a page, is answered at once. See [When an error reaches your app](/reference/endpoints/authorize/#when-an-error-reaches-your-app).
+- **A self-registered client is never sent an error.** Anyone can register a client and point it anywhere, so instead of redirecting, the auth server shows the user a page naming the address. See [self-registered clients](/concepts/clients/#self-registered-clients).
 
-## Security features
+### Tokens
 
-Goiabada includes several built-in security features:
+- **Access tokens are short-lived:** 5 minutes by default.
+- **Tokens are signed** with RS256, by keys you can rotate in the admin console. See [Discovery and JWKS](/reference/endpoints/discovery-and-jwks/).
+- **A refresh token works once.** Each refresh replaces it, and two refreshes with the same token at the same moment get at most one new token. See [rotation](/concepts/refresh-tokens/#rotation).
+- **A replayed refresh token revokes its family.** Presenting one that a refresh already replaced revokes every other token in its line of refreshes, and leaves a `refresh_token_replay_detected` entry in the audit log. See [replay](/concepts/refresh-tokens/#replay).
+- **Ending a session revokes what it authorized:** its refresh tokens, offline ones included, and its unredeemed authorization codes. See [what ending a session revokes](/concepts/ending-sessions/#what-ending-a-session-revokes).
 
-### Authentication security
+### Sessions and cookies
 
-- **PKCE support** - [Configurable PKCE enforcement](/concepts/pkce/) at global and per-client levels, protecting against code interception attacks. PKCE is required by default (OAuth 2.1 recommendation).
-- **Two-factor authentication** - Optional or mandatory 2FA using TOTP
-- **One-time use of 2FA codes** - Each TOTP code can only be used once by the authenticator currently enrolled, enforced atomically, so two simultaneous submissions of the same code yield at most one success. Once a code has been accepted it is refused everywhere afterwards, at the login prompt, during enrollment and through the account API, with the same generic error a wrong code gets. Removing an authenticator clears that history, so enrolling again starts fresh. An `otp_code_replay_detected` [audit event](/concepts/audit-log/) is recorded whenever a replayed code is refused
-- **Rate limiting** - Off by default. When switched on, fixed budgets apply to every limited endpoint: login, OTP verification, the password grant, password reset, self-registration, email verification, password, OTP and email changes, and dynamic client registration. The limits on credential guessing are shared across replicas on PostgreSQL, MySQL and SQL Server; every other limit is per pod. See the [rate limiting table](/reference/environment-variables/#rate-limits)
-- **Session management** - Configurable session timeouts with idle and absolute expiration
-- **Durable session termination** - Ending a session revokes the refresh tokens and authorization codes that session authorized, including offline refresh tokens that outlive the browser session. A `terminated_user_session` [audit event](/concepts/audit-log/) records what each termination revoked. See [what ending a session revokes](/concepts/ending-sessions/#what-ending-a-session-revokes)
-
-### Token security
-
-- **Short-lived access tokens** - Default 5-minute expiration to limit exposure
-- **Refresh token rotation** - Each refresh token can only be used once, enforced atomically, so two simultaneous requests presenting the same token yield at most one new token set
-- **Replay containment** - Presenting a refresh token that rotation already retired revokes the rest of that token's rotation family and records the family as revoked, so a successor still being minted is refused too. A `refresh_token_replay_detected` [audit event](/concepts/audit-log/) is recorded whenever containment revokes a token or first records the family. See [refresh token replay](/concepts/refresh-tokens/#replay)
-- **Signed JWTs** - All tokens are cryptographically signed
-
-### Cookie security
-
-- **Secure flag** - Cookies marked as secure in production (HTTPS only)
-- **HttpOnly flag** - Cookies not accessible via JavaScript
-- **SameSite attribute** - Protection against CSRF attacks
-- **Opaque identifier** - Cookie names the session; contents stay on the server
-- **Admin console cookie** - Dropped when the browser closes; session restore may return it
+- **The cookie holds an identifier, nothing else.** The session's contents stay on the server.
+- **The cookie is `HttpOnly`,** so no script can read it, **`SameSite=Lax`,** so the browser leaves it off another site's form posts, and **`Secure`** when the server's base URL is `https`, so it never travels over plain HTTP.
+- **Sessions expire:** after 2 hours idle or 24 hours in all, by default. See [Sessions](/concepts/sessions/#how-long-a-session-lasts).
+- **The admin console's cookie has no expiry,** so the browser drops it when it closes. A browser that restores its last session can bring it back.
 
 ### Cross-site request forgery
 
-- **Same-origin requirement** - Every state-changing request to a cookie-authenticated page (the login form, the OTP prompt, the consent screen, and every admin console form) must come from Goiabada's own origin. A request the browser reports as coming from another site, a sibling subdomain included, is refused with a 403
-- **How it is checked** - From the browser's own `Sec-Fetch-Site` header, which every browser has sent since 2023. `same-origin` is allowed; `cross-site` and `same-site` are refused. `none` is also allowed: browsers send it only for a navigation the person started themselves, by typing the address or picking a bookmark, which no other page can cause. When the header is absent altogether, the `Origin` header's host is compared against the host the request was made to instead
-- **No token and no cookie** - There is no hidden CSRF token in the forms and no CSRF cookie. The origin is the whole check, so there is nothing to expire, nothing to go stale in a page left open, and nothing to configure
-- **No trusted origins** - There is no list of extra origins to trust and no setting that creates one, so no other site can be granted access to a protected form. The exempt endpoints below are exempt by path, for the protocol reasons given, rather than by trusting the origin a request arrives from
-- **Exempt endpoints** - The OAuth2 and OIDC endpoints are cross-origin by design and are exempt, each with a control of its own: `/auth/token` requires a client secret from a confidential client, while a public client instead redeems a one-time authorization code bound to its registered redirect URI and, with [PKCE](/concepts/pkce/) required by default, to a code verifier only the client that began the flow holds. `/userinfo` and everything under `/api/` authenticate a bearer token, and `/auth/callback` is protected by the OAuth `state` parameter. `/auth/authorize` is exempt because OpenID Connect requires it to accept both `GET` and `POST`, and a cross-site `POST` to it reaches nothing that a plain link would not. `/connect/register` is exempt because it creates a client rather than acting on a signed-in user; it is disabled by default, and rate limited when rate limiting is enabled. `/auth/logout` is exempt only for a `POST` carrying an `id_token_hint`, which is the binding [RP-initiated logout](/concepts/id-token-hint/) requires; a hintless `POST` keeps full protection
-- **Referrer-Policy** - Goiabada sends `Referrer-Policy: same-origin`. Do not override it with `no-referrer`: that makes browsers send an opaque origin on form posts, which the fallback check cannot match
+Every form the auth server and the admin console serve, the sign-in, two-factor and consent screens and every admin console page, accepts a POST only from its own origin. A request the browser says came from another site, a sibling subdomain included, is refused with `403 Forbidden`.
 
-### Network security
+The browser's `Sec-Fetch-Site` header decides: `same-origin` and `none`, which a browser sends only for an address the user typed or a bookmark they picked, are accepted, and `same-site` and `cross-site` are refused. A browser that sends no `Sec-Fetch-Site` has its `Origin` header's host compared with the host it called. There's no CSRF token and no CSRF cookie, so there's nothing to expire in a page left open, and no setting that trusts another origin.
 
-- **No open redirection for self-registered clients** - Authorization errors are normally delivered by redirecting the browser to the client's registered address. For a client that [registered itself](/concepts/clients/#self-registered-clients), Goiabada shows the user a page naming that address instead. Anyone can register a client and choose where it points, so without this a refused authorization is a way to send someone's browser to an unvetted site. Clients an administrator created are unaffected
-- **No error redirect before the user has authenticated** - The bullet above turns on where the redirect address came from. This one turns on who is at the browser, and it applies to every client, administrator-created ones included. A request that fails validation while nobody is signed in does not produce a redirect: the user is sent to the login page, and the error reaches the client afterwards, unchanged. Otherwise a single link carrying one bad parameter turns the authorization server into a redirector to any address a client has registered, with the victim never having interacted with anything. A browser that already holds a session is answered at once, and so is a `prompt=none` request, which must never show a page. [RFC 9700](https://www.rfc-editor.org/rfc/rfc9700.html) 4.11.2 requires this. See [When an error reaches your app](/reference/endpoints/authorize/#when-an-error-reaches-your-app)
-- **CORS configuration** - Explicit web origin configuration required for JavaScript clients
-- **Proxy header trust** - Forwarded IP headers are ignored by default; enable `TRUST_PROXY_HEADERS` only behind a proxy. Behind multiple proxies or a CDN, set `TRUSTED_PROXIES` to your proxy IPs/CIDRs so the client IP is resolved from the trusted end of `X-Forwarded-For` and cannot be spoofed
+The protocol endpoints are called from other sites by design, so the auth server leaves them out of the check. Each is protected by something else:
 
-### Logging
+| Path | Why another site may POST to it |
+|---|---|
+| `/auth/authorize` | OpenID Connect requires it to take a POST as well as a GET, and a POST only starts a sign-in, as a link would. Every step after it is checked. |
+| `/auth/token` | A confidential client presents its secret. A public client presents a one-time code, bound to its redirect URI and to a PKCE verifier only it holds. |
+| `/userinfo` | It takes an access token, never a cookie. |
+| `/connect/register` | It creates a client and acts on no signed-in user. It's off by default. |
+| `/auth/logout` | Only a POST carrying an `id_token_hint`, which [RP-initiated logout](/reference/endpoints/logout/) requires. A POST without one is checked. |
+| `/api/` and everything under it | Every API route takes an access token, never a cookie. |
+| `/static/` and everything under it | Images, styles and scripts, read with a GET, which the check never applies to. |
 
-- **What the logs leave out** - Request records redact every query value but a short list of safe ones, and verbose API logging redacts credentials. See [What a request record leaves out](/deploy/logs/#what-a-request-record-leaves-out) and [Verbose API logging](/deploy/logs/#verbose-api-logging)
+The admin console leaves out only `/auth/callback`, its sign-in callback, which the OAuth `state` parameter protects, and `/static/`.
+
+### Response headers
+
+Both servers add these headers to every answer:
+
+| Header | Value | What it does |
+|---|---|---|
+| `X-Frame-Options` | `DENY` | No other site can show a page in a frame, so it can't trick a user into clicking. |
+| `Content-Security-Policy` | `frame-ancestors 'none'` | The same, for browsers that read the policy. It sets nothing else. |
+| `X-Content-Type-Options` | `nosniff` | The browser takes each answer, an uploaded image included, as the type it's labelled with. |
+| `Referrer-Policy` | `same-origin` | A URL carrying a code or a `state` never reaches another site in the `Referer` header. |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | The browser uses only `https` for a year, subdomains included. Only when the server's base URL is `https`. |
+
+<Aside type="caution">
+**Never** replace `Referrer-Policy` with `no-referrer` at a proxy. A browser then sends `Origin: null` on form posts, and the cross-site check refuses every form on a browser that sends no `Sec-Fetch-Site`.
+</Aside>
+
+### Stored data
+
+- **Secrets are encrypted** in the database with AES-256-GCM, under `GOIABADA_AES_ENCRYPTION_KEY`: client secrets, the SMTP password, authenticator seeds, emailed codes and the keys that sign tokens. See [Secrets](/deploy/secrets/#what-each-secret-protects).
+- **Authorization codes are stored as a digest.** The database holds each code's SHA-256, so a copy of it holds no code anyone could redeem. The identifier in a session cookie is stored the same way.
+- **The audit log leaves out what users type.** An email address typed into the sign-in, registration or forgot-password form is recorded only as a digest. See [the audit log's details](/concepts/audit-log/#details).
+
+### The network
+
+- **Forwarded headers are ignored** until you turn on `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS`, so a client can't pick the IP address the rate limiter counts and the audit log records. See [client IP addresses](/reference/environment-variables/#client-ip-addresses).
+- **The admin console's calls to the auth server** are plain HTTP with the generated setups, carrying its client secret and administrators' tokens, which is sound only on a network you trust. See [the hop from the admin console to the auth server](/deploy/production-checklist/#the-hop-from-the-admin-console-to-the-auth-server).
+- **Browser calls across origins** are allowed only from the [web origins](/concepts/clients/#web-origins) registered on clients.
+
+### Logs
+
+Request records redact every query value but a short list of safe ones, and verbose API logging redacts credentials. See [What a request record leaves out](/deploy/logs/#what-a-request-record-leaves-out) and [Verbose API logging](/deploy/logs/#verbose-api-logging).
+
+## Thanks
+
+[Adrean Boyadzhiev](https://www.linkedin.com/in/adrean-boyadzhiev/) of [Lambda Bit](https://www.lambdabit.io/) assessed Goiabada's security and advised on it. Thank you, Adrean.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Production checklist" description="Everything to check before Goiabada goes live." href="/deploy/production-checklist/" />
+  <LinkCard title="Audit log" description="What Goiabada records, and the events to alert on." href="/concepts/audit-log/" />
+  <LinkCard title="Rotate secrets" description="Replace each secret without signing everyone out." href="/deploy/rotate-secrets/" />
+</CardGrid>

@@ -1,0 +1,136 @@
+---
+title: Logout
+description: Sign a user out of the auth server from your app with /auth/logout, and bring them back.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you sign a user out of the auth server from your app, with the logout endpoint, `/auth/logout`.
+
+It's OpenID Connect's [RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html) endpoint, the `end_session_endpoint` in the [discovery document](/reference/endpoints/discovery-and-jwks/). What a sign-out ends, and what it leaves alone, is on [Ending sessions](/concepts/ending-sessions/#signing-out).
+
+## Sign a user out
+
+<Steps>
+
+1. Keep the ID token the user signed in with. You send it back as the `id_token_hint`, which tells the auth server who's asking, so the user isn't asked to confirm.
+
+2. Send the browser to `/auth/logout` with the hint, where to come back to, and a `state`:
+
+   ```http
+   GET /auth/logout?id_token_hint=eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...&post_logout_redirect_uri=https%3A%2F%2Fmyapp.example.com%2Fsigned-out&state=af0ifjsldkj HTTP/1.1
+   Host: auth.example.com
+   ```
+
+   The return address must be one of the client's registered [redirect URIs](/concepts/clients/#redirect-uris), exactly.
+
+3. The auth server signs the user out and sends the browser back, with your `state`:
+
+   ```http
+   HTTP/1.1 302 Found
+   Location: https://myapp.example.com/signed-out?state=af0ifjsldkj
+   ```
+
+4. Check that `state` is the one you sent, and end your app's own session.
+
+</Steps>
+
+## How it works
+
+### The request
+
+`/auth/logout` takes a GET and a POST, with the same parameters. On a GET they go in the query string. On a POST they go in an `application/x-www-form-urlencoded` body, and the query string is read too, so send each parameter once.
+
+| Parameter | Required | What it does |
+|---|---|---|
+| `id_token_hint` | Recommended | An ID token the auth server issued to your app, signed or [encrypted](#encrypting-the-hint). One it can confirm signs the user out with no question asked. It may have expired. |
+| `post_logout_redirect_uri` | No | Where to send the browser afterwards. It must exactly match one of the client's redirect URIs, and it's honoured only on the terms in [Where the user lands](#where-the-user-lands). |
+| `client_id` | Sometimes | The client's identifier. Required with an encrypted hint, to say whose secret decrypts it, and with a `post_logout_redirect_uri` sent without a hint. With a hint, it must match the hint's `aud`. |
+| `state` | No | Any value. It comes back on the redirect exactly as you sent it. |
+| `ui_locales` | No | The languages for the pages the user sees, such as `pt-BR en`. |
+
+There's no separate list of post-logout redirect URIs: the client's redirect URIs are the list.
+
+### Whether the user is asked
+
+A sign-out the auth server can tie to your app happens at once. Any other asks the user first, with "Are you sure you want to sign out?", as RP-Initiated Logout requires, and happens when they click **Yes**:
+
+| Request | What happens |
+|---|---|
+| A GET or a POST with a hint the auth server confirms | The user is signed out at once |
+| A GET with no hint, or with a hint it can't confirm | The user is asked, then signed out |
+| A POST with a hint it can't confirm | `303 See Other` to `GET /auth/logout`, which asks the user |
+| A POST from another site with no hint | `403 Forbidden`. See [Sign-out answers 403](/troubleshooting/sign-out-answers-403/). |
+
+A hint that can't be confirmed isn't an error your app sees: it only means the user is asked. The `303` keeps `post_logout_redirect_uri`, `state` and `ui_locales`, and drops `id_token_hint` and `client_id`.
+
+A POST is worth it when you send a hint, because it keeps the ID token out of the address bar, the browser's history and the `Referer` header. A self-submitting form on your app's page does it.
+
+### What a hint must pass
+
+The auth server confirms a hint when all of these hold:
+
+- It isn't empty.
+- An encrypted hint comes with a `client_id`, and decrypts with that client's secret.
+- Its signature is the auth server's, and it's an ID token: an access token or a refresh token isn't one.
+- It has `sub` and `iat`, `iss` is the auth server's issuer, and `aud` is the identifier of a client that exists.
+- A `client_id` sent beside it equals its `aud`. An empty `client_id=` doesn't.
+- Its `nbf`, when there is one, has passed.
+- It has an `exp` and a `sid`. An `exp` that has passed is fine while the session `sid` names is still there, as RP-Initiated Logout recommends: a user who pauses before signing out shouldn't be refused.
+- When the browser holds a session, `sid` names that one.
+- When the session `sid` names is still there, it belongs to the user `sub` names.
+
+The ID token from a user's sign-in to your app passes all of these until it has both expired and lost its session.
+
+### What it ends
+
+**With a confirmed hint,** the auth server removes your app from the session the hint's `sid` names. The session ends when your app was the last client on it, so the user stays signed in to the other apps sharing it. **Without one,** once the user clicks **Yes**, the browser's whole session ends.
+
+Either way, the browser's session cookie is cleared, so its next sign-in starts with the password.
+
+### Where the user lands
+
+The browser goes to your `post_logout_redirect_uri` with a `302 Found` when:
+
+- the request carries a hint the auth server confirmed, and the URI is a redirect URI of the client the hint's `aud` names; or
+- the request carries no hint, and the URI is a redirect URI of the client `client_id` names.
+
+The auth server adds `state` and nothing else. It comes back byte for byte, `+`, `/`, `=`, `#` and `&` included; sent empty, it comes back empty, and not sent, there's none. A query the registered URI already has is kept.
+
+Otherwise the user lands on the auth server's "Signed out" page, "You have been signed out." When you sent a `post_logout_redirect_uri` that wasn't honoured, it adds "We could not return you to the application that signed you out." That's the case for a URI that isn't registered, a `client_id` that's missing or names no client, and a hint that couldn't be confirmed, even beside a valid `client_id`.
+
+The sign-out has already happened by then: a request the auth server can't honour in full still signs the user out.
+
+### Encrypting the hint
+
+An encrypted hint keeps the ID token unreadable in logs and the browser's history. It's a JWE, the signed ID token encrypted as [OpenID Connect Core 1.0 section 2](https://openid.net/specs/openid-connect-core-1_0.html#IDToken) describes a nested JWT, with this protected header:
+
+| Member | Value | What it means |
+|---|---|---|
+| `alg` | `dir` | The key below is the content encryption key. There's no encrypted key. |
+| `enc` | `A256GCM` | AES-256 in GCM mode, with a 96-bit IV and a 128-bit tag |
+| `cty` | `JWT` | The plaintext is a JWT. Optional: a header without it is accepted too. |
+
+The key is the SHA-256 of the client's secret, as UTF-8, which is 32 bytes. The JWE is in compact serialization, five parts with the second empty. A header with `zip` or `crit` is refused. Use a JOSE library for your platform rather than writing it yourself, and send `client_id` beside the hint.
+
+Only a confidential client can encrypt a hint, since a public client has no secret.
+
+### Errors
+
+`/auth/logout` never sends your app an error. Apart from the `403` above, the one failure is the auth server's own: when its database or session store fails, it shows an error page with `500 Internal Server Error`, and the sign-out may not have happened.
+
+### Calling it from a browser
+
+JavaScript can call `/auth/logout` across origins when its origin is registered as a [web origin](/concepts/clients/#web-origins) on a client. Sending the browser there with a link or a form needs nothing more.
+
+### The audit log
+
+A sign-out that ends a session leaves a `logout` entry in the [audit log](/concepts/audit-log/), and one that removes your app from a session other clients still use leaves `deleted_user_session_client`.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Ending sessions" description="What signing out ends, and what it leaves alone." href="/concepts/ending-sessions/#signing-out" />
+  <LinkCard title="id_token_hint" description="What the hint is, and how the auth server checks it." href="/concepts/id-token-hint/" />
+  <LinkCard title="Sign-out answers 403" description="When a POST to /auth/logout is refused." href="/troubleshooting/sign-out-answers-403/" />
+</CardGrid>
