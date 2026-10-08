@@ -599,9 +599,69 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		// guard.AssertAuditLogContext, which refuses a Background one here.
 		auditLogger.On("Log", mock.MatchedBy(func(ctx context.Context) bool {
 			return chimiddleware.GetReqID(ctx) == "goiabada/req-pwd-1"
-		}), audit.EventAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["email"] == "test@example.com"
-		})).Return()
+		}), audit.EventAuthFailedPwd, map[string]interface{}{
+			// The address typed into the form is recorded only as its digest, and no account
+			// is named because none matched (#522 decision 10). The literal is SHA-256 of
+			// "test@example.com", computed outside this code.
+			"email_digest": "973dfe463ec85785f5f95af5ba3906eedb2d931c24e69824a89ea65dba4e813b",
+		}).Return()
+
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+			return data["error"] == "Authentication failed."
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		pageRenderer.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	// A wrong password against an account that exists records the account it was tried against
+	// beside the digest of what was typed, and still never the address itself (#522 decision 10).
+	t.Run("Wrong password", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+
+		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+
+		passwordHash, err := passwordhash.Hash("the-right-password")
+		assert.NoError(t, err)
+
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("email", "Alice@Example.com")
+		form.Add("password", "a-wrong-password")
+		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel1Password,
+			CeremonyId: testCeremonyId,
+			ClientId:   "test-client",
+		}
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
+			Return(&record.Client{ClientIdentifier: "test-client"}, nil)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true}))
+
+		user := &record.User{
+			Id:           31,
+			Email:        "alice@example.com",
+			PasswordHash: passwordHash,
+			Enabled:      true,
+		}
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "alice@example.com").Return(user, nil)
+
+		// SHA-256 of "alice@example.com", computed outside this code.
+		auditLogger.On("Log", mock.Anything, audit.EventAuthFailedPwd, map[string]interface{}{
+			"email_digest": "ff8d9819fc0e12bf0d24892e45987e249a28dce836a85cad60e28eaaa8c6d976",
+			"user_id":      int64(31),
+		}).Return().Once()
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Authentication failed."
@@ -662,9 +722,10 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "bob@example.com").Return(nil, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.EventAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["email"] == "bob@example.com"
-		})).Return()
+		// SHA-256 of "bob@example.com": the digest is of the address as the lookup normalized it.
+		auditLogger.On("Log", mock.Anything, audit.EventAuthFailedPwd, map[string]interface{}{
+			"email_digest": "5ff860bf1190596c7188ab851db691f0f3169c453936e9e1eba2f9a47f7a0018",
+		}).Return()
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Authentication failed." && data["email"] == "bob@example.com"
@@ -876,9 +937,9 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "disabled@example.com").Return(disabledUser, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["user_id"] == int64(2)
-		})).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
+			"user_id": int64(2),
+		}).Return()
 
 		// mock.Anything for the request: the user-locale refinement fires after
 		// the password verifies and produces a fresh request, so renderError

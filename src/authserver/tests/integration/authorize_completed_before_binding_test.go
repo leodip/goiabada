@@ -155,7 +155,8 @@ func TestAuthCompleted_AUserDisabledMidSignInGetsNoSession(t *testing.T) {
 	assert.Equal(t, signIn.state, params.Get("state"))
 	assert.Empty(t, params.Get("code"))
 
-	assert.Len(t, auditRows(t, adminToken, "user_disabled", requestId), 1, "the refusal is recorded")
+	assert.Equal(t, []map[string]any{{"user_id": float64(signIn.user.Id)}},
+		auditRows(t, adminToken, "user_disabled", requestId), "the refusal is recorded, naming the user")
 	signIn.assertNothingWasBound(t, adminToken, requestId)
 }
 

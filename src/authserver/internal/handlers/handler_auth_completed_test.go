@@ -1757,7 +1757,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
+			"user_id": int64(1),
+		}).Return()
 
 		// The clear has to reach the browser, so it must happen before the response is
 		// committed. rr.Header() is the live map the handler and this stub share, so it shows
@@ -1851,7 +1853,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
+			"user_id": int64(1),
+		}).Return()
 
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
 		// handler does next. The client is still owed its error response, and server_error is
@@ -1941,7 +1945,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
+			"user_id": int64(1),
+		}).Return()
 
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
@@ -2027,7 +2033,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
+			"user_id": int64(1),
+		}).Return()
 
 		// The other half of the same family: here the clear succeeds and it is the ordinary
 		// refusal that cannot be committed. This is the site's second and pre-existing 500,

@@ -79,13 +79,14 @@ func TestHandleTokenPost_WrappedUserDisabledStillAudits(t *testing.T) {
 	} {
 		t.Run(description, func(t *testing.T) {
 			disabled := &protocolvalidation.UserDisabledError{Detail: oauth.NewErrorDetailWithHTTPStatus(
-				"invalid_grant", description, http.StatusBadRequest)}
+				"invalid_grant", description, http.StatusBadRequest), UserId: 17}
 
 			jsonWriter, auditLogger, _, rr, req, handler := wrappedTokenRequest(t,
 				errs.Wrap(disabled, "unable to validate the token request"))
 
 			auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
 				"client_identifier": "test_client",
+				"user_id":           int64(17),
 			}).Return().Once()
 			captured := expectJSONErrorWithDetail(jsonWriter)
 

@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/ratelimit"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/metrics"
 )
@@ -91,7 +92,7 @@ type tier struct {
 	// kept out of logs by allowlist rather than by denylist, and email is deliberately not
 	// on that list, so the account tiers log their limiter name and nothing else. The
 	// identifier is carried by the audit event instead, which is the surface built to hold
-	// one (#219).
+	// one (#219), and a typed address only as its digest (#522 decision 10).
 	keyField string
 	// auditGate bounds the audit writes to exactly one event per key per window. It is taken
 	// from the tier's limiter, so it rolls at the same instant the limiter does and its First
@@ -407,8 +408,8 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 // refusal is everything below.
 //
 // details carries the identifier the audit event records, which is the one this limiter's
-// neighbours in the audit log already carry for the same event: the email for account
-// tiers, the user id for the OTP tier, the client block for IP tiers.
+// neighbours in the audit log already carry for the same event: the digest of the typed
+// address for the address tiers, the user id for the OTP tier, the client block for IP tiers.
 func (m *RateLimiter) tripped(w http.ResponseWriter, r *http.Request, t *requestTier, key string,
 	class rejectClass, details map[string]interface{}) bool {
 
@@ -568,7 +569,10 @@ func (m *RateLimiter) LimitPwd(next http.Handler) http.Handler {
 			return
 		}
 		if t != nil {
-			m.refuse(w, r, t, key, rejectBrowser, map[string]interface{}{"email": accountKey, "ip": ipKey})
+			m.refuse(w, r, t, key, rejectBrowser, map[string]interface{}{
+				"email_digest": typedAddressDigest(strings.ToLower(strings.TrimSpace(r.FormValue("email")))),
+				"ip":           ipKey,
+			})
 			return
 		}
 
@@ -837,7 +841,9 @@ func (m *RateLimiter) LimitRegister(next http.Handler) http.Handler {
 		// Normalized as the handler normalizes the address it looks up, so every spelling it
 		// treats as one address spends one budget.
 		emailKey := ratelimit.AccountKey(r.FormValue("email"))
-		if m.tripped(w, r, m.registerEmail, emailKey, rejectBrowser, map[string]interface{}{"email": emailKey}) {
+		if m.tripped(w, r, m.registerEmail, emailKey, rejectBrowser, map[string]interface{}{
+			"email_digest": typedAddressDigest(strings.TrimSpace(strings.ToLower(r.FormValue("email")))),
+		}) {
 			return
 		}
 
@@ -881,7 +887,9 @@ func (m *RateLimiter) LimitForgotPwd(next http.Handler) http.Handler {
 
 		// Per-email limit: prevents mail-bombing a specific address.
 		emailKey := ratelimit.AccountKey(r.FormValue("email"))
-		if m.tripped(w, r, m.forgotPwd, emailKey, rejectBrowser, map[string]interface{}{"email": emailKey}) {
+		if m.tripped(w, r, m.forgotPwd, emailKey, rejectBrowser, map[string]interface{}{
+			"email_digest": typedAddressDigest(strings.ToLower(r.FormValue("email"))),
+		}) {
 			return
 		}
 
@@ -900,6 +908,16 @@ func (m *RateLimiter) LimitForgotPwd(next http.Handler) http.Handler {
 // by the request body limit (#219, #426, #428).
 func (m *RateLimiter) LimitDCR(next http.Handler) http.Handler {
 	return m.limitPerIP(next, m.dcr, rejectOAuth)
+}
+
+// typedAddressDigest is how a trip records an address typed into an unauthenticated form, or named
+// by the password grant: its SHA-256 hex and never the address itself, as the handlers behind
+// those routes record it (#522 decision 10). normalized is the address as that route's own lookup
+// normalizes it, which each caller spells out, so a trip's row and the handler's rows for one
+// address carry one digest. It is not the bucket key: ratelimit.AccountKey digests only an
+// oversized identifier, and the key is never what is audited.
+func typedAddressDigest(normalized string) string {
+	return hashutil.HashString(normalized)
 }
 
 // clientIPRateLimitKey buckets a request by the block its client controls: the address
@@ -1001,8 +1019,10 @@ func (m *RateLimiter) LimitROPC(next http.Handler) http.Handler {
 			return
 		}
 		if t != nil {
-			m.refuse(w, r, t, key, rejectOAuth,
-				map[string]interface{}{"email": accountKey, "ip": ipKey})
+			m.refuse(w, r, t, key, rejectOAuth, map[string]interface{}{
+				"email_digest": typedAddressDigest(strings.ToLower(strings.TrimSpace(r.PostFormValue("username")))),
+				"ip":           ipKey,
+			})
 			return
 		}
 

@@ -1622,6 +1622,9 @@ func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testing.T) {
 	const tightBudget = 10 // failures per 15 minutes per (account, client block)
 	const username = "victim@example.com"
+	// SHA-256 of username, computed outside this code: the address a password grant names is
+	// recorded only as its digest (#522 decision 10).
+	const usernameDigest = "ffbe8cff4f9f8d8b109460f975c343e942cd4c3ed191323eb83374ae2ea4de5f"
 
 	// newHandler wires one handler behind its own limiter, the way routes.go does. failure
 	// is what ValidateTokenRequest answers every time; nil means the grant succeeds.
@@ -1703,7 +1706,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		assert.Equal(t, http.StatusOK, post(handler))
 		// Declared since the grant was written and never fired until now (#126).
 		auditLogger.AssertCalled(t, "Log", mock.Anything, audit.EventROPCAuthFailed, map[string]interface{}{
-			"email":             username,
+			"email_digest":      usernameDigest,
 			"client_identifier": "app",
 		})
 	})
@@ -1722,7 +1725,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		req.RemoteAddr = "203.0.113.7:5000"
 		handler.ServeHTTP(httptest.NewRecorder(), req)
 		auditLogger.AssertCalled(t, "Log", mock.Anything, audit.EventROPCAuthFailed, map[string]interface{}{
-			"email":             username,
+			"email_digest":      usernameDigest,
 			"client_identifier": "app",
 		})
 	})
@@ -1732,16 +1735,18 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 	// the account, and the wrapper must not hide the detail from it (#137).
 	t.Run("a disabled user spends the budget and emits both user_disabled and ropc_auth_failed", func(t *testing.T) {
 		disabled := &protocolvalidation.UserDisabledError{Detail: oauth.NewErrorDetailWithHTTPStatus(
-			"invalid_grant", "The user account is disabled.", http.StatusBadRequest)}
+			"invalid_grant", "The user account is disabled.", http.StatusBadRequest), UserId: 42}
 		assert.True(t, spends(t, disabled), "a disabled user's refusal compared the password, so it is charged")
 
 		handler, auditLogger := newHandler(t, disabled)
 		assert.Equal(t, http.StatusOK, post(handler))
+		// The user the validator refused, as the event's other sites name it (#522 decision 7).
 		auditLogger.AssertCalled(t, "Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
 			"client_identifier": "app",
+			"user_id":           int64(42),
 		})
 		auditLogger.AssertCalled(t, "Log", mock.Anything, audit.EventROPCAuthFailed, map[string]interface{}{
-			"email":             username,
+			"email_digest":      usernameDigest,
 			"client_identifier": "app",
 		})
 	})

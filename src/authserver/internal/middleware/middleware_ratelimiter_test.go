@@ -567,6 +567,25 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 		}
 	})
 
+	// The address typed into the form is recorded only as its digest, of the address as the
+	// forgot-password lookup normalizes it, so the trip joins requested_password_reset's rows for
+	// the same address (#522 decision 10). SHA-256 of "victim@example.com", computed outside
+	// this code.
+	t.Run("the trip records the address as its digest", func(t *testing.T) {
+		m, auditLog := newAuditedTestMiddleware(nil, true)
+		for i := 0; i < emailBudget+1; i++ {
+			run(m, "Victim@Example.com", freshIP(i))
+		}
+		auditLog.mu.Lock()
+		events := append([]auditEvent(nil), auditLog.events...)
+		auditLog.mu.Unlock()
+		want := map[string]interface{}{"limiter": "forgot_pwd_email",
+			"email_digest": "ffbe8cff4f9f8d8b109460f975c343e942cd4c3ed191323eb83374ae2ea4de5f"}
+		if len(events) != 1 || !reflect.DeepEqual(events[0].details, want) {
+			t.Errorf("audited %v, want one event with details %v", events, want)
+		}
+	})
+
 	t.Run("ten case and whitespace variants of one address share the per-email bucket", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
 		spellings := spellingsOf("victim", "example.com")
@@ -1010,7 +1029,10 @@ func TestLimitRegister_PerAddress(t *testing.T) {
 		auditLog.mu.Lock()
 		events := append([]auditEvent(nil), auditLog.events...)
 		auditLog.mu.Unlock()
-		want := map[string]interface{}{"limiter": "register_email", "email": "holder@example.com"}
+		// The address typed into the form, as its digest only (#522 decision 10): SHA-256 of
+		// "holder@example.com", computed outside this code.
+		want := map[string]interface{}{"limiter": "register_email",
+			"email_digest": "1a4c5ee1a381a1003aee056aea6df0740ba8744e0493228e5d9c573d4090c9ec"}
 		if len(events) != 1 || !reflect.DeepEqual(events[0].details, want) {
 			t.Errorf("audited %v, want one event with details %v", events, want)
 		}
@@ -1805,18 +1827,18 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 		if e.name != audit.EventRateLimitExceeded {
 			t.Errorf("event name = %q, want %q", e.name, audit.EventRateLimitExceeded)
 		}
-		if e.details["limiter"] != "pwd_account_net" {
-			t.Errorf("details[limiter] = %v, want pwd_account_net", e.details["limiter"])
+		// The digest of the normalized address, which is how EventAuthFailedPwd records the
+		// same typed address, and never the address itself (#522 decision 10): SHA-256 of
+		// "victim@example.com", computed outside this code. And the block it was refused for,
+		// which is half of this tier's key: an administrator reading the event needs to know
+		// which network spent the budget.
+		want := map[string]interface{}{
+			"limiter":      "pwd_account_net",
+			"email_digest": "ffbe8cff4f9f8d8b109460f975c343e942cd4c3ed191323eb83374ae2ea4de5f",
+			"ip":           "203.0.113.7",
 		}
-		// The normalized address, which is the identifier EventAuthFailedPwd already
-		// records under the same name, and the one the log line no longer carries.
-		if e.details["email"] != "victim@example.com" {
-			t.Errorf("details[email] = %v, want victim@example.com", e.details["email"])
-		}
-		// And the block it was refused for, which is half of this tier's key: an
-		// administrator reading the event needs to know which network spent the budget.
-		if e.details["ip"] != "203.0.113.7" {
-			t.Errorf("details[ip] = %v, want 203.0.113.7", e.details["ip"])
+		if !reflect.DeepEqual(e.details, want) {
+			t.Errorf("details = %#v, want %#v", e.details, want)
 		}
 		// reportTrip is the one production Log call site outside the handlers, and the fourth of
 		// #328's four call shapes: it already took a context for its own Warn record, so the
@@ -1860,7 +1882,8 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 //
 // The repository already settled the policy this asserts: httpmw.RequestLogger in
 // this same package logs by allowlist "because a denylist fails open", and email is
-// deliberately not on that list. The address is carried by the audit event instead.
+// deliberately not on that list. The address is carried by the audit event instead, as its
+// digest.
 func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
 	t.Run("an account tier names the limiter and nothing else", func(t *testing.T) {
 		buf := logtest.CaptureSlog(t)
@@ -2705,6 +2728,28 @@ func TestLimitROPC_AccountFailureBudget(t *testing.T) {
 	// escaped the account ceiling RFC 6749 section 4.3.2 makes a MUST by naming a second
 	// client, which costs nothing when registration is open. This is the case that fails if
 	// the client id ever creeps back into the key.
+	// The password grant spends the sign-in form's bucket, and its trip records the username as
+	// that form's trip records the address: its digest, normalized as the grant's lookup
+	// normalizes it (#522 decision 10). SHA-256 of "victim@example.com", computed outside this
+	// code.
+	t.Run("the trip records the username as its digest", func(t *testing.T) {
+		m, auditLog := newAuditedTestMiddleware(nil, true)
+		for i := 0; i < tightBudget+1; i++ {
+			runROPC(m, "password", " Victim@Example.com", "app", attacker, true)
+		}
+		auditLog.mu.Lock()
+		events := append([]auditEvent(nil), auditLog.events...)
+		auditLog.mu.Unlock()
+		want := map[string]interface{}{
+			"limiter":      "pwd_account_net",
+			"email_digest": "ffbe8cff4f9f8d8b109460f975c343e942cd4c3ed191323eb83374ae2ea4de5f",
+			"ip":           "203.0.113.7",
+		}
+		if len(events) != 1 || !reflect.DeepEqual(events[0].details, want) {
+			t.Errorf("audited %v, want one event with details %v", events, want)
+		}
+	})
+
 	t.Run("a second client id does not buy a fresh budget for the same account", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
 		for i := 0; i < tightBudget; i++ {

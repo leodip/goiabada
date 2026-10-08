@@ -162,7 +162,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	// A disabled user's token gets the wording that says nothing about why (#137), and
 	// UserDisabledError is what still tells the handler to write EventUserDisabled.
 	if !tokenUser.Enabled {
-		return nil, userDisabled(invalidRefreshTokenMessage)
+		return nil, userDisabled(invalidRefreshTokenMessage, tokenUser.Id)
 	}
 
 	// The generation boundary (#106), read from the TOKEN row, not from any joined record (#106

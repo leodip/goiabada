@@ -178,7 +178,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 	// never with one naming the account (#137). UserDisabledError is what still tells the handler
 	// to write EventUserDisabled.
 	if !codeEntity.User.Enabled {
-		return nil, userDisabled("Code is invalid.")
+		return nil, userDisabled("Code is invalid.", codeEntity.User.Id)
 	}
 
 	// The generation boundary (#106). A code carries the generation its ceremony

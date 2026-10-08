@@ -128,9 +128,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		user := &record.User{Id: 1, Subject: sub, Enabled: false}
 		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["user_id"] == user.Id
-		})).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
+			"user_id": user.Id,
+		}).Return()
 
 		jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
 			return isUserInfoInvalidToken(err, "The user account is disabled.")
@@ -556,7 +556,9 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user123").Return(test.user, nil)
 			if test.user != nil {
-				auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.Anything).Return()
+				auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
+					"user_id": test.user.Id,
+				}).Return()
 			}
 
 			handler.ServeHTTP(rr, req)

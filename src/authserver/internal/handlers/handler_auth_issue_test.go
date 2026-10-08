@@ -1911,9 +1911,12 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "unknown-client").Return(nil, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["client_identifier"] == "unknown-client" && details["user_id"] == int64(123)
-		})).Return()
+		// No client_id: the client could not be loaded, and a payload naming row 0 would assert a
+		// row that does not exist.
+		auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedRedirectURI, map[string]interface{}{
+			"user_id":           int64(123),
+			"client_identifier": "unknown-client",
+		}).Return()
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		// No clientName in the bind: renderRedirectBlocked leaves it out when the client could
@@ -3880,9 +3883,12 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 					Return(&record.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: tc.requested, State: "test-state"}, nil)
 				auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return()
 			} else {
-				auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
-					return details["client_identifier"] == "test-client" && details["user_id"] == int64(123)
-				})).Return()
+				// The client row beside its identifier, since the gate loaded it (#522 decision 7).
+				auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedRedirectURI, map[string]interface{}{
+					"user_id":           int64(123),
+					"client_id":         int64(1),
+					"client_identifier": "test-client",
+				}).Return()
 				pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
 					mock.MatchedBy(func(data map[string]interface{}) bool {
 						return data["destination"] == tc.wantDest
@@ -4051,11 +4057,12 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 				}),
 				testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, (*int64)(nil)).Return(false)
 
-			auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedSessionInvalid, mock.MatchedBy(func(details map[string]interface{}) bool {
-				return details["user_id"] == int64(123) &&
-					details["client_identifier"] == "test-client" &&
-					details["session_identifier"] == liveSessionIdentifier
-			})).Return()
+			auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedSessionInvalid, map[string]interface{}{
+				"user_id":            int64(123),
+				"client_id":          int64(1),
+				"client_identifier":  "test-client",
+				"session_identifier": liveSessionIdentifier,
+			}).Return()
 
 			if tc.silent {
 				ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
@@ -4217,9 +4224,11 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 					RedirectURI: "https://example.com/callback", State: "test-state"}, nil)
 				auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return()
 			} else {
-				auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedScopeDenied, mock.MatchedBy(func(details map[string]interface{}) bool {
-					return details["user_id"] == int64(123) && details["client_identifier"] == "test-client"
-				})).Return()
+				auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedScopeDenied, map[string]interface{}{
+					"user_id":           int64(123),
+					"client_id":         int64(1),
+					"client_identifier": "test-client",
+				}).Return()
 			}
 
 			handler.ServeHTTP(rr, req)

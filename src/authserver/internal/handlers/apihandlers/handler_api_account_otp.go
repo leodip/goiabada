@@ -412,8 +412,9 @@ func HandleAccountOTPPut(
 				// existing failure event, and here there is none. That is why the verification
 				// reports an outcome and leaves the audit set to each caller (#387 decision 4).
 				auditLogger.Log(r.Context(), audit.EventOTPCodeReplayDetected, map[string]interface{}{
-					"user_id": user.Id,
-					"step":    verified.Step,
+					"user_id":        user.Id,
+					"step":           verified.Step,
+					"logged_in_user": subject,
 				})
 				writeJSONError(w, incorrectOtpCode, "INVALID_OTP_CODE", http.StatusBadRequest)
 				return
@@ -440,7 +441,8 @@ func HandleAccountOTPPut(
 			}
 
 			auditLogger.Log(r.Context(), audit.EventEnabledOTP, map[string]interface{}{
-				"user_id": user.Id,
+				"user_id":        user.Id,
+				"logged_in_user": subject,
 			})
 		} else {
 			// Disable OTP
@@ -460,7 +462,8 @@ func HandleAccountOTPPut(
 			}
 
 			auditLogger.Log(r.Context(), audit.EventDisabledOTP, map[string]interface{}{
-				"user_id": user.Id,
+				"user_id":        user.Id,
+				"logged_in_user": subject,
 			})
 		}
 
