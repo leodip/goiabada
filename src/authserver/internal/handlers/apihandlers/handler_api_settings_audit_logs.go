@@ -70,29 +70,30 @@ func HandleSettingsAuditLogsPut(
 			return
 		}
 
-		// Audit log before saving, so the logger reads the old settings
-		// and always records the change (even when disabling logging)
-		auditLogger.Log(r.Context(), audit.EventUpdatedAuditLogsSettings, map[string]interface{}{
-			"loggedInUser":               callerSubject(r),
-			"auditLogsInConsoleEnabled":  req.AuditLogsInConsoleEnabled,
-			"auditLogsInDatabaseEnabled": req.AuditLogsInDatabaseEnabled,
-			"auditLogRetentionDays":      req.AuditLogRetentionDays,
-		})
+		// Saved from a copy, so the settings on the request's context stay the ones it started
+		// with. The change is then recorded under those, the audit logger's switches, so switching
+		// logging off is recorded too, and a save the database refuses records nothing.
+		updated := *currentSettings
+		updated.AuditLogsInConsoleEnabled = req.AuditLogsInConsoleEnabled
+		updated.AuditLogsInDatabaseEnabled = req.AuditLogsInDatabaseEnabled
+		updated.AuditLogRetentionDays = req.AuditLogRetentionDays
 
-		// Apply updates
-		currentSettings.AuditLogsInConsoleEnabled = req.AuditLogsInConsoleEnabled
-		currentSettings.AuditLogsInDatabaseEnabled = req.AuditLogsInDatabaseEnabled
-		currentSettings.AuditLogRetentionDays = req.AuditLogRetentionDays
-
-		if err := database.UpdateSettings(r.Context(), nil, currentSettings); err != nil {
+		if err := database.UpdateSettings(r.Context(), nil, &updated); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
 
+		auditLogger.Log(r.Context(), audit.EventUpdatedAuditLogsSettings, map[string]interface{}{
+			"loggedInUser":               callerSubject(r),
+			"auditLogsInConsoleEnabled":  updated.AuditLogsInConsoleEnabled,
+			"auditLogsInDatabaseEnabled": updated.AuditLogsInDatabaseEnabled,
+			"auditLogRetentionDays":      updated.AuditLogRetentionDays,
+		})
+
 		resp := api.SettingsAuditLogsResponse{
-			AuditLogsInConsoleEnabled:  currentSettings.AuditLogsInConsoleEnabled,
-			AuditLogsInDatabaseEnabled: currentSettings.AuditLogsInDatabaseEnabled,
-			AuditLogRetentionDays:      currentSettings.AuditLogRetentionDays,
+			AuditLogsInConsoleEnabled:  updated.AuditLogsInConsoleEnabled,
+			AuditLogsInDatabaseEnabled: updated.AuditLogsInDatabaseEnabled,
+			AuditLogRetentionDays:      updated.AuditLogRetentionDays,
 		}
 
 		writeJSON(w, r, http.StatusOK, resp)
