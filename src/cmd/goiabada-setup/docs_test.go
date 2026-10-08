@@ -16,7 +16,7 @@ import (
 // setupWizardPage is the docs page about this wizard, flagsHeading its section listing every flag,
 // one table row per flag, and questionsHeading its section listing the questions, one row each.
 const (
-	setupWizardPage  = "../../../site/src/content/docs/get-started/setup-wizard.mdx"
+	setupWizardPage  = "../../../site/src/content/docs/deploy/setup-wizard.mdx"
 	flagsHeading     = "### Flags"
 	questionsHeading = "### The questions"
 )

@@ -3,7 +3,8 @@ title: Setup wizard
 description: Generate a ready-to-run configuration for Docker Compose, Kubernetes or the native binaries, with every key and password created for you.
 ---
 
-import { Aside, CardGrid, LinkCard, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import SetupWizardDownload from '../../../components/SetupWizardDownload.mdx';
 
 The setup wizard, `goiabada-setup`, asks you a few questions and writes the configuration for your deployment, with every key and password already generated.
 
@@ -11,37 +12,7 @@ The setup wizard, `goiabada-setup`, asks you a few questions and writes the conf
 
 1. Download the wizard for your platform.
 
-   <Tabs>
-     <TabItem label="Linux (x86_64)">
-       ```bash
-       curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-amd64
-       chmod +x goiabada-setup-linux-amd64
-       ```
-     </TabItem>
-     <TabItem label="Linux (ARM64)">
-       ```bash
-       curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-arm64
-       chmod +x goiabada-setup-linux-arm64
-       ```
-     </TabItem>
-     <TabItem label="macOS (Apple Silicon)">
-       ```bash
-       curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-arm64
-       chmod +x goiabada-setup-darwin-arm64
-       ```
-     </TabItem>
-     <TabItem label="macOS (Intel)">
-       ```bash
-       curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-amd64
-       chmod +x goiabada-setup-darwin-amd64
-       ```
-     </TabItem>
-     <TabItem label="Windows">
-       ```bash
-       curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-windows-amd64.exe
-       ```
-     </TabItem>
-   </Tabs>
+   <SetupWizardDownload />
 
    Every release has the same five binaries on the [releases page](https://github.com/leodip/goiabada/releases).
 
@@ -67,7 +38,7 @@ The first question picks one of four deployments. Each writes its own files, in 
 
 | Deployment | Use it for | Files it writes |
 |---|---|---|
-| 1. Local testing | Trying Goiabada on your machine. Plain HTTP on `localhost`. | `docker-compose.yml` and `docker-compose.override.yml` |
+| 1. Local testing | Trying Goiabada on your machine. Plain HTTP on `localhost`. The [Quickstart](/get-started/quickstart/) walks through it. | `docker-compose.yml` and `docker-compose.override.yml` |
 | 2. Production with reverse proxy | Docker Compose behind a proxy that serves HTTPS, such as Nginx or Cloudflare. | `docker-compose.yml` and `docker-compose.override.yml` |
 | 3. Kubernetes cluster | A cluster with Envoy Gateway and cert-manager. | `goiabada-k8s.yaml` and `goiabada-secrets.yaml` |
 | 4. Native binaries | Running the two binaries yourself, without containers. | `goiabada.env` |

@@ -88,7 +88,6 @@ export default defineConfig({
 					items: [
 						{ label: 'Introduction', slug: 'get-started/introduction' },
 						{ label: 'Quickstart', slug: 'get-started/quickstart' },
-						{ label: 'Setup wizard', slug: 'get-started/setup-wizard' },
 						{ label: 'First sign-in', slug: 'get-started/first-sign-in' },
 					],
 				},
@@ -130,6 +129,7 @@ export default defineConfig({
 					label: 'Deploy',
 					items: [
 						{ label: 'Choose a method', slug: 'deploy/choose-a-method' },
+						{ label: 'Setup wizard', slug: 'deploy/setup-wizard' },
 						{ label: 'Docker Compose', slug: 'deploy/docker-compose' },
 						{ label: 'Cloudflare Tunnel', slug: 'deploy/cloudflare-tunnel' },
 						{ label: 'Cloudflare + Nginx', slug: 'deploy/cloudflare-nginx' },

@@ -3,7 +3,8 @@ title: Quickstart
 description: Run Goiabada on your own machine in a few minutes, to try it out.
 ---
 
-import { Aside, CardGrid, LinkCard, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import SetupWizardDownload from '../../../components/SetupWizardDownload.mdx';
 
 This page gets Goiabada running on your machine in a few minutes, so you can try it out. All you need is Docker with Docker Compose.
 
@@ -13,39 +14,9 @@ This test setup serves plain HTTP on `localhost`. **Never** use it for a deploym
 
 <Steps>
 
-1. Download the [setup wizard](/get-started/setup-wizard/) for your platform.
+1. Download the [setup wizard](/deploy/setup-wizard/) for your platform.
 
-   <Tabs>
-     <TabItem label="Linux (x86_64)">
-       ```bash
-       curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-amd64
-       chmod +x goiabada-setup-linux-amd64
-       ```
-     </TabItem>
-     <TabItem label="Linux (ARM64)">
-       ```bash
-       curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-linux-arm64
-       chmod +x goiabada-setup-linux-arm64
-       ```
-     </TabItem>
-     <TabItem label="macOS (Apple Silicon)">
-       ```bash
-       curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-arm64
-       chmod +x goiabada-setup-darwin-arm64
-       ```
-     </TabItem>
-     <TabItem label="macOS (Intel)">
-       ```bash
-       curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-darwin-amd64
-       chmod +x goiabada-setup-darwin-amd64
-       ```
-     </TabItem>
-     <TabItem label="Windows">
-       ```bash
-       curl -LO https://github.com/leodip/goiabada/releases/latest/download/goiabada-setup-windows-amd64.exe
-       ```
-     </TabItem>
-   </Tabs>
+   <SetupWizardDownload />
 
 2. In an empty directory, run it for local testing with SQLite. Use the name of the file you downloaded.
 
@@ -103,5 +74,5 @@ Prefer MySQL, PostgreSQL or SQL Server? Pass `--db=mysql`, `--db=postgres` or `-
 
 <CardGrid>
   <LinkCard title="First sign-in" description="Sign in to the admin console and secure your account." href="/get-started/first-sign-in/" />
-  <LinkCard title="Setup wizard" description="Every question and flag of the wizard." href="/get-started/setup-wizard/" />
+  <LinkCard title="Setup wizard" description="Every question and flag of the wizard." href="/deploy/setup-wizard/" />
 </CardGrid>
