@@ -752,23 +752,14 @@ func (m *RateLimiter) LimitAccountPassword(next http.Handler) http.Handler {
 	return m.limitFailuresPerSubject(next, m.accountPassword, rejectAPI)
 }
 
-// tokenSubjectRateLimitKey buckets by the account a bearer token names. It reads the token
-// the API authentication middleware validated and left on the context, which is the same
-// value the handler resolves its user from, so the limiter and the handler cannot disagree
-// about whose budget is being spent.
+// tokenSubjectRateLimitKey buckets by the account a bearer token names. It reads the subject
+// through reqctx.ValidatedSubject, the one reading the session check and the account handlers
+// use too, so the limiter and the handler cannot disagree about whose budget is being spent.
 //
 // false means no bucket can be derived, which is a request that has no business reaching a
 // credential check anyway.
 func tokenSubjectRateLimitKey(r *http.Request) (string, bool) {
-	token, ok := reqctx.ValidatedTokenFrom(r.Context())
-	if !ok {
-		return "", false
-	}
-	subject := strings.TrimSpace(token.StringClaim("sub"))
-	if subject == "" {
-		return "", false
-	}
-	return subject, true
+	return reqctx.ValidatedSubject(r.Context())
 }
 
 // limitRequests writes the body of a limiter every request spends, keyed on what its one tier

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -184,8 +183,8 @@ func (m *BearerToken) RequireValidSession(database apiAuthDatabase) func(http.Ha
 				return
 			}
 
-			sub := strings.TrimSpace(jwtToken.StringClaim("sub"))
-			if sub == "" {
+			sub, hasSub := reqctx.BearerSubject(r.Context())
+			if !hasSub {
 				slog.WarnContext(r.Context(), "rejecting bearer token: user token has no sub claim")
 				m.refusals.invalidToken(w, r, "Invalid token subject")
 				return

@@ -42,7 +42,7 @@ func HandleAccountLogoutRequestPost(
 	baseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		jwtToken, _, ok := accountCaller(w, r)
+		jwtToken, subject, ok := accountCaller(w, r)
 		if !ok {
 			return
 		}
@@ -183,7 +183,7 @@ func HandleAccountLogoutRequestPost(
 		now := time.Now().UTC()
 		claims := jwt.MapClaims{}
 		claims["iss"] = settings.Issuer
-		claims["sub"] = jwtToken.StringClaim("sub")
+		claims["sub"] = subject
 		claims["iat"] = now.Unix()
 		claims["sid"] = sid
 		claims["aud"] = client.ClientIdentifier
