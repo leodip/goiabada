@@ -73,9 +73,9 @@ The auth server describes what it implements, which no setting changes but two: 
 | `authorization_endpoint` | `/auth/authorize`, the [authorization endpoint](/reference/endpoints/authorize/) |
 | `token_endpoint` | `/auth/token`, the [token endpoint](/reference/endpoints/token/) |
 | `userinfo_endpoint` | `/userinfo`, the [UserInfo endpoint](/reference/endpoints/userinfo/) |
-| `end_session_endpoint` | `/auth/logout`, the [logout endpoint](/reference/endpoints/) |
+| `end_session_endpoint` | `/auth/logout`, the [logout endpoint](/reference/endpoints/logout/) |
 | `jwks_uri` | `/certs`, the key set below |
-| `registration_endpoint` | `/connect/register`, only while dynamic client registration is on. See [self-registered clients](/concepts/clients/#self-registered-clients). |
+| `registration_endpoint` | `/connect/register`, only while dynamic client registration is on. See [Dynamic client registration](/reference/endpoints/dynamic-client-registration/). |
 | `grant_types_supported` | `authorization_code`, `refresh_token`, `client_credentials`, `password` and `implicit` |
 | `response_types_supported` | `code`, `token`, `id_token` and `id_token token` |
 | `response_modes_supported` | `query`, `fragment` and `form_post` |

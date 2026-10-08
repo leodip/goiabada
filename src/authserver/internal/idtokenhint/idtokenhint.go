@@ -23,7 +23,7 @@ import (
 )
 
 // The encrypted id_token_hint scheme (see the docs at
-// reference/endpoints.mdx, "Encrypting the ID token hint"):
+// reference/endpoints/logout.mdx, "Encrypting the hint"):
 //
 //	alg = dir      key management: the derived key IS the content-encryption key
 //	enc = A256GCM  content encryption: AES-256-GCM
@@ -43,7 +43,7 @@ import (
 // so algorithm substitution and downgrade have no surface to work on.
 
 // idTokenHintJWEHeader is the protected header Encrypt writes, byte
-// for byte. It is the header of the scheme reference/endpoints.mdx documents.
+// for byte. It is the header of the scheme reference/endpoints/logout.mdx documents.
 //
 //nolint:gosec // G101: a JWE protected header naming algorithms, not a credential
 const idTokenHintJWEHeader = `{"alg":"dir","enc":"A256GCM","cty":"JWT"}`
@@ -83,7 +83,7 @@ func DeriveKey(clientSecret string) []byte {
 }
 
 // Encrypt is the reference encryptor for the id_token_hint scheme
-// documented at reference/endpoints.mdx: it produces what Decrypt
+// documented at reference/endpoints/logout.mdx: it produces what Decrypt
 // reads, with the header above. Nothing in the binaries calls it -- an RP does the
 // encrypting -- but keeping the two halves in one file is what lets every test in
 // the auth server build a fixture without a JOSE library, and what makes the

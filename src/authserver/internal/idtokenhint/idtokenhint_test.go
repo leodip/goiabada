@@ -141,7 +141,7 @@ func TestDeriveKey(t *testing.T) {
 }
 
 // TestEncrypt_Shape pins the wire format the docs at
-// reference/endpoints.mdx promise an RP, byte for byte: change any of it and
+// reference/endpoints/logout.mdx promise an RP, byte for byte: change any of it and
 // every client following that page breaks.
 func TestEncrypt_Shape(t *testing.T) {
 	jwe, err := Encrypt(testInner, testClientSecret)

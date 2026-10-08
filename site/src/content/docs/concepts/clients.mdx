@@ -238,7 +238,7 @@ The auth server reads four fields and ignores the rest:
 - `grant_types`: `authorization_code` (the default), `refresh_token` and `client_credentials`. A public client can't ask for `client_credentials`, and the legacy flows can't be asked for at all.
 - `client_name`: the name the consent screen shows, up to 128 characters.
 
-It answers 201 with the new `client_id` and, for a confidential client, its `client_secret`. Metadata it refuses gets a 400 with `invalid_client_metadata`, or `invalid_redirect_uri` for a redirect URI.
+It answers 201 with the new `client_id` and, for a confidential client, its `client_secret`. Metadata it refuses gets a 400 with `invalid_client_metadata`, or `invalid_redirect_uri` for a redirect URI. Every field, answer and error is on [Dynamic client registration](/reference/endpoints/dynamic-client-registration/).
 
 Because nobody has reviewed them, self-registered clients are treated more carefully:
 

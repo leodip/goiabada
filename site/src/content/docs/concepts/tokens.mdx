@@ -105,7 +105,7 @@ User claims, `groups` and `attributes` come on top, as [Scopes](/concepts/scopes
 | `jti` | The token's own identifier |
 | `auth_time` | When the user last entered a credential, a password or a one-time code |
 | `acr`, `amr` | How the user signed in. See [ACR and AMR](/concepts/acr-and-amr/) |
-| `sid` | The session the user signed in with, when there is one. [`/auth/logout`](/reference/endpoints/) matches on it |
+| `sid` | The session the user signed in with, when there is one. [`/auth/logout`](/reference/endpoints/logout/) matches on it |
 | `nonce` | The `nonce` of the authorization request, when it had one |
 | `at_hash` | A hash of the access token issued beside it, in the [implicit flow](/legacy-flows/implicit/) only |
 
