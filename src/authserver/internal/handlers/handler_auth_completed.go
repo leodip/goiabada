@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"io/fs"
+	"log/slog"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -105,6 +106,36 @@ func HandleAuthCompletedGet(
 			target:                      targetAcrLevel,
 		})
 
+		// The user is decided on before either arm binds, so a refusal or a restart leaves no
+		// session row, no rotated cookie and no record of a session behind it (#522 decision 6).
+		// The restart arm needs no user: it binds nothing and the password step reads the user
+		// afresh.
+		var user *record.User
+		if plan.arm != completionArmRestart {
+			user, err = database.GetUserById(r.Context(), nil, authContext.UserId)
+			if err != nil {
+				pageRenderer.InternalServerError(w, r, err)
+				return
+			}
+
+			switch decideBeforeBinding(user, authContext.AuthStateGeneration) {
+			case beforeBindingUserMissing:
+				pageRenderer.InternalServerError(w, r, errs.New("user not found"))
+				return
+			case beforeBindingUserDisabled:
+				auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
+					"userId": user.Id,
+				})
+				answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+					redirectErrorFromAuthContext(authContext, client, "access_denied", userDisabledDescription))
+				return
+			case beforeBindingGenerationMoved:
+				slog.WarnContext(r.Context(), "the user's authentication generation has moved on since this ceremony authenticated, restarting level 1 instead of binding a session",
+					"ceremony_user_id", authContext.UserId)
+				plan = completionPlan{arm: completionArmRestart}
+			}
+		}
+
 		// The session this ceremony actually bound to, which is what the ACR below is taken
 		// against. It is the bumped row on the reuse arm and the freshly created row on the
 		// create arm, never the ambient one the browser happened to carry (#133).
@@ -112,9 +143,12 @@ func HandleAuthCompletedGet(
 
 		switch plan.arm {
 		case completionArmRestart:
-			// Restart route 1. The attempt is discarded with it, so methods and the user
-			// carried in from the session that ended do not reach the session the second
-			// pass creates (#140, #436).
+			// Restart route 1, taken when no session is reusable and level 1 was never completed,
+			// or when the user's generation has moved on since the ceremony authenticated, which
+			// /auth/issue would restart one step later after a consent screen whose answer it
+			// throws away. The attempt is discarded with it, so methods and the user carried in
+			// from the session that ended do not reach the session the second pass creates
+			// (#140, #436).
 			authContext.Restart()
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
@@ -149,18 +183,7 @@ func HandleAuthCompletedGet(
 			return
 		}
 
-		user, err := database.GetUserById(r.Context(), nil, authContext.UserId)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
-		if user == nil {
-			pageRenderer.InternalServerError(w, r, errs.New("user not found"))
-			return
-		}
-
 		facts := afterBindingFacts{
-			userEnabled:     user.Enabled,
 			promptConsent:   authContext.HasPromptValue("consent"),
 			consentRequired: client.ConsentRequired,
 		}
@@ -183,12 +206,6 @@ func HandleAuthCompletedGet(
 		}
 
 		switch answer {
-		case afterBindingUserDisabled:
-			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
-				"userId": user.Id,
-			})
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
-				redirectErrorFromAuthContext(authContext, client, "access_denied", userDisabledDescription))
 		case afterBindingNoScope:
 			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
 				redirectErrorFromAuthContext(authContext, client,
@@ -323,6 +340,52 @@ func decideCompletion(f completionFacts) completionPlan {
 		terminateForeignSession: f.sessionPresent && !f.sessionOwned,
 		replaceOwnSession:       f.sessionPresent && f.sessionOwned,
 	}
+}
+
+// beforeBindingAnswer is what /auth/completed does with the ceremony's user before an arm binds a
+// session.
+type beforeBindingAnswer int
+
+const (
+	// beforeBindingBind lets the arm bind.
+	beforeBindingBind beforeBindingAnswer = iota + 1
+	// beforeBindingUserMissing answers 500: the ceremony's user no longer exists.
+	beforeBindingUserMissing
+	// beforeBindingUserDisabled answers access_denied: the ceremony's user has been disabled.
+	beforeBindingUserDisabled
+	// beforeBindingGenerationMoved restarts the ceremony at level 1 (restart route 1).
+	beforeBindingGenerationMoved
+)
+
+// decideBeforeBinding decides on the ceremony's user before either arm binds a session (#522
+// decision 6). ceremonyGeneration is the authentication generation the ceremony holds, captured at
+// its password step or inherited from the session it reused.
+//
+// Binding first wrote a session row stamped with the ceremony's generation, rotated the cookie onto
+// it and recorded started_new_user_session, and only then refused a disabled user. Disabling sweeps
+// the user's sessions and moves their generation on, so that row was one nothing could use,
+// /auth/issue checking both, left listed until it timed out. A password reset or an ending of the
+// user's sessions mid-sign-in left the same row, and a consent screen whose answer /auth/issue then
+// discarded by restarting. Deciding here closes both:
+//
+//   - a disabled user is refused, as /auth/issue refuses one. It is asked first: a disable moves the
+//     generation on too, and the client is owed access_denied rather than a password form the
+//     disabled account cannot get past;
+//   - a generation other than the ceremony's is restarted at level 1, the restart /auth/issue would
+//     perform one step later, compared as the token endpoint compares it at redemption. It is never
+//     the user's current value read into the ceremony, which would launder a sign-in that began
+//     before a credential change into the generation that change established (#106 decision 11).
+func decideBeforeBinding(user *record.User, ceremonyGeneration int64) beforeBindingAnswer {
+	if user == nil {
+		return beforeBindingUserMissing
+	}
+	if !user.Enabled {
+		return beforeBindingUserDisabled
+	}
+	if user.AuthStateGeneration != ceremonyGeneration {
+		return beforeBindingGenerationMoved
+	}
+	return beforeBindingBind
 }
 
 // bindReusedSession is the reuse arm: it bumps the session the browser arrived with, as plan says,
@@ -549,8 +612,6 @@ type afterBindingAnswer int
 const (
 	// afterBindingUndecided is returned beside a fact still to load.
 	afterBindingUndecided afterBindingAnswer = iota
-	// afterBindingUserDisabled answers access_denied for a disabled user.
-	afterBindingUserDisabled
 	// afterBindingNoScope answers access_denied for a user holding none of the requested scopes.
 	afterBindingNoScope
 	// afterBindingConsent goes on to the consent screen.
@@ -562,7 +623,6 @@ const (
 // afterBindingFacts is what decideAfterBinding decides from. The effective scope is nil until
 // HandleAuthCompletedGet has loaded it.
 type afterBindingFacts struct {
-	userEnabled bool
 	// promptConsent is the prompt's consent token.
 	promptConsent bool
 	// consentRequired is the client's ConsentRequired.
@@ -571,14 +631,12 @@ type afterBindingFacts struct {
 }
 
 // decideAfterBinding decides where a ceremony goes once it is bound to a session, or names the
-// next fact it needs to decide that. A disabled user is refused before the scope is filtered, so
-// the permission check is made only for a user who may be issued something. prompt=consent forces
-// the consent screen regardless of an existing consent or the client's setting; otherwise it is
-// shown when the client requires it or offline_access is asked for.
+// next fact it needs to decide that. The user is enabled by now, since decideBeforeBinding refused
+// a disabled one before anything was bound, so the permission check is made only for a user who
+// may be issued something. prompt=consent forces the consent screen regardless of an existing
+// consent or the client's setting; otherwise it is shown when the client requires it or
+// offline_access is asked for.
 func decideAfterBinding(f afterBindingFacts) (afterBindingAnswer, afterBindingFact) {
-	if !f.userEnabled {
-		return afterBindingUserDisabled, afterBindingFactNone
-	}
 	if f.effectiveScope == nil {
 		return afterBindingUndecided, afterBindingFactEffectiveScope
 	}

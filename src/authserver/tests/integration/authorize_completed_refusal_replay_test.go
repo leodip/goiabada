@@ -106,9 +106,9 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 
 	completedUrl := assertRedirect(t, resp, "/auth/completed")
 
-	// The password has already been accepted and the session exists, so the account is disabled
-	// here rather than up front: this is the only window in which /auth/completed sees a disabled
-	// user.
+	// The password has already been accepted, so the account is disabled here rather than up
+	// front: this is the only window in which /auth/completed sees a disabled user. No session
+	// exists yet, since /auth/completed is what would create it, and it refuses before it does.
 	user.Enabled = false
 	err = database.UpdateUser(context.Background(), nil, user)
 	if err != nil {

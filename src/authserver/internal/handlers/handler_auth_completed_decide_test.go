@@ -133,9 +133,42 @@ func TestDecideCompletion(t *testing.T) {
 	}
 }
 
+// What /auth/completed does with the ceremony's user before an arm binds a session (#522 decision
+// 6). The ceremony authenticated at generation 7.
+func TestDecideBeforeBinding(t *testing.T) {
+	testCases := []struct {
+		name string
+		user *record.User
+		want beforeBindingAnswer
+	}{
+		{name: "an enabled user at the ceremony's generation is bound",
+			user: &record.User{Enabled: true, AuthStateGeneration: 7}, want: beforeBindingBind},
+		{name: "a missing user", user: nil, want: beforeBindingUserMissing},
+		{name: "a disabled user is refused",
+			user: &record.User{Enabled: false, AuthStateGeneration: 7}, want: beforeBindingUserDisabled},
+		{
+			// A disable moves the generation on too, and the client is owed access_denied.
+			name: "a disabled user is refused before the generation is compared",
+			user: &record.User{Enabled: false, AuthStateGeneration: 8}, want: beforeBindingUserDisabled,
+		},
+		{name: "a generation moved on restarts",
+			user: &record.User{Enabled: true, AuthStateGeneration: 8}, want: beforeBindingGenerationMoved},
+		{
+			// Any difference, not only a later one: the comparison is the token endpoint's.
+			name: "a generation behind the ceremony's restarts as well",
+			user: &record.User{Enabled: true, AuthStateGeneration: 6}, want: beforeBindingGenerationMoved,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, decideBeforeBinding(tc.user, 7))
+		})
+	}
+}
+
 // afterBindingWorld is what HandleAuthCompletedGet would load after binding, answered from the row.
 type afterBindingWorld struct {
-	userEnabled     bool
 	promptConsent   bool
 	consentRequired bool
 	effectiveScope  string
@@ -147,7 +180,6 @@ func driveAfterBinding(t *testing.T, world afterBindingWorld) (afterBindingAnswe
 	t.Helper()
 
 	facts := afterBindingFacts{
-		userEnabled:     world.userEnabled,
 		promptConsent:   world.promptConsent,
 		consentRequired: world.consentRequired,
 	}
@@ -182,48 +214,38 @@ func TestDecideAfterBinding(t *testing.T) {
 		wantReads  []afterBindingFact
 	}{
 		{
-			name:       "a disabled user is refused without filtering the scope",
-			world:      afterBindingWorld{userEnabled: false, effectiveScope: "openid"},
-			wantAnswer: afterBindingUserDisabled,
-		},
-		{
-			name:       "a disabled user is refused before prompt=consent is honoured",
-			world:      afterBindingWorld{userEnabled: false, promptConsent: true, consentRequired: true, effectiveScope: "openid"},
-			wantAnswer: afterBindingUserDisabled,
-		},
-		{
 			name:       "a user holding none of the scopes is refused",
-			world:      afterBindingWorld{userEnabled: true, effectiveScope: ""},
+			world:      afterBindingWorld{effectiveScope: ""},
 			wantAnswer: afterBindingNoScope,
 			wantReads:  []afterBindingFact{scope},
 		},
 		{
 			name:       "no scope is refused before prompt=consent is honoured",
-			world:      afterBindingWorld{userEnabled: true, promptConsent: true, effectiveScope: ""},
+			world:      afterBindingWorld{promptConsent: true, effectiveScope: ""},
 			wantAnswer: afterBindingNoScope,
 			wantReads:  []afterBindingFact{scope},
 		},
 		{
 			name:       "prompt=consent goes to the consent screen",
-			world:      afterBindingWorld{userEnabled: true, promptConsent: true, effectiveScope: "openid"},
+			world:      afterBindingWorld{promptConsent: true, effectiveScope: "openid"},
 			wantAnswer: afterBindingConsent,
 			wantReads:  []afterBindingFact{scope},
 		},
 		{
 			name:       "a client requiring consent goes to the consent screen",
-			world:      afterBindingWorld{userEnabled: true, consentRequired: true, effectiveScope: "openid"},
+			world:      afterBindingWorld{consentRequired: true, effectiveScope: "openid"},
 			wantAnswer: afterBindingConsent,
 			wantReads:  []afterBindingFact{scope},
 		},
 		{
 			name:       "offline_access in the effective scope goes to the consent screen",
-			world:      afterBindingWorld{userEnabled: true, effectiveScope: "openid offline_access"},
+			world:      afterBindingWorld{effectiveScope: "openid offline_access"},
 			wantAnswer: afterBindingConsent,
 			wantReads:  []afterBindingFact{scope},
 		},
 		{
 			name:       "no consent needed goes to issuance",
-			world:      afterBindingWorld{userEnabled: true, effectiveScope: "openid profile"},
+			world:      afterBindingWorld{effectiveScope: "openid profile"},
 			wantAnswer: afterBindingIssue,
 			wantReads:  []afterBindingFact{scope},
 		},
