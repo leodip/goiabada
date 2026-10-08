@@ -16,19 +16,22 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// rollbackFloor is the lowest schema version `migrate to` will step down to: the version this
-// release of Goiabada ships with.
+// rollbackFloor is the lowest schema version `migrate to` will step down to: the head of the
+// migration set when the command was added (#268), so the first release carrying `migrate to`
+// carries this schema too. The head has moved past it since; the floor does not move with the
+// head, and no release is named beside it, because the binary printing a refusal is not the
+// release that set the floor.
 //
 // Rolling further back would put the schema where an older release expects it while leaving that
 // release unable to read the data. Goiabada v1.6.0 moved every TOTP secret into an encrypted
 // column and blanked the plaintext one, and moved the data-encryption key out of the database into
 // the environment; neither is a SQL migration, so no .down.sql reverses either, and no release
 // before v1.6.0 can read what a later one wrote whatever the schema says. Rollback is therefore
-// supported between releases from this one onwards, and the floor is what enforces it.
+// supported between releases carrying this schema or a later one, and the floor is what enforces
+// it.
 //
 // It moves only when a later release introduces another one-way data change, and that release says
 // so in its notes. The runner itself is unrestricted, so the tests can step anywhere (#268).
@@ -296,7 +299,7 @@ func migrateVersion(ctx context.Context, m *migrator.Migrator, out io.Writer) in
 // migrateTo steps the schema to target, in whichever direction that is.
 //
 // The refusals it composes itself are the three the runner cannot know about: the rollback floor,
-// which is this release's promise rather than a property of the migration set, and a target above
+// which is a promise about releases rather than a property of the migration set, and a target above
 // the head, which the runner reports as an unknown version without saying that being above the
 // head is what makes it unknown, and the stored email addresses migration 000047 cannot resolve,
 // which is a fact about the data rather than about the schema (#351). Everything else is printed
@@ -306,11 +309,10 @@ func migrateTo(ctx context.Context, database emailCaseReader, m *migrator.Migrat
 	if target < floor {
 		// Neutral about direction on purpose: the floor refuses any target below it, and a
 		// database still at an old version can ask for one on the way UP as easily as down.
-		outf(out, "refusing to migrate to %06d: rollback is supported between releases from "+
-			"Goiabada %s onwards, whose schema version is %06d, and no lower target is safe because "+
-			"earlier releases changed data in ways no migration reverses. Start this server normally "+
-			"to migrate up instead.\n",
-			target, buildinfo.Version, floor)
+		outf(out, "refusing to migrate to %06d: rollback is supported down to schema version %06d "+
+			"and no further, because the releases before that schema changed data in ways no "+
+			"migration reverses. Start this server normally to migrate up instead.\n",
+			target, floor)
 		return migrateExitError
 	}
 	if target > m.Head() {

@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
+	"github.com/leodip/goiabada/core/buildinfo"
 )
 
 // newTestMigrator gives each test its own SQLite file database and a migrator over the real
@@ -41,8 +42,8 @@ func newTestMigrator(t *testing.T) (data.Database, *migrator.Migrator, *sql.DB) 
 // head is the highest version the embedded migration set carries, and headf the way this command
 // prints it. Derived from the migrator rather than written down: every migration added to the
 // repository moves it, and #281 stage 1 found six assertions in this file spelling the old number.
-// rollbackFloor is NOT the head and is deliberately still a literal: it is the version this release
-// ships with and it moves only when a release introduces a one-way data change (see migrate.go).
+// rollbackFloor is NOT the head and is deliberately still a literal: it is the head when `migrate to`
+// was added, and it moves only when a release introduces a one-way data change (see migrate.go).
 func head(m *migrator.Migrator) int {
 	return m.Head()
 }
@@ -178,9 +179,11 @@ func TestMigrateTo_RefusesATargetBelowTheRollbackFloor(t *testing.T) {
 
 	require.Equal(t, 1, code)
 	assert.Contains(t, out.String(), "000030")
-	assert.Contains(t, out.String(), "rollback is supported between releases")
+	assert.Contains(t, out.String(), "rollback is supported down to schema version")
 	assert.Contains(t, out.String(), fmt.Sprintf("%06d", rollbackFloor),
 		"the refusal names the FLOOR it enforces, which is not the head and does not move with it")
+	assert.NotContains(t, out.String(), buildinfo.Version,
+		"the running build is not the release that set the floor, so the refusal names no release")
 
 	// It refused before touching anything.
 	version, _, err := m.Version(context.Background())
