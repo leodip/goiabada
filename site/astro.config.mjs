@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import { satteri } from '@astrojs/markdown-satteri';
 import starlightLinksValidator from 'starlight-links-validator';
 import starlightOpenAPI, { openAPISidebarGroups } from 'starlight-openapi';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +10,7 @@ import { writeApiReference } from './checks/api-reference.mjs';
 import { apiReferences } from './checks/api-reference-links.mjs';
 import buildChecks from './checks/build-checks.mjs';
 import { fullFile, indexFile } from './checks/llms.mjs';
+import { tableCodeWords } from './plugins/table-code-words.mjs';
 
 const googleAnalyticsId = 'G-CYZXDTHNB1'
 
@@ -35,6 +37,10 @@ function apiReferenceSchema(base, label, schema) {
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://goiabada.dev',
+	// Astro's own Markdown processor, with one plugin added: it keeps each hyphenated word of code
+	// in a table whole (plugins/table-code-words.mjs). Starlight adds its plugins to it as it would
+	// to the default one.
+	markdown: { processor: satteri({ hastPlugins: [tableCodeWords] }) },
 	integrations: [
 		starlight({
 			title: 'Goiabada',
