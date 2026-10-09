@@ -50,6 +50,18 @@ concurrency:
 permissions:
   contents: read
 
+# Every image this workflow pulls from Docker Hub is pulled logged in: the golang job containers,
+# the mailpit, MySQL and PostgreSQL services, the node and nginx bases of the docs build, and the
+# release images' bases and Buildx's own images in Build validation.
+# Anonymous pulls count against an allowance per IP address that GitHub's hosted runners share
+# with every other job, and a refusal ("429 Too Many Requests", "toomanyrequests") fails a job
+# before anything in it runs. DOCKERHUB_USERNAME and DOCKERHUB_TOKEN are repository secrets
+# holding a Docker Hub access token that can read public images and nothing else. The token that
+# pushes the images is another one, DOCKER_PASSWORD, held only by the prod environment, which
+# admits main and v* tags alone: this workflow runs a pull request's code, and a credential it
+# holds is one that code can read. Where the secrets are absent, as on a pull request from a fork,
+# the runner pulls anonymously, as it did before, and the login steps are skipped.
+
 # Test-only values, copied as literals from src/build/docker-compose-test.yml.
 # These are fixed test credentials, not secrets: keeping them literal is what
 # lets a developer reproduce a CI failure locally. Declared once at workflow
@@ -405,7 +417,11 @@ jobs:
     name: Unit / core
     needs: versions
     runs-on: ubuntu-latest
-    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    container:
+      image: golang:${{ needs.versions.outputs.go }}-bookworm
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-test-container
@@ -419,12 +435,19 @@ jobs:
     name: Unit / authserver
     needs: versions
     runs-on: ubuntu-latest
-    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    container:
+      image: golang:${{ needs.versions.outputs.go }}-bookworm
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
     services:
       # emaildelivery's TestSendEmail talks to a real SMTP server. Verified by
       # running the tier without it, where that is the only test that fails.
       mailpit:
         image: axllent/mailpit
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-test-container
@@ -439,7 +462,11 @@ jobs:
     name: Unit / adminconsole
     needs: versions
     runs-on: ubuntu-latest
-    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    container:
+      image: golang:${{ needs.versions.outputs.go }}-bookworm
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-test-container
@@ -465,7 +492,11 @@ jobs:
     name: Unit / setup
     needs: versions
     runs-on: ubuntu-latest
-    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    container:
+      image: golang:${{ needs.versions.outputs.go }}-bookworm
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup wizard tests
@@ -490,10 +521,17 @@ jobs:
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    container:
+      image: golang:${{ needs.versions.outputs.go }}-bookworm
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
     services:
       mailpit:
         image: axllent/mailpit
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-test-container
@@ -521,8 +559,18 @@ jobs:
   docs:
     name: Docs
     runs-on: ubuntu-latest
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The builds below pull node and nginx from Docker Hub; the login is skipped where the
+      # secrets are absent, as on a pull request from a fork. See the note above permissions.
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Site check tests
         run: |
           set -euo pipefail
@@ -566,10 +614,17 @@ jobs:
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    container:
+      image: golang:${{ needs.versions.outputs.go }}-bookworm
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
     services:
       mailpit:
         image: axllent/mailpit
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/runner-specs
@@ -591,7 +646,11 @@ jobs:
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    container:
+      image: golang:${{ needs.versions.outputs.go }}-bookworm
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
     services:
       # MYSQL_TCP_PORT rather than `command: --port=13306`, because service
       # containers cannot override a container's command. Verified against the
@@ -605,6 +664,9 @@ jobs:
       # TestDevelopmentStacks_RunTheGeneratedDatabaseImages holds this to.
       mysql-server:
         image: mysql:26
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         env:
           MYSQL_ROOT_PASSWORD: mySqlPass123
           MYSQL_TCP_PORT: 13306
@@ -614,6 +676,9 @@ jobs:
           --health-interval 3s --health-timeout 3s --health-retries 30
       mailpit:
         image: axllent/mailpit
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/runner-specs
@@ -635,10 +700,17 @@ jobs:
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    container:
+      image: golang:${{ needs.versions.outputs.go }}-bookworm
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
     services:
       postgres-server:
         image: postgres:18
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         env:
           POSTGRES_PASSWORD: myPostgresPass123
           POSTGRES_DB: goiabada
@@ -649,6 +721,9 @@ jobs:
           --health-interval 3s --health-timeout 3s --health-retries 30
       mailpit:
         image: axllent/mailpit
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/runner-specs
@@ -670,7 +745,11 @@ jobs:
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    container: golang:${{ needs.versions.outputs.go }}-bookworm
+    container:
+      image: golang:${{ needs.versions.outputs.go }}-bookworm
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
     services:
       mssql-server:
         image: mcr.microsoft.com/mssql/server:2022-latest
@@ -690,6 +769,9 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 40
       mailpit:
         image: axllent/mailpit
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/runner-specs
@@ -714,12 +796,23 @@ jobs:
     needs: versions
     if: github.event_name == 'push' || inputs.full
     runs-on: ubuntu-latest
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ needs.versions.outputs.go }}
           cache-dependency-path: src/**/go.sum
+      # Before QEMU and Buildx, whose setup pulls their own images from Docker Hub, and the two
+      # release builds, whose golang and alpine bases come from there. See the note above
+      # permissions.
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Install Tailwind
