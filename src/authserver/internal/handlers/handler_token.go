@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/base64"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -334,7 +336,35 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 		})
 	}
 
+	// A client that could not be authenticated: an unknown or disabled client, or a missing or
+	// wrong secret. The answer's 401 was all the server's log showed, so a client refused for a
+	// reason its operator couldn't see stayed refused, which is how a library that form-encodes its
+	// Basic credentials went unnoticed. A Warn record says which reason, how the client sent its
+	// credentials and what identifier it sent. No audit event, for the reason the scope denial above
+	// gives for its prelude: the identifier is the caller's own, unproven, and an audit row would let
+	// anyone write ones naming a legitimate client. The record escapes and bounds it.
+	if errors.As(err, &errDetail) && errDetail.Code() == "invalid_client" {
+		slog.WarnContext(r.Context(), "client authentication refused at the token endpoint",
+			"reason", errDetail.Description(),
+			"client_identifier", logging.FieldForLog(input.ClientId),
+			"client_auth_method", clientAuthMethod(r),
+			"grant_type", input.GrantType.String())
+	}
+
 	return err
+}
+
+// clientAuthMethod names how a token request presented its client credentials, as discovery's
+// token_endpoint_auth_methods_supported names them, for a log record: client_secret_basic for the
+// Authorization header, client_secret_post for a secret in the body, and none for neither.
+func clientAuthMethod(r *http.Request) string {
+	if strings.HasPrefix(r.Header.Get("Authorization"), "Basic ") {
+		return "client_secret_basic"
+	}
+	if r.PostForm.Get("client_secret") != "" {
+		return "client_secret_post"
+	}
+	return "none"
 }
 
 // tokenResponder answers a validated grant: one method per grant, each in handler_token_<grant>.go,

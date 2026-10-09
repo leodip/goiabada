@@ -85,6 +85,8 @@ When the client can't be authenticated, the answer is `401 Unauthorized` with `i
 | "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed." | A confidential client sent no secret |
 | "Client authentication failed. Please review your client_secret." | The secret is wrong |
 
+The auth server's log has a `client authentication refused at the token endpoint` warning for each, with the same reason, the client identifier the request named and how its credentials came. See [Logs](/deploy/logs/#records-worth-knowing).
+
 A request with no `client_id` at all is refused with `invalid_request`, "Missing required client_id parameter.", before `grant_type` is read.
 
 ## Authorization code grant
