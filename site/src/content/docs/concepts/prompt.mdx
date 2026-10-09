@@ -77,11 +77,11 @@ The auth server redirects each error to your redirect URI with your `state`, in 
 
 ### prompt=login
 
-The auth server doesn't use the browser's session to skip the sign-in: whoever is at the browser enters a password. They're asked for a one-time code too when the request's level needs one that the user's session hasn't already given. The ID token's `auth_time` is this sign-in.
+The auth server doesn't use the browser's session to skip the sign-in, or to skip any part of it: whoever is at the browser enters a password, and a one-time code too whenever the request's level needs one, whatever the session already gave. The ID token's `acr`, `amr` and `auth_time` all describe this sign-in.
 
 What happens to the session that was in the browser depends on who signs in:
 
-- **The same user.** Their session is kept and its sign-in time updated, as long as it's still valid. A session that has idled out, reached its maximum lifetime or fallen outside the request's `max_age` is replaced by a new one, with nothing revoked.
+- **The same user.** Their session is kept, as long as it's still valid, and takes this sign-in's level, methods and time, which can be lower than what it held. See [A session that's already there](/concepts/acr-and-amr/#a-session-thats-already-there). A session that has idled out, reached its maximum lifetime or fallen outside the request's `max_age` is replaced by a new one, with nothing revoked.
 - **Someone else.** The other user's session is ended, as described in [A different user signs in on the same browser](/concepts/ending-sessions/#a-different-user-signs-in-on-the-same-browser).
 
 `max_age` can ask for a sign-in too, but only when the last one is older than the number of seconds it gives. Use `prompt=login` when you always want a fresh sign-in, and `max_age` when a recent one is enough. With both, `prompt=login` wins.

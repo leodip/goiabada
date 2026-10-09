@@ -1017,6 +1017,86 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		permissionChecker.AssertExpectations(t)
 	})
 
+	// prompt=login at a level 1 client over the user's own level 3 session. The ceremony verified
+	// the password itself (Level1AuthCompleted), so it is a new authentication: the session takes its
+	// level, methods and credential instant, exactly what the create arm would stamp on a new
+	// session, and the token's acr is the level this authentication reached. Until #537 the session
+	// kept level 3 while its methods dropped to "pwd", and the token said level 3 beside ["pwd"].
+	// The bump is stubbed returning the row as it was, which is what a raise-only bump does with
+	// fewer methods and a lower level: the replacement is this handler's write, not the bump's.
+	t.Run("a ceremony that verified the password replaces the reused session's authentication (#537)", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{}, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req = withSessionSettings(req)
+		rr := httptest.NewRecorder()
+
+		pwdAuthTime := time.Now().UTC().Add(-2 * time.Minute)
+		authContext := &ceremony.AuthContext{
+			CeremonyId:          testCeremonyId,
+			AuthState:           ceremony.AuthStateAuthenticationCompleted,
+			ClientId:            "test-client",
+			UserId:              1,
+			Scope:               "openid",
+			AuthMethods:         "pwd",
+			AuthenticatedAt:     &pwdAuthTime,
+			Level1AuthCompleted: true,
+		}
+		sessionIdentifier := "test-session"
+		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		userSession := &record.UserSession{
+			Id:          1,
+			UserId:      1,
+			AcrLevel:    record.AcrLevel2Mandatory,
+			AuthMethods: "pwd otp",
+			AuthTime:    time.Now().UTC().Add(-3 * time.Hour),
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
+		client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1, AuthorizationCodeEnabled: true}
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
+
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
+		// A drop, not a raise: no identifier rotation (RegenerateSession has no expectation).
+		bumped := *userSession
+		userSessionManager.On("BumpUserSession", mock.Anything, sessionIdentifier, int64(1),
+			"pwd", record.AcrLevel1, "").Return(&bumped, nil)
+
+		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
+			return s.Id == 1 && s.AcrLevel == record.AcrLevel1 && s.AuthMethods == "pwd" && s.AuthTime.Equal(pwdAuthTime)
+		})).Return(nil).Once()
+		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
+
+		user := &record.User{Id: 1, Enabled: true}
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid", user).Return("openid", nil)
+
+		// The code /auth/issue mints carries these: acr level 1, amr ["pwd"], auth_time the
+		// password's instant, all three about the same authentication.
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
+				ac.AcrLevel == record.AcrLevel1 && ac.AuthMethods == "pwd" &&
+				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(pwdAuthTime)
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		ceremonyStore.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+	})
+
 	// The only row that distinguishes the two spellings of userReallyAuthenticated. The SSO
 	// subtest above carries nil, which short-circuits before !IsZero() is reached, and the
 	// re-auth subtest carries a nonzero timestamp, which passes either way; so with the

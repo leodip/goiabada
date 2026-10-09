@@ -166,7 +166,7 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 | `level1_password` | `HandleAuthLevel1Get` | unconditional |
 | `level1_password_completed` | `HandleAuthPwdPost` | password verified, user enabled |
 | `level1_existing_session` | `HandleAuthorizeGet` | valid session, hint matches, user enabled. The SSO shortcut: password entry is skipped and `/auth/level1completed` accepts this state directly |
-| `requires_level_2` | `HandleAuthLevel1CompletedGet` | target ACR above the owned session's ACR, or above level 1 with no owned session, or the session's `OtpConfigGeneration` differs from the user's and the target is above level 1 |
+| `requires_level_2` | `HandleAuthLevel1CompletedGet` | target ACR above the owned session's ACR, or above level 1 with no owned session, or the session's `OtpConfigGeneration` differs from the user's and the target is above level 1. A ceremony that verified the password itself (`Level1AuthCompleted`) counts no session, so it lands here whenever the target is above level 1 (#537) |
 | `level2_otp` | `HandleAuthLevel2Get` | `level2_optional` with OTP enabled, or `level2_mandatory` (enrolment happens at `/auth/otp` if needed) |
 | `authentication_completed` | `HandleAuthLevel1CompletedGet` | no step-up needed |
 | | `HandleAuthLevel2Get` | `level2_optional` and no OTP enrolled, which is the skip that bypasses `/auth/otp` entirely |
@@ -245,6 +245,8 @@ one definition, `protocolvalidation.IsSupportedResponseMode`, shared by the hand
 ### Key Logic in Level1Completed
 `handler_auth_level1.go:HandleAuthLevel1CompletedGet`:
 - If a deferred error is parked → answer the client and stop (see above)
+- If the ceremony verified the password itself (`Level1AuthCompleted`: `prompt=login`, an `id_token_hint` naming someone else, a restart) → the session counts for nothing, and the step-up is decided as with no session: target above level 1 → redirect to level2. See **Re-authentication over a session** below (#537)
+- Otherwise the session is reused (the `level1_existing_session` SSO shortcut), and:
 - If session ACR is `level1` and target is `level2_*` → redirect to level2
 - If session ACR is `level2_optional` and target is `level2_mandatory` → redirect to level2
 - If the session's `OtpConfigGeneration` differs from the user's → re-auth level2 (user changed OTP settings). This block writes nothing: the obligation is discharged at `/auth/completed`
@@ -261,6 +263,7 @@ When user has valid session (`UserSession` in DB + session cookie):
 - Session validated via `userSessionManager.HasValidUserSession()` (checks idle timeout, max lifetime, max_age param)
 - If valid → uses existing `AcrLevel` and `AuthMethods` from session
 - May still need level2 re-auth if target ACR higher than session ACR
+- Reuse never lowers a session: `BumpUserSession` only raises its ACR and only adds methods (#537)
 
 ## SSO and ACR/AMR Details
 
@@ -300,7 +303,35 @@ One rule, `StepUpOwed`, read by `HandleAuthLevel1CompletedGet` and `handlePrompt
 - Target > level1 → redirect to level2
 
 ### ACR in Token (`auth_context.go:SetAcrLevel`)
-Token ACR = `max(targetACR, sessionACR)`. Never downgrades within a session.
+Token ACR = `max(targetACR, sessionACR)`, against the session the ceremony bound to. SSO reuse never
+downgrades within a session. A ceremony that authenticated afresh has just written its target onto
+that session, so its token ACR is the target (#537).
+
+### Re-authentication over a session (#537)
+A ceremony that verified the password itself is a **new authentication**, not an extension of the
+browser's session. That is `AuthContext.Level1AuthCompleted`, set only by `RecordPasswordVerified`,
+and it covers `prompt=login` over a valid session, an `id_token_hint` naming someone else, and a
+restart. OIDC Core 1.0 section 3.1.2.3 says that with `prompt=login` the server "MUST reauthenticate
+the End-User even if the End-User is already authenticated", and section 2 defines `acr`, `amr` and
+`auth_time` as describing the same "authentication". So such a ceremony:
+
+1. **Owes every factor its target needs.** `HandleAuthLevel1CompletedGet` passes no session to
+   `StepUpOwed`, so a level 3 target asks for the code (or enrolment), and a level 2 target asks for
+   it when the user has one, whatever the session already gave. Keycloak does the same ("the LoA from
+   previous authentications are not considered").
+2. **Replaces the session's authentication** on `/auth/completed`'s reuse arm
+   (`completionPlan.replaceAuthentication`): the session takes the target level, this ceremony's
+   methods and its credential's instant, as the create arm would stamp a new session. That can lower
+   the session (`prompt=login` at a level 1 client over a level 3 session leaves it at level 1, `pwd`),
+   and the next level 3 request then steps up. The session row is kept, not replaced, so other clients'
+   session-bound refresh tokens keep working; their tokens carry the `acr`/`amr` of their own codes.
+
+Do not "fix" this back. Until #537 the session's code counted: the token said level 3 with `amr`
+`["pwd"]` and a fresh `auth_time`, and `BumpUserSession` replaced the session's `pwd otp` with `pwd`
+while keeping level 3, so every later SSO token contradicted itself (#239 finding F4). Merging the
+methods back instead (`pwd otp` beside the fresh `auth_time`) claims a code that was never entered at
+that time, which PR #238 decision 9 rejected. `max_age` already worked this way: a session outside it
+is not valid, so the ceremony takes the create arm.
 
 ### OTP config generation
 `users.otp_config_generation` is a per-user counter, advanced by one at every site that establishes
@@ -331,6 +362,10 @@ columns are `dont-update` (#242).
 - Session ACR >= target ACR → SSO succeeds (keeps higher ACR in token)
 - Session ACR < target ACR → step-up required (prompt for OTP)
 - Session `OtpConfigGeneration` != user's + target requires level2 → re-prompt OTP
+
+**Re-authentication (`prompt=login` over the user's own valid session, #537):**
+- Exactly the fresh login table above, whatever the session held: the same prompts, ACR and AMR
+- The session then holds this sign-in's ACR, AMR and auth time, lower than before if the target was
 
 ## Configuration
 

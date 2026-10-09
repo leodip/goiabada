@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -351,9 +353,18 @@ func (u *Manager) abandonUserSession(ctx context.Context, userSession *record.Us
 // In this case, the session's AuthMethods and AcrLevel must be upgraded to reflect
 // the stronger authentication that was actually performed.
 //
+// **A bump only ever raises.** It never lowers the session's level and never drops a method from
+// its methods. That is right for what calls it: SSO reuse, prompt=none, a step-up and a refresh all
+// extend the authentication the session already holds. A ceremony that authenticated afresh over the
+// session (prompt=login, an id_token_hint naming someone else, a restart: Level1AuthCompleted) is a
+// different thing, a new authentication that replaces the session's, and /auth/completed's reuse arm
+// writes that replacement itself, after this bump, from what the ceremony performed (#537). Until
+// #537 this function replaced the methods on any difference, so such a ceremony left a session at
+// level 3 with amr "pwd", every later token from it contradicting itself (#239 F4).
+//
 // Parameters:
 //   - authMethods: The authentication methods used in the current auth flow (e.g., "pwd otp").
-//     If this differs from the session's current AuthMethods, the session is updated.
+//     A method it lists that the session's lacks is added; nothing is removed.
 //   - acrLevel: The target ACR level for the current auth flow.
 //     The session's ACR is only upgraded (never downgraded) to maintain security guarantees.
 //   - ipAddress: The browser's address as the caller read it, which replaces the one recorded.
@@ -400,11 +411,12 @@ func (u *Manager) BumpUserSession(ctx context.Context, sessionIdentifier string,
 			userSession.IpAddress = ipAddress
 		}
 
-		// Handle step-up authentication: update AuthMethods if new methods were used.
-		// The authMethods parameter contains all methods used in the current auth flow
-		// (e.g., "pwd otp" if the user just completed OTP after having a pwd-only session).
+		// Handle step-up authentication: add the methods the current auth flow used that the
+		// session lacks, e.g. "otp" when the user just completed OTP over a pwd-only session.
+		// Merged, never replaced, so a flow listing fewer methods than the session cannot shrink
+		// them (#537).
 		if raisesAuthMethods(userSession.AuthMethods, authMethods) {
-			userSession.AuthMethods = authMethods
+			userSession.AuthMethods = mergeAuthMethods(userSession.AuthMethods, authMethods)
 		}
 
 		// Handle step-up authentication: upgrade ACR level if a higher level was achieved.
@@ -494,10 +506,34 @@ func WillRaisePrivilege(userSession *record.UserSession, authMethods string, acr
 		(acrLevel != "" && shouldUpgradeAcrLevel(userSession.AcrLevel, acrLevel))
 }
 
-// raisesAuthMethods reports whether a bump would replace the session's recorded methods.
-// An empty incoming value means the ceremony recorded none, which changes nothing.
+// raisesAuthMethods reports whether incoming lists a method current lacks, which is the only change
+// a bump makes to a session's methods. An empty incoming value means the ceremony recorded none,
+// which changes nothing, and so does one listing fewer methods than the session: "pwd" over a
+// "pwd otp" session is not a raise.
+//
+// It answered true on any difference until #537, so a bump with "pwd" replaced a session's
+// "pwd otp" and WillRaisePrivilege counted that drop as a privilege raise.
 func raisesAuthMethods(current, incoming string) bool {
-	return incoming != "" && incoming != current
+	have := strings.Fields(current)
+	for _, method := range strings.Fields(incoming) {
+		if !slices.Contains(have, method) {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeAuthMethods is current with every method of incoming it lacks appended, in incoming's
+// order, space-separated as AuthContext.AuthMethods and the session column store them. Appending
+// keeps amr in the order the methods were used: a session's methods came first.
+func mergeAuthMethods(current, incoming string) string {
+	merged := strings.Fields(current)
+	for _, method := range strings.Fields(incoming) {
+		if !slices.Contains(merged, method) {
+			merged = append(merged, method)
+		}
+	}
+	return strings.Join(merged, " ")
 }
 
 // shouldUpgradeAcrLevel determines if the session's ACR level should be upgraded.

@@ -15,7 +15,7 @@ That's [two-factor authentication](/concepts/glossary/#two-factor-authentication
 
 1. In the admin console, open your client under **Admin**, **Clients**. On the **Settings** tab, set **Default ACR level** to **ACR level 3 - password + mandatory OTP**, which is `urn:goiabada:level2_mandatory`, and save. Sign-ins that start after the change use it.
 
-2. Sign in to your app as a user with no authenticator. After the password, the sign-in page asks you to set one up: scan the QR code with an authenticator app, then enter the code it shows. From then on, a sign-in that starts a new session asks for your password and then a code. While your session lasts, it's reused: signing in to your app again, or to another app at the same level, asks for neither, and a request that asks for the password again, such as one with `prompt=login`, doesn't ask for a code. See [Users who are already signed in](#users-who-are-already-signed-in).
+2. Sign in to your app as a user with no authenticator. After the password, the sign-in page asks you to set one up: scan the QR code with an authenticator app, then enter the code it shows. From then on, a sign-in that starts a new session asks for your password and then a code. While your session lasts, it's reused: signing in to your app again, or to another app at the same level, asks for neither. A request that asks for a fresh sign-in, with `prompt=login`, asks for both, whatever the session already gave. See [Users who are already signed in](#users-who-are-already-signed-in).
 
 3. In your app, check how the user signed in before you let them in. The ID token says it in two claims, `acr`, the level, and `amr`, the methods the user used:
 
@@ -72,7 +72,7 @@ Each code works once. Sent again, it's refused, and the [audit log](/concepts/au
 
 A user whose session already reached the client's level isn't asked for anything: the session is reused, and the tokens say `urn:goiabada:level2_mandatory` and `["pwd", "otp"]` from the sign-in that earned it.
 
-That holds even when your app sends `prompt=login`: the user enters their password, but the code their session already gave still counts, so they aren't asked for another. A session that has idled out, reached its maximum lifetime or fallen outside the request's `max_age` doesn't count, and the user is asked for both.
+`prompt=login` doesn't reuse the session: the user signs in again with their password and a code, whatever their session already gave, and the tokens say `["pwd", "otp"]` and `auth_time` of this sign-in. A session that has idled out, reached its maximum lifetime or fallen outside the request's `max_age` doesn't count either, and the user is asked for both.
 
 A user who signed in to another app with a password alone isn't asked for their password again. They're asked only for the code, which is a [step-up](/concepts/acr-and-amr/#a-session-thats-already-there), and their session keeps the higher level from then on.
 
