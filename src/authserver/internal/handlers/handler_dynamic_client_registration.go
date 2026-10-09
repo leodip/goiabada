@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/inputvalidation"
+	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/securerandom"
 )
@@ -50,14 +51,14 @@ func HandleDynamicClientRegistrationPost(
 
 		// 1. Check if DCR is enabled (RFC 7591 §3)
 		if !settings.DynamicClientRegistrationEnabled {
-			writeDCRError(w, r, "access_denied", "Dynamic client registration is not enabled", http.StatusForbidden)
+			refuseDCR(w, r, "access_denied", "Dynamic client registration is not enabled", http.StatusForbidden)
 			return
 		}
 
 		// 2. Parse request (RFC 7591 §3.1)
 		var req oidc.DynamicClientRegistrationRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeDCRError(w, r, oidc.DCRErrorInvalidClientMetadata, "Invalid request body", http.StatusBadRequest)
+			refuseDCR(w, r, oidc.DCRErrorInvalidClientMetadata, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 
@@ -66,13 +67,13 @@ func HandleDynamicClientRegistrationPost(
 
 		// 4. Validate request
 		if err := validateDCRRequest(&req); err != nil {
-			writeDCRError(w, r, oidc.DCRErrorInvalidClientMetadata, err.Error(), http.StatusBadRequest)
+			refuseDCR(w, r, oidc.DCRErrorInvalidClientMetadata, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// 5. Validate redirect URIs (RFC 7591 §5)
 		if err := validateDCRRedirectURIs(&req); err != nil {
-			writeDCRError(w, r, oidc.DCRErrorInvalidRedirectURI, err.Error(), http.StatusBadRequest)
+			refuseDCR(w, r, oidc.DCRErrorInvalidRedirectURI, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -425,6 +426,21 @@ func containsGrantType(grantTypes []string, want oidc.GrantType) bool {
 		}
 	}
 	return false
+}
+
+// refuseDCR answers a registration the endpoint turns down, a 400 of RFC 7591 section 3.2.2 or the
+// 403 of a server taking none, and records it at Warn, the level the logging convention gives a
+// refused request. The request log's status was all the server recorded until the demo's
+// registrations were checked against the docs: a registrant refused for a redirect URI or a grant
+// type learned why from the answer, and its operator had nothing to read. The record carries the
+// error code and the description the registrant was answered with, escaped and bounded, since it
+// interpolates request text. No audit event: nothing was created, and the request names no client
+// of this server to record it against.
+func refuseDCR(w http.ResponseWriter, r *http.Request, errorCode, description string, statusCode int) {
+	slog.WarnContext(r.Context(), "client registration refused",
+		"error_code", errorCode,
+		"reason", logging.FieldForLog(description))
+	writeDCRError(w, r, errorCode, description, statusCode)
 }
 
 // writeDCRError writes RFC 7591 §3.2.2 error response.

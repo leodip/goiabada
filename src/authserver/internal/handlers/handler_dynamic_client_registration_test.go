@@ -566,6 +566,65 @@ func TestHandleDynamicClientRegistrationPost_ADescriptionEchoingRequestTextIsCon
 	}
 }
 
+// Every refusal writes one Warn record with the code and description the registrant was answered
+// with. Checking the demo's registrations against the docs found the request log's status the only
+// trace of six refused registrations, so an operator could not tell a misconfigured tool's wrong
+// redirect URI from a server taking no registrations at all.
+func TestHandleDynamicClientRegistrationPost_EveryRefusalIsLoggedAtWarn(t *testing.T) {
+	publicAskingClientCredentials, err := json.Marshal(oidc.DynamicClientRegistrationRequest{
+		RedirectURIs:            []string{"http://127.0.0.1:8765/callback"},
+		TokenEndpointAuthMethod: "none",
+		GrantTypes:              []string{"client_credentials"},
+	})
+	require.NoError(t, err)
+	publicWithHTTPS, err := json.Marshal(oidc.DynamicClientRegistrationRequest{
+		RedirectURIs:            []string{"https://spa.example.com/cb"},
+		TokenEndpointAuthMethod: "none",
+	})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		enabled bool
+		body    string
+		status  int
+		code    string
+		reason  string
+	}{
+		{"registration turned off", false, string(publicWithHTTPS), http.StatusForbidden,
+			"access_denied", "Dynamic client registration is not enabled"},
+		{"a body that isn't JSON", true, "{", http.StatusBadRequest,
+			oidc.DCRErrorInvalidClientMetadata, "Invalid request body"},
+		{"metadata the server refuses", true, string(publicAskingClientCredentials), http.StatusBadRequest,
+			oidc.DCRErrorInvalidClientMetadata, "a public client (token_endpoint_auth_method none) cannot use the client_credentials grant"},
+		{"a redirect URI the server refuses", true, string(publicWithHTTPS), http.StatusBadRequest,
+			oidc.DCRErrorInvalidRedirectURI, "public clients registered via DCR cannot use https redirect_uris (security restriction): https://spa.example.com/cb"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logs := logtest.CaptureSlog(t)
+			req := httptest.NewRequest(http.MethodPost, "/connect/register", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			req = req.WithContext(reqctx.WithSettings(req.Context(),
+				&record.Settings{Id: 1, DynamicClientRegistrationEnabled: tc.enabled}))
+			rr := httptest.NewRecorder()
+
+			HandleDynamicClientRegistrationPost(datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t),
+				testDataCipher).ServeHTTP(rr, req)
+
+			assert.Equal(t, tc.status, rr.Code)
+			assert.Equal(t, tc.code, decodeDCRError(t, rr).Error)
+			records := logs.Records()
+			require.Len(t, records, 1)
+			assert.Equal(t, slog.LevelWarn, records[0].Level)
+			assert.Equal(t, "client registration refused", records[0].Message)
+			assert.Equal(t, tc.code, records[0].Attrs["error_code"])
+			assert.Equal(t, tc.reason, records[0].Attrs["reason"])
+		})
+	}
+}
+
 // The two tests below drive writeDCRResponse directly, the only tests in this file below the
 // handler seam. DynamicClientRegistrationResponse holds strings, ints and string slices and cannot
 // fail to marshal, so no request reaches either branch through the handler (#435).
