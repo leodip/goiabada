@@ -13,7 +13,7 @@ There are three levels, from a setting in the admin console to your own copy of 
 
 <Steps>
 
-1. In the admin console, open **Admin**, **General** and set **App name**, up to 30 characters. It's the heading of the sign-in pages and the start of their titles, it signs every email, and it's the name authenticator apps list your users' accounts under.
+1. In the admin console, open **Admin**, **General** and set **App name**, up to 30 bytes, which is fewer characters with accents or in a non-Latin script. It's the heading of the sign-in pages and the start of their titles, it signs every email, and it's the name authenticator apps list your users' accounts under.
 
 2. Open **Admin**, **UI theme** and choose a color theme under **Theme selection**. It applies to the sign-in pages and the admin console alike. **Default** is the dark theme; the others are [daisyUI](https://daisyui.com/docs/themes/)'s built-in themes, such as `light`, `corporate` and `emerald`.
 
@@ -27,7 +27,7 @@ The pages come in English and Portuguese (Brazil). To add another language, you 
 
 <Steps>
 
-1. Get the English text of the release you run: `src/core/i18n/catalogs/active.en.toml` in [the source](https://github.com/leodip/goiabada) at that release's tag, such as `v1.6.0`. The release is in the image tag and in the `build information` line each server logs when it starts.
+1. Get the English text of the release you run: `src/core/i18n/catalogs/active.en.toml` in [the source](https://github.com/leodip/goiabada) at that release's tag, such as `v1.7.0`. The release is in the image tag and in the `build information` line each server logs when it starts.
 
 2. Copy it into a folder named `catalogs`, as `active.<language>.toml`, named with the language's [BCP 47](https://www.rfc-editor.org/info/bcp47) tag: `active.es.toml` for Spanish. Translate the text on the right of each `=` and leave the keys on the left as they are:
 
@@ -67,7 +67,8 @@ To change the layout of a page, or an email's body, you give a server its own co
 1. Copy the web files from the source of the release you run, since a template from another release may use data the server no longer passes to it:
 
    ```bash
-   git clone --depth 1 --branch v1.6.0 https://github.com/leodip/goiabada.git goiabada-source
+   RELEASE=v1.7.0   # replace with the release you run
+   git clone --depth 1 --branch "$RELEASE" https://github.com/leodip/goiabada.git goiabada-source
 
    mkdir authserver-web adminconsole-web
    cp -r goiabada-source/src/authserver/web/{template,static,tailwindcss} authserver-web/

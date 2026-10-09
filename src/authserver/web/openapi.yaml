@@ -11,7 +11,8 @@ info:
     ```
     Authorization: Bearer <access_token>
     ```
-    `getClientLogoImage` is the exception and is marked `security: []`: it is public.
+    `getClientLogoImage`, at `/client/logo/{clientIdentifier}` outside `/api/v1`, is
+    public and marked `security: []`.
 
     ## API Groups
 
@@ -3908,13 +3909,15 @@ components:
         The granular scopes stop short of administrators. An administrator is a user, group or
         client holding any of the six administrative permissions on the `authserver` resource
         (`manage`, `admin-read`, `manage-users`, `manage-clients`, `manage-settings`,
-        `browser-sessions`), a user directly or through any of its groups, and the admin
-        console's own client whatever it holds. Only `authserver:manage` creates an
-        administrator, changes one, or changes what reaches one: a granular scope reaching an
-        operation is still refused, with 403 MANAGE_SCOPE_REQUIRED, when the request grants or
-        revokes an administrative permission (directly, or by moving a user into or out of a
-        group holding one, or by deleting such a group), writes to an administrator, reads an
-        administrator client's secret, or changes the email or audit-log settings. It keeps
+        `browser-sessions`), a user directly or through any of its groups, the admin
+        console's own client whatever it holds, and a client allowed to request the
+        administrative scopes. Only `authserver:manage` creates an administrator, changes one,
+        or changes what reaches one: a granular scope reaching an operation is still refused,
+        with 403 MANAGE_SCOPE_REQUIRED, when the request grants or revokes an administrative
+        permission (directly, or by moving a user into or out of a group holding one, or by
+        deleting such a group), writes to an administrator, switches whether a client may
+        request the administrative scopes, reads an administrator client's secret, changes the
+        email or audit-log settings, or changes an administrative permission's description. It keeps
         full control of everyone else, and still reads administrators. `authserver:manage`
         alone meets 409 LAST_ADMINISTRATOR, on the operations that could leave no enabled user
         holding it.
@@ -4033,8 +4036,9 @@ components:
         holding any of the six administrative permissions (`manage`,
         `admin-read`, `manage-users`, `manage-clients`, `manage-settings`,
         `browser-sessions`), a user directly or through any of its groups,
-        and the admin console's own client whatever it holds. A granular
-        scope is refused here when it:
+        the admin console's own client whatever it holds, and a client
+        allowed to request the administrative scopes. A granular scope is
+        refused here when it:
           - grants or revokes an administrative permission, directly or by
             moving a user into or out of a group that holds one, or deletes
             such a group;
@@ -4044,8 +4048,11 @@ components:
             members, permissions, deletion), or an administrator client
             (settings, authentication, flows, redirect URIs, web origins,
             token settings, permissions, logo, deletion);
+          - switches whether a client may request the administrative scopes,
+            on or off, on any client;
           - reads an administrator client's secret;
-          - changes the email or the audit-log settings.
+          - changes the email or the audit-log settings;
+          - changes an administrative permission's description.
         Granular scopes still read administrators. The refusal is answered
         after the request's 400 and 404, writes nothing, carries
         `WWW-Authenticate: Bearer realm="goiabada", error="insufficient_scope",

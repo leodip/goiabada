@@ -86,13 +86,13 @@ Both servers add these headers to every answer:
 
 - **Secrets are encrypted** in the database with AES-256-GCM, under `GOIABADA_AES_ENCRYPTION_KEY`: client secrets, the SMTP password, authenticator seeds, emailed codes and the keys that sign tokens. See [Secrets](/deploy/secrets/#what-each-secret-protects).
 - **Authorization codes are stored as a digest.** The database holds each code's SHA-256, so a copy of it holds no code anyone could redeem. The identifier in a session cookie is stored the same way.
-- **The audit log leaves out what users type.** An email address typed into the sign-in, registration or forgot-password form is recorded only as a digest. See [the audit log's details](/concepts/audit-log/#details).
+- **The audit log leaves out what users type.** An email address typed into the sign-in, registration or forgot-password form is recorded only as a digest, unless it becomes an account's address, as when registering creates the account: `created_user` names it. See [the audit log's details](/concepts/audit-log/#details).
 
 ## The network
 
 - **Forwarded headers are ignored** until you turn on `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS`, so a client can't pick the IP address the rate limiter counts and the audit log records. See [client IP addresses](/reference/environment-variables/#client-ip-addresses).
 - **The admin console's calls to the auth server** are plain HTTP with the generated setups, carrying its client secret and administrators' tokens, which is sound only on a network you trust. See [the hop from the admin console to the auth server](/deploy/production-checklist/#the-hop-from-the-admin-console-to-the-auth-server).
-- **Browser calls across origins** are allowed only from the [web origins](/concepts/clients/#web-origins) registered on clients.
+- **Browser calls across origins** to `/auth/token`, `/auth/logout` and `/userinfo` are allowed only from the [web origins](/concepts/clients/#web-origins) registered on clients. Discovery and the JWKS answer any origin, since they're public, and nothing else answers a cross-origin call.
 
 ## Logs
 

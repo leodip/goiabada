@@ -194,7 +194,7 @@ A value of 0 uses the global setting. See [Tokens](/concepts/tokens/).
 
 Users see a client on the password, one-time code and consent screens. By default it's shown by its client identifier. On the **Settings** tab you can give it a **Display name** and a **Description**, up to 100 characters each, and a **Website URL**, which must be `http` or `https`. Each one shows only when its switch is on: **Show display name**, **Show description** and **Show website URL**.
 
-The **Logo** tab uploads a logo: JPEG, PNG, GIF or WebP, from 10x10 to 512x512 pixels, and up to 3MB (`GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` sets the limit). **Show logo** on the **Settings** tab puts it on the screens.
+The **Logo** tab uploads a logo: a JPEG, PNG, GIF or WebP file of up to 3 MiB, which you crop and which is uploaded scaled to at most 512 pixels on its longest side, a GIF as PNG. See [Logo and picture](/reference/endpoints/logo-and-picture/#uploading) for what the Admin API takes. **Show logo** on the **Settings** tab puts it on the screens.
 
 The logo is public, at `GET /client/logo/{clientIdentifier}`, with no sign-in, even while **Show logo** is off. It answers 404 when the client has no logo, and carries an `ETag` and `Cache-Control: public, max-age=300, must-revalidate`.
 

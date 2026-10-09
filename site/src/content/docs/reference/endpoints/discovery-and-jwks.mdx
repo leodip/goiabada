@@ -82,7 +82,7 @@ The auth server describes what it implements, which no setting changes but two: 
 | `subject_types_supported` | `public`: a user's `sub` is the same for every client |
 | `id_token_signing_alg_values_supported` | `RS256` |
 | `scopes_supported` | `openid`, `profile`, `email`, `address`, `phone`, `groups`, `attributes` and `offline_access`. Permission scopes aren't listed. See [Scopes](/concepts/scopes/). |
-| `claims_supported` | Every claim the auth server writes into a token or answers from `/userinfo` |
+| `claims_supported` | The claims about the user and the sign-in the auth server can supply, in ID tokens, access tokens and `/userinfo` |
 | `token_endpoint_auth_methods_supported` | `client_secret_post`, `client_secret_basic` and `none`, the last for a public client |
 | `code_challenge_methods_supported` | `S256`. See [PKCE](/concepts/pkce/). |
 | `request_parameter_supported` | `false`: a `request` object is refused |

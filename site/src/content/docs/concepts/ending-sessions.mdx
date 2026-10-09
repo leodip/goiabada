@@ -51,7 +51,7 @@ Your app signs a user out by sending them to [`/auth/logout`](/reference/endpoin
 
 Either way the browser's cookie is cleared, so its next sign-in starts from the password. A normal refresh token stops working once the session behind it has ended. Offline refresh tokens aren't tied to a session and keep working.
 
-A sign-out that ends the session leaves a `logout` entry in the audit log, and one that removes your app from a session other clients still use leaves `deleted_user_session_client`.
+A sign-out with a confirmed hint leaves `deleted_user_session_client` in the audit log, for your app leaving the session, and also `logout` when yours was the session's last client and the session ended. One without a hint leaves `logout`, even when there was no session, and `deleted_user_session` when there was one.
 
 ## Credential changes
 

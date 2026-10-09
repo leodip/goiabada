@@ -58,7 +58,7 @@ A sign-out the auth server can tie to your app happens at once. Any other asks t
 | A GET or a POST with a hint the auth server confirms | The user is signed out at once |
 | A GET with no hint, or with a hint it can't confirm | The user is asked, then signed out |
 | A POST with a hint it can't confirm | `303 See Other` to `GET /auth/logout`, which asks the user |
-| A POST from another site with no hint | `403 Forbidden`. See [Sign-out answers 403](/troubleshooting/sign-out-answers-403/). |
+| A POST from another origin with no hint, another site or another host of the same domain | `403 Forbidden`. See [Sign-out answers 403](/troubleshooting/sign-out-answers-403/). |
 
 A hint that can't be confirmed isn't an error your app sees: it only means the user is asked. The `303` keeps `post_logout_redirect_uri`, `state` and `ui_locales`, and drops `id_token_hint` and `client_id`.
 
@@ -78,7 +78,7 @@ The auth server confirms a hint when all of these hold:
 - When the browser holds a session, `sid` names that one.
 - When the session `sid` names is still there, it belongs to the user `sub` names.
 
-The ID token from a user's sign-in to your app passes all of these until it has both expired and lost its session.
+The ID token from a user's sign-in to your app passes all of these while the browser holds that session or none, until it has both expired and lost its session.
 
 ## What it ends
 
@@ -123,7 +123,7 @@ JavaScript can call `/auth/logout` across origins when its origin is registered 
 
 ## The audit log
 
-A sign-out that ends a session leaves a `logout` entry in the [audit log](/concepts/audit-log/), and one that removes your app from a session other clients still use leaves `deleted_user_session_client`.
+A sign-out with a confirmed hint leaves `deleted_user_session_client` in the [audit log](/concepts/audit-log/), for your app leaving the session, and also `logout` when yours was the session's last client and the session ended. One without a hint leaves `logout`, even when there was no session, and `deleted_user_session` when there was one.
 
 ## Next steps
 
