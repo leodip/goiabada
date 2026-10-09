@@ -229,7 +229,7 @@ func metricsHandler(reg *metrics.Registry) http.Handler {
 func (s *Server) registerRoutes() {
 	branches := s.initMiddleware()
 
-	s.serveStaticFiles("/static", http.FS(s.staticFS))
+	s.serveStaticFiles()
 
 	// Browsers auto-probe /favicon.ico at the site root regardless of the
 	// <link rel="icon"> tags; point it at the real asset under /static.
@@ -679,18 +679,15 @@ func bodyLimitPolicy(profilePictureMaxSizeBytes int64) httpmw.BodyLimitPolicy {
 	}
 }
 
-func (s *Server) serveStaticFiles(path string, root http.FileSystem) {
+// serveStaticFiles serves the embedded static files under /static/ and redirects /static to
+// /static/. They are mounted nowhere else, so neither the path nor the file system is a parameter.
+func (s *Server) serveStaticFiles() {
+	s.router.Get("/static", http.RedirectHandler("/static/", http.StatusMovedPermanently).ServeHTTP)
 
-	if path != "/" && path[len(path)-1] != '/' {
-		s.router.Get(path, http.RedirectHandler(path+"/", http.StatusMovedPermanently).ServeHTTP)
-		path += "/"
-	}
-	path += "*"
-
-	s.router.Get(path, func(w http.ResponseWriter, r *http.Request) {
+	s.router.Get("/static/*", func(w http.ResponseWriter, r *http.Request) {
 		rctx := chi.RouteContext(r.Context())
 		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
-		fsHandler := http.StripPrefix(pathPrefix, http.FileServer(root))
+		fsHandler := http.StripPrefix(pathPrefix, http.FileServer(http.FS(s.staticFS)))
 
 		cacheInSeconds := 5 * 60
 		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%v", cacheInSeconds))
