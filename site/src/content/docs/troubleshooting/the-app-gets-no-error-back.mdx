@@ -31,7 +31,8 @@ The auth server couldn't tell where to send an error, so it shows it to the user
 - a missing, unknown or disabled `client_id`, or a client without the authorization code flow;
 - a missing, malformed or unregistered `redirect_uri`, as [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/) explains;
 - a `response_mode` other than `query`, `fragment` or `form_post`: "Invalid response_mode parameter. Supported values are: query, fragment, form_post.";
-- a parameter sent twice, or one that isn't correctly encoded.
+- `client_id`, `redirect_uri`, `response_type` or `response_mode` sent twice, or a request that isn't correctly encoded;
+- **"This sign-in link is no longer valid."**: your app sent a POST to `/auth/authorize`, and the browser came back to its one-time link after it expired or was used.
 
 **Fix it:** the message on the page names the problem. Fix the request.
 
@@ -50,7 +51,6 @@ These end the sign-in on a page, and nothing is sent to your app:
 
 - **"This request is no longer active"**: another sign-in started in the same browser, such as in a second tab, and replaced this one.
 - **"This step is no longer available"**: the user went back in the browser to a step they had finished.
-- **"This sign-in link is no longer valid."**: your app sent a POST to `/auth/authorize`, and the browser came back to its one-time link after it expired or was used.
 - **"Your two-factor authentication settings changed"**: the user's authenticator changed while they were setting one up.
 
 **Fix it:** each one asks the user to go back to your app and start again, so let them. A new authorization request starts a new sign-in.

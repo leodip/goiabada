@@ -15,7 +15,7 @@ Your app refreshes, and the token endpoint answers `400`:
 {"error": "invalid_grant", "error_description": "This refresh token has been revoked."}
 ```
 
-Then the refresh token your app got from its previous refresh fails too, with "The refresh token is invalid." The audit log may hold a `refresh_token_replay_detected` [event](/concepts/audit-log/) for your client.
+Then the refresh token your app got from its previous refresh fails too, with the same "This refresh token has been revoked." The audit log may hold a `refresh_token_replay_detected` [event](/concepts/audit-log/) for your client.
 
 ## Why it happens
 
@@ -58,10 +58,11 @@ These refreshes answer `invalid_grant` too:
 | `error_description` | Why |
 |---|---|
 | "The refresh token is invalid (token has invalid claims: token is expired)." | The refresh token expired. An offline one expires after going unused for its idle timeout. |
-| "The refresh token is invalid because it was superseded." | The user's password was changed or reset, or the user was disabled. |
+| "The refresh token is invalid because it was superseded." | The user's password was changed or reset, or the user was disabled and has since been enabled again. |
 | "The refresh token is invalid because the associated session has expired or been terminated." | The session it was issued through ended, or the client was made public. |
 | "The refresh token is invalid because it has expired (offline_access_max_lifetime)." | An offline refresh token reached its maximum lifetime. |
-| "The refresh token is invalid." | The user is disabled, or the token is unknown or in a revoked family. |
+| "The refresh token is invalid." | The user is disabled, or the token is unknown. Rarely, a token issued while its family was being revoked. |
+| "The user has either not given consent to this client or the previously granted consent has been revoked." | The user withdrew their consent, under **Account**, **Manage consents**, or it was never given. Checked for an offline refresh token, and for any refresh token of a client that requires consent. |
 | "The refresh token is invalid because it does not belong to the client." | The request named a client other than the one the token was issued to. Each client refreshes only its own tokens. |
 
 ## Next steps
