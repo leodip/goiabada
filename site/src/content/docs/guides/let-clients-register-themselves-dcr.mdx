@@ -107,7 +107,7 @@ The auth server reads four fields, `redirect_uris`, `token_endpoint_auth_method`
 
 ## What a self-registered client gets
 
-It's enabled straight away, with an identifier made up of `dcr_` and a UUID that can't be changed later. Consent is on, its ACR level is `urn:goiabada:level2_optional`, and a public one always uses PKCE. A confidential one gets a secret, which the answer carries once, and which an administrator can read later on the client's **Authentication** tab. Its token lifetimes are copied from the server's settings when it registers. Apart from its identifier, an administrator can change any of it like any other client's. See [Self-registered clients](/concepts/clients/#self-registered-clients).
+It's enabled straight away, with an identifier made up of `dcr_` and a UUID that can't be changed later. Consent is on, its ACR level is `urn:goiabada:level2_optional`, and a public one always uses PKCE. A confidential one gets a secret, which the answer carries once, and which an administrator can read later on the client's **Authentication** tab. The implicit flow and ROPC are off on the client itself, so turning either on globally doesn't reach it. Its token lifetimes are copied from the server's settings when it registers. Apart from its identifier, an administrator can change any of it like any other client's. See [Self-registered clients](/concepts/clients/#self-registered-clients).
 
 ## Turning it off
 

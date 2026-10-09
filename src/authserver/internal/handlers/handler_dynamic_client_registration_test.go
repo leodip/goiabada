@@ -462,6 +462,40 @@ func TestHandleDynamicClientRegistrationPost_APublicClientIsWrittenWithThePublic
 	assert.Empty(t, response.ClientSecret, "a public client is answered no secret")
 }
 
+// A self-registered client has both legacy flows off on the client itself. Left unset, each switch
+// followed the global one, so turning the implicit flow or ROPC on under Admin, General gave it to
+// every client anyone had registered, though a registration asking for either is refused. Found
+// reviewing the DCR docs before 1.7.0.
+func TestHandleDynamicClientRegistrationPost_ASelfRegisteredClientNeverInheritsTheLegacyFlows(t *testing.T) {
+	for _, authMethod := range []string{"none", "client_secret_basic"} {
+		t.Run(authMethod, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			var created *record.Client
+			datamocks.ExpectRunInTransaction(database, dcrTx)
+			database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).
+				Run(func(args mock.Arguments) { created = args.Get(2).(*record.Client) }).Return(nil).Once()
+			database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
+			auditLogger.On("Log", mock.Anything, audit.EventDynamicClientRegistration, mock.Anything).Return().Once()
+
+			rr := serveDCR(t, oidc.DynamicClientRegistrationRequest{
+				RedirectURIs:            []string{"http://127.0.0.1:8765/callback"},
+				TokenEndpointAuthMethod: authMethod,
+			}, database, auditLogger)
+
+			require.Equal(t, http.StatusCreated, rr.Code)
+			require.NotNil(t, created)
+			require.NotNil(t, created.ImplicitGrantEnabled, "the implicit switch must be set, not left to the global one")
+			require.NotNil(t, created.ResourceOwnerPasswordCredentialsEnabled, "the ROPC switch must be set, not left to the global one")
+			assert.False(t, *created.ImplicitGrantEnabled)
+			assert.False(t, *created.ResourceOwnerPasswordCredentialsEnabled)
+			assert.False(t, created.IsImplicitGrantEnabled(true), "the global implicit setting on doesn't reach it")
+			assert.False(t, created.IsResourceOwnerPasswordCredentialsEnabled(true), "the global ROPC setting on doesn't reach it")
+		})
+	}
+}
+
 // The registration's audit entry records the client IP through the module's one reader, so it
 // names the address every other audit entry names: httptest's "192.0.2.1:1234" is recorded as
 // "192.0.2.1". This handler returned r.RemoteAddr as is until #435.
