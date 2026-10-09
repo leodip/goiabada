@@ -36,9 +36,7 @@ Two claims in every ID token and access token tell your app about the sign-in:
 
 </Steps>
 
-## How it works
-
-### Levels
+## Levels
 
 | Level | The user signs in with |
 |---|---|
@@ -48,13 +46,13 @@ Two claims in every ID token and access token tell your app about the sign-in:
 
 They're in that order, weakest first. A level satisfies itself and every level before it. Discovery lists the three in `acr_values_supported`.
 
-### Methods
+## Methods
 
 `amr` lists every method the user used, in the order they used them: `["pwd"]`, or `["pwd", "otp"]`. Goiabada never sends `mfa`: look for `otp` in `amr`, or check `acr`.
 
 Tokens from a refresh token carry the `acr` and `amr` of the sign-in they came from. Tokens from the [password grant](/legacy-flows/ropc/) carry `urn:goiabada:level1` and `["pwd"]`.
 
-### Which level a request asks for
+## Which level a request asks for
 
 The auth server takes the stronger of two levels: the client's **Default ACR level**, and the first value in `acr_values` it recognizes. The client's level is a floor, so `acr_values=urn:goiabada:level1` on a client set to `urn:goiabada:level2_mandatory` still asks for a code.
 
@@ -62,7 +60,7 @@ A value is recognized only when it's one of the three levels, exactly: `level1` 
 
 The level is fixed when the auth server accepts the request, so changing a client's level doesn't change sign-ins already under way.
 
-### A sign-in with no session
+## A sign-in with no session
 
 When the browser has no session with the auth server, the level and the user's two-factor authentication decide what they're asked for, and what your app gets:
 
@@ -77,7 +75,7 @@ When the browser has no session with the auth server, the level and the user's t
 
 `urn:goiabada:level2_optional` with only `pwd` is the level working as intended: the user hasn't set up two-factor authentication. If your app wants to nudge them to, that's the case to look for.
 
-### A session that's already there
+## A session that's already there
 
 A user who already signed in has a [session](/concepts/sessions/), and the session remembers the level it reached. Only a session of the user who's signing in counts: a session the browser holds for someone else counts as none.
 
@@ -90,7 +88,7 @@ When a user sets up or removes two-factor authentication, each of their sessions
 
 `acr` and `max_age` are separate checks. A session at a high enough level still asks for a sign-in when the user signed in longer ago than `max_age` allows. See [Sessions](/concepts/sessions/).
 
-### Setting up two-factor authentication during a sign-in
+## Setting up two-factor authentication during a sign-in
 
 At `urn:goiabada:level2_mandatory`, a user with no authenticator sets one up before they enter a code. The new authenticator is stored only while the account's two-factor settings are still the ones the sign-in read. If they change meanwhile, for example because the same user finished setting one up in another tab or on their account page, nothing is stored, and the sign-in ends on a page saying "Your two-factor authentication settings changed". That sign-in can't go on: the user goes back to the app and signs in again, which starts from the account's current settings.
 

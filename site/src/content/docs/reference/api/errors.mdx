@@ -18,16 +18,14 @@ Every error comes back as a JSON body with the same two fields:
 
 Decide what to do from the HTTP status first: a `4xx` is something your request can fix, and a `5xx` is a problem on the server. Then read `error_code` for the specific case, and show or log `error_description`.
 
-## How it works
-
-### The fields
+## The fields
 
 - **`error_code`** is a stable identifier for the failure. It's either an `UPPER_SNAKE` code from the table below, or, for a refused field the auth server can describe in several languages, a catalog key in dotted lowercase, such as `validator.email.invalid_format`.
 - **`error_description`** is a sentence for people. For a catalog key it's in the request's language; otherwise it's in English. Don't match on it: the wording can change, the code won't.
 
 The protocol endpoints, `/auth/authorize`, `/auth/token`, `/connect/register` and `/userinfo`, answer errors in the format their standards define, not this one. [Authorize](/reference/endpoints/authorize/), [Token](/reference/endpoints/token/) and [UserInfo](/reference/endpoints/userinfo/) cover theirs, and [self-registered clients](/concepts/clients/#self-registered-clients) the registration endpoint's.
 
-### Error codes
+## Error codes
 
 This is every `UPPER_SNAKE` code the two APIs answer.
 
@@ -66,7 +64,7 @@ This is every `UPPER_SNAKE` code the two APIs answer.
 | `INTERNAL_SERVER_ERROR` | `500` | The request failed inside the server. `error_description` ends with a request id an operator can find in the server's log. Retrying is reasonable. |
 | `KEY_SET_INCOMPLETE` | `500` | A signing key rotation found no current or no next key. That's a deployment problem a retry won't clear. `error_description` ends with a request id, as for `INTERNAL_SERVER_ERROR`. |
 
-### Saving a whole list
+## Saving a whole list
 
 An operation that replaces a whole list, such as a client's redirect URIs or a user's groups, also takes the list as you last read it, in a field named `expected` and the list's name, such as `expectedRedirectURIs`. When the stored list is no longer that one, because someone else saved it in between, the save is answered `409` with `CONCURRENT_UPDATE` and changes nothing. Read the list again, apply your change to it, and save again.
 

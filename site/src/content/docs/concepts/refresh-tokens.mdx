@@ -51,9 +51,7 @@ A refresh token is what your app trades for a new access token when the old one 
 
 </Steps>
 
-## How it works
-
-### How long a refresh token lasts
+## How long a refresh token lasts
 
 An offline refresh token's lifetimes are under **Admin**, **Tokens** in the admin console:
 
@@ -75,7 +73,7 @@ A normal refresh token follows the session it's tied to instead: it stops workin
 | When someone [ends the session](/concepts/ending-sessions/#end-a-session) | It's revoked | It's revoked |
 | When the user's [credentials change](/concepts/ending-sessions/#credential-changes) | It's revoked | It's revoked |
 
-### What a refresh checks
+## What a refresh checks
 
 A refresh is refused with `invalid_grant` when the token can't be used any more:
 
@@ -85,9 +83,9 @@ A refresh is refused with `invalid_grant` when the token can't be used any more:
 - the user no longer holds a permission the token carries;
 - the user withdrew their consent to your app, when it has **Consent required** on or the token is an offline one from a sign-in.
 
-A token issued to another client is refused with `invalid_grant`. The [token endpoint](/reference/endpoints/token/#refresh-token-grant) lists every answer, and `scope` can narrow one refresh's access token. [This refresh token has been revoked](/troubleshooting/this-refresh-token-has-been-revoked/#how-it-works) gives each `error_description` and why it happens.
+A token issued to another client is refused with `invalid_grant`. The [token endpoint](/reference/endpoints/token/#refresh-token-grant) lists every answer, and `scope` can narrow one refresh's access token. [This refresh token has been revoked](/troubleshooting/this-refresh-token-has-been-revoked/#other-reasons-a-refresh-fails) gives each `error_description` and why it happens.
 
-### Rotation
+## Rotation
 
 Every refresh rotates the token: the one your app sent is retired, and the answer carries its replacement. A refresh token is good for one refresh.
 
@@ -104,7 +102,7 @@ Two things send a retired token by accident:
 - **Parallel refreshes.** Two threads, tabs or instances notice the access token has expired, and each refreshes with the same refresh token. One wins. The other is either refused, or, when it reads the token after the winner retired it, treated as a replay. Share one refresh between them instead.
 - **Retrying after a lost answer.** The auth server rotated the token, but the answer never reached your app. Retrying sends the retired token. Treat a lost answer as "sign in again", not "retry".
 
-### Replay
+## Replay
 
 A retired refresh token coming back is a replay. The auth server can't tell whether an attacker copied it or your app sent it twice, so it assumes the worst, as [RFC 9700 section 4.14.2](https://www.rfc-editor.org/rfc/rfc9700.html#section-4.14.2) describes: it revokes every live token of the token's rotation family, which is every refresh token descended from the same sign-in, and records the family as revoked. A refresh still under way when that happens yields nothing usable, so the family can't keep rotating. Someone who stole a refresh token and lost the race to use it can't wait and rotate later.
 

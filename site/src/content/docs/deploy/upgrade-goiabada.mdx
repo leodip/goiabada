@@ -60,7 +60,7 @@ You don't migrate the database yourself. The auth server brings the schema up to
 </Steps>
 
 <Aside type="caution">
-Running the setup wizard again generates new secrets. Before you use its output for a deployment that already has a database, copy your existing secret values over the new ones, as [Secrets](/deploy/secrets/#how-it-works) explains: a new AES key can't decrypt the database.
+Running the setup wizard again generates new secrets. Before you use its output for a deployment that already has a database, copy your existing secret values over the new ones, as [Secrets](/deploy/secrets/#when-a-secret-changes) explains: a new AES key can't decrypt the database.
 </Aside>
 
 ## How migrations run

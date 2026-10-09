@@ -47,9 +47,7 @@ Turn it on only for an app that speaks nothing but the implicit flow and that yo
 
 **Implicit flow** on the **OAuth2 flows** tab has three choices: **Enabled**, **Disabled**, or inherit the global **Implicit flow enabled** under **Admin**, **General**, which is off in a new install.
 
-## How it works
-
-### Response types
+## Response types
 
 | `response_type` | What comes back |
 |---|---|
@@ -61,7 +59,7 @@ Turn it on only for an app that speaks nothing but the implicit flow and that yo
 
 Ask for `id_token token` when your app needs an access token. `at_hash` ties the access token to an ID token that carries your `nonce`, which is the one way your app can tell the access token was issued for its own request. With `id_token` alone there's no access token to call [UserInfo](/reference/endpoints/userinfo/) with, so the user's claims reach your app only when **Include OpenID Connect claims in the ID token** is on. It's on in a new install. See [Scopes](/concepts/scopes/).
 
-### What comes back
+## What comes back
 
 The browser comes back to your redirect URI with these parameters after the `#`:
 
@@ -78,7 +76,7 @@ There's **never a refresh token**: [RFC 6749 section 4.2.2](https://www.rfc-edit
 
 With `response_mode=form_post`, the same parameters are posted to your redirect URI by a page that sends a form on its own. `response_mode=query` is refused with `invalid_request`, since tokens never travel in the query. Errors come back the same way as tokens, after the `#` or posted: `error`, `error_description`, and `state` when your app sent one.
 
-### What the auth server checks
+## What the auth server checks
 
 The implicit flow goes through the same [authorization endpoint](/reference/endpoints/authorize/) as the authorization code flow, with the same checks, sign-in, [ACR levels](/concepts/acr-and-amr/), consent and [prompt](/concepts/prompt/). These rules are its own:
 
@@ -88,7 +86,7 @@ The implicit flow goes through the same [authorization endpoint](/reference/endp
 - **The setting is read again just before the tokens are issued,** so a sign-in under way when an administrator turns the flow off ends with `unauthorized_client` and no tokens.
 - **The tokens are tied to the user's session,** which must still be valid when they're issued. Each issue leaves a `token_issued_implicit_response` entry in the [audit log](/concepts/audit-log/).
 
-### Why it's deprecated
+## Why it's deprecated
 
 <Aside type="danger" title="The tokens travel in the address">
 The tokens are part of the address the browser lands on, so they can stay in the browser's history, leak to other sites through the `Referer` header, or be carried to an attacker through an open redirect on your site, since browsers keep the `#` part across a redirect ([RFC 9700 sections 4.1 to 4.3](https://www.rfc-editor.org/rfc/rfc9700.html#section-4.1)). **Never** use the implicit flow on a page that loads scripts or images from other sites.

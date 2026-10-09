@@ -44,8 +44,8 @@ const (
 )
 
 var (
-	implicitAnswerSection = conceptSection{implicitPage, "### What comes back"}
-	ropcErrorsSection     = conceptSection{ropcPage, "### Errors"}
+	implicitAnswerSection = conceptSection{implicitPage, "## What comes back"}
+	ropcErrorsSection     = conceptSection{ropcPage, "## Errors"}
 )
 
 // implicitAnswerParameters is every parameter an implicit response can carry, read off the
@@ -217,13 +217,13 @@ func TestLegacyFlowDocs_TheROPCErrorTableIsWhatTheGrantAnswers(t *testing.T) {
 // tables share, read through the Parameter column the implicit page uses.
 func TestLegacyFlowDocs_AParameterTableDisagreeingWithTheCodeFails(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/implicit.mdx", "### What comes back\n\n"+
+	writeConceptFixture(t, root, "site/implicit.mdx", "## What comes back\n\n"+
 		"| Parameter | When |\n|---|---|\n"+
 		"| `access_token` | Always |\n"+
 		"| `refresh_token` | Never sent |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertNamedTable(r, root, conceptSection{"site/implicit.mdx", "### What comes back"}, "Parameter",
+		assertNamedTable(r, root, conceptSection{"site/implicit.mdx", "## What comes back"}, "Parameter",
 			[]string{"access_token", "state"}, "the response")
 	})
 
@@ -231,8 +231,8 @@ func TestLegacyFlowDocs_AParameterTableDisagreeingWithTheCodeFails(t *testing.T)
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
 	want := []string{
-		"site/implicit.mdx: ### What comes back row 2 names refresh_token, which the response never carries",
-		"site/implicit.mdx: ### What comes back has no row for state",
+		"site/implicit.mdx: ## What comes back row 2 names refresh_token, which the response never carries",
+		"site/implicit.mdx: ## What comes back has no row for state",
 	}
 	if strings.Join(report.Errors, "\n") != strings.Join(want, "\n") {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
@@ -241,11 +241,11 @@ func TestLegacyFlowDocs_AParameterTableDisagreeingWithTheCodeFails(t *testing.T)
 
 func TestLegacyFlowDocs_AParameterTableAgreeingWithTheCodePasses(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/implicit.mdx", "### What comes back\n\n"+
+	writeConceptFixture(t, root, "site/implicit.mdx", "## What comes back\n\n"+
 		"| Parameter | When |\n|---|---|\n| `access_token` | Always |\n| `state` | When sent |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertNamedTable(r, root, conceptSection{"site/implicit.mdx", "### What comes back"}, "Parameter",
+		assertNamedTable(r, root, conceptSection{"site/implicit.mdx", "## What comes back"}, "Parameter",
 			[]string{"access_token", "state"}, "the response")
 	})
 
@@ -256,11 +256,11 @@ func TestLegacyFlowDocs_AParameterTableAgreeingWithTheCodePasses(t *testing.T) {
 
 func TestLegacyFlowDocs_AParameterTableWithoutItsColumnStops(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/implicit.mdx", "### What comes back\n\n"+
+	writeConceptFixture(t, root, "site/implicit.mdx", "## What comes back\n\n"+
 		"| Field | When |\n|---|---|\n| `access_token` | Always |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertNamedTable(r, root, conceptSection{"site/implicit.mdx", "### What comes back"}, "Parameter",
+		assertNamedTable(r, root, conceptSection{"site/implicit.mdx", "## What comes back"}, "Parameter",
 			[]string{"access_token"}, "the response")
 	})
 

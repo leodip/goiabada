@@ -65,7 +65,7 @@ These answer with an error code rather than an OAuth error:
 
 See [Errors](/reference/api/errors/) and [Scopes](/reference/api/scopes/).
 
-## How it works
+## When and where scopes are checked
 
 At `/auth/authorize`, a scope error is sent to your redirect URI. When the browser has no session yet, the auth server first asks the user to sign in, and sends the error after: [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/#the-user-sees-the-sign-in-page) explains why.
 

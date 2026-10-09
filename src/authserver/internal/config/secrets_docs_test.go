@@ -31,7 +31,7 @@ const (
 
 // contractSection is the section of the Kubernetes Secrets page holding the Secret contract: the
 // Secrets, keys and variables the generated manifests read.
-const contractSection = "### The Secrets the manifest reads"
+const contractSection = "## The Secrets the manifest reads"
 
 // docSection is one section of a page: the lines after its heading up to the next heading of the
 // same or a higher level. A section with no heading is the whole page.

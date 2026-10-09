@@ -36,8 +36,8 @@ const (
 type guideSection struct{ page, heading string }
 
 var (
-	signedInIDTokenSection = guideSection{webAppGuide, "### What the ID token says"}
-	serviceTokenSection    = guideSection{protectAnAPIGuide, "### What a service's token carries"}
+	signedInIDTokenSection = guideSection{webAppGuide, "## What the ID token says"}
+	serviceTokenSection    = guideSection{protectAnAPIGuide, "## What a service's token carries"}
 )
 
 // signedInIDTokenClaims is the claims of the ID token the authorization code grant issues for the

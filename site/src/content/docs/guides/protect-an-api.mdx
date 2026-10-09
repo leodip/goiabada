@@ -73,13 +73,11 @@ A service that calls your API on its own, with no user, such as a nightly job, g
 
 </Steps>
 
-## How it works
-
-### What a user's token carries
+## What a user's token carries
 
 An access token from a sign-in names the user in `sub`, and carries in `scope` the permission scopes your app asked for that the user holds, directly or through a group. A permission the user doesn't hold is left out without an error, so check `scope` rather than assuming your app got what it asked for. Its `aud` names the resource of each permission scope, and `authserver` too when the token carries an OpenID Connect scope, since the auth server's own `/userinfo` accepts it. [Tokens](/concepts/tokens/#the-access-token) lists every claim.
 
-### What a service's token carries
+## What a service's token carries
 
 A token from the client credentials flow names no user. Decoded, the one from the steps above looks like this:
 
@@ -103,11 +101,11 @@ The scope is the client's own permissions, never a user's. Leave `scope` out of 
 
 Only a confidential client can use the flow, since its client secret is all it proves itself with. Keep the secret in the service's secret store or environment, never in code, and give each service a client of its own, so you can replace one's secret without touching the others.
 
-### The keys
+## The keys
 
 Fetch the key set from `/certs` once and cache it, then pick the key whose `kid` matches the one in the token's header. When a token names a `kid` your cache doesn't have, fetch the set again: the auth server publishes the next signing key before it signs anything with it, so a fresh copy has it. See [the key set](/reference/endpoints/discovery-and-jwks/#the-key-set).
 
-### What your API can't see
+## What your API can't see
 
 Your API trusts a valid token until it expires. Ending the user's session, disabling them or changing their password stops the next refresh, not a token already issued. That's why access tokens are short, 5 minutes in a new install.
 
@@ -115,7 +113,7 @@ Your API trusts a valid token until it expires. Ending the user's session, disab
 If an operation must stop the moment a user is disabled or their session is ended, check the signature and also call [`/userinfo`](/reference/endpoints/userinfo/) with the token: the auth server refuses it from then on. That works for a token carrying `openid`. See [what ending a session doesn't reach](/concepts/ending-sessions/#what-it-doesnt-reach).
 </Aside>
 
-### When something goes wrong
+## When something goes wrong
 
 - The app gets `error=invalid_scope`, or a token without the permission: see [invalid_scope](/troubleshooting/invalid-scope/).
 - The service gets `unauthorized_client`: **Client credentials flow** is off for its client, or the client is public.

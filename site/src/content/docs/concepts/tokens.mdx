@@ -54,9 +54,7 @@ A decoded access token looks like this:
 }
 ```
 
-## How it works
-
-### How long tokens last
+## How long tokens last
 
 These settings are under **Admin**, **Tokens** in the admin console, and apply to every client:
 
@@ -72,7 +70,7 @@ Keep the lifetime short. An access token can't be taken back once it's issued: a
 
 An authorization code works once, for 60 seconds. [Refresh tokens](/concepts/refresh-tokens/#how-long-a-refresh-token-lasts) have lifetimes of their own.
 
-### The access token
+## The access token
 
 | Claim | |
 |---|---|
@@ -94,7 +92,7 @@ User claims, `groups` and `attributes` come on top, as [Scopes](/concepts/scopes
 
 **`auth_state_generation` is reserved.** It's how the auth server tells a token issued before the user's credentials last changed from one issued after. Don't parse it, compare it between tokens or build anything on it: its meaning can change.
 
-### The ID token
+## The ID token
 
 | Claim | |
 |---|---|
@@ -111,13 +109,13 @@ User claims, `groups` and `attributes` come on top, as [Scopes](/concepts/scopes
 
 User claims, `groups` and `attributes` come on top, as [Scopes](/concepts/scopes/#where-the-claims-go) describes. `auth_time` is never simply when the token was issued: a sign-in that reused a session, [`prompt=none`](/concepts/prompt/) included, keeps the time the user last signed in, which is what `max_age` is measured against.
 
-### Which scopes a token gets
+## Which scopes a token gets
 
 The scope your app asks for isn't always the scope it gets. Once the user has signed in, the auth server drops every [permission scope](/concepts/scopes/#permission-scopes) the user doesn't hold, directly or through a group, without an error. OpenID Connect scopes and `offline_access` are always kept. If that leaves nothing, the request ends with `access_denied`, "The user is not authorized to access any of the requested scopes".
 
 What's left is what the [consent screen](/concepts/clients/#consent-required) asks about, when it's shown. The user can untick scopes there, and the tokens carry only the ones they approved.
 
-### Checked again before a code is issued
+## Checked again before a code is issued
 
 A user can sit on the consent screen for as long as they like, so just before it issues the code, or the implicit flow's tokens, the auth server checks the request again, in this order:
 

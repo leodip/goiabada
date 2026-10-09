@@ -33,15 +33,13 @@ Your app doesn't call this endpoint itself: it sends the user's browser there. T
 
 If the request is refused, the browser comes back with `error` and `error_description` in place of `code`, for example `?error=invalid_scope&error_description=...&state=af0ifjsldkj`. Some refusals never come back: see [When an error reaches your app](#when-an-error-reaches-your-app).
 
-## How it works
-
-### GET or POST
+## GET or POST
 
 Both work, as OpenID Connect requires. A GET carries the parameters in the query string. A POST carries them in an `application/x-www-form-urlencoded` body and is answered with a `303 See Other` to a GET that carries a one-time `request_handle` in their place. The browser follows it on its own, and the sign-in continues from that GET.
 
 The link works once, for five minutes, and only on its own: a `request_handle` sent twice, or beside any of the parameters below, is refused on a page at `400 Bad Request` with "This sign-in link is no longer valid. It may have expired, it may have been used already, or it may have been changed. Go back to the application you were signing in to and start again."
 
-### Parameters
+## Parameters
 
 | Parameter | Required | |
 |---|---|---|
@@ -64,7 +62,7 @@ PKCE is required for every [public client](/concepts/clients/#public-and-confide
 
 `acr_values` and `ui_locales` are never refused. An `acr_values` with no level the auth server knows is ignored, and so is a malformed `ui_locales`; beyond ten language tags or 256 bytes, the rest is ignored. A parameter the auth server doesn't read, such as `login_hint`, `display` or `claims`, is ignored too.
 
-### What the auth server checks
+## What the auth server checks
 
 The auth server checks the request before it shows the user anything. A check it can't answer by sending the browser back to your app is answered on a page, with nothing sent to your app. Those come first, in this order:
 
@@ -101,7 +99,7 @@ Every other check is answered with an error response to your redirect URI, carry
 
 Once the request passes, the user signs in, unless the browser's session is enough, and goes through the one-time code and consent steps the request needs. See [prompt](/concepts/prompt/), [ACR and AMR](/concepts/acr-and-amr/) and [Sessions](/concepts/sessions/).
 
-### When an error reaches your app
+## When an error reaches your app
 
 The auth server never sends a browser to a client's redirect URI with an error before the person at that browser has signed in, as [RFC 9700 section 4.11.2](https://www.rfc-editor.org/rfc/rfc9700.html#section-4.11.2) requires. Otherwise a link carrying one bad parameter would turn the auth server into a redirector, sending anyone who clicked it to an address of the client's choosing. So an error from the second table above reaches your app in one of these ways, the first that applies:
 
@@ -114,7 +112,7 @@ The auth server never sends a browser to a client's redirect URI with an error b
 
 The error, its description, the response mode and `state` are the same whichever way it's sent. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/) for what each case looks like.
 
-### Administrative scopes
+## Administrative scopes
 
 Only a client [allowed to request the administrative scopes](/concepts/clients/#administrative-scopes), the admin console's own client or one an operator has allowed, may ask for `authserver:manage`, `authserver:admin-read`, `authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings` or `authserver:browser-sessions`. Any other client asking for one is refused with `invalid_scope`, naming the first such scope it asked for, and gets no code and no token. The request is refused, never narrowed to the scopes that remain:
 
@@ -127,7 +125,7 @@ It's delivered as every other refusal above is, in the response mode the request
 
 The allowance is read again just before the code or the implicit flow's tokens are issued, so a sign-in under way when an operator switches a client's allowance off ends with the same answer.
 
-### The response
+## The response
 
 A successful response carries `code`, and `state` when your app sent one. An error response carries `error`, `error_description`, and `state` when your app sent one. `error_description` is English, holds no character outside those RFC 6749 allows in it, and is at most 512 bytes.
 

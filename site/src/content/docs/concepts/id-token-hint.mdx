@@ -26,9 +26,7 @@ This page helps your app make sure a sign-in comes back for the user it expects.
 
 </Steps>
 
-## How it works
-
-### What the auth server checks
+## What the auth server checks
 
 The hint must be an ID token the auth server signed, with its issuer in `iss` and a `sub`. Access tokens and refresh tokens are refused, although the same key signs them.
 
@@ -44,7 +42,7 @@ A hint that fails a check is refused with `invalid_request`:
 
 That error reaches your app like any other error in the request: at once when the request has `prompt=none`, or when the browser has a valid session and the request doesn't have `prompt=login`, and otherwise after the user signs in. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/).
 
-### What the hint changes
+## What the hint changes
 
 | The browser has | With `prompt=none` | Without it |
 |---|---|---|
@@ -56,7 +54,7 @@ Without `prompt=none`, whoever then signs in has to be the hinted user. If someo
 
 With [`prompt=login`](/concepts/prompt/#promptlogin), the user signs in again even over their own session, and it still has to be the hinted user. Send the two together to confirm it's still the same person before a sensitive operation.
 
-### Signing out
+## Signing out
 
 `/auth/logout` takes an `id_token_hint` too, with rules of its own, an encrypted hint among them. See [Logout](/reference/endpoints/logout/#what-a-hint-must-pass).
 

@@ -105,7 +105,7 @@ The database is at a schema version this release has no migration for, so a newe
 
 Install the newer release again. To go back to this release for good, run the newer release's `goiabada-authserver migrate to <version>` first, naming the version the message gives, then install this one. [Roll back to an earlier release](/deploy/upgrade-goiabada/#roll-back-to-an-earlier-release) has the procedure.
 
-## How it works
+## How a start migrates the database
 
 A starting auth server opens the database, takes the migration lock, runs every migration its release carries that the database hasn't had, and releases the lock, all before it listens. It writes these records on the way:
 

@@ -33,9 +33,7 @@ This page helps you plan a Goiabada deployment on a Kubernetes cluster.
 
 You also need `kubectl` configured for the cluster, and the setup wizard on the machine you run it from.
 
-## How it works
-
-### What runs where
+## What runs where
 
 ```
 Internet → Gateway (HTTPS) → auth.example.com  → goiabada-authserver Service (9090)   → auth server pods
@@ -47,7 +45,7 @@ auth server pods   → your database
 
 The admin console calls the auth server's API at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, which the wizard sets to `http://goiabada-authserver:9090`: straight to the Service, without passing the gateway. That hop is plain HTTP, and it carries the admin console's client secret, its refresh token and administrators' tokens. It's sound on a pod network you trust; [Encrypt the hop to the auth server](/deploy/kubernetes/security/#encrypt-the-hop-to-the-auth-server) has what to do when it isn't.
 
-### What the wizard generates
+## What the wizard generates
 
 The wizard writes two files. `goiabada-k8s.yaml` holds no secret, so you can commit it:
 

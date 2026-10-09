@@ -64,7 +64,7 @@ Each server serves its metrics on a listener of its own, `GET /metrics` on port 
 Don't publish the metrics ports to fix a scrape. The listener has no authentication, so keep it off every Service, route, proxy and Compose `ports:` entry, and let only your scraper reach it.
 </Aside>
 
-## How it works
+## The metrics listener
 
 The metrics listener answers only `GET /metrics`, and isn't part of the application's routes. A scrape is neither logged nor counted in the request metrics, so the server's own logs don't show your scraper's attempts. A port it can't bind stops the server at start, as the other listeners' do.
 

@@ -82,7 +82,7 @@ sudo systemctl start goiabada-authserver
 Change the owner of the whole directory, `-R` included. A database file you give to the right user beside a `goiabada.db-wal` that still belongs to root fails the same way.
 </Aside>
 
-## How it works
+## Why it fails at the first write
 
 SQLite opens a file it can't write read-only rather than refusing it. A read-only database connects, so the auth server only finds out at its first write. On an upgrade, that's the migration's first step, recording the version it's about to apply, which is why the second message names `schema_migrations`. A directory it can't write fails sooner, since the database runs in WAL mode and SQLite can't create its WAL files.
 

@@ -61,7 +61,7 @@ The sign-in can end on **Sign-in failed** after the password, when the browser r
 - "The admin console could not complete the sign-in with the auth server. This usually means the console's client secret or the auth server's address is wrong." Check the internal URL as above. If it answers, the client secret is the likelier cause: see [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-admin-consoles-client-secret-changed).
 - "The auth server's answer could not be verified. This usually means the admin console and the auth server disagree about the issuer or the client." The admin console couldn't fetch the auth server's signing keys from `/certs` at the internal URL, or the ID token didn't name the issuer the auth server reports.
 
-## How it works
+## The connection to the auth server
 
 The hop from the admin console to the auth server carries the admin console's client secret and administrators' tokens. With an `http` internal URL it's plain HTTP, which is sound on a network you trust, such as a Docker Compose network or a cluster's pod network. When the network isn't trusted, use an `https` internal URL to the auth server's own HTTPS listener, whose certificate names the host the admin console calls.
 

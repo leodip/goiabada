@@ -52,9 +52,7 @@ The admin console signs administrators in through its own client, `admin-console
 **There are no backup codes.** An administrator who loses their authenticator needs another administrator to turn it off for them. Give `authserver:manage` to at least two people before you require a code, or you can **never** sign in again once the only one loses their phone. See [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-last-administrator-cant-sign-in).
 </Aside>
 
-## How it works
-
-### Setting up an authenticator
+## Setting up an authenticator
 
 A user can set up an authenticator before any client requires one, in the admin console under **Account**, **Two-factor authentication**: they scan the QR code, enter their password and the code the app shows, and click **Enable OTP**. A client at level 2, the level new clients start with, then asks them for a code too.
 
@@ -62,13 +60,13 @@ At level 3, a user with no authenticator sets one up during the sign-in, on the 
 
 The authenticator app lists the account under the auth server's **App name** and the user's email address.
 
-### The code
+## The code
 
 The code is a time-based one-time password ([RFC 6238](https://www.rfc-editor.org/rfc/rfc6238)): six digits, a new one every 30 seconds. The auth server also accepts the code from the 30 seconds before and after, so a phone whose clock is a little off still works.
 
 Each code works once. Sent again, it's refused, and the [audit log](/concepts/audit-log/) records `otp_code_replay_detected`. With the rate limiter on, each user gets 5 wrong codes in 15 minutes, and then waits. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
 
-### Users who are already signed in
+## Users who are already signed in
 
 A user whose session already reached the client's level isn't asked for anything: the session is reused, and the tokens say `urn:goiabada:level2_mandatory` and `["pwd", "otp"]` from the sign-in that earned it.
 
@@ -78,13 +76,13 @@ A user who signed in to another app with a password alone isn't asked for their 
 
 When a user sets up or removes an authenticator, every session of theirs goes through the code step again before it's used for a level above `urn:goiabada:level1`.
 
-### A user who lost their authenticator
+## A user who lost their authenticator
 
 An administrator opens **Admin**, **Users**, the user, and their **Authentication** tab, turns off **Two-factor authentication enabled**, and saves. At level 3, the user sets up a new authenticator at their next sign-in.
 
 A user who still has their authenticator can turn it off themselves, with their password, under **Account**, **Two-factor authentication** and **Disable OTP**. At level 3, they then set up a new one at their next sign-in to your app.
 
-### What a code can't protect
+## What a code can't protect
 
 - **A silent request** (`prompt=none`) can't show the code page. When a code is due, it gets `interaction_required`. See [prompt](/concepts/prompt/#the-silent-checks).
 - **The password grant** ([ROPC](/legacy-flows/ropc/)) can't ask for a code, so it refuses every user who has an authenticator.

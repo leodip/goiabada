@@ -54,9 +54,7 @@ Each of these means the server caught something and refused it. One entry is wor
 
 Two more are worth watching. A run of `auth_ceremony_mismatch` against one client is a page trying to act on sign-ins its users never started. And `redemption_refused_redirect_uri` means someone who held a valid code and its PKCE verifier tried to redeem it after you removed its redirect URI.
 
-## How it works
-
-### Where events go
+## Where events go
 
 Goiabada writes each event to two places, and **Audit log settings** has a switch for each. Both are on by default.
 
@@ -71,11 +69,11 @@ Recording an event never fails the request that raised it. If an event can't be 
 If the database is what you're auditing, keep the console switch on too, so your events also reach a log collector outside it.
 </Aside>
 
-### The request id
+## The request id
 
 Every entry carries the id of the request that raised it. That's the `X-Request-Id` the client or a proxy sent, or one Goiabada generated when none came. Use it to find the request's own log lines next to the event. It's not proof of who sent the request, since a client can send any id it likes.
 
-### Retention
+## Retention
 
 | Setting | Default | Range |
 |---|---|---|
@@ -83,7 +81,7 @@ Every entry carries the id of the request that raised it. That's the `X-Request-
 
 A background worker runs every 12 hours and deletes stored events older than the retention. It deletes at most 100,000 per run, 1,000 at a time, so a big backlog clears over several runs. It runs whatever the database switch says, so events you stored earlier still age out after you turn that switch off.
 
-### The `audit_logs` table
+## The `audit_logs` table
 
 Each stored event is one row:
 
@@ -95,7 +93,7 @@ Each stored event is one row:
 | `details` | The details, as JSON text. |
 | `request_id` | The id of the request that raised it, or empty when there was none. |
 
-### Details
+## Details
 
 The details are a JSON object saying who and what. Which keys an entry has depends on its event, and the table below lists every key the auth server writes.
 
@@ -181,7 +179,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `user_id` | The user's row id. |
 | `user_session_id` | The row id of a user's session. |
 
-### The Admin API
+## The Admin API
 
 - [`GET /api/v1/admin/audit-logs`](/reference/api/admin/operations/getauditlogs/) lists stored events, newest first, a page at a time: `page`, `size` (20 unless you ask, at most 200), and the `auditEvent` and `requestId` filters, each an exact match.
 - [`GET /api/v1/admin/audit-logs/event-types`](/reference/api/admin/operations/getauditeventtypes/) returns every event name the server can write. The viewer's event list comes from here, so it includes events that haven't happened yet.
@@ -189,11 +187,11 @@ An email address typed into a form nobody has signed in to is recorded only as `
 
 Reading any of these needs `authserver:admin-read`, `authserver:manage-settings` or `authserver:manage`. Changing the settings needs `authserver:manage`.
 
-### Every event
+## Every event
 
 This is every event the auth server writes, grouped by what raises it. The viewer's event list holds the same names. "An administrator" means whoever called the Admin API, which is what the admin console does for you.
 
-#### Sign-in
+### Sign-in
 
 | Event | Meaning |
 |---|---|
@@ -215,7 +213,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `issuance_refused_redirect_uri` | The last step of a sign-in was refused because the client's redirect URI was removed while the user was signing in. Nothing was sent to the client. |
 | `administrative_scope_refused` | A client that isn't allowed to ask for the administrative scopes asked for one on a signed-in user's behalf, and was refused. |
 
-#### Sign-out and sessions
+### Sign-out and sessions
 
 | Event | Meaning |
 |---|---|
@@ -225,7 +223,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `terminated_user_session` | A session was ended by an administrator, by its own user, or by another user signing in on the same browser, and its codes and refresh tokens were revoked. |
 | `revoked_user_auth_state` | A user's password was reset or changed, or the user was disabled, so their sessions and refresh tokens were revoked. A user changing their own password keeps the session they did it from. |
 
-#### Tokens
+### Tokens
 
 | Event | Meaning |
 |---|---|
@@ -240,7 +238,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `refresh_token_replay_detected` | A refresh token that had already been rotated came back, so the rest of its family was revoked. |
 | `redemption_refused_redirect_uri` | The token endpoint refused an authorization code because its redirect URI was removed from the client after the code was issued. |
 
-#### Registration and emailed links
+### Registration and emailed links
 
 | Event | Meaning |
 |---|---|
@@ -250,7 +248,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `requested_password_reset` | Someone sent the forgot-password form. `outcome` says whether a reset link was sent, or why not. |
 | `failed_reset_password_code` | A password reset link was refused, because it was unknown, expired or already used, or no longer valid for its account. |
 
-#### A user's own account
+### A user's own account
 
 These come from the Account API, which users reach through the admin console's account pages.
 
@@ -270,7 +268,7 @@ These come from the Account API, which users reach through the admin console's a
 | `disabled_otp` | A user's authenticator was removed, by the user or by an administrator. |
 | `deleted_own_user_consent` | A user withdrew the consent they had given a client. |
 
-#### Users
+### Users
 
 | Event | Meaning |
 |---|---|
@@ -292,7 +290,7 @@ These come from the Account API, which users reach through the admin console's a
 | `deleted_user_consent` | An administrator deleted a consent a user had given a client. |
 | `deleted_user` | An administrator deleted a user. |
 
-#### Groups
+### Groups
 
 | Event | Meaning |
 |---|---|
@@ -307,14 +305,14 @@ These come from the Account API, which users reach through the admin console's a
 | `user_added_to_group` | An administrator added a user to a group. One entry per group. |
 | `user_removed_from_group` | An administrator removed a user from a group. One entry per group. |
 
-#### Administrators
+### Administrators
 
 | Event | Meaning |
 |---|---|
 | `administrative_permission_changed` | Who is an administrator changed: an administrative permission was granted or revoked, or a user joined or left a group holding one. |
 | `administrator_change_refused` | An Admin API request was refused because only `authserver:manage` may make that change. |
 
-#### Clients
+### Clients
 
 | Event | Meaning |
 |---|---|
@@ -334,7 +332,7 @@ These come from the Account API, which users reach through the admin console's a
 | `deleted_client_logo` | An administrator removed a client's logo. |
 | `deleted_client` | An administrator deleted a client. |
 
-#### Resources
+### Resources
 
 | Event | Meaning |
 |---|---|
@@ -343,7 +341,7 @@ These come from the Account API, which users reach through the admin console's a
 | `updated_resource_permissions` | An administrator changed the permissions a resource defines: added, renamed, described or deleted them. Granting a permission writes a different event. |
 | `deleted_resource` | An administrator deleted a resource. |
 
-#### Settings and keys
+### Settings and keys
 
 | Event | Meaning |
 |---|---|

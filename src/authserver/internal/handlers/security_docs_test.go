@@ -24,7 +24,7 @@ import (
 
 const securityPage = "site/src/content/docs/reference/security.mdx"
 
-var securityHeadersSection = conceptSection{securityPage, "### Response headers"}
+var securityHeadersSection = conceptSection{securityPage, "## Response headers"}
 
 // securityHeaders is every header httpmw.SecurityHeaders sets on an https deployment's answers, with
 // its value. Over http it leaves out Strict-Transport-Security, which the page says in the row.
@@ -52,13 +52,13 @@ func TestSecurityDocs_TheHeadersTableIsWhatTheMiddlewareSets(t *testing.T) {
 
 func TestSecurityDocs_AHeadersTableDisagreeingWithTheMiddlewareFails(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/security.mdx", "### Response headers\n\n"+
+	writeConceptFixture(t, root, "site/security.mdx", "## Response headers\n\n"+
 		"| Header | Value |\n|---|---|\n"+
 		"| `Referrer-Policy` | `no-referrer` |\n"+
 		"| `X-XSS-Protection` | `1` |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertValueTable(r, root, conceptSection{"site/security.mdx", "### Response headers"}, "Header", "Value",
+		assertValueTable(r, root, conceptSection{"site/security.mdx", "## Response headers"}, "Header", "Value",
 			map[string]string{"Referrer-Policy": "same-origin", "X-Frame-Options": "DENY"}, "the middleware")
 	})
 
@@ -66,9 +66,9 @@ func TestSecurityDocs_AHeadersTableDisagreeingWithTheMiddlewareFails(t *testing.
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
 	want := []string{
-		"site/security.mdx: ### Response headers row 1 gives Referrer-Policy as no-referrer, where the middleware has same-origin",
-		"site/security.mdx: ### Response headers row 2 names X-XSS-Protection, which the middleware never has",
-		"site/security.mdx: ### Response headers has no row for X-Frame-Options",
+		"site/security.mdx: ## Response headers row 1 gives Referrer-Policy as no-referrer, where the middleware has same-origin",
+		"site/security.mdx: ## Response headers row 2 names X-XSS-Protection, which the middleware never has",
+		"site/security.mdx: ## Response headers has no row for X-Frame-Options",
 	}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)

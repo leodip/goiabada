@@ -184,9 +184,7 @@ A few rules make these work:
 
 Each limit that trips writes a `rate_limit_exceeded` [audit event](/concepts/audit-log/), once per key and window on each replica.
 
-## How it works
-
-### Values
+## Values
 
 The servers trim spaces around every value. An empty number or switch counts as unset and takes its default, but an empty text value is just empty: that's how an empty listen host turns a listener off.
 
@@ -194,7 +192,7 @@ A number, switch or duration that doesn't parse stops the server at start. It pr
 
 Each server accepts only the flags of the variables it reads. Give the admin console a flag only the auth server reads, or the other way round, and it refuses to start.
 
-### Listen addresses
+## Listen addresses
 
 A listen host is an address on the server's own machine, not its public URL. It decides which of the machine's addresses accept connections.
 
@@ -204,7 +202,7 @@ A listen host is an address on the server's own machine, not its public URL. It 
 
 Each server needs at least one listener. With both off, it refuses to start.
 
-### Client IP addresses
+## Client IP addresses
 
 The rate limiter counts by client IP address, and the audit log records it. With `TRUST_PROXY_HEADERS` off, the server uses the address of whatever connected to it. Behind a proxy, that's the proxy, so every client looks the same, and every user shares one rate limit: see [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
 
@@ -216,7 +214,7 @@ Once you set `TRUSTED_PROXIES`, it must include the proxy that connects to Goiab
 A client that reaches Goiabada without going through your proxy can claim any address it likes. Make sure the proxy is the only way in. See [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/).
 </Aside>
 
-### Session keys
+## Session keys
 
 Each server seals its sessions with its own pair of keys: a 64-byte authentication key and a 32-byte encryption key. Generate a fresh pair for each server, and for each deployment:
 
@@ -236,7 +234,7 @@ To rotate the keys without signing anyone out:
 
 A sign-in still in progress when you remove them may have to start again. Skip the `_PREVIOUS` variables altogether and everyone simply signs in again once. [Rotate secrets](/deploy/rotate-secrets/#the-session-keys) has the commands for each platform.
 
-### The data encryption key
+## The data encryption key
 
 `GOIABADA_AES_ENCRYPTION_KEY` encrypts the secrets the auth server stores: client secrets, the SMTP password, verification and password-reset codes, authenticator seeds, and the private keys that sign tokens. Only the auth server needs it.
 
@@ -250,7 +248,7 @@ If you lose this key, every secret and signing key in the database is lost with 
 
 To rotate it, set `GOIABADA_AES_ENCRYPTION_KEY` to a new key and `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` to the old one, then restart the auth server. At start, it re-encrypts everything under the new key in one transaction. Leaving the previous key set across restarts is harmless, but remove it once the rotation is done. If the data decrypts under neither key, the auth server refuses to start rather than risk damaging it. [Rotate secrets](/deploy/rotate-secrets/#the-aes-key) has the procedure for each platform, and [Back up the AES key](/deploy/secrets/#back-up-the-aes-key) where to keep the key.
 
-### The first start
+## The first start
 
 When the auth server starts on an empty database, it creates the first administrator from `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD`, and a client for the admin console. How it gets that client's secret depends on what you set:
 
@@ -260,7 +258,7 @@ When the auth server starts on an empty database, it creates the first administr
 
 On every later start, the database already holds the administrator and the client, and none of these variables does anything on the auth server. Changed one and can't sign in? See [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/).
 
-### The connection pool
+## The connection pool
 
 The four pool settings apply to PostgreSQL, MySQL and SQL Server. SQLite always uses one connection, though the values are still checked there. A value out of range stops the server at start, as does an idle limit above the open limit. A request that finds every connection busy waits for one.
 
@@ -268,7 +266,7 @@ The lifetime and idle time hand connections back over time, so they move to a ne
 
 With several replicas, each opens its own pool against the one database. [High availability](/deploy/kubernetes/high-availability/#scale-out) shows how to size it against your database's connection limit.
 
-### SQLite
+## SQLite
 
 For a SQLite file that survives restarts, point `GOIABADA_DB_DSN` at a file, with a busy timeout and write-ahead logging:
 
@@ -278,7 +276,7 @@ GOIABADA_DB_DSN='file:/var/lib/goiabada/goiabada.db?_pragma=busy_timeout=5000&_p
 
 The busy timeout makes a request wait up to 5 seconds for a lock instead of failing at once. Write-ahead logging lets reads carry on while a write is in progress.
 
-### Time zone
+## Time zone
 
 Both servers also read `TZ`, the standard variable, with no `GOIABADA_` prefix and no flag. It sets the zone of the log timestamps and of the times the servers format. Use an IANA name such as `Europe/Lisbon`, or an absolute path to a zone file, either one optionally after a leading `:`.
 

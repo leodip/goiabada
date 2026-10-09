@@ -33,8 +33,8 @@ const (
 type conceptSection struct{ page, heading string }
 
 var (
-	silentChecksSection = conceptSection{promptPage, "### The silent checks"}
-	signInLevelsSection = conceptSection{acrAndAmrPage, "### A sign-in with no session"}
+	silentChecksSection = conceptSection{promptPage, "## The silent checks"}
+	signInLevelsSection = conceptSection{acrAndAmrPage, "## A sign-in with no session"}
 )
 
 // silentRefusalWorlds is one prompt=none request per refusal, in the order decideSilentAuthentication
@@ -173,13 +173,13 @@ func TestConceptDocs_TheSignInTableIsWhatTheCeremonyEndsWith(t *testing.T) {
 
 func TestConceptDocs_ASilentChecksTableOutOfOrderFails(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/prompt.mdx", "### The silent checks\n\n"+
+	writeConceptFixture(t, root, "site/prompt.mdx", "## The silent checks\n\n"+
 		"| Check | `error` | `error_description` |\n|---|---|---|\n"+
 		"| The user is enabled | `access_denied` | \"The user account is disabled\" |\n"+
 		"| A session | `login_required` | \"User authentication is required\" |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSilentChecksTable(r, root, conceptSection{"site/prompt.mdx", "### The silent checks"}, []silentRefusal{
+		assertSilentChecksTable(r, root, conceptSection{"site/prompt.mdx", "## The silent checks"}, []silentRefusal{
 			{"login_required", "User authentication is required"},
 			{"access_denied", "The user account is disabled"},
 		})
@@ -189,8 +189,8 @@ func TestConceptDocs_ASilentChecksTableOutOfOrderFails(t *testing.T) {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
 	want := []string{
-		`site/prompt.mdx: ### The silent checks row 1 says access_denied "The user account is disabled", the code's refusal 1 is login_required "User authentication is required"`,
-		`site/prompt.mdx: ### The silent checks row 2 says login_required "User authentication is required", the code's refusal 2 is access_denied "The user account is disabled"`,
+		`site/prompt.mdx: ## The silent checks row 1 says access_denied "The user account is disabled", the code's refusal 1 is login_required "User authentication is required"`,
+		`site/prompt.mdx: ## The silent checks row 2 says login_required "User authentication is required", the code's refusal 2 is access_denied "The user account is disabled"`,
 	}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
@@ -199,13 +199,13 @@ func TestConceptDocs_ASilentChecksTableOutOfOrderFails(t *testing.T) {
 
 func TestConceptDocs_ASilentChecksTableMissingARefusalFails(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/prompt.mdx", "### The silent checks\n\n"+
+	writeConceptFixture(t, root, "site/prompt.mdx", "## The silent checks\n\n"+
 		"| Check | `error` | `error_description` |\n|---|---|---|\n"+
 		"| A session | `login_required` | \"User authentication is required\" |\n"+
 		"| A row no code answers | `login_required` | \"Something else\" |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSilentChecksTable(r, root, conceptSection{"site/prompt.mdx", "### The silent checks"}, []silentRefusal{
+		assertSilentChecksTable(r, root, conceptSection{"site/prompt.mdx", "## The silent checks"}, []silentRefusal{
 			{"login_required", "User authentication is required"},
 			{"login_required", "Something else"},
 			{"access_denied", "The user account is disabled"},
@@ -215,7 +215,7 @@ func TestConceptDocs_ASilentChecksTableMissingARefusalFails(t *testing.T) {
 	if report.Stopped {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
-	want := []string{`site/prompt.mdx: ### The silent checks has no row for the code's refusal 3, access_denied "The user account is disabled"`}
+	want := []string{`site/prompt.mdx: ## The silent checks has no row for the code's refusal 3, access_denied "The user account is disabled"`}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
 	}
@@ -223,18 +223,18 @@ func TestConceptDocs_ASilentChecksTableMissingARefusalFails(t *testing.T) {
 
 func TestConceptDocs_ASilentChecksTableWithAnExtraRowFails(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/prompt.mdx", "### The silent checks\n\n"+
+	writeConceptFixture(t, root, "site/prompt.mdx", "## The silent checks\n\n"+
 		"| Check | `error` | `error_description` |\n|---|---|---|\n"+
 		"| A session | `login_required` | \"User authentication is required\" |\n"+
 		"| A row no code answers | `login_required` | \"Something else\" |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSilentChecksTable(r, root, conceptSection{"site/prompt.mdx", "### The silent checks"}, []silentRefusal{
+		assertSilentChecksTable(r, root, conceptSection{"site/prompt.mdx", "## The silent checks"}, []silentRefusal{
 			{"login_required", "User authentication is required"},
 		})
 	})
 
-	want := []string{`site/prompt.mdx: ### The silent checks row 2 says login_required "Something else", which the code never answers`}
+	want := []string{`site/prompt.mdx: ## The silent checks row 2 says login_required "Something else", which the code never answers`}
 	if report.Stopped || !slices.Equal(report.Errors, want) {
 		t.Errorf("failures %+v\nwant\n%q", report, want)
 	}
@@ -242,14 +242,14 @@ func TestConceptDocs_ASilentChecksTableWithAnExtraRowFails(t *testing.T) {
 
 func TestConceptDocs_ASilentChecksTableAgreeingWithTheCodePasses(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/prompt.mdx", "### The silent checks\n\n"+
+	writeConceptFixture(t, root, "site/prompt.mdx", "## The silent checks\n\n"+
 		"| Check | `error` | `error_description` |\n|---|---|---|\n"+
 		"| A session | `login_required` | \"User authentication is required\" |\n"+
 		"| The user is enabled | `access_denied` | \"The user account is disabled\" |\n\n"+
-		"### Next\n\n| Check | `error` | `error_description` |\n|---|---|---|\n| Other | `x` | \"y\" |\n")
+		"## Next\n\n| Check | `error` | `error_description` |\n|---|---|---|\n| Other | `x` | \"y\" |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSilentChecksTable(r, root, conceptSection{"site/prompt.mdx", "### The silent checks"}, []silentRefusal{
+		assertSilentChecksTable(r, root, conceptSection{"site/prompt.mdx", "## The silent checks"}, []silentRefusal{
 			{"login_required", "User authentication is required"},
 			{"access_denied", "The user account is disabled"},
 		})
@@ -262,11 +262,11 @@ func TestConceptDocs_ASilentChecksTableAgreeingWithTheCodePasses(t *testing.T) {
 
 func TestConceptDocs_ASilentChecksTableWithoutItsColumnsStops(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/prompt.mdx", "### The silent checks\n\n"+
+	writeConceptFixture(t, root, "site/prompt.mdx", "## The silent checks\n\n"+
 		"| Check | `error` | Description |\n|---|---|---|\n| A session | `login_required` | User authentication is required |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSilentChecksTable(r, root, conceptSection{"site/prompt.mdx", "### The silent checks"},
+		assertSilentChecksTable(r, root, conceptSection{"site/prompt.mdx", "## The silent checks"},
 			[]silentRefusal{{"login_required", "User authentication is required"}})
 	})
 
@@ -277,29 +277,29 @@ func TestConceptDocs_ASilentChecksTableWithoutItsColumnsStops(t *testing.T) {
 
 func TestConceptDocs_AMissingSilentChecksSectionStops(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/prompt.mdx", "### Silent checks\n\n"+
+	writeConceptFixture(t, root, "site/prompt.mdx", "## Silent checks\n\n"+
 		"| Check | `error` | `error_description` |\n|---|---|---|\n| A session | `login_required` | \"x\" |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSilentChecksTable(r, root, conceptSection{"site/prompt.mdx", "### The silent checks"},
+		assertSilentChecksTable(r, root, conceptSection{"site/prompt.mdx", "## The silent checks"},
 			[]silentRefusal{{"login_required", "x"}})
 	})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, "### The silent checks") {
+	if !report.Stopped || !strings.Contains(report.Fatal, "## The silent checks") {
 		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
 	}
 }
 
 func TestConceptDocs_ASignInTableDisagreeingWithTheCodeFails(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/acr.mdx", "### A sign-in with no session\n\n"+
+	writeConceptFixture(t, root, "site/acr.mdx", "## A sign-in with no session\n\n"+
 		"| Level | User has two-factor authentication | `acr` | `amr` |\n|---|---|---|---|\n"+
 		"| `urn:goiabada:level1` | No | `urn:goiabada:level1` | `[\"pwd\"]` |\n"+
 		"| `urn:goiabada:level2_optional` | No | `urn:goiabada:level2_optional` | `[\"pwd\", \"otp\"]` |\n"+
 		"| `urn:goiabada:level3` | No | `urn:goiabada:level3` | `[\"pwd\"]` |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSignInTable(r, root, conceptSection{"site/acr.mdx", "### A sign-in with no session"}, []signInLevel{
+		assertSignInTable(r, root, conceptSection{"site/acr.mdx", "## A sign-in with no session"}, []signInLevel{
 			{record.AcrLevel1, false, "urn:goiabada:level1", `["pwd"]`},
 			{record.AcrLevel2Optional, false, "urn:goiabada:level2_optional", `["pwd"]`},
 			{record.AcrLevel2Mandatory, true, "urn:goiabada:level2_mandatory", `["pwd", "otp"]`},
@@ -310,9 +310,9 @@ func TestConceptDocs_ASignInTableDisagreeingWithTheCodeFails(t *testing.T) {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
 	want := []string{
-		`site/acr.mdx: ### A sign-in with no session row 2 says urn:goiabada:level2_optional, No ends with acr urn:goiabada:level2_optional and amr ["pwd", "otp"], the code ends it with acr urn:goiabada:level2_optional and amr ["pwd"]`,
-		`site/acr.mdx: ### A sign-in with no session row 3 names urn:goiabada:level3, No, which is no level and answer the code has`,
-		`site/acr.mdx: ### A sign-in with no session has no row for urn:goiabada:level2_mandatory, Yes`,
+		`site/acr.mdx: ## A sign-in with no session row 2 says urn:goiabada:level2_optional, No ends with acr urn:goiabada:level2_optional and amr ["pwd", "otp"], the code ends it with acr urn:goiabada:level2_optional and amr ["pwd"]`,
+		`site/acr.mdx: ## A sign-in with no session row 3 names urn:goiabada:level3, No, which is no level and answer the code has`,
+		`site/acr.mdx: ## A sign-in with no session has no row for urn:goiabada:level2_mandatory, Yes`,
 	}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
@@ -321,18 +321,18 @@ func TestConceptDocs_ASignInTableDisagreeingWithTheCodeFails(t *testing.T) {
 
 func TestConceptDocs_ASignInTableNamingARowTwiceFails(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/acr.mdx", "### A sign-in with no session\n\n"+
+	writeConceptFixture(t, root, "site/acr.mdx", "## A sign-in with no session\n\n"+
 		"| Level | User has two-factor authentication | `acr` | `amr` |\n|---|---|---|---|\n"+
 		"| `urn:goiabada:level1` | No | `urn:goiabada:level1` | `[\"pwd\"]` |\n"+
 		"| `urn:goiabada:level1` | No | `urn:goiabada:level1` | `[\"pwd\"]` |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSignInTable(r, root, conceptSection{"site/acr.mdx", "### A sign-in with no session"}, []signInLevel{
+		assertSignInTable(r, root, conceptSection{"site/acr.mdx", "## A sign-in with no session"}, []signInLevel{
 			{record.AcrLevel1, false, "urn:goiabada:level1", `["pwd"]`},
 		})
 	})
 
-	want := []string{`site/acr.mdx: ### A sign-in with no session row 2 repeats urn:goiabada:level1, No`}
+	want := []string{`site/acr.mdx: ## A sign-in with no session row 2 repeats urn:goiabada:level1, No`}
 	if report.Stopped || !slices.Equal(report.Errors, want) {
 		t.Errorf("failures %+v\nwant\n%q", report, want)
 	}
@@ -340,13 +340,13 @@ func TestConceptDocs_ASignInTableNamingARowTwiceFails(t *testing.T) {
 
 func TestConceptDocs_ASignInTableAgreeingWithTheCodePasses(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/acr.mdx", "### A sign-in with no session\n\n"+
+	writeConceptFixture(t, root, "site/acr.mdx", "## A sign-in with no session\n\n"+
 		"| Level | User has two-factor authentication | `acr` | `amr` |\n|---|---|---|---|\n"+
 		"| `urn:goiabada:level1` | No | `urn:goiabada:level1` | `[\"pwd\"]` |\n"+
 		"| `urn:goiabada:level2_mandatory` | Yes | `urn:goiabada:level2_mandatory` | `[\"pwd\", \"otp\"]` |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSignInTable(r, root, conceptSection{"site/acr.mdx", "### A sign-in with no session"}, []signInLevel{
+		assertSignInTable(r, root, conceptSection{"site/acr.mdx", "## A sign-in with no session"}, []signInLevel{
 			{record.AcrLevel1, false, "urn:goiabada:level1", `["pwd"]`},
 			{record.AcrLevel2Mandatory, true, "urn:goiabada:level2_mandatory", `["pwd", "otp"]`},
 		})
@@ -359,14 +359,14 @@ func TestConceptDocs_ASignInTableAgreeingWithTheCodePasses(t *testing.T) {
 
 func TestConceptDocs_ASignInSectionWithNoTableStops(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/acr.mdx", "### A sign-in with no session\n\nLevel 1 asks for a password.\n")
+	writeConceptFixture(t, root, "site/acr.mdx", "## A sign-in with no session\n\nLevel 1 asks for a password.\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSignInTable(r, root, conceptSection{"site/acr.mdx", "### A sign-in with no session"},
+		assertSignInTable(r, root, conceptSection{"site/acr.mdx", "## A sign-in with no session"},
 			[]signInLevel{{record.AcrLevel1, false, "urn:goiabada:level1", `["pwd"]`}})
 	})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, "### A sign-in with no session") {
+	if !report.Stopped || !strings.Contains(report.Fatal, "## A sign-in with no session") {
 		t.Errorf("a section with no table did not stop the check naming it: %+v", report)
 	}
 }

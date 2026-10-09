@@ -101,17 +101,15 @@ A self-registered client is never sent an error. When a sign-in fails, the user 
 
 Every registration leaves a `dynamic_client_registration` entry in the [audit log](/concepts/audit-log/), with the new client, its grant types, whether it's public, and the IP address it came from.
 
-## How it works
-
-### What a registration may ask for
+## What a registration may ask for
 
 The auth server reads four fields, `redirect_uris`, `token_endpoint_auth_method`, `grant_types` and `client_name`, and ignores the rest. A registration can't ask for the [legacy flows](/legacy-flows/implicit/), and a public client can't ask for `client_credentials`. Redirect URIs follow stricter rules than for clients you create, since nobody has checked who's asking: a public client gets loopback `http` and custom schemes such as `myapp://callback`, and a confidential one `https` and loopback `http`. So a single-page app can't register itself: create it in the admin console. [Dynamic client registration](/reference/endpoints/dynamic-client-registration/) has every field, rule and error.
 
-### What a self-registered client gets
+## What a self-registered client gets
 
 It's enabled straight away, with an identifier made up of `dcr_` and a UUID that can't be changed later. Consent is on, its ACR level is `urn:goiabada:level2_optional`, and a public one always uses PKCE. A confidential one gets a secret, which the answer carries once, and which an administrator can read later on the client's **Authentication** tab. Its token lifetimes are copied from the server's settings when it registers. Apart from its identifier, an administrator can change any of it like any other client's. See [Self-registered clients](/concepts/clients/#self-registered-clients).
 
-### Turning it off
+## Turning it off
 
 Turning **Dynamic client registration enabled** off stops new registrations: `/connect/register` answers `403` with `access_denied`, and discovery stops carrying `registration_endpoint`. Clients that already registered keep working. To stop one, disable or delete it.
 

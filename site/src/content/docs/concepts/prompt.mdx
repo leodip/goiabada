@@ -45,15 +45,13 @@ Leave `prompt` out and the auth server decides: it uses the browser's session wh
 A client that [registered itself](/concepts/clients/#self-registered-clients) gets no error back from a silent request: the auth server never redirects an error to one. Treat a silent request that doesn't come back as "send the user through an ordinary sign-in". See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/).
 </Aside>
 
-## How it works
-
-### Values
+## Values
 
 Separate values with a single space. `login` and `consent` go together: `prompt=login consent` asks the user to sign in and then shows the consent screen. `none` goes alone, and `none` with anything else is refused with `invalid_request`, as is a value Goiabada doesn't know.
 
 `select_account` is defined by OpenID Connect, but the auth server can't ask a user to choose an account, so it's refused with `account_selection_required`. Discovery lists the three values it supports in `prompt_values_supported`.
 
-### The silent checks
+## The silent checks
 
 With `prompt=none`, the auth server makes the checks it would otherwise show the user a page for, in this order, and answers with the first that fails:
 
@@ -75,7 +73,7 @@ When every check passes, the auth server issues the code and records the session
 
 The auth server redirects each error to your redirect URI with your `state`, in the request's response mode. A request with `prompt=none` that fails validation, such as one with a scope that doesn't exist, is answered at once too, rather than after a sign-in.
 
-### prompt=login
+## prompt=login
 
 The auth server doesn't use the browser's session to skip the sign-in, or to skip any part of it: whoever is at the browser enters a password, and a one-time code too whenever the request's level needs one, whatever the session already gave. The ID token's `acr`, `amr` and `auth_time` all describe this sign-in.
 
@@ -86,7 +84,7 @@ What happens to the session that was in the browser depends on who signs in:
 
 `max_age` can ask for a sign-in too, but only when the last one is older than the number of seconds it gives. Use `prompt=login` when you always want a fresh sign-in, and `max_age` when a recent one is enough. With both, `prompt=login` wins.
 
-### prompt=consent
+## prompt=consent
 
 The auth server shows the consent screen after the sign-in, even when the user has already approved every scope your app asks for. Use it when your app should hear the user's answer again, for example after it starts asking for more. See [Consent required](/concepts/clients/#consent-required).
 

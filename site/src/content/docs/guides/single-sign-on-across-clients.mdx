@@ -32,9 +32,7 @@ That's [single sign-on](/concepts/glossary/#single-sign-on-sso), and there's not
 
 </Steps>
 
-## How it works
-
-### When the user is still asked something
+## When the user is still asked something
 
 A session saves the user their password, not every step. A sign-in through it still shows a page when:
 
@@ -43,13 +41,13 @@ A session saves the user their password, not every step. A sign-in through it st
 - **The request asks for a password.** `prompt=login`, a `max_age` shorter than the time since the user last entered their password, or an `id_token_hint` naming another user each ask for the password whatever the session. See [prompt](/concepts/prompt/#promptlogin) and [Sessions](/concepts/sessions/#ask-for-a-recent-sign-in).
 - **The session can't be used.** It has been idle too long or reached its maximum lifetime, so the user signs in again. See [How long a session lasts](/concepts/sessions/#how-long-a-session-lasts). A user who has been disabled can't sign in at all: the request ends with `access_denied`.
 
-### How long it lasts
+## How long it lasts
 
 One session serves every client, so its lifetimes apply to all of them. They're under **Admin**, **Sessions** in the admin console: by default a session ends after 2 hours idle, and after 24 hours whatever happens. A sign-in to any app through the session counts as activity, and so does a refresh with a normal [refresh token](/concepts/refresh-tokens/) from it.
 
 Each app's tokens keep their own lifetimes, set under **Admin**, **Tokens**, or on the client's **Tokens** tab. See [How long tokens last](/concepts/tokens/#how-long-tokens-last).
 
-### Signing out
+## Signing out
 
 When the user signs out of one app with its ID token as the hint, the auth server removes only that app from the session. The other apps the user signed in to stay signed in, and their normal refresh tokens keep working. The browser's session cookie is cleared, though, so the next sign-in in that browser asks for the password, for every app. See [Sign users out](/guides/sign-users-out/).
 

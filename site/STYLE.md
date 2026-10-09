@@ -26,7 +26,8 @@ Every page under `src/content/docs` follows this guide, and every docs change do
 - Every page has the same shape:
   1. One sentence on what the page helps you do.
   2. The common path, using Starlight's `<Steps>` for any procedure.
-  3. A "How it works" section with the precise rules.
+  3. The precise rules, in sections titled for what each covers, such as "How long tokens last"
+     or "How redirect URIs are checked". Never a generic "How it works".
   4. Next steps cards.
 
 ## Formatting

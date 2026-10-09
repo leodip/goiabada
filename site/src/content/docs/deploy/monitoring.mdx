@@ -256,7 +256,7 @@ What each one is for:
 
 Alert as well on the scrape itself failing, Prometheus's `up` series at 0 for Goiabada's targets, and on pods restarting, which Kubernetes reports through kube-state-metrics rather than Goiabada. When a scrape fails, see [Metrics are not scraped](/troubleshooting/metrics-are-not-scraped/).
 
-## How it works
+## What the listener serves
 
 The metrics listener answers `GET /metrics` in the Prometheus text exposition format, and any other path with a 404. It isn't part of the application's routes: a scrape is neither logged nor counted in the request metrics.
 
@@ -264,7 +264,7 @@ A label only ever takes a value from a set declared in the code when the metric 
 
 Prometheus adds the `job`, `instance` and, on Kubernetes, `pod` and `container` labels itself. A metric both servers expose has the same name, labels and meaning on each, so one query covers both, and those labels tell them apart.
 
-### Metrics catalog
+## Metrics catalog
 
 Every metric Goiabada exposes, with each label and the values it can take:
 

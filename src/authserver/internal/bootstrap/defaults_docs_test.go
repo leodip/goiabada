@@ -32,16 +32,16 @@ type defaultsSection struct {
 }
 
 var defaultsSections = []defaultsSection{
-	{"site/src/content/docs/concepts/tokens.mdx", "### How long tokens last", []string{
+	{"site/src/content/docs/concepts/tokens.mdx", "## How long tokens last", []string{
 		"Token expiration in seconds",
 		"Include OpenID Connect claims in the access token",
 		"Include OpenID Connect claims in the ID token",
 	}},
-	{"site/src/content/docs/concepts/refresh-tokens.mdx", "### How long a refresh token lasts", []string{
+	{"site/src/content/docs/concepts/refresh-tokens.mdx", "## How long a refresh token lasts", []string{
 		"Offline refresh token - idle timeout in seconds",
 		"Offline refresh token - max lifetime in seconds",
 	}},
-	{"site/src/content/docs/concepts/sessions.mdx", "### How long a session lasts", []string{
+	{"site/src/content/docs/concepts/sessions.mdx", "## How long a session lasts", []string{
 		"User session - idle timeout in seconds",
 		"User session - max lifetime in seconds",
 	}},
@@ -81,13 +81,13 @@ func TestConceptDocs_TheDefaultsAreWhatTheSeedWrites(t *testing.T) {
 
 func TestConceptDocs_ADefaultsTableDisagreeingWithTheSeedFails(t *testing.T) {
 	root := t.TempDir()
-	writeDefaultsFixture(t, root, "site/sessions.mdx", "### How long a session lasts\n\n"+
+	writeDefaultsFixture(t, root, "site/sessions.mdx", "## How long a session lasts\n\n"+
 		"| Setting | Default |\n|---|---|\n"+
 		"| **User session - idle timeout in seconds** | 3600 (an hour) |\n"+
 		"| **User session - lifetime** | 86400 (a day) |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertDefaultsTable(r, root, defaultsSection{"site/sessions.mdx", "### How long a session lasts", []string{
+		assertDefaultsTable(r, root, defaultsSection{"site/sessions.mdx", "## How long a session lasts", []string{
 			"User session - idle timeout in seconds",
 			"User session - max lifetime in seconds",
 		}}, map[string]string{
@@ -100,9 +100,9 @@ func TestConceptDocs_ADefaultsTableDisagreeingWithTheSeedFails(t *testing.T) {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
 	want := []string{
-		"site/sessions.mdx: ### How long a session lasts row 1 says User session - idle timeout in seconds starts at 3600, the seed writes 7200",
-		"site/sessions.mdx: ### How long a session lasts row 2 names User session - lifetime, which is none of the settings it owes",
-		"site/sessions.mdx: ### How long a session lasts has no row for User session - max lifetime in seconds",
+		"site/sessions.mdx: ## How long a session lasts row 1 says User session - idle timeout in seconds starts at 3600, the seed writes 7200",
+		"site/sessions.mdx: ## How long a session lasts row 2 names User session - lifetime, which is none of the settings it owes",
+		"site/sessions.mdx: ## How long a session lasts has no row for User session - max lifetime in seconds",
 	}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
@@ -111,14 +111,14 @@ func TestConceptDocs_ADefaultsTableDisagreeingWithTheSeedFails(t *testing.T) {
 
 func TestConceptDocs_ADefaultsTableAgreeingWithTheSeedPasses(t *testing.T) {
 	root := t.TempDir()
-	writeDefaultsFixture(t, root, "site/tokens.mdx", "### How long tokens last\n\n"+
+	writeDefaultsFixture(t, root, "site/tokens.mdx", "## How long tokens last\n\n"+
 		"| Setting | Default |\n|---|---|\n"+
 		"| **Token expiration in seconds** | 300 (5 minutes) |\n"+
 		"| **Include OpenID Connect claims in the ID token** | On |\n\n"+
-		"### Next\n\n| Setting | Default |\n|---|---|\n| **Token expiration in seconds** | 1 |\n")
+		"## Next\n\n| Setting | Default |\n|---|---|\n| **Token expiration in seconds** | 1 |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertDefaultsTable(r, root, defaultsSection{"site/tokens.mdx", "### How long tokens last", []string{
+		assertDefaultsTable(r, root, defaultsSection{"site/tokens.mdx", "## How long tokens last", []string{
 			"Token expiration in seconds",
 			"Include OpenID Connect claims in the ID token",
 		}}, map[string]string{
@@ -134,25 +134,25 @@ func TestConceptDocs_ADefaultsTableAgreeingWithTheSeedPasses(t *testing.T) {
 
 func TestConceptDocs_AMissingDefaultsSectionStops(t *testing.T) {
 	root := t.TempDir()
-	writeDefaultsFixture(t, root, "site/tokens.mdx", "### Lifetimes\n\n"+
+	writeDefaultsFixture(t, root, "site/tokens.mdx", "## Lifetimes\n\n"+
 		"| Setting | Default |\n|---|---|\n| **Token expiration in seconds** | 300 |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertDefaultsTable(r, root, defaultsSection{"site/tokens.mdx", "### How long tokens last",
+		assertDefaultsTable(r, root, defaultsSection{"site/tokens.mdx", "## How long tokens last",
 			[]string{"Token expiration in seconds"}}, map[string]string{"Token expiration in seconds": "300"})
 	})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, "### How long tokens last") {
+	if !report.Stopped || !strings.Contains(report.Fatal, "## How long tokens last") {
 		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
 	}
 }
 
 func TestConceptDocs_ADefaultsSectionWithNoTableStops(t *testing.T) {
 	root := t.TempDir()
-	writeDefaultsFixture(t, root, "site/tokens.mdx", "### How long tokens last\n\nFive minutes.\n")
+	writeDefaultsFixture(t, root, "site/tokens.mdx", "## How long tokens last\n\nFive minutes.\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertDefaultsTable(r, root, defaultsSection{"site/tokens.mdx", "### How long tokens last",
+		assertDefaultsTable(r, root, defaultsSection{"site/tokens.mdx", "## How long tokens last",
 			[]string{"Token expiration in seconds"}}, map[string]string{"Token expiration in seconds": "300"})
 	})
 

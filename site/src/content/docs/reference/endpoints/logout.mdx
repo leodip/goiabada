@@ -35,9 +35,7 @@ It's OpenID Connect's [RP-Initiated Logout 1.0](https://openid.net/specs/openid-
 
 </Steps>
 
-## How it works
-
-### The request
+## The request
 
 `/auth/logout` takes a GET and a POST, with the same parameters. On a GET they go in the query string. On a POST they go in an `application/x-www-form-urlencoded` body, and the query string is read too, so send each parameter once.
 
@@ -51,7 +49,7 @@ It's OpenID Connect's [RP-Initiated Logout 1.0](https://openid.net/specs/openid-
 
 There's no separate list of post-logout redirect URIs: the client's redirect URIs are the list.
 
-### Whether the user is asked
+## Whether the user is asked
 
 A sign-out the auth server can tie to your app happens at once. Any other asks the user first, with "Are you sure you want to sign out?", as RP-Initiated Logout requires, and happens when they click **Yes**:
 
@@ -66,7 +64,7 @@ A hint that can't be confirmed isn't an error your app sees: it only means the u
 
 A POST is worth it when you send a hint, because it keeps the ID token out of the address bar, the browser's history and the `Referer` header. A self-submitting form on your app's page does it.
 
-### What a hint must pass
+## What a hint must pass
 
 The auth server confirms a hint when all of these hold:
 
@@ -82,13 +80,13 @@ The auth server confirms a hint when all of these hold:
 
 The ID token from a user's sign-in to your app passes all of these until it has both expired and lost its session.
 
-### What it ends
+## What it ends
 
 **With a confirmed hint,** the auth server removes your app from the session the hint's `sid` names. The session ends when your app was the last client on it, so the user stays signed in to the other apps sharing it. **Without one,** once the user clicks **Yes**, the browser's whole session ends.
 
 Either way, the browser's session cookie is cleared, so its next sign-in starts with the password.
 
-### Where the user lands
+## Where the user lands
 
 The browser goes to your `post_logout_redirect_uri` with a `302 Found` when:
 
@@ -101,7 +99,7 @@ Otherwise the user lands on the auth server's "Signed out" page, "You have been 
 
 The sign-out has already happened by then: a request the auth server can't honour in full still signs the user out.
 
-### Encrypting the hint
+## Encrypting the hint
 
 An encrypted hint keeps the ID token unreadable in logs and the browser's history. It's a JWE, the signed ID token encrypted as [OpenID Connect Core 1.0 section 2](https://openid.net/specs/openid-connect-core-1_0.html#IDToken) describes a nested JWT, with this protected header:
 
@@ -115,15 +113,15 @@ The key is the SHA-256 of the client's secret, as UTF-8, which is 32 bytes. The 
 
 Only a confidential client can encrypt a hint, since a public client has no secret.
 
-### Errors
+## Errors
 
 `/auth/logout` never sends your app an error. Apart from the `403` above, the one failure is the auth server's own: when its database or session store fails, it shows an error page with `500 Internal Server Error`, and the sign-out may not have happened.
 
-### Calling it from a browser
+## Calling it from a browser
 
 JavaScript can call `/auth/logout` across origins when its origin is registered as a [web origin](/concepts/clients/#web-origins) on a client. Sending the browser there with a link or a form needs nothing more.
 
-### The audit log
+## The audit log
 
 A sign-out that ends a session leaves a `logout` entry in the [audit log](/concepts/audit-log/), and one that removes your app from a session other clients still use leaves `deleted_user_session_client`.
 

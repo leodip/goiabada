@@ -26,7 +26,7 @@ The first three run the [Docker Compose](/deploy/docker-compose/) files the setu
 - **HTTPS on both public URLs.** Each server marks its cookies `Secure` only when its URL is `https://`.
 - **An empty database on the first start,** which the auth server seeds with the administrator and the admin console's client, for the URLs you gave. Changing the URLs later means changing that client's redirect URIs too: see [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/).
 
-## How it works
+## What changes between methods
 
 Every method runs the same two servers. The auth server answers sign-ins, tokens and the API on port 9090, and the admin console answers administrators on port 9091. Each serves plain HTTP by default, and something in front of it serves HTTPS: Cloudflare, Nginx, a Kubernetes Gateway, or the server itself with a certificate of its own.
 

@@ -15,9 +15,7 @@ Use a token carrying `authserver:manage` for any change to an administrator, or 
 
 A service that only manages ordinary users and clients should keep its granular scope. When one of its requests touches an administrator, it's refused with `403` and `MANAGE_SCOPE_REQUIRED`, and nothing changes. That refusal is the design working, not something to retry with a bigger scope.
 
-## How it works
-
-### Who is an administrator
+## Who is an administrator
 
 An administrator is a user, group or client holding any of the six administrative permissions on the `authserver` resource: `manage`, `admin-read`, `manage-users`, `manage-clients`, `manage-settings` and `browser-sessions`.
 
@@ -27,7 +25,7 @@ An administrator is a user, group or client holding any of the six administrativ
 
 `manage-account` and the permissions you add to the `authserver` resource yourself aren't administrative. [Resources and permissions](/concepts/resources-and-permissions/#the-authserver-resource) lists the built-in permissions.
 
-### What only `authserver:manage` does
+## What only `authserver:manage` does
 
 A granular scope reaching an operation is still refused when the request would:
 
@@ -42,7 +40,7 @@ These rules judge the object a request writes. A change to an ordinary group or 
 
 Creating a user, group or client isn't restricted. None of the three requests carries a permission or a group, and a new user is granted only `manage-account`, so nothing new starts as an administrator.
 
-### The refusal
+## The refusal
 
 A refused request writes nothing. It's answered after the request's own `400` and `404` checks, with `403`, the error code `MANAGE_SCOPE_REQUIRED`, and a challenge naming the one scope that would do:
 
@@ -52,7 +50,7 @@ WWW-Authenticate: Bearer realm="goiabada", error="insufficient_scope", error_des
 
 Don't confuse it with `INSUFFICIENT_SCOPE`. That one means the token lacks the scope the operation accepts, and asking for that scope fixes the call. `MANAGE_SCOPE_REQUIRED` means no granular scope will ever be enough: use a token with `authserver:manage`, or leave the administrator alone.
 
-### The last administrator
+## The last administrator
 
 A token with `authserver:manage` passes every rule above, but meets one more. A change that would leave no enabled user holding `authserver:manage`, directly or through a group, is answered `409` with the error code `LAST_ADMINISTRATOR`, and nothing changes. A client holding the permission doesn't count, and neither does a disabled user.
 
@@ -60,7 +58,7 @@ Seven operations can meet it: setting a user's permissions, setting a group's pe
 
 What has to survive is a person who can sign in to the admin console and repair things, which is why a client doesn't count. The check reads permissions, not whether that person can still sign in: a sole administrator who has forgotten their password or lost their authenticator still counts. Keep `manage` on at least two people you trust, so one can always let the other back in. [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-last-administrator-cant-sign-in) covers what to do when that's already happened.
 
-### What the audit log records
+## What the audit log records
 
 - A refused request leaves an `administrator_change_refused` entry, naming the caller, the route, the target and the rule that refused it.
 - An administrative permission granted or revoked, on a user, a group or a client, or a user joining or leaving a group that holds one, leaves an `administrative_permission_changed` entry beside the change's own entry.

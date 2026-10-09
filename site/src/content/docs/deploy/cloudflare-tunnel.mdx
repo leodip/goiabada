@@ -46,7 +46,7 @@ You need a domain on Cloudflare, a server with Docker, two hostnames under that 
 
 </Steps>
 
-## How it works
+## What this setup gives you
 
 - **Nothing on the server is published.** `cloudflared` connects out, so the firewall can refuse every inbound connection, and the server's address never appears in DNS. The Compose file publishes 9090 and 9091 on `127.0.0.1` alone, where only `cloudflared` and other processes on the host reach them.
 - **Cloudflare holds the certificates** for both hostnames, and the tunnel encrypts the hop from Cloudflare to `cloudflared`. Goiabada serves plain HTTP on the host, and marks its cookies `Secure` because its URLs are `https://`.

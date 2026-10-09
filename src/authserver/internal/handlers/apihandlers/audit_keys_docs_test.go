@@ -38,7 +38,7 @@ import (
 )
 
 // auditKeysSection is the section of the audit log page whose table is the key catalog.
-var auditKeysSection = docSection{auditLogPage, "### Details"}
+var auditKeysSection = docSection{auditLogPage, "## Details"}
 
 // auditKeysCodeDir is the module whose audit Log calls the catalog is held to, relative to the
 // repository root.
@@ -244,11 +244,11 @@ func LogFor(ctx context.Context, auditLogger AuditLogger, details map[string]int
 
 // auditKeysCatalog is a Details section whose table has one row per key, each with a meaning.
 func auditKeysCatalog(keys []string) string {
-	page := "### Details\n\nKeys are snake_case.\n\n| Key | Meaning |\n|---|---|\n"
+	page := "## Details\n\nKeys are snake_case.\n\n| Key | Meaning |\n|---|---|\n"
 	for _, key := range keys {
 		page += "| `" + key + "` | What " + key + " holds. |\n"
 	}
-	return page + "\n### Next\n\n| `outside_the_section` | Not read. |\n"
+	return page + "\n## Next\n\n| `outside_the_section` | Not read. |\n"
 }
 
 // writeAuditKeysFixture writes a fixture repository: the page at site/audit.mdx and each Go file
@@ -276,7 +276,7 @@ func fixtureLine(t *testing.T, code, text string) string {
 	return ""
 }
 
-var auditKeysFixtureSection = docSection{"site/audit.mdx", "### Details"}
+var auditKeysFixtureSection = docSection{"site/audit.mdx", "## Details"}
 
 func TestAuditLogDocs_AKeyCatalogMatchingThePayloadsPasses(t *testing.T) {
 	root := writeAuditKeysFixture(t, auditKeysCatalog(auditKeysFixtureKeys),
@@ -294,7 +294,7 @@ func TestAuditLogDocs_AKeyCatalogMatchingThePayloadsPasses(t *testing.T) {
 // TestAuditLogDocs_AKeyCatalogDisagreeingWithThePayloadsFails reports every finding the guard
 // makes, each naming the page and section, or the file and line.
 func TestAuditLogDocs_AKeyCatalogDisagreeingWithThePayloadsFails(t *testing.T) {
-	page := "### Details\n\n" +
+	page := "## Details\n\n" +
 		"| Key | Meaning |\n|---|---|\n" +
 		"| `client_id` | The client's row id. |\n" +
 		"| `retired_key` | Written by nothing. |\n" +
@@ -320,7 +320,7 @@ func TestAuditLogDocs_AKeyCatalogDisagreeingWithThePayloadsFails(t *testing.T) {
 	code := "src/authserver/internal/fixture/"
 	unfollowable := auditKeysFixtureUnfollowable
 	fixture := auditKeysFixtureCode
-	where := "site/audit.mdx: ### Details"
+	where := "site/audit.mdx: ## Details"
 	want := []string{
 		where + " lists retired_key, which no audit Log call writes",
 		where + " lists client_id twice",
@@ -350,20 +350,20 @@ func TestAuditLogDocs_AKeyCatalogDisagreeingWithThePayloadsFails(t *testing.T) {
 }
 
 func TestAuditLogDocs_AKeyCatalogWithNoSectionStops(t *testing.T) {
-	root := writeAuditKeysFixture(t, "### Payloads\n\n| Key | Meaning |\n|---|---|\n| `user_id` | The user. |\n",
+	root := writeAuditKeysFixture(t, "## Payloads\n\n| Key | Meaning |\n|---|---|\n| `user_id` | The user. |\n",
 		map[string]string{"fixture.go": auditKeysFixtureCode})
 
 	report := guard.Run(func(r guard.Reporter) {
 		assertAuditDetailsKeys(r, root, "src/authserver", auditKeysFixtureSection)
 	})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, "### Details") {
+	if !report.Stopped || !strings.Contains(report.Fatal, "## Details") {
 		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
 	}
 }
 
 func TestAuditLogDocs_AKeyCatalogWithNoTableStops(t *testing.T) {
-	root := writeAuditKeysFixture(t, "### Details\n\n- `user_id`: the user.\n",
+	root := writeAuditKeysFixture(t, "## Details\n\n- `user_id`: the user.\n",
 		map[string]string{"fixture.go": auditKeysFixtureCode})
 
 	report := guard.Run(func(r guard.Reporter) {

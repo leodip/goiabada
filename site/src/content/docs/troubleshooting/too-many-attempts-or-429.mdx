@@ -51,7 +51,7 @@ Trust forwarded headers only when the proxy is the **only** way to reach the aut
 
 [Client IP addresses](/reference/environment-variables/#client-ip-addresses) has the precise rules, and [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/) shows them for each setup.
 
-## How it works
+## How the limits count
 
 A limit that counts failures, such as wrong passwords, isn't spent by a success, so signing in normally never uses it up. A limit that counts every request is spent by every request, successful or not.
 

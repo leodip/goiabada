@@ -43,9 +43,7 @@ The Compose files run the auth server, the admin console and the database on one
 
 </Steps>
 
-## How it works
-
-### What the files run
+## What the files run
 
 - **The database runs beside Goiabada,** in a container of its own for MySQL, PostgreSQL and SQL Server, with its data in a named volume. With SQLite, the auth server keeps the database file in the `sqlite-data` volume. [Database](/deploy/database/) covers using a database server of your own instead.
 - **The auth server starts once the database answers,** and the admin console once the auth server does. A first start or an upgrade has up to five minutes to seed or migrate the database before Docker Compose counts the auth server unhealthy.
@@ -54,7 +52,7 @@ The Compose files run the auth server, the admin console and the database on one
 - **Each server gets up to 60 seconds to stop** when you run `docker compose down` or `restart`, so requests in flight finish.
 - **The wizard's rate limiter answer,** yes unless you said no, is written as `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`. See [Rate limits](/reference/environment-variables/#rate-limits).
 
-### The hop to the auth server
+## The hop to the auth server
 
 The admin console calls the auth server at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, which the wizard sets to `http://goiabada-authserver:9090`: straight to the auth server's container, over the Compose network, without passing your proxy.
 
@@ -90,7 +88,7 @@ When that isn't enough, encrypt the hop with the auth server's own HTTPS listene
 
 If the admin console then can't reach the auth server, see [Unable to load the configuration from the auth server](/troubleshooting/unable-to-load-the-configuration-from-the-auth-server/).
 
-### The user the images run as
+## The user the images run as
 
 Both images run as uid 10001 and gid 10001, a user and group named `goiabada`, and never as root. The image names them by number, so a platform that refuses a root container, such as Kubernetes with `runAsNonRoot`, can verify the user without reading the image's `/etc/passwd`. The binary and the `/app` directory holding it belong to root, so the process can't replace what its next start runs.
 

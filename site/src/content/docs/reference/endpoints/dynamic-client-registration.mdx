@@ -52,9 +52,7 @@ That's dynamic client registration (DCR), `POST /connect/register`, as [RFC 7591
 While DCR is on, **anyone** who can reach `/connect/register` can create a client, with no token and no sign-in. Limit the endpoint at your reverse proxy, or turn on the rate limiter, which then allows 10 registrations a minute from each IP address. See [rate limits](/reference/environment-variables/#rate-limits).
 </Aside>
 
-## How it works
-
-### The request
+## The request
 
 The body is a JSON object. The auth server reads four fields and ignores every other one, as RFC 7591 asks:
 
@@ -69,11 +67,11 @@ The body is a JSON object. The auth server reads four fields and ignores every o
 
 A body larger than 64 KiB is refused as one that can't be read.
 
-### Redirect URIs
+## Redirect URIs
 
 A self-registered client's redirect URIs follow the [rules for every client](/concepts/clients/#redirect-uris), and the stricter ones on [Redirect URIs for self-registered clients](/concepts/clients/#redirect-uris-for-self-registered-clients): a public client gets loopback `http` and custom schemes, a confidential one `https` and loopback `http`. On top of those, a registration holds at most 60 redirect URIs, each up to 2,048 bytes, and none listed twice.
 
-### The client it creates
+## The client it creates
 
 The new client is enabled straight away, and:
 
@@ -90,7 +88,7 @@ There's no endpoint to read, update or delete a registration afterwards, so the 
 
 Each registration leaves a `dynamic_client_registration` entry in the [audit log](/concepts/audit-log/).
 
-### The answer
+## The answer
 
 A registration is answered `201 Created`, with `Cache-Control: no-store`, and the client's metadata as JSON:
 
@@ -105,7 +103,7 @@ A registration is answered `201 Created`, with `Cache-Control: no-store`, and th
 | `grant_types` | The grant types, with the default filled in |
 | `client_name` | The name, when one was sent |
 
-### Errors
+## Errors
 
 An error is answered with a JSON body holding `error` and `error_description`, as RFC 7591 section 3.2.2 defines:
 
@@ -131,7 +129,7 @@ The `error_description` says which value was refused, so it's worth showing to w
 
 With the rate limiter on, an IP address past its budget is answered `429 Too Many Requests` with `invalid_request`, "Too many requests. Please wait and try again later."
 
-### Discovery
+## Discovery
 
 While DCR is on, the [discovery document](/reference/endpoints/discovery-and-jwks/) carries `registration_endpoint`, the URL of `/connect/register`. While it's off, the field isn't there, so an app can tell from discovery whether it may register.
 

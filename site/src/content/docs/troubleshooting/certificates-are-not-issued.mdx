@@ -76,7 +76,7 @@ So the usual causes are:
 Let's Encrypt limits how many failed validations it accepts for one host name in an hour. Fix the cause before you retry, rather than deleting challenges in a loop.
 </Aside>
 
-## How it works
+## How the certificates are served and renewed
 
 The Gateway terminates TLS for both host names, with the certificate in each listener's Secret. Goiabada's own HTTPRoutes attach only to the two HTTPS listeners, so the `http` listener on port 80 carries nothing but cert-manager's challenges. cert-manager renews each certificate before it expires the same way, so port 80 has to stay reachable after the first issue too.
 

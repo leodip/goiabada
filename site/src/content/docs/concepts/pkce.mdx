@@ -46,9 +46,7 @@ Most OAuth libraries do all of this for you: turn PKCE on and use `S256`.
 
 </Steps>
 
-## How it works
-
-### When it's required
+## When it's required
 
 PKCE applies to the authorization code flow, the one flow where a code travels through the browser.
 
@@ -62,7 +60,7 @@ Making PKCE optional takes away a defence against stolen codes. Do it only for a
 
 Optional doesn't mean ignored: a client that sends PKCE when it's optional is held to the same rules as one that has to.
 
-### What the auth server checks
+## What the auth server checks
 
 At `/auth/authorize`, `code_challenge_method` must be `S256`, and `code_challenge` must be 43 to 128 characters of the set above. `plain` isn't supported, and discovery lists `S256` alone in `code_challenge_methods_supported`. Each failure is refused with `invalid_request`. When the browser has no session, the user sees the sign-in page first and your app gets the error after it, as [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/) explains.
 

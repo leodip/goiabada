@@ -125,7 +125,7 @@ GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES=10.0.0.0/8,192.168.1.5
 
 Under Docker Compose, the one that connects to Goiabada is the Compose network's gateway, so list the network's range. For Cloudflare in front of Nginx, [resolve Cloudflare in Nginx](#cloudflare--nginx) instead.
 
-## How it works
+## How the client's address is resolved
 
 Both servers resolve the client's address the same way, each from its own two variables. The auth server's rate limiter, audit records, session records and request log, and the admin console's request log, all read the one address it resolves.
 

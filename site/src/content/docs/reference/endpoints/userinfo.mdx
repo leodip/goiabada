@@ -43,9 +43,7 @@ It's the OpenID Connect endpoint for a user's [claims](/concepts/glossary/#claim
 
 </Steps>
 
-## How it works
-
-### The request
+## The request
 
 Send the access token one way:
 
@@ -56,7 +54,7 @@ A token in the query string isn't read, since it would end up in logs and the br
 
 The token must be an access token the auth server issued for a user, with `openid` in its scope. A client credentials token never has `openid`, and an ID token or a refresh token isn't accepted.
 
-### The answer
+## The answer
 
 The answer is `200 OK` with the claims as a JSON object. `sub`, the user's [subject](/concepts/glossary/#subject), is always there. The rest come from the token's scope:
 
@@ -73,7 +71,7 @@ A claim with no value is left out, as [Scopes](/concepts/scopes/#openid-connect-
 
 The claims are read when you call, so they're current even when the token is older than the user's last change. The answer is plain JSON, never a signed JWT.
 
-### Errors
+## Errors
 
 An error is answered with a `WWW-Authenticate: Bearer realm="goiabada"` header naming the `error` and its `error_description`, and the same two in a JSON body, as [RFC 6750 section 3](https://www.rfc-editor.org/rfc/rfc6750#section-3) defines:
 
@@ -102,7 +100,7 @@ Pragma: no-cache
 
 The last two make `/userinfo` stricter than the token's own `exp`: an access token stops working here as soon as the session it came from ends. A token with no session, from an offline refresh token or the password grant, stops when the user is disabled or their credentials change. See [Ending sessions](/concepts/ending-sessions/#what-it-doesnt-reach).
 
-### Calling it from a browser
+## Calling it from a browser
 
 JavaScript in a browser can call `/userinfo` when its origin is registered as a [web origin](/concepts/clients/#web-origins) on a client. Without one, the browser blocks the call.
 

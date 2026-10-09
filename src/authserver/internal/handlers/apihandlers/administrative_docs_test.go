@@ -104,7 +104,7 @@ func administrativeIdentifiers() map[string]bool {
 // only authserver:manage does are on the Administrators reference page, which it links to (#522).
 func TestAdministrativeDocs_TheBuiltInPermissionTableIsTheSeedAndThePolicy(t *testing.T) {
 	assertBuiltInPermissionTable(t, filepath.Dir(guard.SourceRoot(t)),
-		docSection{resourcesPermissionsPage, "### The authserver resource"},
+		docSection{resourcesPermissionsPage, "## The authserver resource"},
 		builtin.AuthServerPermissionIdentifiers(), seededPermissionDescriptions, administrativeIdentifiers())
 }
 
@@ -138,9 +138,14 @@ func TestAdministrativeDocs_NameWhatTheModelRestsOn(t *testing.T) {
 			skipColumn: "Details",
 		},
 		{
-			section: docSection{apiAdministratorsPage, "## How it works"},
+			section: docSection{apiAdministratorsPage, "## The refusal"},
 			pattern: docErrorCode, kind: "error code", live: codes,
-			want: []string{"MANAGE_SCOPE_REQUIRED", "LAST_ADMINISTRATOR"},
+			want: []string{"MANAGE_SCOPE_REQUIRED"},
+		},
+		{
+			section: docSection{apiAdministratorsPage, "## The last administrator"},
+			pattern: docErrorCode, kind: "error code", live: codes,
+			want: []string{"LAST_ADMINISTRATOR"},
 		},
 		{
 			section: docSection{apiScopesPage, "## The Admin API scopes"},
@@ -151,7 +156,7 @@ func TestAdministrativeDocs_NameWhatTheModelRestsOn(t *testing.T) {
 			},
 		},
 		{
-			section: docSection{apiAdministratorsPage, "### The last administrator"},
+			section: docSection{apiAdministratorsPage, "## The last administrator"},
 			pattern: docErrorCode, kind: "error code", live: codes,
 			want: []string{"LAST_ADMINISTRATOR"},
 		},
@@ -184,24 +189,24 @@ func TestAdministrativeDocs_TheConsoleLockoutRecoveryRequestsManage(t *testing.T
 // there from Users and groups, which now links to it (#522).
 func TestAdministrativeDocs_TheLastAdministratorSectionQuotesTheRefusal(t *testing.T) {
 	assertSectionQuotes(t, filepath.Dir(guard.SourceRoot(t)),
-		docSection{apiAdministratorsPage, "### The last administrator"}, lastAdministratorDescription)
+		docSection{apiAdministratorsPage, "## The last administrator"}, lastAdministratorDescription)
 }
 
 func TestAdministrativeDocs_ASectionNotQuotingTheSentenceFails(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/admins.mdx", "### The last administrator\n\n"+
+	writeDocFixture(t, root, "site/admins.mdx", "## The last administrator\n\n"+
 		"The console says \"Grant it to someone first.\"\n\n"+
-		"### Next\n\nThis change would leave nobody. Grant it first.\n")
+		"## Next\n\nThis change would leave nobody. Grant it first.\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSectionQuotes(r, root, docSection{"site/admins.mdx", "### The last administrator"},
+		assertSectionQuotes(r, root, docSection{"site/admins.mdx", "## The last administrator"},
 			"This change would leave nobody. Grant it first.")
 	})
 
 	if report.Stopped {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
-	want := []string{`site/admins.mdx: ### The last administrator does not quote "This change would leave nobody. Grant it first."`}
+	want := []string{`site/admins.mdx: ## The last administrator does not quote "This change would leave nobody. Grant it first."`}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
 	}
@@ -209,11 +214,11 @@ func TestAdministrativeDocs_ASectionNotQuotingTheSentenceFails(t *testing.T) {
 
 func TestAdministrativeDocs_ASectionQuotingTheSentencePasses(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/admins.mdx", "### The last administrator\n\n"+
+	writeDocFixture(t, root, "site/admins.mdx", "## The last administrator\n\n"+
 		"The console shows \"This change would leave nobody. Grant it first.\"\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSectionQuotes(r, root, docSection{"site/admins.mdx", "### The last administrator"},
+		assertSectionQuotes(r, root, docSection{"site/admins.mdx", "## The last administrator"},
 			"This change would leave nobody. Grant it first.")
 	})
 
@@ -224,14 +229,14 @@ func TestAdministrativeDocs_ASectionQuotingTheSentencePasses(t *testing.T) {
 
 func TestAdministrativeDocs_AQuoteCheckWithoutItsSectionStops(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/admins.mdx", "### The final administrator\n\nThis change would leave nobody.\n")
+	writeDocFixture(t, root, "site/admins.mdx", "## The final administrator\n\nThis change would leave nobody.\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSectionQuotes(r, root, docSection{"site/admins.mdx", "### The last administrator"},
+		assertSectionQuotes(r, root, docSection{"site/admins.mdx", "## The last administrator"},
 			"This change would leave nobody.")
 	})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, "### The last administrator") {
+	if !report.Stopped || !strings.Contains(report.Fatal, "## The last administrator") {
 		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
 	}
 }
