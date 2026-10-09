@@ -49,7 +49,7 @@ Every command below runs inside the container, from the directory it names.
 
 </Steps>
 
-Both rebuild and restart when you save a Go file or a template.
+Each rebuilds and restarts when you save a Go file or a template in its own module. A change under `src/core` isn't watched: save a file in the server's module, or run `make serve` again, to pick it up.
 
 <Aside type="danger">
 The dev container's administrator password, keys and secrets are published in the repository. **Never** use them in a deployment.
@@ -113,7 +113,7 @@ Some committed files are written by a tool. When your change touches what one is
 
 The docs site is in `site/`, and every page follows [`site/STYLE.md`](https://github.com/leodip/goiabada/blob/main/site/STYLE.md): the voice, the shape of a page and the words the [glossary](/concepts/glossary/) gives each concept.
 
-The dev container has no Node.js, so build the site on your own machine, with Node.js 22 or later, from `site/`:
+The dev container has no Node.js, so build the site on your own machine, with Node.js 22.12 or later, from `site/`:
 
 ```sh
 npm ci
@@ -150,13 +150,13 @@ Much of what a reviewer would otherwise check is a test that fails: the architec
 
 ## The databases and mail
 
-The dev container runs MySQL, PostgreSQL and SQL Server beside it, and `make serve` uses SQL Server. The tests leave that database alone: each data and integration run starts from an empty database of its own.
+The dev container runs MySQL, PostgreSQL and SQL Server beside it, and `make serve` uses SQL Server. The tests leave that database alone: each data and integration run starts from an empty database of its own. `./run-tests.sh` does stop a running `make serve`, though: it frees ports 19090, 19091 and 19190 before the data and integration tiers and again when it exits, so start `make serve` again afterwards.
 
-Mailpit runs beside them too. Under **Email - SMTP** in the admin console's settings, turn on **SMTP enabled** and set the host to `mailpit`, the port to 1025 and the encryption to **None**. Every mail Goiabada sends then lands in Mailpit, at http://localhost:8025.
+Mailpit runs beside them too. Under **Email - SMTP** in the admin console's settings, turn on **SMTP enabled** and set the host to `mailpit`, the port to 1025, the encryption to **None**, and **From email** to any address, such as `noreply@example.com`. Every mail Goiabada sends then lands in Mailpit, at http://localhost:8025.
 
 ## CI
 
-CI runs the same tiers on every pull request, a job each, and builds the site. The data and integration tiers wait until the pull request is out of draft.
+CI runs the same tiers on every pull request, a job each, and builds the site. The data, integration and race jobs wait until the pull request is out of draft.
 
 ## Next steps
 

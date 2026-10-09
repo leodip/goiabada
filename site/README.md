@@ -10,7 +10,7 @@ its one name.
 
 ## Build and preview
 
-Build the site on your own machine, with Node.js 22 or later. The devcontainer has no Node.js.
+Build the site on your own machine, with Node.js 22.12 or later. The devcontainer has no Node.js.
 
 ```sh
 cd site
