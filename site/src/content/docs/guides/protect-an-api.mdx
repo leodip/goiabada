@@ -15,9 +15,9 @@ Callers show what they may do with an [access token](/concepts/tokens/): a signe
 
 1. Describe your API. In the admin console, open **Admin**, **Resources and permissions** and click **Create new**. Enter a **Resource identifier**, such as `product-api`, and a **Description**, and click **Create**.
 
-2. Open the resource's **Permissions** tab, add a permission for each thing your API lets callers do, such as `read` and `write`, and click **Save**. Each one is a scope your app can ask for, `product-api:read` and `product-api:write`. See [Resources and permissions](/concepts/resources-and-permissions/).
+2. Click **Manage** beside it and open **Permissions**. For each thing your API lets callers do, enter a **Permission identifier**, such as `read` or `write`, and click **Create permission**. Click **Save** when the list is done. Each one is a scope your app can ask for, `product-api:read` and `product-api:write`. See [Resources and permissions](/concepts/resources-and-permissions/).
 
-3. Give the permissions to the users who need them, on each user's **Permissions** tab, or to a group, on the group's **Permissions** tab, so every member gets them.
+3. Give the permissions to the users who need them, on each user's **Permissions** tab, or to a group, on the group's **Permissions** tab, so every member gets them. Choose the **Resource** and the **Permission**, click **Grant permission**, and click **Save**: until you save, nothing is granted.
 
 4. Have your app ask for the scope when it signs the user in, beside the OpenID Connect scopes it already asks for, as in [Add sign-in to a web app](/guides/add-sign-in-to-a-web-app/):
 
@@ -45,7 +45,7 @@ A service that calls your API on its own, with no user, such as a nightly job, g
 
 <Steps>
 
-1. Register the service. In the admin console, open **Admin**, **Clients** and click **Create new**. Enter a **Client identifier**, such as `billing-service`, turn on **Client credentials flow**, and click **Create**.
+1. Register the service. In the admin console, open **Admin**, **Clients** and click **Create new**. Enter a **Client identifier**, such as `billing-service`, turn on **Client credentials flow**, turn off **Authorization code flow with PKCE**, and click **Create**.
 
 2. Click **Manage** beside it. On **Permissions**, choose the **Resource** and the **Permission** the service needs, click **Grant permission**, and click **Save**. On **Authentication**, click **Reveal** and copy the **Client secret** to the service's configuration.
 
