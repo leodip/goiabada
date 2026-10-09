@@ -31,7 +31,7 @@ If everyone is refused behind a proxy, tell the auth server to read the client's
 
 <Steps>
 
-1. Look for this warning in the auth server's startup log. It's there when the limiter is on and forwarded headers are not trusted:
+1. Look for a `rate limiter configuration warning` record in the auth server's startup log, whose `warning` reads as below. It's there when the limiter is on and forwarded headers are not trusted:
 
    ```
    config: GOIABADA_AUTHSERVER_RATELIMITER_ENABLED is true but GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS is false; if this server sits behind a reverse proxy, every request resolves to the proxy's address and the whole deployment shares one per-IP bucket. Set GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS, and GOIABADA_AUTHSERVER_TRUSTED_PROXIES with it

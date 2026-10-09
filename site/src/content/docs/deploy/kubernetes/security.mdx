@@ -120,7 +120,7 @@ When the pod network isn't one you trust, such as a cluster shared with workload
      SSL_CERT_FILE: "/certs/ca.pem"
      ```
 
-     `SSL_CERT_FILE`, or `SSL_CERT_DIR` for a directory, replaces the system's certificate authorities rather than adding to them, so the file must hold every authority the admin console needs.
+     `SSL_CERT_FILE`, or `SSL_CERT_DIR` for a directory, adds your authority to the ones the image already trusts. To trust yours alone, set both, `SSL_CERT_DIR` to a directory holding only your certificates.
 
   4. Restart both Deployments. The auth server reads its certificate when it starts, so restart it after each renewal too.
 

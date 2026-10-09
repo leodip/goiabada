@@ -29,6 +29,8 @@ Most often the record is `unable to create the database connection`, and its `er
 
 The rest of the `error` is the database driver's own words, such as `connection refused`, `no such host`, a refused password or a database that doesn't exist.
 
+On PostgreSQL and MySQL with `GOIABADA_DB_CREATE` on, a login that reaches the server but can't use Goiabada's database shows up later, as an `error` starting `unable to prepare the migration runner`. Check what the user may do in `GOIABADA_DB_NAME`: see [Database](/deploy/database/).
+
 ## Why it happens
 
 The auth server opens the database before anything else, and it doesn't retry: if the first connection fails, it exits, and Kubernetes or Compose starts it again. Kubernetes waits longer before each restart, which is the back-off in `CrashLoopBackOff`.
@@ -71,10 +73,15 @@ On SQLite, `unable to connect to database` means the file couldn't be opened. Wh
 
 The auth server refuses to start on these too, each with its own record and exit status 1:
 
-- `the data encryption key is missing or malformed, so the auth server cannot start`: `GOIABADA_AES_ENCRYPTION_KEY` isn't set to 64 hex characters.
+- `the data encryption key is missing or malformed, so the auth server cannot start`: `GOIABADA_AES_ENCRYPTION_KEY` isn't set to 64 hex characters, or `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` is set to something else.
 - `the auth server session keys are missing or malformed, so the auth server cannot start`: the session keys aren't set, or aren't the length they must be.
+- `the previous session key pair is incomplete or malformed, so the auth server cannot start`: only one of the two `_PREVIOUS` session key variables is set, or one is malformed. Set both while you [rotate the keys](/deploy/rotate-secrets/), or neither once you're done.
+- `bootstrap credentials are not configured, so the auth server cannot start`: `GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE` is set and the credentials it wrote haven't been copied into the two servers' configuration yet. Copy them, then restart both.
+- `unable to bootstrap the database`, with an `error` starting `GOIABADA_ADMIN_PASSWORD cannot be the first administrator's password`: on a first start, the password is empty, shorter than 15 characters, longer than 72 bytes, or `changeme`.
 - `the trusted proxy list is malformed, so the auth server cannot start`: `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` has an entry that isn't an address or a CIDR range.
 - `initial setup is required, because the database is empty and neither bootstrap mode is configured`: the database is empty, and neither `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` nor `GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE` is set to seed it with.
+
+When the record is `unable to create the database connection` and its `error` starts `refusing to migrate: schema version 000047 lowercases every stored email address`, an upgrade from 1.6 or earlier found accounts it can't convert: two whose addresses differ only by case, or one the database engine can't lowercase the way Goiabada does. The `error` lists each by `users.id`. Nothing was migrated: fix those rows by hand, then start again.
 
 When the record is `unable to create the database connection` and its `error` starts `unable to migrate the database`, the database answered but its schema couldn't be brought up to date: see [Waiting for the migration lock, or marked dirty](/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/), or [attempt to write a readonly database](/troubleshooting/attempt-to-write-a-readonly-database/) on SQLite.
 
@@ -84,7 +91,7 @@ A variable that doesn't parse, such as a port that isn't a number, stops it even
 
 `/health` answers only once the auth server listens, and it opens and migrates the database before it does. So a pod that can't reach the database never becomes ready, and nothing else in the cluster calls it in the meantime. Once it runs, `/health` doesn't check the database at all, so a database outage later doesn't restart every pod at once.
 
-The admin console doesn't open the database, so it keeps running while the auth server crash-loops, and answers every page with [Unable to load the configuration from the auth server](/troubleshooting/unable-to-load-the-configuration-from-the-auth-server/).
+The admin console doesn't open the database. On Kubernetes it keeps running while the auth server crash-loops, and answers every page with [Unable to load the configuration from the auth server](/troubleshooting/unable-to-load-the-configuration-from-the-auth-server/). Under Docker Compose, the generated file starts it only once the auth server is healthy, so it doesn't start at all.
 
 ## Next steps
 

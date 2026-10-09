@@ -15,7 +15,7 @@ Every admin console page answers `500` with one line of text:
 Unable to load the configuration from the auth server. You can find further information in the server logs.
 ```
 
-The admin console's log has `unable to fetch settings from the auth server`, and its `error` says what the connection failed with: a name that doesn't resolve, a connection refused, a timeout, or a certificate the admin console doesn't trust.
+The admin console's log has `unable to fetch settings from the auth server`, and its `error` says what the connection failed with: a name that doesn't resolve, a connection refused, a timeout, or a certificate the admin console doesn't trust. Or it starts `authserver returned status`, when something answered with an error instead of the settings.
 
 For up to 30 seconds after the auth server goes away, while the admin console still holds its settings, a page answers **Server error** instead.
 
@@ -31,6 +31,7 @@ The usual causes:
 - **The internal URL is wrong for where the admin console runs.** Inside Docker Compose, `localhost` is the admin console's own container, not the auth server's. Use the auth server's service name, such as `http://goiabada-authserver:9090`.
 - **The internal URL is empty, and the public URL isn't reachable from inside,** such as a public hostname that only resolves outside your network, or a firewall that stops the admin console's host from reaching it.
 - **The internal URL is `https`, and its certificate isn't trusted** or doesn't name the host in the URL.
+- **Something answers, but with an error,** `authserver returned status` and the status: a proxy in between answering `404` or `502`, or the auth server answering `500` because its database is down. The auth server's `/health` doesn't check the database, so it can answer `healthy` meanwhile: read the auth server's log.
 
 ## Fix it
 
@@ -50,7 +51,7 @@ The usual causes:
 
 </Steps>
 
-For an `https` internal URL, the admin console trusts the operating system's certificate authorities. To trust your own, point `SSL_CERT_FILE` at a file of PEM certificates, or `SSL_CERT_DIR` at a directory of them, on the admin console. Either replaces the system's set rather than adding to it, so include every authority it needs.
+For an `https` internal URL, the admin console trusts the operating system's certificate authorities. To trust your own, point `SSL_CERT_FILE` at a file of PEM certificates, or `SSL_CERT_DIR` at a directory of them, on the admin console. Either one alone adds to the system's authorities; setting both replaces them.
 
 ## When only signing in fails
 

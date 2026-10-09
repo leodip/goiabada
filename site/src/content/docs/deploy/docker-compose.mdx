@@ -80,7 +80,7 @@ When that isn't enough, encrypt the hop with the auth server's own HTTPS listene
    - "SSL_CERT_FILE=/certs/ca.pem"
    ```
 
-   `SSL_CERT_FILE`, or `SSL_CERT_DIR` for a directory of certificates, replaces the system's certificate authorities rather than adding to them, so the file must hold every authority the admin console needs.
+   `SSL_CERT_FILE`, or `SSL_CERT_DIR` for a directory of certificates, adds your authority to the ones the image already trusts. To trust yours alone, set both, `SSL_CERT_DIR` to a directory holding only your certificates.
 
 4. Restart both servers with `docker compose up -d`.
 

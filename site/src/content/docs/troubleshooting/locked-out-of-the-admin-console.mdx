@@ -59,7 +59,7 @@ Create that client **before** you need it: a client with the **Client credential
        Set `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` to `$CLIENT_SECRET` under both services in `docker-compose.override.yml`.
      </TabItem>
      <TabItem label="Native binaries">
-       Set `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` to `$CLIENT_SECRET` in the admin console's env file.
+       Set `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` to `$CLIENT_SECRET` in `/etc/goiabada/goiabada.env`, the env file both servers read.
      </TabItem>
      <TabItem label="Kubernetes">
        ```bash
