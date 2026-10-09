@@ -99,6 +99,7 @@ func HandleDynamicClientRegistrationPost(
 		}
 
 		// 9. Create client model
+		implicitGrantEnabled, ropcEnabled := false, false
 		client := &record.Client{
 			ClientIdentifier:      clientIdentifier,
 			ClientSecretEncrypted: clientSecretEncrypted,
@@ -117,9 +118,17 @@ func HandleDynamicClientRegistrationPost(
 			ConsentRequired: true,
 			// Set here and nowhere else. Nothing on the update path can change it, deliberately:
 			// it is a fact about where the client came from, not a trust setting (#108).
-			CreatedViaDCR:                           true,
-			AuthorizationCodeEnabled:                containsGrantType(req.GrantTypes, oidc.GrantTypeAuthorizationCode),
-			ClientCredentialsEnabled:                containsGrantType(req.GrantTypes, oidc.GrantTypeClientCredentials),
+			CreatedViaDCR:            true,
+			AuthorizationCodeEnabled: containsGrantType(req.GrantTypes, oidc.GrantTypeAuthorizationCode),
+			ClientCredentialsEnabled: containsGrantType(req.GrantTypes, oidc.GrantTypeClientCredentials),
+			// The two legacy flows are off on the client itself, not left to inherit. A
+			// registration can't ask for either, since validateDCRRequest refuses implicit and
+			// password, but a client whose switch is unset follows the global setting, so turning
+			// either flow on under Admin, General handed it to every client anyone had registered,
+			// whatever its registration said. An administrator who has reviewed one can still turn
+			// a flow on for it, on its OAuth2 flows tab.
+			ImplicitGrantEnabled:                    &implicitGrantEnabled,
+			ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
 			DefaultAcrLevel:                         record.AcrLevel2Optional,
 			IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
 			// Token expiration settings use global defaults from settings

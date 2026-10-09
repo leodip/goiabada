@@ -233,7 +233,7 @@ The auth server reads four fields and ignores the rest:
 
 - `redirect_uris`, required when the client uses the authorization code flow.
 - `token_endpoint_auth_method`: `none` for a public client, or `client_secret_basic` (the default) or `client_secret_post` for a confidential one.
-- `grant_types`: `authorization_code` (the default), `refresh_token` and `client_credentials`. A public client can't ask for `client_credentials`, and the legacy flows can't be asked for at all.
+- `grant_types`: `authorization_code` (the default), `refresh_token` and `client_credentials`. A public client can't ask for `client_credentials`, and the legacy flows can't be asked for at all: both are off on the client, whatever the global settings, until an administrator turns one on for it.
 - `client_name`: the name the consent screen shows, up to 128 characters.
 
 It answers 201 with the new `client_id` and, for a confidential client, its `client_secret`. Metadata it refuses gets a 400 with `invalid_client_metadata`, or `invalid_redirect_uri` for a redirect URI. Every field, answer and error is on [Dynamic client registration](/reference/endpoints/dynamic-client-registration/).
