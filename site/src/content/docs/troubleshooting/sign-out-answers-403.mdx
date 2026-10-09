@@ -23,7 +23,9 @@ The auth server refuses a POST that comes from another site, unless it can tell 
 
 For `/auth/logout`, a POST is safe when it carries an `id_token_hint`. A POST **without** one is exactly what the auth server's own "Are you sure you want to sign out?" screen submits when the user clicks **Yes**. Accepting it from another site would let any page sign your users out without asking them, so the auth server refuses it.
 
-So the usual cause is a self-submitting form on your app's page that posts to `/auth/logout` without an `id_token_hint`. Your app's origin is a different site from the auth server's, which makes the form cross-site.
+So the usual cause is a self-submitting form on your app's page that posts to `/auth/logout` without an `id_token_hint`. Your app's origin differs from the auth server's, whether it's another site or another host on the same domain, such as `app.example.com` beside `auth.example.com`.
+
+On the same domain, the warning's `explanation` speaks of a sibling host and a deployment misconfiguration, and its `remedy` of serving the form from one origin. That's meant for the auth server's own forms, as in [When the confirmation screen itself answers 403](#when-the-confirmation-screen-itself-answers-403). When the form is your app's, use the fix that follows.
 
 ## Fix it
 
