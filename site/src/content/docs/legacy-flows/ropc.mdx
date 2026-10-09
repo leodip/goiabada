@@ -109,12 +109,12 @@ Errors are JSON, as for every grant, with `error` and `error_description`:
 | `error` | Status | When |
 |---|---|---|
 | `unauthorized_client` | 400 | The flow is off for the client |
-| `invalid_request` | 400 | `username` or `password` is missing, or a public client sent a `client_secret` |
+| `invalid_request` | 400 | `username`, `password` or `client_id` is missing, a public client sent a `client_secret`, or the secret came both in the `Authorization` header and in the body |
 | `invalid_client` | 401 | The client secret is missing or wrong, or the client doesn't exist or is disabled. The answer carries `WWW-Authenticate: Basic realm="goiabada"`. |
 | `invalid_grant` | 400 | The email or password is wrong, the user is disabled, or the user has two-factor authentication |
 | `invalid_scope` | 400 | A scope doesn't exist or the user doesn't hold it, or an administrative scope the client may not request |
 
-A user with two-factor authentication is told why:
+A user with two-factor authentication who sends the right password is told why:
 
 ```json
 {

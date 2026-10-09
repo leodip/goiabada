@@ -62,6 +62,7 @@ What has to survive is a person who can sign in to the admin console and repair 
 
 - A refused request leaves an `administrator_change_refused` entry, naming the caller, the route, the target and the rule that refused it.
 - An administrative permission granted or revoked, on a user, a group or a client, or a user joining or leaving a group that holds one, leaves an `administrative_permission_changed` entry beside the change's own entry.
+- Switching whether a client may request the administrative scopes, on or off, leaves an `updated_client_administrative_scopes` entry, on every save.
 - Deleting an administrator or an administrative group leaves its own deletion entry, `deleted_user`, `deleted_client` or `deleted_group`, and no `administrative_permission_changed`.
 
 An alert on who is an administrator watches all of these. [Audit log](/concepts/audit-log/#events-to-alert-on) lists the events to alert on.

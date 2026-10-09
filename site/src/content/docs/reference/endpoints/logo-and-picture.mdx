@@ -61,7 +61,9 @@ Anyone who knows a user's subject can fetch their picture. A subject is a random
 
 An administrator uploads a client's logo on the client's **Logo** tab, and a user's picture on the user's **Picture** tab. Users upload their own under **Picture** on their account pages in the admin console. See [Clients](/concepts/clients/#display-name-description-and-logo) and [Users and groups](/concepts/users-and-groups/).
 
-Both take a JPEG, PNG, GIF or WebP image, from 10x10 to 512x512 pixels, and up to 3MB. `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` sets that limit, for logos too. The image type is read from the file's content, not its name.
+In the admin console, both take a JPEG, PNG, GIF or WebP file of up to 3 MiB, and let you crop it before it's uploaded. A picture is uploaded as a 512x512 JPEG. A logo keeps its shape, scaled down to at most 512 pixels on its longest side, and its type, but for a GIF, which is uploaded as PNG.
+
+The [Admin API](/reference/api/authentication/) checks the image itself: JPEG, PNG, GIF or WebP, read from the file's content rather than its name, from 10x10 to 512x512 pixels, and up to `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES`, 3 MiB by default, for logos too. Raising that setting doesn't raise the admin console's 3 MiB.
 
 ## Calling them from a browser
 

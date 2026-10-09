@@ -53,7 +53,7 @@ Each of `manage`, `admin-read`, `manage-users`, `manage-clients` and `manage-set
 
 ## Call the Account API
 
-The Account API acts on the account of the user the token was issued for, so it needs a token your app got for a signed-in user, through the authorization code flow. A token from the client credentials flow is refused.
+The Account API acts on the account of the user the token was issued for, so it needs a token your app got for a signed-in user, through the authorization code flow. A token from the client credentials flow is refused, as below.
 
 <Steps>
 
@@ -94,7 +94,7 @@ Every user holds the `manage-account` permission from the moment they're created
 
 ## The bearer token
 
-Every operation under `/api/v1/` takes an access token in the `Authorization` header, as `Bearer` followed by the token. The one operation that takes none is the public client logo, `GET /client/logo/{clientIdentifier}`.
+Every operation under `/api/v1/` takes an access token in the `Authorization` header, as `Bearer` followed by the token. The reference also lists one public operation outside `/api/v1/`, the client logo, `GET /client/logo/{clientIdentifier}`, which takes none.
 
 The token must be an access token the auth server issued for the `authserver` resource, which is what asking for an `authserver:` scope gets you. An ID token or a refresh token is refused.
 
@@ -102,7 +102,7 @@ The token must be an access token the auth server issued for the `authserver` re
 
 The Admin API accepts a client's token from the client credentials flow, and a user's token from the authorization code flow when the client may [request the administrative scopes on a user's behalf](/reference/api/scopes/#administrative-scopes-on-a-users-behalf).
 
-The Account API accepts only a token issued for a user. A token from the client credentials flow is answered `403` with the error code `USER_CONTEXT_REQUIRED`.
+The Account API accepts only a token issued for a user. A token from the client credentials flow is answered `403`: with `INSUFFICIENT_SCOPE` when it doesn't carry `authserver:manage-account`, which is the usual case, and with `USER_CONTEXT_REQUIRED` when its client was granted that permission.
 
 ## When a token stops working
 

@@ -60,7 +60,7 @@ The link works once, for five minutes, and only on its own: a `request_handle` s
 
 PKCE is required for every [public client](/concepts/clients/#public-and-confidential-clients), and for a confidential one unless an administrator made it optional.
 
-`acr_values` and `ui_locales` are never refused. An `acr_values` with no level the auth server knows is ignored, and so is a malformed `ui_locales`; beyond ten language tags or 256 bytes, the rest is ignored. A parameter the auth server doesn't read, such as `login_hint`, `display` or `claims`, is ignored too.
+`acr_values` and `ui_locales` are never refused for their value, though sent twice they're refused like any repeated parameter. An `acr_values` with no level the auth server knows is ignored, and so is a malformed `ui_locales`; beyond ten language tags or 256 bytes, the rest is ignored. A parameter the auth server doesn't read, such as `login_hint`, `display` or `claims`, is ignored too.
 
 ## What the auth server checks
 

@@ -62,7 +62,7 @@ A base URL is the address browsers and clients use. A listener is where the serv
 |---|---|---|---|---|
 | `GOIABADA_AUTHSERVER_BASEURL` | `--authserver-baseurl` | `http://localhost:9090` | both | The auth server's public URL. The first start also makes it the issuer that tokens carry. An `https://` URL marks the auth server's cookies `Secure`. |
 | `GOIABADA_AUTHSERVER_INTERNALBASEURL` | `--authserver-internalbaseurl` | empty | both | Where the admin console calls the auth server's API, such as `http://goiabada-authserver:9090` inside a cluster. Empty, it uses the public URL. The auth server only reports it in its startup log. |
-| `GOIABADA_ADMINCONSOLE_BASEURL` | `--adminconsole-baseurl` | `http://localhost:9091` | both | The admin console's public URL. The auth server links to it in its emails and sends visitors of `/` there. An `https://` URL marks the admin console's cookies `Secure`. |
+| `GOIABADA_ADMINCONSOLE_BASEURL` | `--adminconsole-baseurl` | `http://localhost:9091` | both | The admin console's public URL. The auth server links to it in its emails and sends visitors of `/` there. An `https://` URL marks the admin console's cookies `Secure`. The auth server's first start also registers it, and it followed by `/auth/callback`, as the admin console client's redirect URIs; change it later and update those on the client's **Redirect URIs** tab too. |
 | `GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP` | `--authserver-listen-host-http` | `0.0.0.0` | auth server | The address the auth server's HTTP listener binds. Set it empty to turn that listener off. See [listen addresses](#listen-addresses). |
 | `GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP` | `--authserver-listen-port-http` | `9090` | auth server | The auth server's HTTP port. |
 | `GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS` | `--authserver-listen-host-https` | `0.0.0.0` | auth server | The address the auth server's HTTPS listener binds. It listens only once the certificate and key files are set. |
@@ -108,7 +108,7 @@ Both servers write their logs to standard error.
 
 | Variable | Flag | Default | Read by | What it does |
 |---|---|---|---|---|
-| `GOIABADA_AUTHSERVER_LOG_LEVEL` | `--authserver-log-level` | `info` | auth server | The lowest level written: `debug`, `info`, `warn` or `error`. `debug` adds a trace of each request. |
+| `GOIABADA_AUTHSERVER_LOG_LEVEL` | `--authserver-log-level` | `info` | auth server | The lowest level written: `debug`, `info`, `warn` or `error`. `debug` adds a few diagnostic records; for one record per request, turn on `GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS`. |
 | `GOIABADA_AUTHSERVER_LOG_FORMAT` | `--authserver-log-format` | `text` | auth server | `text` for one `key=value` line per record, or `json` for one JSON object per record. |
 | `GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS` | `--authserver-log-http-requests` | `false` | auth server | Write one record per request, except health checks, static files and the favicon. Query values are redacted, apart from a short list of safe ones. |
 | `GOIABADA_AUTHSERVER_LOG_SQL` | `--authserver-log-sql` | `false` | auth server | Write one record per SQL statement, with its text but not the values it ran with. |
@@ -140,7 +140,7 @@ Each server can serve Prometheus metrics on a listener of its own, which answers
 | `GOIABADA_AUTHSERVER_TEMPLATEDIR` | `--authserver-templatedir` | empty | auth server | A directory to load the auth server's page templates from, instead of the built-in ones. |
 | `GOIABADA_ADMINCONSOLE_STATICDIR` | `--adminconsole-staticdir` | empty | admin console | The same, for the admin console's static files. |
 | `GOIABADA_ADMINCONSOLE_TEMPLATEDIR` | `--adminconsole-templatedir` | empty | admin console | The same, for the admin console's page templates. |
-| `GOIABADA_I18N_OVERRIDES_DIR` | none | empty | both | A directory of message catalogs that replace the built-in text. Set it on both servers. See [Add a language](/guides/customize-and-translate-the-pages/#add-a-language). |
+| `GOIABADA_I18N_OVERRIDES_DIR` | none | empty | both | A directory whose `catalogs` subfolder holds `active.<language>.toml` files, merged key by key over the built-in text. Without a `catalogs` subfolder nothing is loaded. Set it on both servers. See [Add a language](/guides/customize-and-translate-the-pages/#add-a-language). |
 | `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` | none | `3145728` | auth server | The largest profile picture or client logo the API accepts, in bytes. The default is 3 MiB. The admin console's upload form stops at 3 MiB, whatever this says. |
 
 ### Rate limiting
