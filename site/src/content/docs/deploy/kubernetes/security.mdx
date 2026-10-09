@@ -49,7 +49,7 @@ Both pod specs also set:
 - **`automountServiceAccountToken: false`,** because neither server calls the Kubernetes API, so a compromised pod gets no API credential.
 - **`enableServiceLinks: false`,** because Kubernetes would otherwise give each container variables for every Service in the namespace, and two of the generated Services are named so that those begin with `GOIABADA_`, such as `GOIABADA_AUTHSERVER_PORT` and `GOIABADA_ADMINCONSOLE_SERVICE_HOST`, which neither server reads.
 
-The generated Namespace is labelled `pod-security.kubernetes.io/warn: restricted` and `pod-security.kubernetes.io/audit: restricted`. For any pod in it that breaks the standard, Goiabada's own included, `kubectl apply` prints a warning and the API server writes an audit entry; nothing is refused. It doesn't enforce, because the wizard accepts an existing namespace, whose other workloads `kubectl apply` would then start refusing.
+The generated Namespace is labelled `pod-security.kubernetes.io/warn: restricted` and `pod-security.kubernetes.io/audit: restricted`. For any pod in it that breaks the standard, Goiabada's own included, `kubectl apply` prints a warning and the API server writes an audit entry; nothing is refused. It doesn't enforce, because the wizard accepts an existing namespace, whose other workloads' pods would then be refused the next time they're created.
 
 ## Who can reach Goiabada
 

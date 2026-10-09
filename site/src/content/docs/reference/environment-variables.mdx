@@ -229,7 +229,7 @@ To rotate the keys without signing anyone out:
 
 1. Move each server's current pair into its two `_PREVIOUS` variables.
 2. Set the current variables to freshly generated keys.
-3. Restart both servers. They seal new sessions with the new pair and still open sessions sealed with the old one.
+3. Restart both servers. They seal new sessions with the new pair and still open sessions sealed with the old one. On Kubernetes, where a rollout runs old and new pods side by side, this takes two rollouts instead: see below.
 4. Once the longest session lifetime has passed, remove the `_PREVIOUS` variables.
 
 A sign-in still in progress when you remove them may have to start again. Skip the `_PREVIOUS` variables altogether and everyone simply signs in again once. [Rotate secrets](/deploy/rotate-secrets/#the-session-keys) has the commands for each platform.
