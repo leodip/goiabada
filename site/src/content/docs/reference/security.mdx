@@ -21,9 +21,7 @@ This page helps you report a security issue in Goiabada, and shows what it does 
 **Never** report a vulnerability in a public GitHub issue or discussion. Anyone can read it there, before there's a fix.
 </Aside>
 
-## How it works
-
-### Sign-in
+## Sign-in
 
 - **Passwords are hashed** with bcrypt, and never stored or logged as typed. See [passwords](/concepts/users-and-groups/#passwords).
 - **Two-factor authentication** uses one-time codes from an authenticator app, optional or required per client. See [ACR and AMR](/concepts/acr-and-amr/).
@@ -33,7 +31,7 @@ This page helps you report a security issue in Goiabada, and shows what it does 
 - **No error is redirected before the user signs in.** A request that fails while nobody is signed in sends the user to sign in first, and the error reaches the client afterwards, so one crafted link can't send a visitor straight to any address a client has registered, as [RFC 9700](https://www.rfc-editor.org/rfc/rfc9700.html) section 4.11.2 requires. A silent request, which must never show a page, is answered at once. See [When an error reaches your app](/reference/endpoints/authorize/#when-an-error-reaches-your-app).
 - **A self-registered client is never sent an error.** Anyone can register a client and point it anywhere, so instead of redirecting, the auth server shows the user a page naming the address. See [self-registered clients](/concepts/clients/#self-registered-clients).
 
-### Tokens
+## Tokens
 
 - **Access tokens are short-lived:** 5 minutes by default.
 - **Tokens are signed** with RS256, by keys you can rotate in the admin console. See [Discovery and JWKS](/reference/endpoints/discovery-and-jwks/).
@@ -41,14 +39,14 @@ This page helps you report a security issue in Goiabada, and shows what it does 
 - **A replayed refresh token revokes its family.** Presenting one that a refresh already replaced revokes every other token in its line of refreshes, and leaves a `refresh_token_replay_detected` entry in the audit log. See [replay](/concepts/refresh-tokens/#replay).
 - **Ending a session revokes what it authorized:** its refresh tokens, offline ones included, and its unredeemed authorization codes. See [what ending a session revokes](/concepts/ending-sessions/#what-ending-a-session-revokes).
 
-### Sessions and cookies
+## Sessions and cookies
 
 - **The cookie holds an identifier, nothing else.** The session's contents stay on the server.
 - **The cookie is `HttpOnly`,** so no script can read it, **`SameSite=Lax`,** so the browser leaves it off another site's form posts, and **`Secure`** when the server's base URL is `https`, so it never travels over plain HTTP.
 - **Sessions expire:** after 2 hours idle or 24 hours in all, by default. See [Sessions](/concepts/sessions/#how-long-a-session-lasts).
 - **The admin console's cookie has no expiry,** so the browser drops it when it closes. A browser that restores its last session can bring it back.
 
-### Cross-site request forgery
+## Cross-site request forgery
 
 Every form the auth server and the admin console serve, the sign-in, two-factor and consent screens and every admin console page, accepts a POST only from its own origin. A request the browser says came from another site, a sibling subdomain included, is refused with `403 Forbidden`.
 
@@ -68,7 +66,7 @@ The protocol endpoints are called from other sites by design, so the auth server
 
 The admin console leaves out only `/auth/callback`, its sign-in callback, which the OAuth `state` parameter protects, and `/static/`.
 
-### Response headers
+## Response headers
 
 Both servers add these headers to every answer:
 
@@ -84,19 +82,19 @@ Both servers add these headers to every answer:
 **Never** replace `Referrer-Policy` with `no-referrer` at a proxy. A browser then sends `Origin: null` on form posts, and the cross-site check refuses every form on a browser that sends no `Sec-Fetch-Site`.
 </Aside>
 
-### Stored data
+## Stored data
 
 - **Secrets are encrypted** in the database with AES-256-GCM, under `GOIABADA_AES_ENCRYPTION_KEY`: client secrets, the SMTP password, authenticator seeds, emailed codes and the keys that sign tokens. See [Secrets](/deploy/secrets/#what-each-secret-protects).
 - **Authorization codes are stored as a digest.** The database holds each code's SHA-256, so a copy of it holds no code anyone could redeem. The identifier in a session cookie is stored the same way.
 - **The audit log leaves out what users type.** An email address typed into the sign-in, registration or forgot-password form is recorded only as a digest. See [the audit log's details](/concepts/audit-log/#details).
 
-### The network
+## The network
 
 - **Forwarded headers are ignored** until you turn on `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS`, so a client can't pick the IP address the rate limiter counts and the audit log records. See [client IP addresses](/reference/environment-variables/#client-ip-addresses).
 - **The admin console's calls to the auth server** are plain HTTP with the generated setups, carrying its client secret and administrators' tokens, which is sound only on a network you trust. See [the hop from the admin console to the auth server](/deploy/production-checklist/#the-hop-from-the-admin-console-to-the-auth-server).
 - **Browser calls across origins** are allowed only from the [web origins](/concepts/clients/#web-origins) registered on clients.
 
-### Logs
+## Logs
 
 Request records redact every query value but a short list of safe ones, and verbose API logging redacts credentials. See [What a request record leaves out](/deploy/logs/#what-a-request-record-leaves-out) and [Verbose API logging](/deploy/logs/#verbose-api-logging).
 

@@ -54,7 +54,7 @@ Fix it in one of these ways:
 - **Call the Admin API** with a client of your own allowed `authserver:manage`: [`PUT /api/v1/admin/clients/{id}/redirect-uris`](/reference/api/admin/operations/updateclientredirecturis/). The admin console's client is an [administrator](/reference/api/administrators/), so a token with only `authserver:manage-clients` is refused.
 - **Start from an empty database,** when the one you have holds nothing worth keeping.
 
-## How it works
+## How redirect URIs are checked
 
 The checks run in this order, before anything else in the request, and each failure shows the page:
 

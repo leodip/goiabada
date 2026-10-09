@@ -42,9 +42,7 @@ Ending your app's own session isn't enough. The auth server keeps a [session](/c
 
 </Steps>
 
-## How it works
-
-### What a sign-out ends
+## What a sign-out ends
 
 With the ID token as its hint, a sign-out ends your app's part of the user's session on the auth server. If other apps signed in with the same session, the user stays signed in to them, and the session ends when the last one signs out. Either way the browser's session cookie is cleared, so the next sign-in in that browser starts with the password.
 
@@ -52,7 +50,7 @@ A sign-out with no hint, or with one the auth server can't confirm, asks the use
 
 An ID token that has expired still works as a hint while the session it came from is there, so a user who leaves your app open all day can still sign out without the question.
 
-### Your app's tokens
+## Your app's tokens
 
 Signing out revokes no token. That's why step 3 deletes them:
 
@@ -61,19 +59,19 @@ Signing out revokes no token. That's why step 3 deletes them:
 
 To cut off everything a session handed out, end the session instead. A user can, under **Account**, **Sessions** in the admin console, and an administrator can, on the user's **Sessions** tab. See [Ending sessions](/concepts/ending-sessions/#end-a-session).
 
-### Where the user lands
+## Where the user lands
 
 The browser goes to your `post_logout_redirect_uri` only when it's one of the redirect URIs registered on the client the hint was issued to. Otherwise the user stays on the auth server's "Signed out" page. The sign-out has happened either way. [Logout](/reference/endpoints/logout/#where-the-user-lands) gives every case.
 
 The auth server adds `state` exactly as you sent it, and nothing else.
 
-### Hiding the hint
+## Hiding the hint
 
 The hint is the user's ID token, and anyone who decodes it can read the claims about the user in it. Posting it, as in step 4, keeps it out of the browser's history and the `Referer` header of the next page.
 
 A confidential client can go further and encrypt the hint with a key made from its client secret, so it's unreadable wherever it's seen or logged on the way. Send `client_id` beside an encrypted hint, so the auth server knows whose secret decrypts it. [Encrypting the hint](/reference/endpoints/logout/#encrypting-the-hint) gives the scheme.
 
-### When it's refused
+## When it's refused
 
 A POST from another site with no hint is refused with `403 Forbidden`, to stop a page you don't control from signing your users out. See [Sign-out answers 403](/troubleshooting/sign-out-answers-403/).
 

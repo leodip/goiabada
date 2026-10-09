@@ -54,11 +54,11 @@ func quotedLabels() []guideLabels {
 			"adminconsole.admin_clients.settings.field.default_acr",
 			"adminconsole.admin_clients.settings.acr_level2_mandatory",
 		}},
-		{guideSection{twoFactorGuide, "### Setting up an authenticator"}, []string{
+		{guideSection{twoFactorGuide, "## Setting up an authenticator"}, []string{
 			"adminconsole.account_menu.otp",
 			"adminconsole.account.otp.enable_button",
 		}},
-		{guideSection{twoFactorGuide, "### A user who lost their authenticator"}, []string{
+		{guideSection{twoFactorGuide, "## A user who lost their authenticator"}, []string{
 			"adminconsole.admin_users.authentication.otp_enabled_label",
 			"adminconsole.account.otp.disable_button",
 		}},
@@ -67,7 +67,7 @@ func quotedLabels() []guideLabels {
 			"adminconsole.admin_menu.settings_ui_theme",
 			"adminconsole.admin_settings.ui_theme.field.theme_selection",
 		}},
-		{guideSection{customizeGuide, "### How the language is chosen"}, []string{
+		{guideSection{customizeGuide, "## How the language is chosen"}, []string{
 			"adminconsole.account.profile.field.locale",
 		}},
 		{guideSection{dcrGuide, "## Let clients register themselves"}, []string{

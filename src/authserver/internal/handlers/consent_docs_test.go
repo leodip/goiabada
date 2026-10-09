@@ -23,7 +23,7 @@ import (
 
 const clientsPage = "site/src/content/docs/concepts/clients.mdx"
 
-var consentScreenSection = conceptSection{clientsPage, "### Consent required"}
+var consentScreenSection = conceptSection{clientsPage, "## Consent required"}
 
 // The consent table's columns, as the page heads them.
 const (
@@ -111,12 +111,12 @@ func TestConceptDocs_TheConsentTableIsWhenTheCodeShowsTheScreen(t *testing.T) {
 
 func TestConceptDocs_AConsentTableDisagreeingWithTheCodeFails(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/clients.mdx", "### Consent required\n\n"+consentFixtureHeader+
+	writeConceptFixture(t, root, "site/clients.mdx", "## Consent required\n\n"+consentFixtureHeader+
 		"| Off | Either | Either | Either | Skipped |\n"+
 		"| On | No | No | Maybe | Shown |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertConsentTable(r, root, conceptSection{"site/clients.mdx", "### Consent required"}, map[consentWorld]bool{
+		assertConsentTable(r, root, conceptSection{"site/clients.mdx", "## Consent required"}, map[consentWorld]bool{
 			{false, false, false, false}: false,
 			{false, true, false, false}:  true,
 			{true, false, false, false}:  true,
@@ -127,9 +127,9 @@ func TestConceptDocs_AConsentTableDisagreeingWithTheCodeFails(t *testing.T) {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
 	want := []string{
-		"site/clients.mdx: ### Consent required row 1 says the screen is skipped, the code shows it for Consent required Off, offline_access Yes, prompt=consent No, approved before No",
-		`site/clients.mdx: ### Consent required row 2 says "Maybe" under "The user approved every scope before", which is not Yes, No or Either`,
-		"site/clients.mdx: ### Consent required has no row for Consent required On, offline_access No, prompt=consent No, approved before No",
+		"site/clients.mdx: ## Consent required row 1 says the screen is skipped, the code shows it for Consent required Off, offline_access Yes, prompt=consent No, approved before No",
+		`site/clients.mdx: ## Consent required row 2 says "Maybe" under "The user approved every scope before", which is not Yes, No or Either`,
+		"site/clients.mdx: ## Consent required has no row for Consent required On, offline_access No, prompt=consent No, approved before No",
 	}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
@@ -138,13 +138,13 @@ func TestConceptDocs_AConsentTableDisagreeingWithTheCodeFails(t *testing.T) {
 
 func TestConceptDocs_AConsentTableAgreeingWithTheCodePasses(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/clients.mdx", "### Consent required\n\n"+consentFixtureHeader+
+	writeConceptFixture(t, root, "site/clients.mdx", "## Consent required\n\n"+consentFixtureHeader+
 		"| Off | No | No | Either | Skipped |\n"+
 		"| Either | Yes | Either | Either | Shown |\n"+
 		"| On | No | No | Either | Shown |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertConsentTable(r, root, conceptSection{"site/clients.mdx", "### Consent required"}, map[consentWorld]bool{
+		assertConsentTable(r, root, conceptSection{"site/clients.mdx", "## Consent required"}, map[consentWorld]bool{
 			{false, false, false, false}: false,
 			{false, false, false, true}:  false,
 			{false, true, false, false}:  true,
@@ -160,11 +160,11 @@ func TestConceptDocs_AConsentTableAgreeingWithTheCodePasses(t *testing.T) {
 
 func TestConceptDocs_AConsentTableWithoutItsColumnsStops(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/clients.mdx", "### Consent required\n\n"+
+	writeConceptFixture(t, root, "site/clients.mdx", "## Consent required\n\n"+
 		"| **Consent required** | Consent screen |\n|---|---|\n| On | Shown |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertConsentTable(r, root, conceptSection{"site/clients.mdx", "### Consent required"},
+		assertConsentTable(r, root, conceptSection{"site/clients.mdx", "## Consent required"},
 			map[consentWorld]bool{{true, false, false, false}: true})
 	})
 
@@ -175,15 +175,15 @@ func TestConceptDocs_AConsentTableWithoutItsColumnsStops(t *testing.T) {
 
 func TestConceptDocs_AMissingConsentSectionStops(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/clients.mdx", "### Consent\n\n"+consentFixtureHeader+
+	writeConceptFixture(t, root, "site/clients.mdx", "## Consent\n\n"+consentFixtureHeader+
 		"| On | No | No | No | Shown |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertConsentTable(r, root, conceptSection{"site/clients.mdx", "### Consent required"},
+		assertConsentTable(r, root, conceptSection{"site/clients.mdx", "## Consent required"},
 			map[consentWorld]bool{{true, false, false, false}: true})
 	})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, "### Consent required") {
+	if !report.Stopped || !strings.Contains(report.Fatal, "## Consent required") {
 		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
 	}
 }

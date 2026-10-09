@@ -38,7 +38,7 @@ For the hint mismatch, drop the `id_token_hint` of the previous user, or sign th
 
 If silent requests fail in an iframe on every browser that blocks third-party cookies, don't rely on them there. Use a refresh token to keep the user signed in to your app, or redirect the whole page with `prompt=none` rather than using an iframe.
 
-## How it works
+## What `prompt=none` checks
 
 With `prompt=none`, the auth server runs every check it would otherwise show the user a page for, and answers with an error instead of the page. `login_required` is one of them. The others:
 

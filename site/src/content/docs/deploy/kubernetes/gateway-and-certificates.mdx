@@ -143,15 +143,13 @@ If something goes wrong:
 - A start waits for the migration lock, or refuses a dirty schema: [Waiting for the migration lock, or marked dirty](/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/).
 - Signing in fails with "Invalid redirect_uri": [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/).
 
-## How it works
-
-### The route in
+## The route in
 
 The Gateway has three listeners: HTTP on port 80, and HTTPS on port 443 for each host name, each ending TLS with a certificate of its own, `goiabada-tls-auth` and `goiabada-tls-admin`. One HTTPRoute per host name sends its traffic to the server's Service, and a third answers every plain HTTP request with a `301` to HTTPS.
 
 The Gateway carries the annotation `cert-manager.io/cluster-issuer: "letsencrypt-prod"`. From it, cert-manager creates one Certificate per HTTPS listener, and the ClusterIssuer proves you control each host name by answering Let's Encrypt's HTTP-01 challenge through a temporary route on the Gateway's port 80 listener. cert-manager renews the certificates itself.
 
-### The gateway's traffic policy
+## The gateway's traffic policy
 
 The traffic policy of the load balancer in front of Envoy decides which address Envoy sees for a client, and so what Goiabada's rate limits, audit records and session records count. The wizard asks which one you use, writes its comments to match, and prints the GatewayClass file for it.
 

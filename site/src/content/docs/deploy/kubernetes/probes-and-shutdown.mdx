@@ -33,9 +33,7 @@ The manifest the setup wizard generates sets every probe, the stop pause and the
 
 </Steps>
 
-## How it works
-
-### Health endpoints
+## Health endpoints
 
 Both servers answer a health endpoint, and every probe in the manifest points at it:
 
@@ -46,7 +44,7 @@ Both servers answer a health endpoint, and every probe in the manifest points at
 
 That's on purpose. Every auth server pod shares one database, and every admin console pod one auth server, so a probe that checked either would fail on every pod at the same moment. A liveness probe would restart them all at once, and a readiness probe would take every pod out of the Service together, so clients would get the gateway's "no healthy upstream" in place of Goiabada's own error, and recovery would wait a probe period longer.
 
-### First start and upgrades
+## First start and upgrades
 
 The auth server does its database work before it listens: it opens the database, runs every outstanding migration, and on a first start seeds the empty database. Until that's done `/health` doesn't answer, so a pod that can't reach the database never answers it at all. Each container has a startup probe on `/health`, every 5 seconds with 60 failures allowed: up to 5 minutes to start. Liveness and readiness wait for the startup probe's first success, so neither counts a slow start against the pod, and once it succeeds they take over at their own periods. The admin console gets the same probe, and starts in seconds.
 
@@ -54,7 +52,7 @@ With several replicas, the first pod to start takes the migration lock and migra
 
 A pod stopped while it starts, because it was deleted or its startup budget ran out, stops cleanly: a wait for the database or the migration lock ends at once, a migration file already running runs to its end and the next doesn't start, and the auth server exits 0 with the schema clean at the version it reached, which the next start carries on from. [A start that's stopped](/deploy/upgrade-goiabada/#a-start-thats-stopped) has the details and the records. The grace period below bounds that too: a single migration file running longer than 65 seconds is ended by SIGKILL mid-file, leaving the schema dirty. So it's the startup budget, not the grace period, that has to cover the longest migration.
 
-### Stopping and the grace period
+## Stopping and the grace period
 
 When a pod is deleted, by a rollout, a scale-down or a node drain, Kubernetes removes it from the Service and starts stopping its containers at the same moment. Both servers close their listening socket the moment the signal arrives, so a connection the gateway opens before it has learned the pod is gone would be refused, and its client answered 503. The manifest gives both containers a five-second pause before they're signalled, through Kubernetes' native `preStop` sleep action, which keeps the pod serving while the gateway catches up. The sleep action is on by default from Kubernetes 1.30, and generally available from 1.34.
 

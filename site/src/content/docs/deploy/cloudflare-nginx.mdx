@@ -52,7 +52,7 @@ You need a domain on Cloudflare, a server with Docker and Nginx, two hostnames u
 
 </Steps>
 
-## How it works
+## What this setup gives you
 
 - **Two certificates protect each request:** Cloudflare's edge certificate on the browser's side, and the Let's Encrypt certificate Nginx serves to Cloudflare. **Full (strict)** makes Cloudflare refuse an Nginx certificate that isn't valid for the hostname.
 - **Renewals work with the proxy on.** The Nginx configuration answers Let's Encrypt's challenge on both 80 and 443, where Cloudflare's redirect to HTTPS sends it. `sudo certbot renew --dry-run` checks it.

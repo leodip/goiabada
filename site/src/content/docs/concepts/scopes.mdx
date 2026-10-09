@@ -31,9 +31,7 @@ A scope is something a client asks for when it requests a token. There are two k
 
 Ask only for what you use: the user sees the list on the consent screen, when the client asks for consent.
 
-## How it works
-
-### OpenID Connect scopes and their claims
+## OpenID Connect scopes and their claims
 
 | Scope | Claims |
 |---|---|
@@ -52,7 +50,7 @@ A claim with no value is left out rather than sent empty: a user with no nicknam
 
 `groups` and `attributes` are Goiabada's own. `offline_access` is defined by [OpenID Connect Core, section 11](https://openid.net/specs/openid-connect-core-1_0.html#OfflineAccess), and the rest by [section 5.4](https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims).
 
-### Where the claims go
+## Where the claims go
 
 Your app can read the claims in three places.
 
@@ -66,7 +64,7 @@ Neither setting decides `groups` and `attributes`. Each group and attribute has 
 
 The claims about the sign-in itself, such as `sub`, `iss`, `aud`, `exp`, `auth_time` and `acr`, are always in the ID token. See [Tokens](/concepts/tokens/).
 
-### Permission scopes
+## Permission scopes
 
 A permission scope names a permission: `product-api:read` is the permission `read` on the resource `product-api`.
 
@@ -74,7 +72,7 @@ A permission scope names a permission: `product-api:read` is the permission `rea
 - With the client credentials flow, the token carries the permissions the client itself holds. Leave `scope` out to get all of them.
 - The administrative scopes, such as `authserver:manage`, need the client to be allowed to request them. See [administrative scopes](/concepts/clients/#administrative-scopes).
 
-### Rules
+## Rules
 
 Scopes are case-sensitive and separated by exactly one space, with none at either end. Asking for `offline_access` alone is refused, since it grants nothing by itself. A scope the auth server doesn't know, or a permission the client may not have, is refused with `invalid_scope`: see [invalid_scope](/troubleshooting/invalid-scope/).
 

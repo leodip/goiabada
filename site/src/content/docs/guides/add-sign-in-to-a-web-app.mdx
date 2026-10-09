@@ -56,9 +56,7 @@ Most OpenID Connect libraries do every step below once you give them the discove
 
 That's sign-in done. The next thing your users will want is a way to sign out: see [Sign users out](/guides/sign-users-out/).
 
-## How it works
-
-### What the ID token says
+## What the ID token says
 
 The ID token is a signed JWT, a set of claims about the sign-in. Decoded, the one from the sign-in above looks like this:
 
@@ -83,7 +81,7 @@ The ID token is a signed JWT, a set of claims about the sign-in. Decoded, the on
 
 Identify the user by `sub`, the user's [subject](/concepts/glossary/#subject). It never changes, where an email address can. `email` and `email_verified` are there because the request asked for the `email` scope. Each [scope](/concepts/scopes/) brings its own claims, and they're in the ID token while **Include OpenID Connect claims in the ID token** is on, as it is in a new install. `acr` and `amr` say how the user signed in: see [ACR and AMR](/concepts/acr-and-amr/). Keep the ID token itself: signing the user out sends it back.
 
-### state, nonce and PKCE
+## state, nonce and PKCE
 
 Each of the three values you made in step 3 guards against something different, so send all three, new for every sign-in:
 
@@ -93,7 +91,7 @@ Each of the three values you made in step 3 guards against something different, 
 
 The auth server requires PKCE from a confidential client while **PKCE required for confidential clients using the authorization code flow** is on, under **Admin**, **General**, as it is in a new install. Send it anyway: [PKCE](/concepts/pkce/) explains why, and how to make the challenge.
 
-### The client secret
+## The client secret
 
 Your server proves who it is when it redeems the code. Step 5 sends the secret in an `Authorization: Basic` header, which curl's `-u` builds. Sending `client_id` and `client_secret` in the body works too, but not both ways in one request. See [client authentication](/reference/endpoints/token/#client-authentication).
 
@@ -101,13 +99,13 @@ Your server proves who it is when it redeems the code. Step 5 sends the secret i
 **Never** send the client secret to the browser, or put it in your app's front-end code. Anyone who has it can redeem codes as your app.
 </Aside>
 
-### Staying signed in
+## Staying signed in
 
 Your app's session and the auth server's are two things. Once a user has signed in, the auth server keeps a [session](/concepts/sessions/) of its own. While it lasts, the next time your app, or another app using Goiabada, sends them to sign in, they don't enter their password again. That's [single sign-on](/concepts/glossary/#single-sign-on-sso).
 
 Access tokens last 5 minutes in a new install. The refresh token gets your app new ones without the user, while the user's session lasts. Ask for the `offline_access` scope as well when your app needs to work while the user is away. See [Refresh tokens](/concepts/refresh-tokens/).
 
-### When something goes wrong
+## When something goes wrong
 
 - The sign-in page says "Invalid redirect_uri parameter.": see [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/).
 - The browser never comes back with an error: see [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/).

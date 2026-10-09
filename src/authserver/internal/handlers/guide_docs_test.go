@@ -42,7 +42,7 @@ const (
 
 var (
 	registrationExampleSection = conceptSection{registrationGuide, "## Register your app"}
-	alreadySignedInSection     = conceptSection{twoFactorGuide, "### Users who are already signed in"}
+	alreadySignedInSection     = conceptSection{twoFactorGuide, "## Users who are already signed in"}
 	requireACodeSection        = conceptSection{twoFactorGuide, "## Require a code for your app"}
 )
 

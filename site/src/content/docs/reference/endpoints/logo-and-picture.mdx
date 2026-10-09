@@ -35,9 +35,7 @@ The auth server serves both images, with no sign-in and no token:
 
 A client's logo works the same way: `<img src="https://auth.example.com/client/logo/my-app">`.
 
-## How it works
-
-### The client logo
+## The client logo
 
 `GET /client/logo/{clientIdentifier}` answers with the client's logo, under the image type it was uploaded as, such as `image/png`.
 
@@ -47,7 +45,7 @@ The answer carries an `ETag` and `Cache-Control: public, max-age=300, must-reval
 
 A client that doesn't exist, or has no logo, is answered `404 Not Found`. The identifier is matched exactly, case included.
 
-### The profile picture
+## The profile picture
 
 `GET /userinfo/picture/{subject}` answers with the picture of the user whose [subject](/concepts/glossary/#subject) is in the path, under the image type it was uploaded as.
 
@@ -59,13 +57,13 @@ A subject that names no user, or a user with no picture, is answered `404 Not Fo
 Anyone who knows a user's subject can fetch their picture. A subject is a random identifier nobody can guess, but every client the user signs in to receives it, so treat a profile picture as visible to all of them.
 </Aside>
 
-### Uploading
+## Uploading
 
 An administrator uploads a client's logo on the client's **Logo** tab, and a user's picture on the user's **Picture** tab. Users upload their own under **Picture** on their account pages in the admin console. See [Clients](/concepts/clients/#display-name-description-and-logo) and [Users and groups](/concepts/users-and-groups/).
 
 Both take a JPEG, PNG, GIF or WebP image, from 10x10 to 512x512 pixels, and up to 3MB. `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` sets that limit, for logos too. The image type is read from the file's content, not its name.
 
-### Calling them from a browser
+## Calling them from a browser
 
 Both endpoints work in an `<img>` tag from any site, which needs nothing more. They send no CORS headers, so JavaScript on another origin can't read the image's bytes with `fetch`.
 

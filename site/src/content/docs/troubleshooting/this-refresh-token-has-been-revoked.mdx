@@ -41,7 +41,7 @@ Refresh through **one** path at a time, and store the new refresh token in place
 
 Once a family is revoked, the user has to sign in to your app again. Their session with the auth server survives, so they usually go straight through.
 
-## How it works
+## What's revoked, and what isn't
 
 **Only that one grant is revoked.** The user's session with the auth server, their sign-ins to other clients and their other grants keep working.
 
@@ -51,7 +51,9 @@ Once a family is revoked, the user has to sign in to your app again. Their sessi
 
 The `refresh_token_replay_detected` event is written when the auth server revokes something, not on every repeat, and its `first_refresh_token_jti` identifies the grant. It doesn't prove an attack: an app that refreshes in parallel triggers it too.
 
-Other reasons a refresh answers `invalid_grant`:
+## Other reasons a refresh fails
+
+These refreshes answer `invalid_grant` too:
 
 | `error_description` | Why |
 |---|---|

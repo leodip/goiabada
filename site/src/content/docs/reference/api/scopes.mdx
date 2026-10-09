@@ -34,9 +34,7 @@ The four granular scopes stop short of administrators: they read them, but they 
 
 Every Account API operation takes `authserver:manage-account`, on a token issued for a user. Each user holds the `manage-account` permission from the moment they're created, so any client that signs a user in can ask for it. It isn't an administrative scope: a token carrying it reaches the user's own account and nothing else.
 
-## How it works
-
-### The domains
+## The domains
 
 Each Admin API operation belongs to one domain, and the domain decides which granular scope reaches it:
 
@@ -46,7 +44,7 @@ Each Admin API operation belongs to one domain, and the domain decides which gra
 | Clients | Clients, with their authentication, flows, redirect URIs, web origins, tokens, permissions, sessions, logo and secret |
 | Settings | General, email, session, token, UI theme and audit log settings, signing keys, resources and their permissions, and the audit log |
 
-### Administrative scopes on a user's behalf
+## Administrative scopes on a user's behalf
 
 A token from the client credentials flow carries the client's own permissions. A token your app gets for a signed-in user, through the authorization code flow, carries the scopes that user holds. For the six administrative scopes, `authserver:manage`, `authserver:admin-read`, `authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings` and `authserver:browser-sessions`, that token would reach the Admin API with the user's administrative rights. So only a client allowed to request the administrative scopes can get one on a user's behalf:
 

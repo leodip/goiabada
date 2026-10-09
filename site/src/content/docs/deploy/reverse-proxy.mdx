@@ -154,7 +154,7 @@ You need a server with Docker and Nginx, two hostnames under one domain, such as
 
 </Steps>
 
-## How it works
+## What this setup gives you
 
 - **Nginx terminates TLS.** Goiabada serves plain HTTP on `127.0.0.1`, which only processes on the host reach. Goiabada marks its cookies `Secure` because its URLs are `https://`, whatever Nginx speaks to it.
 - **Each server sees the client's address,** from the `X-Forwarded-For` entry Nginx appends: see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#reverse-proxy).

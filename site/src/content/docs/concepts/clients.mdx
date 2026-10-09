@@ -41,15 +41,13 @@ Pick this by where your app's code runs.
 
 New clients are confidential. Switch to public on the **Authentication** tab.
 
-## How it works
-
-### Client identifier
+## Client identifier
 
 The client identifier is 3 to 38 characters long. It starts with a letter, ends with a letter or digit, and uses only letters, digits, `-` and `_`, with no `--` or `__`.
 
 It's case-sensitive: `my-app` and `My-App` are two different clients, and a request whose `client_id` differs only in case finds no client.
 
-### Settings a new client starts with
+## Settings a new client starts with
 
 A client you create in the admin console starts:
 
@@ -61,7 +59,7 @@ A client you create in the admin console starts:
 
 The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authentication**, **OAuth2 flows**, **Redirect URIs**, **Web origins**, **User sessions** and **Permissions**.
 
-### Public and confidential clients
+## Public and confidential clients
 
 A confidential client proves who it is at the token endpoint with its client secret. The **Authentication** tab shows it (**Reveal**), and the audit log records each time it's read. **Generate new secret** makes a new one, which replaces the old one when you save, so your app needs it straight away.
 
@@ -72,7 +70,7 @@ A public client has no secret, so two rules make up for it:
 
 Switching a client from confidential to public deletes its secret, turns off the client credentials flow, and revokes the authorization codes and refresh tokens it already holds, because they were issued to a client that had to authenticate. Switching the other way revokes nothing.
 
-### Flows
+## Flows
 
 The **OAuth2 flows** tab turns each flow on or off for the client.
 
@@ -82,7 +80,7 @@ The **OAuth2 flows** tab turns each flow on or off for the client.
 
 The same tab sets **PKCE requirement for this client?** for a confidential client: **Required**, **Optional (not recommended)**, or inherit **PKCE required for confidential clients using the authorization code flow** under **Admin**, **General**, which is on in a new install. New clients inherit it.
 
-### Redirect URIs
+## Redirect URIs
 
 A redirect URI is the address the auth server sends the browser back to after sign-in, with the authorization code. Your app names one in its authorization request, and it must match one registered on the client **exactly**: no wildcards, and scheme, host, path and query are compared byte for byte.
 
@@ -99,9 +97,9 @@ The scheme, host and fragment rules are checked again on every authorization req
 
 The authorization code is bound to the redirect URI it was issued for. Your app must send that same `redirect_uri` when it exchanges the code at `/auth/token`.
 
-Removing a redirect URI takes effect on sign-ins already under way: [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/#how-it-works) says what the user sees.
+Removing a redirect URI takes effect on sign-ins already under way: [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/#how-redirect-uris-are-checked) says what the user sees.
 
-#### Loopback redirect URIs
+### Loopback redirect URIs
 
 A desktop or command-line app often receives its callback on a temporary local server, on a port the operating system picks at startup. So for an `http` redirect URI on a loopback host, `127.0.0.1`, `[::1]` or `localhost`, the port is ignored when comparing: register `http://127.0.0.1/callback` and `http://127.0.0.1:54321/callback` matches, per [RFC 8252](https://datatracker.ietf.org/doc/html/rfc8252#section-7.3).
 
@@ -111,7 +109,7 @@ The port is the only part that may differ. It applies to `http` only, never `htt
 Prefer `127.0.0.1` or `[::1]` to `localhost`. Resolving `localhost` isn't guaranteed to reach the loopback interface, which is why [RFC 8252](https://datatracker.ietf.org/doc/html/rfc8252#section-8.3) recommends against it.
 </Aside>
 
-### Web origins
+## Web origins
 
 Register a web origin when JavaScript in the browser calls `/auth/token`, `/auth/logout` or `/userinfo` directly, such as a single-page app. Without it, the browser blocks the call (CORS).
 
@@ -121,7 +119,7 @@ An origin is a scheme, a host and an optional port, with nothing after the host:
 
 `/.well-known/openid-configuration` and `/certs` accept every origin, with nothing to register.
 
-### Consent required
+## Consent required
 
 Turn **Consent required** on when users should approve what a client can access before it gets a token.
 
@@ -143,7 +141,7 @@ The scopes are the ones left once the auth server has dropped those the user doe
 
 Choosing **Cancel** ends the sign-in. A client you created gets `access_denied`, "The user did not provide consent", at its redirect URI. A client that [registered itself](#self-registered-clients) gets nothing: the user sees a page naming the app and the address it asked to send them to, and the request stops there. So does a client whose redirect URI has been removed since the request began.
 
-### Default ACR level
+## Default ACR level
 
 The ACR level is how strongly a user must sign in to use the client:
 
@@ -157,7 +155,7 @@ New clients start at `urn:goiabada:level2_optional`.
 
 The default is a floor. An authorization request can ask for a stronger level with `acr_values`, but never a weaker one: the auth server uses the stronger of the two. A change applies to sign-ins that start after it. See [ACR and AMR](/concepts/acr-and-amr/).
 
-### Administrative scopes
+## Administrative scopes
 
 Six permissions on the `authserver` resource let whoever holds them administer Goiabada: `authserver:manage`, `authserver:admin-read`, `authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings` and `authserver:browser-sessions`. A token carrying one of them on a user's behalf acts at the Admin API with that user's authority. So **only a client allowed to request the administrative scopes may get one**:
 
@@ -178,11 +176,11 @@ Allowing a client changes nothing else. A token still carries only the scopes th
 
 Each switch leaves an `updated_client_administrative_scopes` event in the [audit log](/concepts/audit-log/#events-to-alert-on), and each refusal reaching a signed-in user or an authenticated client leaves an `administrative_scope_refused` event.
 
-### Permissions
+## Permissions
 
 The **Permissions** tab grants permissions to the client itself, for the client credentials flow: a token the client gets for itself can carry only these permissions. It has no effect on tokens a client gets for a user, which carry the user's permissions. See [Resources and permissions](/concepts/resources-and-permissions/).
 
-### Tokens
+## Tokens
 
 The **Tokens** tab overrides the global token settings for this client:
 
@@ -192,7 +190,7 @@ The **Tokens** tab overrides the global token settings for this client:
 
 A value of 0 uses the global setting. See [Tokens](/concepts/tokens/).
 
-### Display name, description and logo
+## Display name, description and logo
 
 Users see a client on the password, one-time code and consent screens. By default it's shown by its client identifier. On the **Settings** tab you can give it a **Display name** and a **Description**, up to 100 characters each, and a **Website URL**, which must be `http` or `https`. Each one shows only when its switch is on: **Show display name**, **Show description** and **Show website URL**.
 
@@ -200,17 +198,17 @@ The **Logo** tab uploads a logo: JPEG, PNG, GIF or WebP, from 10x10 to 512x512 p
 
 The logo is public, at `GET /client/logo/{clientIdentifier}`, with no sign-in, even while **Show logo** is off. It answers 404 when the client has no logo, and carries an `ETag` and `Cache-Control: public, max-age=300, must-revalidate`.
 
-### Disabling and deleting a client
+## Disabling and deleting a client
 
 Untick **Enabled** on the **Settings** tab to stop a client while keeping its settings. The authorization endpoint then shows an error page instead of signing users in, and the token endpoint answers 401 with `invalid_client`, so its refresh tokens stop working too. Access tokens it already has stay valid until they expire.
 
 **Delete** on the list of clients removes the client with its redirect URIs, web origins, permissions, logo, unredeemed codes, refresh tokens and users' consents to it. Access tokens it already has stay valid until they expire.
 
-### The admin console's client
+## The admin console's client
 
 The admin console signs administrators in through its own client, `admin-console-client`. It's a system-level client, so its identifier can't be changed, it can't be deleted, and it's always allowed to request the administrative scopes. Its other settings can be changed, by an administrator with `authserver:manage`.
 
-### Self-registered clients
+## Self-registered clients
 
 With dynamic client registration (DCR) turned on, an app can register itself as a client by calling `POST /connect/register`, as [RFC 7591](https://datatracker.ietf.org/doc/html/rfc7591) describes, with nobody creating it in the admin console. It's how tools like MCP clients get a client of their own.
 
@@ -253,7 +251,7 @@ Once you've reviewed a self-registered client, you can change its settings like 
 **Building a self-registered client?** You get no error response when a sign-in fails: it just never comes back. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/#the-user-sees-you-have-not-been-sent-anywhere).
 </Aside>
 
-#### Redirect URIs for self-registered clients
+### Redirect URIs for self-registered clients
 
 The [redirect URI rules](#redirect-uris) apply, plus stricter ones, since the caller is anonymous. A client is public when it registers with `token_endpoint_auth_method` set to `none`, and confidential otherwise.
 

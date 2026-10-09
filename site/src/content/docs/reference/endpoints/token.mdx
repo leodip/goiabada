@@ -57,15 +57,13 @@ Your app calls it directly, not through the browser, with a `grant_type` saying 
 
 Redeem the code straight away: it works once, and for 60 seconds.
 
-## How it works
-
-### The request
+## The request
 
 The parameters go in an `application/x-www-form-urlencoded` body, as RFC 6749 asks. The auth server reads nothing from the query string. Each parameter goes in once: one sent twice is refused with `invalid_request`, "The '*name*' parameter was included more than once.", even when both copies agree.
 
 A body that can't be read, such as one with a broken `%` escape or one over 64 KiB, is refused with `invalid_request`, "The request body could not be parsed."
 
-### Client authentication
+## Client authentication
 
 A [confidential client](/concepts/clients/#public-and-confidential-clients) proves who it is with its client secret, in one of two ways:
 
@@ -89,7 +87,7 @@ When the client can't be authenticated, the answer is `401 Unauthorized` with `i
 
 A request with no `client_id` at all is refused with `invalid_request`, "Missing required client_id parameter.", before `grant_type` is read.
 
-### Authorization code grant
+## Authorization code grant
 
 | Parameter | Required | |
 |---|---|---|
@@ -116,7 +114,7 @@ A code the auth server doesn't know, one already redeemed or revoked, and one wh
 | `invalid_request` | "The code_verifier parameter was provided, but PKCE was not used during authorization." | A verifier for a code issued without a challenge |
 | `invalid_grant` | "The redirect URI recorded on this authorization code is no longer registered on the client, so the code can no longer be redeemed." | An administrator removed the redirect URI after the code was issued |
 
-### Refresh token grant
+## Refresh token grant
 
 | Parameter | Required | |
 |---|---|---|
@@ -129,7 +127,7 @@ Every refresh rotates the token: the answer carries a new refresh token, and the
 
 The refresh is refused with `invalid_grant` when the token can't be used any more, with a description saying why: the user's session has ended or expired, the user was disabled or their credentials changed, an offline refresh token reached its maximum lifetime, or the user withdrew their consent. So is a refresh token issued to another client, with "The refresh token is invalid because it does not belong to the client." [Refresh tokens](/concepts/refresh-tokens/#how-long-a-refresh-token-lasts) explains how long each kind lasts.
 
-### Client credentials grant
+## Client credentials grant
 
 | Parameter | Required | |
 |---|---|---|
@@ -142,7 +140,7 @@ Only a confidential client with **Client credentials** turned on can use it. The
 | `unauthorized_client` | The flow is off for the client, or it's a public client |
 | `invalid_scope` | A scope isn't `resource:permission`, names a resource or permission that doesn't exist, or names a permission the client doesn't hold. Or it's an OpenID Connect scope, such as `openid`, or `offline_access`: there's no user to describe. Or `scope` is left out and the client holds no permissions, so there's nothing to grant |
 
-### Password grant
+## Password grant
 
 | Parameter | Required | |
 |---|---|---|
@@ -152,7 +150,7 @@ Only a confidential client with **Client credentials** turned on can use it. The
 
 It's refused with `unauthorized_client` unless the flow is on for the client, and with `invalid_grant` for a user with two-factor authentication. See [ROPC](/legacy-flows/ropc/) for every rule.
 
-### Administrative scopes
+## Administrative scopes
 
 On the grants where a client acts for a user, a client that isn't [allowed to request the administrative scopes](/concepts/clients/#administrative-scopes) is refused one, never handed a narrower token, and the refusal leaves an `administrative_scope_refused` entry in the [audit log](/concepts/audit-log/#events-to-alert-on). The client credentials grant isn't affected.
 
@@ -187,7 +185,7 @@ The **refresh token grant** answers `invalid_grant`, in the shape of its other p
 
 The refresh token isn't spent: refresh again with a `scope` that leaves every administrative scope out, which [RFC 6749 section 6](https://www.rfc-editor.org/rfc/rfc6749#section-6) allows as a narrower request.
 
-### The answer
+## The answer
 
 A successful answer is `200 OK` with a JSON body, `Cache-Control: no-store` and `Pragma: no-cache`, as RFC 6749 section 5.1 requires. A field with no value is left out.
 
@@ -201,7 +199,7 @@ A successful answer is `200 OK` with a JSON body, `Cache-Control: no-store` and 
 | `refresh_expires_in` | Seconds until the refresh token expires if it isn't used |
 | `scope` | The scope the access token carries |
 
-### Errors
+## Errors
 
 An error is a JSON body with `error` and `error_description`, as RFC 6749 section 5.2 defines, with `Cache-Control: no-store` and `Pragma: no-cache`:
 
@@ -231,7 +229,7 @@ Pragma: no-cache
 
 With rate limiting on, the password grant is limited per IP address and per account, and a request over the limit is answered `429 Too Many Requests` with a `Retry-After` header. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/). The other grants aren't limited.
 
-### Calling it from a browser
+## Calling it from a browser
 
 JavaScript in a browser, such as a single-page app, can call the token endpoint when its origin is registered as a [web origin](/concepts/clients/#web-origins) on a client. Without one, the browser blocks the call.
 

@@ -56,15 +56,13 @@ It's the same trip as [a web app's](/guides/add-sign-in-to-a-web-app/): the brow
 
 </Steps>
 
-## How it works
-
-### No secret, always PKCE
+## No secret, always PKCE
 
 A public client has no secret, so nothing it sends to the token endpoint proves who it is. PKCE makes up for that: your app sends a hash of a fresh secret with each authorization request, and the code is redeemed only with the secret itself. A code someone intercepts on its way back is no use without it.
 
 So a public client **always** uses PKCE, and the auth server refuses a public client's authorization request without a `code_challenge`. There's no setting to turn it off. A public client also can't use the client credentials flow, and a request that sends it a `client_secret` is refused with `invalid_request`. See [Clients](/concepts/clients/#public-and-confidential-clients).
 
-### In the browser
+## In the browser
 
 Your SPA calls the token endpoint from JavaScript, from another origin than the auth server's, so the browser lets it read the answer only when the auth server allows that origin (CORS). The auth server allows every origin registered as a [web origin](/concepts/clients/#web-origins), at `/userinfo` and `/auth/logout` too. A web origin is permitted server-wide, for every client, whichever client you register it on.
 
@@ -74,7 +72,7 @@ Keep the tokens where other sites can't reach them. Keeping them in memory is th
 Refresh from **one** place. When two tabs refresh with the same refresh token, the second can look like a stolen token being replayed, and the auth server then revokes every refresh token of the sign-in, so the user has to sign in again. See [Rotation](/concepts/refresh-tokens/#rotation).
 </Aside>
 
-### On a phone or a desktop
+## On a phone or a desktop
 
 Open the authorization request in the system browser, never in a web view inside your app. [RFC 8252](https://www.rfc-editor.org/rfc/rfc8252.html#section-8.12) says a native app must not use one, since your app could read the password the user types into it. The system browser also shares the auth server's session with every other app, so a user who's already signed in isn't asked for their password again.
 
@@ -82,7 +80,7 @@ A mobile app's redirect URI uses a scheme of its own, such as `com.example.app:/
 
 A desktop app can receive the code on a local server it starts on a free port. For an `http` redirect URI on `127.0.0.1`, `[::1]` or `localhost`, the auth server ignores the port when it compares, as RFC 8252 asks: register `http://127.0.0.1/callback`, and `http://127.0.0.1:54321/callback` matches. Prefer `127.0.0.1` to `localhost`. See [loopback redirect URIs](/concepts/clients/#loopback-redirect-uris).
 
-### Refresh tokens
+## Refresh tokens
 
 A public client gets a refresh token like any other, and it works the same way: every refresh hands your app a new refresh token and retires the one it sent, so store each new one before you use the rest of the answer. See [Refresh tokens](/concepts/refresh-tokens/).
 

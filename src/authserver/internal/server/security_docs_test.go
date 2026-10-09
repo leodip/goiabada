@@ -19,7 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/httpmw"
 )
 
-var csrfExemptionsSection = docSection{"site/src/content/docs/reference/security.mdx", "### Cross-site request forgery"}
+var csrfExemptionsSection = docSection{"site/src/content/docs/reference/security.mdx", "## Cross-site request forgery"}
 
 // csrfExemptPaths is every path the policy names, exact, prefix and conditional alike, sorted.
 func csrfExemptPaths(policy httpmw.CSRFPolicy) []string {
@@ -39,14 +39,14 @@ func TestSecurityDocs_TheCSRFTableIsThePolicysPaths(t *testing.T) {
 
 func TestSecurityDocs_ACSRFTableDisagreeingWithThePolicyFails(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/security.mdx", "### Cross-site request forgery\n\n"+
+	writeDocFixture(t, root, "site/security.mdx", "## Cross-site request forgery\n\n"+
 		"| Path | Why |\n|---|---|\n"+
 		"| `/auth/token` | A client secret or a code |\n"+
 		"| `/api` | Bearer tokens |\n"+
 		"| `/auth/token` | Twice |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertCSRFExemptionTable(r, root, docSection{"site/security.mdx", "### Cross-site request forgery"},
+		assertCSRFExemptionTable(r, root, docSection{"site/security.mdx", "## Cross-site request forgery"},
 			[]string{"/api/", "/auth/token"})
 	})
 
@@ -54,9 +54,9 @@ func TestSecurityDocs_ACSRFTableDisagreeingWithThePolicyFails(t *testing.T) {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
 	want := []string{
-		"site/security.mdx: ### Cross-site request forgery row 2 names /api, which the policy does not exempt",
-		"site/security.mdx: ### Cross-site request forgery row 3 names /auth/token, which an earlier row already does",
-		"site/security.mdx: ### Cross-site request forgery has no row for /api/",
+		"site/security.mdx: ## Cross-site request forgery row 2 names /api, which the policy does not exempt",
+		"site/security.mdx: ## Cross-site request forgery row 3 names /auth/token, which an earlier row already does",
+		"site/security.mdx: ## Cross-site request forgery has no row for /api/",
 	}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
@@ -65,14 +65,14 @@ func TestSecurityDocs_ACSRFTableDisagreeingWithThePolicyFails(t *testing.T) {
 
 func TestSecurityDocs_ACSRFTableAgreeingWithThePolicyPasses(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/security.mdx", "### Cross-site request forgery\n\n"+
+	writeDocFixture(t, root, "site/security.mdx", "## Cross-site request forgery\n\n"+
 		"| Path | Why |\n|---|---|\n"+
 		"| `/api/` and everything under it | Bearer tokens |\n"+
 		"| `/auth/token` | A client secret or a code |\n\n"+
-		"### Next\n\n| Path | Why |\n|---|---|\n| `/other` | Another table |\n")
+		"## Next\n\n| Path | Why |\n|---|---|\n| `/other` | Another table |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertCSRFExemptionTable(r, root, docSection{"site/security.mdx", "### Cross-site request forgery"},
+		assertCSRFExemptionTable(r, root, docSection{"site/security.mdx", "## Cross-site request forgery"},
 			[]string{"/api/", "/auth/token"})
 	})
 
@@ -83,24 +83,24 @@ func TestSecurityDocs_ACSRFTableAgreeingWithThePolicyPasses(t *testing.T) {
 
 func TestSecurityDocs_AMissingCSRFSectionStops(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/security.mdx", "### CSRF\n\n| Path | Why |\n|---|---|\n| `/auth/token` | A secret |\n")
+	writeDocFixture(t, root, "site/security.mdx", "## CSRF\n\n| Path | Why |\n|---|---|\n| `/auth/token` | A secret |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertCSRFExemptionTable(r, root, docSection{"site/security.mdx", "### Cross-site request forgery"},
+		assertCSRFExemptionTable(r, root, docSection{"site/security.mdx", "## Cross-site request forgery"},
 			[]string{"/auth/token"})
 	})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, "### Cross-site request forgery") {
+	if !report.Stopped || !strings.Contains(report.Fatal, "## Cross-site request forgery") {
 		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
 	}
 }
 
 func TestSecurityDocs_ACSRFSectionWithNoTableStops(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/security.mdx", "### Cross-site request forgery\n\n- `/auth/token` is exempt.\n")
+	writeDocFixture(t, root, "site/security.mdx", "## Cross-site request forgery\n\n- `/auth/token` is exempt.\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertCSRFExemptionTable(r, root, docSection{"site/security.mdx", "### Cross-site request forgery"},
+		assertCSRFExemptionTable(r, root, docSection{"site/security.mdx", "## Cross-site request forgery"},
 			[]string{"/auth/token"})
 	})
 
@@ -111,11 +111,11 @@ func TestSecurityDocs_ACSRFSectionWithNoTableStops(t *testing.T) {
 
 func TestSecurityDocs_NoExemptPathsStops(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/security.mdx", "### Cross-site request forgery\n\n"+
+	writeDocFixture(t, root, "site/security.mdx", "## Cross-site request forgery\n\n"+
 		"| Path | Why |\n|---|---|\n| `/auth/token` | A secret |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertCSRFExemptionTable(r, root, docSection{"site/security.mdx", "### Cross-site request forgery"}, nil)
+		assertCSRFExemptionTable(r, root, docSection{"site/security.mdx", "## Cross-site request forgery"}, nil)
 	})
 
 	if !report.Stopped || !strings.Contains(report.Fatal, "no path") {

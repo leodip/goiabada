@@ -18,7 +18,7 @@ import (
 // package reads it, so the page's checks against those packages never see it.
 const (
 	environmentVariablesPage = "../../../site/src/content/docs/reference/environment-variables.mdx"
-	timeZoneHeading          = "### Time zone"
+	timeZoneHeading          = "## Time zone"
 )
 
 // The page's Time zone section names `TZ`, and TZ is the variable Install reads: a zone set there
@@ -70,8 +70,8 @@ func markdownSection(page []byte, heading string) string {
 }
 
 func TestMarkdownSection_ReadsOnlyItsSection(t *testing.T) {
-	page := "## Configuration\n\n`GHOST` above.\n\n### Time zone\n\nBoth servers read `TZ`.\n\n" +
-		"```\n### Time zone\n`IN_FENCE`\n```\n#### Detail\n\n`NESTED`\n\n### Next\n\n`AFTER`\n"
+	page := "## Configuration\n\n`GHOST` above.\n\n## Time zone\n\nBoth servers read `TZ`.\n\n" +
+		"```\n## Time zone\n`IN_FENCE`\n```\n### Detail\n\n`NESTED`\n\n## Next\n\n`AFTER`\n"
 
 	section := markdownSection([]byte(page), timeZoneHeading)
 
@@ -80,6 +80,6 @@ func TestMarkdownSection_ReadsOnlyItsSection(t *testing.T) {
 	for _, outside := range []string{"GHOST", "IN_FENCE", "AFTER"} {
 		assert.NotContains(t, section, outside)
 	}
-	assert.Empty(t, markdownSection([]byte("### Timezone\n\n`TZ`\n"), timeZoneHeading), "a page with no such section reads nothing")
-	assert.Empty(t, markdownSection([]byte("```\n### Time zone\n`TZ`\n```\n"), timeZoneHeading), "a heading in a fence opens nothing")
+	assert.Empty(t, markdownSection([]byte("## Timezone\n\n`TZ`\n"), timeZoneHeading), "a page with no such section reads nothing")
+	assert.Empty(t, markdownSection([]byte("```\n## Time zone\n`TZ`\n```\n"), timeZoneHeading), "a heading in a fence opens nothing")
 }

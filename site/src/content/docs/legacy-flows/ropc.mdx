@@ -65,9 +65,7 @@ Turn it on only for an app of your own that signs users in this way and that you
 
 **Resource Owner Password Credentials (ROPC)** on the **OAuth2 flows** tab has three choices: **Enabled**, **Disabled**, or inherit the global **Resource owner password credentials flow enabled** under **Admin**, **General**, which is off in a new install.
 
-## How it works
-
-### The request
+## The request
 
 | Parameter | Required | |
 |---|---|---|
@@ -80,7 +78,7 @@ Turn it on only for an app of your own that signs users in this way and that you
 
 The scope can hold the OpenID Connect scopes, such as `openid`, `profile` and `email`, `offline_access`, and `resource:permission` scopes the user holds, directly or through a group. A scope the user doesn't hold is refused, never dropped. An [administrative scope](/concepts/clients/#administrative-scopes) needs a client allowed to request one.
 
-### What your app gets
+## What your app gets
 
 - **An access token and a refresh token, always,** and an ID token when the scope has `openid`.
 - **An offline refresh token,** whether or not your app asked for `offline_access`, since there's no session for it to belong to. It follows the offline refresh token's idle timeout and maximum lifetime, 30 days and a year in a new install. See [Refresh tokens](/concepts/refresh-tokens/).
@@ -91,20 +89,20 @@ The scope can hold the OpenID Connect scopes, such as `openid`, `profile` and `e
 
 Each grant leaves a `token_issued_ropc_response` entry in the [audit log](/concepts/audit-log/). Each `invalid_grant` below leaves a `ropc_auth_failed` entry, which records the address only as `email_digest`.
 
-### Who can't use it
+## Who can't use it
 
 - **A user with two-factor authentication.** The grant can't ask for a one-time code, so it refuses every user who has an authenticator rather than skip the second factor. They sign in through the browser instead.
 - **A disabled user,** even with the right password.
 
-### Turning it off
+## Turning it off
 
 Setting the flow to **Disabled**, for the client or globally, stops new grants and refresh tokens already issued alike: the next refresh is refused with `unauthorized_client`, and the user has to sign in another way.
 
-### Rate limits
+## Rate limits
 
 [RFC 6749 section 4.3.2](https://www.rfc-editor.org/rfc/rfc6749.html#section-4.3.2) requires the endpoint to be protected against guessing. With the rate limiter on, the password grant has a budget per IP address for every request, and a wrong password counts against the same budgets as one typed into the sign-in page. It's off by default. See [rate limits](/reference/environment-variables/#rate-limits) and [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
 
-### Errors
+## Errors
 
 Errors are JSON, as for every grant, with `error` and `error_description`:
 
@@ -125,7 +123,7 @@ A user with two-factor authentication is told why:
 }
 ```
 
-### Why it's deprecated
+## Why it's deprecated
 
 <Aside type="danger" title="Your app sees the password">
 The app holds the user's password, so a bug, a log line or a breach in the app gives it away, and the user can't tell a real app from a fake one asking for it. **Never** log the token request's body, and never store the password.

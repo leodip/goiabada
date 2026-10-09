@@ -61,9 +61,7 @@ Two endpoints do this, and neither needs a token:
 
 Then it checks the token's `iss` against the discovery document's `issuer`, and its `aud` and `exp`. See [Tokens](/concepts/tokens/).
 
-## How it works
-
-### The discovery document
+## The discovery document
 
 The auth server describes what it implements, which no setting changes but two: the issuer, and whether `registration_endpoint` is there. Every grant and response type is listed even while the implicit flow or the password grant is off, as OpenID Connect Discovery 1.0 and RFC 8414 define these fields: a client that isn't allowed one is refused at the endpoint.
 
@@ -92,7 +90,7 @@ The auth server describes what it implements, which no setting changes but two: 
 
 Each endpoint is the auth server's base URL, `GOIABADA_AUTHSERVER_BASEURL`, followed by its path. The admin console's home page links to the document.
 
-### The key set
+## The key set
 
 `/certs` answers with the public half of every signing key the auth server keeps, in this order:
 
@@ -104,7 +102,7 @@ Each key is a 4096-bit RSA key with `alg` `RS256`, `use` `sig`, and a `kid` that
 
 To rotate, choose **Rotate key** under **Admin**, **Keys** in the admin console. The next key becomes the current one, the current one becomes the previous one, the old previous key is deleted, and a new next key is created. A token signed by the deleted key no longer verifies, refresh tokens included, so don't rotate twice within the lifetime of your longest-lived token.
 
-### Calling them from a browser
+## Calling them from a browser
 
 Both endpoints answer cross-origin requests from any origin, with nothing to register, so JavaScript in a browser can read them. See [web origins](/concepts/clients/#web-origins) for the endpoints that need one.
 

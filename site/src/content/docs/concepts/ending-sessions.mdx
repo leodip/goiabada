@@ -23,9 +23,7 @@ A [session](/concepts/sessions/) ends in one of four ways: someone ends it from 
 
 </Steps>
 
-## How it works
-
-### What ending a session revokes
+## What ending a session revokes
 
 | What | What happens |
 |---|---|
@@ -38,13 +36,13 @@ That's what sets ending a session apart from one expiring. An [offline refresh t
 
 Each one leaves two entries in the [audit log](/concepts/audit-log/): `terminated_user_session`, which records what was revoked, and `deleted_user_session`, the record that the session is gone. Count `terminated_user_session` to know how many sessions were ended.
 
-### A sign-in under way
+## A sign-in under way
 
 A sign-in can't slip past an ended session. If someone was partway through signing in to an app on the strength of the session you ended, the sign-in goes back to the password step rather than quietly starting a new session. That holds on the consent screen too: just before it issues the code, the auth server checks the session again, so a sign-in left waiting there goes back to the password step as well, and so does one whose session timed out while the screen was open.
 
 A [silent request](/concepts/glossary/#silent-request) can't show a page, so it gets `login_required` instead, and your app decides when to send the user to sign in. Two things withhold that error: a client that [registered itself](/concepts/clients/#self-registered-clients) is never sent one, and neither is a redirect URI no longer registered on the client. A silent request that doesn't come back is then the signal. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/).
 
-### Signing out
+## Signing out
 
 Your app signs a user out by sending them to [`/auth/logout`](/reference/endpoints/logout/). Signing out revokes nothing: no refresh token and no authorization code is revoked. What it ends depends on what the request carries:
 
@@ -55,7 +53,7 @@ Either way the browser's cookie is cleared, so its next sign-in starts from the 
 
 A sign-out that ends the session leaves a `logout` entry in the audit log, and one that removes your app from a session other clients still use leaves `deleted_user_session_client`.
 
-### Credential changes
+## Credential changes
 
 When a user's credentials change, their sessions and refresh tokens stop being usable:
 
@@ -75,7 +73,7 @@ These end nothing:
 - **Changing an email address.** The change already asks for the current password, so signing other devices out would protect nothing that person couldn't do again. Tokens issued before it carry the old `email` claim until they're refreshed or expire.
 - **Setting up or removing two-factor authentication.** Each session goes through the one-time code step again before it's used for a level above `urn:goiabada:level1`. See [ACR and AMR](/concepts/acr-and-amr/#a-session-thats-already-there).
 
-### A different user signs in on the same browser
+## A different user signs in on the same browser
 
 A shared or borrowed browser can reach the sign-in page still holding someone else's session. That happens whenever a client sends [`prompt=login`](/concepts/prompt/) or an [`id_token_hint`](/concepts/id-token-hint/) naming another user, and whenever the session there has stopped being valid.
 
@@ -97,7 +95,7 @@ Each handover leaves a `cross_user_session_replaced` entry in the audit log, nam
 When the **same** user signs in again, none of this applies. Their session is reused while it's still valid. When it isn't, they get a new session, and nothing is revoked.
 </Aside>
 
-### What it doesn't reach
+## What it doesn't reach
 
 An access token is checked by signature, and an API doesn't ask the auth server about it, so nothing on this page can take back one already issued:
 

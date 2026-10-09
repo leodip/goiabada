@@ -46,17 +46,15 @@ The security events are in the [audit log](/concepts/audit-log/), not the metric
 
 Watch for a run of `auth_failed_pwd` or `ropc_auth_failed` events against one account, and for `rate_limit_exceeded`, which each pod writes at most once per key and window, so it shows which accounts and addresses the rate limiter's refusals were about.
 
-## How it works
-
-### Levels
+## Levels
 
 Each server writes records at its level and above: `GOIABADA_AUTHSERVER_LOG_LEVEL` and `GOIABADA_ADMINCONSOLE_LOG_LEVEL`, `info` by default, or `debug`, `warn` or `error`. A level or format spelled any other way, uppercase included, stops the server at start. The [environment variables](/reference/environment-variables/#logging) list every logging setting.
 
-### Request records
+## Request records
 
 With request logging on, every request gets a record but three kinds, which are never logged: health checks (`/health`), static files (`/static/`) and `/favicon.ico`. A record's `request_id`, `method` and `ip` are each clipped at 128 bytes, with the true length in a marker, so a very long request id sent by a proxy shows up shortened rather than missing.
 
-### What a request record leaves out
+## What a request record leaves out
 
 A request record names every query parameter that arrived, but not every value. Every query value is replaced by `[redacted]`, apart from those of these names, whose value is kept: `client_id`, `response_type`, `response_mode`, `scope`, `prompt`, `max_age`, `acr_values`, `code_challenge_method`, `ui_locales`, `error`, `page` and `size`.
 
@@ -72,7 +70,7 @@ The recorded target is an inventory, not a copy:
 - **It's bounded.** Each parameter name and each kept value is clipped at 512 bytes, and the whole target at 4096, each with a marker giving the true length. A target past 4096 bytes loses its later parameters.
 - **A query that can't be parsed isn't guessed at.** It's recorded as `?[unparsable query, N bytes]`, with no names at all.
 
-### Verbose API logging
+## Verbose API logging
 
 `GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS=true` writes the request and response bodies of every `/api/v1/admin` and `/api/v1/account` call to the auth server's log. It's off by default and meant for development.
 

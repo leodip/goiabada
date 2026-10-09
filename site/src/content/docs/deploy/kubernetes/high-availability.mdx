@@ -34,9 +34,7 @@ The manifest the setup wizard generates runs one replica of each server. At one 
 
 </Steps>
 
-## How it works
-
-### Connections
+## Connections
 
 - **Surge** is the extra pod a rolling update runs beside the old ones. The generated Deployments set `maxSurge: 1` and `maxUnavailable: 0`: a rollout starts one new pod, waits for it to be ready, and only then stops an old one, so three replicas briefly run four, and never fewer than three.
 - **Headroom** is every other connection the database must accept: the `migrate` subcommand, the maintenance connection a starting pod opens to create the database when `GOIABADA_DB_CREATE` is on, your own sessions, and any other application on the same server. The admin console opens none.
@@ -44,20 +42,20 @@ The manifest the setup wizard generates runs one replica of each server. At one 
 
 A capped pool trades one failure for another, on purpose. When every connection of a pod is busy, its next request waits for one to be released, until the client or the gateway gives up, rather than the database refusing a new connection to every pod at once. Raising replicas without raising `max_connections` adds no capacity at the database: it moves the bottleneck from the pods' queues to the database's refusals. The pool's settings are in [Environment variables](/reference/environment-variables/#database).
 
-### Disruptions and spread
+## Disruptions and spread
 
 Each Deployment has a PodDisruptionBudget with `maxUnavailable: 1`, so a voluntary disruption, such as a `kubectl drain`, a node pool upgrade or an autoscaler removing a node, evicts at most one of its pods at a time. At one replica that one is the only pod, and the server is down until its replacement is scheduled elsewhere and ready; the rolling update doesn't help, because an eviction starts no surge pod first. Run at least two replicas to keep serving through a drain. The same budget then keeps all but one pod serving at any count, so it needs no change when you scale.
 
 Each pod template also spreads its pods over nodes, with a `topologySpreadConstraints` on `kubernetes.io/hostname`, `maxSkew: 1` and `whenUnsatisfiable: ScheduleAnyway`. At three replicas on three nodes it places one per node, so losing a node takes one pod rather than all of them. On fewer nodes than replicas it still schedules every pod rather than leave one pending.
 
-### Autoscaling
+## Autoscaling
 
 The manifest emits no HorizontalPodAutoscaler. You can add one; settle two things first:
 
 - **The database's connections,** sized for `maxReplicas` plus the surge pod, as [Connections](#connections) says.
 - **What to scale on.** CPU is the auth server's bottleneck under a burst of sign-ins (see [Resource limits](#resource-limits)), so a CPU target relative to its `100m` request is a reasonable signal. The admin console checks no passwords and rarely needs more than one or two replicas.
 
-### Rate limiting across replicas
+## Rate limiting across replicas
 
 The auth server's rate limiter is off unless you turn it on, with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`. The wizard asks, and writes the answer into the auth server's ConfigMap either way; `--rate-limiter=true` or `=false` answers without the prompt. Its default follows the [gateway's traffic policy](/deploy/kubernetes/gateway-and-certificates/#the-gateways-traffic-policy):
 
@@ -71,7 +69,7 @@ With the limiter on, not every limit holds across replicas:
 
 The budgets are in [Rate limits](/reference/environment-variables/#rate-limits). With the limiter on, the auth server also logs a warning at every start that it trusts one proxy hop with no list; behind Envoy alone that's expected, as [The startup warnings](/deploy/client-ip-and-proxy-trust/#the-startup-warnings) explains.
 
-### Resource limits
+## Resource limits
 
 Both containers request `100m` of CPU and `128Mi` of memory, and are limited to `500m` and `512Mi`:
 

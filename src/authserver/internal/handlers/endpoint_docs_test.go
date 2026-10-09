@@ -60,13 +60,13 @@ const (
 )
 
 var (
-	discoveryFieldsSection     = conceptSection{discoveryPage, "### The discovery document"}
-	clientLogoSection          = conceptSection{logoAndPicturePage, "### The client logo"}
-	profilePictureSection      = conceptSection{logoAndPicturePage, "### The profile picture"}
-	registrationRequestSection = conceptSection{registrationPage, "### The request"}
-	registrationAnswerSection  = conceptSection{registrationPage, "### The answer"}
-	registrationErrorsSection  = conceptSection{registrationPage, "### Errors"}
-	hintHeaderSection          = conceptSection{logoutPage, "### Encrypting the hint"}
+	discoveryFieldsSection     = conceptSection{discoveryPage, "## The discovery document"}
+	clientLogoSection          = conceptSection{logoAndPicturePage, "## The client logo"}
+	profilePictureSection      = conceptSection{logoAndPicturePage, "## The profile picture"}
+	registrationRequestSection = conceptSection{registrationPage, "## The request"}
+	registrationAnswerSection  = conceptSection{registrationPage, "## The answer"}
+	registrationErrorsSection  = conceptSection{registrationPage, "## Errors"}
+	hintHeaderSection          = conceptSection{logoutPage, "## Encrypting the hint"}
 	readClaimsSection          = conceptSection{userInfoPage, "## Read a user's claims"}
 )
 
@@ -96,14 +96,14 @@ func TestEndpointDocs_TheDiscoveryTableIsTheDocumentsFields(t *testing.T) {
 
 func TestEndpointDocs_ADiscoveryTableDisagreeingWithTheCodeFails(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/discovery.mdx", "### The discovery document\n\n"+
+	writeConceptFixture(t, root, "site/discovery.mdx", "## The discovery document\n\n"+
 		"| Field | Value |\n|---|---|\n"+
 		"| `issuer` | The issuer |\n"+
 		"| `check_session_iframe` | Not a field |\n"+
 		"| `issuer` | Twice |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertFieldTable(r, root, conceptSection{"site/discovery.mdx", "### The discovery document"},
+		assertFieldTable(r, root, conceptSection{"site/discovery.mdx", "## The discovery document"},
 			[]string{"issuer", "jwks_uri"}, "the document")
 	})
 
@@ -111,9 +111,9 @@ func TestEndpointDocs_ADiscoveryTableDisagreeingWithTheCodeFails(t *testing.T) {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
 	want := []string{
-		"site/discovery.mdx: ### The discovery document row 2 names check_session_iframe, which the document never carries",
-		"site/discovery.mdx: ### The discovery document row 3 names issuer, which an earlier row already does",
-		"site/discovery.mdx: ### The discovery document has no row for jwks_uri",
+		"site/discovery.mdx: ## The discovery document row 2 names check_session_iframe, which the document never carries",
+		"site/discovery.mdx: ## The discovery document row 3 names issuer, which an earlier row already does",
+		"site/discovery.mdx: ## The discovery document has no row for jwks_uri",
 	}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
@@ -122,14 +122,14 @@ func TestEndpointDocs_ADiscoveryTableDisagreeingWithTheCodeFails(t *testing.T) {
 
 func TestEndpointDocs_ADiscoveryTableAgreeingWithTheCodePasses(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/discovery.mdx", "### The discovery document\n\n"+
+	writeConceptFixture(t, root, "site/discovery.mdx", "## The discovery document\n\n"+
 		"| Field | Value |\n|---|---|\n"+
 		"| `jwks_uri` | The key set |\n"+
 		"| `issuer` | The issuer |\n\n"+
-		"### Next\n\n| Field | Value |\n|---|---|\n| `other` | Another table |\n")
+		"## Next\n\n| Field | Value |\n|---|---|\n| `other` | Another table |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertFieldTable(r, root, conceptSection{"site/discovery.mdx", "### The discovery document"},
+		assertFieldTable(r, root, conceptSection{"site/discovery.mdx", "## The discovery document"},
 			[]string{"issuer", "jwks_uri"}, "the document")
 	})
 
@@ -140,26 +140,26 @@ func TestEndpointDocs_ADiscoveryTableAgreeingWithTheCodePasses(t *testing.T) {
 
 func TestEndpointDocs_AMissingDiscoverySectionStops(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/discovery.mdx", "### Discovery\n\n"+
+	writeConceptFixture(t, root, "site/discovery.mdx", "## Discovery\n\n"+
 		"| Field | Value |\n|---|---|\n| `issuer` | The issuer |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertFieldTable(r, root, conceptSection{"site/discovery.mdx", "### The discovery document"},
+		assertFieldTable(r, root, conceptSection{"site/discovery.mdx", "## The discovery document"},
 			[]string{"issuer"}, "the document")
 	})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, "### The discovery document") {
+	if !report.Stopped || !strings.Contains(report.Fatal, "## The discovery document") {
 		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
 	}
 }
 
 func TestEndpointDocs_ADiscoveryTableWithoutItsFieldColumnStops(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/discovery.mdx", "### The discovery document\n\n"+
+	writeConceptFixture(t, root, "site/discovery.mdx", "## The discovery document\n\n"+
 		"| Name | Value |\n|---|---|\n| `issuer` | The issuer |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertFieldTable(r, root, conceptSection{"site/discovery.mdx", "### The discovery document"},
+		assertFieldTable(r, root, conceptSection{"site/discovery.mdx", "## The discovery document"},
 			[]string{"issuer"}, "the document")
 	})
 
@@ -252,18 +252,18 @@ func TestEndpointDocs_TheImageSectionsQuoteTheirCacheControl(t *testing.T) {
 
 func TestEndpointDocs_ASectionNotQuotingTheHeaderFails(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/images.mdx", "### The client logo\n\n`Cache-Control: no-store`\n\n"+
-		"### Next\n\n`Cache-Control: public, max-age=300`\n")
+	writeConceptFixture(t, root, "site/images.mdx", "## The client logo\n\n`Cache-Control: no-store`\n\n"+
+		"## Next\n\n`Cache-Control: public, max-age=300`\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSectionSays(r, root, conceptSection{"site/images.mdx", "### The client logo"},
+		assertSectionSays(r, root, conceptSection{"site/images.mdx", "## The client logo"},
 			[]string{"`Cache-Control: public, max-age=300`"})
 	})
 
 	if report.Stopped {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
-	want := []string{"site/images.mdx: ### The client logo does not say \"`Cache-Control: public, max-age=300`\""}
+	want := []string{"site/images.mdx: ## The client logo does not say \"`Cache-Control: public, max-age=300`\""}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
 	}
@@ -271,10 +271,10 @@ func TestEndpointDocs_ASectionNotQuotingTheHeaderFails(t *testing.T) {
 
 func TestEndpointDocs_ASectionQuotingTheHeaderPasses(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/images.mdx", "### The client logo\n\nIt carries `Cache-Control: public, max-age=300`.\n")
+	writeConceptFixture(t, root, "site/images.mdx", "## The client logo\n\nIt carries `Cache-Control: public, max-age=300`.\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSectionSays(r, root, conceptSection{"site/images.mdx", "### The client logo"},
+		assertSectionSays(r, root, conceptSection{"site/images.mdx", "## The client logo"},
 			[]string{"`Cache-Control: public, max-age=300`"})
 	})
 
@@ -285,14 +285,14 @@ func TestEndpointDocs_ASectionQuotingTheHeaderPasses(t *testing.T) {
 
 func TestEndpointDocs_AMissingImageSectionStops(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/images.mdx", "### Client logo\n\n`Cache-Control: public, max-age=300`\n")
+	writeConceptFixture(t, root, "site/images.mdx", "## Client logo\n\n`Cache-Control: public, max-age=300`\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertSectionSays(r, root, conceptSection{"site/images.mdx", "### The client logo"},
+		assertSectionSays(r, root, conceptSection{"site/images.mdx", "## The client logo"},
 			[]string{"`Cache-Control: public, max-age=300`"})
 	})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, "### The client logo") {
+	if !report.Stopped || !strings.Contains(report.Fatal, "## The client logo") {
 		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
 	}
 }
@@ -443,7 +443,7 @@ func TestEndpointDocs_TheHintHeaderTableIsTheHeaderEncryptWrites(t *testing.T) {
 
 func TestEndpointDocs_AValueTableDisagreeingWithTheCodeFails(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/logout.mdx", "### Encrypting the hint\n\n"+
+	writeConceptFixture(t, root, "site/logout.mdx", "## Encrypting the hint\n\n"+
 		"| Member | Value | Meaning |\n|---|---|---|\n"+
 		"| `alg` | `dir` | Direct |\n"+
 		"| `enc` | `A128GCM` | The cipher |\n"+
@@ -451,7 +451,7 @@ func TestEndpointDocs_AValueTableDisagreeingWithTheCodeFails(t *testing.T) {
 		"| `alg` | `dir` | Twice |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertValueTable(r, root, conceptSection{"site/logout.mdx", "### Encrypting the hint"}, "Member", "Value",
+		assertValueTable(r, root, conceptSection{"site/logout.mdx", "## Encrypting the hint"}, "Member", "Value",
 			map[string]string{"alg": "dir", "enc": "A256GCM", "cty": "JWT"}, "the header")
 	})
 
@@ -459,10 +459,10 @@ func TestEndpointDocs_AValueTableDisagreeingWithTheCodeFails(t *testing.T) {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
 	want := []string{
-		"site/logout.mdx: ### Encrypting the hint row 2 gives enc as A128GCM, where the header has A256GCM",
-		"site/logout.mdx: ### Encrypting the hint row 3 names zip, which the header never has",
-		"site/logout.mdx: ### Encrypting the hint row 4 names alg, which an earlier row already does",
-		"site/logout.mdx: ### Encrypting the hint has no row for cty",
+		"site/logout.mdx: ## Encrypting the hint row 2 gives enc as A128GCM, where the header has A256GCM",
+		"site/logout.mdx: ## Encrypting the hint row 3 names zip, which the header never has",
+		"site/logout.mdx: ## Encrypting the hint row 4 names alg, which an earlier row already does",
+		"site/logout.mdx: ## Encrypting the hint has no row for cty",
 	}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
@@ -471,14 +471,14 @@ func TestEndpointDocs_AValueTableDisagreeingWithTheCodeFails(t *testing.T) {
 
 func TestEndpointDocs_AValueTableAgreeingWithTheCodePasses(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/register.mdx", "### Errors\n\n"+
+	writeConceptFixture(t, root, "site/register.mdx", "## Errors\n\n"+
 		"| `error` | Status | When |\n|---|---|---|\n"+
 		"| `invalid_client_metadata` | 400 | Metadata refused |\n"+
 		"| `access_denied` | 403 | Registration is off |\n\n"+
-		"### Next\n\n| `error` | Status |\n|---|---|\n| `other` | 418 |\n")
+		"## Next\n\n| `error` | Status |\n|---|---|\n| `other` | 418 |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertValueTable(r, root, conceptSection{"site/register.mdx", "### Errors"}, "`error`", "Status",
+		assertValueTable(r, root, conceptSection{"site/register.mdx", "## Errors"}, "`error`", "Status",
 			map[string]string{"access_denied": "403", "invalid_client_metadata": "400"}, "the handler")
 	})
 
@@ -489,26 +489,26 @@ func TestEndpointDocs_AValueTableAgreeingWithTheCodePasses(t *testing.T) {
 
 func TestEndpointDocs_AMissingValueTableSectionStops(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/register.mdx", "### Error codes\n\n"+
+	writeConceptFixture(t, root, "site/register.mdx", "## Error codes\n\n"+
 		"| `error` | Status |\n|---|---|\n| `access_denied` | 403 |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertValueTable(r, root, conceptSection{"site/register.mdx", "### Errors"}, "`error`", "Status",
+		assertValueTable(r, root, conceptSection{"site/register.mdx", "## Errors"}, "`error`", "Status",
 			map[string]string{"access_denied": "403"}, "the handler")
 	})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, "### Errors") {
+	if !report.Stopped || !strings.Contains(report.Fatal, "## Errors") {
 		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
 	}
 }
 
 func TestEndpointDocs_AValueTableWithoutItsValueColumnStops(t *testing.T) {
 	root := t.TempDir()
-	writeConceptFixture(t, root, "site/register.mdx", "### Errors\n\n"+
+	writeConceptFixture(t, root, "site/register.mdx", "## Errors\n\n"+
 		"| `error` | Code |\n|---|---|\n| `access_denied` | 403 |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertValueTable(r, root, conceptSection{"site/register.mdx", "### Errors"}, "`error`", "Status",
+		assertValueTable(r, root, conceptSection{"site/register.mdx", "## Errors"}, "`error`", "Status",
 			map[string]string{"access_denied": "403"}, "the handler")
 	})
 

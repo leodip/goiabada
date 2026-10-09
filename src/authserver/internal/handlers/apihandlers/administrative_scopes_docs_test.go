@@ -47,12 +47,12 @@ const (
 
 // The sections the allowance is described in.
 var (
-	allowanceRESTSection    = docSection{apiScopesPage, "### Administrative scopes on a user's behalf"}
-	allowanceClientsSection = docSection{clientsPage, "### Administrative scopes"}
+	allowanceRESTSection    = docSection{apiScopesPage, "## Administrative scopes on a user's behalf"}
+	allowanceClientsSection = docSection{clientsPage, "## Administrative scopes"}
 	accountAPISetupSection  = docSection{apiAuthenticationPage, "## Call the Account API"}
 	clientCredentialsSetup  = docSection{apiAuthenticationPage, "## Call the Admin API"}
-	authorizeSection        = docSection{authorizePage, "### Administrative scopes"}
-	tokenSection            = docSection{tokenPage, "### Administrative scopes"}
+	authorizeSection        = docSection{authorizePage, "## Administrative scopes"}
+	tokenSection            = docSection{tokenPage, "## Administrative scopes"}
 )
 
 // allowanceRoute is the route that switches a client's allowance, as openapi.yaml spells it.

@@ -25,9 +25,7 @@ This page helps you decide who in your cluster can reach Goiabada's pods, and wh
 
 </Steps>
 
-## How it works
-
-### Pod security
+## Pod security
 
 Every generated container runs with this `securityContext`, which is everything the restricted [Pod Security Standard](https://kubernetes.io/docs/concepts/security/pod-security-standards/) requires, and a read-only root file system besides:
 
@@ -53,7 +51,7 @@ Both pod specs also set:
 
 The generated Namespace is labelled `pod-security.kubernetes.io/warn: restricted` and `pod-security.kubernetes.io/audit: restricted`. For any pod in it that breaks the standard, Goiabada's own included, `kubectl apply` prints a warning and the API server writes an audit entry; nothing is refused. It doesn't enforce, because the wizard accepts an existing namespace, whose other workloads `kubectl apply` would then start refusing.
 
-### Who can reach Goiabada
+## Who can reach Goiabada
 
 Without a NetworkPolicy, any pod in the cluster can call the `goiabada-authserver` and `goiabada-adminconsole` Services directly, around Envoy. Besides reaching the admin console from inside the cluster, such a pod chooses the address it's rate limited and audited under, by sending its own `X-Forwarded-For` (see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#kubernetes)). The wizard asks whether to close that; the answer is no unless you say yes, or pass `--network-policy`.
 
@@ -99,7 +97,7 @@ To see what the policies admit:
 kubectl describe networkpolicy -n goiabada
 ```
 
-### Encrypt the hop to the auth server
+## Encrypt the hop to the auth server
 
 The admin console calls the auth server at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, which the wizard sets to `http://goiabada-authserver:9090`: plain HTTP to the Service, inside the cluster. That hop carries the admin console's client secret, its refresh token and administrators' tokens. The gateway's hop to each pod is plain HTTP too, and carries what users send, passwords included. Both are sound on a pod network only your cluster uses. The comment the manifest carries above the variable says so.
 

@@ -44,9 +44,7 @@ Users can also create their own accounts from the sign-in page: see [Self-regist
 
 Now give the group what its members need: permissions on its **Permissions** tab, and attributes on its **Attributes** tab.
 
-## How it works
-
-### Users
+## Users
 
 Each user has a **subject**, a random identifier the auth server gives them when they're created. It never changes, and it's the `sub` claim in every token about them, so key your app's records on it rather than on the email address, which can change.
 
@@ -56,13 +54,13 @@ Every new user gets the `authserver:manage-account` permission, which lets them 
 
 The user's page has these tabs: **Details**, **Profile**, **Picture**, **Email**, **Phone**, **Address**, **Authentication**, **Consents**, **Sessions**, **Attributes**, **Permissions** and **Groups**. The profile, email, phone and address are what a client reads through [scopes](/concepts/scopes/).
 
-### Enabled and disabled
+## Enabled and disabled
 
 A disabled user can't sign in. Turning off **Enabled** on the **Details** tab also ends every session the user has and revokes their refresh tokens, so no client can get a new token for them. Turning it back on lets them sign in again, and gives back nothing that was revoked.
 
 Deleting a user deletes everything attached to them: their permissions, their group memberships and their attributes.
 
-### Passwords
+## Passwords
 
 **Set password** on the **Authentication** tab gives the user a new password. It signs them out of every session and revokes their refresh tokens. A password the user changes themselves does the same, except for the session they change it from. See [credential changes](/concepts/ending-sessions/#credential-changes).
 
@@ -70,7 +68,7 @@ A user who forgot their password can ask for a reset link from the sign-in page:
 
 The **Authentication** tab also shows whether the user has two-factor authentication, and lets you turn it off for a user who lost their authenticator. They can set it up again under **Account**.
 
-### Groups
+## Groups
 
 A group identifier is 3 to 38 characters long. It starts with a letter, ends with a letter or digit, and uses only letters, digits, `-` and `_`, with no `--` or `__`. A description is at most 100 characters.
 
@@ -78,7 +76,7 @@ A user can be in any number of groups. They hold every permission each of their 
 
 A group is listed in the `groups` claim when the client asks for the `groups` scope. **Include group in access token if requested** puts it in the access token, and **Include group in id token if requested** puts it in the ID token and in the `/userinfo` answer. Turn either off for a group a client has no business seeing.
 
-### Attributes
+## Attributes
 
 An attribute is a key and a value you attach to a user or a group, such as `department` and `sales`. A client gets them in the `attributes` claim when it asks for the `attributes` scope.
 
@@ -88,7 +86,7 @@ An attribute is a key and a value you attach to a user or a group, such as `depa
 
 A user's claim holds their own attributes and those of every group they're in. When a user and one of their groups both have an attribute with the same key, the group's value wins.
 
-### Administrators
+## Administrators
 
 A user who holds one of the administrative permissions on the `authserver` resource, directly or through a group, is an administrator. So a group holding one makes every member an administrator, and adding a user to it, removing one, or deleting it needs `authserver:manage`, just as granting the permission directly does.
 

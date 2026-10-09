@@ -25,9 +25,7 @@ With email verification, a new account's address is proven before the account ex
 
 To turn self-registration off, turn off **User self registration enabled** on the same page. Only administrators can then create users.
 
-## How it works
-
-### Without email verification
+## Without email verification
 
 The registration form asks for an email address and a password, twice. The password must meet the **Password policy** on **Admin**, **General**. When the form is sent, the account is created at once, with its address not verified, and the page says "Your account has been created." When email is set up, the user also gets a "Welcome!" email.
 
@@ -39,7 +37,7 @@ That's also what happens when email verification is on but email isn't set up: t
 Without email verification, anyone can find out whether an address has an account, by trying to register it. The answer can't be hidden, because the account the form creates is usable at once: signing in with the chosen password would fail for an address that was already taken. Turn on email verification if the list of addresses with an account shouldn't be discoverable.
 </Aside>
 
-### With email verification
+## With email verification
 
 The registration form asks for the email address alone, and every well-formed address gets the same "Check your email" page, whether or not it has an account. What happens next travels by email:
 
@@ -53,11 +51,11 @@ If the address gains an account before the form is sent, because an administrato
 
 An expired or used link shows "Unable to activate the account. The verification code appears to be expired." The person registers again to get a new one.
 
-### What a new account has
+## What a new account has
 
 A user who registers gets what every new user gets: the `authserver:manage-account` permission, so they can manage their own account in the admin console's **Account** pages, and nothing else. See [Users and groups](/concepts/users-and-groups/#users).
 
-### Limits and the audit log
+## Limits and the audit log
 
 With the rate limiter on, an address can register 5 times every 5 minutes, and an IP address 20 times, and following links and sending the password form is limited per IP address. Past that, the page shows "Too many attempts": see [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
 

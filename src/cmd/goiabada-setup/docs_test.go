@@ -17,8 +17,8 @@ import (
 // one table row per flag, and questionsHeading its section listing the questions, one row each.
 const (
 	setupWizardPage  = "../../../site/src/content/docs/deploy/setup-wizard.mdx"
-	flagsHeading     = "### Flags"
-	questionsHeading = "### The questions"
+	flagsHeading     = "## Flags"
+	questionsHeading = "## The questions"
 )
 
 // The setup wizard page's flags table lists every flag the wizard declares, and names none it does
@@ -169,13 +169,13 @@ func sortedKeys(set map[string]bool) []string {
 }
 
 const flagsFixture = "# Setup wizard\n\n`--ghost` above the section is not read.\n\n" +
-	"## How it works\n\n### Flags\n\n" +
+	"## Flags\n\n" +
 	"| Flag | What it does |\n|---|---|\n" +
 	"| `--type`, `-t` | `local` or `native` |\n" +
 	"| `--db=NAME` | `sqlite` |\n" +
 	"```\n| `--in-fence` | a fenced row is not read |\n```\n" +
-	"#### Examples\n\n| `--nested` | a subsection is part of the section |\n\n" +
-	"### Next\n\n| `--after` | not read |\n"
+	"### Examples\n\n| `--nested` | a subsection is part of the section |\n\n" +
+	"## Next\n\n| `--after` | not read |\n"
 
 func TestFlagTable_FindsWhatDisagreesInBothDirections(t *testing.T) {
 	rows, err := readFlagRows([]byte(flagsFixture), flagsHeading)
@@ -224,9 +224,9 @@ func TestFlagTable_PassesWhenTheyAgree(t *testing.T) {
 
 func TestFlagTable_AMissingSectionOrTableStops(t *testing.T) {
 	for name, page := range map[string]string{
-		"no section":     "## How it works\n\n### Flag\n\n| `--type` | x |\n",
-		"no flag in it":  "### Flags\n\nSee the usage text.\n\n### Next\n\n| `--type` | x |\n",
-		"fenced heading": "```\n### Flags\n| `--type` | x |\n```\n",
+		"no section":     "## Flag\n\n| `--type` | x |\n",
+		"no flag in it":  "## Flags\n\nSee the usage text.\n\n## Next\n\n| `--type` | x |\n",
+		"fenced heading": "```\n## Flags\n| `--type` | x |\n```\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			if rows, err := readFlagRows([]byte(page), flagsHeading); err == nil {
@@ -319,13 +319,13 @@ func questionTableFindings(table, asked []string) []string {
 }
 
 const questionsFixture = "# Setup wizard\n\n| Question | x |\n|---|---|\n| Above | not read |\n\n" +
-	"## How it works\n\n### The questions\n\n" +
+	"## The questions\n\n" +
 	"| Question | Asked for | Default |\n|---|---|---|\n" +
 	"| Deployment type | Always | none |\n" +
 	"| Database type | Always | none |\n" +
 	"```\n| In a fence | not read | |\n```\n" +
 	"| Metrics | Kubernetes | None |\n\n" +
-	"### Next\n\n| After | not read |\n"
+	"## Next\n\n| After | not read |\n"
 
 func TestQuestionTable_FindsWhatDisagreesInBothDirections(t *testing.T) {
 	table, err := readQuestions([]byte(questionsFixture), questionsHeading)
@@ -375,9 +375,9 @@ func TestQuestionTable_PassesWhenTheyAgree(t *testing.T) {
 
 func TestQuestionTable_AMissingSectionOrTableStops(t *testing.T) {
 	for name, page := range map[string]string{
-		"no section":     "## How it works\n\n### Questions\n\n| Question |\n|---|\n| Metrics |\n",
-		"header only":    "### The questions\n\n| Question | Default |\n|---|---|\n\n### Next\n\n| Metrics |\n",
-		"fenced heading": "```\n### The questions\n| Metrics |\n```\n",
+		"no section":     "## Questions\n\n| Question |\n|---|\n| Metrics |\n",
+		"header only":    "## The questions\n\n| Question | Default |\n|---|---|\n\n## Next\n\n| Metrics |\n",
+		"fenced heading": "```\n## The questions\n| Metrics |\n```\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			if questions, err := readQuestions([]byte(page), questionsHeading); err == nil {

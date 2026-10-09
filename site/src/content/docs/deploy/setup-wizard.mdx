@@ -30,9 +30,7 @@ The setup wizard, `goiabada-setup`, asks you a few questions and writes the conf
 
 </Steps>
 
-## How it works
-
-### Deployment types
+## Deployment types
 
 The first question picks one of four deployments. Each writes its own files, in the current directory unless you pass `--output`.
 
@@ -47,7 +45,7 @@ The first question picks one of four deployments. Each writes its own files, in 
 Local testing serves plain HTTP. **Never** use it for a deployment other people reach.
 </Aside>
 
-### The questions
+## The questions
 
 The wizard asks only the questions that apply to your deployment, in this order, each under its step's heading.
 
@@ -66,11 +64,11 @@ The wizard asks only the questions that apply to your deployment, in this order,
 | Database connection | Kubernetes and native binaries, with any database but SQLite: host, port, name, user and password, then an optional connection test. | The database's usual port and user, and the name `goiabada` |
 | Database password | Local testing and production, with any database but SQLite. The wizard runs that database for you. | A generated password |
 
-### The rate limiter under the Cluster traffic policy
+## The rate limiter under the Cluster traffic policy
 
 Under the Cluster policy, Goiabada sees a node's address for every client. The rate limiter's per-address limits would then count every user who arrives through one node together, and throttle sign-ins on a busy site. That's why it's off by default there. Its limits on failed passwords and codes count per account, so they work under either policy. See the [rate limits](/reference/environment-variables/#rate-limits).
 
-### Where the secrets go
+## Where the secrets go
 
 The wizard keeps every secret in one file, and the rest of the configuration in another, so you can commit the second one.
 
@@ -88,13 +86,13 @@ Running the wizard again replaces the files, with new secrets. A database seeded
 
 With `--output`, the files go into the directory it names. When it names a file instead, the secrets file is named after it: `compose.yaml` gets `compose.override.yaml`, and `my-k8s.yaml` gets `my-k8s-secrets.yaml`.
 
-### Passwords
+## Passwords
 
 The wizard never prints a password. The summary says only whether each one was set or generated, and the last message tells you where the admin password is.
 
 When you type a password at a terminal, the wizard doesn't show it. The admin password must be at least 15 characters and at most 72 bytes, and it can't be `changeme`. The wizard refuses any other and asks again, because the auth server would refuse to start with it. A password without an uppercase letter, a lowercase letter, a digit and a symbol gets a warning, and you choose whether to keep it.
 
-### Answering with flags
+## Answering with flags
 
 Pass `--type` and the wizard asks nothing: it takes every answer from the flags and the defaults. That's useful in scripts and CI.
 
@@ -115,7 +113,7 @@ printf '%s' "$DB_PASSWORD" | ./goiabada-setup-linux-amd64 --type=native --db=pos
 
 The wizard exits with 0 when it's done or when you abort it, 1 when it can't finish, and 2 when it can't read a flag. It writes nothing until every answer is valid.
 
-### Flags
+## Flags
 
 | Flag | What it does |
 |---|---|

@@ -23,7 +23,7 @@ import (
 )
 
 // errorCodesSection is the section of the errors page that holds the catalog.
-var errorCodesSection = docSection{apiErrorsPage, "### Error codes"}
+var errorCodesSection = docSection{apiErrorsPage, "## Error codes"}
 
 // docErrorCodeCell is a table cell holding one backticked UPPER_SNAKE code and nothing else. A
 // code may be one word, as FORBIDDEN is.
@@ -36,7 +36,7 @@ func TestErrorCodesDocs_TheCatalogIsTheSurvivorTable(t *testing.T) {
 
 func TestErrorCodesDocs_ACatalogDisagreeingWithTheCodeFails(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/errors.mdx", "### Error codes\n\n"+
+	writeDocFixture(t, root, "site/errors.mdx", "## Error codes\n\n"+
 		"| Code | Status | Meaning |\n"+
 		"|---|---|---|\n"+
 		"| `NOT_FOUND` | `404` | Nothing has that id. |\n"+
@@ -45,10 +45,10 @@ func TestErrorCodesDocs_ACatalogDisagreeingWithTheCodeFails(t *testing.T) {
 		"| `VALIDATION_ERROR` | `400` | |\n"+
 		"| INVALID_TOKEN | `401` | Not backticked. |\n"+
 		"| `TOO_MANY_REQUESTS` | A limit was reached. |\n\n"+
-		"### Next\n\n| `INVALID_REQUEST_BODY` | `400` | Outside the section. |\n")
+		"## Next\n\n| `INVALID_REQUEST_BODY` | `400` | Outside the section. |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertErrorCodeCatalog(r, root, docSection{"site/errors.mdx", "### Error codes"},
+		assertErrorCodeCatalog(r, root, docSection{"site/errors.mdx", "## Error codes"},
 			[]string{"INVALID_REQUEST_BODY", "INVALID_TOKEN", "NOT_FOUND", "TOO_MANY_REQUESTS", "VALIDATION_ERROR"})
 	})
 
@@ -56,14 +56,14 @@ func TestErrorCodesDocs_ACatalogDisagreeingWithTheCodeFails(t *testing.T) {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
 	want := []string{
-		"site/errors.mdx: ### Error codes lists RETIRED_CODE, which the API does not write",
-		"site/errors.mdx: ### Error codes lists NOT_FOUND twice",
-		"site/errors.mdx: ### Error codes gives VALIDATION_ERROR no meaning",
-		`site/errors.mdx: ### Error codes has a row whose code is not one backticked UPPER_SNAKE code: "INVALID_TOKEN"`,
-		`site/errors.mdx: ### Error codes has a row of 2 cells, want code, status and meaning: ["` + "`TOO_MANY_REQUESTS`" + `" "A limit was reached."]`,
-		"site/errors.mdx: ### Error codes does not list INVALID_REQUEST_BODY",
-		"site/errors.mdx: ### Error codes does not list INVALID_TOKEN",
-		"site/errors.mdx: ### Error codes does not list TOO_MANY_REQUESTS",
+		"site/errors.mdx: ## Error codes lists RETIRED_CODE, which the API does not write",
+		"site/errors.mdx: ## Error codes lists NOT_FOUND twice",
+		"site/errors.mdx: ## Error codes gives VALIDATION_ERROR no meaning",
+		`site/errors.mdx: ## Error codes has a row whose code is not one backticked UPPER_SNAKE code: "INVALID_TOKEN"`,
+		`site/errors.mdx: ## Error codes has a row of 2 cells, want code, status and meaning: ["` + "`TOO_MANY_REQUESTS`" + `" "A limit was reached."]`,
+		"site/errors.mdx: ## Error codes does not list INVALID_REQUEST_BODY",
+		"site/errors.mdx: ## Error codes does not list INVALID_TOKEN",
+		"site/errors.mdx: ## Error codes does not list TOO_MANY_REQUESTS",
 	}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
@@ -72,16 +72,16 @@ func TestErrorCodesDocs_ACatalogDisagreeingWithTheCodeFails(t *testing.T) {
 
 func TestErrorCodesDocs_ACatalogMatchingTheCodePasses(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/errors.mdx", "### Error codes\n\n"+
+	writeDocFixture(t, root, "site/errors.mdx", "## Error codes\n\n"+
 		"| Code | Status | Meaning |\n"+
 		"|---|---|---|\n"+
 		"| `NOT_FOUND` | `404` | Nothing has that id. |\n"+
 		"| `FORBIDDEN` | `403` | It belongs to another user. |\n"+
 		"| `VALIDATION_ERROR` | `400` | A value was refused. |\n\n"+
-		"### Next\n\nText.\n")
+		"## Next\n\nText.\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertErrorCodeCatalog(r, root, docSection{"site/errors.mdx", "### Error codes"},
+		assertErrorCodeCatalog(r, root, docSection{"site/errors.mdx", "## Error codes"},
 			[]string{"FORBIDDEN", "NOT_FOUND", "VALIDATION_ERROR"})
 	})
 
@@ -92,24 +92,24 @@ func TestErrorCodesDocs_ACatalogMatchingTheCodePasses(t *testing.T) {
 
 func TestErrorCodesDocs_AMissingSectionStops(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/errors.mdx", "### Codes\n\n"+
+	writeDocFixture(t, root, "site/errors.mdx", "## Codes\n\n"+
 		"| Code | Status | Meaning |\n|---|---|---|\n| `NOT_FOUND` | `404` | Nothing has that id. |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertErrorCodeCatalog(r, root, docSection{"site/errors.mdx", "### Error codes"}, []string{"NOT_FOUND"})
+		assertErrorCodeCatalog(r, root, docSection{"site/errors.mdx", "## Error codes"}, []string{"NOT_FOUND"})
 	})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, "### Error codes") {
+	if !report.Stopped || !strings.Contains(report.Fatal, "## Error codes") {
 		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
 	}
 }
 
 func TestErrorCodesDocs_ASectionWithNoTableStops(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/errors.mdx", "### Error codes\n\n- `NOT_FOUND`: `404`, nothing has that id.\n")
+	writeDocFixture(t, root, "site/errors.mdx", "## Error codes\n\n- `NOT_FOUND`: `404`, nothing has that id.\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertErrorCodeCatalog(r, root, docSection{"site/errors.mdx", "### Error codes"}, []string{"NOT_FOUND"})
+		assertErrorCodeCatalog(r, root, docSection{"site/errors.mdx", "## Error codes"}, []string{"NOT_FOUND"})
 	})
 
 	if !report.Stopped || !strings.Contains(report.Fatal, "no table") {

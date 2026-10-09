@@ -24,7 +24,7 @@ import (
 
 // The sections of the audit log page the checks read.
 var (
-	auditEventsSection = docSection{auditLogPage, "### Every event"}
+	auditEventsSection = docSection{auditLogPage, "## Every event"}
 	auditAlertSection  = docSection{auditLogPage, "## Events to alert on"}
 )
 
@@ -59,23 +59,23 @@ func TestAuditLogDocs_TheAlertSectionNamesTheAttackSignals(t *testing.T) {
 
 func TestAuditLogDocs_ACatalogDisagreeingWithTheCodeFails(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/audit.mdx", "### Every event\n\n"+
-		"#### Sign-in\n\n"+
+	writeDocFixture(t, root, "site/audit.mdx", "## Every event\n\n"+
+		"### Sign-in\n\n"+
 		"| Event | Meaning |\n"+
 		"|---|---|\n"+
 		"| `auth_failed_pwd` | A password was refused. |\n"+
 		"| `retired_event` | Gone from the code. |\n\n"+
-		"#### Clients\n\n"+
+		"### Clients\n\n"+
 		"| Event | Meaning |\n"+
 		"|---|---|\n"+
 		"| `auth_failed_pwd` | Listed twice. |\n"+
 		"| `created_client` | |\n"+
 		"| deleted_client | Not backticked. |\n"+
 		"| `logout` | A user signed out. | extra |\n\n"+
-		"### Next\n\n| `viewed_client_secret` | Outside the section. |\n")
+		"## Next\n\n| `viewed_client_secret` | Outside the section. |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertAuditEventCatalog(r, root, docSection{"site/audit.mdx", "### Every event"},
+		assertAuditEventCatalog(r, root, docSection{"site/audit.mdx", "## Every event"},
 			[]string{"auth_failed_pwd", "created_client", "deleted_client", "logout", "viewed_client_secret"})
 	})
 
@@ -83,14 +83,14 @@ func TestAuditLogDocs_ACatalogDisagreeingWithTheCodeFails(t *testing.T) {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
 	want := []string{
-		"site/audit.mdx: ### Every event lists retired_event, which the auth server does not write",
-		"site/audit.mdx: ### Every event lists auth_failed_pwd twice",
-		"site/audit.mdx: ### Every event gives created_client no meaning",
-		`site/audit.mdx: ### Every event has a row whose event is not one backticked snake_case event: "deleted_client"`,
-		`site/audit.mdx: ### Every event has a row of 3 cells, want event and meaning: ["` + "`logout`" + `" "A user signed out." "extra"]`,
-		"site/audit.mdx: ### Every event does not list deleted_client",
-		"site/audit.mdx: ### Every event does not list logout",
-		"site/audit.mdx: ### Every event does not list viewed_client_secret",
+		"site/audit.mdx: ## Every event lists retired_event, which the auth server does not write",
+		"site/audit.mdx: ## Every event lists auth_failed_pwd twice",
+		"site/audit.mdx: ## Every event gives created_client no meaning",
+		`site/audit.mdx: ## Every event has a row whose event is not one backticked snake_case event: "deleted_client"`,
+		`site/audit.mdx: ## Every event has a row of 3 cells, want event and meaning: ["` + "`logout`" + `" "A user signed out." "extra"]`,
+		"site/audit.mdx: ## Every event does not list deleted_client",
+		"site/audit.mdx: ## Every event does not list logout",
+		"site/audit.mdx: ## Every event does not list viewed_client_secret",
 	}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
@@ -99,20 +99,20 @@ func TestAuditLogDocs_ACatalogDisagreeingWithTheCodeFails(t *testing.T) {
 
 func TestAuditLogDocs_ACatalogMatchingTheCodePasses(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/audit.mdx", "### Every event\n\n"+
-		"#### Sign-in\n\n"+
+	writeDocFixture(t, root, "site/audit.mdx", "## Every event\n\n"+
+		"### Sign-in\n\n"+
 		"| Event | Meaning |\n"+
 		"|---|---|\n"+
 		"| `auth_failed_pwd` | A password was refused. |\n"+
 		"| `logout` | A user signed out. |\n\n"+
-		"#### Clients\n\n"+
+		"### Clients\n\n"+
 		"| Event | Meaning |\n"+
 		"|---|---|\n"+
 		"| `created_client` | An administrator created a client. |\n\n"+
-		"### Next\n\nText.\n")
+		"## Next\n\nText.\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertAuditEventCatalog(r, root, docSection{"site/audit.mdx", "### Every event"},
+		assertAuditEventCatalog(r, root, docSection{"site/audit.mdx", "## Every event"},
 			[]string{"auth_failed_pwd", "created_client", "logout"})
 	})
 
@@ -123,24 +123,24 @@ func TestAuditLogDocs_ACatalogMatchingTheCodePasses(t *testing.T) {
 
 func TestAuditLogDocs_AMissingSectionStops(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/audit.mdx", "### Events\n\n"+
+	writeDocFixture(t, root, "site/audit.mdx", "## Events\n\n"+
 		"| Event | Meaning |\n|---|---|\n| `logout` | A user signed out. |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertAuditEventCatalog(r, root, docSection{"site/audit.mdx", "### Every event"}, []string{"logout"})
+		assertAuditEventCatalog(r, root, docSection{"site/audit.mdx", "## Every event"}, []string{"logout"})
 	})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, "### Every event") {
+	if !report.Stopped || !strings.Contains(report.Fatal, "## Every event") {
 		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
 	}
 }
 
 func TestAuditLogDocs_ASectionWithNoTableStops(t *testing.T) {
 	root := t.TempDir()
-	writeDocFixture(t, root, "site/audit.mdx", "### Every event\n\n- `logout`: a user signed out.\n")
+	writeDocFixture(t, root, "site/audit.mdx", "## Every event\n\n- `logout`: a user signed out.\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertAuditEventCatalog(r, root, docSection{"site/audit.mdx", "### Every event"}, []string{"logout"})
+		assertAuditEventCatalog(r, root, docSection{"site/audit.mdx", "## Every event"}, []string{"logout"})
 	})
 
 	if !report.Stopped || !strings.Contains(report.Fatal, "no table") {

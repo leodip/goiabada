@@ -129,9 +129,7 @@ npm test
 
 The build fails on a broken link, including a link to the site from the Go code under `src/`, so move a page or rename a heading in the same change as every link to it.
 
-## How it works
-
-### The project
+## The project
 
 Goiabada is three Go modules and the setup wizard:
 
@@ -146,17 +144,17 @@ src/
 
 `ARCHITECTURE.md` at the repository root says which module owns what, and the unit tiers hold the code to it. `AGENTS.md` describes the code in depth: the sign-in state machine, the patterns every handler follows and every guard the tests run. It's written for AI coding assistants, and reads just as well for people. `CLAUDE.md` is the same file.
 
-### Many checks are tests
+## Many checks are tests
 
 Much of what a reviewer would otherwise check is a test that fails: the architecture rules, the logging convention, gofmt, the API error codes and audit events listed in the docs, and the docs pages that state a fact the code decides, this one included. When you change one of those facts, change the page in the same pull request.
 
-### The databases and mail
+## The databases and mail
 
 The dev container runs MySQL, PostgreSQL and SQL Server beside it, and `make serve` uses SQL Server. The tests leave that database alone: each data and integration run starts from an empty database of its own.
 
 Mailpit runs beside them too. Under **Email - SMTP** in the admin console's settings, turn on **SMTP enabled** and set the host to `mailpit`, the port to 1025 and the encryption to **None**. Every mail Goiabada sends then lands in Mailpit, at http://localhost:8025.
 
-### CI
+## CI
 
 CI runs the same tiers on every pull request, a job each, and builds the site. The data and integration tiers wait until the pull request is out of draft.
 

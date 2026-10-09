@@ -93,22 +93,20 @@ To try the binaries before installing them, load the file into a shell and start
 set -a && . ./goiabada.env && set +a && ./goiabada-authserver
 ```
 
-## How it works
-
-### What the wizard's answers set
+## What the wizard's answers set
 
 - **With a reverse proxy on this machine,** both servers listen on `127.0.0.1` alone, so nothing past the proxy reaches the plain HTTP they serve, and they trust the forwarded headers of a connection from `127.0.0.1` alone: see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#native-binaries).
 - **With none** (`--local-proxy=false`), both servers listen on every interface and trust no forwarded header. They serve plain HTTP until you [serve HTTPS directly](#serve-https-without-a-proxy).
 - **The rate limiter** is on unless you answered no (`--rate-limiter=false`). See [Rate limits](/reference/environment-variables/#rate-limits).
 - **With SQLite,** the database is `goiabada.db` in the auth server's working directory, `/var/lib/goiabada` with the unit above. SQLite suits one auth server: see [Database](/deploy/database/).
 
-### The hop to the auth server
+## The hop to the auth server
 
 The admin console calls the auth server at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, which the wizard sets to the auth server's public URL. So the admin console goes out through your reverse proxy and back in, over HTTPS, and its client secret and administrators' tokens are encrypted on the way.
 
 With both servers on one machine, you can point it at `http://127.0.0.1:9090` instead, to skip the proxy. That hop is plain HTTP, but it never leaves the machine.
 
-### Serve HTTPS without a proxy
+## Serve HTTPS without a proxy
 
 Each server serves HTTPS itself once it has a certificate and a key. Set both in `goiabada.env`, and set each HTTP listen host empty to stop serving plain HTTP:
 

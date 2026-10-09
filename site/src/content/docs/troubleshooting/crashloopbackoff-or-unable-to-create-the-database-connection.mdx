@@ -80,7 +80,7 @@ When the record is `unable to create the database connection` and its `error` st
 
 A variable that doesn't parse, such as a port that isn't a number, stops it even sooner, with one line on standard error starting `malformed configuration:` that names the variable, and exit status 2.
 
-## How it works
+## While the database is unreachable
 
 `/health` answers only once the auth server listens, and it opens and migrates the database before it does. So a pod that can't reach the database never becomes ready, and nothing else in the cluster calls it in the meantime. Once it runs, `/health` doesn't check the database at all, so a database outage later doesn't restart every pod at once.
 

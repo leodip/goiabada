@@ -136,9 +136,7 @@ The pages are styled with [Tailwind CSS](https://tailwindcss.com/), and `main.cs
 
 </Steps>
 
-## How it works
-
-### How the language is chosen
+## How the language is chosen
 
 On the auth server's pages, the sign-in, one-time code, consent, sign-out, registration and password reset pages, the language is the first of these that names one:
 
@@ -152,7 +150,7 @@ Whichever of these decides, it gets the first of its languages Goiabada has text
 
 An email is written in its recipient's language: the **Locale** on their profile, or English when they haven't picked one. The activation link and the welcome email a user gets when they register are written in the language of the page they registered on, since their account has no language yet.
 
-### Catalogs
+## Catalogs
 
 The text of every page, message and email subject is in two built-in catalogs, English, which is complete, and Portuguese (Brazil). A key with no text in the chosen language shows in English.
 
@@ -160,11 +158,11 @@ The text of every page, message and email subject is in two built-in catalogs, E
 
 The names of countries and phone country codes, and the country in each time zone's label, come from Unicode's CLDR data, in the page's language, and each language on the **Locale** list is named in itself and in English, so none of them needs translating.
 
-### Email bodies
+## Email bodies
 
 An email's subject is in the catalogs, and its body is a template under `emails/` in the auth server's templates. To translate a body, add a copy beside the English one named with the language, such as `emails/email_forgot_password.es.html`, in your own [templates directory](#change-the-templates). The auth server uses it for a recipient whose language is exactly that tag, `es` here, and the English template for everyone else.
 
-### Templates and static files
+## Templates and static files
 
 A server reads a template each time it renders the page, so an edited template shows on the next request with no restart. Static files are served with `Cache-Control: public, max-age=300`. The four directory variables are on [Environment variables](/reference/environment-variables/#customization).
 
