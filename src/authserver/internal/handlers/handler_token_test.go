@@ -602,6 +602,26 @@ func TestParseBasicAuth(t *testing.T) {
 		assert.Equal(t, "my-secret", clientSecret)
 	})
 
+	// RFC 6749 section 2.3.1: the client form-urlencodes both values before it joins them, which
+	// openid-client does, escaping even '-', '.' and '_'. Every generated secret holds those.
+	t.Run("Form-urlencoded credentials are decoded", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte("my%2Dclient%5Fid:s3cr%2Et%2Dwith%2Bplus%3Aand%25"))
+		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		assert.True(t, ok)
+		assert.Equal(t, "my-client_id", clientId)
+		assert.Equal(t, "s3cr.t-with+plus:and%", clientSecret)
+	})
+
+	// A client that skips the encoding, such as curl -u, sends an operator's secret as is: a '+' in
+	// it stays a '+', and a '%' not followed by two hex digits stays a '%'.
+	t.Run("Credentials sent unencoded are kept as sent", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte("my-client:a+b/c=d%zz"))
+		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		assert.True(t, ok)
+		assert.Equal(t, "my-client", clientId)
+		assert.Equal(t, "a+b/c=d%zz", clientSecret)
+	})
+
 	t.Run("Password with colons is parsed correctly", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("client:pass:with:colons"))
 		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)

@@ -74,7 +74,7 @@ Use one. Sending a secret both ways is refused with `invalid_request`. With the 
 
 A public client sends `client_id` in the body and no secret, which discovery calls `none`. Sending a secret for a public client is refused with `invalid_request`, since it has none to check.
 
-Client identifiers and secrets hold only letters, digits and `-`, `_` or `.`, which form-encoding leaves as they are, so encoding them first, as RFC 6749 section 2.3.1 describes, changes nothing.
+RFC 6749 section 2.3.1 has a client form-encode its identifier and its secret before it builds the header, and some libraries, such as openid-client, escape every character but a letter or a digit, writing `my-app` as `my%2Dapp`. The auth server decodes `%` escapes in the header, so a client that encodes and one that doesn't, like curl, are read the same.
 
 When the client can't be authenticated, the answer is `401 Unauthorized` with `invalid_client` and a `WWW-Authenticate: Basic realm="goiabada"` header, whichever way the credentials came:
 

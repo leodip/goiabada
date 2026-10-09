@@ -60,6 +60,61 @@ func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
 	assert.NotNil(t, data["expires_in"])
 }
 
+// RFC 6749 section 2.3.1 has the client form-urlencode its identifier and secret before it puts
+// them in the Basic header. openid-client escapes every character but a letter or a digit, so a
+// client named test-client-x with a generated secret, which holds '-', '.' and '_', arrives as
+// test%2Dclient%2Dx and must still authenticate.
+func TestToken_ClientCred_ClientSecretBasic_FormEncodedCredentials(t *testing.T) {
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+
+	clientSecret := fake.Password(32) + "-._"
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
+	require.NoError(t, err)
+
+	resource := createResourceWithId(t, "backend-svc-"+fake.LetterN(8))
+	permission := createPermissionWithId(t, resource.Id, "read-data-"+fake.LetterN(8))
+
+	client := &record.Client{
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
+		Enabled:                  true,
+		ClientCredentialsEnabled: true,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
+		IsPublic:                 false,
+		ClientSecretEncrypted:    clientSecretEncrypted,
+	}
+	err = database.CreateClient(context.Background(), nil, client)
+	require.NoError(t, err)
+	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
+		ClientId:     client.Id,
+		PermissionId: permission.Id,
+	})
+	require.NoError(t, err)
+
+	// Every byte but a letter or a digit as %XX, as openid-client's formUrlEncode writes it.
+	escapeAll := func(value string) string {
+		var b strings.Builder
+		for i := 0; i < len(value); i++ {
+			c := value[i]
+			if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+				b.WriteByte(c)
+				continue
+			}
+			fmt.Fprintf(&b, "%%%02X", c)
+		}
+		return b.String()
+	}
+	require.Contains(t, escapeAll(client.ClientIdentifier), "%2D")
+
+	formData := url.Values{
+		"grant_type": {"client_credentials"},
+	}
+	data := postToTokenEndpointWithBasicAuth(t, createHttpClient(t), destUrl, formData,
+		escapeAll(client.ClientIdentifier), escapeAll(clientSecret))
+
+	assert.Nil(t, data["error"], "error_description: %v", data["error_description"])
+	assert.NotNil(t, data["access_token"])
+}
+
 func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
