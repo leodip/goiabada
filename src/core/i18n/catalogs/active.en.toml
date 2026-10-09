@@ -420,7 +420,7 @@
 "adminconsole.account.email_verification.section_title" = "Verify your email"
 "adminconsole.account.email_verification.unverified_prefix" = "Your email "
 "adminconsole.account.email_verification.unverified_em" = "isn't verified"
-"adminconsole.account.email_verification.unverified_suffix" = ". Click the link below to receive a verification code by email."
+"adminconsole.account.email_verification.unverified_suffix" = ". Click Send verification code below to receive a code by email."
 "adminconsole.account.email_verification.verified_prefix" = "Your email is "
 "adminconsole.account.email_verification.verified_em" = "verified"
 "adminconsole.account.email_verification.verified_suffix" = "."
