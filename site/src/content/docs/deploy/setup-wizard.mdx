@@ -51,8 +51,8 @@ The wizard asks only the questions that apply to your deployment, in this order,
 
 | Question | Asked for | Default |
 |---|---|---|
-| Deployment type | Every deployment. See [Deployment types](#deployment-types). | none |
-| Database type | Every deployment. MySQL, PostgreSQL, SQL Server or SQLite. Kubernetes doesn't offer SQLite. | none |
+| Deployment type | Every deployment. See [Deployment types](#deployment-types). | 1, Local testing (`--type` has none) |
+| Database type | Every deployment. MySQL, PostgreSQL, SQL Server or SQLite. Kubernetes doesn't offer SQLite. | 1, MySQL (`--db` has none) |
 | Domain names | The auth server's and the admin console's URLs, for every deployment but local testing, which uses `http://localhost:9090` and `http://localhost:9091`. On Kubernetes, each URL needs a host of its own. | `https://auth.example.com`, then the admin console's on the same domain: `https://admin.example.com` |
 | Kubernetes namespace | Kubernetes | `goiabada` |
 | Gateway traffic policy | Kubernetes. Cluster works behind every load balancer, but Goiabada then sees a node's address for every client. Local runs Envoy on every node and keeps each client's own address. | Cluster |
@@ -82,7 +82,7 @@ The wizard keeps every secret in one file, and the rest of the configuration in 
 
 Every file the wizard writes can be read by its owner only. When it writes into a Git working tree, it warns you and prints the line to add to `.gitignore`. It never edits `.gitignore` itself.
 
-Running the wizard again replaces the files, with new secrets. A database seeded with the old ones can't be used with the new ones, so start over with an empty database.
+Running the wizard again replaces the files, with new secrets. A database seeded with the old ones can't be used with the new ones, so either start over with an empty database, or copy your existing secrets over the new ones, as [Secrets](/deploy/secrets/#when-a-secret-changes) describes.
 
 With `--output`, the files go into the directory it names. When it names a file instead, the secrets file is named after it: `compose.yaml` gets `compose.override.yaml`, and `my-k8s.yaml` gets `my-k8s-secrets.yaml`.
 

@@ -102,7 +102,7 @@ sudo chgrp 10001 key.pem && sudo chmod 0640 key.pem
 
 The auth server writes to two directories, and its image creates both owned by 10001:
 
-- `/data`, where the generated Compose file and the hand-written SQLite sample mount the SQLite volume. Docker copies a mount point's ownership into an empty named volume, so a new volume mounted here is writable from the first start. A volume mounted at a path the image lacks gets a directory Docker creates owned by root, where the server can write nothing.
+- `/data`, where the generated Compose file mounts the SQLite volume. Docker copies a mount point's ownership into an empty named volume, so a new volume mounted here is writable from the first start. A volume mounted at a path the image lacks gets a directory Docker creates owned by root, where the server can write nothing.
 - `/bootstrap`, where the legacy bootstrap writes `bootstrap.env` when `GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE` names a file in it. Mount a named volume there, and read the file with `docker compose cp goiabada-authserver:/bootstrap/bootstrap.env .`. A bind mount of a host directory that doesn't exist yet is created owned by root, and the write is refused.
 
 The generated file also drops every capability, keeps the root file system read-only and gives each server a `/tmp` in memory.

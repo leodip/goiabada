@@ -36,10 +36,10 @@ So keep the database where nobody else can read or change that traffic: on the s
 ## PostgreSQL
 
 ```sql
-CREATE DATABASE goiabada ENCODING 'UTF8';
+CREATE DATABASE goiabada OWNER goiabada ENCODING 'UTF8';
 ```
 
-Make the login the owner, or grant it full rights in the database. It needs no `CREATEDB` attribute and no access to the `postgres` database.
+Make the login the owner, as above. A login that isn't the owner can't create tables from PostgreSQL 15 on, even with every right on the database: also run `GRANT ALL ON SCHEMA public TO goiabada;` connected to that database. It needs no `CREATEDB` attribute and no access to the `postgres` database.
 
 Quote the name if `GOIABADA_DB_NAME` isn't all lower case. PostgreSQL folds an unquoted identifier, so `CREATE DATABASE Goiabada` makes a database called `goiabada`, which isn't the one Goiabada connects to.
 
@@ -67,7 +67,7 @@ On SQL Server, spell out the `COLLATE` clause. A database's default can't be cha
 
 ## SQLite
 
-There's nothing to create, and `GOIABADA_DB_CREATE` doesn't apply: the driver creates the file. To refuse a missing file instead of creating one, put `mode=rw` in `GOIABADA_DB_DSN`. [SQLite](/reference/environment-variables/#sqlite) has the connection string for a file that survives restarts.
+There's nothing to create, and `GOIABADA_DB_CREATE` doesn't apply: the driver creates the file. To refuse a missing file instead of creating one, write `GOIABADA_DB_DSN` as a `file:` URI with `mode=rw`, such as `file:/data/goiabada.db?mode=rw`. After a plain path, like the one the setup wizard writes, the driver ignores `mode=rw`. [SQLite](/reference/environment-variables/#sqlite) has the connection string for a file that survives restarts.
 
 The auth server runs as uid 10001, so the directory holding the file must be writable by it. In Docker, mount the volume at `/data`, which the image creates owned by that user. A volume whose files belong to another user needs a [one-time `chown`](/troubleshooting/attempt-to-write-a-readonly-database/).
 

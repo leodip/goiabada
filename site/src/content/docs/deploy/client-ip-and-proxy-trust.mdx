@@ -20,12 +20,14 @@ Goiabada counts [rate limits](/reference/environment-variables/#rate-limits) by 
    GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=true
    ```
 
-2. **Leave the trusted proxy lists empty when one proxy connects to Goiabada.** That's every setup on this page but [a second proxy hop](#a-second-proxy-hop). The setup wizard writes them empty, side by side with the switch:
+2. **Leave the trusted proxy lists empty when one proxy connects to Goiabada.** That's every setup on this page but [a second proxy hop](#a-second-proxy-hop). For Docker Compose and Kubernetes the setup wizard writes them empty, side by side with the switch:
 
    ```bash
    GOIABADA_AUTHSERVER_TRUSTED_PROXIES=
    GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES=
    ```
+
+   For [native binaries](#native-binaries) it lists `127.0.0.1`, the address Nginx connects from on the same host, which resolves the same client address.
 
 3. **Make the proxy the only way in.** Nothing but the proxy may reach ports 9090 and 9091. The section for [your setup](#your-setup) says how.
 

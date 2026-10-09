@@ -49,7 +49,9 @@ func Pool() data.PoolConfig {
 // The DSN is all SQLite reads, so it is all New takes. GOIABADA_DB_CREATE does not apply here:
 // there is no create statement and no maintenance connection on SQLite, and what decides whether
 // an absent file is created is the operator's own DSN. The equivalent is mode=rw in it, which the
-// driver honours by refusing to create the file (#293, #438 decision 4).
+// driver honours by refusing to create the file (#293, #438 decision 4), but only in a file: URI
+// such as file:/data/goiabada.db?mode=rw: after a plain path, the setup wizard's form, the driver
+// drops the query and creates the file all the same.
 func New(ctx context.Context, dsn string, logSQL bool) (*Database, error) {
 	if dsn == "" {
 		dsn = "file::memory:?cache=shared"

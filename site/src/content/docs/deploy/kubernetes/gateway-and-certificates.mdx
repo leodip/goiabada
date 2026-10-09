@@ -118,7 +118,7 @@ The steps install Envoy Gateway and cert-manager, and create cluster-wide resour
    kubectl get gateway goiabada -n goiabada -o jsonpath='{.status.addresses[0].value}'
    ```
 
-   Then create an `A` record for each host name, `auth.example.com` and `admin.example.com`, with that address. cert-manager can't get the certificates until both resolve to it.
+   Then create an `A` record for each host name, `auth.example.com` and `admin.example.com`, with that address, or a `CNAME` when the address is a host name, as on AWS. cert-manager can't get the certificates until both resolve to it.
 
 7. **Check it's up, and sign in.**
 

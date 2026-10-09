@@ -81,7 +81,7 @@ You need a Linux server, a database (a MySQL, PostgreSQL or SQL Server you run, 
 
    The first start seeds the database. `sudo journalctl -u goiabada-authserver -f` follows its log.
 
-6. **Put the reverse proxy in front.** Proxy `auth.example.com` to `http://127.0.0.1:9090` and `admin.example.com` to `http://127.0.0.1:9091`, with the Nginx configuration and certificates of [Reverse proxy](/deploy/reverse-proxy/#set-it-up), steps 3 to 6.
+6. **Put the reverse proxy in front.** Proxy `auth.example.com` to `http://127.0.0.1:9090` and `admin.example.com` to `http://127.0.0.1:9091`, with the DNS records, Nginx configuration and certificates of [Reverse proxy](/deploy/reverse-proxy/#set-it-up), steps 1 and 3 to 6. Skip its step 2, which starts the Docker Compose files.
 
 7. **Sign in** at `https://admin.example.com`, as [First sign-in](/get-started/first-sign-in/) describes.
 
