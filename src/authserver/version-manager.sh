@@ -14,6 +14,7 @@
 #   update  - Update version strings in all project files
 #   deps    - Update Go modules and npm packages
 #   generate - Regenerate committed data files (timezones, countries)
+#   override-status - Report whether unparam and mockery still need tools.x-tools-override
 #   all     - Run all commands in sequence (check → update → deps)
 #
 # Scope: this script manages TOOLCHAIN and CDN pins (Go, Tailwind,
@@ -138,6 +139,7 @@ get_all_versions() {
         echo "tools.staticcheck=$(get_version 'tools.staticcheck')"
         echo "tools.unparam=$(get_version 'tools.unparam')"
         echo "tools.govulncheck=$(get_version 'tools.govulncheck')"
+        echo "tools.x-tools-override=$(get_version 'tools."x-tools-override"')"
         echo "tools.alpine=$(get_version 'tools.alpine')"
         echo "cdn.daisyui=$(get_version 'cdn.daisyui')"
         echo "cdn.humanize-duration=$(get_version 'cdn.humanize-duration')"
@@ -184,6 +186,19 @@ get_goproxy_latest() {
     response=$(curl -s --connect-timeout 10 "https://proxy.golang.org/${module}/@latest" 2>/dev/null)
     if [ $? -eq 0 ] && [ -n "$response" ]; then
         echo "$response" | grep -o '"Version"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 | sed 's/^v//'
+    fi
+}
+
+# The version of one requirement in a module version's go.mod, read from the Go module proxy, without
+# its leading v. Usage: get_goproxy_requirement "mvdan.cc/unparam" "0.0.0-2026..." "golang.org/x/tools"
+get_goproxy_requirement() {
+    local module="$1"
+    local version="$2"
+    local requirement="$3"
+    local response
+    response=$(curl -s --connect-timeout 10 "https://proxy.golang.org/${module}/@v/v${version}.mod" 2>/dev/null)
+    if [ $? -eq 0 ] && [ -n "$response" ]; then
+        echo "$response" | awk -v r="$requirement" '$1 == r { print $2; exit } $1 == "require" && $2 == r { print $3; exit }' | sed 's/^v//'
     fi
 }
 
@@ -285,6 +300,7 @@ cmd_show() {
     printf "  %-23s ${GREEN}%s${NC}\n" "staticcheck" "$(get_version 'tools.staticcheck')"
     printf "  %-23s ${GREEN}%s${NC}\n" "unparam" "$(get_version 'tools.unparam')"
     printf "  %-23s ${GREEN}%s${NC}\n" "govulncheck" "$(get_version 'tools.govulncheck')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "x-tools-override" "$(get_version 'tools."x-tools-override"')"
     printf "  %-23s ${GREEN}%s${NC}\n" "alpine" "$(get_version 'tools.alpine')"
 
     # CDN versions
@@ -475,6 +491,10 @@ cmd_check() {
         print_warning "Check failed"
     fi
 
+    # --- x/tools override ---
+    echo ""
+    override_report
+
     # --- Summary ---
     echo ""
     if [ ${#updates_available[@]} -gt 0 ]; then
@@ -509,6 +529,7 @@ cmd_update() {
     local STATICCHECK_VERSION=$(get_version 'tools.staticcheck')
     local UNPARAM_VERSION=$(get_version 'tools.unparam')
     local GOVULNCHECK_VERSION=$(get_version 'tools.govulncheck')
+    local XTOOLS_OVERRIDE=$(get_version 'tools."x-tools-override"')
     local ALPINE_VERSION=$(get_version 'tools.alpine')
     local DAISYUI_VERSION=$(get_version 'cdn.daisyui')
     local HUMANIZE_VERSION=$(get_version 'cdn.humanize-duration')
@@ -596,6 +617,19 @@ cmd_update() {
             ((success_count++))
         else
             ((fail_count++))
+        fi
+
+        # The x/tools unparam and mockery are built against: golang.org/x/tools@vX.Y.Z, an
+        # argument of go-install-with-x-tools.sh. gopls and goimports are installed from
+        # golang.org/x/tools/... paths, which this pattern does not match.
+        if [ -n "$XTOOLS_OVERRIDE" ] && [ "$XTOOLS_OVERRIDE" != "null" ]; then
+            if update_file "$BASE_DIR/src/.devcontainer/Dockerfile" \
+                "s|golang.org/x/tools@v[0-9.]*|golang.org/x/tools@v${XTOOLS_OVERRIDE}|g" \
+                "x/tools override"; then
+                ((success_count++))
+            else
+                ((fail_count++))
+            fi
         fi
     fi
 
@@ -819,6 +853,64 @@ cmd_deps() {
 }
 
 # =============================================================================
+# Command: override-status
+# =============================================================================
+# Whether unparam and mockery still need tools.x-tools-override: for each, the golang.org/x/tools
+# its latest upstream version requires, from the Go module proxy, against the override. The daily
+# Upstream tools workflow runs this and opens an issue on exit 3. Plain text, no colour, because the
+# workflow puts it in the issue.
+#
+# Exit status: 0 when both still need the override or none is pinned, 3 when at least one no
+# longer does, 1 when a lookup failed.
+
+# override_report prints one line per tool and sets OVERRIDE_CAUGHT_UP and OVERRIDE_FAILED.
+override_report() {
+    OVERRIDE_CAUGHT_UP=0
+    OVERRIDE_FAILED=0
+    local override
+    override=$(get_version 'tools."x-tools-override"')
+    if [ -z "$override" ] || [ "$override" = "null" ]; then
+        echo "No x/tools override is pinned: unparam and mockery are installed with plain go install."
+        return 0
+    fi
+    echo "unparam and mockery are built against golang.org/x/tools v${override} (tools.x-tools-override)."
+    local entry name module latest required
+    for entry in "unparam|mvdan.cc/unparam" "mockery|github.com/vektra/mockery/v3"; do
+        IFS='|' read -r name module <<< "$entry"
+        latest=$(get_goproxy_latest "$module")
+        if [ -z "$latest" ]; then
+            echo "- ${name}: unable to read its latest version from the Go module proxy"
+            OVERRIDE_FAILED=1
+            continue
+        fi
+        required=$(get_goproxy_requirement "$module" "$latest" "golang.org/x/tools")
+        if [ -z "$required" ]; then
+            echo "- ${name} v${latest}: unable to read the golang.org/x/tools its go.mod requires"
+            OVERRIDE_FAILED=1
+            continue
+        fi
+        if version_lt "$required" "$override"; then
+            echo "- ${name} v${latest} requires golang.org/x/tools v${required}, older than the override: still needed"
+        else
+            echo "- ${name} v${latest} requires golang.org/x/tools v${required}, at least the override: pin ${name} to v${latest} and install it with plain go install again"
+            OVERRIDE_CAUGHT_UP=1
+        fi
+    done
+}
+
+cmd_override_status() {
+    require_yq
+    override_report
+    if [ "$OVERRIDE_FAILED" -ne 0 ]; then
+        return 1
+    fi
+    if [ "$OVERRIDE_CAUGHT_UP" -ne 0 ]; then
+        return 3
+    fi
+    return 0
+}
+
+# =============================================================================
 # Command: generate
 # =============================================================================
 # Regenerate committed "// Code generated" data files from their upstream
@@ -925,6 +1017,7 @@ show_help() {
     echo "  update  Update version strings in all project files"
     echo "  deps    Update Go modules and npm packages"
     echo "  generate Regenerate committed data files (timezones, countries)"
+    echo "  override-status  Report whether unparam and mockery still need tools.x-tools-override"
     echo "  all     Run all commands in sequence"
     echo ""
     echo "Scope: toolchain and CDN pins only. The product version comes from"
@@ -979,6 +1072,10 @@ case "${1:-}" in
         ;;
     generate)
         cmd_generate "${2:-all}"
+        ;;
+    override-status)
+        cmd_override_status
+        exit $?
         ;;
     all)
         cmd_all

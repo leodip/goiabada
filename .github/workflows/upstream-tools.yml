@@ -1,0 +1,56 @@
+# Watches the two tools CI builds against tools.x-tools-override, unparam and mockery, and opens an
+# issue the day either one's latest upstream version requires a golang.org/x/tools that reads the
+# export data Go 1.27.2 writes. The override and src/.devcontainer/go-install-with-x-tools.sh then
+# go when they can, not when someone remembers to look (mvdan/unparam#94, vektra/mockery#1187).
+#
+# One issue, found by its title: opened once, then its body rewritten and a comment added only when
+# the report changes, so a day with nothing new sends nothing. A failed lookup fails the run, which
+# is the signal the check itself needs attention. With no override pinned, the run does nothing.
+
+name: Upstream tools
+
+on:
+  schedule:
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  x-tools-override:
+    name: x/tools override
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Report, and open or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          report=$(cd src/authserver && ./version-manager.sh override-status)
+          rc=$?
+          echo "$report"
+          case "$rc" in
+            0) exit 0 ;;
+            3) ;;
+            *) echo "::error::version-manager.sh override-status exited $rc"; exit 1 ;;
+          esac
+
+          title="unparam or mockery no longer needs the golang.org/x/tools override"
+          body=$(printf '%s\n\n%s\n' "$report" "Every tool marked \"at least the override\" can be pinned to the version named in \`src/authserver/versions.yaml\` and installed with plain \`go install\` again, in \`src/.devcontainer/Dockerfile\` and in the Lint job of \`.github/workflows/check.yml\`. Once neither tool needs the override, delete \`tools.x-tools-override\` and \`src/.devcontainer/go-install-with-x-tools.sh\`, and close this issue. Opened by the Upstream tools workflow, which rewrites this text when the report changes.")
+
+          number=$(gh issue list --state open --search "in:title $title" --json number,title \
+            --jq "map(select(.title == \"$title\")) | .[0].number // empty")
+          if [ -z "$number" ]; then
+            gh issue create --title "$title" --body "$body"
+            exit 0
+          fi
+          current=$(gh issue view "$number" --json body --jq .body)
+          if [ "$current" != "$body" ]; then
+            gh issue edit "$number" --body "$body"
+            gh issue comment "$number" --body "$(printf 'The report changed:\n\n%s\n' "$report")"
+          fi

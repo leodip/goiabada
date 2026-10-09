@@ -119,6 +119,7 @@ jobs:
       unparam: ${{ steps.read.outputs.unparam }}
       govulncheck: ${{ steps.read.outputs.govulncheck }}
       mockery: ${{ steps.read.outputs.mockery }}
+      xtools: ${{ steps.read.outputs.xtools }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: read
@@ -133,6 +134,9 @@ jobs:
           v=$(yq -r '.tools."golangci-lint"' "$f")
           [ -n "$v" ] && [ "$v" != "null" ] || { echo "::error::tools.golangci-lint missing from $f"; exit 1; }
           echo "golangci=$v" >> "$GITHUB_OUTPUT"
+          v=$(yq -r '.tools."x-tools-override"' "$f")
+          [ -n "$v" ] && [ "$v" != "null" ] || { echo "::error::tools.x-tools-override missing from $f"; exit 1; }
+          echo "xtools=$v" >> "$GITHUB_OUTPUT"
 
   lint:
     name: Lint
@@ -166,7 +170,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/go/bin
-          key: linters-${{ runner.os }}-go${{ needs.versions.outputs.go }}-golangci${{ needs.versions.outputs.golangci }}-unparam${{ needs.versions.outputs.unparam }}-mockery${{ needs.versions.outputs.mockery }}
+          key: linters-${{ runner.os }}-go${{ needs.versions.outputs.go }}-golangci${{ needs.versions.outputs.golangci }}-unparam${{ needs.versions.outputs.unparam }}-mockery${{ needs.versions.outputs.mockery }}-xtools${{ needs.versions.outputs.xtools }}
 
       # Pinned from versions.yaml. A blocking gate whose definition of "clean"
       # can change on an upstream release is not a gate. mockery is here for the
@@ -179,8 +183,11 @@ jobs:
         run: |
           set -euo pipefail
           go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${{ needs.versions.outputs.golangci }}
-          go install mvdan.cc/unparam@v${{ needs.versions.outputs.unparam }}
-          go install github.com/vektra/mockery/v3@v${{ needs.versions.outputs.mockery }}
+          # unparam and mockery are built against tools.x-tools-override, because the
+          # golang.org/x/tools their own go.mod requires cannot read Go 1.27.2's export
+          # data; the script says why and when it can go.
+          src/.devcontainer/go-install-with-x-tools.sh mvdan.cc/unparam@v${{ needs.versions.outputs.unparam }} golang.org/x/tools@v${{ needs.versions.outputs.xtools }} unparam
+          src/.devcontainer/go-install-with-x-tools.sh github.com/vektra/mockery/v3@v${{ needs.versions.outputs.mockery }} golang.org/x/tools@v${{ needs.versions.outputs.xtools }} mockery
 
       # Fails loudly if the cache restored something unusable or stale, rather
       # than letting a later step fail with a confusing "command not found".
@@ -197,7 +204,7 @@ jobs:
           mockery version
           for tool in golangci-lint unparam mockery; do
             path=$(command -v "$tool") || { echo "::error::$tool not on PATH"; exit 1; }
-            go version -m "$path" | awk -v t="$tool" '$1 == "mod" { print t ": " $2 " " $3 }'
+            go version -m "$path" | awk -v t="$tool" '$1 == "mod" { print t ": " $2 " " $3 } $1 == "dep" && $2 == "golang.org/x/tools" { print t ": built against " $2 " " $3 }'
           done
 
       # The standalone staticcheck binary is deliberately not run. It does not

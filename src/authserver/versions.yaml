@@ -24,6 +24,8 @@
 # staticcheck:    Static analyzer (devcontainer, make check)
 # unparam:        Unused-parameter analyzer (devcontainer, make check)
 # govulncheck:    Vulnerability scanner (devcontainer)
+# x-tools-override: The golang.org/x/tools unparam and mockery are built against
+#                 (devcontainer, CI), in place of the one their own go.mod requires
 # alpine:         Base of the release images' final stage, as major.minor
 #                 (Dockerfile-authserver, Dockerfile-adminconsole)
 #
@@ -37,6 +39,16 @@
 # is pinned to a pseudo-version and every upstream commit will show up as an
 # available update.
 #
+# x-tools-override is not a tool. Go 1.27.2 writes export data version 5, and
+# golang.org/x/tools v0.49.0, which unparam and mockery both require, reads up to
+# version 4, so neither can load a package built by it (mvdan/unparam#94,
+# vektra/mockery#1187).
+# src/.devcontainer/go-install-with-x-tools.sh builds the two pinned releases
+# against this version instead, the oldest that reads version 5, so that
+# `./version-manager.sh override-status`, run daily by the Upstream tools
+# workflow, reports exactly when either upstream requires one that does. Once both do, delete this key and the script, and go
+# back to plain `go install` for both.
+#
 # alpine is pinned to a minor rather than a patch: the alpine:X.Y tag receives
 # Alpine's patch releases, security fixes included, at the next image build, so
 # only the six-monthly minor release is a bump made here, and
@@ -44,10 +56,11 @@
 # alpine:latest, which moved the release images to a new minor with no change
 # on our side (#396).
 tools:
-  go: "1.27.1"
+  go: "1.27.2"
   tailwind: "4.3.3"
   golangci-lint: "2.14.0"
   mockery: "3.8.0"
+  x-tools-override: "0.50.0"
   staticcheck: "0.8.1"
   unparam: "0.0.0-20260823230713-2fa3d841b0c8"
   govulncheck: "1.8.0"
