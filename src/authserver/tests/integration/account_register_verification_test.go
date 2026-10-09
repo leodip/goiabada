@@ -277,12 +277,12 @@ func TestSelfRegister_WithVerificationEveryRequestIsAuditedOnce(t *testing.T) {
 			if tc.userId == 0 {
 				assert.NotContains(t, details, "user_id", "no account matched, so none is named")
 			} else {
-				assert.Equal(t, float64(tc.userId), details["user_id"])
+				assert.InDelta(t, float64(tc.userId), details["user_id"], 0)
 			}
 			if tc.preRegistrationId == 0 {
 				assert.NotContains(t, details, "pre_registration_id")
 			} else {
-				assert.Equal(t, float64(tc.preRegistrationId), details["pre_registration_id"])
+				assert.InDelta(t, float64(tc.preRegistrationId), details["pre_registration_id"], 0)
 			}
 			for key, value := range details {
 				assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), tc.address,

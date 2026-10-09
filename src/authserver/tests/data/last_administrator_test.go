@@ -147,16 +147,11 @@ func (d *parkedAfterTheRemovalCounted) CountEnabledUsersHoldingPermission(ctx co
 }
 
 // serveAsManage serves one admin API request through handler, with no router, under a validated
-// token carrying authserver:manage, the only token that reaches the guard.
-func serveAsManage(handler http.HandlerFunc, method, target string, params map[string]string, body any) *httptest.ResponseRecorder {
-	var reader *bytes.Reader
-	if body != nil {
-		encoded, _ := json.Marshal(body)
-		reader = bytes.NewReader(encoded)
-	} else {
-		reader = bytes.NewReader(nil)
-	}
-	req := httptest.NewRequest(method, target, reader)
+// token carrying authserver:manage, the only token that reaches the guard. The body arrives
+// encoded, because the callers serve from a worker goroutine and an encoding failure has to stop
+// the test on its own goroutine.
+func serveAsManage(handler http.HandlerFunc, method, target string, params map[string]string, body []byte) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, target, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rctx := chi.NewRouteContext()
 	for key, value := range params {
@@ -213,11 +208,13 @@ func TestLastAdministrator_TwoConcurrentRemovalsOfTheLastTwoEndWithOneRefused(t 
 	}()
 	holder := parked.awaitParked(t)
 
+	disable, err := json.Marshal(map[string]bool{"enabled": false})
+	require.NoError(t, err)
 	second := goBlocked(t, "the disabling of administrator B", holder, func(reached func()) *httptest.ResponseRecorder {
 		bId := strconv.FormatInt(b.Id, 10)
 		reached()
 		return serveAsManage(apihandlers.HandleUserEnabledPut(h.DB, auditLogger),
-			http.MethodPut, "/api/v1/admin/users/"+bId+"/enabled", map[string]string{"id": bId}, map[string]bool{"enabled": false})
+			http.MethodPut, "/api/v1/admin/users/"+bId+"/enabled", map[string]string{"id": bId}, disable)
 	})
 	second.requireBlocked(t)
 	second.requireStillWaiting(t)

@@ -223,7 +223,7 @@ func columnShape000028(t *testing.T, h *isolatedDB, table, col string) (bool, bo
 	}
 	require.NoErrorf(t, err, "column metadata: %s.%s", table, col)
 
-	notNull := false
+	var notNull bool
 	switch dbType() {
 	case data.MySQL, data.Postgres:
 		notNull = strings.EqualFold(nullFlag.String, "NO")

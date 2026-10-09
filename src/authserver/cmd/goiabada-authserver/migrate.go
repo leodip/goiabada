@@ -424,7 +424,9 @@ func reportStop(out io.Writer, err error) {
 	outf(out, "stopped by a signal: the database is at schema version %s, clean, with %d migrations "+
 		"applied and %d remaining; run the same command again to carry on\n",
 		reached, stopped.Applied, stopped.Remaining)
-	if err != error(stopped) {
+	// Identity, not errors.Is: a stop with a failed unlock joined onto it still matches errors.Is,
+	// and that unlock failure is the line this prints.
+	if err != error(stopped) { //nolint:errorlint // the bare stop was printed above; anything joined onto it is printed here
 		outf(out, "%s\n", err)
 	}
 }

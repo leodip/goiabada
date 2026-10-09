@@ -44,7 +44,7 @@ func (val *EmailValidator) ValidateEmailAddress(emailAddress string) error {
 	}
 
 	// The shape above guarantees exactly one @ with at least one character before it.
-	localPart := emailAddress[:strings.Index(emailAddress, "@")]
+	localPart, _, _ := strings.Cut(emailAddress, "@")
 
 	if strings.Contains(emailAddress, "..") {
 		return i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil)

@@ -18,7 +18,8 @@ import (
 func SkipWithoutIPv6Loopback(t *testing.T) {
 	t.Helper()
 
-	ln, err := net.Listen("tcp6", "[::1]:0")
+	var lc net.ListenConfig
+	ln, err := lc.Listen(t.Context(), "tcp6", "[::1]:0")
 	if err != nil {
 		t.Skipf("this machine has no IPv6 loopback: %v", err)
 	}

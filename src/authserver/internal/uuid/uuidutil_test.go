@@ -97,19 +97,10 @@ func (alwaysFailingReader) Read([]byte) (int, error) {
 // fatal handler on any error from it.
 func TestNew_CrashesIrrecoverablyOnReaderFailure(t *testing.T) {
 	if os.Getenv(crashChildEnv) == "1" {
-		rand.Reader = alwaysFailingReader{}
-		defer func() {
-			// Reached only if New panicked in a catchable way, which is the
-			// contract being violated. Exit 0 so the parent's assertion fails.
-			if r := recover(); r != nil {
-				fmt.Fprintf(os.Stderr, "New() panicked recoverably with %v\n", r)
-				os.Exit(0)
-			}
-		}()
-		got := New()
-		fmt.Fprintf(os.Stderr, "New() returned %q from a failing reader\n", got)
+		callNewOverAFailingReader()
+		// Reached only if New returned or panicked in a catchable way, either of
+		// which violates the contract. Exit 0 so the parent's assertion fails.
 		os.Exit(0)
-		return
 	}
 
 	cmd := exec.Command(os.Args[0], "-test.run=^TestNew_CrashesIrrecoverablyOnReaderFailure$")
@@ -131,4 +122,18 @@ func TestNew_CrashesIrrecoverablyOnReaderFailure(t *testing.T) {
 		t.Fatalf("child died without %q, so it died of something other than the CSPRNG; output:\n%s",
 			wantFatal, out.String())
 	}
+}
+
+// callNewOverAFailingReader is the crash child's body: New over a reader that
+// always fails. It returns only when New returned or panicked recoverably, and
+// says which on stderr.
+func callNewOverAFailingReader() {
+	rand.Reader = alwaysFailingReader{}
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "New() panicked recoverably with %v\n", r)
+		}
+	}()
+	got := New()
+	fmt.Fprintf(os.Stderr, "New() returned %q from a failing reader\n", got)
 }

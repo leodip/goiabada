@@ -240,7 +240,7 @@ func TestAuthorize_AdministrativeScope_RefusedForTheImplicitFlow(t *testing.T) {
 	require.Len(t, rows, 2, "one row for each refusal")
 	for _, row := range rows {
 		assert.Equal(t, "authorize", row["checkpoint"])
-		assert.Equal(t, float64(f.user.Id), row["user_id"])
+		assert.InDelta(t, float64(f.user.Id), row["user_id"], 0)
 	}
 }
 

@@ -32,7 +32,7 @@ func advisoryLockID(name string, extra ...string) string {
 		name = strings.Join(append(extra, name), "\x00")
 	}
 	sum := crc32.ChecksumIEEE([]byte(name))
-	sum = sum * advisoryLockIDSalt
+	sum *= advisoryLockIDSalt
 	return strconv.FormatUint(uint64(sum), 10)
 }
 

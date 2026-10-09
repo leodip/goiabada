@@ -188,7 +188,7 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 
 	space := regexp.MustCompile(`\s+`)
 
-	scope := ""
+	var scope string
 	if len(input.ConsentedScope) > 0 {
 		scope = space.ReplaceAllString(input.ConsentedScope, " ")
 	} else {

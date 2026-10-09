@@ -88,7 +88,7 @@ type sqlMark struct {
 // A double quote would be an identifier quote on PostgreSQL and SQLite and a string delimiter on
 // MySQL. It appears in no statement on any engine, and scanSQL refuses it rather than picking
 // one of the two meanings.
-func identifierQuotes(d data.Dialect) (open, close byte) {
+func identifierQuotes(d data.Dialect) (opening, closing byte) {
 	switch d {
 	case data.MSSQL:
 		return '[', ']'
@@ -229,7 +229,7 @@ func maskRange(buf []byte, from, to int, fill byte) {
 // sqlitedb all write '\'. Reading mssqldb/000034's CHARINDEX('\', [authority]) under MySQL's
 // rules leaves the quote open, so the rest of a real file reads as string interior and a content
 // rule reports nothing at all rather than reporting a violation.
-func skipQuoted(text string, i int, close byte, backslashEscapes bool) (int, int, bool) {
+func skipQuoted(text string, i int, closing byte, backslashEscapes bool) (int, int, bool) {
 	newlines := 0
 	for j := i + 1; j < len(text); j++ {
 		switch text[j] {
@@ -242,8 +242,8 @@ func skipQuoted(text string, i int, close byte, backslashEscapes bool) (int, int
 				}
 				j++
 			}
-		case close:
-			if j+1 < len(text) && text[j+1] == close {
+		case closing:
+			if j+1 < len(text) && text[j+1] == closing {
 				j++
 				continue
 			}
@@ -332,11 +332,11 @@ var (
 func (s sqlStatement) declarations() []sqlFragment {
 	switch {
 	case createTableRe.MatchString(s.Match):
-		open, close := s.body()
-		if open < 0 || close < 0 {
+		opening, closing := s.body()
+		if opening < 0 || closing < 0 {
 			return nil
 		}
-		return s.splitRange(open+1, close, 1)
+		return s.splitRange(opening+1, closing, 1)
 	case alterTableRe.MatchString(s.Match):
 		return s.splitRange(s.start, s.end, 0)
 	}
@@ -345,21 +345,21 @@ func (s sqlStatement) declarations() []sqlFragment {
 
 // body is the offsets of a statement's first top-level (...) pair, which for a CREATE TABLE is
 // the column list. Either is -1 when there is no such pair.
-func (s sqlStatement) body() (open, close int) {
-	open, close = -1, -1
+func (s sqlStatement) body() (opening, closing int) {
+	opening, closing = -1, -1
 	for _, m := range s.marks {
 		if m.Off < s.start || m.Off >= s.end {
 			continue
 		}
-		if m.Rune == '(' && m.Depth == 0 && open < 0 {
-			open = m.Off
+		if m.Rune == '(' && m.Depth == 0 && opening < 0 {
+			opening = m.Off
 		}
-		if m.Rune == ')' && m.Depth == 0 && open >= 0 {
-			close = m.Off
+		if m.Rune == ')' && m.Depth == 0 && opening >= 0 {
+			closing = m.Off
 			break
 		}
 	}
-	return open, close
+	return opening, closing
 }
 
 // tableOptions is a CREATE TABLE's suffix, everything after the column list closes, masked. That
@@ -377,11 +377,11 @@ func (s sqlStatement) tableOptions() (string, bool) {
 	if !createTableRe.MatchString(s.Match) {
 		return "", false
 	}
-	_, close := s.body()
-	if close < 0 || close+1 > s.end {
+	_, closing := s.body()
+	if closing < 0 || closing+1 > s.end {
 		return "", true
 	}
-	return s.masked[close+1 : s.end], true
+	return s.masked[closing+1 : s.end], true
 }
 
 func (s sqlStatement) splitRange(from, to, depth int) []sqlFragment {

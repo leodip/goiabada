@@ -314,8 +314,8 @@ func TestUtilsJS_ModalTitleFollowsTheStatus(t *testing.T) {
 			chooser, server, generic, serverAt, genericAt)
 	}
 
-	if strings.Contains(content, oldTitle) {
-		line := 1 + strings.Count(content[:strings.Index(content, oldTitle)], "\n")
+	if before, _, found := strings.Cut(content, oldTitle); found {
+		line := 1 + strings.Count(before, "\n")
 		t.Errorf("static/utils.js:%d: showModalDialog is handed \"Server error\" unconditionally; "+
 			"a 400, 404 or 409 is not the server's mistake (#279)", line)
 	}

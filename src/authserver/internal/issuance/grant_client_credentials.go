@@ -64,7 +64,7 @@ func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings 
 		claims["aud"] = audCollection
 	}
 	claims["typ"] = TokenTypeBearer.String()
-	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
+	claims["exp"] = now.Add(time.Second * time.Duration(tokenExpirationInSeconds)).Unix()
 	claims["scope"] = scope
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)

@@ -173,7 +173,7 @@ func generationColumnShape000024(t *testing.T, h *isolatedDB, table string) (boo
 	require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&nullFlag, &def),
 		"column metadata: %s.%s", table, col)
 
-	notNull := false
+	var notNull bool
 	switch dbType() {
 	case data.MySQL, data.Postgres:
 		notNull = strings.EqualFold(nullFlag.String, "NO")

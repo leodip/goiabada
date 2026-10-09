@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -368,12 +369,12 @@ func TestBuildScopeString_SpecialCharacters(t *testing.T) {
 	result := middleware.buildScopeString(input)
 	resultParts := strings.Fields(result)
 
-	expectedScopes := append(input, []string{
+	expectedScopes := slices.Concat(input, []string{
 		"openid",
 		"email",
 		manageAccountScope,
 		manageScope,
-	}...)
+	})
 
 	for _, scope := range expectedScopes {
 		assert.Contains(t, resultParts, scope, "Result should contain scope: "+scope)

@@ -738,7 +738,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 	authTime2 := claims2["auth_time"].(float64)
 
 	// auth_time should be preserved from original login
-	assert.Equal(t, authTime1, authTime2, "auth_time should be preserved from original session")
+	assert.InDelta(t, authTime1, authTime2, 0, "auth_time should be preserved from original session")
 }
 
 func TestPromptNone_PKCEWrongVerifier(t *testing.T) {

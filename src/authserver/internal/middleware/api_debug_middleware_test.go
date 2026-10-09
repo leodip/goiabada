@@ -236,12 +236,14 @@ func TestAPIDebug_ReadsNoMoreThanOneBytePastTheCapBeforeTheHandler(t *testing.T)
 	req.Body = source
 
 	readBeforeHandler := -1
+	var closeErr error
 	handler := APIDebug(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		readBeforeHandler = source.read
-		require.NoError(t, r.Body.Close())
+		closeErr = r.Body.Close()
 	}))
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
+	require.NoError(t, closeErr)
 	assert.Equal(t, maxLoggedBody+1, readBeforeHandler)
 	assert.True(t, source.closed, "closing the body the handler holds closes the original")
 }

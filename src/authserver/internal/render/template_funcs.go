@@ -43,7 +43,7 @@ var templateFuncMap = template.FuncMap{
 	// Lang resolves the active locale's BCP 47 tag for the <html lang="...">
 	// attribute, so the document advertises the language it actually renders
 	// in (screen readers, hyphenation, translation tools). Falls back to "en".
-	"Lang": func(ctx context.Context) string { return i18n.LocaleTag(ctx) },
+	"Lang": i18n.LocaleTag,
 
 	// https://dev.to/moniquelive/passing-multiple-arguments-to-golang-templates-16h8
 	"args": func(els ...any) []any {

@@ -140,19 +140,11 @@ func (alwaysFailingReader) Read([]byte) (int, error) {
 // fatal handler on any error from it.
 func TestString_CrashesIrrecoverablyOnReaderFailure(t *testing.T) {
 	if os.Getenv(crashChildEnv) == "1" {
-		rand.Reader = alwaysFailingReader{}
-		defer func() {
-			// Reached only if the draw failed in a catchable way, which is the
-			// contract being violated. Exit 0 so the parent's assertion fails.
-			if r := recover(); r != nil {
-				fmt.Fprintf(os.Stderr, "String panicked recoverably with %v\n", r)
-				os.Exit(0)
-			}
-		}()
-		got := String(32)
-		fmt.Fprintf(os.Stderr, "String returned %q from a failing reader\n", got)
+		// drawFromFailingReader returns only if the draw failed in a catchable
+		// way, which is the contract being violated. Exit 0 so the parent's
+		// assertion fails.
+		drawFromFailingReader()
 		os.Exit(0)
-		return
 	}
 
 	cmd := exec.Command(os.Args[0],
@@ -175,6 +167,20 @@ func TestString_CrashesIrrecoverablyOnReaderFailure(t *testing.T) {
 		t.Fatalf("child died without %q, so it died of something other than the CSPRNG; output:\n%s",
 			wantFatal, out.String())
 	}
+}
+
+// drawFromFailingReader is the crash child's draw. It returns only if String
+// failed in a way the caller could catch: by returning a string, or by a panic
+// recovered here. Either is written to stderr for the parent's failure message.
+func drawFromFailingReader() {
+	rand.Reader = alwaysFailingReader{}
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "String panicked recoverably with %v\n", r)
+		}
+	}()
+	got := String(32)
+	fmt.Fprintf(os.Stderr, "String returned %q from a failing reader\n", got)
 }
 
 // TestStringFromAlphabet_Domain is the reason StringFromAlphabet checks its alphabet's length

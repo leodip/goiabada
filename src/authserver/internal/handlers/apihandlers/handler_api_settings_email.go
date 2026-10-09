@@ -200,11 +200,12 @@ func HandleSettingsEmailPut(
 			return
 		}
 
-		// TCP connectivity test with 3s timeout. Every check that needs no network runs
-		// above, so a bad field is answered without waiting on the dial. A failure answers at most
-		// its coarse cause and the error goes to the log, so the answer is no probe of the network
-		// the server sits on (#410 decision 4).
-		conn, err := net.DialTimeout("tcp", hostport.Join(smtpHost, req.SMTPPort), 3*time.Second)
+		// TCP connectivity test with 3s timeout, abandoned with the request. Every check that needs
+		// no network runs above, so a bad field is answered without waiting on the dial. A failure
+		// answers at most its coarse cause and the error goes to the log, so the answer is no probe
+		// of the network the server sits on (#410 decision 4).
+		dialer := net.Dialer{Timeout: 3 * time.Second}
+		conn, err := dialer.DialContext(r.Context(), "tcp", hostport.Join(smtpHost, req.SMTPPort))
 		if err != nil {
 			slog.WarnContext(r.Context(), "unable to connect to the smtp server", "error", err)
 			writeJSONError(w, connectionFailureMessage(smtpDialFailure,

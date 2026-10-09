@@ -229,11 +229,11 @@ func (m *malformedValues) add(key, value, want string) {
 // err is the refusal: one line, whatever the values hold, because main writes it to stderr
 // before any log handler exists and an operator reads it as the one reason the server stopped.
 // The values are quoted, so not even a value carrying a newline can break it.
-func (m malformedValues) err() error {
-	if len(m) == 0 {
+func (m *malformedValues) err() error {
+	if len(*m) == 0 {
 		return nil
 	}
-	return errs.Errorf("malformed configuration: %s", strings.Join(m, "; "))
+	return errs.Errorf("malformed configuration: %s", strings.Join(*m, "; "))
 }
 
 // getEnvAsInt answers the default when the variable is unset or empty after the trim, and the

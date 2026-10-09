@@ -99,9 +99,21 @@ func saveRedirectURIs(t *testing.T, db data.Database, auditLogger apihandlers.Au
 	wanted, expected []string) *httptest.ResponseRecorder {
 
 	t.Helper()
+	return serveRedirectURIsSave(db, auditLogger, clientId, redirectURIsSaveBody(t, wanted, expected))
+}
+
+// redirectURIsSaveBody encodes one save's request body.
+func redirectURIsSaveBody(t *testing.T, wanted, expected []string) []byte {
+	t.Helper()
 	body, err := json.Marshal(api.UpdateClientRedirectURIsRequest{RedirectURIs: wanted, ExpectedRedirectURIs: expected})
 	require.NoError(t, err)
+	return body
+}
 
+// serveRedirectURIsSave serves one encoded save through the real handler against db, with no
+// router. It takes no *testing.T, so a worker goroutine can call it: require stops a test only
+// from the test's own goroutine, so the body is encoded and checked there first.
+func serveRedirectURIsSave(db data.Database, auditLogger apihandlers.AuditLogger, clientId int64, body []byte) *httptest.ResponseRecorder {
 	id := strconv.FormatInt(clientId, 10)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/"+id+"/redirect-uris", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -169,9 +181,10 @@ func TestRedirectURISave_TwoOverlappingSavesMergePerItemAndAnOutdatedListIsRefus
 
 	b := newBarrier(t, "the first redirect URI save")
 	first := make(chan *httptest.ResponseRecorder, 1)
+	firstBody := redirectURIsSaveBody(t, []string{a, x, z}, loaded)
 	go func() {
-		first <- saveRedirectURIs(t, pausedAfterRedirectURIRead{Database: database, b: b}, auditLogger,
-			client.Id, []string{a, x, z}, loaded)
+		first <- serveRedirectURIsSave(pausedAfterRedirectURIRead{Database: database, b: b}, auditLogger,
+			client.Id, firstBody)
 	}()
 	b.awaitParked(t)
 

@@ -26,9 +26,7 @@ func TestAdminResourceHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *test
 		return []handlertest.Option{routed, handlertest.WithRouteParam(subject, "5"),
 			handlertest.WithRouteParam("permissionId", "8")}
 	}
-	request := func(method, target string, opts ...handlertest.Option) *http.Request {
-		return handlertest.Request(method, target, opts...)
-	}
+	request := handlertest.Request
 
 	type build func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc
 	testCases := []struct {

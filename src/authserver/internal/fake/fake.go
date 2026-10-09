@@ -209,13 +209,13 @@ func Bool() bool {
 	return intn(2) == 1
 }
 
-// Number returns a value in [min, max], inclusive at both ends. It panics when
-// max is below min, which is a caller mistake rather than an empty range.
-func Number(min, max int) int {
-	if max < min {
-		panic("fake: Number needs max >= min")
+// Number returns a value in [low, high], inclusive at both ends. It panics when
+// high is below low, which is a caller mistake rather than an empty range.
+func Number(low, high int) int {
+	if high < low {
+		panic("fake: Number needs high >= low")
 	}
-	return min + intn(max-min+1)
+	return low + intn(high-low+1)
 }
 
 var (

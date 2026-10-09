@@ -394,7 +394,7 @@ func TestIssueImplicitTx_ClientOverrideExpiration(t *testing.T) {
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	exp := accessClaims["exp"].(float64)
 	iat := accessClaims["iat"].(float64)
-	assert.Equal(t, float64(1800), exp-iat)
+	assert.InDelta(t, float64(1800), exp-iat, 0)
 
 	mockDB.AssertExpectations(t)
 }

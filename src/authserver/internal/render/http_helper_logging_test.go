@@ -426,9 +426,9 @@ func TestJSONError_ConformsTheFinalDescription(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			httpHelper := New(fstest.MapFS{})
+			var adoptedRequestId string
 			router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
-				require.Equal(t, test.requestId, middleware.GetReqID(r.Context()),
-					"chi must adopt the inbound header verbatim, otherwise this row proves nothing")
+				adoptedRequestId = middleware.GetReqID(r.Context())
 				httpHelper.JSONError(w, r, test.err)
 			})
 
@@ -436,6 +436,9 @@ func TestJSONError_ConformsTheFinalDescription(t *testing.T) {
 			req.Header.Set(middleware.RequestIDHeader, test.requestId)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
+
+			require.Equal(t, test.requestId, adoptedRequestId,
+				"chi must adopt the inbound header verbatim, otherwise this row proves nothing")
 
 			assert.Equal(t, test.wantStatus, w.Code)
 			assert.Equal(t, "application/json", w.Header().Get("Content-Type"))

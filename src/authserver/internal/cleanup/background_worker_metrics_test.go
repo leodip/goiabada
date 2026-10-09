@@ -111,7 +111,7 @@ func TestWorker_PerformTask_AFullRunIsCountedCompletedAndTimed(t *testing.T) {
 	require.True(t, ok, "the completion record carries a duration: %v", records[0].Attrs)
 	assert.GreaterOrEqual(t, duration, 20*time.Millisecond)
 	assert.LessOrEqual(t, duration, after.Sub(before))
-	assert.Equal(t, duration.Seconds(), sampleFloat(t, samples["goiabada_cleanup_last_run_duration_seconds"]))
+	assert.InDelta(t, duration.Seconds(), sampleFloat(t, samples["goiabada_cleanup_last_run_duration_seconds"]), 0)
 }
 
 func TestWorker_PerformTask_ARunWithAFailedStepIsCountedFailed(t *testing.T) {

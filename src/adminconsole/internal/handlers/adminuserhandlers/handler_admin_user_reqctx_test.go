@@ -30,9 +30,7 @@ func TestAdminUserHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.
 			handlertest.WithContentType("application/json"),
 		}
 	}
-	request := func(method, target string, opts ...handlertest.Option) *http.Request {
-		return handlertest.Request(method, target, opts...)
-	}
+	request := handlertest.Request
 
 	type build func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc
 	testCases := []struct {

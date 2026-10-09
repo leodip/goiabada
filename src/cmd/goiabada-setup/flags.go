@@ -76,7 +76,7 @@ func (b *optionalBool) Set(value string) error {
 func (b *optionalBool) IsBoolFlag() bool { return true }
 
 // or is the value given, or defaultValue when the flag was left out.
-func (b optionalBool) or(defaultValue bool) bool {
+func (b *optionalBool) or(defaultValue bool) bool {
 	if b.set {
 		return b.value
 	}

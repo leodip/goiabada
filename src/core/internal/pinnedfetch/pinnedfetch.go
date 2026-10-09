@@ -11,6 +11,7 @@
 package pinnedfetch
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
@@ -25,8 +26,11 @@ type Doer func(req *http.Request) (*http.Response, error)
 
 // Get fetches url with userAgent through doer, refuses any status but 200, and reads the body
 // through boundedread.Read under limit, so an oversized answer is refused rather than cut.
+//
+// The request carries the Background context: a generator's main has no context of its own, and
+// the doer's client carries the timeout.
 func Get(doer Doer, url, userAgent string, limit int64) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 	if err != nil {
 		return nil, errs.Wrapf(err, "build the request for %s", url)
 	}

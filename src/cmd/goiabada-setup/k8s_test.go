@@ -315,7 +315,7 @@ func TestKubernetesInstructions_FollowTheTrafficPolicy(t *testing.T) {
 			if !strings.Contains(message, "cluster-wide") || !strings.Contains(message, "whoever runs") {
 				t.Errorf("the message does not say the EnvoyProxy and GatewayClass are cluster-wide, so the choice is whoever runs Envoy Gateway's:\n%s", message)
 			}
-			tips := message[strings.Index(message, "TROUBLESHOOTING TIPS"):]
+			tips := outputFrom(t, message, "TROUBLESHOOTING TIPS")
 			for _, want := range testCase.wanted {
 				if !strings.Contains(tips, want) {
 					t.Errorf("the troubleshooting tips lack %q:\n%s", want, tips)

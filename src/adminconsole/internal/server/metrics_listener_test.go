@@ -184,7 +184,7 @@ func TestInitRoutes_TheJWKSFetchAndTheAdminAPIRecordOnTheServersRegistry(t *test
 		case "/api/public/settings":
 			_, _ = w.Write([]byte(`{"appName":"Goiabada Test","issuer":"` + oauthclienttest.Issuer + `"}`))
 		case "/certs":
-			require.NoError(t, json.NewEncoder(w).Encode(oauth.Jwks{
+			assert.NoError(t, json.NewEncoder(w).Encode(oauth.Jwks{
 				Keys: []oauth.Jwk{oauthclienttest.JwkFromPublicKey("key-1", &signing.PublicKey)}}))
 		default:
 			w.WriteHeader(http.StatusServiceUnavailable)

@@ -149,7 +149,8 @@ func TestAPIClientCreate_Duplicate(t *testing.T) {
 
 func TestAPIClientCreate_Unauthorized(t *testing.T) {
 	reqBody := api.CreateClientRequest{ClientIdentifier: "unauth-client", Description: "x"}
-	b, _ := json.Marshal(reqBody)
+	b, err := json.Marshal(reqBody)
+	require.NoError(t, err)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	httpClient := createHttpClient(t)

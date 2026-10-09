@@ -101,7 +101,8 @@ func TestHandleResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testing.
 		})
 	}
 	reqBody := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: permUpserts}
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	require.NoError(t, err)
 
 	req, _ := http.NewRequest("PUT", "/api/v1/admin/resources/1/permissions", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -116,7 +117,7 @@ func TestHandleResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testing.
 	// code and the one sentence, and the identifier that is missing goes to the operator as a
 	// structured attribute (#279 decision 7).
 	var response map[string]interface{}
-	err := json.Unmarshal(rr.Body.Bytes(), &response)
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
 	require.NoError(t, err)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", response["error_code"])
 	assert.Contains(t, response["error_description"], "An unexpected server error has occurred")

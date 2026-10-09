@@ -138,7 +138,7 @@ var templateFuncMap = template.FuncMap{
 	// Lang resolves the active locale's BCP 47 tag for the <html lang="...">
 	// attribute, so the document advertises the language it actually renders
 	// in (screen readers, hyphenation, translation tools). Falls back to "en".
-	"Lang": func(ctx context.Context) string { return i18n.LocaleTag(ctx) },
+	"Lang": i18n.LocaleTag,
 
 	// DateTime renders an instant as an absolute date and time in the active
 	// locale's numeric layout, which lives in the catalog because Go's
@@ -217,8 +217,8 @@ var templateFuncMap = template.FuncMap{
 		}
 		return *b
 	},
-	"isLast": func(index int, len int) bool {
-		return index == len-1
+	"isLast": func(index int, length int) bool {
+		return index == length-1
 	},
 	"add": func(a int, b int) int {
 		return a + b

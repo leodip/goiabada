@@ -483,6 +483,17 @@ func completionLine(t *testing.T, output, command string) string {
 	return found[0]
 }
 
+// outputFrom is the wizard's output from the first marker on, the marker included. An output
+// without the marker fails the test rather than being sliced from -1.
+func outputFrom(t *testing.T, output, marker string) string {
+	t.Helper()
+	at := strings.Index(output, marker)
+	if at < 0 {
+		t.Fatalf("the output holds no %q:\n%s", marker, output)
+	}
+	return output[at:]
+}
+
 // The completion message prints one kubectl apply naming both files, the manifest first: the
 // Secrets are namespaced and the manifest creates their Namespace, and kubectl applies its files in
 // the order given, so the command works on an empty cluster. Checked by walking its files in that
@@ -610,7 +621,7 @@ func TestWizard_SaysWhichFileToKeepOutOfVersionControl(t *testing.T) {
 			if err := w.setup(); err != nil {
 				t.Fatalf("setup: %v\n%s", err, out)
 			}
-			message := out.String()[strings.Index(out.String(), "SETUP COMPLETE!"):]
+			message := outputFrom(t, out.String(), "SETUP COMPLETE!")
 
 			advice := completionLine(t, message, "out of version control")
 			if !strings.Contains(advice, tc.secrets) {

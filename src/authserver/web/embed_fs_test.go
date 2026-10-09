@@ -1,9 +1,11 @@
 package web
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // OpenAPISpec returns the spec embedded at build time. An empty return would mean
@@ -17,7 +19,11 @@ func TestOpenAPISpec(t *testing.T) {
 		"the embedded file must look like an OpenAPI document")
 }
 
-// The same bytes are returned on every call, so handlers can serve it repeatedly.
+// The same bytes are returned on every call, the file's own, so handlers can serve it repeatedly.
 func TestOpenAPISpec_IsStable(t *testing.T) {
-	assert.Equal(t, OpenAPISpec(), OpenAPISpec())
+	onDisk, err := os.ReadFile("openapi.yaml")
+	require.NoError(t, err)
+
+	assert.Equal(t, onDisk, OpenAPISpec())
+	assert.Equal(t, onDisk, OpenAPISpec(), "a second call returns the same bytes")
 }
