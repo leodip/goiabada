@@ -38,6 +38,7 @@ The level says who should look: `ERROR` means someone must act, `WARN` a request
 | `worker task completed` | `INFO` | A cleanup run that reached every step, with its `duration`. A failed step writes an `ERROR` record first |
 | `a job to run after its response was dropped, too many in flight` | `WARN` | A forgot-password, registration or email-change mail that wasn't sent |
 | `cross-origin request refused` | `WARN` | A state-changing request the CSRF check refused as cross-origin, with its `explanation` and `remedy`. A run of them after a change of hostname or proxy is a misconfiguration rather than an attack |
+| `client authentication refused at the token endpoint` | `WARN` | A token request answered `invalid_client`, with the `reason` the client was given, the `client_identifier` as sent and the `client_auth_method` it used. A run of them from one client is usually a wrong or rotated secret |
 | `database migrated` | `INFO` | How many migrations a starting auth server `applied`, and their `duration` |
 
 ## The audit log
