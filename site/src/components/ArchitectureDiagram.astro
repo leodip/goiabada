@@ -1,0 +1,152 @@
+---
+// The Introduction's diagram of Goiabada's three parts and your apps. It is drawn inline, in
+// Starlight's color tokens, so it follows the site's theme, light or dark, as the page does. A
+// narrow column gets a compact copy instead, so its text is not scaled down to half its size on a
+// phone. Screen readers get the one-sentence caption instead of either drawing. The llms files keep
+// neither the drawings nor the caption, and lose nothing: the list the diagram follows says it all.
+---
+
+<figure class="architecture">
+	<svg class="wide" viewBox="0 0 600 472" aria-hidden="true">
+		<rect class="box" x="8" y="8" width="272" height="96" rx="12" />
+		<text class="title" x="144" y="44">Your apps</text>
+		<text class="sub" x="144" y="68">Web apps, mobile apps, SPAs</text>
+		<text class="sub" x="144" y="88">and your APIs</text>
+
+		<rect class="box" x="320" y="8" width="272" height="96" rx="12" />
+		<text class="title" x="456" y="44">Admin console</text>
+		<text class="sub" x="456" y="68">Clients, users and settings,</text>
+		<text class="sub" x="456" y="88">and each user's own account</text>
+
+		<line class="wire" x1="144" y1="104" x2="144" y2="186" />
+		<polygon class="head" points="137,184 151,184 144,196" />
+		<rect class="pill" x="44" y="136" width="200" height="28" rx="14" />
+		<text class="note" x="144" y="155">OAuth2 and OpenID Connect</text>
+
+		<line class="wire" x1="456" y1="104" x2="456" y2="186" />
+		<polygon class="head" points="449,184 463,184 456,196" />
+		<rect class="pill" x="374" y="136" width="164" height="28" rx="14" />
+		<text class="note" x="456" y="155">Sign-in and admin API</text>
+
+		<rect class="box accent" x="8" y="196" width="584" height="96" rx="12" />
+		<text class="title" x="300" y="234">Auth server</text>
+		<text class="sub" x="300" y="262">Signs users in, issues tokens and serves the admin API</text>
+
+		<line class="wire" x1="300" y1="292" x2="300" y2="364" />
+		<polygon class="head" points="293,362 307,362 300,374" />
+		<rect class="pill" x="188" y="314" width="224" height="28" rx="14" />
+		<text class="note" x="300" y="333">Only the auth server connects</text>
+
+		<path class="box" d="M130,388 V448 A170,12 0 0 0 470,448 V388" />
+		<ellipse class="box" cx="300" cy="388" rx="170" ry="12" />
+		<text class="title" x="300" y="422">Database</text>
+		<text class="sub" x="300" y="446">MySQL, PostgreSQL, SQL Server or SQLite</text>
+	</svg>
+	<svg class="narrow" viewBox="0 0 340 460" aria-hidden="true">
+		<rect class="box" x="8" y="8" width="156" height="60" rx="12" />
+		<text class="title small" x="86" y="44">Your apps</text>
+
+		<rect class="box" x="176" y="8" width="156" height="60" rx="12" />
+		<text class="title small" x="254" y="44">Admin console</text>
+
+		<line class="wire" x1="86" y1="68" x2="86" y2="166" />
+		<polygon class="head" points="79,164 93,164 86,176" />
+		<rect class="pill" x="26" y="100" width="120" height="44" rx="14" />
+		<text class="note" x="86" y="118">OAuth2 and</text>
+		<text class="note" x="86" y="136">OpenID Connect</text>
+
+		<line class="wire" x1="254" y1="68" x2="254" y2="166" />
+		<polygon class="head" points="247,164 261,164 254,176" />
+		<rect class="pill" x="202" y="100" width="104" height="44" rx="14" />
+		<text class="note" x="254" y="118">Sign-in and</text>
+		<text class="note" x="254" y="136">admin API</text>
+
+		<rect class="box accent" x="8" y="176" width="324" height="92" rx="12" />
+		<text class="title" x="170" y="210">Auth server</text>
+		<text class="sub" x="170" y="234">Signs users in, issues tokens</text>
+		<text class="sub" x="170" y="254">and serves the admin API</text>
+
+		<line class="wire" x1="170" y1="268" x2="170" y2="332" />
+		<polygon class="head" points="163,330 177,330 170,342" />
+		<rect class="pill" x="56" y="292" width="228" height="28" rx="14" />
+		<text class="note" x="170" y="311">Only the auth server connects</text>
+
+		<path class="box" d="M20,356 V440 A150,12 0 0 0 320,440 V356" />
+		<ellipse class="box" cx="170" cy="356" rx="150" ry="12" />
+		<text class="title" x="170" y="392">Database</text>
+		<text class="sub" x="170" y="414">MySQL, PostgreSQL,</text>
+		<text class="sub" x="170" y="434">SQL Server or SQLite</text>
+	</svg>
+	<figcaption class="sr-only">
+		Your apps and the admin console talk to the auth server, which is the only part that reaches the
+		database.
+	</figcaption>
+</figure>
+
+<style>
+	.architecture {
+		container-type: inline-size;
+	}
+	.architecture svg {
+		display: block;
+		width: 100%;
+		margin-inline: auto;
+		font-family: var(--__sl-font);
+	}
+	.wide {
+		max-width: 38rem;
+	}
+	.narrow {
+		max-width: 24rem;
+	}
+	@container (min-width: 30rem) {
+		.architecture .narrow {
+			display: none;
+		}
+	}
+	@container (max-width: calc(30rem - 0.02px)) {
+		.architecture .wide {
+			display: none;
+		}
+	}
+	.box {
+		fill: var(--sl-color-gray-6);
+		stroke: var(--sl-color-gray-5);
+		stroke-width: 1.5;
+	}
+	.accent {
+		fill: var(--sl-color-accent-low);
+		stroke: var(--sl-color-accent);
+		stroke-width: 2;
+	}
+	.wire {
+		stroke: var(--sl-color-gray-3);
+		stroke-width: 2;
+	}
+	.head {
+		fill: var(--sl-color-gray-3);
+	}
+	.pill {
+		fill: var(--sl-color-bg);
+		stroke: var(--sl-color-gray-5);
+	}
+	text {
+		text-anchor: middle;
+	}
+	.title {
+		fill: var(--sl-color-white);
+		font-size: 21px;
+		font-weight: 600;
+	}
+	.small {
+		font-size: 18px;
+	}
+	.sub {
+		fill: var(--sl-color-gray-2);
+		font-size: 15.5px;
+	}
+	.note {
+		fill: var(--sl-color-gray-2);
+		font-size: 14px;
+	}
+</style>
