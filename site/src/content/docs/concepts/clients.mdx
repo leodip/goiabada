@@ -151,7 +151,7 @@ The ACR level is how strongly a user must sign in to use the client:
 | `urn:goiabada:level2_optional` | ACR level 2 - password + OTP (if enabled by the user) | A password, plus a one-time code if they've set up two-factor authentication |
 | `urn:goiabada:level2_mandatory` | ACR level 3 - password + mandatory OTP | A password and a one-time code, setting up two-factor authentication first if they haven't |
 
-New clients start at `urn:goiabada:level2_optional`.
+New clients start at `urn:goiabada:level2_optional`. Change it on the client's **Settings** tab and click the **Save** at the bottom of the tab: the **Save** just under **May request administrative scopes** saves that switch alone, and the page reloads without your change.
 
 The default is a floor. An authorization request can ask for a stronger level with `acr_values`, but never a weaker one: the auth server uses the stronger of the two. A change applies to sign-ins that start after it. See [ACR and AMR](/concepts/acr-and-amr/).
 
