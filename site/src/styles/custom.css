@@ -5,3 +5,10 @@
 .sl-markdown-content table {
 	overflow-wrap: break-word;
 }
+
+/* A hyphen is a place a line may break, even in code, so a column squeezed to fit split
+   `goiabada-authserver` after its hyphen. plugins/table-code-words.mjs puts each hyphenated
+   word of code in a table into a code-word span, kept on one line here. */
+.sl-markdown-content .code-word {
+	white-space: nowrap;
+}
