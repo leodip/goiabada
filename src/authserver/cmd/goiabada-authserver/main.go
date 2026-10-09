@@ -40,6 +40,12 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+// run is the process from its start to its stop, and answers the code main exits with, so what it
+// defers is done on every path out of it.
+func run() int {
 	// TZ is resolved again before anything else, so the first record is already in the zone the
 	// deployment chose. The zone database this binary embeds is reachable only from here: a
 	// dependency fixes the local zone during package initialization, before it registers, so on a
@@ -47,7 +53,7 @@ func main() {
 	// not load, takes a malformed variable's channel and code, one line on stderr and exit 2 (#331).
 	if err := localzone.Install(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(migrateExitUsage)
+		return migrateExitUsage
 	}
 
 	// The configuration and the log handler come before the first record. The
@@ -63,11 +69,11 @@ func main() {
 	cfg, loadErr := config.Load(flag.CommandLine, os.Args[1:])
 	if loadErr != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", loadErr)
-		os.Exit(migrateExitUsage)
+		return migrateExitUsage
 	}
 	if err := logging.Install(cfg.AuthServer.LogLevel, cfg.AuthServer.LogFormat); err != nil {
 		slog.Error("unable to install the log handler", "error", err)
-		os.Exit(1)
+		return 1
 	}
 
 	// The command is chosen from what the flag parse left, not from os.Args: the parse stops at
@@ -78,7 +84,7 @@ func main() {
 	migrateArgs, isMigrate, err := dispatch(cfg.Args)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(migrateExitUsage)
+		return migrateExitUsage
 	}
 
 	slog.Info("auth server started")
@@ -96,7 +102,7 @@ func main() {
 	// configuration is handed over by value, so the --db-* flags it parses among them override a
 	// copy and the loaded configuration stays what the process was started with (#424).
 	if isMigrate {
-		os.Exit(migrateCommand(migrateArgs, cfg.Database, os.Stdout, os.Stderr))
+		return migrateCommand(migrateArgs, cfg.Database, os.Stdout, os.Stderr)
 	}
 
 	// The process owns the signals, from here to its exit, so a stop arriving while the server is
@@ -118,7 +124,7 @@ func main() {
 	trustedProxies, proxyErr := cfg.AuthServer.TrustedProxyRanges()
 	if proxyErr != nil {
 		slog.Error("the trusted proxy list is malformed, so the auth server cannot start", "error", proxyErr)
-		os.Exit(1)
+		return 1
 	}
 
 	// Validate the data-encryption key EARLY and build the data cipher from it
@@ -134,14 +140,14 @@ func main() {
 		slog.Error("the data encryption key is missing or malformed, so the auth server cannot start: set GOIABADA_AES_ENCRYPTION_KEY, and back it up separately from the database because every encrypted secret and signing key is unrecoverable without it",
 			"error", aesKeyErr,
 			"generate_with", "openssl rand -hex 32")
-		os.Exit(1)
+		return 1
 	}
 	// One cipher for the process, built here and handed to every consumer rather than set as a
 	// package-wide key each of them reads (#434).
 	dataCipher, dataCipherErr := encryption.NewDataCipher(currentDataKey)
 	if dataCipherErr != nil {
 		slog.Error("unable to initialize the data cipher", "error", dataCipherErr)
-		os.Exit(1)
+		return 1
 	}
 	slog.Info("data encryption key validated")
 
@@ -154,7 +160,7 @@ func main() {
 	dir, err := os.Getwd()
 	if err != nil {
 		slog.Error("unable to determine the working directory", "error", err)
-		os.Exit(1)
+		return 1
 	}
 	slog.Info("current working directory", "directory", dir)
 
@@ -162,7 +168,7 @@ func main() {
 	// the embedded message catalogs. Fail-fast: a malformed catalog is a config bug.
 	if loadBundleErr := i18n.LoadBundle(cfg.AuthServer.I18nOverridesDir); loadBundleErr != nil {
 		slog.Error("unable to load the i18n message catalogs", "error", loadBundleErr)
-		os.Exit(1)
+		return 1
 	}
 	slog.Info("i18n catalogs loaded")
 
@@ -184,10 +190,10 @@ func main() {
 		currentDataKey, previousDataKey, cfg.AuthServer.LogSQL)
 	if err != nil {
 		if stoppedDuringStartup(startupCtx, err) {
-			exitStopped()
+			return stopCleanly()
 		}
 		slog.Error("unable to create the database connection", "error", err)
-		os.Exit(1)
+		return 1
 	}
 	slog.Info("created database connection")
 
@@ -206,21 +212,21 @@ func main() {
 	})
 	if err != nil {
 		if stoppedDuringStartup(startupCtx, err) {
-			exitStopped()
+			return stopCleanly()
 		}
 		slog.Error("unable to bootstrap the database", "error", err)
-		os.Exit(1)
+		return 1
 	}
 	switch outcome {
 	case bootstrap.Exit:
 		// The legacy two-step seed ends the process whatever happens next, but a signal that
 		// arrived while it ran is still a stop during startup, said as every other one is.
 		if finishStartup() {
-			exitStopped()
+			return stopCleanly()
 		}
-		os.Exit(0)
+		return 0
 	case bootstrap.Refused:
-		os.Exit(1)
+		return 1
 	}
 
 	// Validate and decode the session keys for normal operation, after the bootstrap check,
@@ -231,7 +237,7 @@ func main() {
 	currentKeys, previousKeys, sessionKeysErr := cfg.AuthServer.SessionKeys()
 	if sessionKeysErr != nil {
 		logSessionKeysRefused(startupCtx, sessionKeysErr, cfg.AuthServer.BootstrapEnvOutFile)
-		os.Exit(1)
+		return 1
 	}
 	slog.Info("session keys validated")
 
@@ -260,7 +266,7 @@ func main() {
 	)
 	if err != nil {
 		slog.Error("unable to initialize the session store", "error", err)
-		os.Exit(1)
+		return 1
 	}
 
 	slog.Info("initialized server-side session store")
@@ -272,19 +278,19 @@ func main() {
 	// store, is still a stop during startup: the server does not start. From here on a signal is
 	// the running server's to say and to act on.
 	if finishStartup() {
-		exitStopped()
+		return stopCleanly()
 	}
 
 	// The server just gets told when to stop. Start has already drained whatever it started by the
 	// time it returns an error, and logs none of them: this is the one record, and the one exit,
-	// for all of them (#426). The deferred stop does not run under os.Exit, hence the explicit call.
+	// for all of them (#426).
 	if err := s.Start(signalled); err != nil {
 		slog.Error("the auth server stopped on an error", "error", err)
-		stopListeningForSignals()
-		os.Exit(1)
+		return 1
 	}
 
 	slog.Info("auth server stopped")
+	return 0
 }
 
 // watchStartup answers the context the startup steps run under, which ends when signalled does,
@@ -318,13 +324,13 @@ func stoppedDuringStartup(startup context.Context, err error) bool {
 	return startup.Err() != nil && errors.Is(err, context.Canceled)
 }
 
-// exitStopped ends a start the shutdown signal stopped: the running step finished and nothing new
-// started, so the platform's request was carried out cleanly, and the process exits 0, as it does
-// after a drain. Kubernetes restarts the container whatever the code, and Compose does not restart
+// stopCleanly ends a start the shutdown signal stopped: the running step finished and nothing new
+// started, so the platform's request was carried out cleanly, and it answers exit code 0, as a
+// drain does. Kubernetes restarts the container whatever the code, and Compose does not restart
 // one it was told to stop (#390 decision 9).
-func exitStopped() {
+func stopCleanly() int {
 	slog.Info("auth server stopped")
-	os.Exit(0)
+	return 0
 }
 
 // sessionKeysPrevious and sessionKeysRequired are the auth server's two session-key pairs, by the

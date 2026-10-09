@@ -214,7 +214,7 @@ func TestWizard_TheCompletionMessageSaysWhereTheAdminPasswordIs(t *testing.T) {
 			if err := w.setup(); err != nil {
 				t.Fatalf("setup: %v\n%s", err, out)
 			}
-			completion := out.String()[strings.Index(out.String(), "SETUP COMPLETE!"):]
+			completion := outputFrom(t, out.String(), "SETUP COMPLETE!")
 			want := "Sign in as " + w.config.AdminEmail + " with the admin password, GOIABADA_ADMIN_PASSWORD in " + filepath.Base(w.paths.secrets) + ".\n"
 			if kind == deploymentKubernetes {
 				want = "Sign in as " + w.config.AdminEmail + " with the admin password, which this reads back out of the cluster:\n" +

@@ -727,6 +727,11 @@ func (d *Database) IncrementUserAuthStateGeneration(ctx context.Context, tx *sql
 	}
 	defer func() { _ = rows.Close() }()
 	if !rows.Next() {
+		// Next answers false on a read error as well as on no row, and only rows.Err tells
+		// them apart.
+		if err := rows.Err(); err != nil {
+			return 0, errs.Wrap(err, "unable to read back user auth state generation")
+		}
 		return 0, errs.New("user vanished while incrementing auth state generation")
 	}
 	if err := rows.Scan(&generation); err != nil {
@@ -797,6 +802,11 @@ func (d *Database) IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql
 	}
 	defer func() { _ = rows.Close() }()
 	if !rows.Next() {
+		// Next answers false on a read error as well as on no row, and only rows.Err tells
+		// them apart.
+		if err := rows.Err(); err != nil {
+			return 0, errs.Wrap(err, "unable to read back user otp config generation")
+		}
 		return 0, errs.New("user vanished while incrementing otp config generation")
 	}
 	if err := rows.Scan(&generation); err != nil {

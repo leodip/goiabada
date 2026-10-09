@@ -73,7 +73,8 @@ func (c *Config) metricsAnswer() string {
 		if len(c.PodMonitorLabels) == 0 {
 			return "a PodMonitor, unlabeled"
 		}
-		return "a PodMonitor labeled " + podMonitorLabels(c.PodMonitorLabels).String()
+		labels := podMonitorLabels(c.PodMonitorLabels)
+		return "a PodMonitor labeled " + labels.String()
 	}
 	return "none"
 }
@@ -84,10 +85,14 @@ type podMonitorLabel struct{ key, value string }
 // podMonitorLabels is --podmonitor-labels: key=value pairs separated by commas, in the order given.
 type podMonitorLabels []podMonitorLabel
 
-// String is the labels as the summary reports them, key=value separated by commas.
-func (l podMonitorLabels) String() string {
-	pairs := make([]string, 0, len(l))
-	for _, label := range l {
+// String is the labels as the summary reports them, key=value separated by commas. A nil receiver
+// is no label, because the flag package may call String on one.
+func (l *podMonitorLabels) String() string {
+	if l == nil {
+		return ""
+	}
+	pairs := make([]string, 0, len(*l))
+	for _, label := range *l {
 		pairs = append(pairs, label.key+"="+label.value)
 	}
 	return strings.Join(pairs, ", ")

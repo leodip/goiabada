@@ -278,13 +278,14 @@ func checkPasswordStrength(password string) []string {
 	hasDigit := false
 	hasSpecial := false
 	for _, c := range password {
-		if unicode.IsUpper(c) {
+		switch {
+		case unicode.IsUpper(c):
 			hasUpper = true
-		} else if unicode.IsLower(c) {
+		case unicode.IsLower(c):
 			hasLower = true
-		} else if unicode.IsDigit(c) {
+		case unicode.IsDigit(c):
 			hasDigit = true
-		} else {
+		default:
 			hasSpecial = true
 		}
 	}

@@ -44,20 +44,20 @@ func HandleDynamicClientRegistrationPost(
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
 			apiresponse.LogInternalServerError(r, reqctx.ErrNoSettings)
-			writeDCRError(w, "server_error", "Internal server error", http.StatusInternalServerError)
+			writeDCRError(w, r, "server_error", "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		// 1. Check if DCR is enabled (RFC 7591 §3)
 		if !settings.DynamicClientRegistrationEnabled {
-			writeDCRError(w, "access_denied", "Dynamic client registration is not enabled", http.StatusForbidden)
+			writeDCRError(w, r, "access_denied", "Dynamic client registration is not enabled", http.StatusForbidden)
 			return
 		}
 
 		// 2. Parse request (RFC 7591 §3.1)
 		var req oidc.DynamicClientRegistrationRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeDCRError(w, oidc.DCRErrorInvalidClientMetadata, "Invalid request body", http.StatusBadRequest)
+			writeDCRError(w, r, oidc.DCRErrorInvalidClientMetadata, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 
@@ -66,13 +66,13 @@ func HandleDynamicClientRegistrationPost(
 
 		// 4. Validate request
 		if err := validateDCRRequest(&req); err != nil {
-			writeDCRError(w, oidc.DCRErrorInvalidClientMetadata, err.Error(), http.StatusBadRequest)
+			writeDCRError(w, r, oidc.DCRErrorInvalidClientMetadata, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// 5. Validate redirect URIs (RFC 7591 §5)
 		if err := validateDCRRedirectURIs(&req); err != nil {
-			writeDCRError(w, oidc.DCRErrorInvalidRedirectURI, err.Error(), http.StatusBadRequest)
+			writeDCRError(w, r, oidc.DCRErrorInvalidRedirectURI, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -92,7 +92,7 @@ func HandleDynamicClientRegistrationPost(
 			clientSecretEncrypted, err = dataCipher.Encrypt(clientSecret)
 			if err != nil {
 				apiresponse.LogInternalServerError(r, errs.Wrap(err, "DCR: failed to encrypt client secret"))
-				writeDCRError(w, "server_error", "Internal server error", http.StatusInternalServerError)
+				writeDCRError(w, r, "server_error", "Internal server error", http.StatusInternalServerError)
 				return
 			}
 		}
@@ -159,7 +159,7 @@ func HandleDynamicClientRegistrationPost(
 		if err != nil {
 			apiresponse.LogInternalServerError(r, err)
 			// One answer whichever write failed, since the whole registration was undone.
-			writeDCRError(w, "server_error", "Failed to register client", http.StatusInternalServerError)
+			writeDCRError(w, r, "server_error", "Failed to register client", http.StatusInternalServerError)
 			return
 		}
 
@@ -433,7 +433,10 @@ func containsGrantType(grantTypes []string, want oidc.GrantType) bool {
 // section 3.2.2 makes error_description "human-readable ASCII text", and descriptions here
 // interpolate request text -- a grant type, a redirect URI -- so without it a registrant's quote,
 // backslash or non-ASCII character comes back raw, at whatever length it was sent (#428).
-func writeDCRError(w http.ResponseWriter, errorCode, description string, statusCode int) {
+//
+// The status is committed before the body is encoded, so a failed write has nothing left to
+// answer, and it is recorded at Debug, as writeDCRResponse records its own.
+func writeDCRError(w http.ResponseWriter, r *http.Request, errorCode, description string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")
@@ -443,7 +446,9 @@ func writeDCRError(w http.ResponseWriter, errorCode, description string, statusC
 		Error:            errorCode,
 		ErrorDescription: oauth.ConformErrorDescription(description),
 	}
-	_ = json.NewEncoder(w).Encode(errorResp)
+	if err := json.NewEncoder(w).Encode(errorResp); err != nil {
+		slog.DebugContext(r.Context(), "unable to write the registration error response", "error", err)
+	}
 }
 
 // writeDCRResponse writes RFC 7591 section 3.2.1's 201 with the registered metadata.
@@ -456,7 +461,7 @@ func writeDCRResponse(w http.ResponseWriter, r *http.Request, response any) {
 	body, err := json.Marshal(response)
 	if err != nil {
 		apiresponse.LogInternalServerError(r, errs.Wrap(err, "unable to encode the registration response"))
-		writeDCRError(w, "server_error", "Internal server error", http.StatusInternalServerError)
+		writeDCRError(w, r, "server_error", "Internal server error", http.StatusInternalServerError)
 		return
 	}
 

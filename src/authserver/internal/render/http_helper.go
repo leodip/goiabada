@@ -218,8 +218,7 @@ func (h *Renderer) JSONError(w http.ResponseWriter, r *http.Request, err error) 
 
 	requestId := middleware.GetReqID(r.Context())
 
-	errorStr := ""
-	errorDescriptionStr := ""
+	var errorStr, errorDescriptionStr string
 
 	// errors.As rather than a bare assertion, so an *ErrorDetail still decides the status after
 	// anything on the way up has wrapped it. The assertion this replaces was correct only while the

@@ -214,7 +214,7 @@ func assertRefusedByTheGrantCeiling(t *testing.T, resp *http.Response, requestId
 	assert.Equal(t, "/api/v1/admin/"+target.kind+"s/{id}/permissions", row["route"])
 	assert.Equal(t, "grant", row["ceiling"])
 	assert.Equal(t, target.kind, row["target_kind"])
-	assert.Equal(t, float64(targetId), row["target_id"])
+	assert.InDelta(t, float64(targetId), row["target_id"], 0)
 	var named []int64
 	if raw, ok := row["permission_ids"].([]any); assert.True(t, ok, "permissionIds is a list: %v", row["permission_ids"]) {
 		for _, id := range raw {

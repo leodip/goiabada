@@ -181,7 +181,7 @@ func codeRevokedShape000026(t *testing.T, h *isolatedDB) (bool, bool, string) {
 	}
 	require.NoErrorf(t, err, "column metadata: %s.%s", table, col)
 
-	notNull := false
+	var notNull bool
 	switch dbType() {
 	case data.MySQL, data.Postgres:
 		notNull = strings.EqualFold(nullFlag.String, "NO")

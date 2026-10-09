@@ -110,13 +110,13 @@ func TestROPC_RefreshKeepsThePasswordGrantsAuthTime(t *testing.T) {
 	require.Equal(t, http.StatusOK, status, "the password grant: %v", granted)
 
 	accessAuthTime, idAuthTime, _ := requireAuthTime(t, granted)
-	assert.Equal(t, accessAuthTime, idAuthTime, "the password grant's two tokens disagree")
+	assert.InDelta(t, accessAuthTime, idAuthTime, 0, "the password grant's two tokens disagree")
 
 	refreshToken, ok := granted["refresh_token"].(string)
 	require.True(t, ok, "no refresh token: %v", granted)
 	first := tokenRow(t, refreshToken)
 	require.True(t, first.AuthenticatedAt.Valid, "the password grant's refresh token recorded no instant")
-	assert.EqualValues(t, first.AuthenticatedAt.Time.Unix(), accessAuthTime,
+	assert.InDelta(t, first.AuthenticatedAt.Time.Unix(), accessAuthTime, 0,
 		"the refresh token row and the tokens disagree on the instant")
 
 	// auth_time is whole seconds, so a refresh inside the same second as the grant would report
@@ -128,8 +128,8 @@ func TestROPC_RefreshKeepsThePasswordGrantsAuthTime(t *testing.T) {
 		require.Equal(t, http.StatusOK, status, "refresh %d: %v", rotation, refreshed)
 
 		gotAccess, gotId, iat := requireAuthTime(t, refreshed)
-		assert.Equal(t, accessAuthTime, gotAccess, "refresh %d: the access token's auth_time moved", rotation)
-		assert.Equal(t, accessAuthTime, gotId, "refresh %d: the ID token's auth_time moved", rotation)
+		assert.InDelta(t, accessAuthTime, gotAccess, 0, "refresh %d: the access token's auth_time moved", rotation)
+		assert.InDelta(t, accessAuthTime, gotId, 0, "refresh %d: the ID token's auth_time moved", rotation)
 		assert.Greater(t, iat, accessAuthTime, "refresh %d: iat is the refresh, later than the grant", rotation)
 
 		refreshToken, ok = refreshed["refresh_token"].(string)
@@ -203,8 +203,8 @@ func TestROPC_RefreshOfAFamilyStartedDaysAgoReportsThatStart(t *testing.T) {
 	require.Equal(t, http.StatusOK, status, "the refresh: %v", refreshed)
 
 	accessAuthTime, idAuthTime, iat := requireAuthTime(t, refreshed)
-	assert.EqualValues(t, threeDaysAgo.Unix(), accessAuthTime, "the access token reports the refresh, not the grant")
-	assert.EqualValues(t, threeDaysAgo.Unix(), idAuthTime, "the ID token reports the refresh, not the grant")
+	assert.InDelta(t, threeDaysAgo.Unix(), accessAuthTime, 0, "the access token reports the refresh, not the grant")
+	assert.InDelta(t, threeDaysAgo.Unix(), idAuthTime, 0, "the ID token reports the refresh, not the grant")
 	assert.GreaterOrEqual(t, iat, float64(before), "iat is the refresh")
 
 	childToken, ok := refreshed["refresh_token"].(string)

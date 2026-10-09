@@ -257,7 +257,7 @@ func TestMain_ServesMetricsOnTheirOwnListenerAndDrainsIt(t *testing.T) {
 	require.NotNilf(t, configured, "the listener's configuration is recorded as the others' is\n%s", dumpRecords(records))
 	assert.Equal(t, true, configured["enabled"])
 	assert.Equal(t, "127.0.0.1", configured["host"])
-	assert.Equal(t, float64(metricsPort), configured["port"])
+	assert.InDelta(t, float64(metricsPort), configured["port"], 0)
 
 	_, err := net.DialTimeout("tcp", "127.0.0.1:"+strconv.Itoa(metricsPort), time.Second)
 	assert.Error(t, err, "the metrics listener is closed once the process has stopped")

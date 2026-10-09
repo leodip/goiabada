@@ -61,7 +61,9 @@ func runSettingsChainForRequest(t *testing.T, authServerBaseURL string, req *htt
 	var seen *api.PublicSettingsResponse
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		settings, ok := reqctx.SettingsFrom(r.Context())
-		require.True(t, ok, "the middleware must put the settings on the context")
+		if !assert.True(t, ok, "the middleware must put the settings on the context") {
+			return
+		}
 		seen = settings
 		w.WriteHeader(http.StatusOK)
 	})

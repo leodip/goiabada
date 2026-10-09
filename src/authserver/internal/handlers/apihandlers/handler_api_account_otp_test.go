@@ -436,9 +436,9 @@ func TestHandleAccountOTPPut_Disable_ResetFailureRollsBack(t *testing.T) {
 // because a fixed literal is the real code roughly once in a million runs.
 func wrongButWellFormedCode(t *testing.T) string {
 	t.Helper()
-	real := currentOtpCode(t)
+	current := currentOtpCode(t)
 	for _, candidate := range []string{"000000", "111111", "222222"} {
-		if candidate != real {
+		if candidate != current {
 			if _, matched := otp.MatchStep(candidate, otpTestSecret, time.Now().UTC()); !matched {
 				return candidate
 			}

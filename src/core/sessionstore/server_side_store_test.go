@@ -1383,7 +1383,7 @@ func TestServerSideStore_AuthenticatedFlagFollowsTheConfiguredKey(t *testing.T) 
 func TestExpiresAt(t *testing.T) {
 	now := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
 	idle := 2 * time.Hour
-	max := 24 * time.Hour
+	maxLifetime := 24 * time.Hour
 
 	tests := []struct {
 		name          string
@@ -1429,7 +1429,7 @@ func TestExpiresAt(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expected, ExpiresAt(now, test.createdAt, test.authenticated, idle, max))
+			assert.Equal(t, test.expected, ExpiresAt(now, test.createdAt, test.authenticated, idle, maxLifetime))
 		})
 	}
 }

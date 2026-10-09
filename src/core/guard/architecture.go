@@ -2,6 +2,7 @@ package guard
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -697,8 +698,12 @@ type listedPackage struct {
 // goListDeps runs `go list -e -deps` over the main package in dir with the release builds' tag and
 // cgo setting, for one target. -e makes a package that fails to load a record carrying its error
 // rather than the end of the listing; -mod=readonly keeps the listing from editing a go.mod.
+//
+// The context is Background because the reporting half holds none: a Reporter is Helper, Errorf
+// and Fatalf, and the tier's own timeout is what bounds the run.
 func goListDeps(dir, goos, goarch string) ([]listedPackage, error) {
-	cmd := exec.Command("go", "list", "-e", "-deps", "-tags", "production", "-json=ImportPath,Imports,Error", ".")
+	cmd := exec.CommandContext(context.Background(),
+		"go", "list", "-e", "-deps", "-tags", "production", "-json=ImportPath,Imports,Error", ".")
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
 		"GOOS="+goos, "GOARCH="+goarch, "CGO_ENABLED=0", "GOFLAGS=-mod=readonly", "GOWORK=off")

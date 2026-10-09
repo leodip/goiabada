@@ -46,14 +46,16 @@ type requestSpec struct {
 	hasSettings bool
 }
 
-// Request builds a request carrying what the options ask for and nothing else.
+// Request builds a request carrying what the options ask for and nothing else. Its context is
+// Background with those values on it, as httptest.NewRequest's would be: a test has no request
+// above it whose context this one could inherit.
 func Request(method, target string, opts ...Option) *http.Request {
 	spec := &requestSpec{}
 	for _, opt := range opts {
 		opt(spec)
 	}
 
-	req := httptest.NewRequest(method, target, spec.body)
+	req := httptest.NewRequestWithContext(context.Background(), method, target, spec.body)
 	if spec.contentType != "" {
 		req.Header.Set("Content-Type", spec.contentType)
 	}

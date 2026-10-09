@@ -78,7 +78,7 @@ func TestAPIClientGet_NeitherTheDetailNorTheListCarriesTheSecret(t *testing.T) {
 		Client map[string]any `json:"client"`
 	}
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&detail))
-	assert.Equal(t, float64(client.Id), detail.Client["id"], "the detail is this client's")
+	assert.InDelta(t, float64(client.Id), detail.Client["id"], 0, "the detail is this client's")
 	assert.NotContains(t, detail.Client, "clientSecret")
 	encoded, err := json.Marshal(detail)
 	require.NoError(t, err)

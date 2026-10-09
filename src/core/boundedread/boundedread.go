@@ -36,17 +36,17 @@ import (
 // what makes the reason readable in a record and assertable in a test.
 var ErrResponseTooLarge = errors.New("the response exceeded the maximum size")
 
-// Read reads body under max bytes, refusing an overrun rather than cutting it. One byte past the
+// Read reads body under limit bytes, refusing an overrun rather than cutting it. One byte past the
 // ceiling is read: if that byte arrived the answer is oversized, nothing is returned, and no
 // prefix can reach a decoder.
 //
 // Whatever did arrive is returned alongside a read error, because a caller that treats a failed
 // read as a success -- the auth server's key rotation is one -- needs the partial body. Nothing
 // is returned on an overrun, so a prefix cannot reach a decoder by that route either.
-func Read(body io.Reader, max int64) ([]byte, error) {
-	read, err := io.ReadAll(io.LimitReader(body, max+1))
-	if int64(len(read)) > max {
-		return nil, errs.Wrapf(ErrResponseTooLarge, "the peer answered with more than %d bytes", max)
+func Read(body io.Reader, limit int64) ([]byte, error) {
+	read, err := io.ReadAll(io.LimitReader(body, limit+1))
+	if int64(len(read)) > limit {
+		return nil, errs.Wrapf(ErrResponseTooLarge, "the peer answered with more than %d bytes", limit)
 	}
 	if err != nil {
 		return read, errs.Errorf("failed to read response body: %w", err)

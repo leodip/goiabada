@@ -38,7 +38,10 @@ func newTokenStub(t *testing.T, answer func(w http.ResponseWriter, attempt int))
 
 	stub := &tokenStub{}
 	stub.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.NoError(t, r.ParseForm())
+		if !assert.NoError(t, r.ParseForm()) {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
 		stub.mu.Lock()
 		stub.forms = append(stub.forms, r.PostForm)

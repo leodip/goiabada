@@ -96,8 +96,13 @@ func TestAPIResourcesGet_EmptyDatabase(t *testing.T) {
 
 	// Assert: Should have proper structure (system resources exist)
 	assert.NotNil(t, getResponse.Resources)
-	// System should have at least the default authserver and adminconsole resources
-	assert.GreaterOrEqual(t, len(getResponse.Resources), 0)
+	// The authserver resource, which the first start seeds, is always listed. It is the one
+	// system resource: migration 000005 moved the adminconsole resource's permissions onto it.
+	identifiers := make([]string, 0, len(getResponse.Resources))
+	for _, resource := range getResponse.Resources {
+		identifiers = append(identifiers, resource.ResourceIdentifier)
+	}
+	assert.Contains(t, identifiers, builtin.AuthServerResourceIdentifier)
 }
 
 func TestAPIResourcesGet_Unauthorized(t *testing.T) {

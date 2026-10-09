@@ -46,6 +46,12 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+// run is the process from its start to its stop, and answers the code main exits with, so what it
+// defers is done on every path out of it.
+func run() int {
 	// TZ is resolved again before anything else, so the first record is already in the zone the
 	// deployment chose. The zone database this binary embeds is reachable only from here: a
 	// dependency fixes the local zone during package initialization, before it registers, so on a
@@ -53,7 +59,7 @@ func main() {
 	// not load, takes a malformed variable's channel and code, one line on stderr and exit 2 (#331).
 	if err := localzone.Install(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(2)
+		return 2
 	}
 
 	// The configuration and the log handler come before the first record. The
@@ -71,11 +77,11 @@ func main() {
 	cfg, loadErr := config.Load(flag.CommandLine, os.Args[1:])
 	if loadErr != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", loadErr)
-		os.Exit(2)
+		return 2
 	}
 	if err := logging.Install(cfg.AdminConsole.LogLevel, cfg.AdminConsole.LogFormat); err != nil {
 		slog.Error("unable to install the log handler", "error", err)
-		os.Exit(1)
+		return 1
 	}
 
 	// A trusted-proxy entry that is neither an IP nor a CIDR stops the server whatever
@@ -85,7 +91,7 @@ func main() {
 	trustedProxies, proxyErr := cfg.AdminConsole.TrustedProxyRanges()
 	if proxyErr != nil {
 		slog.Error("the trusted proxy list is malformed, so the admin console cannot start", "error", proxyErr)
-		os.Exit(1)
+		return 1
 	}
 
 	slog.Info("admin console started")
@@ -102,7 +108,7 @@ func main() {
 	if err := config.ValidateRemovedAdminConsoleVars(); err != nil {
 		slog.Error("the configuration sets variables that were removed, so the admin console cannot start",
 			"error", err)
-		os.Exit(1)
+		return 1
 	}
 
 	// Validate and decode the session keys EARLY - fail fast if missing or invalid.
@@ -113,7 +119,7 @@ func main() {
 	currentKeys, previousKeys, err := cfg.AdminConsole.SessionKeys()
 	if err != nil {
 		logSessionKeysNotConfigured(err)
-		os.Exit(1)
+		return 1
 	}
 	slog.Info("session keys validated")
 
@@ -124,7 +130,7 @@ func main() {
 	// console there (#426).
 	if strings.TrimSpace(cfg.AdminConsole.OAuthClientSecret) == "" {
 		logBootstrapCredentialsNotConfigured()
-		os.Exit(1)
+		return 1
 	}
 	slog.Info("oauth credentials validated")
 
@@ -136,7 +142,7 @@ func main() {
 	dir, err := os.Getwd()
 	if err != nil {
 		slog.Error("unable to determine the current working directory", "error", err)
-		os.Exit(1)
+		return 1
 	}
 	slog.Info("current working directory", "directory", dir)
 
@@ -144,7 +150,7 @@ func main() {
 	// the embedded message catalogs. Fail-fast: a malformed catalog is a config bug.
 	if loadBundleErr := i18n.LoadBundle(cfg.AdminConsole.I18nOverridesDir); loadBundleErr != nil {
 		slog.Error("unable to load the i18n message catalogs", "error", loadBundleErr)
-		os.Exit(1)
+		return 1
 	}
 	slog.Info("i18n catalogs loaded")
 
@@ -209,7 +215,7 @@ func main() {
 	)
 	if err != nil {
 		slog.Error("unable to initialize the session store", "error", err)
-		os.Exit(1)
+		return 1
 	}
 
 	slog.Info("initialized server-side session store")
@@ -230,15 +236,14 @@ func main() {
 	ctx, stopListeningForSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopListeningForSignals()
 
-	// Start logs none of its errors: this is the one record, and the one exit, for all of them. The
-	// deferred stop does not run under os.Exit, hence the explicit call.
+	// Start logs none of its errors: this is the one record, and the one exit, for all of them.
 	if err := s.Start(ctx); err != nil {
 		slog.Error("the admin console stopped on an error", "error", err)
-		stopListeningForSignals()
-		os.Exit(1)
+		return 1
 	}
 
 	slog.Info("admin console stopped")
+	return 0
 }
 
 // newTokenClient builds the console's one token client, which makes all three of its grants. The
@@ -268,7 +273,7 @@ func newTokenClient(cfg *config.Config, httpClient *http.Client, upstream *upstr
 // banners: the failure, the two variables to set and the command that generates
 // them are one instruction, and as three records a JSON deployment received them
 // unrelated, with the remedy in a message field nothing could query. It is a
-// function rather than three lines inside main so that the record has a seam to be
+// function rather than three lines inside run so that the record has a seam to be
 // asserted at (#320).
 func logSessionKeysNotConfigured(err error) {
 	var previousErr *sessionstore.PreviousKeysError

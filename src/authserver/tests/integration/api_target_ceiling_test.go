@@ -516,7 +516,7 @@ func assertRefusedByTheTargetCeiling(t *testing.T, resp *http.Response, requestI
 	assert.Equal(t, write.route, row["route"])
 	assert.Equal(t, "target", row["ceiling"])
 	assert.Equal(t, write.kind, row["target_kind"])
-	assert.Equal(t, float64(targetId), row["target_id"])
+	assert.InDelta(t, float64(targetId), row["target_id"], 0)
 	assert.NotContains(t, row, "permission_ids")
 }
 

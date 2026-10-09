@@ -602,7 +602,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			client := &record.Client{
 				Id: 1, ClientIdentifier: "test_client", Enabled: true,
 				AuthorizationCodeEnabled: true, IsPublic: false,
-				ClientSecretEncrypted: []byte(clientSecretEncrypted),
+				ClientSecretEncrypted: clientSecretEncrypted,
 			}
 			code := &record.Code{
 				Id: 5, ClientId: 1, UserId: 7,
@@ -656,7 +656,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			client := &record.Client{
 				Id: 1, ClientIdentifier: "test_client", Enabled: true,
 				AuthorizationCodeEnabled: true, IsPublic: false,
-				ClientSecretEncrypted: []byte(clientSecretEncrypted),
+				ClientSecretEncrypted: clientSecretEncrypted,
 			}
 			code := &record.Code{
 				Id: 5, ClientId: 1, UserId: 7,

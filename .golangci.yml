@@ -17,7 +17,31 @@
 # because gosec's false positives are suppressed inline, and it holds every
 # suppression to naming its linter and its reason and to still being needed.
 # staticcheck's ST1000 was turned on by #443, under staticcheck's settings
-# below. The binary itself is pinned in src/authserver/versions.yaml
+# below.
+#
+# The rest were measured as a set, each at its defaults, over the four modules
+# on golangci-lint 2.14.0, and every finding was fixed rather than suppressed
+# where a fix was the honest answer:
+#
+#   - none reported anything, so they hold a property for free: bidichk and
+#     asciicheck (hidden Unicode and non-ASCII identifiers in source),
+#     durationcheck, makezero, copyloopvar, predeclared, reassign,
+#     gocheckcompilerdirectives, nosprintfhostport, exptostd, misspell, and
+#     bodyclose, whose test findings are out of scope below;
+#   - a few production findings each, some of them real: rowserrcheck and
+#     sqlclosecheck (a read error in commondb reported as "user vanished"),
+#     errchkjson, noctx (an outbound request with no context), errorlint
+#     (pattern 7's errors.Is and errors.As, mechanically), wastedassign,
+#     unconvert, recvcheck and gocritic (os.Exit past a deferred call in both
+#     mains);
+#   - testifylint, all in tests: an error assertion made with assert, which
+#     carries on into code that assumes the error was what it said, and the
+#     rest of testify's misuses.
+#
+# Left out as noise at their defaults: revive, goconst, modernize, intrange,
+# contextcheck, exhaustive, perfsprint, prealloc, forcetypeassert and dupword.
+#
+# The binary itself is pinned in src/authserver/versions.yaml
 # (tools.golangci-lint).
 #
 # Note that golangci-lint's bundled staticcheck includes the QF (quickfix)
@@ -36,7 +60,38 @@ linters:
     - sloglint
     - gosec
     - nolintlint
+    - bidichk
+    - asciicheck
+    - durationcheck
+    - makezero
+    - copyloopvar
+    - predeclared
+    - reassign
+    - gocheckcompilerdirectives
+    - nosprintfhostport
+    - exptostd
+    - misspell
+    - bodyclose
+    - rowserrcheck
+    - sqlclosecheck
+    - errchkjson
+    - noctx
+    - errorlint
+    - wastedassign
+    - unconvert
+    - recvcheck
+    - gocritic
+    - testifylint
   settings:
+    testifylint:
+      # encoded-compare turns assert.Equal into JSONEq wherever a name says
+      # JSON. Every comparison it found compares exact bytes on purpose: that
+      # "</script>" reaches a page unescaped, which JSONEq accepts either way,
+      # that a stored auth context re-encodes byte for byte, that a wrapped
+      # writer passes a body through unchanged. JSONEq where the order and
+      # spacing of a document do not matter is written by hand.
+      disable:
+        - encoded-compare
     staticcheck:
       # golangci-lint's default list with one exclusion taken out: ST1000, a
       # library package with no comment attached to its package clause, or one
@@ -155,6 +210,12 @@ linters:
       # decision 10).
       - path: _test\.go
         linters: [gosec]
+      # A test builds its requests with httptest.NewRequest and reads responses
+      # from recorders and test servers that the test's own end tears down:
+      # 1,612 noctx and 83 bodyclose findings there, against 5 and 0 in the
+      # code a binary ships, which is what both are here for.
+      - path: _test\.go
+        linters: [noctx, bodyclose]
       # The tree-wide guards read the source tree by path and call the test
       # mail server; no binary imports them.
       - path: core/guard/

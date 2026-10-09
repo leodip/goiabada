@@ -657,21 +657,27 @@ func TestTokenLifetimeSeconds(t *testing.T) {
 func TestCalculateAtHash(t *testing.T) {
 	tokenIssuer := &TokenIssuer{}
 
+	// want is base64url, unpadded, of the left half of the token's SHA-256 (OIDC Core 1.0
+	// section 3.2.2.10), computed outside Go. An empty token still has one: the empty string's.
 	testCases := []struct {
 		name        string
 		accessToken string
+		want        string
 	}{
 		{
 			name:        "Standard access token",
 			accessToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature",
+			want:        "m3jOY-uKmta2P5VtFCvVVA",
 		},
 		{
 			name:        "Empty token",
 			accessToken: "",
+			want:        "47DEQpj8HBSa-_TImW-5JA",
 		},
 		{
 			name:        "Short token",
 			accessToken: "abc",
+			want:        "ungWv48Bz-pBQUDeXa4iIw",
 		},
 	}
 
@@ -679,12 +685,7 @@ func TestCalculateAtHash(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			atHash := tokenIssuer.calculateAtHash(tc.accessToken)
 
-			if tc.accessToken == "" {
-				// Empty token should still produce a hash (of empty string)
-				assert.NotEmpty(t, atHash)
-			} else {
-				assert.NotEmpty(t, atHash)
-			}
+			assert.Equal(t, tc.want, atHash)
 
 			// Verify it's base64url encoded (no padding, no + or /)
 			assert.NotContains(t, atHash, "=")
@@ -2075,13 +2076,13 @@ func TestClaims_UpdatedAtRidesWithTheProfileScope(t *testing.T) {
 				"http://localhost:8081", user, false)
 
 			if test.idTokenHasUpdatedAt {
-				assert.Equal(t, float64(updatedAt.Unix()), idClaims["updated_at"])
+				assert.InDelta(t, float64(updatedAt.Unix()), idClaims["updated_at"], 0)
 			} else {
 				assert.NotContains(t, idClaims, "updated_at")
 			}
 
 			if test.accessTokenHasUpdatedAt {
-				assert.Equal(t, float64(updatedAt.Unix()), accessClaims["updated_at"])
+				assert.InDelta(t, float64(updatedAt.Unix()), accessClaims["updated_at"], 0)
 			} else {
 				assert.NotContains(t, accessClaims, "updated_at")
 			}

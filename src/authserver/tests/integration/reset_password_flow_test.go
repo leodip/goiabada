@@ -837,7 +837,7 @@ func TestForgotPassword_EveryRequestIsAuditedOnce(t *testing.T) {
 			if tc.userId == 0 {
 				assert.NotContains(t, auditDetails, "user_id", "no account matched, so none is named")
 			} else {
-				assert.Equal(t, float64(tc.userId), auditDetails["user_id"])
+				assert.InDelta(t, float64(tc.userId), auditDetails["user_id"], 0)
 			}
 			for key, value := range auditDetails {
 				assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), tc.address,

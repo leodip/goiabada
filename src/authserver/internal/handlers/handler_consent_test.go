@@ -1844,7 +1844,8 @@ func TestHandleConsentPost(t *testing.T) {
 				}
 				ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-				if tc.ceremonyMismatch {
+				switch {
+				case tc.ceremonyMismatch:
 					expectCeremonyMismatch(t, pageRenderer, auditLogger, rr, req)
 
 					handler.ServeHTTP(rr, req)
@@ -1852,7 +1853,7 @@ func TestHandleConsentPost(t *testing.T) {
 					// Nothing was cleared and nothing was saved, which the mocks enforce by
 					// having no expectation for either call.
 					assert.Empty(t, rr.Header().Get("Location"))
-				} else if tc.granted == nil {
+				case tc.granted == nil:
 					stubClientProvenanceLookup(database)
 					// Only this branch emits, so only this branch reaches the emitter's
 					// registration read. Stubbing it above the split would leave the approving
@@ -1865,7 +1866,7 @@ func TestHandleConsentPost(t *testing.T) {
 					assert.Equal(t, http.StatusFound, rr.Code)
 					assert.Contains(t, rr.Header().Get("Location"),
 						"https://example.com/callback?error=access_denied")
-				} else {
+				default:
 					// The counterpart of the stub above: only the approving rows reach the
 					// permission re-check, so stubbing it above the split would leave the
 					// refusing rows carrying an expectation nothing calls.

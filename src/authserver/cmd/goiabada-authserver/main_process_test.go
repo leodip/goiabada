@@ -27,9 +27,8 @@ const runMainMarker = "GOIABADA_TEST_RUN_MAIN"
 func TestMain(m *testing.M) {
 	if os.Getenv(runMainMarker) == "1" {
 		os.Args = append([]string{"goiabada-authserver"}, os.Args[1:]...)
+		// main does not return: it exits with the code run answers.
 		main()
-		// main returns only when the server stops, which no case asks for.
-		os.Exit(0)
 	}
 	os.Exit(m.Run())
 }

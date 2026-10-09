@@ -598,7 +598,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
 			IsPublic:                 false,
-			ClientSecretEncrypted:    []byte(clientSecretEncrypted),
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
 		codeEntity := &record.Code{
@@ -922,7 +922,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
 			IsPublic:                 false,
-			ClientSecretEncrypted:    []byte(clientSecretEncrypted),
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
 		input := &ValidateTokenRequestInput{
@@ -1117,7 +1117,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
 			IsPublic:                 false,
-			ClientSecretEncrypted:    []byte(clientSecretEncrypted),
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
 		input := &ValidateTokenRequestInput{
@@ -1167,7 +1167,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
 			IsPublic:                 false,
-			ClientSecretEncrypted:    []byte(clientSecretEncrypted),
+			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
 		input := &ValidateTokenRequestInput{

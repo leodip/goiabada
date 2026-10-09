@@ -164,7 +164,7 @@ func TestDurationBuckets_IsAFreshCopy(t *testing.T) {
 	first := metrics.DurationBuckets()
 	first[0] = 99
 
-	assert.Equal(t, 0.005, metrics.DurationBuckets()[0])
+	assert.InDelta(t, 0.005, metrics.DurationBuckets()[0], 0)
 }
 
 // The value sets the two families declare: the router's own route table and unmatched, the

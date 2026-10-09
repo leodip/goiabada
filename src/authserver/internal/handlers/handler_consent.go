@@ -216,8 +216,7 @@ func HandleConsentPost(
 
 		answer, need := decideConsentSubmission(facts)
 		for need != consentSubmissionFactNone {
-			switch need {
-			case consentSubmissionFactHeldScope:
+			if need == consentSubmissionFactHeldScope {
 				var err error
 				client, err = database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 				if err != nil {

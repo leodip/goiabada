@@ -113,7 +113,7 @@ func TestPermissionDescriptionCeiling_ManageSettingsCannotRewriteAnAdministrativ
 			assert.Equal(t, "/api/v1/admin/resources/{resourceId}/permissions", row["route"])
 			assert.Equal(t, "target", row["ceiling"])
 			assert.Equal(t, "resource", row["target_kind"])
-			assert.Equal(t, float64(resource.Id), row["target_id"])
+			assert.InDelta(t, float64(resource.Id), row["target_id"], 0)
 			assert.Equal(t, []any{float64(permissionId)}, row["permission_ids"])
 		})
 	}

@@ -19,22 +19,22 @@ type valueAtTheBound struct {
 	value string
 }
 
-// valuesAtTheBound returns three values of exactly max bytes, in one-, two- and four-byte
+// valuesAtTheBound returns three values of exactly boundBytes bytes, in one-, two- and four-byte
 // characters. The engines count a column's width differently, MySQL and PostgreSQL in code points
 // and SQL Server in UTF-16 units, and the authorization endpoint and the password grant bound
 // state, nonce and scope in bytes because a string is never fewer bytes than either, so these are
 // the values that prove the bound fits every column: the ASCII one at the most characters the bound
 // admits, and the other two at the most UTF-16 units per byte (#437).
-func valuesAtTheBound(t *testing.T, max int) []valueAtTheBound {
+func valuesAtTheBound(t *testing.T, boundBytes int) []valueAtTheBound {
 	t.Helper()
-	require.Zero(t, max%4, "the two- and four-byte values need a bound both widths divide")
+	require.Zero(t, boundBytes%4, "the two- and four-byte values need a bound both widths divide")
 	values := []valueAtTheBound{
-		{"ascii", strings.Repeat("a", max)},
-		{"two-byte characters", strings.Repeat("é", max/2)},
-		{"four-byte characters", strings.Repeat("😀", max/4)},
+		{"ascii", strings.Repeat("a", boundBytes)},
+		{"two-byte characters", strings.Repeat("é", boundBytes/2)},
+		{"four-byte characters", strings.Repeat("😀", boundBytes/4)},
 	}
 	for _, v := range values {
-		require.Len(t, v.value, max, "%s is off the bound, so the case no longer observes the column's edge", v.name)
+		require.Len(t, v.value, boundBytes, "%s is off the bound, so the case no longer observes the column's edge", v.name)
 	}
 	return values
 }

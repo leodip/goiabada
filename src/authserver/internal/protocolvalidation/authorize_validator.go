@@ -170,15 +170,11 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 	// Here we just need to verify the client supports at least one of the requested flows
 	rtInfo := ParseResponseType(input.ResponseType)
 
-	if rtInfo.IsImplicitFlow() {
-		// For implicit flow, we don't require AuthorizationCodeEnabled
-		// The actual implicit grant enablement is checked in ValidateRequest
-		// We just need the client to be enabled (already checked above)
-	} else {
-		// Authorization code flow requires AuthorizationCodeEnabled
-		if !client.AuthorizationCodeEnabled {
-			return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeAuthCodeNotEnabled, nil)
-		}
+	// Authorization code flow requires AuthorizationCodeEnabled. Implicit flow does not: the
+	// actual implicit grant enablement is checked in ValidateRequest, and here the client only
+	// needs to be enabled, which is checked above.
+	if !rtInfo.IsImplicitFlow() && !client.AuthorizationCodeEnabled {
+		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeAuthCodeNotEnabled, nil)
 	}
 
 	// RFC 8252 section 7.3 port flexibility for http loopback redirect URIs is for the

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -281,7 +282,11 @@ func count(messages []string, message string) int {
 func dump(records []map[string]any) string {
 	var b strings.Builder
 	for _, r := range records {
-		line, _ := json.Marshal(r)
+		line, err := json.Marshal(r)
+		if err != nil {
+			fmt.Fprintf(&b, "(unable to render the record: %v) %v\n", err, r)
+			continue
+		}
 		b.Write(line)
 		b.WriteByte('\n')
 	}

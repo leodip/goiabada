@@ -187,7 +187,7 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, input.Client)
 
-	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
+	claims["exp"] = now.Add(time.Second * time.Duration(tokenExpirationInSeconds)).Unix()
 	claims["scope"] = input.Scope
 
 	// Optional nonce claim
@@ -255,7 +255,7 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, tx *sql.Tx, setti
 
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, input.Client)
 
-	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
+	claims["exp"] = now.Add(time.Second * time.Duration(tokenExpirationInSeconds)).Unix()
 
 	// Optional nonce claim
 	if len(input.Nonce) > 0 {

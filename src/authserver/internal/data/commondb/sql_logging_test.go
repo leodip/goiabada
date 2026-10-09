@@ -65,7 +65,8 @@ func TestDatabaseLog_QuerySQLWritesOneRecordAndNoBoundValue(t *testing.T) {
 
 	rows, err := database.QuerySQL(context.Background(), nil, `SELECT id FROM secrets WHERE value = ?`, boundSentinel)
 	require.NoError(t, err)
-	require.NoError(t, rows.Close())
+	defer func() { assert.NoError(t, rows.Close()) }()
+	require.NoError(t, rows.Err())
 
 	records := logs.Records()
 	require.Len(t, records, 1, "the read path must be bounded exactly as the write path is")
@@ -84,7 +85,8 @@ func TestDatabaseLog_WritesNothingWhenLogSqlIsOff(t *testing.T) {
 	require.NoError(t, err)
 	rows, err := database.QuerySQL(context.Background(), nil, `SELECT id FROM secrets WHERE value = ?`, boundSentinel)
 	require.NoError(t, err)
-	require.NoError(t, rows.Close())
+	defer func() { assert.NoError(t, rows.Close()) }()
+	require.NoError(t, rows.Err())
 
 	assert.Empty(t, logs.Records(), "the flag is off, so neither path may write anything")
 }

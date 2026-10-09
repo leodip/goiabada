@@ -87,10 +87,11 @@ func (e *withStack) Format(s fmt.State, verb rune) {
 // however many failures were joined into it.
 func owner(err error) *withStack {
 	for err != nil {
-		if ws, ok := err.(*withStack); ok && ws.pcs != nil {
+		// This walk is errors.As's own, one node at a time, so each node is asked directly.
+		if ws, ok := err.(*withStack); ok && ws.pcs != nil { //nolint:errorlint // the walk visits each node itself
 			return ws
 		}
-		switch u := err.(type) {
+		switch u := err.(type) { //nolint:errorlint // the walk visits each node itself
 		case interface{ Unwrap() error }:
 			err = u.Unwrap()
 		case interface{ Unwrap() []error }:
@@ -127,8 +128,9 @@ func stack(err error) error {
 	if err == nil {
 		return nil
 	}
-	// Already ours, and already answering for the tree: nothing to add.
-	if _, ok := err.(*withStack); ok {
+	// Already ours, and already answering for the tree: nothing to add. The value itself, not
+	// the chain: a withStack under a wrapper is the case below.
+	if _, ok := err.(*withStack); ok { //nolint:errorlint // the outermost value, not the chain
 		return err
 	}
 	// A stdlib wrapper or a join sitting over a stacked branch. Capturing here would record the

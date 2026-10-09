@@ -150,13 +150,14 @@ func TestUnknownId_ReturnsNilWithoutError(t *testing.T) {
 type byValueReader struct {
 	name string
 	// value is generated per run so it cannot collide with a row left behind by
-	// an earlier test: the three server databases are never reset.
+	// an earlier test: a run starts from an empty database (#433), and every test
+	// in it shares that database.
 	value func() string
 	found func(tx *sql.Tx, value string) (bool, error)
 }
 
 func byValueReaders() []byValueReader {
-	randomUUID := func() string { return fake.UUID() }
+	randomUUID := fake.UUID
 	randomWord := func() string { return "missing_" + fake.LetterN(16) }
 
 	return []byValueReader{

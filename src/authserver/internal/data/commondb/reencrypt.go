@@ -65,39 +65,13 @@ func (d *Database) reencryptAll(ctx context.Context, tx *sql.Tx, oldKey, newKey 
 // reads each row fully before writing (SQLite runs on a single connection), and
 // skips rows whose ciphertext is empty/NULL.
 func (d *Database) reencryptStringColumn(ctx context.Context, tx *sql.Tx, table, column string, oldKey, newKey []byte) error {
-	sb := sqlbuilder.NewSelectBuilder()
-	sb.Select("id", column).From(table)
-	query, args := sb.BuildWithFlavor(d.Flavor)
-
-	rows, err := d.QuerySQL(ctx, tx, query, args...)
+	items, err := d.readNonEmptyColumn(ctx, tx, table, column)
 	if err != nil {
 		return err
 	}
-	type item struct {
-		id int64
-		ct []byte
-	}
-	var items []item
-	for rows.Next() {
-		var id int64
-		var ct []byte
-		if err := rows.Scan(&id, &ct); err != nil {
-			_ = rows.Close()
-			return err
-		}
-		if len(ct) == 0 {
-			continue
-		}
-		items = append(items, item{id: id, ct: ct})
-	}
-	if err := rows.Err(); err != nil {
-		_ = rows.Close()
-		return err
-	}
-	_ = rows.Close()
 
 	for _, it := range items {
-		plaintext, err := encryption.DecryptText(it.ct, oldKey)
+		plaintext, err := encryption.DecryptText(it.value, oldKey)
 		if err != nil {
 			return errs.Wrapf(err, "decrypt %s id %d", column, it.id)
 		}
@@ -127,43 +101,17 @@ func (d *Database) reencryptStringColumn(ctx context.Context, tx *sql.Tx, table,
 // decision 8). So a plaintext PEM fails closed at the canary, never reaching this branch. It is kept because deleting it would
 // change a crypto path for no observable gain.
 func (d *Database) reencryptPrivateKeys(ctx context.Context, tx *sql.Tx, oldKey, newKey []byte) error {
-	sb := sqlbuilder.NewSelectBuilder()
-	sb.Select("id", "private_key_pem").From("key_pairs")
-	query, args := sb.BuildWithFlavor(d.Flavor)
-
-	rows, err := d.QuerySQL(ctx, tx, query, args...)
+	items, err := d.readNonEmptyColumn(ctx, tx, "key_pairs", "private_key_pem")
 	if err != nil {
 		return err
 	}
-	type item struct {
-		id  int64
-		pem []byte
-	}
-	var items []item
-	for rows.Next() {
-		var id int64
-		var pem []byte
-		if err := rows.Scan(&id, &pem); err != nil {
-			_ = rows.Close()
-			return err
-		}
-		if len(pem) == 0 {
-			continue
-		}
-		items = append(items, item{id: id, pem: pem})
-	}
-	if err := rows.Err(); err != nil {
-		_ = rows.Close()
-		return err
-	}
-	_ = rows.Close()
 
 	for _, it := range items {
 		var plaintextPEM string
-		if bytes.HasPrefix(it.pem, []byte("-----BEGIN")) {
-			plaintextPEM = string(it.pem) // plaintext PEM (pre-#83): encrypt it now
+		if bytes.HasPrefix(it.value, []byte("-----BEGIN")) {
+			plaintextPEM = string(it.value) // plaintext PEM (pre-#83): encrypt it now
 		} else {
-			pt, err := encryption.DecryptText(it.pem, oldKey) // ciphertext under oldKey: rotate
+			pt, err := encryption.DecryptText(it.value, oldKey) // ciphertext under oldKey: rotate
 			if err != nil {
 				return errs.Wrapf(err, "decrypt private key id %d", it.id)
 			}
@@ -183,4 +131,41 @@ func (d *Database) reencryptPrivateKeys(ctx context.Context, tx *sql.Tx, oldKey,
 		}
 	}
 	return nil
+}
+
+// storedValue is one row's id and the bytes one column holds for it.
+type storedValue struct {
+	id    int64
+	value []byte
+}
+
+// readNonEmptyColumn reads every row's id and column from table, skipping the rows whose column is
+// empty or NULL. The rows are closed before it returns, because its callers write next and SQLite
+// runs on a single connection.
+func (d *Database) readNonEmptyColumn(ctx context.Context, tx *sql.Tx, table, column string) ([]storedValue, error) {
+	sb := sqlbuilder.NewSelectBuilder()
+	sb.Select("id", column).From(table)
+	query, args := sb.BuildWithFlavor(d.Flavor)
+
+	rows, err := d.QuerySQL(ctx, tx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var items []storedValue
+	for rows.Next() {
+		var item storedValue
+		if err := rows.Scan(&item.id, &item.value); err != nil {
+			return nil, err
+		}
+		if len(item.value) == 0 {
+			continue
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

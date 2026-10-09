@@ -23,7 +23,7 @@ var ErrNoChange = errors.New("no change")
 // as the process lives. The runner returns the sentinel bare when it means it, so identity is the
 // whole test (#268).
 func IsNoChange(err error) bool {
-	return err == ErrNoChange
+	return err == ErrNoChange //nolint:errorlint // identity is the test, as above (#268)
 }
 
 // ErrNilVersion is answered by Version() when schema_migrations holds no row, which is what a
@@ -35,7 +35,7 @@ var ErrNilVersion = errors.New("no migration has been applied to this database")
 // read returned, and errors.Is would report an unmigrated database while dropping the failure
 // that says the read could not be completed cleanly (#268).
 func IsNilVersion(err error) bool {
-	return err == ErrNilVersion
+	return err == ErrNilVersion //nolint:errorlint // identity is the test, as above (#268)
 }
 
 // NilVersion is the version of a database with no row in schema_migrations. It is -1 rather than

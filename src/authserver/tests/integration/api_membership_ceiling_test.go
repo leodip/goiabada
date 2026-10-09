@@ -133,7 +133,7 @@ var membershipCeilingChanges = []membershipCeilingChange{
 			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/groups", userId),
 				map[string]any{"groupIds": []int64{groupId}, "expectedGroupIds": []int64{}})
 		},
-		done:       func(t *testing.T, userId, groupId int64) bool { return memberOf(t, userId, groupId) },
+		done:       memberOf,
 		targetKind: "user",
 	},
 	{
@@ -157,7 +157,7 @@ var membershipCeilingChanges = []membershipCeilingChange{
 			return sendAdmin(t, token, http.MethodPost, fmt.Sprintf("/api/v1/admin/groups/%d/members", groupId),
 				map[string]any{"userId": userId})
 		},
-		done:       func(t *testing.T, userId, groupId int64) bool { return memberOf(t, userId, groupId) },
+		done:       memberOf,
 		targetKind: "user",
 	},
 	{
@@ -225,7 +225,7 @@ func TestMembershipCeiling_AGranularTokenCannotMoveAUserThroughAnAdministrativeG
 				assert.Equal(t, change.route, row["route"])
 				assert.Equal(t, "grant", row["ceiling"])
 				assert.Equal(t, change.targetKind, row["target_kind"])
-				assert.Equal(t, float64(change.targetId(userId, groupId)), row["target_id"])
+				assert.InDelta(t, float64(change.targetId(userId, groupId)), row["target_id"], 0)
 				assert.Equal(t, []any{float64(administrative)}, row["permission_ids"], "the administrative permission the group holds")
 				if change.targetKind == "user" {
 					assert.Equal(t, []any{float64(groupId)}, row["group_ids"], "the group whose membership was refused")

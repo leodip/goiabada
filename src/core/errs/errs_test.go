@@ -92,10 +92,10 @@ func stackOwners(err error) []*withStack {
 	var walk func(error)
 	walk = func(e error) {
 		for e != nil {
-			if ws, ok := e.(*withStack); ok && ws.pcs != nil {
+			if ws, ok := e.(*withStack); ok && ws.pcs != nil { //nolint:errorlint // the walk visits each node itself, as owner does
 				found = append(found, ws)
 			}
-			switch u := e.(type) {
+			switch u := e.(type) { //nolint:errorlint // the walk visits each node itself, as owner does
 			case interface{ Unwrap() error }:
 				e = u.Unwrap()
 			case interface{ Unwrap() []error }:
@@ -237,7 +237,7 @@ func TestChain_ErrorsAsFindsATypedErrorABareAssertionMisses(t *testing.T) {
 	require.ErrorAs(t, wrapped, &d)
 	assert.Equal(t, "invalid_grant", d.code)
 
-	_, bare := wrapped.(*detail)
+	_, bare := wrapped.(*detail) //nolint:errorlint // the bare assertion is what this test shows missing
 	assert.False(t, bare,
 		"the bare assertion the tree uses at 55 sites today is what decision 6 retires")
 }
@@ -266,7 +266,7 @@ func TestWithStack_KeepsSentinelIdentity(t *testing.T) {
 	sentinel := errors.New("sentinel")
 	stacked := WithStack(sentinel)
 
-	assert.ErrorIs(t, stacked, sentinel)
+	require.ErrorIs(t, stacked, sentinel)
 	assert.Equal(t, "sentinel", stacked.Error())
 	assert.Same(t, stacked, WithStack(stacked), "already stacked, so WithStack is the identity")
 }
@@ -382,7 +382,7 @@ func TestInheritedStack_TheOriginKeepsTheOnlyStack(t *testing.T) {
 			assert.Equal(t, row.message, err.Error())
 			assert.Equal(t, "dataLayer", firstFrame(t, err),
 				"the wrapper prints the origin's frames, not its own")
-			assert.ErrorIs(t, err, sql.ErrConnDone, "the chain still unwraps")
+			require.ErrorIs(t, err, sql.ErrConnDone, "the chain still unwraps")
 
 			frames := plusV(err)
 			assert.NotContains(t, frames, ":0",
@@ -394,11 +394,11 @@ func TestInheritedStack_TheOriginKeepsTheOnlyStack(t *testing.T) {
 
 func TestInheritedStack_JoinedBranchesAreStillMatchable(t *testing.T) {
 	wrapped := Wrap(errors.Join(dataLayer(), errors.New("cleanup failed")), "migration")
-	assert.ErrorIs(t, wrapped, sql.ErrConnDone, "the left branch of a wrapped join")
+	require.ErrorIs(t, wrapped, sql.ErrConnDone, "the left branch of a wrapped join")
 
 	both := Join(Wrap(&detail{code: "invalid_grant"}, "validating"), dataLayer())
 	var d *detail
-	assert.ErrorAs(t, both, &d, "errors.As reaches a typed error in the left branch")
+	require.ErrorAs(t, both, &d, "errors.As reaches a typed error in the left branch")
 	assert.ErrorIs(t, both, sql.ErrConnDone, "and errors.Is the sentinel in the right one")
 }
 

@@ -363,7 +363,7 @@ func TestClientAdministrativeScopes_AnAllowanceWithdrawnDuringTheSignInRefusesIt
 			rows := administrativeScopeRefusedRows(t, f.client.ClientIdentifier)
 			require.Len(t, rows, 1)
 			assert.Equal(t, "issue", rows[0]["checkpoint"])
-			assert.Equal(t, float64(f.user.Id), rows[0]["user_id"])
+			assert.InDelta(t, float64(f.user.Id), rows[0]["user_id"], 0)
 			assert.Equal(t, []any{"authserver:manage"}, rows[0]["scopes"])
 		})
 	}

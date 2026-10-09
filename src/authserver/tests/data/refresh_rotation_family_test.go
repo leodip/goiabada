@@ -133,17 +133,18 @@ func newFamilyOfShape(t *testing.T, db data.Database, shape familyShape) *family
 		if jti != firstJti {
 			token.PreviousRefreshTokenJti = firstJti
 		}
-		if ropc {
+		switch {
+		case ropc:
 			token.UserId = sql.NullInt64{Int64: user.Id, Valid: true}
 			token.ClientId = sql.NullInt64{Int64: client.Id, Valid: true}
 			token.RefreshTokenType = "Offline"
 			token.AuthenticatedAt = sql.NullTime{Time: now.Add(-time.Hour), Valid: true}
-		} else if f.offline {
+		case f.offline:
 			// An offline grant's token names no session of its own: the one it came from is on its code.
 			token.CodeId = sql.NullInt64{Int64: f.code.Id, Valid: true}
 			token.RefreshTokenType = "Offline"
 			token.Scope = "openid profile offline_access"
-		} else {
+		default:
 			token.CodeId = sql.NullInt64{Int64: f.code.Id, Valid: true}
 			token.SessionIdentifier = f.code.SessionIdentifier
 			token.RefreshTokenType = "Refresh"

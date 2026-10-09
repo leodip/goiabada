@@ -147,7 +147,7 @@ func TestRender_AdminClientWebOrigins(t *testing.T) {
 	assert.Contains(t, out, "https://theirs.example.com")
 	assert.Contains(t, out, "another-app")
 	assert.Contains(t, out, "Origens permitidas em todo o servidor")
-	assert.Contains(t, out, "é permitida para todos os clientes")
+	assert.Contains(t, out, "é permitida para todos os clientes") //nolint:misspell // the pt-BR catalog's text: "clientes" is Portuguese, not a misspelling of "clients"
 
 	// The intro says the value is a bare origin rather than a URL, which is where the trailing
 	// slash that CORS can never match used to come from.

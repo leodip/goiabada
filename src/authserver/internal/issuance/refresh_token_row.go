@@ -147,11 +147,11 @@ func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType TokenType, now 
 		if client.RefreshTokenOfflineIdleTimeoutInSeconds > 0 {
 			refreshTokenExpirationInSeconds = client.RefreshTokenOfflineIdleTimeoutInSeconds
 		}
-		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds))).Unix()
+		exp := now.Add(time.Second * time.Duration(refreshTokenExpirationInSeconds)).Unix()
 		return exp, nil
 	case TokenTypeRefresh:
 		refreshTokenExpirationInSeconds := settings.UserSessionIdleTimeoutInSeconds
-		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds))).Unix()
+		exp := now.Add(time.Second * time.Duration(refreshTokenExpirationInSeconds)).Unix()
 		return exp, nil
 	}
 	return 0, errs.Errorf("invalid refresh token type: %v", refreshTokenType)
@@ -169,7 +169,7 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, tx *sql.Tx
 		if client.RefreshTokenOfflineMaxLifetimeInSeconds > 0 {
 			maxLifetimeInSeconds = client.RefreshTokenOfflineMaxLifetimeInSeconds
 		}
-		maxLifetime := now.Add(time.Duration(time.Second * time.Duration(maxLifetimeInSeconds))).Unix()
+		maxLifetime := now.Add(time.Second * time.Duration(maxLifetimeInSeconds)).Unix()
 		return maxLifetime, nil
 	case TokenTypeRefresh:
 		userSession, err := t.database.GetUserSessionBySessionIdentifier(ctx, tx, sessionIdentifier)
@@ -182,7 +182,7 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, tx *sql.Tx
 			return 0, errs.Errorf("user session %q not found while computing refresh token max lifetime", sessionIdentifier)
 		}
 		maxLifetime := userSession.Started.Add(
-			time.Duration(time.Second * time.Duration(settings.UserSessionMaxLifetimeInSeconds))).Unix()
+			time.Second * time.Duration(settings.UserSessionMaxLifetimeInSeconds)).Unix()
 		return maxLifetime, nil
 	}
 	return 0, errs.Errorf("invalid refresh token type: %v", refreshTokenType)
@@ -283,5 +283,5 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetimeForROPC(now time.Time, settings 
 	if client.RefreshTokenOfflineMaxLifetimeInSeconds > 0 {
 		maxLifetimeInSeconds = client.RefreshTokenOfflineMaxLifetimeInSeconds
 	}
-	return now.Add(time.Duration(time.Second * time.Duration(maxLifetimeInSeconds))).Unix()
+	return now.Add(time.Second * time.Duration(maxLifetimeInSeconds)).Unix()
 }

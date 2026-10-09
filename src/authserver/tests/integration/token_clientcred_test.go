@@ -787,7 +787,7 @@ func TestToken_ClientCred_TokenLifetime(t *testing.T) {
 			}
 			data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, client.ClientIdentifier, clientSecret)
 
-			assert.Equal(t, float64(tt.expectedLifetime), data["expires_in"])
+			assert.InDelta(t, float64(tt.expectedLifetime), data["expires_in"], 0)
 
 			accessToken, ok := data["access_token"].(string)
 			if !assert.True(t, ok, "access_token should be a string") {
@@ -796,7 +796,7 @@ func TestToken_ClientCred_TokenLifetime(t *testing.T) {
 			claims := decodeJWTPayload(t, accessToken)
 			iat, _ := claims["iat"].(float64)
 			exp, _ := claims["exp"].(float64)
-			assert.Equal(t, float64(tt.expectedLifetime), exp-iat, "exp - iat should be the token's lifetime")
+			assert.InDelta(t, float64(tt.expectedLifetime), exp-iat, 0, "exp - iat should be the token's lifetime")
 		})
 	}
 }

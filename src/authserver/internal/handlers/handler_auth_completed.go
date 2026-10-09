@@ -189,8 +189,7 @@ func HandleAuthCompletedGet(
 		}
 		answer, need := decideAfterBinding(facts)
 		for need != afterBindingFactNone {
-			switch need {
-			case afterBindingFactEffectiveScope:
+			if need == afterBindingFactEffectiveScope {
 				// The effective scope is the requested one with every scope the user is not
 				// authorized for filtered out, and it replaces the ceremony's scope.
 				effectiveScope, filterErr := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(r.Context(), authContext.Scope, user)

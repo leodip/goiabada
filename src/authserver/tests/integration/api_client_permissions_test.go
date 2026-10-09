@@ -198,7 +198,8 @@ func TestAPIClientPermissions_Unauthorized(t *testing.T) {
 	// PUT without token
 	putURL := getURL
 	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{}, ExpectedPermissionIds: []int64{}}
-	bodyBytes, _ := json.Marshal(&reqBody)
+	bodyBytes, err := json.Marshal(&reqBody)
+	require.NoError(t, err)
 	req, _ = http.NewRequest("PUT", putURL, bytes.NewBuffer(bodyBytes))
 	resp2, err := httpClient.Do(req)
 	require.NoError(t, err)

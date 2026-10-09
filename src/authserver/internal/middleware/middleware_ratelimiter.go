@@ -569,10 +569,15 @@ func (m *RateLimiter) reject(w http.ResponseWriter, r *http.Request, class rejec
 		// authorization request is still pending and polling should continue" (RFC 8628
 		// Section 3.5), which would tell a conformant client to keep polling a rejected
 		// request (#219).
-		_ = json.NewEncoder(w).Encode(map[string]string{
+		//
+		// The 429 is committed before the body is encoded, so a failed write has nothing left to
+		// answer, and it is recorded at Debug, as the other committed responses record theirs.
+		if err := json.NewEncoder(w).Encode(map[string]string{
 			"error":             "invalid_request",
 			"error_description": "Too many requests. Please wait and try again later.",
-		})
+		}); err != nil {
+			slog.DebugContext(r.Context(), "unable to write the rate limit response", "error", err)
+		}
 		return
 	}
 

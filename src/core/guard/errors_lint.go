@@ -279,7 +279,7 @@ func legacyErrorUsesInFile(file *ast.File, fset *token.FileSet, rel string) []le
 			if !resolved {
 				return true
 			}
-			what, fix := "", ""
+			var what, fix string
 			switch {
 			case pkg == "errors" && (fn == "New" || fn == "Join"):
 				what, fix = "stdlib errors."+fn, "use errs."+fn
