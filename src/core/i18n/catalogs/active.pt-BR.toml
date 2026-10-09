@@ -398,7 +398,7 @@
 "adminconsole.account.email_verification.section_title" = "Verifique seu e-mail"
 "adminconsole.account.email_verification.unverified_prefix" = "Seu e-mail "
 "adminconsole.account.email_verification.unverified_em" = "não está verificado"
-"adminconsole.account.email_verification.unverified_suffix" = ". Clique no link abaixo para receber um código de verificação por e-mail."
+"adminconsole.account.email_verification.unverified_suffix" = ". Clique em Enviar código de verificação abaixo para receber um código por e-mail."
 "adminconsole.account.email_verification.verified_prefix" = "Seu e-mail está "
 "adminconsole.account.email_verification.verified_em" = "verificado"
 "adminconsole.account.email_verification.verified_suffix" = "."
