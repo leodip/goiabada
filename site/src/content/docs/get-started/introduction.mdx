@@ -4,6 +4,7 @@ description: What Goiabada is, what it does for your apps, and how its parts fit
 ---
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+import ArchitectureDiagram from '../../../components/ArchitectureDiagram.astro';
 
 Goiabada is an open-source server that signs your users in, so your apps don't have to.
 
@@ -14,12 +15,17 @@ You run it yourself. Your apps send users to Goiabada to sign in, and get back t
 - **Sign-in with passwords and two-factor authentication.** Users sign in with a password, and optionally a code from an authenticator app. Each app chooses whether a code is required. See [Require two-factor authentication](/guides/require-two-factor-authentication/).
 - **Single sign-on.** Users sign in once and can use all your apps without signing in again. See [Single sign-on across clients](/guides/single-sign-on-across-clients/).
 - **Permissions.** You decide who can do what in your APIs, with resources, permissions and groups. See [Resources and permissions](/concepts/resources-and-permissions/).
+- **Custom claims.** You add groups and your own user and group attributes to ID tokens, access tokens or both. See [Attributes](/concepts/users-and-groups/#attributes).
 - **API protection.** Apps and services get tokens for calling your APIs, with or without a user. See [Protect an API](/guides/protect-an-api/).
-- **Self-service accounts.** Users update their own profile, email, password and two-factor authentication.
+- **Self-service accounts.** Users update their own profile, picture, email, phone, address, password and two-factor authentication, end their sessions and revoke the consents they gave.
+- **Self-registration and password recovery.** People create their own accounts, with or without email verification, and reset a forgotten password by email. See [Self-registration](/concepts/self-registration/) and [Password recovery](/concepts/password-recovery/).
 - **Dynamic client registration.** Apps such as MCP clients can register themselves, when you turn it on. See [Let clients register themselves (DCR)](/guides/let-clients-register-themselves-dcr/).
+- **An admin API.** Your scripts and tools can do everything the admin console does, with an OpenAPI reference and permissions as narrow as read-only. See [API authentication](/reference/api/authentication/).
 - **An audit log.** Sign-ins, failed passwords and every change an administrator makes are recorded. See [Audit log](/concepts/audit-log/).
+- **A setup wizard.** It asks a few questions and writes a ready-to-run configuration for Docker Compose, Kubernetes or the native binaries, keys and passwords included. See [Setup wizard](/deploy/setup-wizard/).
+- **Ready for Kubernetes.** Generated manifests with probes, graceful shutdown and disruption budgets, Prometheus metrics, and servers that scale out to several replicas. See [Kubernetes](/deploy/kubernetes/overview/) and [Monitoring](/deploy/monitoring/).
 
-## How it works
+## How the parts fit together
 
 Goiabada has three parts:
 
@@ -27,7 +33,7 @@ Goiabada has three parts:
 - The **admin console** is the web app where you manage clients, users, groups, permissions and settings, and where users manage their own account. It's a client of the auth server and talks to it over HTTP.
 - The **database** holds everything: MySQL, PostgreSQL, SQL Server or SQLite. Only the auth server connects to it.
 
-![The admin console and your apps talk to the auth server, which is the only part that reaches the database](../../../assets/screenshot4.png)
+<ArchitectureDiagram />
 
 Both servers are written in Go, and each ships as a Docker image and a native binary for Linux, macOS and Windows.
 
