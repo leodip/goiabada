@@ -554,9 +554,12 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				req = withSessionSettings(req)
 				rr := httptest.NewRecorder()
 
+				// The SSO shortcut, the one ceremony that reuses the session's level: it verified
+				// nothing itself. A ceremony that verified the password is decided without the
+				// session, which the next test pins (#537).
 				authContext := &ceremony.AuthContext{
 					CeremonyId: testCeremonyId,
-					AuthState:  ceremony.AuthStateLevel1PasswordCompleted,
+					AuthState:  ceremony.AuthStateLevel1ExistingSession,
 					ClientId:   "test-client",
 					UserId:     1,
 				}
@@ -615,6 +618,75 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				userSessionManager.AssertExpectations(t)
 				database.AssertExpectations(t)
 			})
+		}
+	})
+
+	// A ceremony that verified the password itself is a new authentication: prompt=login over the
+	// user's own valid session, an id_token_hint naming someone else, a restart. The session counts
+	// for nothing towards its level, whatever level it reached and however recently, so it owes every
+	// factor its target needs, exactly as a sign-in with no session does (OIDC Core 1.0 section
+	// 3.1.2.3, #537). Until #537 the session's code counted, and the token said level 3 beside amr
+	// ["pwd"]. The session is not even asked whether it is valid.
+	t.Run("A ceremony that verified the password counts no session (#537)", func(t *testing.T) {
+		levels := []record.AcrLevel{record.AcrLevel1, record.AcrLevel2Optional, record.AcrLevel2Mandatory}
+		for _, sessionAcrLevel := range levels {
+			for _, targetAcrLevel := range levels {
+				expectedRedirect := "/auth/level2"
+				expectedAuthState := ceremony.AuthStateRequiresLevel2
+				if targetAcrLevel == record.AcrLevel1 {
+					expectedRedirect = "/auth/completed"
+					expectedAuthState = ceremony.AuthStateAuthenticationCompleted
+				}
+				name := "session " + string(sessionAcrLevel) + ", target " + string(targetAcrLevel)
+				t.Run(name, func(t *testing.T) {
+					pageRenderer := handlersmocks.NewPageRenderer(t)
+					ceremonyStore := handlersmocks.NewCeremonyStore(t)
+					// No expectation: asking whether the session is valid fails the test.
+					userSessionManager := handlersmocks.NewUserSessionManager(t)
+					database := datamocks.NewDatabase(t)
+					auditLogger := handlersmocks.NewAuditLogger(t)
+					handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+
+					req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
+					req = withSessionSettings(req)
+					rr := httptest.NewRecorder()
+
+					authContext := &ceremony.AuthContext{
+						CeremonyId:          testCeremonyId,
+						AuthState:           ceremony.AuthStateLevel1PasswordCompleted,
+						Level1AuthCompleted: true,
+						ClientId:            "test-client",
+						UserId:              1,
+					}
+					ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+					req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), "test-session"))
+
+					// The user's own session, at a level that would satisfy any target, with its
+					// two-factor settings unchanged: everything that used to let it count.
+					userSession := &record.UserSession{
+						Id:                  1,
+						UserId:              1,
+						AcrLevel:            sessionAcrLevel,
+						AuthMethods:         "pwd otp",
+						OtpConfigGeneration: 3,
+						User:                record.User{Id: 1, OTPEnabled: true, OtpConfigGeneration: 3},
+					}
+					database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
+					database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
+					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
+						Return(&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: targetAcrLevel}, nil)
+
+					ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+						return ac.AuthState == expectedAuthState
+					})).Return(nil)
+
+					handler.ServeHTTP(rr, req)
+
+					assert.Equal(t, http.StatusFound, rr.Code)
+					assert.Equal(t, testBaseURL+expectedRedirect+"?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+					database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything, mock.Anything)
+				})
+			}
 		}
 	})
 

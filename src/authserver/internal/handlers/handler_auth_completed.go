@@ -171,6 +171,10 @@ func HandleAuthCompletedGet(
 
 		// set the acr level in the auth context
 		//
+		// A ceremony that authenticated afresh has just written its target onto the session it
+		// reused, so for it this is the target: the level this authentication reached, not the
+		// higher one an earlier authentication left on the session (#537).
+		//
 		// Against the session this ceremony bound to, not the one the browser arrived with. The
 		// two differ whenever the create arm ran with an ambient session present, and the ACR is
 		// the maximum of the two arguments, so feeding the ambient row lets a session this
@@ -233,7 +237,8 @@ func HandleAuthCompletedGet(
 type completionArm int
 
 const (
-	// completionArmReuse bumps the session the browser arrived with.
+	// completionArmReuse bumps the session the browser arrived with, and when the ceremony
+	// authenticated afresh replaces the session's level and methods with its own (#537).
 	completionArmReuse completionArm = iota + 1
 	// completionArmCreate starts a new session.
 	completionArmCreate
@@ -268,6 +273,9 @@ type completionPlan struct {
 	rotateIdentifier bool
 	// refreshAuthTime writes the credential's instant onto the bumped session.
 	refreshAuthTime bool
+	// replaceAuthentication writes this ceremony's level and methods onto the bumped session, as
+	// the create arm would stamp them on a new one: the ceremony authenticated afresh (#537).
+	replaceAuthentication bool
 	// promoteOtpConfigGeneration records the generation the session answered level 2 against.
 	promoteOtpConfigGeneration bool
 
@@ -295,6 +303,20 @@ type completionPlan struct {
 //     create arm, inside StartNewUserSession;
 //   - AuthTime is refreshed when a credential was entered in this ceremony (prompt=login, step-up),
 //     since the bump preserves the old AuthTime, which is right for SSO reuse only;
+//   - the level and methods are replaced with this ceremony's when it completed level 1 itself
+//     (prompt=login, an id_token_hint naming someone else, a restart), which makes it a new
+//     authentication rather than an extension of the session's. /auth/level1completed already
+//     asked it for every factor its target needs (#537), so the session ends up exactly as the
+//     create arm would have stamped a new one: the target level, this ceremony's methods and its
+//     credential's instant, all three describing the same authentication as OIDC Core 1.0 section 2
+//     defines acr, amr and auth_time. That can lower the session: prompt=login at a level 1 client
+//     over a level 3 session leaves it at level 1 with amr "pwd", so the next level 3 request steps
+//     up and asks for the code. Keeping level 3 instead was the contradiction #239 F4 recorded, a
+//     level the latest authentication did not reach beside methods that say so, and merging the
+//     methods back to "pwd otp" beside a fresh AuthTime would claim a code that was never entered
+//     at that time (PR #238 decision 9). The session is kept rather than replaced, so the other
+//     clients signed in through it keep their session-bound refresh tokens; their tokens carry the
+//     acr and amr of the codes they were issued from, which this does not touch;
 //   - the OTP config generation is promoted when the ceremony captured one and the target is above
 //     level 1. A missing capture means the ceremony never reached /auth/level2, which can only
 //     happen when the snapshot already matched, so there is nothing to promote. The ACR gate is
@@ -328,6 +350,7 @@ func decideCompletion(f completionFacts) completionPlan {
 			arm:                        completionArmReuse,
 			rotateIdentifier:           f.raisesPrivilege,
 			refreshAuthTime:            f.credentialEntered,
+			replaceAuthentication:      f.level1Completed,
 			promoteOtpConfigGeneration: f.otpConfigGenerationCaptured && ceremony.TargetRequiresSecondFactor(f.target),
 		}
 	}
@@ -420,10 +443,21 @@ func bindReusedSession(
 	// This handles step-up authentication: if the user had a level1 session but just
 	// completed OTP for a level2 client, the session's AuthMethods and AcrLevel
 	// will be upgraded to reflect the stronger authentication that was performed.
+	// The bump only ever raises; a ceremony that authenticated afresh is written over it below.
 	bumpedSession, err := userSessionManager.BumpUserSession(r.Context(), sessionIdentifier, client.Id,
 		authContext.AuthMethods, targetAcrLevel, middleware.ClientIP(r))
 	if err != nil {
 		return nil, err
+	}
+
+	if plan.replaceAuthentication {
+		// A new authentication replaces the session's, as decideCompletion explains: the level it
+		// was asked for and the methods it performed, never merged with what the session held
+		// before. The AuthTime beside them is written by the refreshAuthTime block below, which
+		// this ceremony always takes: the password handler that set Level1AuthCompleted set
+		// AuthenticatedAt with it (#537).
+		bumpedSession.AcrLevel = targetAcrLevel
+		bumpedSession.AuthMethods = authContext.AuthMethods
 	}
 
 	if plan.refreshAuthTime {
@@ -436,6 +470,9 @@ func bindReusedSession(
 		// refreshAuthTime is exactly the guard that makes the dereference safe: non-nil and
 		// non-zero.
 		bumpedSession.AuthTime = authContext.AuthenticatedAt.UTC()
+	}
+
+	if plan.replaceAuthentication || plan.refreshAuthTime {
 		err = database.UpdateUserSession(r.Context(), nil, bumpedSession)
 		if err != nil {
 			return nil, err

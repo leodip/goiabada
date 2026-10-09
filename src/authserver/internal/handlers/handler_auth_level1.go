@@ -140,8 +140,26 @@ func HandleAuthLevel1CompletedGet(
 			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
+		//
+		// A ceremony that verified the password itself is a new authentication, and the session
+		// counts for nothing towards its level either (#537). That is a ceremony in
+		// level1_password_completed: prompt=login over a session that is still valid, an
+		// id_token_hint naming someone else, or a restart. OIDC Core 1.0 section 3.1.2.3 says the
+		// server "MUST reauthenticate the End-User even if the End-User is already authenticated",
+		// and section 2 has acr, amr and auth_time all describe "the authentication" performed. So
+		// it owes every factor its target needs, as a sign-in with no session does: a code at level
+		// 3, and at level 2 when the user has an authenticator. Keycloak decides the same way
+		// ("the LoA from previous authentications are not considered"). Letting the session's code
+		// count, as this did until #537, issued acr level 3 beside amr ["pwd"] and a fresh
+		// auth_time, three claims about one authentication that could not all be true.
+		//
+		// Only the SSO shortcut, level1_existing_session, reuses a session's level: that ceremony
+		// verified nothing itself and carries the session's methods and auth time (AdoptSession),
+		// so a step-up from the session's level is the honest answer there. Keyed on
+		// Level1AuthCompleted rather than on the state, because that field is the one record of
+		// "level 1 happened in this ceremony", and any future level 1 method must set it.
 		var reusableSession *record.UserSession
-		if userSessionManager.HasValidUserSession(userSession,
+		if !authContext.Level1AuthCompleted && userSessionManager.HasValidUserSession(userSession,
 			settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds,
 			authContext.RequestedMaxAge()) && authContext.OwnsSession(userSession) {
 			reusableSession = userSession

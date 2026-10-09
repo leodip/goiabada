@@ -74,7 +74,7 @@ Neither moves its maximum lifetime.
 
 ### Single sign-on
 
-When a browser arrives with a session that's valid and belongs to the user signing in, the user isn't asked for their password, and goes on with the session's ACR level. They're asked for a one-time code only when the client needs a higher level than the session reached, which is a [step-up](/concepts/acr-and-amr/#a-session-thats-already-there). A request whose `id_token_hint` names someone else, or with `prompt=login`, asks for a password whatever the session.
+When a browser arrives with a session that's valid and belongs to the user signing in, the user isn't asked for their password, and goes on with the session's ACR level. They're asked for a one-time code only when the client needs a higher level than the session reached, which is a [step-up](/concepts/acr-and-amr/#a-session-thats-already-there). A request whose `id_token_hint` names someone else, or with `prompt=login`, asks for a password whatever the session, and for a one-time code whenever the level needs one.
 
 A user who has been disabled can't use their session: the request ends with `access_denied` and "The user account is disabled."
 
@@ -87,7 +87,7 @@ Once the user has signed in, the auth server checks them again before it records
 
 Then it records the sign-in in a session:
 
-- **The browser's session is valid and the user's own.** It's reused: its last activity moves forward, and its ACR level goes up when this sign-in reached a higher one. A session's level never goes down. When the user entered a credential in this sign-in, its `auth_time` is updated to then.
+- **The browser's session is valid and the user's own.** It's reused: its last activity moves forward, and its ACR level goes up when this sign-in reached a higher one. Reusing it never lowers its level. When the user entered a credential in this sign-in, its `auth_time` is updated to then. A sign-in that asked for the password again, such as one with `prompt=login`, replaces the session's level and methods with its own, as described in [A session that's already there](/concepts/acr-and-amr/#a-session-thats-already-there).
 - **Otherwise, a new session starts.** It replaces the user's own session the browser had, if it had one that's no longer valid, and the user's other sessions from the same device, which means the same browser `User-Agent` and the same IP address. Nothing those sessions handed out is revoked, though their normal refresh tokens stop working with them. A session the browser had for **another** user is ended, as [Ending sessions](/concepts/ending-sessions/#a-different-user-signs-in-on-the-same-browser) describes.
 
 A new session needs a password entered in this sign-in. A sign-in that was relying on a session that ended partway through goes back to the password step rather than starting one from nothing.

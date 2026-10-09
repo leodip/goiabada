@@ -107,39 +107,47 @@ func TestGuideDocs_ASessionAtTheLevelIsReusedWithoutACode(t *testing.T) {
 	})
 }
 
-// Require two-factor authentication promises a code at a sign-in that starts a session, not at every
-// sign-in with a password. A request with prompt=login asks for the password again over the user's
-// own level 3 session, and HandleAuthLevel1CompletedGet then decides with StepUpOwed over that
-// session, which owes nothing while its two-factor settings are unchanged; with no session to reuse,
-// the code is owed (#522 decision 13).
-func TestGuideDocs_APasswordOverASessionAtTheLevelAsksForNoCode(t *testing.T) {
-	session := &record.UserSession{
-		AcrLevel:            record.AcrLevel2Mandatory,
-		OtpConfigGeneration: 2,
-		User:                record.User{OTPEnabled: true, OtpConfigGeneration: 2},
-	}
-	step, err := ceremony.StepUpOwed(record.AcrLevel2Mandatory, session)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	if step != ceremony.StepUpNone {
-		t.Fatalf("a password over a level 3 session owes %v at level 3, so the guide's sentences no longer hold", step)
-	}
-	step, err = ceremony.StepUpOwed(record.AcrLevel2Mandatory, nil)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	if step == ceremony.StepUpNone {
-		t.Fatalf("a sign-in with no session to reuse owes no code at level 3, so the guide's sentences no longer hold")
+// Require two-factor authentication promises a code at a sign-in that starts a session, and at a
+// request with prompt=login, whatever the session already gave, not at every sign-in with a password:
+// SSO reuses a session at the level. prompt=login is a new authentication (OIDC Core 1.0 section
+// 3.1.2.3), so HandleAuthLevel1CompletedGet decides its step-up as for a sign-in with no session and
+// sends a level 3 target to /auth/level2 over the user's own level 3 session (#537). Until #537 the
+// session's code counted and the guide said prompt=login "doesn't ask for a code" (#522 decision 13).
+func TestGuideDocs_PromptLoginAsksForTheCodeAgain(t *testing.T) {
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	database := datamocks.NewDatabase(t)
+	handler := HandleAuthLevel1CompletedGet(handlersmocks.NewPageRenderer(t), ceremonyStore,
+		handlersmocks.NewUserSessionManager(t), database, nil, handlersmocks.NewAuditLogger(t),
+		testBaseURL, testAdminConsoleBaseURL)
+
+	req, _ := http.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
+	req = withSessionSettings(req)
+	req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), "s"))
+	rr := httptest.NewRecorder()
+	ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
+		CeremonyId: testCeremonyId, AuthState: ceremony.AuthStateLevel1PasswordCompleted,
+		Level1AuthCompleted: true, ClientId: "app", UserId: 1,
+	}, nil)
+	session := &record.UserSession{Id: 1, UserId: 1, AcrLevel: record.AcrLevel2Mandatory, AuthMethods: "pwd otp",
+		OtpConfigGeneration: 2, User: record.User{Id: 1, OTPEnabled: true, OtpConfigGeneration: 2}}
+	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "s").Return(session, nil)
+	database.On("UserSessionLoadUser", mock.Anything, mock.Anything, session).Return(nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "app").
+		Return(&record.Client{Id: 1, ClientIdentifier: "app", DefaultAcrLevel: record.AcrLevel2Mandatory}, nil)
+	ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	handler.ServeHTTP(rr, req)
+	if got := rr.Header().Get("Location"); got != testBaseURL+"/auth/level2?ceremony="+testCeremonyId {
+		t.Fatalf("prompt=login over a level 3 session went to %q rather than the code step, so the guide's sentences no longer hold", got)
 	}
 
 	root := filepath.Dir(guard.SourceRoot(t))
 	assertSectionSays(t, root, requireACodeSection, []string{
 		"From then on, a sign-in that starts a new session asks for your password and then a code.",
-		"a request that asks for the password again, such as one with `prompt=login`, doesn't ask for a code",
+		"A request that asks for a fresh sign-in, with `prompt=login`, asks for both, whatever the session already gave.",
 	})
 	assertSectionSays(t, root, alreadySignedInSection, []string{
-		"That holds even when your app sends `prompt=login`: the user enters their password, but the code their session already gave still counts",
+		"`prompt=login` doesn't reuse the session: the user signs in again with their password and a code, whatever their session already gave",
 	})
 	page, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(twoFactorGuide)))
 	if err != nil {
@@ -148,9 +156,11 @@ func TestGuideDocs_APasswordOverASessionAtTheLevelAsksForNoCode(t *testing.T) {
 	for _, promise := range []string{
 		"whenever a user signs in with their password",
 		"each time you sign in with your password",
+		"the code their session already gave still counts",
+		"doesn't ask for a code",
 	} {
 		if strings.Contains(string(page), promise) {
-			t.Errorf("%s says a code is asked %q, which a password over a session at the level does not", twoFactorGuide, promise)
+			t.Errorf("%s says %q, which the sign-in no longer does", twoFactorGuide, promise)
 		}
 	}
 }

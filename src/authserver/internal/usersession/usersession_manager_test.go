@@ -447,6 +447,36 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
+	// A bump only ever raises. "pwd" over a "pwd otp" session is what a prompt=login ceremony at a
+	// level 1 client passes, and until #537 it replaced the session's methods while the level stayed
+	// at level 3, every later token from the session then saying level 3 beside ["pwd"] (#239 F4).
+	// A ceremony that authenticated afresh replaces the session's authentication itself, on
+	// /auth/completed's reuse arm, and never through this.
+	t.Run("Fewer methods never shrink the session's (#537)", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		manager := &Manager{database: database}
+
+		userSession := createUserSession(record.AcrLevel2Mandatory, "pwd otp")
+
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
+			Return(userSession, nil)
+		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
+			Return(nil)
+		datamocks.ExpectRunInTransaction(database, txSentinel)
+		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
+			return s.AcrLevel == record.AcrLevel2Mandatory && s.AuthMethods == "pwd otp"
+		})).Return(nil)
+		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
+			"pwd", record.AcrLevel1, "192.168.1.1")
+
+		require.NoError(t, err)
+		assert.Equal(t, record.AcrLevel2Mandatory, result.AcrLevel)
+		assert.Equal(t, "pwd otp", result.AuthMethods)
+		database.AssertExpectations(t)
+	})
+
 	t.Run("Session not found returns error", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
@@ -746,6 +776,24 @@ func TestWillRaisePrivilege(t *testing.T) {
 			expected:    false,
 		},
 		{
+			// Fewer methods than the session holds are not a raise, and the bump keeps the
+			// session's. Until #537 any difference counted, so a prompt=login ceremony at a
+			// level 1 client over a level 3 session rotated the identifier for a drop.
+			name:        "Fewer auth methods are not a raise",
+			userSession: &record.UserSession{AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory},
+			authMethods: "pwd",
+			acrLevel:    record.AcrLevel1,
+			expected:    false,
+		},
+		{
+			// The same methods in another order add nothing.
+			name:        "The same auth methods in another order are not a raise",
+			userSession: &record.UserSession{AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Optional},
+			authMethods: "otp pwd",
+			acrLevel:    record.AcrLevel2Optional,
+			expected:    false,
+		},
+		{
 			// An empty incoming value means the ceremony recorded nothing, which is not a
 			// change. Reading it as one would rotate on every SSO reuse.
 			name:        "Empty inputs change nothing",
@@ -760,6 +808,32 @@ func TestWillRaisePrivilege(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.expected,
 				WillRaisePrivilege(tt.userSession, tt.authMethods, tt.acrLevel))
+		})
+	}
+}
+
+// The two halves of "a bump only adds methods" (#537): raisesAuthMethods decides whether the
+// session's methods change, and mergeAuthMethods what they change to. The session's methods come
+// first, in their order, so amr keeps the order the methods were used in.
+func TestAuthMethodsOnlyGrow(t *testing.T) {
+	tests := []struct {
+		current, incoming string
+		raises            bool
+		merged            string
+	}{
+		{"pwd", "pwd otp", true, "pwd otp"},
+		{"pwd otp", "pwd", false, "pwd otp"},
+		{"pwd otp", "pwd otp", false, "pwd otp"},
+		{"pwd otp", "otp pwd", false, "pwd otp"},
+		{"pwd", "otp", true, "pwd otp"},
+		{"pwd", "", false, "pwd"},
+		{"", "pwd", true, "pwd"},
+		{"", "", false, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.current+" + "+tt.incoming, func(t *testing.T) {
+			assert.Equal(t, tt.raises, raisesAuthMethods(tt.current, tt.incoming))
+			assert.Equal(t, tt.merged, mergeAuthMethods(tt.current, tt.incoming))
 		})
 	}
 }

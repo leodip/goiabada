@@ -65,11 +65,28 @@ func TestDecideCompletion(t *testing.T) {
 			want:  completionPlan{arm: completionArmReuse},
 		},
 		{
+			// prompt=login over the user's own valid session: a new authentication, so the session
+			// takes its level and methods rather than keeping the ones an earlier authentication
+			// left (#537).
+			name: "level 1 completed in this ceremony replaces the reused session's authentication",
+			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, level1Completed: true,
+				credentialEntered: true, target: record.AcrLevel1},
+			want: completionPlan{arm: completionArmReuse, refreshAuthTime: true, replaceAuthentication: true},
+		},
+		{
+			// A step-up over an SSO pass entered a credential, the code, but verified no password,
+			// so it extends the session's authentication rather than replacing it.
+			name: "a code entered over a reused session refreshes AuthTime and replaces nothing",
+			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
+				credentialEntered: true, otpConfigGenerationCaptured: true, target: record.AcrLevel2Mandatory},
+			want: completionPlan{arm: completionArmReuse, refreshAuthTime: true, promoteOtpConfigGeneration: true},
+		},
+		{
 			name: "every reuse flag at once",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, raisesPrivilege: true,
-				credentialEntered: true, otpConfigGenerationCaptured: true, target: record.AcrLevel2Optional},
+				level1Completed: true, credentialEntered: true, otpConfigGenerationCaptured: true, target: record.AcrLevel2Optional},
 			want: completionPlan{arm: completionArmReuse, rotateIdentifier: true, refreshAuthTime: true,
-				promoteOtpConfigGeneration: true},
+				replaceAuthentication: true, promoteOtpConfigGeneration: true},
 		},
 
 		// Restart: no reusable session and no level 1 in this ceremony (#129 decision 6).
