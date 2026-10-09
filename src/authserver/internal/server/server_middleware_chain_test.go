@@ -19,7 +19,7 @@ import (
 func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	s := newStaticBranchTestServer(datamocks.NewDatabase(t))
 	branches := s.initMiddleware()
-	s.serveStaticFiles("/static", http.FS(s.staticFS))
+	s.serveStaticFiles()
 	probe := func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}

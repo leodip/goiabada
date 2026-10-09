@@ -102,7 +102,7 @@ func TestBodyLimitPolicy_TheUploadRowFollowsTheUploadPage(t *testing.T) {
 func TestInitMiddleware_TheBodyLimitSitsAfterStripSlashes(t *testing.T) {
 	s := newStaticBranchTestServer("http://127.0.0.1:1", newTestSessionStore())
 	s.initMiddleware()
-	s.serveStaticFiles("/static", http.FS(s.staticFS))
+	s.serveStaticFiles()
 
 	var root []string
 	err := chi.Walk(s.router, func(_ string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {

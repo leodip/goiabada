@@ -43,7 +43,7 @@ func TestInitMiddleware_StaticFilesSkipTheSettingsAndSessionChain(t *testing.T) 
 
 	s := newStaticBranchTestServer(database)
 	app := s.initMiddleware().pages
-	s.serveStaticFiles("/static", http.FS(s.staticFS))
+	s.serveStaticFiles()
 	app.Get("/auth/authorize", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -66,7 +66,7 @@ func TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain(t *testi
 
 	s := newStaticBranchTestServer(database)
 	app := s.initMiddleware().pages
-	s.serveStaticFiles("/static", http.FS(s.staticFS))
+	s.serveStaticFiles()
 
 	reached := false
 	app.Get("/auth/authorize", func(w http.ResponseWriter, _ *http.Request) {
