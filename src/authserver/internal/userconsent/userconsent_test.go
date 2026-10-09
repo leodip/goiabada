@@ -102,8 +102,8 @@ func TestRecord_ASaveThatLosesTheKeyRunsOnceMoreAndRewritesTheWinnersRow(t *test
 	consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid email")
 
 	require.NoError(t, err, "a loser on the key is rerun, and the rerun finds the row")
-	assert.ErrorIs(t, first.BodyErr, data.ErrUniqueViolation, "the first attempt rolled back")
-	assert.NoError(t, second.BodyErr)
+	require.ErrorIs(t, first.BodyErr, data.ErrUniqueViolation, "the first attempt rolled back")
+	require.NoError(t, second.BodyErr)
 	assert.Same(t, winners, consent, "the row returned is the one the committed attempt rewrote")
 	assert.Equal(t, "openid email", consent.Scope, "the rerun's scope, which is the last writer's")
 	db.AssertExpectations(t)
@@ -123,7 +123,7 @@ func TestRecord_ASecondLossIsAFaultAndIsNotRetriedAgain(t *testing.T) {
 
 	consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid")
 
-	assert.ErrorIs(t, err, data.ErrUniqueViolation)
+	require.ErrorIs(t, err, data.ErrUniqueViolation)
 	assert.Nil(t, consent)
 	db.AssertExpectations(t)
 }
@@ -137,8 +137,8 @@ func TestRecord_Failures(t *testing.T) {
 		db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, boom).Once()
 
 		consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid")
-		assert.ErrorIs(t, err, boom)
-		assert.ErrorIs(t, stub.BodyErr, boom, "the transaction rolled back")
+		require.ErrorIs(t, err, boom)
+		require.ErrorIs(t, stub.BodyErr, boom, "the transaction rolled back")
 		assert.Nil(t, consent)
 		db.AssertNotCalled(t, "CreateUserConsent", mock.Anything, mock.Anything, mock.Anything)
 		db.AssertNotCalled(t, "UpdateUserConsent", mock.Anything, mock.Anything, mock.Anything)
@@ -151,8 +151,8 @@ func TestRecord_Failures(t *testing.T) {
 		db.On("CreateUserConsent", mock.Anything, consentTx, mock.Anything).Return(boom).Once()
 
 		consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid")
-		assert.ErrorIs(t, err, boom)
-		assert.ErrorIs(t, stub.BodyErr, boom)
+		require.ErrorIs(t, err, boom)
+		require.ErrorIs(t, stub.BodyErr, boom)
 		assert.Nil(t, consent)
 	})
 
@@ -164,8 +164,8 @@ func TestRecord_Failures(t *testing.T) {
 		db.On("UpdateUserConsent", mock.Anything, consentTx, mock.Anything).Return(boom).Once()
 
 		consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid")
-		assert.ErrorIs(t, err, boom)
-		assert.ErrorIs(t, stub.BodyErr, boom)
+		require.ErrorIs(t, err, boom)
+		require.ErrorIs(t, stub.BodyErr, boom)
 		assert.Nil(t, consent)
 	})
 
@@ -176,7 +176,7 @@ func TestRecord_Failures(t *testing.T) {
 		db.On("CreateUserConsent", mock.Anything, consentTx, mock.Anything).Return(nil).Once()
 
 		consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid")
-		assert.ErrorIs(t, err, boom)
+		require.ErrorIs(t, err, boom)
 		assert.Nil(t, consent, "a consent that was not committed is not reported as saved")
 	})
 
@@ -185,7 +185,7 @@ func TestRecord_Failures(t *testing.T) {
 		datamocks.ExpectRunInTransactionRefused(db, boom)
 
 		consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid")
-		assert.ErrorIs(t, err, boom)
+		require.ErrorIs(t, err, boom)
 		assert.Nil(t, consent)
 		db.AssertNotCalled(t, "GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})

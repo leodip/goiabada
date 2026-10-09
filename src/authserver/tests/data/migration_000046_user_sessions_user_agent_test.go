@@ -59,7 +59,7 @@ func TestMigration000046_UserSessionsUserAgent(t *testing.T) {
 	read, err := h.DB.GetUserSessionBySessionIdentifier(context.Background(), nil, legacy)
 	require.NoError(t, err, "read back the legacy session")
 	require.NotNil(t, read, "the legacy session must be there")
-	assert.Equal(t, "", read.UserAgent,
+	assert.Empty(t, read.UserAgent,
 		"a row inserted without user_agent must read back empty: that is what leaves a legacy row sweepable only by another header-less client")
 
 	assertUserAgentRoundTrip000046(t, h, userId, "512 ASCII bytes", strings.Repeat("a", 512))
@@ -85,7 +85,7 @@ func TestMigration000046_UserSessionsUserAgent(t *testing.T) {
 	read, err = h.DB.GetUserSessionBySessionIdentifier(context.Background(), nil, roundTripped)
 	require.NoError(t, err, "read back the session seeded after the round trip")
 	require.NotNil(t, read)
-	assert.Equal(t, "", read.UserAgent, "the default must still apply after down then up")
+	assert.Empty(t, read.UserAgent, "the default must still apply after down then up")
 }
 
 // assertUserAgentColumn000046 holds the declared shape: present, NOT NULL, defaulted, and the type

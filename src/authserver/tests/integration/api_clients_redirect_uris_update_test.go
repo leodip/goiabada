@@ -170,7 +170,7 @@ func TestAPIClientRedirectURIsPut_Success_AddRemoveAndTrim(t *testing.T) {
 	// Create a confidential client with auth code enabled
 	clientSecret := securerandom.String(60)
 	enc, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	client := &record.Client{
 		ClientIdentifier:         "redir-succ-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
@@ -181,16 +181,16 @@ func TestAPIClientRedirectURIsPut_Success_AddRemoveAndTrim(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Seed existing redirect URIs
 	uriA := "https://a.example.com/callback"
 	uriB := "https://b.example.com/callback"
 	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: uriA})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: uriB})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Desired: keep A (with spaces to test trimming), remove B, add C
 	uriC := "https://c.example.com/newcb"
@@ -206,7 +206,7 @@ func TestAPIClientRedirectURIsPut_Success_AddRemoveAndTrim(t *testing.T) {
 
 	var updateResp api.UpdateClientResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Response should include exactly A and C after trimming
 	got := map[string]bool{}
@@ -219,9 +219,9 @@ func TestAPIClientRedirectURIsPut_Success_AddRemoveAndTrim(t *testing.T) {
 
 	// Verify DB reflects the change
 	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = database.ClientLoadRedirectURIs(context.Background(), nil, refreshed)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	gotDB := map[string]bool{}
 	for _, ru := range refreshed.RedirectURIs {
 		gotDB[ru.URI] = true
@@ -252,7 +252,7 @@ func TestAPIClientRedirectURIsPut_NoRedirectFlowRejected(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	reqBody := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{"https://example.com/cb"},
@@ -288,7 +288,7 @@ func TestAPIClientRedirectURIsPut_ImplicitOnlyClientAllowed(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	uri := "https://implicit-app.example.com/cb"
@@ -301,7 +301,7 @@ func TestAPIClientRedirectURIsPut_ImplicitOnlyClientAllowed(t *testing.T) {
 
 	var updateResp api.UpdateClientResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	got := make([]string, 0, len(updateResp.Client.RedirectURIs))
 	for _, ru := range updateResp.Client.RedirectURIs {
@@ -320,7 +320,7 @@ func TestAPIClientRedirectURIsPut_SystemLevelClientAllowed(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var listResp api.GetClientsResponse
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var sysId int64
 	for _, c := range listResp.Clients {
@@ -366,7 +366,7 @@ func TestAPIClientRedirectURIsPut_DuplicateAndInvalidURLs(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
@@ -491,17 +491,17 @@ func TestAPIClientRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t 
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, client2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client2.Id) }()
 
 	urlIB := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client2.Id, 10) + "/redirect-uris"
 	req, err := http.NewRequest("PUT", urlIB, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 	httpClient := createHttpClient(t)
 	resp3, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var ib map[string]interface{}
@@ -513,9 +513,9 @@ func TestAPIClientRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t 
 
 	// Unauthorized
 	req2, err := http.NewRequest("PUT", urlIB, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	resp4, err := httpClient.Do(req2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp4.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp4.StatusCode)
 }
@@ -533,7 +533,7 @@ func TestAPIClientRedirectURIsPut_InsufficientScope(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, target)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/redirect-uris"

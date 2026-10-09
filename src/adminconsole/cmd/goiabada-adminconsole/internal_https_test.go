@@ -10,7 +10,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"errors"
 	"io"
 	"log"
 	"math/big"
@@ -121,11 +120,11 @@ func TestInternalBaseURL_HTTPS_TrustsWhatTheSystemRootsTrust(t *testing.T) {
 	}
 
 	for i, err := range call(os.Getenv(httpsTrustedURL)) {
-		assert.NoError(t, err, "call %d to the trusted auth server", i)
+		require.NoError(t, err, "call %d to the trusted auth server", i)
 	}
 	for i, err := range call(os.Getenv(httpsUntrustedURL)) {
 		var unknownAuthority x509.UnknownAuthorityError
-		assert.True(t, errors.As(err, &unknownAuthority), "call %d to the untrusted auth server answered %v, want its certificate refused", i, err)
+		assert.ErrorAs(t, err, &unknownAuthority, "call %d to the untrusted auth server answered %v, want its certificate refused", i, err)
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestToken_ClientIdIsMissing(t *testing.T) {
@@ -51,7 +52,7 @@ func TestToken_InvalidGrantType(t *testing.T) {
 		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 
@@ -91,12 +92,12 @@ func TestToken_UnparseableForm_IsInvalidRequest(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			request, err := http.NewRequest("POST", destUrl, strings.NewReader(test.body))
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			request.Header.Set("X-Request-Id", "caller\U0001F4A3id\"x\\y")
 
 			resp, err := httpClient.Do(request)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 
 			body, err := io.ReadAll(resp.Body)

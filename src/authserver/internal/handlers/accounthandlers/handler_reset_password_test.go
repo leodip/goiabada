@@ -1143,7 +1143,7 @@ func TestHandleResetPasswordPost_ClaimLost(t *testing.T) {
 	// Nothing committed, and no sweep started: a reset that wrote no password must not
 	// terminate the user's sessions either. The body leaves the helper on the lost-claim
 	// sentinel, which is how it asks for a rollback rather than a commit.
-	assert.ErrorIs(t, stub.BodyErr, errResetPasswordClaimLost)
+	require.ErrorIs(t, stub.BodyErr, errResetPasswordClaimLost)
 	database.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything, mock.Anything)
 	// And it is not a 500: a lost claim is an ordinary outcome, not a fault.
 	pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
@@ -1181,7 +1181,7 @@ func TestHandleResetPasswordPost_ClaimFails(t *testing.T) {
 	// restate the two that matter most explicitly, because a passing test here with a silently
 	// committed transaction would be the worst outcome: a changed password with the old
 	// sessions intact.
-	assert.EqualError(t, stub.BodyErr, "update failed", "the body hands its error to the helper, which rolls back")
+	require.EqualError(t, stub.BodyErr, "update failed", "the body hands its error to the helper, which rolls back")
 	database.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }

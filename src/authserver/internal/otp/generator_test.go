@@ -49,28 +49,28 @@ func TestGenerateKeyURL(t *testing.T) {
 	t.Run("Empty email", func(t *testing.T) {
 		_, err := generator.GenerateKeyURL("", "TestApp")
 
-		assert.Error(t, err, "GenerateKeyURL should return an error for empty email")
+		require.Error(t, err, "GenerateKeyURL should return an error for empty email")
 		assert.Contains(t, err.Error(), "email is empty", "Error message should mention empty email")
 	})
 
 	t.Run("Whitespace email", func(t *testing.T) {
 		_, err := generator.GenerateKeyURL("   ", "TestApp")
 
-		assert.Error(t, err, "GenerateKeyURL should return an error for whitespace email")
+		require.Error(t, err, "GenerateKeyURL should return an error for whitespace email")
 		assert.Contains(t, err.Error(), "email is empty", "Error message should mention empty email")
 	})
 
 	t.Run("Empty app name", func(t *testing.T) {
 		_, err := generator.GenerateKeyURL("test@example.com", "")
 
-		assert.Error(t, err, "GenerateKeyURL should return an error for empty app name")
+		require.Error(t, err, "GenerateKeyURL should return an error for empty app name")
 		assert.Contains(t, err.Error(), "app name is empty", "Error message should mention empty app name")
 	})
 
 	t.Run("Whitespace app name", func(t *testing.T) {
 		_, err := generator.GenerateKeyURL("test@example.com", "   ")
 
-		assert.Error(t, err, "GenerateKeyURL should return an error for whitespace app name")
+		require.Error(t, err, "GenerateKeyURL should return an error for whitespace app name")
 		assert.Contains(t, err.Error(), "app name is empty", "Error message should mention empty app name")
 	})
 
@@ -208,7 +208,7 @@ func TestKeyURLRefusals(t *testing.T) {
 			}
 
 			_, err := SecretFromKeyURL(c.keyURL)
-			assert.Error(t, err, "SecretFromKeyURL must refuse %q", c.keyURL)
+			require.Error(t, err, "SecretFromKeyURL must refuse %q", c.keyURL)
 
 			_, err = RenderQRCodeImage(c.keyURL)
 			assert.Error(t, err, "RenderQRCodeImage must refuse %q", c.keyURL)

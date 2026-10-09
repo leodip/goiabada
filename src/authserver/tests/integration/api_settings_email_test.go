@@ -22,7 +22,7 @@ func TestAPISettingsEmailGet_Success(t *testing.T) {
 
 	// Read current settings from DB for comparison
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, settings)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
@@ -34,7 +34,7 @@ func TestAPISettingsEmailGet_Success(t *testing.T) {
 
 	var body api.SettingsEmailResponse
 	err = json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, settings.SMTPEnabled, body.SMTPEnabled)
 	assert.Equal(t, settings.SMTPHost, body.SMTPHost)
@@ -71,20 +71,20 @@ func TestAPISettingsEmailPut_EnableSuccess(t *testing.T) {
 
 	var body api.SettingsEmailResponse
 	err := json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	assert.Equal(t, true, body.SMTPEnabled)
+	assert.True(t, body.SMTPEnabled)
 	assert.Equal(t, req.SMTPHost, body.SMTPHost)
 	assert.Equal(t, req.SMTPPort, body.SMTPPort)
 	assert.Equal(t, req.SMTPUsername, body.SMTPUsername)
 	assert.Equal(t, strings.ToLower(req.SMTPEncryption), strings.ToLower(body.SMTPEncryption))
 	assert.Equal(t, req.SMTPFromName, body.SMTPFromName)
 	assert.Equal(t, strings.ToLower(req.SMTPFromEmail), strings.ToLower(body.SMTPFromEmail))
-	assert.Equal(t, true, body.HasSMTPPassword)
+	assert.True(t, body.HasSMTPPassword)
 
 	// Verify DB persisted
 	settings, err2 := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err2)
+	require.NoError(t, err2)
 	assert.True(t, settings.SMTPEnabled)
 	assert.Equal(t, req.SMTPHost, settings.SMTPHost)
 	assert.Equal(t, req.SMTPPort, settings.SMTPPort)
@@ -92,7 +92,7 @@ func TestAPISettingsEmailPut_EnableSuccess(t *testing.T) {
 	assert.Equal(t, strings.ToLower(req.SMTPEncryption), strings.ToLower(settings.SMTPEncryption))
 	assert.Equal(t, req.SMTPFromName, settings.SMTPFromName)
 	assert.Equal(t, strings.ToLower(req.SMTPFromEmail), strings.ToLower(settings.SMTPFromEmail))
-	assert.Greater(t, len(settings.SMTPPasswordEncrypted), 0)
+	assert.NotEmpty(t, settings.SMTPPasswordEncrypted)
 }
 
 // PUT: disable should reset fields
@@ -122,15 +122,15 @@ func TestAPISettingsEmailPut_DisableResetsFields(t *testing.T) {
 
 	// Verify DB reset
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, settings.SMTPEnabled)
-	assert.Equal(t, "", settings.SMTPHost)
+	assert.Empty(t, settings.SMTPHost)
 	assert.Equal(t, 0, settings.SMTPPort)
 	assert.Equal(t, "none", strings.ToLower(settings.SMTPEncryption))
-	assert.Equal(t, "", settings.SMTPUsername)
+	assert.Empty(t, settings.SMTPUsername)
 	assert.Nil(t, settings.SMTPPasswordEncrypted)
-	assert.Equal(t, "", settings.SMTPFromName)
-	assert.Equal(t, "", settings.SMTPFromEmail)
+	assert.Empty(t, settings.SMTPFromName)
+	assert.Empty(t, settings.SMTPFromEmail)
 }
 
 // PUT: validation errors
@@ -257,13 +257,13 @@ func TestAPISettingsEmailPut_PasswordAtBoundIsAccepted(t *testing.T) {
 
 	var body api.SettingsEmailResponse
 	err := json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
-	assert.Equal(t, true, body.HasSMTPPassword)
+	require.NoError(t, err)
+	assert.True(t, body.HasSMTPPassword)
 
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	stored, err := dataCipher.Decrypt(settings.SMTPPasswordEncrypted)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, strings.Repeat("p", 256), stored)
 }
 
@@ -468,7 +468,7 @@ func TestAPISettingsEmailSendTest_Success(t *testing.T) {
 		Success bool `json:"success"`
 	}
 	err := json.NewDecoder(resp.Body).Decode(&okBody)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, okBody.Success)
 }
 
@@ -496,7 +496,7 @@ func TestAPISettingsEmail_Unauthorized(t *testing.T) {
 	// No token - GET
 	req, _ := http.NewRequest("GET", url, nil)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	bodyBytes, _ := io.ReadAll(resp.Body)
@@ -505,7 +505,7 @@ func TestAPISettingsEmail_Unauthorized(t *testing.T) {
 	// No token - PUT
 	req2, _ := http.NewRequest("PUT", url, nil)
 	resp2, err := httpClient.Do(req2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }
@@ -558,10 +558,10 @@ func TestAPISettingsEmailPut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 
 	var body api.SettingsEmailResponse
 	err := json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `Tom & Jerry "QA"`, body.SMTPFromName)
 
 	stored, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `Tom & Jerry "QA"`, stored.SMTPFromName)
 }

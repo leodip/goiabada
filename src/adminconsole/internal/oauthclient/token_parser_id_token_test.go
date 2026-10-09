@@ -137,10 +137,10 @@ func assertOutcome(t *testing.T, want outcome, err error) {
 	t.Helper()
 	switch want {
 	case accepted:
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	case foreign:
 		require.Error(t, err)
-		assert.ErrorIs(t, err, oauthclient.ErrForeignToken)
+		require.ErrorIs(t, err, oauthclient.ErrForeignToken)
 	case refusedNotForeign:
 		require.Error(t, err)
 		assert.NotErrorIs(t, err, oauthclient.ErrForeignToken)
@@ -636,7 +636,7 @@ func TestDecodeAndValidateStoredIDToken(t *testing.T) {
 			oauthclienttest.SignRS256(t, f.attacker, "key-1", idClaims()))
 
 		assertOutcome(t, refusedNotForeign, err)
-		assert.ErrorIs(t, err, jwt.ErrTokenSignatureInvalid)
+		require.ErrorIs(t, err, jwt.ErrTokenSignatureInvalid)
 		assert.Nil(t, token)
 	})
 

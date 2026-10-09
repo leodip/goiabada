@@ -3,7 +3,6 @@ package imageupload
 import (
 	"bytes"
 	"context"
-	"errors"
 	"image"
 	"image/color"
 	"image/gif"
@@ -157,7 +156,7 @@ func TestValidate_Refuses(t *testing.T) {
 
 			assert.Equal(t, Info{}, info)
 			var localized *i18n.LocalizedError
-			require.True(t, errors.As(err, &localized), "want an *i18n.LocalizedError, got %T: %v", err, err)
+			require.ErrorAs(t, err, &localized, "want an *i18n.LocalizedError, got %T: %v", err, err)
 			assert.Equal(t, tt.code, localized.Code)
 			assert.Equal(t, tt.args, localized.Args)
 			assert.Equal(t, tt.english, localized.Localize(context.Background()))
@@ -173,7 +172,7 @@ func TestValidate_TheRefusalIsLocalized(t *testing.T) {
 	_, err := Validate(createTestPNG(100, 100), 64)
 
 	var localized *i18n.LocalizedError
-	require.True(t, errors.As(err, &localized))
+	require.ErrorAs(t, err, &localized)
 	assert.Equal(t, "A imagem pode ter no máximo 64 bytes.", localized.Localize(i18n.WithLocale(context.Background(), true, "pt-BR")))
 }
 

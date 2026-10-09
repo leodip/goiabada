@@ -89,7 +89,7 @@ func TestToUserResponse_DoesNotLeakSecrets(t *testing.T) {
 	assert.NotNil(t, resp)
 
 	marshalled, err := json.Marshal(resp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	payload := string(marshalled)
 
 	// Plaintext secrets.
@@ -104,7 +104,7 @@ func TestToUserResponse_DoesNotLeakSecrets(t *testing.T) {
 
 	// And no key named after any of them.
 	var asMap map[string]any
-	assert.NoError(t, json.Unmarshal(marshalled, &asMap))
+	require.NoError(t, json.Unmarshal(marshalled, &asMap))
 	for key := range asMap {
 		for _, forbidden := range sensitiveUserFields {
 			assert.NotEqual(t, strings.ToLower(forbidden), strings.ToLower(key),
@@ -131,7 +131,7 @@ func TestToClientResponse_CarriesNoClientSecret(t *testing.T) {
 	assert.NotNil(t, resp)
 
 	marshalled, err := json.Marshal(resp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	payload := string(marshalled)
 
 	assert.NotContains(t, payload, "SENTINEL-client-secret-encrypted")
@@ -245,13 +245,13 @@ func TestUserResponse_SubjectIsABareCanonicalString(t *testing.T) {
 	const subject = "3f2a1c4e-5b6d-4e8f-9a0b-1c2d3e4f5a6b"
 
 	encoded, err := json.Marshal(&api.UserResponse{Id: 9, Subject: subject})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Contains(t, string(encoded), `"subject":"`+subject+`"`,
 		"subject must marshal as the bare 36-character string a client already parses")
 
 	var decoded api.UserResponse
-	assert.NoError(t, json.Unmarshal(encoded, &decoded))
+	require.NoError(t, json.Unmarshal(encoded, &decoded))
 	assert.Equal(t, subject, decoded.Subject, "the wire form must round-trip unchanged")
 }
 
@@ -306,11 +306,11 @@ func TestListMappers_NilSliceBehaviorDiffersByType(t *testing.T) {
 	assert.Nil(t, ToUserResponses(nil))
 
 	groupsJSON, err := json.Marshal(ToGroupResponses(nil, nil))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "[]", string(groupsJSON))
 
 	usersJSON, err := json.Marshal(ToUserResponses(nil))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "null", string(usersJSON))
 }
 
@@ -594,7 +594,7 @@ func TestUserSessionResponses_PublishUserAgentWhenEmpty(t *testing.T) {
 
 			value, present := decoded["userAgent"]
 			assert.True(t, present, "%s must publish userAgent even when empty", tc.name)
-			assert.Equal(t, "", value)
+			assert.Empty(t, value)
 		})
 	}
 }
@@ -640,8 +640,8 @@ func TestToUserConsentResponse_OmitsClientDetailsWhenClientNotLoaded(t *testing.
 		Client:   record.Client{}, // not loaded
 	})
 
-	assert.Equal(t, "", resp.ClientIdentifier)
-	assert.Equal(t, "", resp.ClientDescription)
+	assert.Empty(t, resp.ClientIdentifier)
+	assert.Empty(t, resp.ClientDescription)
 }
 
 func TestToUserConsentResponses_MapsEachConsentDistinctly(t *testing.T) {

@@ -61,8 +61,8 @@ func TestParseProfileForm_NoZoneLeavesBothHalvesEmpty(t *testing.T) {
 	got, err := ParseProfileForm(profileFormRequest(t, url.Values{"username": {"jdoe"}}))
 
 	require.NoError(t, err)
-	assert.Equal(t, "", got.ZoneInfoCountryName)
-	assert.Equal(t, "", got.ZoneInfo)
+	assert.Empty(t, got.ZoneInfoCountryName)
+	assert.Empty(t, got.ZoneInfo)
 	assert.Equal(t, "jdoe", got.Username)
 }
 
@@ -76,7 +76,7 @@ func TestParseProfileForm_RefusesAZoneValueThatIsNotTwoHalves(t *testing.T) {
 		t.Run(value, func(t *testing.T) {
 			got, err := ParseProfileForm(profileFormRequest(t, url.Values{"zoneInfo": {value}}))
 
-			assert.Error(t, err)
+			require.Error(t, err)
 			assert.Nil(t, got)
 		})
 	}
@@ -141,7 +141,7 @@ func TestEchoProfileForm_EmptiedGenderAndBirthDateAreShownEmpty(t *testing.T) {
 
 	EchoProfileForm(user, &api.UpdateUserProfileRequest{})
 
-	assert.Equal(t, "", user.Gender)
+	assert.Empty(t, user.Gender)
 	assert.Nil(t, user.BirthDate)
 }
 

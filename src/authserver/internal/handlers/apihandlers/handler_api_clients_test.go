@@ -293,7 +293,7 @@ func TestHandleClientAuthenticationPut_AFailedClassificationRevokesNothingAndSav
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	// The client write is not registered on the strict mock, so reaching it fails on its own.
 	// Naming it says which property broke; BodyErr says the helper was asked to roll back.
-	assert.EqualError(t, stub.BodyErr, "no client with that id")
+	require.EqualError(t, stub.BodyErr, "no client with that id")
 	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient",
 		"RevokeCodesByClientId", "GetRefreshTokensByClientId")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything)
@@ -481,7 +481,7 @@ func TestHandleClientWebOriginsPut_SavesTheExactPlanInOneTransaction(t *testing.
 			[]string{"https://old.example.com", "https://keep.example.com"})))
 
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-	assert.NoError(t, stub.BodyErr)
+	require.NoError(t, stub.BodyErr)
 	assert.Equal(t, []int64{11}, deleted, "the removed origin, and nothing kept")
 	assert.Equal(t, []string{"https://new.example.com"}, created, "the new origin, canonical, and nothing already stored")
 	assert.Equal(t, []string{"begin", "delete", "insert", "commit", "audit"}, order)
@@ -514,7 +514,7 @@ func TestHandleClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	assert.Equal(t, 1, strings.Count(rr.Body.String(), "INTERNAL_SERVER_ERROR"), "exactly one error response")
-	assert.ErrorIs(t, stub.BodyErr, diskFull, "the body hands the driver's error to the helper, which rolls back")
+	require.ErrorIs(t, stub.BodyErr, diskFull, "the body hands the driver's error to the helper, which rolls back")
 	assert.Contains(t, stub.BodyErr.Error(), "https://a.example.com")
 	database.AssertExpectations(t)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
@@ -552,7 +552,7 @@ func TestHandleClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testin
 			assert.Equal(t, 1, strings.Count(rr.Body.String(), "INTERNAL_SERVER_ERROR"), "exactly one error response")
 			// The step is named on the error rather than on the wire: it is carried out of the
 			// transaction body so nothing is written from an attempt that might be rerun.
-			assert.ErrorIs(t, stub.BodyErr, loadErr)
+			require.ErrorIs(t, stub.BodyErr, loadErr)
 			assert.Contains(t, stub.BodyErr.Error(), "database error loading client web origins before update")
 			database.AssertExpectations(t)
 			assertNotAttemptedOnClientDatabase(t, database, "CreateWebOrigin", "DeleteWebOrigin")
@@ -732,7 +732,7 @@ func TestHandleClientWebOriginsPut_AUniqueKeyRaceIsAConflict(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, rr.Code, rr.Body.String())
 	code, _ := decodeErrorEnvelope(t, rr)
 	assert.Equal(t, "CONCURRENT_UPDATE", code)
-	assert.ErrorIs(t, stub.BodyErr, data.ErrUniqueViolation, "the body hands the refusal to the helper, which rolls back")
+	require.ErrorIs(t, stub.BodyErr, data.ErrUniqueViolation, "the body hands the refusal to the helper, which rolls back")
 	database.AssertExpectations(t)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -758,7 +758,7 @@ func TestHandleClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, rr.Code)
 	code, _ := decodeErrorEnvelope(t, rr)
 	assert.Equal(t, "CONCURRENT_UPDATE", code)
-	assert.ErrorIs(t, stub.BodyErr, errListChanged, "the body refuses, so the helper rolls back")
+	require.ErrorIs(t, stub.BodyErr, errListChanged, "the body refuses, so the helper rolls back")
 	database.AssertExpectations(t)
 	assertNotAttemptedOnClientDatabase(t, database, "CreateWebOrigin", "DeleteWebOrigin")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
@@ -967,7 +967,7 @@ func TestHandleClientRedirectURIsPut_SavesTheExactPlanInOneTransaction(t *testin
 			[]string{"https://old.example.com/cb", "https://keep.example.com/cb"})))
 
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-	assert.NoError(t, stub.BodyErr)
+	require.NoError(t, stub.BodyErr)
 	assert.Equal(t, []int64{11, 13}, deleted, "every copy of a removed URI and every extra copy of a kept one")
 	assert.Equal(t, []string{"https://new.example.com/cb"}, created, "the new URI, trimmed, and nothing already stored")
 	assert.Equal(t, []string{"begin", "delete", "delete", "insert", "commit", "audit"}, order)
@@ -995,7 +995,7 @@ func TestHandleClientRedirectURIsPut_AFailedWriteCommitsNothing(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	assert.Equal(t, 1, strings.Count(rr.Body.String(), "INTERNAL_SERVER_ERROR"), "exactly one error response")
-	assert.ErrorIs(t, stub.BodyErr, diskFull, "the body hands the driver's error to the helper, which rolls back")
+	require.ErrorIs(t, stub.BodyErr, diskFull, "the body hands the driver's error to the helper, which rolls back")
 	database.AssertExpectations(t)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -1030,7 +1030,7 @@ func TestHandleClientRedirectURIsPut_AFailedStoredReadIsOneFiveHundred(t *testin
 
 			assert.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
 			assert.Equal(t, 1, strings.Count(rr.Body.String(), "INTERNAL_SERVER_ERROR"), "exactly one error response")
-			assert.ErrorIs(t, stub.BodyErr, readErr)
+			require.ErrorIs(t, stub.BodyErr, readErr)
 			database.AssertExpectations(t)
 			assertNotAttemptedOnClientDatabase(t, database, "CreateRedirectURI", "DeleteRedirectURI")
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
@@ -1098,7 +1098,7 @@ func TestHandleClientRedirectURIsPut_AnOutdatedLoadedListIsRefused(t *testing.T)
 	assert.Equal(t, http.StatusConflict, rr.Code)
 	code, _ := decodeErrorEnvelope(t, rr)
 	assert.Equal(t, "CONCURRENT_UPDATE", code)
-	assert.ErrorIs(t, stub.BodyErr, errListChanged, "the body refuses, so the helper rolls back")
+	require.ErrorIs(t, stub.BodyErr, errListChanged, "the body refuses, so the helper rolls back")
 	database.AssertExpectations(t)
 	assertNotAttemptedOnClientDatabase(t, database, "CreateRedirectURI", "DeleteRedirectURI")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)

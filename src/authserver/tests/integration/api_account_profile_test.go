@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func getUserAccessTokenWithAccountScope(t *testing.T) (string, *record.User) {
@@ -32,7 +33,7 @@ func TestAPIAccountProfileGet_Success(t *testing.T) {
 
 	var getResp api.GetUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, u.Id, getResp.User.Id)
 	assert.Equal(t, u.Email, getResp.User.Email)
 }
@@ -42,10 +43,10 @@ func TestAPIAccountProfileGet_UnauthorizedAndScope(t *testing.T) {
 
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	body1, _ := io.ReadAll(resp.Body)
@@ -100,7 +101,7 @@ func TestAPIAccountProfilePut_Success(t *testing.T) {
 
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, reqBody.Username, updateResp.User.Username)
 	assert.Equal(t, reqBody.GivenName, updateResp.User.GivenName)
 	assert.Equal(t, reqBody.FamilyName, updateResp.User.FamilyName)
@@ -114,14 +115,14 @@ func TestAPIAccountProfilePut_Success(t *testing.T) {
 func TestAPIAccountProfilePut_WritesBackWhatGetReturned(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope(t)
 	u.Gender = "other"
-	assert.NoError(t, database.UpdateUser(context.Background(), nil, u))
+	require.NoError(t, database.UpdateUser(context.Background(), nil, u))
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
 	getResp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = getResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, getResp.StatusCode)
 	var got api.GetUserResponse
-	assert.NoError(t, json.NewDecoder(getResp.Body).Decode(&got))
+	require.NoError(t, json.NewDecoder(getResp.Body).Decode(&got))
 	assert.Equal(t, "other", got.User.Gender)
 
 	putResp := makeAPIRequest(t, "PUT", url, accessToken, profileRequestFrom(got.User))
@@ -131,11 +132,11 @@ func TestAPIAccountProfilePut_WritesBackWhatGetReturned(t *testing.T) {
 		t.Fatalf("expected 200, got %d. body: %s", putResp.StatusCode, string(body))
 	}
 	var updated api.UpdateUserResponse
-	assert.NoError(t, json.NewDecoder(putResp.Body).Decode(&updated))
+	require.NoError(t, json.NewDecoder(putResp.Body).Decode(&updated))
 	assert.Equal(t, "other", updated.User.Gender)
 
 	stored, err := database.GetUserById(context.Background(), nil, u.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "other", stored.Gender)
 }
 
@@ -184,7 +185,7 @@ func TestAPIAccountProfilePut_ZonePairNamingNoRow(t *testing.T) {
 
 	u.ZoneInfoCountryName = "United States"
 	u.ZoneInfo = "America/New_York"
-	assert.NoError(t, database.UpdateUser(context.Background(), nil, u))
+	require.NoError(t, database.UpdateUser(context.Background(), nil, u))
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{
@@ -197,11 +198,11 @@ func TestAPIAccountProfilePut_ZonePairNamingNoRow(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
-	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
 	assert.Equal(t, "The zone info is invalid.", errResp.ErrorDescription)
 
 	stored, err := database.GetUserById(context.Background(), nil, u.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if assert.NotNil(t, stored) {
 		assert.Equal(t, "United States", stored.ZoneInfoCountryName)
 		assert.Equal(t, "America/New_York", stored.ZoneInfo)
@@ -214,10 +215,10 @@ func TestAPIAccountProfilePut_UnauthorizedAndScope(t *testing.T) {
 
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 

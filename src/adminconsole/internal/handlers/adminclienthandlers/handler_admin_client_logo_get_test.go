@@ -87,7 +87,7 @@ func TestHandleLogoGet_OnlyASessionEndedLogoReadStopsThePage(t *testing.T) {
 			assert.Equal(t, http.StatusOK, recorder.Code)
 			require.NotNil(t, httpHelper.bind, "the page is drawn without the logo")
 			assert.Empty(t, httpHelper.bind["logoUrl"])
-			assert.Nil(t, httpHelper.err, "nothing reached the 500 writer")
+			require.NoError(t, httpHelper.err, "nothing reached the 500 writer")
 			records := logs.Records()
 			require.Len(t, records, 1)
 			assert.Equal(t, slog.LevelWarn, records[0].Level)

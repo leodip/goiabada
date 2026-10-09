@@ -39,7 +39,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	code := &record.Code{
 		Id:                1,
@@ -75,7 +75,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
 	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 
 	claims := verifyAndDecodeToken(t, accessToken, publicKeyBytes)
@@ -95,7 +95,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, user.FullName(), claims["name"])
 	assert.Equal(t, user.GivenName, claims["given_name"])
@@ -127,7 +127,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	code := &record.Code{
 		Id:                2,
@@ -153,7 +153,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	code.User = *user
 
 	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 
 	claims := verifyAndDecodeToken(t, accessToken, publicKeyBytes)
@@ -173,7 +173,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "auth_time", -600*time.Second, "auth_time should be 600 seconds ago")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, "resource1:read resource2:write", claims["scope"])
 
@@ -201,7 +201,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	code := &record.Code{
 		Id:                3,
@@ -247,7 +247,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
 	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 
 	claims := verifyAndDecodeToken(t, accessToken, publicKeyBytes)
@@ -267,7 +267,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "auth_time", -900*time.Second, "auth_time should be 900 seconds ago")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, user.FullName(), claims["name"])
 	assert.Equal(t, user.GivenName, claims["given_name"])
@@ -311,7 +311,7 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	code := &record.Code{
 		Id:                4,
@@ -337,7 +337,7 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	code.User = *user
 
 	_, err = tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid scope")
 }
 
@@ -359,7 +359,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	code := &record.Code{
 		Id:                1,
@@ -417,7 +417,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
 	idToken, err := tokenIssuer.generateIdToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
 	claims := verifyAndDecodeToken(t, idToken, publicKeyBytes)
@@ -436,7 +436,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, user.FullName(), claims["name"])
 	assert.Equal(t, user.GivenName, claims["given_name"])
@@ -490,7 +490,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	code := &record.Code{
 		Id:                2,
@@ -516,7 +516,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	code.User = *user
 
 	idToken, err := tokenIssuer.generateIdToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
 	claims := verifyAndDecodeToken(t, idToken, publicKeyBytes)
@@ -535,7 +535,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "auth_time", -60*time.Second, "auth_time should be 60 seconds ago")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.NotContains(t, claims, "name")
 	assert.NotContains(t, claims, "email")
@@ -563,7 +563,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	code := &record.Code{
 		Id:                3,
@@ -598,7 +598,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
 	idToken, err := tokenIssuer.generateIdToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
 	claims := verifyAndDecodeToken(t, idToken, publicKeyBytes)
@@ -617,7 +617,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "auth_time", -120*time.Second, "auth_time should be 120 seconds ago")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, user.FullName(), claims["name"])
 	assert.Equal(t, user.GivenName, claims["given_name"])
@@ -711,7 +711,7 @@ func TestCalculateAtHash_MatchesOIDCSpec(t *testing.T) {
 	// The at_hash should be 16 bytes (128 bits) when decoded
 	// SHA256 produces 32 bytes, left half is 16 bytes
 	decoded, err := base64.RawURLEncoding.DecodeString(atHash)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, decoded, 16, "at_hash should be 16 bytes (left half of SHA256)")
 }
 
@@ -785,7 +785,7 @@ func TestAuthMethodsToArray_OIDCCompliance(t *testing.T) {
 	t.Run("empty input returns empty slice not nil", func(t *testing.T) {
 		result := authMethodsToArray("")
 		assert.NotNil(t, result, "amr should be an empty array, not nil")
-		assert.Equal(t, 0, len(result))
+		assert.Empty(t, result)
 	})
 
 	// Test common authentication scenarios
@@ -870,7 +870,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil).Once()
 
 		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify access_token AMR is an array
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -914,7 +914,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil).Once()
 
 		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify access_token AMR is an array with both methods
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -945,7 +945,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		}
 
 		response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify access_token AMR is an array
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -982,7 +982,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		armImplicitTransaction(mockDB, input.SessionIdentifier)
 
 		response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, true)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify access_token AMR is an array
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -1091,7 +1091,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 		}
 
 		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 		_, present := accessClaims["amr"]
@@ -1122,7 +1122,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 		}
 
 		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 		amrAccess, present := accessClaims["amr"]
@@ -1152,7 +1152,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 		armImplicitTransaction(mockDB, input.SessionIdentifier)
 
 		response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, true)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 		_, present := accessClaims["amr"]
@@ -1181,7 +1181,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 		armImplicitTransaction(mockDB, input.SessionIdentifier)
 
 		response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, true)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 		amrAccess, present := accessClaims["amr"]
@@ -1342,7 +1342,7 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 
 	privateKeyBytes := getTestPrivateKey(t)
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -1367,7 +1367,7 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 		}
 
 		_, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid scope")
 	})
 
@@ -1389,7 +1389,7 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 		}
 
 		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEmpty(t, token)
 		claims := verifyAndDecodeToken(t, token, getTestPublicKey(t))
 		assert.Equal(t, "openid", claims["scope"])
@@ -1404,7 +1404,7 @@ func TestGenerateAccessTokenCore_MultipleAudiences(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -1428,7 +1428,7 @@ func TestGenerateAccessTokenCore_MultipleAudiences(t *testing.T) {
 	}
 
 	token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	claims := verifyAndDecodeToken(t, token, publicKeyBytes)
 	aud := claims["aud"].([]interface{})
@@ -1446,7 +1446,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -1473,7 +1473,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 		}
 
 		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
 		assert.Equal(t, "test-nonce", claims["nonce"])
@@ -1496,7 +1496,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 		}
 
 		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
 		_, hasNonce := claims["nonce"]
@@ -1514,7 +1514,7 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
@@ -1543,7 +1543,7 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 		}
 
 		token, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
 		atHash, hasAtHash := claims["at_hash"]
@@ -1568,7 +1568,7 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 		}
 
 		token, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
 		_, hasAtHash := claims["at_hash"]
@@ -1584,7 +1584,7 @@ func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
@@ -1622,7 +1622,7 @@ func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 	}
 
 	token, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	claims := verifyAndDecodeToken(t, token, publicKeyBytes)
 
@@ -1689,7 +1689,7 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -1715,7 +1715,7 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 		}
 
 		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
 		exp := int64(claims["exp"].(float64))
@@ -1739,7 +1739,7 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 		}
 
 		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
 		exp := int64(claims["exp"].(float64))
@@ -1756,7 +1756,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	now := time.Now().UTC()
 	userSubject := fake.UUID()
@@ -1786,7 +1786,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 		}
 
 		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
 		assert.Equal(t, "test@example.com", claims["email"])
@@ -1815,7 +1815,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 		}
 
 		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
 		_, hasEmail := claims["email"]
@@ -1846,7 +1846,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 		}
 
 		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
 		assert.Equal(t, "test@example.com", claims["email"])
@@ -1876,7 +1876,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 		}
 
 		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
 		_, hasEmail := claims["email"]

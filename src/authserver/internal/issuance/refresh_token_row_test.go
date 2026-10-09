@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateRefreshToken_Offline(t *testing.T) {
@@ -33,7 +34,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	code := &record.Code{
 		Id:                1,
@@ -62,7 +63,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 
 	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)
 	assert.Equal(t, int64(7200), refreshExpiresIn)
 
@@ -80,7 +81,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", 172800*time.Second, "offline_access_max_lifetime should be 172800 seconds from now")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
 }
@@ -103,7 +104,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	code := &record.Code{
 		Id:                2,
@@ -136,7 +137,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 
 	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)
 	assert.Equal(t, int64(1800), refreshExpiresIn)
 
@@ -154,7 +155,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 1800*time.Second, "exp should be 1800 seconds from now")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
 }
@@ -177,7 +178,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	code := &record.Code{
 		Id:                3,
@@ -211,7 +212,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 
 	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", existingRefreshToken)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)
 	assert.Equal(t, int64(3600), refreshExpiresIn)
 
@@ -229,7 +230,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", 24*time.Hour, "offline_access_max_lifetime should match existing refresh token")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
 
@@ -257,7 +258,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	code := &record.Code{
 		Id:                4,
@@ -300,7 +301,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	thirdRefreshTime := initialTime
 	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, thirdRefreshTime, privKey, "test-key-id", secondRefreshToken)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)
 
 	// The remaining time should be close to 1 hour (3600 seconds)
@@ -321,7 +322,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", time.Duration(expectedRemainingTime)*time.Second, "offline_access_max_lifetime is not correct")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
 
@@ -393,7 +394,7 @@ func TestGetRefreshTokenExpiration(t *testing.T) {
 			if tt.expectedError {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expectedExpiration, exp)
 			}
 		})
@@ -463,9 +464,9 @@ func TestGetRefreshTokenMaxLifetime(t *testing.T) {
 			maxLifetime, err := tokenIssuer.getRefreshTokenMaxLifetime(context.Background(), nil, tt.refreshTokenType, now, settings, client, sessionIdentifier)
 
 			if tt.expectedError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expectedLifetime, maxLifetime)
 			}
 

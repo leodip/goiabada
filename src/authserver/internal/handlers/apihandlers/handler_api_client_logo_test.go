@@ -34,7 +34,7 @@ func TestHandleClientLogoGet_NoClientId(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
@@ -53,7 +53,7 @@ func TestHandleClientLogoGet_InvalidClientId(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
@@ -74,7 +74,7 @@ func TestHandleClientLogoGet_ClientNotFound(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "NOT_FOUND", response["error_code"])
 
 	database.AssertExpectations(t)
@@ -145,7 +145,7 @@ func TestHandleClientLogoPost_NoClientId(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
@@ -165,7 +165,7 @@ func TestHandleClientLogoPost_InvalidClientId(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
@@ -177,7 +177,7 @@ func TestHandleClientLogoPost_ClientNotFound(t *testing.T) {
 
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", pictureData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
@@ -189,7 +189,7 @@ func TestHandleClientLogoPost_ClientNotFound(t *testing.T) {
 
 	var response map[string]interface{}
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "NOT_FOUND", response["error_code"])
 
 	database.AssertExpectations(t)
@@ -205,7 +205,7 @@ func TestHandleClientLogoPost_InvalidImage(t *testing.T) {
 
 	invalidImageData := []byte("not a valid image")
 	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", invalidImageData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
@@ -217,7 +217,7 @@ func TestHandleClientLogoPost_InvalidImage(t *testing.T) {
 
 	var response map[string]interface{}
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// The catalog key and its English sentence, through writeValidationError, as every other
 	// validator on this API answers (#435).
 	assert.Equal(t, "validator.image.unsupported_type", response["error_code"])
@@ -264,7 +264,7 @@ func TestHandleClientLogoPost_CreateNew(t *testing.T) {
 
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", pictureData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req = setChiURLParam(req, "id", "123")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
@@ -306,7 +306,7 @@ func TestHandleClientLogoPost_UpdateExisting(t *testing.T) {
 
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", pictureData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req = setChiURLParam(req, "id", "123")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
@@ -350,7 +350,7 @@ func TestHandleClientLogoDelete_NoClientId(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
@@ -370,7 +370,7 @@ func TestHandleClientLogoDelete_InvalidClientId(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
@@ -392,7 +392,7 @@ func TestHandleClientLogoDelete_ClientNotFound(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "NOT_FOUND", response["error_code"])
 
 	database.AssertExpectations(t)
@@ -452,7 +452,7 @@ func TestHandleClientLogoDelete_DatabaseError(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", response["error_code"])
 
 	database.AssertExpectations(t)

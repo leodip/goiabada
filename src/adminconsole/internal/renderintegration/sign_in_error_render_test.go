@@ -1,7 +1,6 @@
 package renderintegration
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -117,5 +116,5 @@ func TestRender_SignInErrorPage_EscapesTheAuthServersDescription(t *testing.T) {
 
 	assert.NotContains(t, out, "<script>alert(1)</script>")
 	assert.NotContains(t, out, "<b>bold</b>")
-	assert.True(t, strings.Contains(out, "&lt;script&gt;alert(1)&lt;/script&gt;"), "rendered as text")
+	assert.Contains(t, out, "&lt;script&gt;alert(1)&lt;/script&gt;", "rendered as text")
 }

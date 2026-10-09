@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -14,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // assertJSONInternalServerError holds a response to the admin and account API's one 500 shape
@@ -28,11 +28,11 @@ func assertJSONInternalServerError(t *testing.T, rr *httptest.ResponseRecorder) 
 	assert.Contains(t, rr.Header().Get("Content-Type"), "application/json")
 
 	body := rr.Body.String()
-	assert.False(t, strings.Contains(body, "<html"), "a 500 on the API surface must not render a page: %s", body)
+	assert.NotContains(t, body, "<html", "a 500 on the API surface must not render a page: %s", body)
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", response["error_code"])
 }
 
@@ -55,7 +55,7 @@ func TestHandleUserConsentsGet_Success(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	var response map[string]interface{}
-	assert.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
 	assert.Len(t, response["consents"], 1)
 	database.AssertExpectations(t)
 }

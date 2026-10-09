@@ -504,7 +504,7 @@ func TestLinkMarkerStoreFailures(t *testing.T) {
 			httptest.NewRequest("GET", "/reset-password", nil),
 			LinkMarkerFlowResetPassword, 42, "the-code-hash")
 
-		assert.ErrorIs(t, err, expectedError)
+		require.ErrorIs(t, err, expectedError)
 		assert.Empty(t, rejection)
 	})
 
@@ -515,7 +515,7 @@ func TestLinkMarkerStoreFailures(t *testing.T) {
 		marker, rejection, err := GetLinkMarker(store,
 			httptest.NewRequest("GET", "/reset-password", nil), LinkMarkerFlowResetPassword)
 
-		assert.ErrorIs(t, err, expectedError)
+		require.ErrorIs(t, err, expectedError)
 		assert.Nil(t, marker)
 		assert.Empty(t, rejection)
 	})

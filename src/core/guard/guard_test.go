@@ -1,7 +1,6 @@
 package guard
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -114,5 +113,5 @@ func TestRun_TextOmitsAFatalThatWasNeverReached(t *testing.T) {
 	report := Report{Errors: []string{"one"}, Fatal: "never reached", Stopped: false}
 
 	assert.Equal(t, "one", report.Text())
-	assert.False(t, strings.Contains(report.Text(), "never reached"))
+	assert.NotContains(t, report.Text(), "never reached")
 }

@@ -552,7 +552,7 @@ func TestSetAcrLevel_NoSessionUsesTarget(t *testing.T) {
 
 			err := ac.SetAcrLevel(target, nil)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, target, ac.AcrLevel)
 		})
 	}
@@ -603,7 +603,7 @@ func TestSetAcrLevel_UsesHigherOfTargetAndSession(t *testing.T) {
 
 			err := ac.SetAcrLevel(tc.target, session)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.wantAcr, ac.AcrLevel, tc.description)
 		})
 	}
@@ -617,7 +617,7 @@ func TestSetAcrLevel_InvalidSessionAcrReturnsError(t *testing.T) {
 
 	err := ac.SetAcrLevel(record.AcrLevel1, session)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Empty(t, ac.AcrLevel, "the ACR must not be set when the session level cannot be parsed")
 }
 

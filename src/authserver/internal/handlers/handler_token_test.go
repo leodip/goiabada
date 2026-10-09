@@ -63,7 +63,8 @@ func TestHandleTokenPost(t *testing.T) {
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 				jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
-					detail, ok := err.(*oauth.ErrorDetail)
+					var detail *oauth.ErrorDetail
+					ok := errors.As(err, &detail)
 					return ok && detail.Code() == "invalid_request" &&
 						detail.HTTPStatus() == http.StatusBadRequest &&
 						detail.Description() == "The request body could not be parsed."
@@ -96,7 +97,8 @@ func TestHandleTokenPost(t *testing.T) {
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 			jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
-				detail, ok := err.(*oauth.ErrorDetail)
+				var detail *oauth.ErrorDetail
+				ok := errors.As(err, &detail)
 				return ok && detail.Code() == "invalid_client"
 			})).Return().Once()
 
@@ -124,7 +126,8 @@ func TestHandleTokenPost(t *testing.T) {
 			require.Error(t, req.ParseForm(), "the limiter's parse fails")
 
 			jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
-				detail, ok := err.(*oauth.ErrorDetail)
+				var detail *oauth.ErrorDetail
+				ok := errors.As(err, &detail)
 				return ok && detail.Code() == "invalid_request" &&
 					detail.HTTPStatus() == http.StatusBadRequest &&
 					detail.Description() == "Missing required client_id parameter."
@@ -142,7 +145,8 @@ func TestHandleTokenPost(t *testing.T) {
 	t.Run("two client authentication methods are refused before the validator", func(t *testing.T) {
 		endpoint := newTokenEndpoint(t)
 		endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-			detail, ok := err.(*oauth.ErrorDetail)
+			var detail *oauth.ErrorDetail
+			ok := errors.As(err, &detail)
 			return ok && detail.Code() == "invalid_request" &&
 				detail.HTTPStatus() == http.StatusBadRequest &&
 				strings.Contains(detail.Description(), "multiple authentication methods provided")
@@ -432,7 +436,8 @@ func TestHandleTokenPost(t *testing.T) {
 		endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, nil, &issuance.RefreshTokenReplayedError{FamilyRevokedCount: 0}).Once()
 		endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-			detail, ok := err.(*oauth.ErrorDetail)
+			var detail *oauth.ErrorDetail
+			ok := errors.As(err, &detail)
 			return ok && detail.Code() == "invalid_grant" &&
 				detail.Description() == "This refresh token has been revoked." &&
 				detail.HTTPStatus() == http.StatusBadRequest
@@ -610,14 +615,14 @@ func TestParseBasicAuth(t *testing.T) {
 		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
 		assert.True(t, ok)
 		assert.Equal(t, "client", clientId)
-		assert.Equal(t, "", clientSecret)
+		assert.Empty(t, clientSecret)
 	})
 
 	t.Run("Empty client_id with password is valid", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte(":secret"))
 		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
 		assert.True(t, ok)
-		assert.Equal(t, "", clientId)
+		assert.Empty(t, clientId)
 		assert.Equal(t, "secret", clientSecret)
 	})
 
@@ -687,7 +692,7 @@ func TestExtractClientCredentials(t *testing.T) {
 		_ = req.ParseForm()
 
 		clientId, clientSecret, err := extractClientCredentials(req)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "basic-client", clientId)
 		assert.Equal(t, "basic-secret", clientSecret)
 	})
@@ -700,7 +705,7 @@ func TestExtractClientCredentials(t *testing.T) {
 		_ = req.ParseForm()
 
 		clientId, clientSecret, err := extractClientCredentials(req)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "post-client", clientId)
 		assert.Equal(t, "post-secret", clientSecret)
 	})
@@ -715,11 +720,12 @@ func TestExtractClientCredentials(t *testing.T) {
 		_ = req.ParseForm()
 
 		clientId, clientSecret, err := extractClientCredentials(req)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Empty(t, clientId)
 		assert.Empty(t, clientSecret)
 
-		errDetail, ok := err.(*oauth.ErrorDetail)
+		var errDetail *oauth.ErrorDetail
+		ok := errors.As(err, &errDetail)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_request", errDetail.Code())
 		assert.Contains(t, errDetail.Description(), "multiple authentication methods")
@@ -733,7 +739,7 @@ func TestExtractClientCredentials(t *testing.T) {
 		_ = req.ParseForm()
 
 		clientId, clientSecret, err := extractClientCredentials(req)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Empty(t, clientId)
 		assert.Empty(t, clientSecret)
 	})
@@ -749,7 +755,7 @@ func TestExtractClientCredentials(t *testing.T) {
 		_ = req.ParseForm()
 
 		clientId, clientSecret, err := extractClientCredentials(req)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "basic-client", clientId)
 		assert.Equal(t, "basic-secret", clientSecret)
 	})
@@ -764,7 +770,7 @@ func TestExtractClientCredentials(t *testing.T) {
 		_ = req.ParseForm()
 
 		clientId, clientSecret, err := extractClientCredentials(req)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "post-client", clientId)
 		assert.Equal(t, "post-secret", clientSecret)
 	})
@@ -779,7 +785,7 @@ func TestExtractClientCredentials(t *testing.T) {
 		_ = req.ParseForm()
 
 		clientId, clientSecret, err := extractClientCredentials(req)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "post-client", clientId)
 		assert.Equal(t, "post-secret", clientSecret)
 	})
@@ -795,7 +801,7 @@ func TestExtractClientCredentials(t *testing.T) {
 		_ = req.ParseForm()
 
 		clientId, clientSecret, err := extractClientCredentials(req)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "basic-client", clientId)
 		assert.Equal(t, "basic-secret", clientSecret)
 	})
@@ -808,9 +814,9 @@ func TestExtractClientCredentials(t *testing.T) {
 		_ = req.ParseForm()
 
 		clientId, clientSecret, err := extractClientCredentials(req)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "public-client", clientId)
-		assert.Equal(t, "", clientSecret)
+		assert.Empty(t, clientSecret)
 	})
 }
 
@@ -868,7 +874,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	assert.ErrorIs(t, stub.BodyErr, dbErr, "the body hands its error to the helper, which rolls back")
+	require.ErrorIs(t, stub.BodyErr, dbErr, "the body hands its error to the helper, which rolls back")
 
 	jsonWriter.AssertExpectations(t)
 	tokenValidator.AssertExpectations(t)
@@ -1001,7 +1007,8 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 	endpoint.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, mock.Anything, racedCode).
 		Return(nil, issuance.ErrCodeNotClaimed).Once()
 	endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-		detail, ok := err.(*oauth.ErrorDetail)
+		var detail *oauth.ErrorDetail
+		ok := errors.As(err, &detail)
 		return ok && detail.Code() == "invalid_grant" && detail.Description() == "Code is invalid." &&
 			detail.HTTPStatus() == http.StatusBadRequest
 	})).Return().Once()
@@ -1030,7 +1037,8 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 	endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil, issuance.ErrRefreshTokenNotClaimed).Once()
 	endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-		detail, ok := err.(*oauth.ErrorDetail)
+		var detail *oauth.ErrorDetail
+		ok := errors.As(err, &detail)
 		return ok && detail.Code() == "invalid_grant" &&
 			detail.Description() == "This refresh token has been revoked." &&
 			detail.HTTPStatus() == http.StatusBadRequest
@@ -1093,7 +1101,8 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 				}).Return()
 
 			endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-				detail, ok := err.(*oauth.ErrorDetail)
+				var detail *oauth.ErrorDetail
+				ok := errors.As(err, &detail)
 				return ok && detail.Code() == "invalid_grant" &&
 					detail.Description() == "This refresh token has been revoked."
 			})).Return().Once()
@@ -1322,7 +1331,8 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 			// none is the assertion that it was not reached.
 			var rejection *oauth.ErrorDetail
 			jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
-				detail, ok := err.(*oauth.ErrorDetail)
+				var detail *oauth.ErrorDetail
+				ok := errors.As(err, &detail)
 				if !ok {
 					return false
 				}
@@ -1447,7 +1457,8 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 
 		var rejection *oauth.ErrorDetail
 		jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
-			detail, ok := err.(*oauth.ErrorDetail)
+			var detail *oauth.ErrorDetail
+			ok := errors.As(err, &detail)
 			if !ok {
 				return false
 			}
@@ -1830,7 +1841,8 @@ func TestHandleTokenPost_Refresh_FlowDisabledAnswer(t *testing.T) {
 			endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
 				Return(nil, nil, issuance.ErrRefreshFlowDisabled).Once()
 			endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-				detail, ok := err.(*oauth.ErrorDetail)
+				var detail *oauth.ErrorDetail
+				ok := errors.As(err, &detail)
 				return ok && detail.Code() == "unauthorized_client" &&
 					detail.Description() == tc.wantRefusal &&
 					detail.HTTPStatus() == http.StatusBadRequest

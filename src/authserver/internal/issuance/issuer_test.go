@@ -2,13 +2,13 @@ package issuance
 
 import (
 	"encoding/base64"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func getTestPrivateKey(t *testing.T) []byte {
@@ -44,7 +44,7 @@ func assertTimeClaimWithinRange(t *testing.T, claims jwt.MapClaims, claimName st
 
 	start := expectedTime.Add(-3 * time.Second)
 	end := expectedTime.Add(3 * time.Second)
-	assert.True(t, claimTime.After(start) && claimTime.Before(end), fmt.Sprintf("%s: %s", message, claimTime))
+	assert.True(t, claimTime.After(start) && claimTime.Before(end), "%s: %s", message, claimTime)
 }
 
 func verifyAndDecodeToken(t *testing.T, tokenString string, publicKeyBytes []byte) jwt.MapClaims {
@@ -52,7 +52,7 @@ func verifyAndDecodeToken(t *testing.T, tokenString string, publicKeyBytes []byt
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		return jwt.ParseRSAPublicKeyFromPEM(publicKeyBytes)
 	}, jwt.WithExpirationRequired())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, token.Valid)
 	return claims
 }

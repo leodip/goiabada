@@ -86,7 +86,7 @@ func TestSessionOwners_AnEmptyPageAsksNothingAndIsNeverNil(t *testing.T) {
 	owners, err := sessionOwners(context.Background(), database, []api.UserSessionDetailResponse{})
 	require.NoError(t, err)
 	require.NotNil(t, owners)
-	assert.Len(t, owners, 0)
+	assert.Empty(t, owners)
 
 	marshalled, err := json.Marshal(owners)
 	require.NoError(t, err)

@@ -137,7 +137,7 @@ func createAdminClientWithToken(t *testing.T) (string, *record.Client) {
 	// Generate client secret
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create client with admin permissions
 	client := &record.Client{
@@ -148,14 +148,14 @@ func createAdminClientWithToken(t *testing.T) (string, *record.Client) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Get authserver resource and permission
 	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authServerResource.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var adminPermission *record.Permission
 	for idx, permission := range permissions {
@@ -171,7 +171,7 @@ func createAdminClientWithToken(t *testing.T) (string, *record.Client) {
 		ClientId:     client.Id,
 		PermissionId: adminPermission.Id,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Get access token using client credentials flow
 	httpClient := createHttpClient(t)

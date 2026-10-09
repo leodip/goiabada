@@ -134,7 +134,7 @@ func TestEstablish_ALostCompareAndSetWritesNothingElse(t *testing.T) {
 	require.NoError(t, err, "a lost compare-and-set is an answer, not a fault")
 	assert.False(t, established)
 	assert.Zero(t, generation)
-	assert.NoError(t, stub.BodyErr)
+	require.NoError(t, stub.BodyErr)
 	database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "ClearPendingOTPEnrollment", mock.Anything, mock.Anything, mock.Anything)
 	assert.False(t, user.OTPEnabled, "the user must not claim an authenticator that was never stored")
@@ -156,7 +156,7 @@ func TestEstablish_AFailedWriteRollsTheWholeTransactionBack(t *testing.T) {
 	require.ErrorIs(t, err, writeErr)
 	assert.False(t, established)
 	assert.Zero(t, generation)
-	assert.ErrorIs(t, stub.BodyErr, writeErr,
+	require.ErrorIs(t, stub.BodyErr, writeErr,
 		"the body must hand the error to the helper rather than swallow it, because that is what "+
 			"makes the pending enrolment survive a failed enable (#247)")
 	database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
@@ -257,7 +257,7 @@ func TestRemove_ALostCompareAndSetWritesNothingElse(t *testing.T) {
 
 	require.NoError(t, err, "a lost compare-and-set is an answer, not a fault")
 	assert.False(t, removed)
-	assert.NoError(t, stub.BodyErr)
+	require.NoError(t, stub.BodyErr)
 	database.AssertNotCalled(t, "ResetUserOTPStep", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
 	assert.True(t, user.OTPEnabled, "the user must not report a removal that did not happen")
@@ -299,7 +299,7 @@ func TestVerifyStored(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, OutcomeMatched, result.Outcome)
-		assert.EqualValues(t, now.Unix()/otp.StepSeconds, result.Step,
+		assert.Equal(t, now.Unix()/otp.StepSeconds, result.Step,
 			"the step reported is the one the passcode matched, which is what the replay record names")
 	})
 
@@ -329,7 +329,7 @@ func TestVerifyStored(t *testing.T) {
 		assert.Equal(t, OutcomeReplayed, result.Outcome,
 			"a replay is a refusal distinct from a wrong code: every caller raises "+
 				"EventOTPCodeReplayDetected on it, and two of the three raise nothing on a wrong code")
-		assert.EqualValues(t, now.Unix()/otp.StepSeconds, result.Step)
+		assert.Equal(t, now.Unix()/otp.StepSeconds, result.Step)
 	})
 
 	t.Run("a failing claim is an error rather than a refusal", func(t *testing.T) {
@@ -404,7 +404,7 @@ func TestVerifySupplied(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, OutcomeReplayed, result.Outcome)
-		assert.EqualValues(t, now.Unix()/otp.StepSeconds, result.Step)
+		assert.Equal(t, now.Unix()/otp.StepSeconds, result.Step)
 	})
 }
 
@@ -432,7 +432,7 @@ func TestSeedAtRest(t *testing.T) {
 	otherCipher, err := encryption.NewDataCipher([]byte("fedcba9876543210fedcba9876543210"))
 	require.NoError(t, err)
 	_, err = storedSecret(otherCipher, u)
-	assert.Error(t, err, "storedSecret with a different cipher key: expected an error")
+	require.Error(t, err, "storedSecret with a different cipher key: expected an error")
 
 	// A user with no encrypted secret returns an empty string, no error.
 	got, err = storedSecret(testDataCipher, &record.User{})

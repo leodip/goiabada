@@ -1,11 +1,13 @@
 package inputvalidation
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // The sentences validator.identifier.* renders, transcribed from
@@ -68,8 +70,9 @@ func TestIdentifierValidator_Validate(t *testing.T) {
 			if tt.expectedCode == "" {
 				assert.NoError(t, err)
 			} else {
-				assert.Error(t, err)
-				locErr, ok := err.(*i18n.LocalizedError)
+				require.Error(t, err)
+				var locErr *i18n.LocalizedError
+				ok := errors.As(err, &locErr)
 				assert.True(t, ok, "expected *i18n.LocalizedError, got %T", err)
 				if ok {
 					assert.Equal(t, tt.expectedCode, locErr.Code)
@@ -115,8 +118,9 @@ func TestIdentifierValidator_ValidateEdgeCases(t *testing.T) {
 			if tt.expectedCode == "" {
 				assert.NoError(t, err)
 			} else {
-				assert.Error(t, err)
-				locErr, ok := err.(*i18n.LocalizedError)
+				require.Error(t, err)
+				var locErr *i18n.LocalizedError
+				ok := errors.As(err, &locErr)
 				assert.True(t, ok, "expected *i18n.LocalizedError, got %T", err)
 				if ok {
 					assert.Equal(t, tt.expectedCode, locErr.Code)

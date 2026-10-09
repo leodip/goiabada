@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // assertLocalizedError asserts that err is an *i18n.LocalizedError carrying the
@@ -28,8 +29,9 @@ import (
 // lowercase character survived the whole suite before this landed (#230).
 func assertLocalizedError(t *testing.T, err error, expectedCode string, expectedMessage string) {
 	t.Helper()
-	assert.Error(t, err)
-	locErr, ok := err.(*i18n.LocalizedError)
+	require.Error(t, err)
+	var locErr *i18n.LocalizedError
+	ok := errors.As(err, &locErr)
 	assert.True(t, ok, "expected *i18n.LocalizedError, got %T", err)
 	if ok {
 		assert.Equal(t, expectedCode, locErr.Code)
@@ -182,9 +184,10 @@ func TestValidateProfile_UnresolvableSubjectReturnsError(t *testing.T) {
 				Subject:  "unknown-subject",
 			})
 
-			assert.Error(t, err)
+			require.Error(t, err)
 			assert.Contains(t, err.Error(), "subject not found: unknown-subject")
-			_, isLocalized := err.(*i18n.LocalizedError)
+			var localizedError *i18n.LocalizedError
+			isLocalized := errors.As(err, &localizedError)
 			assert.False(t, isLocalized, "an unresolvable subject is not a user-facing validation error")
 		})
 	}
@@ -368,8 +371,9 @@ func TestValidateProfile_UsernameLookupErrorsPropagate(t *testing.T) {
 			Subject:  subject,
 		})
 
-		assert.Error(t, err)
-		_, isLocalized := err.(*i18n.LocalizedError)
+		require.Error(t, err)
+		var localizedError *i18n.LocalizedError
+		isLocalized := errors.As(err, &localizedError)
 		assert.False(t, isLocalized, "a database failure is not a validation error")
 	})
 
@@ -386,8 +390,9 @@ func TestValidateProfile_UsernameLookupErrorsPropagate(t *testing.T) {
 			Subject:  subject,
 		})
 
-		assert.Error(t, err)
-		_, isLocalized := err.(*i18n.LocalizedError)
+		require.Error(t, err)
+		var localizedError *i18n.LocalizedError
+		isLocalized := errors.As(err, &localizedError)
 		assert.False(t, isLocalized)
 	})
 }
@@ -547,7 +552,8 @@ func TestValidateProfile_WebsiteTooLong(t *testing.T) {
 	assertLocalizedError(t, err, i18n.ErrCodeProfileWebsiteTooLong,
 		"Please ensure the website URL is no longer than 96 characters.")
 
-	locErr, ok := err.(*i18n.LocalizedError)
+	var locErr *i18n.LocalizedError
+	ok := errors.As(err, &locErr)
 	assert.True(t, ok)
 	if ok {
 		assert.Equal(t, 96, locErr.Args["max"], "the message must carry the limit for interpolation")

@@ -42,7 +42,7 @@ func TestAPIResourcesGet_Success(t *testing.T) {
 	// Parse response
 	var getResponse api.GetResourcesResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should include our test resources (plus any existing ones)
 	assert.GreaterOrEqual(t, len(getResponse.Resources), 2)
@@ -67,7 +67,7 @@ func TestAPIResourcesGet_Success(t *testing.T) {
 	// Verify resources are sorted by identifier (should come before existing resources like "goiabada-authserver")
 	if len(getResponse.Resources) >= 2 {
 		for i := 0; i < len(getResponse.Resources)-1; i++ {
-			assert.True(t, getResponse.Resources[i].ResourceIdentifier <= getResponse.Resources[i+1].ResourceIdentifier,
+			assert.LessOrEqual(t, getResponse.Resources[i].ResourceIdentifier, getResponse.Resources[i+1].ResourceIdentifier,
 				"Resources should be sorted by identifier")
 		}
 	}
@@ -92,7 +92,7 @@ func TestAPIResourcesGet_EmptyDatabase(t *testing.T) {
 	// Parse response
 	var getResponse api.GetResourcesResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should have proper structure (system resources exist)
 	assert.NotNil(t, getResponse.Resources)
@@ -104,11 +104,11 @@ func TestAPIResourcesGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -158,7 +158,7 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 	clientSecret := "test-secret-non-admin-1234567890"
 
 	encSecret, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "nonadmin-test-client-" + fake.UUID()[:8],
@@ -168,18 +168,18 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 		ClientSecretEncrypted:    encSecret,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	t.Cleanup(func() {
 		assert.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
 	})
 
 	// Find the requested permission
 	resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, resourceIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, resource)
 
 	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var selected *record.Permission
 	for i := range perms {
@@ -192,7 +192,7 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 
 	// Assign permission to client
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientId: client.Id, PermissionId: selected.Id})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Request an access token with that scope
 	form := url.Values{
@@ -263,7 +263,7 @@ func TestAPIResourcesGet_ManyResources(t *testing.T) {
 	// Parse response
 	var getResponse api.GetResourcesResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: All test resources should be present
 	assert.GreaterOrEqual(t, len(getResponse.Resources), 3)
@@ -293,6 +293,6 @@ func TestAPIResourcesGet_ManyResources(t *testing.T) {
 	assert.NotEqual(t, -1, zebraPos, "zebra-resource should be found")
 
 	// Should be in alphabetical order
-	assert.True(t, alphaPos < betaPos, "alpha should come before beta")
-	assert.True(t, betaPos < zebraPos, "beta should come before zebra")
+	assert.Less(t, alphaPos, betaPos, "alpha should come before beta")
+	assert.Less(t, betaPos, zebraPos, "beta should come before zebra")
 }

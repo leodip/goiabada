@@ -57,9 +57,9 @@ func TestRunInTransaction_ACancellationAfterASuccessfulBodyReturnsTheContextErro
 	})
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.Canceled,
+	require.ErrorIs(t, err, context.Canceled,
 		"a cancelled run answers with the context error, whatever the commit reported (decision 13)")
-	assert.NotErrorIs(t, err, sql.ErrTxDone,
+	require.NotErrorIs(t, err, sql.ErrTxDone,
 		"and not with the sentinel that says only that the transaction was already over")
 	assert.Equal(t, 1, ran, "one attempt: a cancelled run is not rerun")
 	assert.Empty(t, *requested, "and no backoff was spent on it")
@@ -94,8 +94,8 @@ func TestRunInTransaction_ACancellationAfterASuccessfulBodyJoinsTheDeadlockItWas
 	})
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.Canceled, "the context error is still what decided the outcome")
-	assert.ErrorIs(t, err, errDeadlock, "and the abort the helper was rerunning for stays reachable")
+	require.ErrorIs(t, err, context.Canceled, "the context error is still what decided the outcome")
+	require.ErrorIs(t, err, errDeadlock, "and the abort the helper was rerunning for stays reachable")
 	assert.Contains(t, err.Error(), "transaction abandoned after the engine aborted it")
 	assert.Equal(t, 2, ran, "the deadlock was rerun once, and the rerun was the cancelled one")
 }
@@ -114,8 +114,8 @@ func TestRunInTransaction_ACommitThatFindsTheTransactionDoneOnALiveContextIsStil
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, sql.ErrTxDone, "a live context leaves the commit's own error alone")
-	assert.NotErrorIs(t, err, context.Canceled, "and contributes no context error")
-	assert.NotErrorIs(t, err, context.DeadlineExceeded)
+	require.ErrorIs(t, err, sql.ErrTxDone, "a live context leaves the commit's own error alone")
+	require.NotErrorIs(t, err, context.Canceled, "and contributes no context error")
+	require.NotErrorIs(t, err, context.DeadlineExceeded)
 	assert.Equal(t, 1, ran, "a commit failure that is not a deadlock is not replayed")
 }

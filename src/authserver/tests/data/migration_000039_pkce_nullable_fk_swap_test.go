@@ -74,8 +74,8 @@ func TestMigration000039_ShapeDifferenceIsExactlyIntended(t *testing.T) {
 		// SQL Server: the intended edit set is empty on both tables, so the shape at its
 		// head IS the final shape. Asserting that here is what stops "no file needed"
 		// being taken on trust.
-		require.Equal(t, codesBefore, codesWant, "the intended edit set must be empty on mssql")
-		require.Equal(t, rtBefore, rtWant, "the intended edit set must be empty on mssql")
+		require.Equal(t, codesWant, codesBefore, "the intended edit set must be empty on mssql")
+		require.Equal(t, rtWant, rtBefore, "the intended edit set must be empty on mssql")
 		assertFinalShape000039(t, "at 000038", codesBefore, rtBefore)
 		return
 	}
@@ -283,9 +283,9 @@ func TestMigration000039_ChallengelessCodeIsStorable(t *testing.T) {
 		// and NULL alike.
 		afterDown := readCode000039(t, h, applied.Id)
 		assert.True(t, afterDown.CodeChallenge.Valid, "the down converts NULL to '' rather than losing the row")
-		assert.Equal(t, "", afterDown.CodeChallenge.String, "the down writes an empty string")
+		assert.Empty(t, afterDown.CodeChallenge.String, "the down writes an empty string")
 		assert.True(t, afterDown.CodeChallengeMethod.Valid, "the down converts the method column too")
-		assert.Equal(t, "", afterDown.CodeChallengeMethod.String, "the down writes an empty string")
+		assert.Empty(t, afterDown.CodeChallengeMethod.String, "the down writes an empty string")
 
 		require.Error(t, createChallengelessCode000039(t, h, client, user, nil),
 			"after the down SQLite must refuse a NULL challenge again: the constraint is back")

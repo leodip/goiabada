@@ -21,7 +21,7 @@ func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create resources and permissions with random identifiers
 	resourceIdentifier := "backend-svc-" + fake.LetterN(8)
@@ -38,14 +38,14 @@ func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assign permission to the client
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: permission.Id,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 
@@ -65,7 +65,7 @@ func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -76,7 +76,7 @@ func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 
@@ -104,7 +104,7 @@ func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
 		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 
@@ -131,7 +131,7 @@ func TestToken_ClientCred_ClientSecretIsMissing(t *testing.T) {
 		IsPublic:                 false, // Set to false to require a client secret
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 
@@ -152,7 +152,7 @@ func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -164,7 +164,7 @@ func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 
@@ -185,7 +185,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 	// Create a client for testing
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -196,7 +196,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create a resource and permission for the last test cases
 	resourceIdentifier := "backend-svcA-" + fake.LetterN(8)
@@ -305,7 +305,7 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 	// Create a client for testing
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -316,7 +316,7 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create resources and permissions with random identifiers
 	resourceAIdentifier := "backend-svcA-" + fake.LetterN(8)
@@ -334,12 +334,12 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 		ClientId:     client.Id,
 		PermissionId: permissionA.Id,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: permissionB.Id,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 
@@ -358,7 +358,7 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 	scope, ok := data["scope"].(string)
 	assert.True(t, ok, "scope should be a string")
 	parts := strings.Split(scope, " ")
-	assert.Equal(t, 2, len(parts))
+	assert.Len(t, parts, 2)
 	expectedScopeA := fmt.Sprintf("%s:%s", resourceAIdentifier, permissionAIdentifier)
 	expectedScopeB := fmt.Sprintf("%s:%s", resourceBIdentifier, permissionBIdentifier)
 	assert.Contains(t, parts, expectedScopeA)
@@ -371,7 +371,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 	// Create a client for testing
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -382,7 +382,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create resources and permissions with random identifiers
 	resourceAIdentifier := "backend-svcA-" + fake.LetterN(8)
@@ -400,12 +400,12 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 		ClientId:     client.Id,
 		PermissionId: permissionA.Id,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: permissionB.Id,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 
@@ -446,7 +446,7 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -457,7 +457,7 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// One permission identifier, defined on two different resources.
 	sharedPermissionIdentifier := "read-product-" + fake.LetterN(8)
@@ -475,7 +475,7 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 		ClientId:     client.Id,
 		PermissionId: permissionA.Id,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	scopeA := fmt.Sprintf("%s:%s", resourceAIdentifier, sharedPermissionIdentifier)
 	scopeB := fmt.Sprintf("%s:%s", resourceBIdentifier, sharedPermissionIdentifier)
@@ -528,7 +528,7 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -539,7 +539,7 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// A custom resource whose permission identifier collides with the built-in one.
 	customResourceIdentifier := "billing-api-" + fake.LetterN(8)
@@ -550,15 +550,15 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 		ClientId:     client.Id,
 		PermissionId: customManage.Id,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Confirm the collision really exists against the seeded authserver resource,
 	// otherwise this test could pass because there was nothing to collide with.
 	authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, authserverResource)
 	authserverPermissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	foundBuiltInManage := false
 	for _, perm := range authserverPermissions {
 		if perm.PermissionIdentifier == builtin.ManagePermissionIdentifier {
@@ -613,7 +613,7 @@ func TestToken_ClientCred_ScopeSeparators(t *testing.T) {
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -624,7 +624,7 @@ func TestToken_ClientCred_ScopeSeparators(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resourceIdentifier := "billing-api-" + fake.LetterN(8)
 	resource := createResourceWithId(t, resourceIdentifier)
@@ -636,7 +636,7 @@ func TestToken_ClientCred_ScopeSeparators(t *testing.T) {
 			ClientId:     client.Id,
 			PermissionId: permission.Id,
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	readScope := resourceIdentifier + ":" + readPermission.PermissionIdentifier
@@ -706,7 +706,7 @@ func TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed(t *testin
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -717,7 +717,7 @@ func TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed(t *testin
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 
@@ -742,7 +742,7 @@ func TestToken_ClientCred_TokenLifetime(t *testing.T) {
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	serverLifetime := settings.TokenExpirationInSeconds
 
 	tests := []struct {
@@ -759,7 +759,7 @@ func TestToken_ClientCred_TokenLifetime(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			clientSecret := fake.Password(32)
 			clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			resource := createResourceWithId(t, "lifetime-svc-"+fake.LetterN(8))
 			permission := createPermissionWithId(t, resource.Id, "read-"+fake.LetterN(8))
@@ -774,12 +774,12 @@ func TestToken_ClientCred_TokenLifetime(t *testing.T) {
 				TokenExpirationInSeconds: tt.clientLifetime,
 			}
 			err = database.CreateClient(context.Background(), nil, client)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
 				ClientId:     client.Id,
 				PermissionId: permission.Id,
 			})
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			httpClient := createHttpClient(t)
 			formData := url.Values{

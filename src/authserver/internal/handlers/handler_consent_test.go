@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // consentSaveTx is the transaction userconsent.Record runs the save in. The consent's read and its
@@ -150,7 +151,7 @@ func TestHandleConsentGet(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == expectedError
+			return errors.Is(err, expectedError)
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
@@ -483,7 +484,7 @@ func TestHandleConsentPost(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == expectedError
+			return errors.Is(err, expectedError)
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
@@ -1175,7 +1176,7 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 
 		location, err := url.Parse(rr.Header().Get("Location"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "access_denied", location.Query().Get("error"))
 		assert.Equal(t, "The user is not authorized to access any of the requested scopes",
 			location.Query().Get("error_description"),
@@ -1438,7 +1439,7 @@ func TestHandleConsentPost(t *testing.T) {
 		// the pair is what keeps the two access_denied refusals from collapsing into one: this is
 		// a user who chose nothing, and that one is a user whose choice was emptied for them.
 		location, err := url.Parse(rr.Header().Get("Location"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "The user did not provide consent", location.Query().Get("error_description"))
 
 		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),

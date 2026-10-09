@@ -164,19 +164,19 @@ func TestPendingOTPEnrollment_RefusedArguments(t *testing.T) {
 	ciphertext := encryptedKeyURL(t, "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
 
 	_, err := database.TryInstallPendingOTPEnrollment(context.Background(), nil, 0, ciphertext, now, now)
-	assert.Error(t, err, "user id 0 must be refused")
+	require.Error(t, err, "user id 0 must be refused")
 
 	// An empty ciphertext is the dormant value of every user with nothing pending, so installing
 	// one would leave the row looking untouched while reporting success.
 	_, err = database.TryInstallPendingOTPEnrollment(context.Background(), nil, user.Id, nil, now, now)
-	assert.Error(t, err, "an empty pending enrolment must be refused")
+	require.Error(t, err, "an empty pending enrolment must be refused")
 
 	// A zero issued_at is worse than useless: every real staleBefore is after it, so the enrolment
 	// would install and then be treated as expired by the very next call.
 	_, err = database.TryInstallPendingOTPEnrollment(context.Background(), nil, user.Id, ciphertext, time.Time{}, now)
-	assert.Error(t, err, "a zero issued at must be refused")
+	require.Error(t, err, "a zero issued at must be refused")
 
-	assert.Error(t, database.ClearPendingOTPEnrollment(context.Background(), nil, 0), "user id 0 must be refused")
+	require.Error(t, database.ClearPendingOTPEnrollment(context.Background(), nil, 0), "user id 0 must be refused")
 
 	after := reloadUser(t, user.Id)
 	assert.Nil(t, after.OtpEnrollmentSecretEncrypted, "none of the refused calls may have written")

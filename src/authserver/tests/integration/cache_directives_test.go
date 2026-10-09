@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Ceremony pages carry an explicit refusal to store them (#247).
@@ -102,7 +103,7 @@ func TestCacheDirectives_TheEnrolmentJsonIsNotStorable(t *testing.T) {
 	// The response really did carry the seed, so the header assertion is about the response the
 	// directives exist for rather than about an error body that happens to be uncacheable.
 	var enrollment api.AccountOTPEnrollmentResponse
-	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&enrollment))
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&enrollment))
 	assert.NotEmpty(t, enrollment.SecretKey,
 		"the enrolment response must carry a secret, or the header assertion means nothing")
 

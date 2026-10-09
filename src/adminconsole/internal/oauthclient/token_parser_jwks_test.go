@@ -7,7 +7,6 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -36,7 +35,7 @@ func TestJWKSTokenParserRejectsNonRS256Token(t *testing.T) {
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), tokenString)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "signing method HS256 is invalid")
 	assert.Nil(t, result)
 }
@@ -105,7 +104,7 @@ func TestJWKSTokenParser_AcceptsTokenSignedByPublishedKey(t *testing.T) {
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), tokenString)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, tokenString, result.TokenBase64)
 	assert.Equal(t, "1234567890", result.Claims["sub"])
@@ -121,7 +120,7 @@ func TestJWKSTokenParser_CachesJwksAcrossCalls(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		_, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "key-1", oauthclienttest.ValidClaims()))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	assert.Equal(t, int32(1), hits.Load(), "the JWKS must be fetched only once")
@@ -136,7 +135,7 @@ func TestJWKSTokenParser_TokenWithoutKidUsesTheOnlyPublishedKey(t *testing.T) {
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "", oauthclienttest.ValidClaims()))
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "1234567890", result.Claims["sub"])
 }
 
@@ -151,7 +150,7 @@ func TestJWKSTokenParser_SelectsCorrectKeyWhenSeveralArePublished(t *testing.T) 
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "key-2", oauthclienttest.ValidClaims()))
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "1234567890", result.Claims["sub"])
 }
 
@@ -242,7 +241,7 @@ func TestJWKSTokenParser_ARemovedKeyVerifiesUntilTheCacheIsPastItsAge(t *testing
 			require.Error(t, err, "at the age the keys are refetched and the removed one is gone")
 			assert.Nil(t, result)
 			if tc.wantError != nil {
-				assert.ErrorIs(t, err, tc.wantError)
+				require.ErrorIs(t, err, tc.wantError)
 			}
 			if tc.wantText != "" {
 				assert.Contains(t, err.Error(), tc.wantText)
@@ -371,7 +370,7 @@ func TestJWKSTokenParser_ChecksThatFindTheCachePastItsAgeTogetherFetchOnce(t *te
 	close(results)
 
 	for err := range results {
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 	assert.Equal(t, int32(2), server.Hits.Load(), "the warm-up's fetch and one refetch between all of them")
 }
@@ -392,7 +391,7 @@ func TestJWKSTokenParser_RejectsTokenSignedByUnpublishedKey(t *testing.T) {
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), forged)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, jwt.ErrTokenSignatureInvalid)
 }
@@ -404,7 +403,7 @@ func TestJWKSTokenParser_RejectsUnknownKid(t *testing.T) {
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "key-does-not-exist", oauthclienttest.ValidClaims()))
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "public key not found for token kid")
 	assert.Equal(t, int32(1), hits.Load(), "an unknown kid must trigger exactly one refresh attempt")
@@ -422,7 +421,7 @@ func TestJWKSTokenParser_RejectsTokenWithoutKidWhenSeveralKeysArePublished(t *te
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "", oauthclienttest.ValidClaims()))
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "public key not found for token kid")
 }
@@ -434,7 +433,7 @@ func TestJWKSTokenParser_RejectsMalformedToken(t *testing.T) {
 		t.Run(tokenString, func(t *testing.T) {
 			result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), tokenString)
 
-			assert.Error(t, err)
+			require.Error(t, err)
 			assert.Nil(t, result)
 		})
 	}
@@ -457,7 +456,7 @@ func TestJWKSTokenParser_JwksEndpointReturnsNonOK(t *testing.T) {
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "key-1", oauthclienttest.ValidClaims()))
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "failed to fetch JWKS")
 }
@@ -472,7 +471,7 @@ func TestJWKSTokenParser_JwksEndpointReturnsInvalidJson(t *testing.T) {
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "key-1", oauthclienttest.ValidClaims()))
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 }
 
@@ -487,7 +486,7 @@ func TestJWKSTokenParser_JwksEndpointUnreachable(t *testing.T) {
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), tokenString)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 }
 
@@ -498,7 +497,7 @@ func TestJWKSTokenParser_JwksEndpointReturnsEmptyKeySet(t *testing.T) {
 
 	result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), oauthclienttest.SignRS256(t, key, "key-1", oauthclienttest.ValidClaims()))
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "public key not found for token kid")
 }
@@ -512,7 +511,7 @@ func TestJWKSTokenParser_RefreshJwksStoresKeys(t *testing.T) {
 
 	err := tp.refreshJwks(context.Background())
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, tp.cachedJwks.Keys, 1)
 	assert.Equal(t, "key-1", tp.cachedJwks.Keys[0].Kid)
 }
@@ -535,7 +534,7 @@ func TestJwkToRSAPublicKey_ValidKey(t *testing.T) {
 
 	pub, err := jwkToRSAPublicKey(oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, pub)
 	assert.Equal(t, key.N, pub.N)
 	assert.Equal(t, key.E, pub.E)
@@ -561,7 +560,7 @@ func TestJwkToRSAPublicKey_Rejections(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			pub, err := jwkToRSAPublicKey(tc.jwk)
 
-			assert.Error(t, err)
+			require.Error(t, err)
 			assert.Nil(t, pub)
 		})
 	}
@@ -589,7 +588,7 @@ func TestJwkToRSAPublicKey_DecodesExponent(t *testing.T) {
 
 			pub, err := jwkToRSAPublicKey(jwk)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.want, pub.E)
 		})
 	}
@@ -700,7 +699,7 @@ func TestRefreshJwks_RefusesADocumentOverTheCap(t *testing.T) {
 	err := tp.refreshJwks(context.Background())
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge),
+	require.ErrorIs(t, err, boundedread.ErrResponseTooLarge,
 		"the document is refused as oversized rather than reaching the decoder truncated: %v", err)
 	assert.Equal(t, int64(MaxTokenResponseBytes)+1, body.read.Load(),
 		"one byte past the cap is read, which is what makes the overrun detectable, and no more")

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
@@ -31,7 +33,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == expectedError
+			return errors.Is(err, expectedError)
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
@@ -360,12 +362,12 @@ func TestDecideLevel2Arm(t *testing.T) {
 			state, path, err := decideLevel2Arm(tc.target, tc.userHasOTP)
 
 			if tc.wantErr != "" {
-				assert.EqualError(t, err, tc.wantErr)
+				require.EqualError(t, err, tc.wantErr)
 				assert.Empty(t, state)
 				assert.Empty(t, path)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.wantState, state)
 			assert.Equal(t, tc.wantPath, path)
 		})

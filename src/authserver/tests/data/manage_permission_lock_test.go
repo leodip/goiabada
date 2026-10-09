@@ -113,7 +113,7 @@ func TestAcquireManagePermissionRow_RefusesWhereThereIsNoManagePermission(t *tes
 	tx, err := h.DB.BeginTransaction(ctx)
 	require.NoError(t, err)
 	_, err = h.DB.AcquireManagePermissionRow(ctx, tx)
-	assert.Error(t, err, "no authserver resource")
+	require.Error(t, err, "no authserver resource")
 	require.NoError(t, h.DB.RollbackTransaction(ctx, tx))
 
 	resource := &record.Resource{ResourceIdentifier: builtin.AuthServerResourceIdentifier, Description: "Authorization server (system-level)"}
@@ -126,7 +126,7 @@ func TestAcquireManagePermissionRow_RefusesWhereThereIsNoManagePermission(t *tes
 	tx, err = h.DB.BeginTransaction(ctx)
 	require.NoError(t, err)
 	_, err = h.DB.AcquireManagePermissionRow(ctx, tx)
-	assert.Error(t, err, "an authserver resource without manage, beside another resource's manage")
+	require.Error(t, err, "an authserver resource without manage, beside another resource's manage")
 	require.NoError(t, h.DB.RollbackTransaction(ctx, tx))
 }
 

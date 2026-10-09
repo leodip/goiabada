@@ -308,7 +308,7 @@ func TestGrantListSaves_SaveTheExactPlanInOneTransaction(t *testing.T) {
 			rr := save.serve(database, auditLogger, save.body(t, []int64{4, 6}, []int64{3, 4}))
 
 			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-			assert.NoError(t, stub.BodyErr)
+			require.NoError(t, stub.BodyErr)
 			assert.Equal(t, []int64{21}, deleted, "the revoked grant's row, and nothing kept")
 			assert.Equal(t, []int64{6}, granted, "the new grant, and nothing already stored")
 			want := save.wantAudits([]int64{6}, []int64{3})
@@ -529,7 +529,7 @@ func TestGrantListSaves_AnOutdatedLoadedListIsRefused(t *testing.T) {
 			assert.Equal(t, http.StatusConflict, rr.Code)
 			code, _ := decodeErrorEnvelope(t, rr)
 			assert.Equal(t, "CONCURRENT_UPDATE", code)
-			assert.ErrorIs(t, stub.BodyErr, errListChanged, "the body refuses, so the helper rolls back")
+			require.ErrorIs(t, stub.BodyErr, errListChanged, "the body refuses, so the helper rolls back")
 			database.AssertExpectations(t)
 			assertNotAttemptedOnClientDatabase(t, database, save.createMethod, save.deleteMethod)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)

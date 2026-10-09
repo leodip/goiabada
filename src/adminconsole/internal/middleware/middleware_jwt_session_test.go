@@ -831,7 +831,7 @@ func TestSessionHandler_TheCheckAndTheWriteOutliveTheBrowser(t *testing.T) {
 	assert.Equal(t, wantRequestID, grantRequestID, "the grant is sent with the request's values")
 
 	// The check.
-	assert.NoError(t, checked.err, "the answer is checked on a context the browser's departure did not cancel")
+	require.NoError(t, checked.err, "the answer is checked on a context the browser's departure did not cancel")
 	require.True(t, checked.hasDeadline, "detached, but not unbounded")
 	assert.Equal(t, wantRequestID, checked.requestID, "and keeping request_id for the parser's records")
 
@@ -845,7 +845,7 @@ func TestSessionHandler_TheCheckAndTheWriteOutliveTheBrowser(t *testing.T) {
 	// The write: the same context as the check, so one deadline covers both.
 	writes := h.backend.recordedWrites()
 	require.Len(t, writes, 1, "one write, the refreshed session")
-	assert.NoError(t, writes[0].err, "the session write runs on the detached context too")
+	require.NoError(t, writes[0].err, "the session write runs on the detached context too")
 	require.True(t, writes[0].hasDeadline)
 	assert.True(t, checked.deadline.Equal(writes[0].deadline),
 		"one deadline covers the check and the write together")

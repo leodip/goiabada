@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIResourcesCreate_Success tests POST /api/v1/admin/resources success flow
@@ -32,7 +33,7 @@ func TestAPIResourcesCreate_Success(t *testing.T) {
 
 	var createResp api.CreateResourceResponse
 	err := json.NewDecoder(resp.Body).Decode(&createResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert returned resource
 	assert.Equal(t, identifier, createResp.Resource.ResourceIdentifier)
@@ -40,7 +41,7 @@ func TestAPIResourcesCreate_Success(t *testing.T) {
 
 	// Verify persistence
 	stored, err := database.GetResourceByResourceIdentifier(context.Background(), nil, identifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, stored)
 	assert.Equal(t, identifier, stored.ResourceIdentifier)
 	assert.Equal(t, "Created via API", stored.Description)
@@ -134,10 +135,10 @@ func TestAPIResourcesCreate_UnauthorizedAndScope(t *testing.T) {
 
 	// No token
 	req, err := http.NewRequest("POST", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	body, _ := io.ReadAll(resp.Body)
@@ -183,7 +184,7 @@ func TestAPIResourcesCreate_AngleBracketsRejected(t *testing.T) {
 	assert.Equal(t, "validator.description.angle_brackets", errResp.ErrorCode)
 
 	stored, err := database.GetResourceByResourceIdentifier(context.Background(), nil, identifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, stored)
 }
 
@@ -205,11 +206,11 @@ func TestAPIResourcesCreate_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 
 	var createResp api.CreateResourceResponse
 	err := json.NewDecoder(resp.Body).Decode(&createResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `AT&T "Wireless"`, createResp.Resource.Description)
 
 	stored, err := database.GetResourceByResourceIdentifier(context.Background(), nil, identifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, stored)
 	assert.Equal(t, `AT&T "Wireless"`, stored.Description)
 	_ = database.DeleteResource(context.Background(), nil, stored.Id)

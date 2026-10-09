@@ -1,7 +1,6 @@
 package adminuserhandlers
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -166,7 +165,7 @@ func TestAdminUserHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.
 			tc.build(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), tc.request)
 
 			require.Len(t, answered, 1, "the handler answers once")
-			assert.True(t, errors.Is(answered[0], reqctx.ErrNoJwtInfo), "answered with %v", answered[0])
+			require.ErrorIs(t, answered[0], reqctx.ErrNoJwtInfo, "answered with %v", answered[0])
 			assert.Empty(t, apiClient.seen, "nothing is asked of the API without a token")
 		})
 	}
@@ -210,7 +209,7 @@ func TestAdminUserNewPages_AbsentSettingsAreAnsweredWithTheSentinel(t *testing.T
 			apiClient := &ctxRecordingApiClient{}
 			tc.build(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), tc.request)
 
-			assert.True(t, errors.Is(refusedWith, reqctx.ErrNoSettings), "answered with %v", refusedWith)
+			require.ErrorIs(t, refusedWith, reqctx.ErrNoSettings, "answered with %v", refusedWith)
 			httpHelper.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything)
 			assert.Empty(t, apiClient.seen, "nothing is asked of the API without settings")

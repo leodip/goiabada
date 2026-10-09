@@ -78,7 +78,7 @@ func TestGet(t *testing.T) {
 		body, err := Get(d.do, testURL, "test-agent", 1024)
 
 		assert.Nil(t, body)
-		assert.True(t, errors.Is(err, sentinel), "got %v", err)
+		assert.ErrorIs(t, err, sentinel, "got %v", err)
 	})
 
 	// The boundary cases of the ceiling belong to boundedread's own tests; what is here is that Get
@@ -97,7 +97,7 @@ func TestGet(t *testing.T) {
 
 		body, err := Get(d.do, testURL, "test-agent", 3)
 
-		assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge), "got %v", err)
+		require.ErrorIs(t, err, boundedread.ErrResponseTooLarge, "got %v", err)
 		assert.Nil(t, body)
 	})
 }

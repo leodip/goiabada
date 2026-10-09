@@ -372,7 +372,7 @@ func TestTokenClient_ErrorsWhenTheEndpointIsUnreachable(t *testing.T) {
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "error sending request")
 			var refusal *TokenEndpointError
-			assert.False(t, errors.As(err, &refusal), "an endpoint that never answered did not refuse anything")
+			assert.NotErrorAs(t, err, &refusal, "an endpoint that never answered did not refuse anything")
 			assert.Nil(t, tokenResponse)
 		})
 	}
@@ -403,7 +403,7 @@ func TestTokenClient_ARefusalCarriesTheStatusTheErrorAndItsDescription(t *testin
 			assert.Nil(t, tokenResponse)
 
 			var refusal *TokenEndpointError
-			require.True(t, errors.As(err, &refusal), "a caller can match the refusal: %v", err)
+			require.ErrorAs(t, err, &refusal, "a caller can match the refusal: %v", err)
 			assert.Equal(t, http.StatusBadRequest, refusal.StatusCode)
 			assert.Equal(t, "invalid_grant", refusal.ErrorCode)
 			assert.Equal(t, "the grant has expired", refusal.ErrorDescription)
@@ -496,7 +496,7 @@ func TestTokenClient_ARefusalNeverCarriesTheRawBody(t *testing.T) {
 
 				require.Error(t, err)
 				var refusal *TokenEndpointError
-				require.True(t, errors.As(err, &refusal))
+				require.ErrorAs(t, err, &refusal)
 				assert.Equal(t, tc.status, refusal.StatusCode)
 				assert.Equal(t, tc.want+g.refusalSuffix, err.Error())
 				assert.NotContains(t, err.Error(), "secret-peer-text")
@@ -521,7 +521,7 @@ func TestTokenClient_ARefusalIsConformedAndBounded(t *testing.T) {
 
 			require.Error(t, err)
 			var refusal *TokenEndpointError
-			require.True(t, errors.As(err, &refusal))
+			require.ErrorAs(t, err, &refusal)
 
 			// '"' is outside Appendix A's error_description set, as is the newline.
 			assert.Equal(t, "invalid?grant", refusal.ErrorCode)
@@ -584,7 +584,7 @@ func TestClientCredentials_ARefusalNamesTheClientAndTheRemedy(t *testing.T) {
 				err.Error())
 
 			var endpointRefusal *TokenEndpointError
-			require.True(t, errors.As(err, &endpointRefusal),
+			require.ErrorAs(t, err, &endpointRefusal,
 				"the client id and the remedy ride on the one refusal error, which a caller still matches")
 			assert.Equal(t, code, endpointRefusal.ErrorCode)
 		})

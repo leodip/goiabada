@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestToken_AuthCode_MissingCode(t *testing.T) {
@@ -137,7 +138,7 @@ func TestToken_AuthCode_WrongClient(t *testing.T) {
 		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 	err := database.CreateClient(context.Background(), nil, wrongClient)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
@@ -161,7 +162,7 @@ func TestToken_AuthCode_ConfidentialClient_NoClientSecret(t *testing.T) {
 	// Ensure the client is not public (confidential)
 	code.Client.IsPublic = false
 	err := database.UpdateClient(context.Background(), nil, &code.Client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
@@ -187,7 +188,7 @@ func TestToken_AuthCode_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 	// Ensure the client is confidential (not public)
 	code.Client.IsPublic = false
 	err := database.UpdateClient(context.Background(), nil, &code.Client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
@@ -213,7 +214,7 @@ func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
 
 	code.Client.IsPublic = false
 	err := database.UpdateClient(context.Background(), nil, &code.Client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
@@ -257,7 +258,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 
 	// Verify that the code has been marked as used
 	usedCode, err := database.GetCodeById(context.Background(), nil, code.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, usedCode.Used)
 }
 
@@ -288,7 +289,7 @@ func TestToken_AuthCode_CodeReuse_ReturnsInvalidGrant(t *testing.T) {
 
 	// Code remains marked as used.
 	stored, err := database.GetCodeById(context.Background(), nil, code.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, stored.Used)
 }
 
@@ -357,10 +358,10 @@ func TestToken_AuthCode_CodeReuse_AccessTokenNoLongerWorks(t *testing.T) {
 	// Sanity check: the access token works against /userinfo before reuse.
 	userinfoURL := appConfig.AuthServer.BaseURL + "/userinfo"
 	req, err := http.NewRequest(http.MethodGet, userinfoURL, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_ = resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -370,10 +371,10 @@ func TestToken_AuthCode_CodeReuse_AccessTokenNoLongerWorks(t *testing.T) {
 
 	// The access token issued from the reused code must now be rejected.
 	req2, err := http.NewRequest(http.MethodGet, userinfoURL, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req2.Header.Set("Authorization", "Bearer "+accessToken)
 	resp2, err := httpClient.Do(req2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_ = resp2.Body.Close()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }

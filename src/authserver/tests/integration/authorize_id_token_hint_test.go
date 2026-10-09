@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // =============================================================================
@@ -28,7 +29,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// =========================================================================
 	passwordA := fake.Password(10)
 	passwordHashedA, err := passwordhash.Hash(passwordA)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	userA := &record.User{
 		Subject:      fake.UUID(),
@@ -37,11 +38,11 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 		PasswordHash: passwordHashedA,
 	}
 	err = database.CreateUser(context.Background(), nil, userA)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	passwordB := fake.Password(10)
 	passwordHashedB, err := passwordhash.Hash(passwordB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	userB := &record.User{
 		Subject:      fake.UUID(),
@@ -50,14 +51,14 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 		PasswordHash: passwordHashedB,
 	}
 	err = database.CreateUser(context.Background(), nil, userB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// =========================================================================
 	// Step 2: Create client with confidential credentials
 	// =========================================================================
 	clientSecret := fake.LetterN(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -69,14 +70,14 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// =========================================================================
 	// Step 3: Get an ID token for User A (complete full auth flow)
@@ -105,7 +106,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// the last response and the earlier ones are never closed. The replay hop at the end of this
 	// function adds one more, which makes that worse.
 	respA, err := httpClientA.Get(destUrlA)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func(body io.ReadCloser) { _ = body.Close() }(respA.Body)
 
 	redirectLocation := assertRedirect(t, respA, "/auth/level1")
@@ -179,7 +180,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// Step 5: User B authenticates (different user than the hint)
 	// =========================================================================
 	respB, err := httpClientB.Get(destUrlB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
 	// Should redirect to login even with prompt=login (since no session exists)
@@ -250,7 +251,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	// =========================================================================
 	password := fake.Password(10)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:      fake.UUID(),
@@ -259,14 +260,14 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// =========================================================================
 	// Step 2: Create client
 	// =========================================================================
 	clientSecret := fake.LetterN(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -278,14 +279,14 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// =========================================================================
 	// Step 3: Get an ID token for User A
@@ -307,7 +308,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 		"&nonce=" + requestNonce1
 
 	resp, err := httpClient1.Get(destUrl1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
@@ -380,7 +381,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	// Step 5: Same user authenticates again
 	// =========================================================================
 	resp2, err := httpClient2.Get(destUrl2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp2.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, resp2, "/auth/level1")
@@ -440,7 +441,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// Create two users
 	passwordA := fake.Password(10)
 	passwordHashedA, err := passwordhash.Hash(passwordA)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	userA := &record.User{
 		Subject:      fake.UUID(),
@@ -449,11 +450,11 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 		PasswordHash: passwordHashedA,
 	}
 	err = database.CreateUser(context.Background(), nil, userA)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	passwordB := fake.Password(10)
 	passwordHashedB, err := passwordhash.Hash(passwordB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	userB := &record.User{
 		Subject:      fake.UUID(),
@@ -462,12 +463,12 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 		PasswordHash: passwordHashedB,
 	}
 	err = database.CreateUser(context.Background(), nil, userB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create client
 	clientSecret := fake.LetterN(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -479,14 +480,14 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Get ID token for User A (complete flow and token exchange)
 	httpClientA := createHttpClient(t)
@@ -506,7 +507,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 		"&nonce=" + requestNonceA
 
 	respA, err := httpClientA.Get(destUrlA)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = respA.Body.Close() }()
 
 	redirectLocation := assertRedirect(t, respA, "/auth/level1")
@@ -568,7 +569,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 
 	// User B authenticates
 	respB, err := httpClientB.Get(destUrlB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = respB.Body.Close() }()
 
 	redirectLocation = assertRedirect(t, respB, "/auth/level1")

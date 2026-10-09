@@ -57,7 +57,7 @@ func TestAPIGroupPermissionsGet_Success(t *testing.T) {
 	// Parse response
 	var getResponse api.GetGroupPermissionsResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Group information
 	assert.Equal(t, testGroup.Id, getResponse.Group.Id)
@@ -134,10 +134,10 @@ func TestAPIGroupPermissionsGet_NoPermissions(t *testing.T) {
 	// Parse response
 	var getResponse api.GetGroupPermissionsResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return empty permissions array
-	assert.Len(t, getResponse.Permissions, 0)
+	assert.Empty(t, getResponse.Permissions)
 	assert.Equal(t, testGroup.Id, getResponse.Group.Id)
 }
 
@@ -151,11 +151,11 @@ func TestAPIGroupPermissionsGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -210,12 +210,12 @@ func TestAPIGroupPermissionsPut_Success(t *testing.T) {
 	// Parse response
 	var updateResponse api.SuccessResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, updateResponse.Success)
 
 	// Verify permissions were updated correctly in database
 	groupPerms, err := database.GetGroupPermissionsByGroupId(context.Background(), nil, testGroup.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, groupPerms, 2)
 
 	// Verify the correct permissions are assigned
@@ -268,17 +268,17 @@ func TestAPIGroupPermissionsPut_RemoveAllPermissions(t *testing.T) {
 	// Parse response
 	var updateResponse api.SuccessResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, updateResponse.Success)
 
 	// Verify permission was removed
 	groupPerms, err := database.GetGroupPermissionsByGroupId(context.Background(), nil, testGroup.Id)
-	assert.NoError(t, err)
-	assert.Len(t, groupPerms, 0)
+	require.NoError(t, err)
+	assert.Empty(t, groupPerms)
 
 	// Verify the group permission record was actually deleted
 	deletedGroupPerm, err := database.GetGroupPermissionById(context.Background(), nil, groupPerm.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, deletedGroupPerm)
 }
 
@@ -321,12 +321,12 @@ func TestAPIGroupPermissionsPut_AddPermissionsToEmptyGroup(t *testing.T) {
 	// Parse response
 	var updateResponse api.SuccessResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, updateResponse.Success)
 
 	// Verify permissions were added correctly
 	groupPerms, err := database.GetGroupPermissionsByGroupId(context.Background(), nil, testGroup.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, groupPerms, 2)
 
 	// Cleanup: Delete created group permissions
@@ -398,13 +398,13 @@ func TestAPIGroupPermissionsPut_InvalidRequestBody(t *testing.T) {
 	// Test: Invalid JSON request body
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
@@ -477,7 +477,7 @@ func TestAPIGroupPermissionsPut_DuplicatePermissionIds(t *testing.T) {
 
 	// Verify only one permission was assigned (no duplicates in database)
 	groupPerms, err := database.GetGroupPermissionsByGroupId(context.Background(), nil, testGroup.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, groupPerms, 1)
 	assert.Equal(t, perm.Id, groupPerms[0].PermissionId)
 
@@ -497,11 +497,11 @@ func TestAPIGroupPermissionsPut_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -564,7 +564,7 @@ func TestAPIGroupPermissionsPut_ComplexScenario(t *testing.T) {
 
 	// Verify final permissions are correct
 	groupPerms, err := database.GetGroupPermissionsByGroupId(context.Background(), nil, testGroup.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, groupPerms, 3)
 
 	// Cleanup: Delete any remaining group permissions

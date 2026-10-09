@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -495,7 +496,7 @@ func TestHandleIssueGet_AnImplicitSessionEndedAtTheSigningIsAnsweredAsAGoneSessi
 		f.implicitIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, true, false).
 			Return(nil, boom).Once()
 		f.pageRenderer.On("InternalServerError", f.rr, f.req, mock.MatchedBy(func(err error) bool {
-			return err == boom
+			return errors.Is(err, boom)
 		})).Return().Once()
 
 		f.serve()

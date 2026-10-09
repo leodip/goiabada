@@ -320,7 +320,7 @@ func TestHandleAccountOTPPut_Enable_CounterFailureRollsBack(t *testing.T) {
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", errorCodeOf(t, rr))
 	// The body handed its error to the helper, which is when the helper rolls back, and an
 	// enable that did not happen is not audited as one.
-	assert.EqualError(t, stub.BodyErr, "the database is unwell")
+	require.EqualError(t, stub.BodyErr, "the database is unwell")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -427,7 +427,7 @@ func TestHandleAccountOTPPut_Disable_ResetFailureRollsBack(t *testing.T) {
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", errorCodeOf(t, rr))
 	// The body handed its error to the helper, which is when the helper rolls back, and a
 	// disable that did not happen is not audited as one.
-	assert.EqualError(t, stub.BodyErr, "the database is unwell")
+	require.EqualError(t, stub.BodyErr, "the database is unwell")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 

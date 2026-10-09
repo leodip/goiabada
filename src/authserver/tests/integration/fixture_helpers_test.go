@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func loadCodeFromDatabase(t *testing.T, codeVal string) *record.Code {
@@ -202,7 +203,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *record.Client, *re
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	return httpClient, client, redirectUri, user
 }
@@ -315,7 +316,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *record.Cli
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	return httpClient, client, redirectUri, user
 }
@@ -450,7 +451,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *record.Cl
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	return httpClient, client, redirectUri, user
 }
@@ -500,7 +501,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 	}
 
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -624,7 +625,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope string) (*http.Client, *record.Code) {
 
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Allowed to request the administrative scopes when the scope names one, as an operator allows a
 	// client that legitimately needs them: the tests minting an administrative user token through

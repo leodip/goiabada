@@ -48,7 +48,7 @@ func TestAPIResourcePermissionsPut_Success_CreateUpdateDelete(t *testing.T) {
 
 	var success api.SuccessResponse
 	err := json.NewDecoder(resp.Body).Decode(&success)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, success.Success)
 
 	// Verify via GET that we have read (updated), admin, read-extra and not write
@@ -57,7 +57,7 @@ func TestAPIResourcePermissionsPut_Success_CreateUpdateDelete(t *testing.T) {
 	assert.Equal(t, http.StatusOK, getResp.StatusCode)
 	var list api.GetPermissionsByResourceResponse
 	err = json.NewDecoder(getResp.Body).Decode(&list)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	idents := map[string]bool{}
 	descByIdent := map[string]string{}
@@ -120,7 +120,7 @@ func TestAPIResourcePermissionsPut_ValidationErrors(t *testing.T) {
 
 	// Nothing in the table above was created, "valid<b" included.
 	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, perms)
 }
 
@@ -160,13 +160,13 @@ func TestAPIResourcePermissionsPut_SystemResourceAddPermissionAllowed(t *testing
 	accessToken, _ := createAdminClientWithToken(t)
 
 	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
 	}
 
 	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Build request with all existing built-in permissions PLUS a new one
 	var permUpserts []api.ResourcePermissionUpsert
@@ -208,14 +208,14 @@ func TestAPIResourcePermissionsPut_SystemResourceRenameBuiltInBlocked(t *testing
 	accessToken, _ := createAdminClientWithToken(t)
 
 	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
 	}
 
 	// Get existing permissions
 	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Find the "manage" built-in permission
 	var managePermId int64
@@ -251,7 +251,7 @@ func TestAPIResourcePermissionsPut_SystemResourceRenameBuiltInBlocked(t *testing
 
 	var errResp api.ErrorResponse
 	err = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, errResp.ErrorDescription, "Built-in permission")
 	assert.Contains(t, errResp.ErrorDescription, "cannot be renamed")
 }
@@ -261,14 +261,14 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteBuiltInBlocked(t *testing
 	accessToken, _ := createAdminClientWithToken(t)
 
 	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
 	}
 
 	// Get existing permissions
 	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Build request that omits the "manage-account" built-in permission (attempt to delete)
 	var permUpserts []api.ResourcePermissionUpsert
@@ -291,7 +291,7 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteBuiltInBlocked(t *testing
 
 	var errResp api.ErrorResponse
 	err = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, errResp.ErrorDescription, "Built-in permission")
 	assert.Contains(t, errResp.ErrorDescription, "cannot be deleted")
 }
@@ -301,13 +301,13 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t 
 	accessToken, _ := createAdminClientWithToken(t)
 
 	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
 	}
 
 	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Find the "manage" built-in permission
 	var managePermId int64
@@ -349,7 +349,7 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t 
 
 	var errResp api.ErrorResponse
 	err = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, errResp.ErrorDescription, "Built-in permission")
 	assert.Contains(t, errResp.ErrorDescription, "cannot be deleted")
 }
@@ -359,14 +359,14 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 	accessToken, _ := createAdminClientWithToken(t)
 
 	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
 	}
 
 	// Get existing permissions
 	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Find the "manage" built-in permission and save original description
 	var managePermId int64
@@ -413,7 +413,7 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 
 	// Verify description was updated
 	updatedPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	for _, p := range updatedPerms {
 		if p.Id == managePermId {
 			assert.Equal(t, "Updated description for manage permission", p.Description)
@@ -428,13 +428,13 @@ func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
 	}
 
 	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Find the "manage" built-in permission
 	var managePermId int64
@@ -473,7 +473,7 @@ func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
 
 	var errResp api.ErrorResponse
 	err = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, errResp.ErrorDescription, "Duplicate permission IDs")
 }
 
@@ -515,7 +515,7 @@ func TestAPIResourcePermissionsPut_Unauthorized(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 

@@ -226,7 +226,7 @@ func TestFormat_EveryDirectiveButPlusVFormatsTheMessageString(t *testing.T) {
 }
 
 func TestChain_ErrorsIsTraversesEveryWrapper(t *testing.T) {
-	assert.True(t, errors.Is(WithStack(service()), sql.ErrConnDone),
+	assert.ErrorIs(t, WithStack(service()), sql.ErrConnDone,
 		"Wrap, then Wrap, then WithStack, and the sentinel is still reachable")
 }
 
@@ -234,7 +234,7 @@ func TestChain_ErrorsAsFindsATypedErrorABareAssertionMisses(t *testing.T) {
 	wrapped := Wrap(&detail{code: "invalid_grant"}, "validating")
 
 	var d *detail
-	require.True(t, errors.As(wrapped, &d))
+	require.ErrorAs(t, wrapped, &d)
 	assert.Equal(t, "invalid_grant", d.code)
 
 	_, bare := wrapped.(*detail)
@@ -244,11 +244,11 @@ func TestChain_ErrorsAsFindsATypedErrorABareAssertionMisses(t *testing.T) {
 
 func TestNilIn_NilOut(t *testing.T) {
 	// Call sites that return Wrap(err, ...) unconditionally rely on this.
-	assert.Nil(t, Wrap(nil, "x"))
-	assert.Nil(t, Wrapf(nil, "x %d", 1))
-	assert.Nil(t, WithStack(nil))
-	assert.Nil(t, Join(nil, nil))
-	assert.Nil(t, Join())
+	assert.NoError(t, Wrap(nil, "x"))
+	assert.NoError(t, Wrapf(nil, "x %d", 1))
+	assert.NoError(t, WithStack(nil))
+	assert.NoError(t, Join(nil, nil))
+	assert.NoError(t, Join())
 }
 
 func TestNew_AndErrorf_Messages(t *testing.T) {
@@ -259,14 +259,14 @@ func TestNew_AndErrorf_Messages(t *testing.T) {
 }
 
 func TestErrorf_WithVerbWKeepsTheChain(t *testing.T) {
-	assert.True(t, errors.Is(Errorf("ctx: %w", sql.ErrNoRows), sql.ErrNoRows))
+	assert.ErrorIs(t, Errorf("ctx: %w", sql.ErrNoRows), sql.ErrNoRows)
 }
 
 func TestWithStack_KeepsSentinelIdentity(t *testing.T) {
 	sentinel := errors.New("sentinel")
 	stacked := WithStack(sentinel)
 
-	assert.True(t, errors.Is(stacked, sentinel))
+	assert.ErrorIs(t, stacked, sentinel)
 	assert.Equal(t, "sentinel", stacked.Error())
 	assert.Same(t, stacked, WithStack(stacked), "already stacked, so WithStack is the identity")
 }
@@ -382,7 +382,7 @@ func TestInheritedStack_TheOriginKeepsTheOnlyStack(t *testing.T) {
 			assert.Equal(t, row.message, err.Error())
 			assert.Equal(t, "dataLayer", firstFrame(t, err),
 				"the wrapper prints the origin's frames, not its own")
-			assert.True(t, errors.Is(err, sql.ErrConnDone), "the chain still unwraps")
+			assert.ErrorIs(t, err, sql.ErrConnDone, "the chain still unwraps")
 
 			frames := plusV(err)
 			assert.NotContains(t, frames, ":0",
@@ -394,12 +394,12 @@ func TestInheritedStack_TheOriginKeepsTheOnlyStack(t *testing.T) {
 
 func TestInheritedStack_JoinedBranchesAreStillMatchable(t *testing.T) {
 	wrapped := Wrap(errors.Join(dataLayer(), errors.New("cleanup failed")), "migration")
-	assert.True(t, errors.Is(wrapped, sql.ErrConnDone), "the left branch of a wrapped join")
+	assert.ErrorIs(t, wrapped, sql.ErrConnDone, "the left branch of a wrapped join")
 
 	both := Join(Wrap(&detail{code: "invalid_grant"}, "validating"), dataLayer())
 	var d *detail
-	assert.True(t, errors.As(both, &d), "errors.As reaches a typed error in the left branch")
-	assert.True(t, errors.Is(both, sql.ErrConnDone), "and errors.Is the sentinel in the right one")
+	assert.ErrorAs(t, both, &d, "errors.As reaches a typed error in the left branch")
+	assert.ErrorIs(t, both, sql.ErrConnDone, "and errors.Is the sentinel in the right one")
 }
 
 // ---- the ownership row -------------------------------------------------------------------------

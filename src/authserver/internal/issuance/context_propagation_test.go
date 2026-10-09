@@ -83,7 +83,7 @@ func TestIssueAuthCode_AGoneClientReachesNoInsert(t *testing.T) {
 
 	code, err := NewCodeIssuer(mockDB).IssueAuthCode(issuanceCallerContext(), issuanceTx, propagationCodeInput())
 
-	assert.ErrorIs(t, err, ErrIssuingClientGone)
+	require.ErrorIs(t, err, ErrIssuingClientGone)
 	assert.Nil(t, code)
 	mockDB.AssertNotCalled(t, "CreateCode", mock.Anything, mock.Anything, mock.Anything)
 }

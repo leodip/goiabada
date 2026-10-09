@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIUserProfilePut tests the PUT /api/v1/admin/users/{id}/profile endpoint
@@ -28,7 +29,7 @@ func TestAPIUserProfilePut_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -59,7 +60,7 @@ func TestAPIUserProfilePut_Success(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Profile data should be updated
 	assert.Equal(t, updateReq.Username, updateResponse.User.Username)
@@ -75,7 +76,7 @@ func TestAPIUserProfilePut_Success(t *testing.T) {
 
 	// Verify changes were persisted to database
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, updateReq.Username, updatedUser.Username)
 	assert.Equal(t, updateReq.GivenName, updatedUser.GivenName)
@@ -97,7 +98,7 @@ func TestAPIUserProfilePut_PartialUpdate(t *testing.T) {
 		Username:   "originaluser",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -120,14 +121,14 @@ func TestAPIUserProfilePut_PartialUpdate(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Updated fields should change, others should be cleared/empty
-	assert.Equal(t, "", updateResponse.User.Username) // Should be empty
+	assert.Empty(t, updateResponse.User.Username) // Should be empty
 	assert.Equal(t, updateReq.GivenName, updateResponse.User.GivenName)
 	assert.Equal(t, updateReq.FamilyName, updateResponse.User.FamilyName)
-	assert.Equal(t, "", updateResponse.User.MiddleName)
-	assert.Equal(t, "", updateResponse.User.Nickname)
+	assert.Empty(t, updateResponse.User.MiddleName)
+	assert.Empty(t, updateResponse.User.Nickname)
 }
 
 func TestAPIUserProfilePut_InvalidGender(t *testing.T) {
@@ -143,7 +144,7 @@ func TestAPIUserProfilePut_InvalidGender(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -176,7 +177,7 @@ func TestAPIUserProfilePut_ValidGender(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -212,7 +213,7 @@ func TestAPIUserProfilePut_ValidGender(t *testing.T) {
 
 			var updateResponse api.UpdateUserResponse
 			err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			// Gender should be converted to string representation
 			assert.Equal(t, tc.expectedGender, updateResponse.User.Gender)
@@ -255,7 +256,7 @@ func TestAPIUserProfilePut_WritesBackWhatGetReturned(t *testing.T) {
 		Gender:     "female",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -265,18 +266,18 @@ func TestAPIUserProfilePut_WritesBackWhatGetReturned(t *testing.T) {
 	defer func() { _ = getResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, getResp.StatusCode)
 	var got api.GetUserResponse
-	assert.NoError(t, json.NewDecoder(getResp.Body).Decode(&got))
+	require.NoError(t, json.NewDecoder(getResp.Body).Decode(&got))
 	assert.Equal(t, "female", got.User.Gender)
 
 	putResp := makeAPIRequest(t, "PUT", userURL+"/profile", accessToken, profileRequestFrom(got.User))
 	defer func() { _ = putResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, putResp.StatusCode)
 	var updated api.UpdateUserResponse
-	assert.NoError(t, json.NewDecoder(putResp.Body).Decode(&updated))
+	require.NoError(t, json.NewDecoder(putResp.Body).Decode(&updated))
 	assert.Equal(t, "female", updated.User.Gender)
 
 	stored, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "female", stored.Gender)
 }
 
@@ -293,7 +294,7 @@ func TestAPIUserProfilePut_InvalidDateOfBirth(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -329,7 +330,7 @@ func TestAPIUserProfilePut_ZonePairNamingNoRow(t *testing.T) {
 		ZoneInfo:            "America/New_York",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -347,11 +348,11 @@ func TestAPIUserProfilePut_ZonePairNamingNoRow(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
-	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
 	assert.Equal(t, "The zone info is invalid.", errResp.ErrorDescription)
 
 	stored, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if assert.NotNil(t, stored) {
 		assert.Equal(t, "United States", stored.ZoneInfoCountryName)
 		assert.Equal(t, "America/New_York", stored.ZoneInfo)
@@ -420,7 +421,7 @@ func TestAPIUserProfilePut_InvalidRequestBody(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -428,13 +429,13 @@ func TestAPIUserProfilePut_InvalidRequestBody(t *testing.T) {
 	// Test: Invalid JSON
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
 	req, err := http.NewRequest("PUT", url, nil) // No body
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
@@ -451,7 +452,7 @@ func TestAPIUserProfilePut_Unauthorized(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -459,11 +460,11 @@ func TestAPIUserProfilePut_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -485,7 +486,7 @@ func TestAPIUserAddressPut_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -511,7 +512,7 @@ func TestAPIUserAddressPut_Success(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Address data should be updated
 	assert.Equal(t, updateReq.AddressLine1, updateResponse.User.AddressLine1)
@@ -523,7 +524,7 @@ func TestAPIUserAddressPut_Success(t *testing.T) {
 
 	// Verify changes were persisted to database
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, updateReq.AddressLine1, updatedUser.AddressLine1)
 	assert.Equal(t, updateReq.AddressLine2, updatedUser.AddressLine2)
@@ -549,7 +550,7 @@ func TestAPIUserAddressPut_PartialAddress(t *testing.T) {
 		AddressPostalCode: "00000",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -572,15 +573,15 @@ func TestAPIUserAddressPut_PartialAddress(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Updated fields should change, others should be cleared
 	assert.Equal(t, updateReq.AddressLine1, updateResponse.User.AddressLine1)
-	assert.Equal(t, "", updateResponse.User.AddressLine2)
+	assert.Empty(t, updateResponse.User.AddressLine2)
 	assert.Equal(t, updateReq.AddressLocality, updateResponse.User.AddressLocality)
-	assert.Equal(t, "", updateResponse.User.AddressRegion)
-	assert.Equal(t, "", updateResponse.User.AddressPostalCode)
-	assert.Equal(t, "", updateResponse.User.AddressCountry)
+	assert.Empty(t, updateResponse.User.AddressRegion)
+	assert.Empty(t, updateResponse.User.AddressPostalCode)
+	assert.Empty(t, updateResponse.User.AddressCountry)
 }
 
 func TestAPIUserAddressPut_ClearAllFields(t *testing.T) {
@@ -599,7 +600,7 @@ func TestAPIUserAddressPut_ClearAllFields(t *testing.T) {
 		AddressPostalCode: "12345",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -619,15 +620,15 @@ func TestAPIUserAddressPut_ClearAllFields(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: All address fields should be empty
-	assert.Equal(t, "", updateResponse.User.AddressLine1)
-	assert.Equal(t, "", updateResponse.User.AddressLine2)
-	assert.Equal(t, "", updateResponse.User.AddressLocality)
-	assert.Equal(t, "", updateResponse.User.AddressRegion)
-	assert.Equal(t, "", updateResponse.User.AddressPostalCode)
-	assert.Equal(t, "", updateResponse.User.AddressCountry)
+	assert.Empty(t, updateResponse.User.AddressLine1)
+	assert.Empty(t, updateResponse.User.AddressLine2)
+	assert.Empty(t, updateResponse.User.AddressLocality)
+	assert.Empty(t, updateResponse.User.AddressRegion)
+	assert.Empty(t, updateResponse.User.AddressPostalCode)
+	assert.Empty(t, updateResponse.User.AddressCountry)
 }
 
 // Angle brackets are refused rather than stripped (#275): the admin endpoint
@@ -646,7 +647,7 @@ func TestAPIUserAddressPut_AngleBracketsRefused(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -669,8 +670,8 @@ func TestAPIUserAddressPut_AngleBracketsRefused(t *testing.T) {
 
 	// Assert: Nothing was written
 	unchanged, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
-	assert.Equal(t, "", unchanged.AddressLine1)
+	require.NoError(t, err)
+	assert.Empty(t, unchanged.AddressLine1)
 }
 
 // Only "<" and ">" are refused (#275, decision 2). An address carrying an
@@ -689,7 +690,7 @@ func TestAPIUserAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -707,11 +708,11 @@ func TestAPIUserAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, line1, updateResponse.User.AddressLine1)
 
 	stored, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, line1, stored.AddressLine1)
 }
 
@@ -774,7 +775,7 @@ func TestAPIUserAddressPut_InvalidRequestBody(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -782,13 +783,13 @@ func TestAPIUserAddressPut_InvalidRequestBody(t *testing.T) {
 	// Test: Invalid JSON
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
 	req, err := http.NewRequest("PUT", url, nil) // No body
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
@@ -805,7 +806,7 @@ func TestAPIUserAddressPut_Unauthorized(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -813,11 +814,11 @@ func TestAPIUserAddressPut_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized

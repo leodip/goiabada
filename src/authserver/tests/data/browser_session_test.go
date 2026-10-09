@@ -451,28 +451,28 @@ func TestBrowserSession_StorageFailuresAreErrors(t *testing.T) {
 
 	t.Run("CreateBrowserSession", func(t *testing.T) {
 		bs := newBrowserSession(ownerAuthServer, now, time.Hour)
-		assert.Error(t, database.CreateBrowserSession(context.Background(), deadTx(t), bs))
+		require.Error(t, database.CreateBrowserSession(context.Background(), deadTx(t), bs))
 		assert.Zero(t, bs.Id, "a failed insert must report no id")
 	})
 
 	t.Run("GetBrowserSessionByOwnerAndSessionIdHash", func(t *testing.T) {
 		got, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), deadTx(t),
 			existing.Owner, existing.SessionIdHash, now)
-		assert.Error(t, err, "a lookup that could not run is an error, not an absent session")
+		require.Error(t, err, "a lookup that could not run is an error, not an absent session")
 		assert.Nil(t, got)
 	})
 
 	t.Run("UpdateBrowserSessionData", func(t *testing.T) {
 		moved, err := database.UpdateBrowserSessionData(context.Background(), deadTx(t),
 			existing.Owner, existing.SessionIdHash, "x", now, now.Add(time.Hour))
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.False(t, moved, "a failed statement must not report a transition")
 	})
 
 	t.Run("TouchBrowserSession", func(t *testing.T) {
 		touched, err := database.TouchBrowserSession(context.Background(), deadTx(t),
 			existing.Owner, existing.SessionIdHash, now, now.Add(time.Hour))
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.False(t, touched)
 	})
 
@@ -505,34 +505,34 @@ func TestBrowserSession_EmptyKeyPartsAreRefused(t *testing.T) {
 	// caller bug. Matching on one would return somebody else's row, or sweep rows the
 	// caller never named.
 	bs := newBrowserSession("", now, time.Hour)
-	assert.Error(t, database.CreateBrowserSession(context.Background(), nil, bs), "an empty owner must be refused")
+	require.Error(t, database.CreateBrowserSession(context.Background(), nil, bs), "an empty owner must be refused")
 
 	bs = newBrowserSession(ownerAuthServer, now, time.Hour)
 	bs.SessionIdHash = ""
-	assert.Error(t, database.CreateBrowserSession(context.Background(), nil, bs), "an empty session id hash must be refused")
+	require.Error(t, database.CreateBrowserSession(context.Background(), nil, bs), "an empty session id hash must be refused")
 
 	got, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, "", hash, now)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, got)
 	got, err = database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, ownerAuthServer, "", now)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, got)
 
 	moved, err := database.UpdateBrowserSessionData(context.Background(), nil, "", hash, "x", now, now.Add(time.Hour))
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.False(t, moved)
 	moved, err = database.UpdateBrowserSessionData(context.Background(), nil, ownerAuthServer, "", "x", now, now.Add(time.Hour))
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.False(t, moved)
 
 	touched, err := database.TouchBrowserSession(context.Background(), nil, "", hash, now, now.Add(time.Hour))
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.False(t, touched)
 	touched, err = database.TouchBrowserSession(context.Background(), nil, ownerAuthServer, "", now, now.Add(time.Hour))
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.False(t, touched)
 
-	assert.Error(t, database.DeleteBrowserSession(context.Background(), nil, "", hash))
+	require.Error(t, database.DeleteBrowserSession(context.Background(), nil, "", hash))
 	assert.Error(t, database.DeleteBrowserSession(context.Background(), nil, ownerAuthServer, ""))
 }
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"strings"
 	"testing"
@@ -27,7 +26,7 @@ func previousKeysRefusal(t *testing.T) error {
 		PreviousEncryption:     sessionstore.ConfiguredKey{Name: sessionKeysPrevious[1], Value: strings.Repeat("34", 32)},
 	})
 	var previousErr *sessionstore.PreviousKeysError
-	require.True(t, errors.As(err, &previousErr), "ParseKeys answered %v, not a refusal of the previous pair", err)
+	require.ErrorAs(t, err, &previousErr, "ParseKeys answered %v, not a refusal of the previous pair", err)
 	return err
 }
 
@@ -50,7 +49,7 @@ func TestLogSessionKeysRefused_APreviousPairIsARotationMistake(t *testing.T) {
 			assert.Equal(t, sessionKeysPrevious, records[0].Attrs["previous"])
 			assert.NotContains(t, records[0].Attrs, "bootstrap_file")
 			logged, _ := records[0].Attrs["error"].(error)
-			require.NotNil(t, logged, "the refusal rides as the error itself")
+			require.Error(t, logged, "the refusal rides as the error itself")
 			assert.Contains(t, logged.Error(), "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS is required when",
 				"which half is missing is the refusal's own text")
 		})
@@ -85,6 +84,6 @@ func TestLogSessionKeysRefused_ACurrentKeyWithNoBootstrapFileNamesTheVariables(t
 	assert.Contains(t, records[0].Attrs["generate_with"], "openssl rand -hex 64")
 	assert.NotContains(t, records[0].Attrs, "bootstrap_file")
 	logged, _ := records[0].Attrs["error"].(error)
-	require.NotNil(t, logged)
+	require.Error(t, logged)
 	assert.Contains(t, logged.Error(), "must be 32 bytes")
 }

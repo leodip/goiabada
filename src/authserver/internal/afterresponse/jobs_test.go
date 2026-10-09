@@ -45,7 +45,7 @@ func TestGo_TheJobRunsDetachedFromTheRequestsCancellationButKeepsItsValues(t *te
 	case <-time.After(5 * time.Second):
 		t.Fatal("the job never ran")
 	}
-	assert.NoError(t, jobCtx.Err(), "the request's cancellation must not reach the job")
+	require.NoError(t, jobCtx.Err(), "the request's cancellation must not reach the job")
 	_, hasDeadline := jobCtx.Deadline()
 	assert.False(t, hasDeadline, "the job's only bound is its own work's, not one inherited from the request")
 	assert.Equal(t, "req-detached", jobCtx.Value(chimiddleware.RequestIDKey), "the job keeps the request's id")

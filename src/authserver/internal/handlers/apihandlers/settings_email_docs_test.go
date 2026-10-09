@@ -138,7 +138,7 @@ func TestSettingsEmailDocs_AResponseGivenByReferenceHasNoDescription(t *testing.
 	assert.Equal(t, "- \"Refused.\"\n", description)
 
 	_, err = openAPIResponseDescription(spec, "post", "/things", "400")
-	assert.EqualError(t, err, "openapi.yaml gives POST /things no 400 description of its own")
+	require.EqualError(t, err, "openapi.yaml gives POST /things no 400 description of its own")
 	_, err = openAPIResponseDescription(spec, "delete", "/things", "400")
 	assert.EqualError(t, err, "openapi.yaml gives DELETE /things no 400 description of its own")
 }
@@ -173,7 +173,7 @@ func TestOpenAPIDocs_AnOperationWithNoDescriptionFails(t *testing.T) {
 	assert.Equal(t, "Reads the things.\n", description)
 
 	_, err = openAPIOperationDescription(spec, "put", "/things")
-	assert.EqualError(t, err, "openapi.yaml gives PUT /things no description")
+	require.EqualError(t, err, "openapi.yaml gives PUT /things no description")
 	_, err = openAPIOperationDescription(spec, "delete", "/things")
 	assert.EqualError(t, err, "openapi.yaml gives DELETE /things no description")
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Helper function to extract tokens from fragment response
@@ -242,11 +243,11 @@ func TestImplicitFlow_IdTokenResponseType(t *testing.T) {
 	// Parse and validate id_token
 	idToken := tokens["id_token"]
 	parts := strings.Split(idToken, ".")
-	assert.Equal(t, 3, len(parts), "id_token should be a valid JWT with 3 parts")
+	assert.Len(t, parts, 3, "id_token should be a valid JWT with 3 parts")
 
 	// Decode payload
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, string(payload), requestNonce, "id_token should contain the nonce")
 	assert.Contains(t, string(payload), user.Subject, "id_token should contain user subject")
 }
@@ -317,10 +318,10 @@ func TestImplicitFlow_IdTokenTokenResponseType(t *testing.T) {
 	// Verify id_token contains at_hash claim (OIDC Core 3.2.2.10)
 	idToken := tokens["id_token"]
 	parts := strings.Split(idToken, ".")
-	assert.Equal(t, 3, len(parts), "id_token should be a valid JWT")
+	assert.Len(t, parts, 3, "id_token should be a valid JWT")
 
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, string(payload), "at_hash", "id_token should contain at_hash when access_token is also issued")
 	assert.Contains(t, string(payload), requestNonce, "id_token should contain the nonce")
 }
@@ -519,14 +520,14 @@ func TestImplicitFlow_UnsupportedResponseType_HybridFlow(t *testing.T) {
 		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	requestState := fake.LetterN(16)
 
@@ -551,7 +552,7 @@ func TestImplicitFlow_UnsupportedResponseType_HybridFlow(t *testing.T) {
 
 	// Hybrid flow uses query for errors (since it contains code)
 	parsedUrl, err := url.Parse(location)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	errorCode := parsedUrl.Query().Get("error")
 	assert.Equal(t, "unsupported_response_type", errorCode)
 }
@@ -610,7 +611,7 @@ func TestImplicitFlow_ValidateAccessToken(t *testing.T) {
 
 	// Parse access token JWT
 	token, _, err := new(jwt.Parser).ParseUnverified(accessToken, jwt.MapClaims{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	assert.True(t, ok)
@@ -625,11 +626,11 @@ func TestImplicitFlow_ValidateAccessToken(t *testing.T) {
 	// Use access token to call userinfo endpoint
 	userinfoUrl := appConfig.AuthServer.BaseURL + "/userinfo"
 	req, err := http.NewRequest("GET", userinfoUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	userinfoResp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = userinfoResp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, userinfoResp.StatusCode)
@@ -665,7 +666,7 @@ func TestImplicitFlow_ErrorInFragment(t *testing.T) {
 
 	// Verify error is in fragment (not query)
 	parsedUrl, err := url.Parse(location)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Query should be empty for implicit flow errors
 	assert.Empty(t, parsedUrl.Query().Get("error"), "error should NOT be in query for implicit flow")
@@ -690,14 +691,14 @@ func TestImplicitFlow_WithResourcePermissions(t *testing.T) {
 		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user, password := createTestUserForImplicit(t)
 
@@ -823,17 +824,17 @@ func TestImplicitFlow_AtHashValidation(t *testing.T) {
 
 	// Parse id_token to extract at_hash
 	idTokenParts := strings.Split(idToken, ".")
-	assert.Equal(t, 3, len(idTokenParts))
+	assert.Len(t, idTokenParts, 3)
 
 	payload, err := base64.RawURLEncoding.DecodeString(idTokenParts[1])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify at_hash is present
 	assert.Contains(t, string(payload), "at_hash")
 
 	// Parse id_token claims
 	token, _, err := new(jwt.Parser).ParseUnverified(idToken, jwt.MapClaims{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	claims := token.Claims.(jwt.MapClaims)
 
 	atHashFromToken := claims["at_hash"].(string)
@@ -1080,7 +1081,7 @@ func TestImplicitFlow_NonceInIdToken(t *testing.T) {
 
 	// Parse id_token and verify nonce
 	token, _, err := new(jwt.Parser).ParseUnverified(idToken, jwt.MapClaims{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	claims := token.Claims.(jwt.MapClaims)
 
 	nonceFromToken := claims["nonce"].(string)
@@ -1140,7 +1141,7 @@ func TestImplicitFlow_AudienceInTokens(t *testing.T) {
 
 	// Parse access_token
 	accessToken, _, err := new(jwt.Parser).ParseUnverified(tokens["access_token"], jwt.MapClaims{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	accessTokenClaims := accessToken.Claims.(jwt.MapClaims)
 
 	// Access token audience should be the resource server (authserver for OIDC scopes)
@@ -1149,7 +1150,7 @@ func TestImplicitFlow_AudienceInTokens(t *testing.T) {
 
 	// Parse id_token
 	idToken, _, err := new(jwt.Parser).ParseUnverified(tokens["id_token"], jwt.MapClaims{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	idTokenClaims := idToken.Claims.(jwt.MapClaims)
 
 	// ID token audience should be the client identifier
@@ -1171,14 +1172,14 @@ func TestImplicitFlow_AuthCodeFlowClient_CanAlsoUseImplicit(t *testing.T) {
 		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user, password := createTestUserForImplicit(t)
 

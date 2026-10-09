@@ -33,7 +33,7 @@ func TestGetGroupById_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	got, err := database.GetGroupById(cancelled(), nil, group.Id)
 
 	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
+	require.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
 	assert.Nil(t, got, "no row is returned alongside the refusal")
 }
 
@@ -49,7 +49,7 @@ func TestCreateGroup_RefusesAnAlreadyCancelledContextAndWritesNothing(t *testing
 	err := database.CreateGroup(cancelled(), nil, group)
 
 	require.Error(t, err, "an insert must not be issued on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Zero(t, group.Id, "no id came back, because no row was inserted")
 
 	found, lookupErr := database.GetGroupByGroupIdentifier(context.Background(), nil, identifier)
@@ -71,7 +71,7 @@ func TestGroupLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	err := database.GroupLoadPermissions(cancelled(), nil, group)
 
 	require.Error(t, err, "a loader must not read on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Empty(t, group.Permissions, "nothing is attached to the model alongside the refusal")
 }
 
@@ -87,7 +87,7 @@ func TestGetGroupMembersPaginated_RefusesAnAlreadyCancelledContext(t *testing.T)
 	members, total, err := database.GetGroupMembersPaginated(cancelled(), nil, group.Id, 1, 10)
 
 	require.Error(t, err, "a paged read must not be issued on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Empty(t, members)
 	assert.Zero(t, total, "the count statement did not run either")
 }
@@ -101,7 +101,7 @@ func TestGetGroupAttributesByGroupId_RefusesAnAlreadyCancelledContext(t *testing
 	got, err := database.GetGroupAttributesByGroupId(cancelled(), nil, group.Id)
 
 	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Empty(t, got, "no rows are returned alongside the refusal")
 }
 
@@ -117,7 +117,7 @@ func TestUpdateKeyPairState_RefusesAnAlreadyCancelledContext(t *testing.T) {
 		record.KeyStateNext.String(), record.KeyStateCurrent.String())
 
 	require.Error(t, err, "the refusal must reach the caller as an error, not as a false")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.False(t, moved)
 
 	after, readErr := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
@@ -136,7 +136,7 @@ func TestTryClaimCleanupRun_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	claimed, err := database.TryClaimCleanupRun(cancelled(), nil, now, now.Add(-time.Hour))
 
 	require.Error(t, err, "the refusal must reach the caller as an error, not as a false")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.False(t, claimed)
 }
 
@@ -150,7 +150,7 @@ func TestScanEmailCase_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	rows, err := database.ScanEmailCase(cancelled())
 
 	require.Error(t, err, "the pre-flight must not read on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Empty(t, rows, "no rows are returned alongside the refusal")
 }
 
@@ -165,7 +165,7 @@ func TestDeleteOldAuditLogs_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	deleted, err := database.DeleteOldAuditLogs(cancelled(), nil, time.Now().UTC().Add(time.Hour), 10)
 
 	require.Error(t, err, "a delete must not be issued on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Zero(t, deleted, "nothing was deleted alongside the refusal")
 }
 
@@ -180,7 +180,7 @@ func TestGetAuditLogsPaginated_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	logs, total, err := database.GetAuditLogsPaginated(cancelled(), nil, 1, 10, "", "")
 
 	require.Error(t, err, "a paged read must not be issued on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Empty(t, logs)
 	assert.Zero(t, total, "the count statement did not run either")
 }
@@ -193,7 +193,7 @@ func TestGetPreRegistrationByEmail_RefusesAnAlreadyCancelledContext(t *testing.T
 	got, err := database.GetPreRegistrationByEmail(cancelled(), nil, preRegistration.Email)
 
 	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Nil(t, got, "no row is returned alongside the refusal")
 }
 
@@ -227,7 +227,7 @@ func TestIsEmpty_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	empty, err := database.IsEmpty(cancelled())
 
 	require.Error(t, err, "the refusal must reach the caller as an error, not as a true")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.False(t, empty, "and the bool alongside the refusal must not read as an empty database")
 }
 
@@ -243,6 +243,6 @@ func TestSchemadumpTables_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	names, err := schemadump.Tables(cancelled(), h.SQL, dbType())
 
 	require.Error(t, err, "a catalog read must not be issued on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
+	require.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
 	assert.Empty(t, names, "no table names are returned alongside the refusal")
 }

@@ -119,7 +119,7 @@ func TestHandleKeysRotatePost_APIErrorReachesTheBrowser(t *testing.T) {
 
 			var response map[string]string
 			err := json.Unmarshal(rec.Body.Bytes(), &response)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t, tc.wantError, response["error"])
 			assert.Contains(t, response["error_description"], tc.wantDescription)
@@ -152,7 +152,7 @@ func TestHandleKeysRotatePost_SuccessIsUnchanged(t *testing.T) {
 		Success bool
 	}
 	err := json.Unmarshal(rec.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, response.Success)
 }
 

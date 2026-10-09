@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -315,7 +316,8 @@ func TestHandleAuthorizeGet_ARepeatedRequestParameterIsInvalidRequest(t *testing
 func TestHandleTokenPost_ARepeatedParameterIsInvalidRequest(t *testing.T) {
 	refused := func(name string) func(error) bool {
 		return func(err error) bool {
-			detail, ok := err.(*oauth.ErrorDetail)
+			var detail *oauth.ErrorDetail
+			ok := errors.As(err, &detail)
 			return ok && detail.Code() == "invalid_request" &&
 				detail.HTTPStatus() == http.StatusBadRequest &&
 				detail.Description() == repeatDescription(name)

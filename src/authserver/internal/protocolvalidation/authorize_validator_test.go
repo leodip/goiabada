@@ -144,8 +144,9 @@ func TestValidateScopes(t *testing.T) {
 			if tt.expectedError == "" {
 				assert.NoError(t, err)
 			} else {
-				assert.Error(t, err)
-				customErr := err.(*oauth.ErrorDetail)
+				require.Error(t, err)
+				var customErr *oauth.ErrorDetail
+				require.ErrorAs(t, err, &customErr)
 				assert.Equal(t, tt.expectedError, customErr.Description())
 			}
 		})
@@ -185,8 +186,9 @@ func TestValidateScopes_DatabaseFailurePropagates(t *testing.T) {
 
 			err := NewAuthorizeValidator(mockDB).ValidateScopes(context.Background(), "billing-api:read")
 
-			assert.EqualError(t, err, "database is down")
-			_, isErrorDetail := err.(*oauth.ErrorDetail)
+			require.EqualError(t, err, "database is down")
+			var errorDetail *oauth.ErrorDetail
+			isErrorDetail := errors.As(err, &errorDetail)
 			assert.False(t, isErrorDetail, "a database failure must not be reported as an OAuth error")
 		})
 	}
@@ -199,8 +201,9 @@ func TestValidateClientAndRedirectURI_MissingClientId(t *testing.T) {
 	input := ValidateClientAndRedirectURIInput{ClientId: "", RedirectURI: "http://example.com"}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
-	assert.Error(t, err)
-	locErr := err.(*i18n.LocalizedError)
+	require.Error(t, err)
+	var locErr *i18n.LocalizedError
+	require.ErrorAs(t, err, &locErr)
 	assert.Equal(t, i18n.ErrCodeAuthorizeClientIdMissing, locErr.Code)
 	assert.Equal(t, "The client_id parameter is missing.", locErr.EnglishFallback())
 }
@@ -214,8 +217,9 @@ func TestValidateClientAndRedirectURI_NonExistentClient(t *testing.T) {
 	input := ValidateClientAndRedirectURIInput{ClientId: "non-existent", RedirectURI: "http://example.com"}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
-	assert.Error(t, err)
-	locErr := err.(*i18n.LocalizedError)
+	require.Error(t, err)
+	var locErr *i18n.LocalizedError
+	require.ErrorAs(t, err, &locErr)
 	assert.Equal(t, i18n.ErrCodeAuthorizeClientNotFound, locErr.Code)
 	assert.Equal(t, "Invalid client_id parameter. The client does not exist.", locErr.EnglishFallback())
 }
@@ -229,8 +233,9 @@ func TestValidateClientAndRedirectURI_DisabledClient(t *testing.T) {
 	input := ValidateClientAndRedirectURIInput{ClientId: "disabled-client", RedirectURI: "http://example.com"}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
-	assert.Error(t, err)
-	locErr := err.(*i18n.LocalizedError)
+	require.Error(t, err)
+	var locErr *i18n.LocalizedError
+	require.ErrorAs(t, err, &locErr)
 	assert.Equal(t, i18n.ErrCodeAuthorizeClientDisabled, locErr.Code)
 	assert.Equal(t, "Invalid client_id parameter. The client is disabled.", locErr.EnglishFallback())
 }
@@ -244,8 +249,9 @@ func TestValidateClientAndRedirectURI_ClientWithoutAuthorizationCodeFlow(t *test
 	input := ValidateClientAndRedirectURIInput{ClientId: "no-auth-code-client", RedirectURI: "http://example.com"}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
-	assert.Error(t, err)
-	locErr := err.(*i18n.LocalizedError)
+	require.Error(t, err)
+	var locErr *i18n.LocalizedError
+	require.ErrorAs(t, err, &locErr)
 	assert.Equal(t, i18n.ErrCodeAuthorizeAuthCodeNotEnabled, locErr.Code)
 	assert.Equal(t, "Invalid client_id parameter. The client does not support the authorization code flow.", locErr.EnglishFallback())
 }
@@ -259,8 +265,9 @@ func TestValidateClientAndRedirectURI_MissingRedirectURI(t *testing.T) {
 	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: ""}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
-	assert.Error(t, err)
-	locErr := err.(*i18n.LocalizedError)
+	require.Error(t, err)
+	var locErr *i18n.LocalizedError
+	require.ErrorAs(t, err, &locErr)
 	assert.Equal(t, i18n.ErrCodeAuthorizeRedirectURIMissing, locErr.Code)
 	assert.Equal(t, "The redirect_uri parameter is missing.", locErr.EnglishFallback())
 }
@@ -494,7 +501,8 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 			// require, not assert: on a regression err is nil, and the type assertion
 			// below would panic and take the remaining rows down with it.
 			require.Error(t, err)
-			locErr, ok := err.(*i18n.LocalizedError)
+			var locErr *i18n.LocalizedError
+			ok := errors.As(err, &locErr)
 			require.True(t, ok)
 
 			// The code and the sentence are asserted together because only the catalog
@@ -523,8 +531,9 @@ func TestValidateRequest_InvalidResponseType(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "The authorization server does not support this response_type. Supported values: code, token, id_token, id_token token.", customErr.Description())
 }
 
@@ -538,8 +547,9 @@ func TestValidateRequest_ImplicitFlowNotEnabled(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Contains(t, customErr.Description(), "The client is not authorized to use the implicit grant type.")
 	assert.Contains(t, customErr.Description(), "admin console")
 }
@@ -557,8 +567,9 @@ func TestValidateRequest_InvalidCodeChallengeMethod(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "Invalid code_challenge_method. Only 'S256' is supported.", customErr.Description())
 }
 
@@ -575,8 +586,9 @@ func TestValidateRequest_InvalidCodeChallengeMethod_PKCERequired(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "PKCE is required. Ensure code_challenge_method is set to 'S256'.", customErr.Description())
 }
 
@@ -593,8 +605,9 @@ func TestValidateRequest_CodeChallengeTooShort(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.Description())
 }
 
@@ -611,8 +624,9 @@ func TestValidateRequest_CodeChallengeTooShort_PKCERequired(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.", customErr.Description())
 }
 
@@ -629,8 +643,9 @@ func TestValidateRequest_CodeChallengeTooLong(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.Description())
 }
 
@@ -647,8 +662,9 @@ func TestValidateRequest_CodeChallengeTooLong_PKCERequired(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.", customErr.Description())
 }
 
@@ -664,8 +680,9 @@ func TestValidateRequest_InvalidResponseMode(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "Invalid response_mode parameter. Supported values are: query, fragment, form_post.", customErr.Description())
 }
 
@@ -727,7 +744,7 @@ func TestSupportedResponseTypes(t *testing.T) {
 			CodeChallengeMethod:  "S256",
 			CodeChallenge:        "a_valid_code_challenge_that_meets_length_requirements",
 		}
-		assert.NoError(t, validator.ValidateRequest(&input), "%q is advertised and must be accepted", responseType)
+		require.NoError(t, validator.ValidateRequest(&input), "%q is advertised and must be accepted", responseType)
 	}
 
 	types[0] = "tampered"
@@ -765,7 +782,7 @@ func TestValidateRequest_MaxAge(t *testing.T) {
 	}
 
 	for _, accepted := range []string{"", "0", "3600", "9999999999999999999999"} {
-		assert.NoError(t, validator.ValidateRequest(inputWith(accepted)), "max_age=%q must be accepted", accepted)
+		require.NoError(t, validator.ValidateRequest(inputWith(accepted)), "max_age=%q must be accepted", accepted)
 	}
 
 	for _, refused := range []string{"abc", "-1", "+5", " 5", "1.5"} {
@@ -826,8 +843,9 @@ func TestValidateClientAndRedirectURI_ExtremelyLongClientId(t *testing.T) {
 	input := ValidateClientAndRedirectURIInput{ClientId: longClientId, RedirectURI: "http://example.com"}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
-	assert.Error(t, err)
-	locErr := err.(*i18n.LocalizedError)
+	require.Error(t, err)
+	var locErr *i18n.LocalizedError
+	require.ErrorAs(t, err, &locErr)
 	assert.Equal(t, i18n.ErrCodeAuthorizeClientNotFound, locErr.Code)
 	assert.Equal(t, "Invalid client_id parameter. The client does not exist.", locErr.EnglishFallback())
 }
@@ -850,8 +868,9 @@ func TestValidateClientAndRedirectURI_ExtremelyLongRedirectURI(t *testing.T) {
 	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: longRedirectURI}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
-	assert.Error(t, err)
-	locErr := err.(*i18n.LocalizedError)
+	require.Error(t, err)
+	var locErr *i18n.LocalizedError
+	require.ErrorAs(t, err, &locErr)
 	assert.Equal(t, i18n.ErrCodeAuthorizeRedirectURINotRegistered, locErr.Code)
 	assert.Equal(t, "Invalid redirect_uri parameter. The client does not have this redirect URI registered.", locErr.EnglishFallback())
 }
@@ -946,8 +965,9 @@ func TestValidateRequest_PKCEOptional_OnlyCodeChallenge_Fails(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "Invalid code_challenge_method. Only 'S256' is supported.", customErr.Description())
 }
 
@@ -966,8 +986,9 @@ func TestValidateRequest_PKCEOptional_OnlyCodeChallengeMethod_Fails(t *testing.T
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.Description())
 }
 
@@ -985,8 +1006,9 @@ func TestValidateRequest_PKCERequired_NoPKCEParams_Fails(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "PKCE is required. Ensure code_challenge_method is set to 'S256'.", customErr.Description())
 }
 
@@ -1040,8 +1062,9 @@ func TestValidateRequest_CodeChallenge_Exactly42Chars_Fails(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.Description())
 }
 
@@ -1078,8 +1101,9 @@ func TestValidateRequest_CodeChallenge_Exactly129Chars_Fails(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.Description())
 }
 
@@ -1181,8 +1205,9 @@ func TestValidateRequest_ImplicitFlow_IdToken_RequiresOpenIdScope(t *testing.T) 
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "invalid_request", customErr.Code())
 	assert.Equal(t, "The 'openid' scope is required when requesting an id_token.", customErr.Description())
 }
@@ -1199,8 +1224,9 @@ func TestValidateRequest_ImplicitFlow_IdTokenToken_RequiresOpenIdScope(t *testin
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "The 'openid' scope is required when requesting an id_token.", customErr.Description())
 }
 
@@ -1216,8 +1242,9 @@ func TestValidateRequest_ImplicitFlow_IdToken_RequiresNonce(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "invalid_request", customErr.Code())
 	assert.Equal(t, "The 'nonce' parameter is required for implicit flow when requesting an id_token.", customErr.Description())
 }
@@ -1234,8 +1261,9 @@ func TestValidateRequest_ImplicitFlow_IdTokenToken_RequiresNonce(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "The 'nonce' parameter is required for implicit flow when requesting an id_token.", customErr.Description())
 }
 
@@ -1295,8 +1323,9 @@ func TestValidateRequest_ImplicitFlow_ClientNotEnabled(t *testing.T) {
 			}
 			err := validator.ValidateRequest(&input)
 
-			assert.Error(t, err)
-			customErr := err.(*oauth.ErrorDetail)
+			require.Error(t, err)
+			var customErr *oauth.ErrorDetail
+			require.ErrorAs(t, err, &customErr)
 			assert.Equal(t, "unauthorized_client", customErr.Code())
 			assert.Contains(t, customErr.Description(), "The client is not authorized to use the implicit grant type.")
 			assert.Contains(t, customErr.Description(), "admin console")
@@ -1315,8 +1344,9 @@ func TestValidateRequest_UnsupportedResponseTypeCombination_CodeToken(t *testing
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "unsupported_response_type", customErr.Code())
 	assert.Contains(t, customErr.Description(), "Supported values: code, token, id_token, id_token token")
 }
@@ -1332,8 +1362,9 @@ func TestValidateRequest_UnsupportedResponseTypeCombination_CodeIdToken(t *testi
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "unsupported_response_type", customErr.Code())
 }
 
@@ -1348,8 +1379,9 @@ func TestValidateRequest_UnsupportedResponseTypeCombination_CodeIdTokenToken(t *
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "unsupported_response_type", customErr.Code())
 }
 
@@ -1362,8 +1394,9 @@ func TestValidateRequest_MissingResponseType(t *testing.T) {
 	}
 	err := validator.ValidateRequest(&input)
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "invalid_request", customErr.Code())
 	assert.Equal(t, "The response_type parameter is missing.", customErr.Description())
 }
@@ -1430,7 +1463,7 @@ func TestValidateClientAndRedirectURI_ImplicitFlow_DoesNotRequireAuthCodeEnabled
 	}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	mockDB.AssertExpectations(t)
 }
 
@@ -1455,8 +1488,9 @@ func TestValidateClientAndRedirectURI_AuthCodeFlow_RequiresAuthCodeEnabled(t *te
 	}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
-	assert.Error(t, err)
-	locErr := err.(*i18n.LocalizedError)
+	require.Error(t, err)
+	var locErr *i18n.LocalizedError
+	require.ErrorAs(t, err, &locErr)
 	assert.Equal(t, i18n.ErrCodeAuthorizeAuthCodeNotEnabled, locErr.Code)
 	assert.Contains(t, locErr.EnglishFallback(), "does not support the authorization code flow")
 	mockDB.AssertExpectations(t)
@@ -1472,8 +1506,8 @@ func TestValidatePrompt_EmptyString(t *testing.T) {
 
 	result, err := validator.ValidatePrompt("")
 
-	assert.NoError(t, err)
-	assert.Equal(t, "", result)
+	require.NoError(t, err)
+	assert.Empty(t, result)
 }
 
 // A prompt of spaces alone was trimmed and read as absent; it is malformed (#244).
@@ -1494,7 +1528,7 @@ func assertPromptMalformed(t *testing.T, result string, err error) {
 	require.ErrorAs(t, err, &detail)
 	assert.Equal(t, "invalid_request", detail.Code())
 	assert.Equal(t, malformedText("prompt"), detail.Description())
-	assert.Equal(t, "", result)
+	assert.Empty(t, result)
 }
 
 func TestValidatePrompt_SingleValue_None(t *testing.T) {
@@ -1503,7 +1537,7 @@ func TestValidatePrompt_SingleValue_None(t *testing.T) {
 
 	result, err := validator.ValidatePrompt("none")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "none", result)
 }
 
@@ -1513,7 +1547,7 @@ func TestValidatePrompt_SingleValue_Login(t *testing.T) {
 
 	result, err := validator.ValidatePrompt("login")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "login", result)
 }
 
@@ -1523,7 +1557,7 @@ func TestValidatePrompt_SingleValue_Consent(t *testing.T) {
 
 	result, err := validator.ValidatePrompt("consent")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "consent", result)
 }
 
@@ -1533,7 +1567,7 @@ func TestValidatePrompt_MultipleValues_LoginConsent(t *testing.T) {
 
 	result, err := validator.ValidatePrompt("login consent")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "login consent", result)
 }
 
@@ -1567,7 +1601,7 @@ func TestValidatePrompt_Duplicates(t *testing.T) {
 
 	result, err := validator.ValidatePrompt("login login")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "login", result)
 }
 
@@ -1577,7 +1611,7 @@ func TestValidatePrompt_DuplicatesWithMultiple(t *testing.T) {
 
 	result, err := validator.ValidatePrompt("login consent login")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "login consent", result)
 }
 
@@ -1587,11 +1621,12 @@ func TestValidatePrompt_InvalidValue(t *testing.T) {
 
 	result, err := validator.ValidatePrompt("foo")
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "invalid_request", customErr.Code())
 	assert.Equal(t, "Invalid prompt value: foo", customErr.Description())
-	assert.Equal(t, "", result)
+	assert.Empty(t, result)
 }
 
 func TestValidatePrompt_CaseSensitive_Uppercase(t *testing.T) {
@@ -1600,11 +1635,12 @@ func TestValidatePrompt_CaseSensitive_Uppercase(t *testing.T) {
 
 	result, err := validator.ValidatePrompt("LOGIN")
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "invalid_request", customErr.Code())
 	assert.Equal(t, "Invalid prompt value: LOGIN", customErr.Description())
-	assert.Equal(t, "", result)
+	assert.Empty(t, result)
 }
 
 func TestValidatePrompt_CaseSensitive_MixedCase(t *testing.T) {
@@ -1613,11 +1649,12 @@ func TestValidatePrompt_CaseSensitive_MixedCase(t *testing.T) {
 
 	result, err := validator.ValidatePrompt("Login")
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "invalid_request", customErr.Code())
 	assert.Equal(t, "Invalid prompt value: Login", customErr.Description())
-	assert.Equal(t, "", result)
+	assert.Empty(t, result)
 }
 
 // select_account is a value the specification defines and this server cannot honour, so it is
@@ -1629,12 +1666,13 @@ func TestValidatePrompt_SelectAccountIsKnownButNotSupported(t *testing.T) {
 
 	result, err := validator.ValidatePrompt("select_account")
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "account_selection_required", customErr.Code())
 	assert.Equal(t, "prompt=select_account is not supported: the authorization server cannot ask the end user to select an account.", customErr.Description())
 	assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
-	assert.Equal(t, "", result)
+	assert.Empty(t, result)
 }
 
 func TestValidatePrompt_ConflictNoneWithLogin(t *testing.T) {
@@ -1643,11 +1681,12 @@ func TestValidatePrompt_ConflictNoneWithLogin(t *testing.T) {
 
 	result, err := validator.ValidatePrompt("none login")
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "invalid_request", customErr.Code())
 	assert.Equal(t, "prompt=none cannot be combined with other values", customErr.Description())
-	assert.Equal(t, "", result)
+	assert.Empty(t, result)
 }
 
 func TestValidatePrompt_ConflictNoneWithConsent(t *testing.T) {
@@ -1656,11 +1695,12 @@ func TestValidatePrompt_ConflictNoneWithConsent(t *testing.T) {
 
 	result, err := validator.ValidatePrompt("none consent")
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "invalid_request", customErr.Code())
 	assert.Equal(t, "prompt=none cannot be combined with other values", customErr.Description())
-	assert.Equal(t, "", result)
+	assert.Empty(t, result)
 }
 
 func TestValidatePrompt_ConflictNoneWithLoginConsent(t *testing.T) {
@@ -1669,11 +1709,12 @@ func TestValidatePrompt_ConflictNoneWithLoginConsent(t *testing.T) {
 
 	result, err := validator.ValidatePrompt("none login consent")
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "invalid_request", customErr.Code())
 	assert.Equal(t, "prompt=none cannot be combined with other values", customErr.Description())
-	assert.Equal(t, "", result)
+	assert.Empty(t, result)
 }
 
 func TestValidatePrompt_ConflictLoginNone_OrderMatters(t *testing.T) {
@@ -1683,11 +1724,12 @@ func TestValidatePrompt_ConflictLoginNone_OrderMatters(t *testing.T) {
 	// Order shouldn't matter for conflict detection
 	result, err := validator.ValidatePrompt("login none")
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "invalid_request", customErr.Code())
 	assert.Equal(t, "prompt=none cannot be combined with other values", customErr.Description())
-	assert.Equal(t, "", result)
+	assert.Empty(t, result)
 }
 
 func TestValidatePrompt_InvalidValueInCombination(t *testing.T) {
@@ -1696,11 +1738,12 @@ func TestValidatePrompt_InvalidValueInCombination(t *testing.T) {
 
 	result, err := validator.ValidatePrompt("login foo")
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "invalid_request", customErr.Code())
 	assert.Equal(t, "Invalid prompt value: foo", customErr.Description())
-	assert.Equal(t, "", result)
+	assert.Empty(t, result)
 }
 
 func TestValidateUnsupportedRequestParameters_HasRequest(t *testing.T) {
@@ -1711,8 +1754,9 @@ func TestValidateUnsupportedRequestParameters_HasRequest(t *testing.T) {
 		HasRequest: true,
 	})
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "request_not_supported", customErr.Code())
 	assert.Equal(t, "The request parameter is not supported.", customErr.Description())
 	assert.Equal(t, 400, customErr.HTTPStatus())
@@ -1726,8 +1770,9 @@ func TestValidateUnsupportedRequestParameters_HasRequestURI(t *testing.T) {
 		HasRequestURI: true,
 	})
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "request_uri_not_supported", customErr.Code())
 	assert.Equal(t, "The request_uri parameter is not supported.", customErr.Description())
 	assert.Equal(t, 400, customErr.HTTPStatus())
@@ -1752,7 +1797,8 @@ func TestValidateUnsupportedRequestParameters_BothTrue_RequestWins(t *testing.T)
 		HasRequestURI: true,
 	})
 
-	assert.Error(t, err)
-	customErr := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "request_not_supported", customErr.Code())
 }

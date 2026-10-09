@@ -2,7 +2,6 @@ package apiclient
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -57,7 +56,7 @@ func TestExecutor_ABodyOneByteOverTheCeilingIsRefusedAndNeverDecoded(t *testing.
 	got, err := client.GetSettingsGeneral(context.Background(), charAccessToken)
 	require.Error(t, err)
 	assert.Nil(t, got, "nothing decoded out of an oversized answer")
-	assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge),
+	assert.ErrorIs(t, err, boundedread.ErrResponseTooLarge,
 		"an overrun is its own failure, not a parse failure: got %v", err)
 }
 
@@ -71,7 +70,7 @@ func TestExecutor_AnOversizedAnswerIsNotAnAPIError(t *testing.T) {
 	require.Error(t, err)
 
 	var apiErr *APIError
-	assert.False(t, errors.As(err, &apiErr), "it falls through to the console's generic 500")
+	assert.NotErrorAs(t, err, &apiErr, "it falls through to the console's generic 500")
 }
 
 // An oversized *failure* body is refused on the same terms: parseAPIError never sees a prefix
@@ -82,7 +81,7 @@ func TestExecutor_AnOversizedFailureBodyIsRefusedBeforeClassification(t *testing
 
 	_, err := client.GetSettingsGeneral(context.Background(), charAccessToken)
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge))
+	assert.ErrorIs(t, err, boundedread.ErrResponseTooLarge)
 }
 
 func TestExecutor_MalformedJSONOnASuccessStatusIsADecodeFailure(t *testing.T) {
@@ -93,8 +92,8 @@ func TestExecutor_MalformedJSONOnASuccessStatusIsADecodeFailure(t *testing.T) {
 	assert.Nil(t, got)
 
 	var apiErr *APIError
-	assert.False(t, errors.As(err, &apiErr), "a 200 that will not parse is not the auth server's refusal")
-	assert.False(t, errors.Is(err, boundedread.ErrResponseTooLarge))
+	assert.NotErrorAs(t, err, &apiErr, "a 200 that will not parse is not the auth server's refusal")
+	assert.NotErrorIs(t, err, boundedread.ErrResponseTooLarge)
 }
 
 // The request's cancellation reaches the transport. This is the whole point of carrying a context
@@ -117,7 +116,7 @@ func TestExecutor_ACancelledRequestContextStopsTheCall(t *testing.T) {
 
 	_, err := client.GetSettingsGeneral(ctx, charAccessToken)
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, context.Canceled), "got %v", err)
+	assert.ErrorIs(t, err, context.Canceled, "got %v", err)
 }
 
 func TestExecutor_ARequestDeadlineStopsACallTheAuthServerNeverAnswers(t *testing.T) {
@@ -139,7 +138,7 @@ func TestExecutor_ARequestDeadlineStopsACallTheAuthServerNeverAnswers(t *testing
 	_, err := client.GetSettingsGeneral(ctx, charAccessToken)
 	require.Error(t, err)
 
-	assert.True(t, errors.Is(err, context.DeadlineExceeded), "got %v", err)
+	require.ErrorIs(t, err, context.DeadlineExceeded, "got %v", err)
 	assert.Less(t, time.Since(started), 5*time.Second, "the call returned on its deadline")
 }
 

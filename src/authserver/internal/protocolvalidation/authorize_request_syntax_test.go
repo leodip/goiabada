@@ -231,7 +231,7 @@ func TestValidatePrompt_SelectAccountAndSeparators(t *testing.T) {
 			assert.Equal(t, tc.wantCode, detail.Code())
 			assert.Equal(t, tc.wantMessage, detail.Description())
 			assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
-			assert.Equal(t, "", result)
+			assert.Empty(t, result)
 		})
 	}
 }

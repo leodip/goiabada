@@ -326,16 +326,16 @@ func (s *seeded000055) assertTheKeysRefuseADuplicate(t *testing.T, h *isolatedDB
 	ctx := context.Background()
 
 	err := h.DB.CreateUserConsent(ctx, nil, &record.UserConsent{UserId: s.userA, ClientId: s.client1, Scope: "openid"})
-	assert.ErrorIsf(t, err, data.ErrUniqueViolation, "a second consent for a pair is refused by the key %s", when)
+	require.ErrorIsf(t, err, data.ErrUniqueViolation, "a second consent for a pair is refused by the key %s", when)
 	assert.Lenf(t, consentRows000055(t, h, s.userA, s.client1), 1, "and writes nothing %s", when)
 
 	other := seedClient000055(t, h)
-	assert.NoErrorf(t, h.DB.CreateUserConsent(ctx, nil, &record.UserConsent{UserId: s.userA, ClientId: other, Scope: "openid"}),
+	require.NoErrorf(t, h.DB.CreateUserConsent(ctx, nil, &record.UserConsent{UserId: s.userA, ClientId: other, Scope: "openid"}),
 		"a consent for another pair is accepted %s", when)
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	err = h.DB.CreateUserSessionClient(ctx, nil, &record.UserSessionClient{UserSessionId: s.session1, ClientId: s.client1, Started: now, LastAccessed: now})
-	assert.ErrorIsf(t, err, data.ErrUniqueViolation, "a second association for a pair is refused by the key %s", when)
+	require.ErrorIsf(t, err, data.ErrUniqueViolation, "a second association for a pair is refused by the key %s", when)
 	assert.Lenf(t, sessionClientIds000055(t, h, s.session1, s.client1), 1, "and writes nothing %s", when)
 
 	assert.NoErrorf(t, h.DB.CreateUserSessionClient(ctx, nil, &record.UserSessionClient{UserSessionId: s.session1, ClientId: s.client3, Started: now, LastAccessed: now}),

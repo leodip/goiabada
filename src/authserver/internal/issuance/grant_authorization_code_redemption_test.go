@@ -3,7 +3,6 @@ package issuance
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"log/slog"
 	"testing"
 	"time"
@@ -101,7 +100,7 @@ func TestIssueAuthorizationCodeGrant_ALostClaimMintsNothing(t *testing.T) {
 
 	response, err := issuer.IssueAuthorizationCodeGrant(context.Background(), codeGrantSettings(), code)
 
-	assert.ErrorIs(t, err, ErrCodeNotClaimed)
+	require.ErrorIs(t, err, ErrCodeNotClaimed)
 	assert.Nil(t, response)
 	mockDB.AssertExpectations(t)
 
@@ -126,8 +125,8 @@ func TestIssueAuthorizationCodeGrant_AClaimFailureIsAFault(t *testing.T) {
 
 	response, err := issuer.IssueAuthorizationCodeGrant(context.Background(), codeGrantSettings(), code)
 
-	assert.ErrorIs(t, err, failure)
-	assert.False(t, errors.Is(err, ErrCodeNotClaimed))
+	require.ErrorIs(t, err, failure)
+	require.NotErrorIs(t, err, ErrCodeNotClaimed)
 	assert.Nil(t, response)
 	mockDB.AssertExpectations(t)
 }
@@ -145,7 +144,7 @@ func TestIssueAuthorizationCodeGrant_AFailedMintAfterTheClaimIsAFault(t *testing
 
 	response, err := issuer.IssueAuthorizationCodeGrant(context.Background(), codeGrantSettings(), code)
 
-	assert.ErrorIs(t, err, failure)
+	require.ErrorIs(t, err, failure)
 	assert.Nil(t, response)
 	mockDB.AssertExpectations(t)
 }

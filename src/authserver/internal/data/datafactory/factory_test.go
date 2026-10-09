@@ -345,7 +345,7 @@ func TestOpenDatabase_Dispatch(t *testing.T) {
 				// nothing else, reached sqlitedb.New: dropped on the way, it would open the
 				// in-memory default and write no file at all (#438 decision 4).
 				_, statErr := os.Stat(cfg.DSN)
-				assert.NoErrorf(t, statErr, "SQLite opened the file its DSN names: %s", tc.why)
+				require.NoErrorf(t, statErr, "SQLite opened the file its DSN names: %s", tc.why)
 			} else {
 				require.Errorf(t, err, "the open must fail: %s", tc.why)
 				// Compared against a nil interface rather than through assert.Nil, which reports

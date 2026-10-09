@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // The English sentence each validator.email.* code renders, transcribed from
@@ -56,8 +57,9 @@ func TestValidateEmailAddress(t *testing.T) {
 			if tt.expectedCode == "" {
 				assert.NoError(t, err)
 			} else {
-				assert.Error(t, err)
-				locErr, ok := err.(*i18n.LocalizedError)
+				require.Error(t, err)
+				var locErr *i18n.LocalizedError
+				ok := errors.As(err, &locErr)
 				assert.True(t, ok, "expected *i18n.LocalizedError, got %T", err)
 				if ok {
 					assert.Equal(t, tt.expectedCode, locErr.Code)
@@ -204,7 +206,8 @@ func TestValidateEmailChange_TooLong(t *testing.T) {
 	assertLocalizedError(t, err, i18n.ErrCodeEmailTooLong,
 		emailErrorMessages[i18n.ErrCodeEmailTooLong])
 
-	locErr, ok := err.(*i18n.LocalizedError)
+	var locErr *i18n.LocalizedError
+	ok := errors.As(err, &locErr)
 	assert.True(t, ok)
 	if ok {
 		assert.Equal(t, 60, locErr.Args["max"], "the message must carry the limit for interpolation")
@@ -223,8 +226,9 @@ func TestValidateEmailChange_DatabaseErrorsPropagate(t *testing.T) {
 
 		err := validator.ValidateEmailChange(context.Background(), "new@example.com", subject)
 
-		assert.Error(t, err)
-		_, isLocalized := err.(*i18n.LocalizedError)
+		require.Error(t, err)
+		var localizedError *i18n.LocalizedError
+		isLocalized := errors.As(err, &localizedError)
 		assert.False(t, isLocalized, "a database failure is not a validation error")
 	})
 
@@ -238,8 +242,9 @@ func TestValidateEmailChange_DatabaseErrorsPropagate(t *testing.T) {
 
 		err := validator.ValidateEmailChange(context.Background(), "new@example.com", subject)
 
-		assert.Error(t, err)
-		_, isLocalized := err.(*i18n.LocalizedError)
+		require.Error(t, err)
+		var localizedError *i18n.LocalizedError
+		isLocalized := errors.As(err, &localizedError)
 		assert.False(t, isLocalized)
 	})
 }
@@ -258,9 +263,10 @@ func TestValidateEmailChange_UnresolvableSubjectReturnsError(t *testing.T) {
 
 	err := validator.ValidateEmailChange(context.Background(), "new@example.com", "unknown-subject")
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "subject not found: unknown-subject")
-	_, isLocalized := err.(*i18n.LocalizedError)
+	var localizedError *i18n.LocalizedError
+	isLocalized := errors.As(err, &localizedError)
 	assert.False(t, isLocalized, "an unresolvable subject is not a user-facing validation error")
 }
 
@@ -311,7 +317,7 @@ func TestValidateEmailChange_CarriesTheCallersContextToBothReads(t *testing.T) {
 
 	err := NewEmailValidator(mockDB).ValidateEmailChange(ctx, "new@example.com", "sub-1")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	mockDB.AssertExpectations(t)
 }
 
@@ -323,7 +329,7 @@ func TestValidateEmailChange_AMalformedAddressReachesNoRead(t *testing.T) {
 
 	err := NewEmailValidator(mockDB).ValidateEmailChange(context.Background(), "not-an-address", "sub-1")
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	mockDB.AssertNotCalled(t, "GetUserBySubject", mock.Anything, mock.Anything, mock.Anything)
 	mockDB.AssertNotCalled(t, "GetUserByEmail", mock.Anything, mock.Anything, mock.Anything)
 }

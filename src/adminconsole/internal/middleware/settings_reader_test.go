@@ -32,7 +32,7 @@ func TestSettingsReader_IssuerWithoutSettingsIsEmpty(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.NotPanics(t, func() {
-				assert.Equal(t, "", SettingsReader{}.Issuer(tt.ctx))
+				assert.Empty(t, SettingsReader{}.Issuer(tt.ctx))
 			})
 		})
 	}

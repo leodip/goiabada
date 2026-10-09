@@ -143,6 +143,6 @@ func TestHandleAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	database.AssertExpectations(t)
-	assert.EqualError(t, stub.BodyErr, "the session delete failed", "the body hands its error to the helper, which rolls back")
+	require.EqualError(t, stub.BodyErr, "the session delete failed", "the body hands its error to the helper, which rolls back")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }

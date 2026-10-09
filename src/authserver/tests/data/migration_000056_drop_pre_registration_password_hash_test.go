@@ -104,7 +104,7 @@ func TestMigration000056_DropPreRegistrationPasswordHash(t *testing.T) {
 	require.NoErrorf(t, h.SQL.QueryRow(fmt.Sprintf(
 		`SELECT password_hash FROM pre_registrations WHERE email = '%s'`, email)).Scan(&restored),
 		"read the restored column on %s", dbType())
-	assert.Equalf(t, "", restored,
+	assert.Emptyf(t, restored,
 		"000056's down restores the shape, never the values: the row reads an empty string on %s", dbType())
 
 	rolledBack, err := h.DB.GetPreRegistrationByVerificationCodeHash(ctx, nil, codeHash)

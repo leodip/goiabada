@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestSMTPEncryption_String owns the total String decision 16 of #385 settled for this type. The
@@ -40,21 +41,21 @@ func TestSMTPEncryptionFromString(t *testing.T) {
 	for _, encryption := range all {
 		t.Run(encryption.String(), func(t *testing.T) {
 			parsed, err := SMTPEncryptionFromString(encryption.String())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, encryption, parsed)
 		})
 	}
 
 	t.Run("the empty string is none, for backward compatibility", func(t *testing.T) {
 		parsed, err := SMTPEncryptionFromString("")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, SMTPEncryptionNone, parsed)
 	})
 
 	t.Run("an unrecognized encryption is refused", func(t *testing.T) {
 		for _, raw := range []string{"tls", "SSLTLS", "0", " none"} {
 			parsed, err := SMTPEncryptionFromString(raw)
-			assert.Error(t, err, "%q must not parse", raw)
+			require.Error(t, err, "%q must not parse", raw)
 			assert.Equal(t, SMTPEncryptionNone, parsed, "the refused value returns the zero encryption")
 		}
 	})

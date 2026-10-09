@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 )
@@ -51,7 +52,7 @@ func TestUserHasScopePermission_GrantedViaDirectUserPermission(t *testing.T) {
 
 	result, err := pc.UserHasScopePermission(context.Background(), 1, "backend-svc:read")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, result)
 }
 
@@ -80,7 +81,7 @@ func TestUserHasScopePermission_GrantedViaGroupPermission(t *testing.T) {
 
 	result, err := pc.UserHasScopePermission(context.Background(), 1, "backend-svc:read")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, result)
 }
 
@@ -106,7 +107,7 @@ func TestUserHasScopePermission_GrantedViaSecondGroup(t *testing.T) {
 
 	result, err := pc.UserHasScopePermission(context.Background(), 1, "backend-svc:read")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, result)
 }
 
@@ -130,7 +131,7 @@ func TestUserHasScopePermission_DeniedWhenNeitherUserNorGroupHasIt(t *testing.T)
 
 	result, err := pc.UserHasScopePermission(context.Background(), 1, "backend-svc:read")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, result)
 }
 
@@ -156,7 +157,7 @@ func TestUserHasScopePermission_DeniedWhenIdentifierMatchesButResourceDiffers(t 
 
 	result, err := pc.UserHasScopePermission(context.Background(), 1, "backend-svc:read")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, result, "holding the same permission identifier on a different resource must not grant access")
 }
 
@@ -168,7 +169,7 @@ func TestUserHasScopePermission_UserNotFound(t *testing.T) {
 
 	result, err := pc.UserHasScopePermission(context.Background(), 42, "backend-svc:read")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, result, "a missing user must be denied")
 }
 
@@ -195,7 +196,7 @@ func TestUserHasScopePermission_MalformedScope(t *testing.T) {
 			result, err := pc.UserHasScopePermission(context.Background(), 1, tc.scope)
 
 			assert.False(t, result)
-			assert.Error(t, err)
+			require.Error(t, err)
 			assert.Contains(t, err.Error(), "invalid scope format")
 		})
 	}
@@ -214,7 +215,7 @@ func TestUserHasScopePermission_SeparatorOnlyScopeIsDenied(t *testing.T) {
 
 	result, err := pc.UserHasScopePermission(context.Background(), 1, ":")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, result)
 }
 
@@ -232,7 +233,7 @@ func TestUserHasScopePermission_DeniedWhenResourceDoesNotExist(t *testing.T) {
 
 	result, err := pc.UserHasScopePermission(context.Background(), 1, "ghost:read")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, result, "an unknown resource must be denied")
 }
 
@@ -250,7 +251,7 @@ func TestUserHasScopePermission_DeniedWhenPermissionIdentifierNotOnResource(t *t
 
 	result, err := pc.UserHasScopePermission(context.Background(), 1, "backend-svc:delete")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, result, "a permission identifier not defined on the resource must be denied")
 }
 
@@ -320,7 +321,7 @@ func TestUserHasScopePermission_DatabaseErrorsPropagate(t *testing.T) {
 
 			result, err := pc.UserHasScopePermission(context.Background(), 1, "backend-svc:read")
 
-			assert.Error(t, err)
+			require.Error(t, err)
 			assert.False(t, result, "an error must never produce a grant")
 		})
 	}
@@ -340,9 +341,9 @@ func TestFilterOutScopes_NilUser(t *testing.T) {
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "backend-svc:read", nil)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "user is nil")
-	assert.Equal(t, "", result)
+	assert.Empty(t, result)
 }
 
 // OIDC and offline_access scopes are returned without any database lookup.
@@ -371,7 +372,7 @@ func TestFilterOutScopes_OidcAndOfflineAccessBypassPermissionCheck(t *testing.T)
 
 			result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), tc.scope, &record.User{Id: 1})
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.want, result)
 		})
 	}
@@ -383,8 +384,8 @@ func TestFilterOutScopes_EmptyScope(t *testing.T) {
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "", &record.User{Id: 1})
 
-	assert.NoError(t, err)
-	assert.Equal(t, "", result)
+	require.NoError(t, err)
+	assert.Empty(t, result)
 }
 
 func TestFilterOutScopes_KeepsAuthorizedStripsUnauthorized(t *testing.T) {
@@ -408,7 +409,7 @@ func TestFilterOutScopes_KeepsAuthorizedStripsUnauthorized(t *testing.T) {
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "backend-svc:read backend-svc:write", user)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "backend-svc:read", result, "the unauthorized scope must be dropped")
 }
 
@@ -432,7 +433,7 @@ func TestFilterOutScopes_PreservesOrderAndMixesOidcWithResourceScopes(t *testing
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(),
 		"openid backend-svc:write profile backend-svc:read offline_access", user)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "openid profile backend-svc:read offline_access", result)
 }
 
@@ -444,7 +445,7 @@ func TestFilterOutScopes_HandlesExtraWhitespace(t *testing.T) {
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "  openid   profile  ", &record.User{Id: 1})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "openid profile", result)
 }
 
@@ -457,7 +458,7 @@ func TestFilterOutScopes_DoesNotDeduplicate(t *testing.T) {
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid openid", &record.User{Id: 1})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "openid openid", result)
 }
 
@@ -467,9 +468,9 @@ func TestFilterOutScopes_MalformedScopeElementReturnsError(t *testing.T) {
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid not-a-valid-scope", &record.User{Id: 1})
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid scope format")
-	assert.Equal(t, "", result, "a malformed element must not yield a partial scope string")
+	assert.Empty(t, result, "a malformed element must not yield a partial scope string")
 }
 
 // Every read the filter makes surfaces its error rather than being swallowed into
@@ -545,8 +546,8 @@ func TestFilterOutScopes_DatabaseErrorPropagates(t *testing.T) {
 
 			result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid backend-svc:read", &record.User{Id: 1})
 
-			assert.ErrorIs(t, err, dbErr)
-			assert.Equal(t, "", result)
+			require.ErrorIs(t, err, dbErr)
+			assert.Empty(t, result)
 		})
 	}
 }
@@ -571,7 +572,7 @@ func TestFilterOutScopes_StripsEveryResourceScopeWhenUserNotInDatabase(t *testin
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(),
 		"openid backend-svc:read backend-svc:write offline_access", callersCopy)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "openid offline_access", result)
 }
 
@@ -613,7 +614,7 @@ func TestFilterOutScopes_LoadsTheUserAndGrantsOnce(t *testing.T) {
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(),
 		"openid backend-svc:read ghost:read backend-svc:write billing-api:read backend-svc:delete", callersCopy)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "openid backend-svc:read billing-api:read", result)
 	assert.Empty(t, callersCopy.Permissions, "the caller's struct must not be mutated")
 	assert.Empty(t, callersCopy.Groups, "the caller's struct must not be mutated")
@@ -634,7 +635,7 @@ func TestFilterOutScopes_UnresolvedScopesNeverReadTheUser(t *testing.T) {
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid ghost:read backend-svc:delete", &record.User{Id: 1})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "openid", result)
 	mockDB.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -649,9 +650,9 @@ func TestFilterOutScopes_UppercaseOfflineAccessIsNotExempt(t *testing.T) {
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid OFFLINE_ACCESS", &record.User{Id: 1})
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid scope format")
-	assert.Equal(t, "", result)
+	assert.Empty(t, result)
 }
 
 // =============================================================================
@@ -718,7 +719,7 @@ func TestResolveScope_Outcomes(t *testing.T) {
 
 			resolution, err := ResolveScope(context.Background(), mockDB, tc.scope)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.want, resolution.Outcome)
 			assert.Equal(t, tc.wantResource, resolution.ResourceIdentifier)
 			assert.Equal(t, tc.wantPerm, resolution.PermissionIdentifier)
@@ -767,7 +768,7 @@ func TestIsResourceScope(t *testing.T) {
 				return
 			}
 			resolution, err := ResolveScope(context.Background(), datamocks.NewDatabase(t), tc.scope)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, ScopeMalformed, resolution.Outcome)
 		})
 	}
@@ -829,7 +830,7 @@ func TestUserHasScopePermission_CarriesTheCallersContextToEveryRead(t *testing.T
 
 	granted, err := pc.UserHasScopePermission(ctx, 1, "backend-svc:read")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, granted)
 	mockDB.AssertExpectations(t)
 }
@@ -859,7 +860,7 @@ func TestFilterOutScopesWhereUserIsNotAuthorized_CarriesTheCallersContextAndSkip
 
 	filtered, err := pc.FilterOutScopesWhereUserIsNotAuthorized(ctx, "openid backend-svc:read", user)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "openid backend-svc:read", filtered)
 	mockDB.AssertExpectations(t)
 }

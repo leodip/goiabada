@@ -57,7 +57,7 @@ func TestLogSessionKeysNotConfigured_IsOneRecordCarryingTheErrorAndTheRemedy(t *
 		"the console cannot start and somebody has to act, which is exactly what Error means")
 
 	logged, _ := records[0].Attrs["error"].(error)
-	require.NotNil(t, logged, "the validator's error rides as a value, not concatenated into the message")
+	require.Error(t, logged, "the validator's error rides as a value, not concatenated into the message")
 	assert.Contains(t, logged.Error(), "128 hex characters",
 		"which of the two keys is wrong is the whole content of this record")
 
@@ -97,6 +97,6 @@ func TestLogSessionKeysNotConfigured_APreviousPairIsARotationMistake(t *testing.
 	assert.NotContains(t, records[0].Attrs, "required", "the current keys are not what is wrong")
 	assert.NotContains(t, records[0].Attrs, "generate_with")
 	logged, _ := records[0].Attrs["error"].(error)
-	require.NotNil(t, logged)
+	require.Error(t, logged)
 	assert.Contains(t, logged.Error(), "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS is required when")
 }

@@ -73,7 +73,7 @@ func TestAuthContextFields_EveryFieldIsClassifiedOnce(t *testing.T) {
 	for _, name := range declared {
 		inRequest := slices.Contains(requestFields, name)
 		inAttempt := slices.Contains(attemptFields, name)
-		assert.Truef(t, inRequest != inAttempt,
+		assert.NotEqualf(t, inRequest, inAttempt,
 			"AuthContext.%s must be in exactly one of requestFields and attemptFields (request: %v, attempt: %v)",
 			name, inRequest, inAttempt)
 	}

@@ -460,7 +460,7 @@ func TestRateLimitCounters_TheOlderWindowCannotChargeOnceTheNewerHasAdmitted(t *
 	assert.True(t, newerResult.admitted, "the newer window's reservation was refused with one slot left")
 	assert.False(t, olderResult.admitted,
 		"the older window took a slot after the newer window had admitted against its count")
-	assert.ErrorIs(t, olderResult.err, data.ErrRateLimitWindowMoved,
+	require.ErrorIs(t, olderResult.err, data.ErrRateLimitWindowMoved,
 		"the older window's reservation was not told its window had moved on")
 
 	curr, prev, err := database.GetRateLimitCounts(ctx, nil, keyHash, w1, w0)
@@ -556,8 +556,8 @@ func TestRateLimitCounters_AnEmptyKeyHashIsRefused(t *testing.T) {
 	w0, _, w2 := rateLimitWindows()
 
 	_, err := database.ReserveRateLimitHit(ctx, "", w0, w0.Add(-15*time.Minute), w2, func(int, int) bool { return true })
-	assert.Error(t, err)
-	assert.Error(t, database.RefundRateLimitHit(ctx, nil, "", w0))
+	require.Error(t, err)
+	require.Error(t, database.RefundRateLimitHit(ctx, nil, "", w0))
 	_, _, err = database.GetRateLimitCounts(ctx, nil, "", w0, w0.Add(-15*time.Minute))
 	assert.Error(t, err)
 }

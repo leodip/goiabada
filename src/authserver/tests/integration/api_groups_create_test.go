@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHandleGroupCreatePost_Success(t *testing.T) {
@@ -35,7 +36,7 @@ func TestHandleGroupCreatePost_Success(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify response structure
 	assert.Contains(t, response, "group")
@@ -131,7 +132,7 @@ func TestHandleGroupCreatePost_ValidationErrors(t *testing.T) {
 
 			var response map[string]interface{}
 			err := json.NewDecoder(resp.Body).Decode(&response)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Contains(t, response["error_description"].(string), tc.expectedError)
 		})
 	}
@@ -149,7 +150,7 @@ func TestHandleGroupCreatePost_DuplicateGroupIdentifier(t *testing.T) {
 		IncludeInAccessToken: false,
 	}
 	err := database.CreateGroup(context.Background(), nil, existingGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, existingGroup.Id)
 	}()
@@ -171,7 +172,7 @@ func TestHandleGroupCreatePost_DuplicateGroupIdentifier(t *testing.T) {
 
 	var response map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, response["error_description"].(string), "The group identifier is already in use")
 }
 
@@ -198,12 +199,12 @@ func TestHandleGroupCreatePost_AngleBracketsRejected(t *testing.T) {
 
 	var errResp api.ErrorResponse
 	err := json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "validator.description.angle_brackets", errResp.ErrorCode)
 
 	// Nothing was created.
 	stored, err := database.GetGroupByGroupIdentifier(context.Background(), nil, identifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, stored)
 }
 
@@ -228,7 +229,7 @@ func TestHandleGroupCreatePost_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	group := response["group"].(map[string]interface{})
 	assert.Equal(t, `Tom & Jerry said "hi"`, group["description"])
@@ -239,7 +240,7 @@ func TestHandleGroupCreatePost_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	}()
 
 	stored, err := database.GetGroupById(context.Background(), nil, groupId)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `Tom & Jerry said "hi"`, stored.Description)
 }
 
@@ -268,13 +269,13 @@ func TestHandleGroupCreatePost_InvalidJSON(t *testing.T) {
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 	req, err := http.NewRequest("POST", url, strings.NewReader(invalidJSON))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert response
@@ -282,6 +283,6 @@ func TestHandleGroupCreatePost_InvalidJSON(t *testing.T) {
 
 	var response map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, response["error_description"].(string), "Invalid")
 }

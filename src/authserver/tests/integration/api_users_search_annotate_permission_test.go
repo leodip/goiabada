@@ -49,7 +49,7 @@ func TestAPIUsersSearch_AnnotatePermission_Success(t *testing.T) {
 
 	var apiResp api.SearchUsersWithPermissionAnnotationResponse
 	err := json.NewDecoder(resp.Body).Decode(&apiResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Find our users and verify HasPermission
 	var seen1, seen2, seen3 bool
@@ -101,7 +101,7 @@ func TestAPIUsersSearch_AnnotatePermission_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	req, _ := http.NewRequest("GET", u, nil)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }

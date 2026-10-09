@@ -45,7 +45,7 @@ func TestExpectRunInTransaction_HandsTheBodysErrorBackAndRecordsIt(t *testing.T)
 	boom := errors.New("the write failed")
 	err := db.RunInTransaction(context.Background(), func(*sql.Tx) error { return boom })
 
-	assert.ErrorIs(t, err, boom, "the caller sees what the body returned")
+	require.ErrorIs(t, err, boom, "the caller sees what the body returned")
 	assert.ErrorIs(t, stub.BodyErr, boom,
 		"BodyErr is how a test says the helper rolled back, which it does exactly when the body errs")
 }
@@ -62,7 +62,7 @@ func TestExpectRunInTransactionThenFail_ReportsTheCommitFailureAfterABodyThatDid
 	})
 
 	assert.True(t, ran, "the body runs: the commit is what fails, not the transaction")
-	assert.ErrorIs(t, err, commitErr, "the caller sees the commit's error")
+	require.ErrorIs(t, err, commitErr, "the caller sees the commit's error")
 	assert.NoError(t, stub.BodyErr, "the body committed, so there is no body error to record")
 }
 
@@ -116,7 +116,7 @@ func TestExpectRunInTransactionRefused_NeverRunsTheBody(t *testing.T) {
 		return nil
 	})
 
-	assert.ErrorIs(t, err, beginErr)
+	require.ErrorIs(t, err, beginErr)
 	assert.False(t, ran, "the transaction never opened, so nothing inside it ran")
 }
 
@@ -161,8 +161,8 @@ func TestExpectRunInTransactionRerun_RunsTheBodyTwiceAndAnswersWithTheSecondAtte
 			return nil
 		})
 
-		assert.ErrorIs(t, err, boom, "the caller sees the attempt that ran last")
-		assert.ErrorIs(t, stub.BodyErr, boom)
+		require.ErrorIs(t, err, boom, "the caller sees the attempt that ran last")
+		require.ErrorIs(t, stub.BodyErr, boom)
 		assert.Equal(t, []string{"begin", "body", "rollback", "begin", "body", "rollback"}, edges)
 	})
 }

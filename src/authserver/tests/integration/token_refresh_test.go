@@ -92,7 +92,7 @@ func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -104,7 +104,7 @@ func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 
@@ -270,7 +270,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 	}
 
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	client.ClientSecretEncrypted = clientSecretEncrypted
 
 	err = database.CreateClient(context.Background(), nil, client)
@@ -341,7 +341,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 	// Create a new client
 	wrongClientSecret := fake.Password(32)
 	wrongClientSecretEncrypted, err := dataCipher.Encrypt(wrongClientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	wrongClient := &record.Client{
 		ClientIdentifier:         "wrong-client-" + fake.LetterN(8),
@@ -353,7 +353,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 		ClientSecretEncrypted:    wrongClientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, wrongClient)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Now try to use the refresh token with the wrong client
 	formData = url.Values{
@@ -434,7 +434,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -445,7 +445,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create a redirect URI for the client
 	redirectUri := &record.RedirectURI{
@@ -453,12 +453,12 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create a user
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
@@ -466,7 +466,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create a resource and permission, and assign it to the user
 	resource := createResource(t)
@@ -488,7 +488,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		"&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destUrl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Follow redirects and authenticate
@@ -544,11 +544,11 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 
 	// Remove the consent
 	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, consent)
 
 	err = database.DeleteUserConsent(context.Background(), nil, consent.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Attempt to use the refresh token
 	formData = url.Values{
@@ -568,7 +568,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -579,18 +579,18 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
@@ -598,7 +598,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resource := createResource(t)
 	permission := createPermission(t, resource.Id)
@@ -619,7 +619,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 		"&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destUrl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
@@ -747,7 +747,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 
 	// Verify that the original refresh token is now marked as used (revoked)
 	revokedRefreshToken, err := database.GetRefreshTokenByJti(context.Background(), nil, jti)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, revokedRefreshToken)
 	assert.True(t, revokedRefreshToken.Revoked, "The original refresh token should be marked as revoked after use")
 

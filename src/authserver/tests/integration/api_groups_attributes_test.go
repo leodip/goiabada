@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIGroupAttributesGet tests the GET /api/v1/admin/groups/{id}/attributes endpoint
@@ -43,7 +44,7 @@ func TestAPIGroupAttributesGet_Success(t *testing.T) {
 	// Parse response
 	var getResponse api.GetGroupAttributesResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return both attributes
 	assert.Len(t, getResponse.Attributes, 2)
@@ -88,10 +89,10 @@ func TestAPIGroupAttributesGet_EmptyAttributes(t *testing.T) {
 	// Parse response
 	var getResponse api.GetGroupAttributesResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return empty attributes array
-	assert.Len(t, getResponse.Attributes, 0)
+	assert.Empty(t, getResponse.Attributes)
 }
 
 func TestAPIGroupAttributesGet_GroupNotFound(t *testing.T) {
@@ -142,11 +143,11 @@ func TestAPIGroupAttributesGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/attributes"
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -182,7 +183,7 @@ func TestAPIGroupAttributeGet_Success(t *testing.T) {
 	// Parse response
 	var getResponse api.GetGroupAttributeResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return the correct attribute
 	assert.Equal(t, attr.Id, getResponse.Attribute.Id)
@@ -246,11 +247,11 @@ func TestAPIGroupAttributeGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -288,7 +289,7 @@ func TestAPIGroupAttributeCreatePost_Success(t *testing.T) {
 	// Parse response
 	var createResponse api.CreateGroupAttributeResponse
 	err := json.NewDecoder(resp.Body).Decode(&createResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Response should match request
 	assert.Equal(t, createReq.Key, createResponse.Attribute.Key)
@@ -296,7 +297,7 @@ func TestAPIGroupAttributeCreatePost_Success(t *testing.T) {
 	assert.Equal(t, createReq.IncludeInIdToken, createResponse.Attribute.IncludeInIdToken)
 	assert.Equal(t, createReq.IncludeInAccessToken, createResponse.Attribute.IncludeInAccessToken)
 	assert.Equal(t, createReq.GroupId, createResponse.Attribute.GroupId)
-	assert.Greater(t, createResponse.Attribute.Id, int64(0))
+	assert.Positive(t, createResponse.Attribute.Id)
 
 	// Cleanup: Delete created attribute
 	defer func() {
@@ -307,7 +308,7 @@ func TestAPIGroupAttributeCreatePost_Success(t *testing.T) {
 
 	// Verify attribute was created in database
 	createdAttr, err := database.GetGroupAttributeById(context.Background(), nil, createResponse.Attribute.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, createdAttr)
 	assert.Equal(t, createReq.Key, createdAttr.Key)
 	assert.Equal(t, createReq.Value, createdAttr.Value)
@@ -392,13 +393,13 @@ func TestAPIGroupAttributeCreatePost_InvalidRequestBody(t *testing.T) {
 	// Test: Invalid JSON
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes"
 	req, err := http.NewRequest("POST", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
@@ -409,11 +410,11 @@ func TestAPIGroupAttributeCreatePost_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes"
 	req, err := http.NewRequest("POST", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -456,7 +457,7 @@ func TestAPIGroupAttributeUpdatePut_Success(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateGroupAttributeResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Response should reflect updates
 	assert.Equal(t, attr.Id, updateResponse.Attribute.Id)
@@ -467,7 +468,7 @@ func TestAPIGroupAttributeUpdatePut_Success(t *testing.T) {
 
 	// Verify changes were persisted to database
 	updatedAttr, err := database.GetGroupAttributeById(context.Background(), nil, attr.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, updatedAttr)
 	assert.Equal(t, updateReq.Key, updatedAttr.Key)
 	assert.Equal(t, updateReq.Value, updatedAttr.Value)
@@ -605,13 +606,13 @@ func TestAPIGroupAttributeUpdatePut_InvalidRequestBody(t *testing.T) {
 	// Test: Invalid JSON
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
@@ -633,11 +634,11 @@ func TestAPIGroupAttributeUpdatePut_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -670,14 +671,14 @@ func TestAPIGroupAttributeDelete_Success(t *testing.T) {
 	// Parse response
 	var deleteResponse api.SuccessResponse
 	err := json.NewDecoder(resp.Body).Decode(&deleteResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Success response
 	assert.True(t, deleteResponse.Success)
 
 	// Verify attribute was actually deleted from database
 	deletedAttr, err := database.GetGroupAttributeById(context.Background(), nil, attr.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, deletedAttr)
 }
 
@@ -734,11 +735,11 @@ func TestAPIGroupAttributeDelete_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
 	req, err := http.NewRequest("DELETE", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -746,7 +747,7 @@ func TestAPIGroupAttributeDelete_Unauthorized(t *testing.T) {
 
 	// Verify attribute was not deleted
 	stillExists, err := database.GetGroupAttributeById(context.Background(), nil, attr.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, stillExists)
 }
 
@@ -802,7 +803,7 @@ func TestAPIGroupAttribute_AngleBracketsRejected(t *testing.T) {
 		assert.Equal(t, "validator.attribute.value_angle_brackets", errResp.ErrorCode)
 
 		stored, err := database.GetGroupAttributeById(context.Background(), nil, attr.Id)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "active", stored.Value)
 	})
 }
@@ -826,11 +827,11 @@ func TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 
 	var createResponse api.CreateGroupAttributeResponse
 	err := json.NewDecoder(resp.Body).Decode(&createResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, value, createResponse.Attribute.Value)
 
 	stored, err := database.GetGroupAttributeById(context.Background(), nil, createResponse.Attribute.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, value, stored.Value)
 	defer func() { _ = database.DeleteGroupAttribute(context.Background(), nil, createResponse.Attribute.Id) }()
 
@@ -844,10 +845,10 @@ func TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 
 	var updateResponse api.UpdateGroupAttributeResponse
 	err = json.NewDecoder(updateResp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, updated, updateResponse.Attribute.Value)
 
 	stored, err = database.GetGroupAttributeById(context.Background(), nil, createResponse.Attribute.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, updated, stored.Value)
 }

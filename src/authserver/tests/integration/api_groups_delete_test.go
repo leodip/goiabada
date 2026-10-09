@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIGroupDelete tests the DELETE /api/v1/admin/groups/{id} endpoint
@@ -31,7 +32,7 @@ func TestAPIGroupDelete_Success(t *testing.T) {
 
 	// Verify group was actually deleted from database
 	deletedGroup, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, deletedGroup, "Group should be deleted from database")
 }
 
@@ -53,7 +54,7 @@ func TestAPIGroupDelete_SuccessWithMembers(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -63,7 +64,7 @@ func TestAPIGroupDelete_SuccessWithMembers(t *testing.T) {
 		GroupId: testGroup.Id,
 	}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// Note: UserGroup should be automatically deleted when group is deleted
 
 	// Test: Delete group
@@ -76,12 +77,12 @@ func TestAPIGroupDelete_SuccessWithMembers(t *testing.T) {
 
 	// Verify group was actually deleted from database
 	deletedGroup, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, deletedGroup, "Group should be deleted from database")
 
 	// Verify user-group relationship was also deleted
 	userGroups, err := database.GetUserGroupsByUserId(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// Should not contain our deleted group
 	for _, ug := range userGroups {
 		assert.NotEqual(t, testGroup.Id, ug.GroupId, "UserGroup relationship should be deleted")
@@ -136,11 +137,11 @@ func TestAPIGroupDelete_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	req, err := http.NewRequest("DELETE", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -148,7 +149,7 @@ func TestAPIGroupDelete_Unauthorized(t *testing.T) {
 
 	// Verify group still exists (not deleted)
 	existingGroup, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, existingGroup, "Group should still exist after unauthorized delete attempt")
 }
 
@@ -169,7 +170,7 @@ func TestAPIGroupDelete_InvalidToken(t *testing.T) {
 
 	// Verify group still exists (not deleted)
 	existingGroup, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, existingGroup, "Group should still exist after invalid token delete attempt")
 }
 
@@ -188,7 +189,7 @@ func TestAPIGroupDelete_WithGroupPermissions(t *testing.T) {
 		ResourceId:           1, // Assuming resource with ID 1 exists
 	}
 	err := database.CreatePermission(context.Background(), nil, testPermission)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeletePermission(context.Background(), nil, testPermission.Id)
 	}()
@@ -198,7 +199,7 @@ func TestAPIGroupDelete_WithGroupPermissions(t *testing.T) {
 		PermissionId: testPermission.Id,
 	}
 	err = database.CreateGroupPermission(context.Background(), nil, groupPermission)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// Note: GroupPermission should be automatically deleted when group is deleted
 
 	// Test: Delete group
@@ -211,12 +212,12 @@ func TestAPIGroupDelete_WithGroupPermissions(t *testing.T) {
 
 	// Verify group was actually deleted from database
 	deletedGroup, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, deletedGroup, "Group should be deleted from database")
 
 	// Verify group-permission relationship was also deleted
 	groupPermissions, err := database.GetGroupPermissionsByGroupId(context.Background(), nil, testGroup.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, groupPermissions, "GroupPermission relationships should be deleted")
 }
 

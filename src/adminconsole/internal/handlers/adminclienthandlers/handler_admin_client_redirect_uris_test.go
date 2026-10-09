@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
@@ -153,7 +154,7 @@ func TestHandleRedirectURIsPost_APIErrorReachesTheBrowser(t *testing.T) {
 
 			var response map[string]string
 			err := json.Unmarshal(rec.Body.Bytes(), &response)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t, tc.wantError, response["error"])
 			assert.Contains(t, response["error_description"], tc.wantDescription)
@@ -222,7 +223,7 @@ func TestHandleRedirectURIsPost_SendsTheLoadedList(t *testing.T) {
 			assert.Equal(t, tc.wantExpected, stub.sent.ExpectedRedirectURIs)
 
 			wire, err := json.Marshal(stub.sent)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if tc.wantExpected == nil {
 				assert.Contains(t, string(wire), `"expectedRedirectURIs":null`)
 			} else if len(tc.wantExpected) == 0 {
@@ -299,7 +300,7 @@ func TestHandleRedirectURIsGet_ResolvesRedirectFlows(t *testing.T) {
 			handler := HandleRedirectURIsGet(httpHelper, httpSession, apiClient)
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
-			assert.NoError(t, httpHelper.err)
+			require.NoError(t, httpHelper.err)
 			assert.NotNil(t, httpHelper.bind, "the handler rendered nothing")
 
 			client := httpHelper.bind["client"]

@@ -63,11 +63,11 @@ func TestMigration000045_AuditLogsRequestId(t *testing.T) {
 	assert.Equalf(t, []string{"request_id"}, index.Columns,
 		"the index is keyed on request_id alone on %s", dbType())
 
-	assert.Equalf(t, "", readRequestId000045(t, h, "written-at-000044"),
+	assert.Emptyf(t, readRequestId000045(t, h, "written-at-000044"),
 		"a row written before the column must read '' on %s, which is what the viewer shows as no request", dbType())
 
 	seedAuditLogWithoutRequestId000045(t, h, "omitting-at-000045")
-	assert.Equalf(t, "", readRequestId000045(t, h, "omitting-at-000045"),
+	assert.Emptyf(t, readRequestId000045(t, h, "omitting-at-000045"),
 		"an insert that names no request_id must be accepted and default to '' on %s", dbType())
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 44), "roll back 000045")

@@ -3,7 +3,6 @@ package apiclient
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -190,7 +189,7 @@ func TestAuthServerClient_EveryMethodAcceptsOnlyTheSuccessStatusItWasWrittenFor(
 			require.Error(t, err, "a 2xx this method does not accept is an error, not a decode")
 
 			var apiErr *APIError
-			require.True(t, errors.As(err, &apiErr), "it arrives as *APIError")
+			require.ErrorAs(t, err, &apiErr, "it arrives as *APIError")
 			assert.Equal(t, other, apiErr.StatusCode)
 		})
 	}
@@ -207,7 +206,7 @@ func TestAuthServerClient_EveryMethodClassifiesANonSuccessThroughParseAPIError(t
 			require.Error(t, err)
 
 			var apiErr *APIError
-			require.True(t, errors.As(err, &apiErr))
+			require.ErrorAs(t, err, &apiErr)
 			assert.Equal(t, "the.error.code", apiErr.Code)
 			assert.Equal(t, "the description", apiErr.Message)
 			assert.Equal(t, http.StatusUnprocessableEntity, apiErr.StatusCode)
@@ -231,7 +230,7 @@ func TestAuthServerClient_TheCharacterizationCoversEveryMethod(t *testing.T) {
 		assert.True(t, characterized[name], "%s has no characterization row", name)
 	}
 
-	assert.Equal(t, client.NumMethod(), len(characterized),
+	assert.Len(t, characterized, client.NumMethod(),
 		"every row names a method of *AuthServerClient and every method has a row")
 }
 
@@ -304,7 +303,7 @@ func TestAuthServerClient_ThreeMethodsDiscardTheirBodyReadError(t *testing.T) {
 		require.Error(t, err)
 
 		var apiErr *APIError
-		require.True(t, errors.As(err, &apiErr))
+		require.ErrorAs(t, err, &apiErr)
 		assert.Equal(t, http.StatusForbidden, apiErr.StatusCode)
 	})
 }

@@ -99,7 +99,7 @@ func TestRotator_Rotate_Success(t *testing.T) {
 		"promote",
 		"CreateKeyPair",
 	}, calls)
-	assert.NoError(t, stub.BodyErr)
+	require.NoError(t, stub.BodyErr)
 
 	require.NotNil(t, created)
 	assert.Equal(t, record.KeyStateNext.String(), created.State)
@@ -180,8 +180,8 @@ func TestRotator_Rotate_GuardRefusesBeforeAnyWrite(t *testing.T) {
 
 			err := newTestRotator(database).Rotate(context.Background())
 
-			assert.ErrorIs(t, err, ErrKeySetIncomplete)
-			assert.ErrorIs(t, stub.BodyErr, ErrKeySetIncomplete, "the refusal reaches the helper, which rolls back")
+			require.ErrorIs(t, err, ErrKeySetIncomplete)
+			require.ErrorIs(t, stub.BodyErr, ErrKeySetIncomplete, "the refusal reaches the helper, which rolls back")
 			// The previous key survives the refusal. This is the assertion the old
 			// handler could not have made.
 			database.AssertNotCalled(t, "DeleteKeyPair", mock.Anything, mock.Anything, mock.Anything)
@@ -207,7 +207,7 @@ func TestRotator_Rotate_LosesTheDemotion(t *testing.T) {
 
 	err := newTestRotator(database).Rotate(context.Background())
 
-	assert.ErrorIs(t, err, ErrRotationInProgress)
+	require.ErrorIs(t, err, ErrRotationInProgress)
 	// A false compare-and-set is not an error, so the promotion must not have been
 	// attempted and nothing may commit: the body hands the refusal to the helper, which
 	// rolls the delete back with it.
@@ -234,7 +234,7 @@ func TestRotator_Rotate_LosesThePromotion(t *testing.T) {
 
 	err := newTestRotator(database).Rotate(context.Background())
 
-	assert.ErrorIs(t, err, ErrRotationInProgress)
+	require.ErrorIs(t, err, ErrRotationInProgress)
 	database.AssertNotCalled(t, "CreateKeyPair", mock.Anything, mock.Anything, mock.Anything)
 	assert.ErrorIs(t, stub.BodyErr, ErrRotationInProgress)
 }
@@ -323,10 +323,10 @@ func TestRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 			// A genuine failure is neither refusal: the handler maps anything that is
 			// not a sentinel to a 500, and reporting a race that did not happen would
 			// tell an operator to stop retrying for the wrong reason.
-			assert.NotErrorIs(t, err, ErrRotationInProgress)
-			assert.NotErrorIs(t, err, ErrKeySetIncomplete)
+			require.NotErrorIs(t, err, ErrRotationInProgress)
+			require.NotErrorIs(t, err, ErrKeySetIncomplete)
 			// The failure reached the helper from the body, so the helper rolled back.
-			assert.Error(t, stub.BodyErr)
+			require.Error(t, stub.BodyErr)
 			assert.Equal(t, err, stub.BodyErr, "the body's error is returned to the caller unchanged")
 		})
 	}
@@ -360,7 +360,7 @@ func TestRotator_Rotate_ATransactionThatCannotOpenIsReported(t *testing.T) {
 
 	datamocks.ExpectRunInTransactionRefused(database, failure)
 
-	assert.ErrorIs(t, newTestRotator(database).Rotate(context.Background()), failure)
+	require.ErrorIs(t, newTestRotator(database).Rotate(context.Background()), failure)
 	database.AssertNotCalled(t, "GetAllSigningKeys", mock.Anything, mock.Anything)
 }
 

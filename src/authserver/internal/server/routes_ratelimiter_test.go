@@ -29,6 +29,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes makes the claim neither the
@@ -136,7 +137,7 @@ func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Serv
 	t.Helper()
 
 	passwordHash, err := passwordhash.Hash("the account's real password")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	database := datamocks.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(routesTestSettings(), nil).Maybe()
@@ -240,7 +241,7 @@ func otpCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
 
 	r := httptest.NewRequest(http.MethodGet, "/auth/otp", nil)
 	sess, err := s.sessionStore.Get(r, sessionkeys.AuthServerSessionName)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	authContext, err := json.Marshal(ceremony.AuthContext{
 		AuthState:  ceremony.AuthStateLevel2OTP,
@@ -249,12 +250,12 @@ func otpCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
 		ClientId:   routesTestClientId,
 		OTPKeyURL:  routesTestOTPKeyURL,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	sess.Values[sessionkeys.AuthContext] = string(authContext)
 
 	recorder := httptest.NewRecorder()
-	assert.NoError(t, s.sessionStore.Save(r, recorder, sess))
+	require.NoError(t, s.sessionStore.Save(r, recorder, sess))
 
 	cookies := recorder.Result().Cookies()
 	assert.Len(t, cookies, 1)

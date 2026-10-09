@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql/driver"
-	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -213,7 +211,7 @@ func TestMain_MigrateStopsCleanlyOnSIGINT(t *testing.T) {
 	require.Truef(t, signalled, "migrate never printed its plan\nstdout: %s\nstderr: %s", printed.String(), stderr.String())
 
 	var exitErr *exec.ExitError
-	require.Truef(t, errors.As(err, &exitErr), "a stop short of the target is not success: %v\n%s", err, printed.String())
+	require.ErrorAsf(t, err, &exitErr, "a stop short of the target is not success: %v\n%s", err, printed.String())
 	require.Equalf(t, 1, exitErr.ExitCode(), "a signal handled, not one that killed the process\n%s", printed.String())
 
 	// The plan is printed before the runner takes the lock, so on a slow run (-race) the signal can
@@ -233,6 +231,6 @@ func TestMain_MigrateStopsCleanlyOnSIGINT(t *testing.T) {
 	reached, err := strconv.Atoi(match[1])
 	require.NoError(t, err)
 	assert.False(t, dirty, "the schema is left clean")
-	assert.Equal(t, reached, version, fmt.Sprintf("the schema is at the version printed\n%s", printed.String()))
+	assert.Equal(t, reached, version, "the schema is at the version printed\n%s", printed.String())
 	assert.Less(t, version, head(m), "the stop landed inside the chain")
 }

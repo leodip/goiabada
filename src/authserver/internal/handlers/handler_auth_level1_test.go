@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -28,7 +29,7 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		handler := HandleAuthLevel1Get(pageRenderer, ceremonyStore, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -38,7 +39,7 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == expectedError
+			return errors.Is(err, expectedError)
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
@@ -55,7 +56,7 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		handler := HandleAuthLevel1Get(pageRenderer, ceremonyStore, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -83,7 +84,7 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		handler := HandleAuthLevel1Get(pageRenderer, ceremonyStore, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -120,7 +121,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -129,7 +130,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, assert.AnError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == assert.AnError
+			return errors.Is(err, assert.AnError)
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
@@ -148,7 +149,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -181,7 +182,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -243,7 +244,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req = withSessionSettings(req)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), "test-session"))
 		rr := httptest.NewRecorder()
@@ -281,7 +282,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 

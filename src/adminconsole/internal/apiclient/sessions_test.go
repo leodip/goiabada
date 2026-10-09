@@ -160,7 +160,7 @@ func TestAuthServerClient_SessionListsAcceptALegacyEmptyUserAgent(t *testing.T) 
 			sessions, err := method.call(client)
 			require.NoError(t, err)
 			require.Len(t, sessions, 1)
-			assert.Equal(t, "", sessions[0].UserAgent)
+			assert.Empty(t, sessions[0].UserAgent)
 		})
 	}
 }

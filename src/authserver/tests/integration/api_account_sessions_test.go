@@ -32,7 +32,7 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, testClient)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	s1 := createTestUserSession(t, user.Id, fake.UUID())
@@ -55,12 +55,12 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 
 	var out api.GetUserSessionsResponse
 	err = json.NewDecoder(resp.Body).Decode(&out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(out.Sessions), 1)
 
 	foundCurrent := false
 	for _, s := range out.Sessions {
-		assert.Greater(t, s.Id, int64(0))
+		assert.Positive(t, s.Id)
 		assert.NotEmpty(t, s.SessionIdentifier)
 		require.NotNil(t, s.Started)
 		require.NotNil(t, s.LastAccessed)
@@ -103,7 +103,7 @@ func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 		UserId:            user.Id,
 	}
 	err := database.CreateUserSession(context.Background(), nil, valid)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteUserSession(context.Background(), nil, valid.Id) }()
 
 	expired := &record.UserSession{
@@ -120,7 +120,7 @@ func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 		UserId:            user.Id,
 	}
 	err = database.CreateUserSession(context.Background(), nil, expired)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteUserSession(context.Background(), nil, expired.Id) }()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions"
@@ -130,7 +130,7 @@ func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 
 	var out api.GetUserSessionsResponse
 	err = json.NewDecoder(resp.Body).Decode(&out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Should not include the expired session identifier
 	for _, s := range out.Sessions {
@@ -153,12 +153,12 @@ func TestAPIAccountSessionDelete_Success(t *testing.T) {
 
 	var out api.SuccessResponse
 	err := json.NewDecoder(resp.Body).Decode(&out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, out.Success)
 
 	// ensure deleted
 	s, err := database.GetUserSessionById(context.Background(), nil, session.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, s)
 }
 
@@ -168,7 +168,7 @@ func TestAPIAccountSessionDelete_ForbiddenOnOtherUsersSession(t *testing.T) {
 	// Create another user and a session for them
 	other := &record.User{Subject: fake.UUID(), Enabled: true, Email: "other-" + fake.UUID()[:8] + "@acctsess.test"}
 	err := database.CreateUser(context.Background(), nil, other)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteUser(context.Background(), nil, other.Id) }()
 
 	otherSession := createTestUserSession(t, other.Id, fake.UUID())
@@ -248,10 +248,10 @@ func TestAPIAccountSessions_UnauthorizedAndScope(t *testing.T) {
 
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	body1, _ := io.ReadAll(resp.Body)
@@ -278,10 +278,10 @@ func TestAPIAccountSessionDelete_UnauthorizedAndInvalidId(t *testing.T) {
 	// No token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/123"
 	req, err := http.NewRequest("DELETE", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 

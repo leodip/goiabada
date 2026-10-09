@@ -712,7 +712,7 @@ func TestLabels_PlatformHintsThatDoNotParseAreAbsent(t *testing.T) {
 			// User-Agent's Windows is not consulted for the OS.
 			assert.Equal(t, "Chrome 120", name)
 			assert.Equal(t, "Desktop", deviceType)
-			assert.Equal(t, "", os)
+			assert.Empty(t, os)
 		})
 	}
 }
@@ -761,7 +761,7 @@ func TestLabels_RepeatedFieldLinesAreJoinedBeforeParsing(t *testing.T) {
 		req.Header.Add("Sec-CH-UA-Platform", `"Linux"`)
 
 		_, _, os := Labels(req)
-		assert.Equal(t, "", os)
+		assert.Empty(t, os)
 	})
 }
 
@@ -905,7 +905,7 @@ func TestLabels_NoUserAgentHeader(t *testing.T) {
 
 	assert.Equal(t, "Unknown", name)
 	assert.Equal(t, "unknown", deviceType)
-	assert.Equal(t, "", os)
+	assert.Empty(t, os)
 }
 
 // Each label is cut to its own column, so no header can make the session insert fail on a
@@ -1089,7 +1089,7 @@ func TestBound(t *testing.T) {
 			got := bound(tc.in, tc.limit)
 
 			assert.Equal(t, tc.want, got)
-			assert.Equal(t, tc.bytes, len(got))
+			assert.Len(t, got, tc.bytes)
 			assert.LessOrEqual(t, len(got), tc.limit)
 			assert.True(t, utf8.ValidString(got), "bound must always return valid UTF-8")
 		})

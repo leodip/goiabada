@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIGroupMembersGet tests the GET /api/v1/admin/groups/{id}/members endpoint
@@ -26,7 +27,7 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 		IncludeInAccessToken: false,
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
@@ -43,7 +44,7 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err = database.CreateUser(context.Background(), nil, testUser1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser1.Id)
 	}()
@@ -57,7 +58,7 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err = database.CreateUser(context.Background(), nil, testUser2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser2.Id)
 	}()
@@ -65,14 +66,14 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 	// Add users to group
 	userGroup1 := &record.UserGroup{UserId: testUser1.Id, GroupId: testGroup.Id}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUserGroup(context.Background(), nil, userGroup1.Id)
 	}()
 
 	userGroup2 := &record.UserGroup{UserId: testUser2.Id, GroupId: testGroup.Id}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUserGroup(context.Background(), nil, userGroup2.Id)
 	}()
@@ -89,7 +90,7 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 	// Parse response
 	var membersResponse api.GetGroupMembersResponse
 	err = json.NewDecoder(resp.Body).Decode(&membersResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return both members
 	assert.Equal(t, 2, membersResponse.Total)
@@ -118,7 +119,7 @@ func TestAPIGroupMembersGet_EmptyGroup(t *testing.T) {
 		IncludeInAccessToken: false,
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
@@ -134,11 +135,11 @@ func TestAPIGroupMembersGet_EmptyGroup(t *testing.T) {
 	// Parse response
 	var membersResponse api.GetGroupMembersResponse
 	err = json.NewDecoder(resp.Body).Decode(&membersResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return empty members
 	assert.Equal(t, 0, membersResponse.Total)
-	assert.Len(t, membersResponse.Members, 0)
+	assert.Empty(t, membersResponse.Members)
 }
 
 func TestAPIGroupMembersGet_Pagination(t *testing.T) {
@@ -151,7 +152,7 @@ func TestAPIGroupMembersGet_Pagination(t *testing.T) {
 		Description:     "Pagination Test Group",
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
@@ -169,12 +170,12 @@ func TestAPIGroupMembersGet_Pagination(t *testing.T) {
 			FamilyName: "User" + strconv.Itoa(i),
 		}
 		err = database.CreateUser(context.Background(), nil, user)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		testUsers = append(testUsers, user)
 
 		userGroup := &record.UserGroup{UserId: user.Id, GroupId: testGroup.Id}
 		err = database.CreateUserGroup(context.Background(), nil, userGroup)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		userGroups = append(userGroups, userGroup)
 	}
 
@@ -196,7 +197,7 @@ func TestAPIGroupMembersGet_Pagination(t *testing.T) {
 
 	var membersResponse api.GetGroupMembersResponse
 	err = json.NewDecoder(resp.Body).Decode(&membersResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return pagination info
 	assert.Equal(t, 3, membersResponse.Total)
@@ -254,7 +255,7 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 		Description:     "Test Group for Adding Member",
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
@@ -268,7 +269,7 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 		FamilyName: "Member",
 	}
 	err = database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -288,12 +289,12 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 	// Parse response
 	var successResponse api.SuccessResponse
 	err = json.NewDecoder(resp.Body).Decode(&successResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, successResponse.Success)
 
 	// Verify user was added to group in database
 	userGroup, err := database.GetUserGroupByUserIdAndGroupId(context.Background(), nil, testUser.Id, testGroup.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, userGroup)
 	assert.Equal(t, testUser.Id, userGroup.UserId)
 	assert.Equal(t, testGroup.Id, userGroup.GroupId)
@@ -312,7 +313,7 @@ func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
 		Description:     "Test Group for Duplicate Member",
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
@@ -326,14 +327,14 @@ func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
 		FamilyName: "User",
 	}
 	err = database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	userGroup := &record.UserGroup{UserId: testUser.Id, GroupId: testGroup.Id}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
 	}()
@@ -360,7 +361,7 @@ func TestAPIGroupMemberAdd_UserNotFound(t *testing.T) {
 		Description:     "Test Group for User Not Found",
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
@@ -403,7 +404,7 @@ func TestAPIGroupMemberAdd_InvalidRequestBody(t *testing.T) {
 		Description:     "Test Group for Invalid Request",
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
@@ -411,13 +412,13 @@ func TestAPIGroupMemberAdd_InvalidRequestBody(t *testing.T) {
 	// Test: Send request with no body
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
 	req, err := http.NewRequest("POST", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return bad request
@@ -435,7 +436,7 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 		Description:     "Test Group for Removing Member",
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
@@ -449,14 +450,14 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 		FamilyName: "Me",
 	}
 	err = database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	userGroup := &record.UserGroup{UserId: testUser.Id, GroupId: testGroup.Id}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test: Remove user from group
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members/" + strconv.FormatInt(testUser.Id, 10)
@@ -470,12 +471,12 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 	// Parse response
 	var successResponse api.SuccessResponse
 	err = json.NewDecoder(resp.Body).Decode(&successResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, successResponse.Success)
 
 	// Verify user was removed from group in database
 	removedUserGroup, err := database.GetUserGroupByUserIdAndGroupId(context.Background(), nil, testUser.Id, testGroup.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, removedUserGroup)
 }
 
@@ -489,7 +490,7 @@ func TestAPIGroupMemberRemove_UserNotInGroup(t *testing.T) {
 		Description:     "Test Group for User Not In Group",
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
@@ -503,7 +504,7 @@ func TestAPIGroupMemberRemove_UserNotInGroup(t *testing.T) {
 		FamilyName: "InGroup",
 	}
 	err = database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -527,7 +528,7 @@ func TestAPIGroupMemberRemove_UserNotFound(t *testing.T) {
 		Description:     "Test Group for Remove User Not Found",
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
@@ -589,7 +590,7 @@ func TestAPIGroupMembers_Unauthorized(t *testing.T) {
 		Description:     "Test Group for Unauthorized",
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
@@ -608,11 +609,11 @@ func TestAPIGroupMembers_Unauthorized(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			url := appConfig.AuthServer.BaseURL + tc.url
 			req, err := http.NewRequest(tc.method, url, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			httpClient := createHttpClient(t)
 			resp, err := httpClient.Do(req)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 
 			// Assert: Should be unauthorized

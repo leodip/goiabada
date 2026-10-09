@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
@@ -320,7 +321,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, int64(1), terminatedPayload["user_id"])
 		assert.Equal(t, int64(7), terminatedPayload["user_session_id"])
 		assert.Equal(t, sessionIdentifier, terminatedPayload["session_identifier"])
-		assert.Equal(t, "", terminatedPayload["logged_in_user"])
+		assert.Contains(t, terminatedPayload, "logged_in_user")
+		assert.Empty(t, terminatedPayload["logged_in_user"])
 		assert.Equal(t, int64(2), terminatedPayload["revoked_code_count"])
 		assert.Equal(t, []string{"rt-of-user-1"}, terminatedPayload["revoked_refresh_token_jtis"])
 
@@ -328,7 +330,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// revocation.TerminateUserSessionTx writes. Without it a handover is the one termination a consumer
 		// watching that stream never sees. Its loggedInUser is empty for the same reason.
 		assert.Equal(t, int64(7), deletedPayload["user_session_id"])
-		assert.Equal(t, "", deletedPayload["logged_in_user"])
+		assert.Contains(t, deletedPayload, "logged_in_user")
+		assert.Empty(t, deletedPayload["logged_in_user"])
 
 		// No audit event before the commit, and the reason before the replacement. An event
 		// written before the transaction commits would attest to a termination that could still
@@ -761,11 +764,11 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// No redirect to /auth/issue, so no code can be minted from this ceremony.
 		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Equal(t, "", rr.Header().Get("Location"))
+		assert.Empty(t, rr.Header().Get("Location"))
 
 		// Nothing committed, nothing deleted, and no replacement session. The browser is left
 		// cookied to the session that is still there, which is the fail-closed direction.
-		assert.ErrorIs(t, stub.BodyErr, deleteError, "the body hands its error to the helper, which rolls back")
+		require.ErrorIs(t, stub.BodyErr, deleteError, "the body hands its error to the helper, which rolls back")
 		assertNotAttempted(t, database, "RevokeCodesBySessionIdentifier",
 			"GetRefreshTokensBySessionIdentifier", "UpdateRefreshToken", "UpdateUserSession")
 		// Eleven mock.Anything, one per parameter. AssertNotCalled compares the whole argument
@@ -884,7 +887,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// No redirect, so nothing is issued on a ceremony left with no session.
 		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Equal(t, "", rr.Header().Get("Location"))
+		assert.Empty(t, rr.Header().Get("Location"))
 
 		// The handover is recorded and the replacement is not, which is the whole shape of this
 		// outcome. started_new_user_session claims a session exists, and none does.
@@ -2983,7 +2986,7 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 				case !u.user.Enabled:
 					assert.Equal(t, http.StatusFound, rr.Code)
 					location, err := rr.Result().Location()
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, "https://example.com/callback", location.Scheme+"://"+location.Host+location.Path)
 					assert.Equal(t, "access_denied", location.Query().Get("error"))
 					assert.Equal(t, "The user account is disabled.", location.Query().Get("error_description"))

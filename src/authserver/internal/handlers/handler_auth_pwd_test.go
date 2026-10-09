@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -35,7 +36,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
@@ -43,7 +44,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == expectedError
+			return errors.Is(err, expectedError)
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
@@ -61,7 +62,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
@@ -92,7 +93,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
@@ -151,7 +152,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
@@ -207,7 +208,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
@@ -341,7 +342,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == expectedError
+			return errors.Is(err, expectedError)
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
@@ -713,7 +714,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		passwordHash, err := passwordhash.Hash("the-right-password")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -877,7 +878,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		password := "testpassword"
 		passwordHash, err := passwordhash.Hash(password)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -985,7 +986,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		password := "testpassword"
 		passwordHash, err := passwordhash.Hash(password)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -1058,7 +1059,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 
 	password := "correct horse battery staple"
 	passwordHash, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	knownAccount := func() *record.User {
 		return &record.User{Id: 1, Enabled: true, Email: email, PasswordHash: passwordHash}

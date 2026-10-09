@@ -8,6 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIClientsGet tests the GET /api/v1/admin/clients endpoint
@@ -27,7 +28,7 @@ func TestAPIClientsGet_Success(t *testing.T) {
 	// Parse response
 	var getResponse api.GetClientsResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return at least the admin console client (system client)
 	assert.GreaterOrEqual(t, len(getResponse.Clients), 1, "Should have at least the admin console client")
@@ -52,11 +53,11 @@ func TestAPIClientsGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -75,8 +76,8 @@ func TestAPIClientGet_Success(t *testing.T) {
 
 	var getResponse api.GetClientsResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
-	assert.Greater(t, len(getResponse.Clients), 0, "Should have at least one client")
+	require.NoError(t, err)
+	assert.NotEmpty(t, getResponse.Clients, "Should have at least one client")
 
 	clientId := getResponse.Clients[0].Id
 
@@ -92,7 +93,7 @@ func TestAPIClientGet_Success(t *testing.T) {
 	// Parse response
 	var getClientResponse api.GetClientResponse
 	err = json.NewDecoder(resp.Body).Decode(&getClientResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return the correct client
 	assert.Equal(t, clientId, getClientResponse.Client.Id)
@@ -158,11 +159,11 @@ func TestAPIClientGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/1"
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized

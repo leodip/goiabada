@@ -29,7 +29,7 @@ func TestHandleHealthCheckGet(t *testing.T) {
 		handler := HandleHealthCheckGet()
 
 		req, err := http.NewRequest("GET", "/health", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 

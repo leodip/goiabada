@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestCheckIdentifier holds the one place a table or index name reaches a catalog query by
@@ -12,7 +13,7 @@ import (
 // by accident.
 func TestCheckIdentifier(t *testing.T) {
 	for _, ok := range []string{"users", "refresh_tokens", "sqlite_autoindex_clients_1", "_x9"} {
-		assert.NoErrorf(t, checkIdentifier("table", ok), "%q is a plain identifier", ok)
+		require.NoErrorf(t, checkIdentifier("table", ok), "%q is a plain identifier", ok)
 	}
 	for _, bad := range []string{"", "users; DROP TABLE clients", "dbo.users", "9lives", "user`s"} {
 		assert.Errorf(t, checkIdentifier("table", bad), "%q is not a plain identifier", bad)
@@ -69,7 +70,7 @@ func TestParseSqliteColumnFacts(t *testing.T) {
 // and the negative case that matters more: the real schema's own DDL must pass, or the
 // guard would refuse every table in the chain.
 func TestSqliteUnrepresentableInDDL(t *testing.T) {
-	assert.NoError(t, sqliteUnrepresentableInDDL(`CREATE TABLE codes (
+	require.NoError(t, sqliteUnrepresentableInDDL(`CREATE TABLE codes (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		code_hash TEXT NOT NULL,
 		description TEXT DEFAULT 'checked out',
@@ -77,10 +78,10 @@ func TestSqliteUnrepresentableInDDL(t *testing.T) {
 		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 	)`, "codes"), "the shape of every table in the chain today")
 
-	assert.ErrorContains(t, sqliteUnrepresentableInDDL(
+	require.ErrorContains(t, sqliteUnrepresentableInDDL(
 		`CREATE TABLE t (n INTEGER CHECK (n > 0))`, "t"),
 		"CHECK constraint", "a column-level CHECK")
-	assert.ErrorContains(t, sqliteUnrepresentableInDDL(
+	require.ErrorContains(t, sqliteUnrepresentableInDDL(
 		`CREATE TABLE t (n INTEGER, CHECK(n > 0))`, "t"),
 		"CHECK constraint", "a table-level CHECK, written without a space")
 	assert.ErrorContains(t, sqliteUnrepresentableInDDL(

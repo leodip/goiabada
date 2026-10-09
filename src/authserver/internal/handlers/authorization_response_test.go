@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Every assertion in this file compares the whole returned string rather than a parsed
@@ -197,12 +198,12 @@ func TestWriteResponseParams(t *testing.T) {
 			result, err := writeResponseParams(tt.redirectURI, tt.params, tt.reserved)
 
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Empty(t, result)
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -234,7 +235,7 @@ func TestWriteResponseParams_ByteExactValues(t *testing.T) {
 			// rule and #109's presence flag is untouched.
 			result, err := writeResponseParams("https://app.example.com/cb", []responseParam{{"state", tt.state}}, nil)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -242,8 +243,8 @@ func TestWriteResponseParams_ByteExactValues(t *testing.T) {
 
 func TestEncodeResponseParams(t *testing.T) {
 	t.Run("An empty slice encodes to the empty string", func(t *testing.T) {
-		assert.Equal(t, "", encodeResponseParams(nil))
-		assert.Equal(t, "", encodeResponseParams([]responseParam{}))
+		assert.Empty(t, encodeResponseParams(nil))
+		assert.Empty(t, encodeResponseParams([]responseParam{}))
 	})
 
 	t.Run("Declaration order is preserved and is not alphabetical", func(t *testing.T) {

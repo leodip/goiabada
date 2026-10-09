@@ -8,7 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/pquerna/otp/totp"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
@@ -29,19 +29,19 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create user with OTP enabled
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	userEmail := fake.Email()
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      "Goiabada",
 		AccountName: userEmail,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:            fake.UUID(),
@@ -52,7 +52,7 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 		OTPEnabled:         true,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Navigate to OTP screen
 	httpClient := createHttpClient(t)
@@ -90,19 +90,19 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create user with OTP enabled
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	userEmail := fake.Email()
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      "Goiabada",
 		AccountName: userEmail,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:            fake.UUID(),
@@ -113,7 +113,7 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 		OTPEnabled:         true,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Navigate to OTP screen
 	httpClient := createHttpClient(t)
@@ -152,19 +152,19 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create user with OTP enabled
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	userEmail := fake.Email()
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      "Goiabada",
 		AccountName: userEmail,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:            fake.UUID(),
@@ -175,7 +175,7 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 		OTPEnabled:         true,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Navigate to OTP screen
 	httpClient := createHttpClient(t)
@@ -210,12 +210,12 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create user WITHOUT OTP (enrollment scenario)
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:      fake.UUID(),
@@ -225,7 +225,7 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 		OTPEnabled:   false, // No OTP yet
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Navigate to OTP screen (will show enrollment page)
 	httpClient := createHttpClient(t)
@@ -263,12 +263,12 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create user WITHOUT OTP (enrollment scenario)
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:      fake.UUID(),
@@ -278,7 +278,7 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 		OTPEnabled:   false,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Navigate to OTP screen (enrollment)
 	httpClient := createHttpClient(t)
@@ -317,12 +317,12 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enrollment(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create user WITHOUT OTP (enrollment scenario)
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:      fake.UUID(),
@@ -332,7 +332,7 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enrollment(t *testing.T) {
 		OTPEnabled:   false,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Navigate to OTP screen (enrollment)
 	httpClient := createHttpClient(t)

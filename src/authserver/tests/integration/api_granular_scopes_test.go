@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // createClientWithGranularScope creates a client with a specific granular permission scope
@@ -19,7 +20,7 @@ import (
 func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (string, *record.Client) {
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "granular-test-client-" + fake.LetterN(8),
@@ -29,15 +30,15 @@ func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (s
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Get authserver resource
 	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Find the specified permission
 	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authServerResource.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var targetPermission *record.Permission
 	for idx, permission := range permissions {
@@ -53,7 +54,7 @@ func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (s
 		ClientId:     client.Id,
 		PermissionId: targetPermission.Id,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Get access token using client credentials flow
 	httpClient := createHttpClient(t)
@@ -91,7 +92,7 @@ func TestGranularScopes_AdminReadCanOnlyReadUserEndpoints(t *testing.T) {
 		GivenName: "TestUser",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -143,7 +144,7 @@ func TestGranularScopes_AdminReadCanOnlyReadClientEndpoints(t *testing.T) {
 		Enabled:          true,
 	}
 	err := database.CreateClient(context.Background(), nil, testClient)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
@@ -240,7 +241,7 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 		GivenName: "TestUser",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -251,7 +252,7 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 		Enabled:          true,
 	}
 	err = database.CreateClient(context.Background(), nil, testClient)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
@@ -299,7 +300,7 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 		GivenName: "TestUser",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -310,7 +311,7 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 		Enabled:          true,
 	}
 	err = database.CreateClient(context.Background(), nil, testClient)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
@@ -358,7 +359,7 @@ func TestGranularScopes_ManageSettingsCanAccessSettingsEndpointsOnly(t *testing.
 		GivenName: "TestUser",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -403,7 +404,7 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 		GivenName: "TestUser",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -414,7 +415,7 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 		Enabled:          true,
 	}
 	err = database.CreateClient(context.Background(), nil, testClient)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
@@ -465,11 +466,11 @@ func TestGranularScopes_NoScopeCannotAccessAdmin(t *testing.T) {
 
 	// Test without any authorization
 	req, err := http.NewRequest("GET", baseURL+"/api/v1/admin/users/search", nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "no token should be unauthorized")
@@ -612,7 +613,7 @@ func TestGranularScopes_UserPermissionsRequireUsersScope(t *testing.T) {
 		GivenName: "TestUser",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -655,7 +656,7 @@ func TestGranularScopes_ClientPermissionsRequireClientsScope(t *testing.T) {
 		Enabled:          true,
 	}
 	err := database.CreateClient(context.Background(), nil, testClient)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()

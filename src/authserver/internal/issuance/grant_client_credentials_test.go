@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIssueClientCredentialsGrant(t *testing.T) {
@@ -93,7 +94,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 
 			response, err := tokenIssuer.IssueClientCredentialsGrant(ctx, settings, tt.client, tt.scope)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, response)
 			assert.Equal(t, "Bearer", response.TokenType)
 			assert.Equal(t, int64(tt.expectedLifetime), response.ExpiresIn)
@@ -116,7 +117,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 				"exp should be the expected lifetime from now")
 
 			_, err = uuidtest.Parse(claims["jti"].(string))
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			mockDB.AssertExpectations(t)
 		})

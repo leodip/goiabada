@@ -74,7 +74,7 @@ func TestMigration000028_CodeHashColumns(t *testing.T) {
 	// Read with raw SQL rather than GetUserById, as the 000027 test does: the seeded row
 	// leaves the nullable string columns as SQL NULL, which the model scanner cannot map
 	// into Go strings. The model mapping is covered by the seam 2 cases in user_test.go.
-	assert.Equal(t, "", readString000028(t, h,
+	assert.Empty(t, readString000028(t, h,
 		fmt.Sprintf("SELECT forgot_password_code_hash FROM users WHERE id = %d", userId)),
 		"a users row that predates the column must land at the dormant ''")
 
@@ -85,7 +85,7 @@ func TestMigration000028_CodeHashColumns(t *testing.T) {
 	// 3b. A pre-registration written without the column lands at '' too. Written after
 	// the migration, since the up migration deletes everything written before it.
 	preRegId := seedPreMigration000028PreRegistration(t, h)
-	assert.Equal(t, "", readString000028(t, h,
+	assert.Empty(t, readString000028(t, h,
 		fmt.Sprintf("SELECT verification_code_hash FROM pre_registrations WHERE id = %d", preRegId)),
 		"a pre_registrations row written without the column must land at the dormant ''")
 
@@ -116,7 +116,7 @@ func assertShape000028(t *testing.T, h *isolatedDB, phase string) {
 		require.Truef(t, exists, "[%s] %s.%s must exist", phase, c.table, c.column)
 		assert.Truef(t, notNull, "[%s] %s.%s must be NOT NULL: database/sql cannot scan NULL into a Go string",
 			phase, c.table, c.column)
-		assert.Equalf(t, "", def, "[%s] %s.%s must default to the empty string, got %q",
+		assert.Emptyf(t, def, "[%s] %s.%s must default to the empty string, got %q",
 			phase, c.table, c.column, def)
 	}
 

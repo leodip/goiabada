@@ -6,7 +6,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAuthPwd_ClientDisplay_ShowDisplayName_WithValue(t *testing.T) {
@@ -28,7 +28,7 @@ func TestAuthPwd_ClientDisplay_ShowDisplayName_WithValue(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Navigate to password screen
 	httpClient := createHttpClient(t)
@@ -66,7 +66,7 @@ func TestAuthPwd_ClientDisplay_ShowDisplayName_Empty(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
@@ -100,7 +100,7 @@ func TestAuthPwd_ClientDisplay_HideDisplayName(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
@@ -133,7 +133,7 @@ func TestAuthPwd_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
@@ -166,7 +166,7 @@ func TestAuthPwd_ClientDisplay_ShowLogo_NoLogo(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
@@ -199,7 +199,7 @@ func TestAuthPwd_ClientDisplay_HideLogo_WithLogo(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
@@ -232,7 +232,7 @@ func TestAuthPwd_ClientDisplay_ShowDescription_WithValue(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
@@ -265,7 +265,7 @@ func TestAuthPwd_ClientDisplay_ShowDescription_Empty(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
@@ -298,7 +298,7 @@ func TestAuthPwd_ClientDisplay_HideDescription(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
@@ -331,7 +331,7 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_WithValue(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
@@ -364,7 +364,7 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_Empty(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
@@ -397,7 +397,7 @@ func TestAuthPwd_ClientDisplay_HideWebsiteUrl(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
@@ -433,7 +433,7 @@ func TestAuthPwd_ClientDisplay_AllEnabled(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
@@ -470,7 +470,7 @@ func TestAuthPwd_ClientDisplay_AllDisabled(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)

@@ -162,7 +162,7 @@ func TestCache_AFailureIsNotCached(t *testing.T) {
 	cache := NewCache(fetcher, time.Hour, metrics.NewRegistry())
 
 	settings, err := cache.Get(context.Background())
-	assert.ErrorIs(t, err, refused)
+	require.ErrorIs(t, err, refused)
 	assert.Nil(t, settings)
 
 	assert.Equal(t, "back", appNameOf(t, cache))
@@ -210,8 +210,8 @@ func TestCache_ConcurrentMissesShareOneFailure(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	close(release)
 
-	assert.ErrorIs(t, await(t, first, "the first waiter").err, refused)
-	assert.ErrorIs(t, await(t, second, "the second waiter").err, refused)
+	require.ErrorIs(t, await(t, first, "the first waiter").err, refused)
+	require.ErrorIs(t, await(t, second, "the second waiter").err, refused)
 	assert.Equal(t, 1, fetcher.fetches())
 
 	assert.Equal(t, "back", appNameOf(t, cache))
@@ -233,10 +233,10 @@ func TestCache_AWaiterWhoseRequestEndsStopsWaitingWhileTheFetchServesTheOthers(t
 
 	cancel()
 	left := await(t, leaving, "the waiter whose request ended")
-	assert.ErrorIs(t, left.err, context.Canceled)
+	require.ErrorIs(t, left.err, context.Canceled)
 	assert.Nil(t, left.settings)
 
-	assert.NoError(t, fetcher.fetchContext(0).Err(),
+	require.NoError(t, fetcher.fetchContext(0).Err(),
 		"the fetch must not end with the request that started it")
 
 	select {

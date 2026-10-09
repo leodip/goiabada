@@ -31,7 +31,7 @@ func TestAPIUserGet_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -48,7 +48,7 @@ func TestAPIUserGet_Success(t *testing.T) {
 	// Parse response
 	var getUserResponse api.GetUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&getUserResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: User data should match
 	assert.Equal(t, testUser.Email, getUserResponse.User.Email)
@@ -108,7 +108,7 @@ func TestAPIUserGet_Unauthorized(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -116,11 +116,11 @@ func TestAPIUserGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -153,7 +153,7 @@ func TestAPIUserCreatePost_Success(t *testing.T) {
 	// Parse response
 	var createResponse api.CreateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&createResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Check for successful creation first
 	if resp.StatusCode != http.StatusCreated {
@@ -180,7 +180,7 @@ func TestAPIUserCreatePost_Success(t *testing.T) {
 
 	// Verify user was actually created in database
 	createdUser, err := database.GetUserById(context.Background(), nil, createResponse.User.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, createdUser)
 	assert.Equal(t, createReq.Email, createdUser.Email)
 }
@@ -201,7 +201,7 @@ func TestAPIUserCreatePost_DuplicateEmail(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, existingUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, existingUser.Id)
 	}()
@@ -295,13 +295,13 @@ func TestAPIUserCreatePost_InvalidRequestBody(t *testing.T) {
 	// Test: Invalid JSON
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/create"
 	req, err := http.NewRequest("POST", url, bytes.NewReader([]byte("invalid json")))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
@@ -319,16 +319,16 @@ func TestAPIUserCreatePost_Unauthorized(t *testing.T) {
 	}
 
 	reqBody, err := json.Marshal(createReq)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/create"
 	req, err := http.NewRequest("POST", url, bytes.NewReader(reqBody))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -350,7 +350,7 @@ func TestAPIUserEnabledPut_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -371,7 +371,7 @@ func TestAPIUserEnabledPut_Success(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: User should now be disabled
 	assert.False(t, updateResponse.User.Enabled)
@@ -379,7 +379,7 @@ func TestAPIUserEnabledPut_Success(t *testing.T) {
 
 	// Verify in database
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, updatedUser.Enabled)
 }
 
@@ -397,7 +397,7 @@ func TestAPIUserEnabledPut_EnableUser(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -417,7 +417,7 @@ func TestAPIUserEnabledPut_EnableUser(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: User should now be enabled
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -472,7 +472,7 @@ func TestAPIUserEnabledPut_InvalidRequestBody(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -480,13 +480,13 @@ func TestAPIUserEnabledPut_InvalidRequestBody(t *testing.T) {
 	// Test: Invalid JSON
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/enabled"
 	req, err := http.NewRequest("PUT", url, bytes.NewReader([]byte("invalid json")))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
@@ -508,7 +508,7 @@ func TestAPIUserDelete_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test: Delete user
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
@@ -522,14 +522,14 @@ func TestAPIUserDelete_Success(t *testing.T) {
 	// Parse response
 	var deleteResponse api.SuccessResponse
 	err = json.NewDecoder(resp.Body).Decode(&deleteResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Success response
 	assert.True(t, deleteResponse.Success)
 
 	// Verify user was actually deleted from database
 	deletedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, deletedUser)
 }
 
@@ -582,7 +582,7 @@ func TestAPIUserDelete_Unauthorized(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -590,11 +590,11 @@ func TestAPIUserDelete_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
 	req, err := http.NewRequest("DELETE", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -602,7 +602,7 @@ func TestAPIUserDelete_Unauthorized(t *testing.T) {
 
 	// Verify user was not deleted
 	stillExists, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, stillExists)
 }
 

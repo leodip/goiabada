@@ -92,7 +92,7 @@ func TestDatabaseBackend_UpdateOfAnAbsentSessionReachesNoInsert(t *testing.T) {
 
 	_, err := testBackend(database, owner).Update(markedSettingsContext(), id, []byte("data"), false)
 
-	assert.ErrorIs(t, err, sessionstore.ErrNotFound)
+	require.ErrorIs(t, err, sessionstore.ErrNotFound)
 	database.AssertNotCalled(t, "CreateBrowserSession", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "TouchBrowserSession", mock.Anything, mock.Anything, mock.Anything,
 		mock.Anything, mock.Anything, mock.Anything)

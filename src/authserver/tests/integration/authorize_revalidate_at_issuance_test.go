@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // The cases in this file are one window seen several ways. /auth/completed establishes that
@@ -66,7 +67,7 @@ func parkCeremonyOnConsentScreen(t *testing.T, responseType string, requestScope
 	t.Helper()
 
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "revalidate-client-" + fake.LetterN(8),
@@ -83,15 +84,15 @@ func parkCeremonyOnConsentScreen(t *testing.T, responseType string, requestScope
 		client.ImplicitGrantEnabled = &implicitOn
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	redirectURI := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	password := fake.Password(10)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:      fake.UUID(),
@@ -100,22 +101,22 @@ func parkCeremonyOnConsentScreen(t *testing.T, responseType string, requestScope
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	for _, scope := range grantScopes {
 		parts := strings.Split(scope, ":")
 		assert.Len(t, parts, 2, "a grantable scope is resource:permission")
 		resource, grantErr := database.GetResourceByResourceIdentifier(context.Background(), nil, parts[0])
-		assert.NoError(t, grantErr)
+		require.NoError(t, grantErr)
 		assert.NotNil(t, resource)
 		permissions, grantErr := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
-		assert.NoError(t, grantErr)
+		require.NoError(t, grantErr)
 		granted := false
 		for i := range permissions {
 			if permissions[i].PermissionIdentifier == parts[1] {
 				grantErr = database.CreateUserPermission(context.Background(), nil,
 					&record.UserPermission{UserId: user.Id, PermissionId: permissions[i].Id})
-				assert.NoError(t, grantErr)
+				require.NoError(t, grantErr)
 				granted = true
 				break
 			}
@@ -140,7 +141,7 @@ func parkCeremonyOnConsentScreen(t *testing.T, responseType string, requestScope
 	}
 
 	resp, err := httpClient.Get(destUrl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	_ = resp.Body.Close()
@@ -190,8 +191,8 @@ func TestSessionExpiredOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	defer func() { _ = parked.consentPage.Body.Close() }()
 
 	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, parked.user.Id)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(sessions), "the ceremony should have created one session before consent")
+	require.NoError(t, err)
+	assert.Len(t, sessions, 1, "the ceremony should have created one session before consent")
 	session := &sessions[0]
 
 	// Backdated rather than deleted, which is the whole point of this case against its sibling:
@@ -202,7 +203,7 @@ func TestSessionExpiredOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	session.Started = longAgo
 	session.LastAccessed = longAgo
 	err = database.UpdateUserSession(context.Background(), nil, session)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resp := postConsent(t, parked.httpClient, parked.consentURL, parked.consentPage, []int{0, 1, 2, 3, 4})
 	defer func() { _ = resp.Body.Close() }()
@@ -252,12 +253,12 @@ func TestPermissionRevokedOnConsentScreen_TokenLosesTheScope(t *testing.T) {
 	// The window: the consent is recorded, the ceremony is one hop from a code, and the
 	// administrator takes the write permission away.
 	permissions, err := database.GetUserPermissionsByUserId(context.Background(), nil, parked.user.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	revoked := false
 	for _, permission := range permissions {
 		if permission.PermissionId == writePermission.Id {
 			err = database.DeleteUserPermission(context.Background(), nil, permission.Id)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			revoked = true
 		}
 	}
@@ -293,7 +294,7 @@ func TestPermissionRevokedOnConsentScreen_TokenLosesTheScope(t *testing.T) {
 	// nothing on its own, because every reader pairs it with a live permission check. The filter
 	// on the consent submission has a different window, which its own case covers.
 	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, parked.user.Id, parked.client.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, consent)
 	assert.Contains(t, consent.Scope, writeScope,
 		"a consent given while the user held the permission is recorded as given")
@@ -319,7 +320,7 @@ func TestRedirectURIDeletedOnConsentScreen_NothingIsDelivered(t *testing.T) {
 	// registered, and its stored redirect URI is still an absolute URI naming a host, which is
 	// what makes the registration check the only thing that can refuse this.
 	err := database.DeleteRedirectURI(context.Background(), nil, parked.redirectURI.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resp = loadPage(t, parked.httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
@@ -334,7 +335,7 @@ func TestRedirectURIDeletedOnConsentScreen_NothingIsDelivered(t *testing.T) {
 	assert.Contains(t, page, "You have not been sent anywhere")
 
 	deletedHost, err := url.Parse(parked.redirectURI.URI)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, page, deletedHost.Host,
 		"the page names the destination the request was stopped from reaching")
 
@@ -376,7 +377,7 @@ func TestRedirectURIDeletedOnConsentScreen_CancelIsNotDeliveredEither(t *testing
 	// The window opens before the submission here rather than after it, because this refusal is
 	// answered by the consent handler itself and never reaches another hop.
 	err := database.DeleteRedirectURI(context.Background(), nil, parked.redirectURI.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// No consent indices is a Cancel, per postConsent.
 	resp := postConsent(t, parked.httpClient, parked.consentURL, parked.consentPage, []int{})
@@ -394,7 +395,7 @@ func TestRedirectURIDeletedOnConsentScreen_CancelIsNotDeliveredEither(t *testing
 		"the refusal must not carry the error response it replaced")
 
 	deletedHost, err := url.Parse(parked.redirectURI.URI)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, page, deletedHost.Host,
 		"the page names the destination the request was stopped from reaching")
 }
@@ -430,12 +431,12 @@ func TestPermissionRevokedBeforeConsentSubmission_ConsentRecordNeverHasIt(t *tes
 	// The window: the consent screen is rendered and on it, with both boxes offered, and the
 	// administrator takes the write permission away before the user clicks Submit.
 	permissions, err := database.GetUserPermissionsByUserId(context.Background(), nil, parked.user.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	revoked := false
 	for _, permission := range permissions {
 		if permission.PermissionId == writePermission.Id {
 			err = database.DeleteUserPermission(context.Background(), nil, permission.Id)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			revoked = true
 		}
 	}
@@ -472,7 +473,7 @@ func TestPermissionRevokedBeforeConsentSubmission_ConsentRecordNeverHasIt(t *tes
 
 	// The half this case exists for, and the half its sibling asserts the opposite of.
 	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, parked.user.Id, parked.client.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, consent)
 	assert.Contains(t, consent.Scope, readScope)
 	assert.NotContains(t, consent.Scope, writeScope,

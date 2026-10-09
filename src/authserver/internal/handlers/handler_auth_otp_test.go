@@ -23,6 +23,7 @@ import (
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 )
@@ -85,7 +86,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == expectedError
+			return errors.Is(err, expectedError)
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
@@ -723,10 +724,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Issuer:      "TestApp",
 			AccountName: "test@test.com",
 		})
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		// The ceremony id is in the body, so the gate above passes and the credential read is
 		// what answers. The passcode is in the query and nowhere else.
@@ -956,10 +957,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Issuer:      "TestApp",
 			AccountName: "test@test.com",
 		})
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -1046,10 +1047,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Issuer:      "TestApp",
 			AccountName: "test@test.com",
 		})
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -1177,10 +1178,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Issuer:      "TestApp",
 			AccountName: "test@test.com",
 		})
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -1230,7 +1231,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// the point: a failed enable rolls back whole, and the counter must not move for an
 		// authenticator that was never established.
 		database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
-		assert.ErrorIs(t, stub.BodyErr, updateError, "the body hands its error to the helper, which rolls back")
+		require.ErrorIs(t, stub.BodyErr, updateError, "the body hands its error to the helper, which rolls back")
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -1255,10 +1256,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Issuer:      "TestApp",
 			AccountName: "test@test.com",
 		})
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -1300,7 +1301,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		assert.ErrorIs(t, stub.BodyErr, incrementError, "the body hands its error to the helper, which rolls back")
+		require.ErrorIs(t, stub.BodyErr, incrementError, "the body hands its error to the helper, which rolls back")
 		database.AssertNotCalled(t, "ClearPendingOTPEnrollment", mock.Anything, mock.Anything, mock.Anything)
 		// Nothing is audited as an enrollment that did not happen, and the ceremony does not
 		// advance: no auth method is added and no context is saved.
@@ -1327,10 +1328,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Issuer:      "TestApp",
 			AccountName: "test@test.com",
 		})
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -1421,10 +1422,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Issuer:      "TestApp",
 			AccountName: "test@test.com",
 		})
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -1514,10 +1515,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Issuer:      "TestApp",
 			AccountName: "test@test.com",
 		})
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -1577,10 +1578,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Issuer:      "TestApp",
 			AccountName: "test@test.com",
 		})
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -1662,9 +1663,9 @@ func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 				testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 			key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
-			assert.Nil(t, err)
+			require.NoError(t, err)
 			otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-			assert.Nil(t, err)
+			require.NoError(t, err)
 
 			form := url.Values{}
 			form.Add(ceremonyIdField, testCeremonyId)
@@ -1731,7 +1732,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	const budget = 5 // failures per 15 minutes, keyed on the user id
 
 	key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	// newHandler wires one handler and its limiter together, the way routes.go does.
 	//
@@ -1809,7 +1810,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	currentCode := func(t *testing.T) string {
 		t.Helper()
 		code, err := totp.GenerateCode(key.Secret(), time.Now())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		return code
 	}
 
@@ -1878,7 +1879,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		// an authenticator at the form legitimately submits several codes in a row.
 		for i := 0; i < budget*3; i++ {
 			otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-			assert.Nil(t, err)
+			require.NoError(t, err)
 			authContext.AuthState = ceremony.AuthStateLevel2OTP
 			assert.Equal(t, http.StatusFound, post(handler, otpCode), "verification %d should succeed", i+1)
 		}

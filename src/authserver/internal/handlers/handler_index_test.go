@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHandleIndexGet(t *testing.T) {
@@ -13,7 +14,7 @@ func TestHandleIndexGet(t *testing.T) {
 		handler := HandleIndexGet(testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 

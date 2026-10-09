@@ -2,7 +2,6 @@ package reqctx
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -87,9 +86,9 @@ func TestReqctx_EachWriterSetsOnlyItsOwnValue(t *testing.T) {
 }
 
 func TestReqctx_SentinelsMatchThroughAWrap(t *testing.T) {
-	assert.True(t, errors.Is(errs.Wrap(ErrNoJwtInfo, "x"), ErrNoJwtInfo))
-	assert.True(t, errors.Is(errs.Wrap(ErrNoSettings, "x"), ErrNoSettings))
-	assert.False(t, errors.Is(ErrNoJwtInfo, ErrNoSettings), "the two sentinels are one error")
+	require.ErrorIs(t, errs.Wrap(ErrNoJwtInfo, "x"), ErrNoJwtInfo)
+	require.ErrorIs(t, errs.Wrap(ErrNoSettings, "x"), ErrNoSettings)
+	assert.NotErrorIs(t, ErrNoJwtInfo, ErrNoSettings, "the two sentinels are one error")
 }
 
 // Every authenticated request carries both values, written by two middlewares in turn, so each key

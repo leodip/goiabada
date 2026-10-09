@@ -45,8 +45,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "unauthorized_client", customErr.Code())
 		assert.Equal(t, "The client associated with the provided client_id does not support client credentials flow.", customErr.Description())
@@ -72,8 +73,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "unauthorized_client", customErr.Code())
 		assert.Equal(t, "A public client is not eligible for the client credentials flow. Please review the client configuration.", customErr.Description())
@@ -99,8 +101,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		// RFC 6749 Section 5.2: invalid_client for missing client credentials
 		assert.Equal(t, "invalid_client", customErr.Code())
@@ -147,7 +150,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, client, grantAs[*ClientCredentialsGrant](t, result).Client)
 		assert.Equal(t, "resource:permission", grantAs[*ClientCredentialsGrant](t, result).Scope)
@@ -184,8 +187,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_client", customErr.Code())
 		assert.Equal(t, "Client authentication failed. Please review your client_secret.", customErr.Description())
@@ -233,7 +237,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, "resource1:read resource2:write", grantAs[*ClientCredentialsGrant](t, result).Scope)
 	})
@@ -272,8 +276,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_scope", customErr.Code())
 		assert.Contains(t, customErr.Description(), "Invalid scope format")
@@ -316,8 +321,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_scope", customErr.Code())
 		assert.Contains(t, customErr.Description(), "Permission to access scope 'resource:read' is not granted to the client")
@@ -357,8 +363,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_scope", customErr.Code())
 		assert.Contains(t, customErr.Description(), "Id token scopes (such as 'openid') are not supported in the client credentials flow")
@@ -399,8 +406,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_scope", customErr.Code())
 		assert.Contains(t, customErr.Description(), "Could not find a resource with identifier 'non_existent_resource'")
@@ -442,8 +450,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_scope", customErr.Code())
 		assert.Contains(t, customErr.Description(), "The resource identified by 'resource' doesn't grant the 'non_existent_permission' permission")
@@ -494,7 +503,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, "resource1:read resource2:write resource3:delete", grantAs[*ClientCredentialsGrant](t, result).Scope)
 	})
@@ -575,7 +584,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		})
 
 		if wantCode == "" {
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if assert.NotNil(t, result) {
 				assert.Equal(t, wantScope, grantAs[*ClientCredentialsGrant](t, result).Scope)
 			}
@@ -583,7 +592,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		assert.Nil(t, result)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		if !assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 			return
 		}
@@ -841,8 +851,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 			})
 
 			assert.Nil(t, result)
-			assert.EqualError(t, err, "database is down")
-			_, isErrorDetail := err.(*oauth.ErrorDetail)
+			require.EqualError(t, err, "database is down")
+			var errorDetail *oauth.ErrorDetail
+			isErrorDetail := errors.As(err, &errorDetail)
 			assert.False(t, isErrorDetail, "a database failure must not be reported as an OAuth error")
 		})
 	}
@@ -936,7 +947,7 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
 				ClientSecret: "valid_secret",
 			})
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if assert.NotNil(t, result) {
 				assert.Equal(t, tc.wantScope, grantAs[*ClientCredentialsGrant](t, result).Scope)
 			}
@@ -973,7 +984,7 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeFromAClientHoldingNothing
 
 	assert.Nil(t, result)
 	var detail *oauth.ErrorDetail
-	require.True(t, errors.As(err, &detail), "the client's mistake is an OAuth error, not a server fault: %v", err)
+	require.ErrorAs(t, err, &detail, "the client's mistake is an OAuth error, not a server fault: %v", err)
 	assert.Equal(t, "invalid_scope", detail.Code())
 	assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 	assert.Equal(t, "The client holds no permissions, so a request without a scope has nothing to grant.", detail.Description())

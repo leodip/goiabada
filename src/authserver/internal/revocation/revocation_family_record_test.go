@@ -103,8 +103,8 @@ func TestRevokeClientGrantsTx_ALostKeyRunsTheRevocationOnceMore(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, 2, writes, "the client write is part of the body that reran")
-		assert.ErrorIs(t, first.BodyErr, data.ErrUniqueViolation)
-		assert.NoError(t, second.BodyErr)
+		require.ErrorIs(t, first.BodyErr, data.ErrUniqueViolation)
+		require.NoError(t, second.BodyErr)
 		assert.Equal(t, []string{"rt-1"}, result.RevokedRefreshTokenJtis)
 		assert.Equal(t, int64(1), result.RevokedCodeCount)
 	})

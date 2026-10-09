@@ -195,7 +195,7 @@ func TestRevokeUserAuthState_RevokingEverything(t *testing.T) {
 		result.RevokedRefreshTokenJtis)
 
 	assert.ElementsMatch(t, []string{revokeKeepSid, revokeOtherSid}, result.TerminatedSessionIdentifiers)
-	assert.Equal(t, "", result.PreservedSessionIdentifier)
+	assert.Empty(t, result.PreservedSessionIdentifier)
 	assert.Equal(t, revokeOldGeneration, result.OldGeneration)
 	assert.Equal(t, revokeNewGeneration, result.NewGeneration)
 

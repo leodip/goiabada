@@ -48,8 +48,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "unauthorized_client", customErr.Code())
 		assert.Equal(t, "The client associated with the provided client_id does not support authorization code flow.", customErr.Description())
@@ -84,8 +85,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_request", customErr.Code())
 		assert.Equal(t, "Missing required code parameter.", customErr.Description())
@@ -121,8 +123,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_request", customErr.Code())
 		assert.Equal(t, "Missing required redirect_uri parameter.", customErr.Description())
@@ -180,8 +183,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_request", customErr.Code())
 		assert.Equal(t, "Missing required code_verifier parameter.", customErr.Description())
@@ -221,8 +225,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, "Code is invalid.", customErr.Description())
@@ -265,8 +270,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, "Invalid redirect_uri.", customErr.Description())
@@ -314,8 +320,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, "The client_id provided does not match the client_id from code.", customErr.Description())
@@ -434,8 +441,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, "Code has expired.", customErr.Description())
@@ -491,8 +499,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, "Invalid code_verifier (PKCE).", customErr.Description())
@@ -550,8 +559,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		// RFC 6749 Section 5.2: invalid_client for missing client credentials
 		assert.Equal(t, "invalid_client", customErr.Code())
@@ -580,7 +590,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		clientSecret := "client_secret"
 		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		client := &record.Client{
 			Id:                       1,
@@ -616,8 +626,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		// RFC 6749 Section 5.2: invalid_client for failed client authentication
 		assert.Equal(t, "invalid_client", customErr.Code())
@@ -677,8 +688,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_request", customErr.Code())
 		assert.Equal(t, "This client is configured as public, which means a client_secret is not required. To proceed, please remove the client_secret from your request.", customErr.Description())
@@ -734,7 +746,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, codeEntity, grantAs[*AuthorizationCodeGrant](t, result).Code)
 	})
@@ -790,7 +802,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, codeEntity, grantAs[*AuthorizationCodeGrant](t, result).Code)
 		assert.True(t, client.IsPublic)
@@ -877,8 +889,9 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		reused, ok := err.(*AuthCodeReusedError)
+		require.Error(t, err)
+		var reused *AuthCodeReusedError
+		ok := errors.As(err, &reused)
 		assert.True(t, ok, "expected *AuthCodeReusedError sentinel, got %T", err)
 		assert.NotNil(t, reused.Code)
 		assert.Equal(t, codeEntity.Id, reused.Code.Id)
@@ -901,7 +914,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		clientSecret := "the_secret"
 		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		client := &record.Client{
 			Id:                       1,
@@ -931,8 +944,9 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		reused, ok := err.(*AuthCodeReusedError)
+		require.Error(t, err)
+		var reused *AuthCodeReusedError
+		ok := errors.As(err, &reused)
 		assert.True(t, ok, "expected *AuthCodeReusedError sentinel, got %T", err)
 		assert.Equal(t, codeEntity.Id, reused.Code.Id)
 	})
@@ -979,7 +993,8 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, err := validator.ValidateTokenRequest(ctx, settings, input)
 
-		_, ok := err.(*AuthCodeReusedError)
+		var authCodeReusedError *AuthCodeReusedError
+		ok := errors.As(err, &authCodeReusedError)
 		assert.True(t, ok, "expected sentinel even with disabled user; user-state checks must be skipped on reuse path. got %T", err)
 	})
 
@@ -1028,9 +1043,11 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, err := validator.ValidateTokenRequest(ctx, settings, input)
 
-		_, isSentinel := err.(*AuthCodeReusedError)
+		var authCodeReusedError *AuthCodeReusedError
+		isSentinel := errors.As(err, &authCodeReusedError)
 		assert.False(t, isSentinel, "wrong client_id must not yield revocation sentinel")
-		detail, ok := err.(*oauth.ErrorDetail)
+		var detail *oauth.ErrorDetail
+		ok := errors.As(err, &detail)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", detail.Code())
 		assert.Contains(t, detail.Description(), "client_id")
@@ -1070,9 +1087,11 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, err := validator.ValidateTokenRequest(ctx, settings, input)
 
-		_, isSentinel := err.(*AuthCodeReusedError)
+		var authCodeReusedError *AuthCodeReusedError
+		isSentinel := errors.As(err, &authCodeReusedError)
 		assert.False(t, isSentinel, "wrong redirect_uri must not yield revocation sentinel")
-		detail, ok := err.(*oauth.ErrorDetail)
+		var detail *oauth.ErrorDetail
+		ok := errors.As(err, &detail)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", detail.Code())
 		assert.Equal(t, "Invalid redirect_uri.", detail.Description())
@@ -1090,7 +1109,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		clientSecret := "the_secret"
 		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		client := &record.Client{
 			Id:                       1,
@@ -1119,9 +1138,11 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, err = validator.ValidateTokenRequest(ctx, settings, input)
 
-		_, isSentinel := err.(*AuthCodeReusedError)
+		var authCodeReusedError *AuthCodeReusedError
+		isSentinel := errors.As(err, &authCodeReusedError)
 		assert.False(t, isSentinel, "missing client_secret must not yield revocation sentinel")
-		detail, ok := err.(*oauth.ErrorDetail)
+		var detail *oauth.ErrorDetail
+		ok := errors.As(err, &detail)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_client", detail.Code())
 	})
@@ -1138,7 +1159,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		clientSecret := "the_secret"
 		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		client := &record.Client{
 			Id:                       1,
@@ -1167,9 +1188,11 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, err = validator.ValidateTokenRequest(ctx, settings, input)
 
-		_, isSentinel := err.(*AuthCodeReusedError)
+		var authCodeReusedError *AuthCodeReusedError
+		isSentinel := errors.As(err, &authCodeReusedError)
 		assert.False(t, isSentinel, "wrong client_secret must not yield revocation sentinel")
-		detail, ok := err.(*oauth.ErrorDetail)
+		var detail *oauth.ErrorDetail
+		ok := errors.As(err, &detail)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_client", detail.Code())
 	})
@@ -1210,9 +1233,11 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, err := validator.ValidateTokenRequest(ctx, settings, input)
 
-		_, isSentinel := err.(*AuthCodeReusedError)
+		var authCodeReusedError *AuthCodeReusedError
+		isSentinel := errors.As(err, &authCodeReusedError)
 		assert.False(t, isSentinel, "wrong code_verifier must not yield revocation sentinel")
-		detail, ok := err.(*oauth.ErrorDetail)
+		var detail *oauth.ErrorDetail
+		ok := errors.As(err, &detail)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", detail.Code())
 		assert.Equal(t, "Invalid code_verifier (PKCE).", detail.Description())
@@ -1250,9 +1275,11 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, err := validator.ValidateTokenRequest(ctx, settings, input)
 
-		_, isSentinel := err.(*AuthCodeReusedError)
+		var authCodeReusedError *AuthCodeReusedError
+		isSentinel := errors.As(err, &authCodeReusedError)
 		assert.False(t, isSentinel, "unknown code must not yield revocation sentinel")
-		detail, ok := err.(*oauth.ErrorDetail)
+		var detail *oauth.ErrorDetail
+		ok := errors.As(err, &detail)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", detail.Code())
 		assert.Equal(t, "Code is invalid.", detail.Description())
@@ -1325,7 +1352,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 
 	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, codeEntity, grantAs[*AuthorizationCodeGrant](t, result).Code)
 }
@@ -1392,8 +1419,9 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
-	assert.Error(t, err)
-	customErr, ok := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	ok := errors.As(err, &customErr)
 	assert.True(t, ok)
 	assert.Equal(t, "invalid_request", customErr.Code())
 	assert.Equal(t, "The code_verifier parameter was provided, but PKCE was not used during authorization.", customErr.Description())
@@ -1455,7 +1483,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) 
 
 	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, codeEntity, grantAs[*AuthorizationCodeGrant](t, result).Code)
 }
@@ -1512,8 +1540,9 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
 	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
-	assert.Error(t, err)
-	customErr, ok := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	ok := errors.As(err, &customErr)
 	assert.True(t, ok)
 	assert.Equal(t, "invalid_request", customErr.Code())
 	assert.Equal(t, "Missing required code_verifier parameter.", customErr.Description())
@@ -1576,8 +1605,9 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
 	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
-	assert.Error(t, err)
-	customErr, ok := err.(*oauth.ErrorDetail)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	ok := errors.As(err, &customErr)
 	assert.True(t, ok)
 	assert.Equal(t, "invalid_grant", customErr.Code())
 	assert.Equal(t, "Invalid code_verifier (PKCE).", customErr.Description())
@@ -1644,7 +1674,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	// Empty string code_challenge should be treated as no PKCE, so this should succeed
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, codeEntity, grantAs[*AuthorizationCodeGrant](t, result).Code)
 }
@@ -1710,7 +1740,8 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_PublicClient_Fails(t *testing.T) {
 	result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 	assert.Nil(t, result)
-	customErr, ok := err.(*oauth.ErrorDetail)
+	var customErr *oauth.ErrorDetail
+	ok := errors.As(err, &customErr)
 	if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
@@ -1728,7 +1759,8 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_PublicClient_Fails(t
 	result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 	assert.Nil(t, result)
-	customErr, ok := err.(*oauth.ErrorDetail)
+	var customErr *oauth.ErrorDetail
+	ok := errors.As(err, &customErr)
 	if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Contains(t, customErr.Description(), "public clients are required to use PKCE")
@@ -1837,7 +1869,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 	})
 
@@ -1849,7 +1881,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 	})
 
@@ -1864,8 +1896,9 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
-		assert.ErrorIs(t, err, lookupErr)
-		_, isErrorDetail := err.(*oauth.ErrorDetail)
+		require.ErrorIs(t, err, lookupErr)
+		var errorDetail *oauth.ErrorDetail
+		isErrorDetail := errors.As(err, &errorDetail)
 		assert.False(t, isErrorDetail, "a database failure must not be reported as an OAuth error")
 	})
 
@@ -1875,8 +1908,9 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
@@ -1982,7 +2016,7 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 	})
 
@@ -1993,11 +2027,12 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		require.True(t, ok)
 		// Matched the way HandleTokenPost matches it, by value against the sentinel, because
 		// that equality is what ties the audit row to the wire message (#241 decision 10).
-		assert.True(t, errors.Is(err, ErrCodeRedirectURIDeregistered))
+		require.ErrorIs(t, err, ErrCodeRedirectURIDeregistered)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 		// Legible rather than the flat "Code is invalid." the refusals above it give. The
@@ -2016,7 +2051,7 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		assert.Nil(t, result)
 		// errors.Is alone: matching the sentinel already establishes the value is an
 		// *ErrorDetail carrying exactly its details, which is what ErrorDetail.Is compares.
-		assert.True(t, errors.Is(err, ErrCodeRedirectURIDeregistered))
+		assert.ErrorIs(t, err, ErrCodeRedirectURIDeregistered)
 	})
 
 	t.Run("a loopback code still matches its registered portless URI", func(t *testing.T) {
@@ -2029,7 +2064,7 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 	})
 
@@ -2044,8 +2079,9 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
-		assert.ErrorIs(t, err, loadErr)
-		_, isErrorDetail := err.(*oauth.ErrorDetail)
+		require.ErrorIs(t, err, loadErr)
+		var errorDetail *oauth.ErrorDetail
+		isErrorDetail := errors.As(err, &errorDetail)
 		assert.False(t, isErrorDetail, "a database failure must not be reported as an OAuth error")
 	})
 
@@ -2063,7 +2099,8 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		require.True(t, ok)
 		assert.Equal(t, "invalid_client", customErr.Code())
 	})
@@ -2080,7 +2117,8 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		require.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, "Invalid code_verifier (PKCE).", customErr.Description())

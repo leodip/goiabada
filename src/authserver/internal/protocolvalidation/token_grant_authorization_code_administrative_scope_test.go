@@ -3,7 +3,6 @@ package protocolvalidation
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"net/http"
 	"testing"
@@ -172,7 +171,7 @@ func TestValidateTokenRequest_AuthorizationCode_AdministrativeScope(t *testing.T
 
 		assert.Nil(t, result)
 		var refused *AdministrativeScopeRefusedError
-		assert.False(t, errors.As(err, &refused))
+		assert.NotErrorAs(t, err, &refused)
 		var customErr *oauth.ErrorDetail
 		require.ErrorAs(t, err, &customErr)
 		assert.Equal(t, "invalid_client", customErr.Code())
@@ -186,7 +185,7 @@ func TestValidateTokenRequest_AuthorizationCode_AdministrativeScope(t *testing.T
 
 		assert.Nil(t, result)
 		var refused *AdministrativeScopeRefusedError
-		assert.False(t, errors.As(err, &refused))
+		assert.NotErrorAs(t, err, &refused)
 		var customErr *oauth.ErrorDetail
 		require.ErrorAs(t, err, &customErr)
 		assert.Equal(t, "invalid_grant", customErr.Code())

@@ -103,7 +103,7 @@ func TestHandleSettingsKeysRotatePost_Success(t *testing.T) {
 	assert.JSONEq(t, `{"success":true}`, rr.Body.String())
 	require.NotNil(t, payload)
 	assert.Equal(t, adminSubject, payload["logged_in_user"])
-	assert.NoError(t, stub.BodyErr, "the body asked the helper to commit")
+	require.NoError(t, stub.BodyErr, "the body asked the helper to commit")
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 }
@@ -134,7 +134,7 @@ func TestHandleSettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 	// refusal, and the body handed the refusal to the helper, which is what rolls it back rather
 	// than committing. auditLogger has no expectation at all, which NewAuditLogger's cleanup turns
 	// into a failure on any Log call.
-	assert.Error(t, stub.BodyErr)
+	require.Error(t, stub.BodyErr)
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 }
@@ -175,7 +175,7 @@ func TestHandleSettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	assert.Contains(t, body.ErrorDescription, rotateKeysRequestId,
 		"the id on the wire and the id in the log have to be the same string")
 
-	assert.Error(t, stub.BodyErr, "the refusal reached the helper, which rolls back")
+	require.Error(t, stub.BodyErr, "the refusal reached the helper, which rolls back")
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 }

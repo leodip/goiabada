@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
@@ -128,7 +129,7 @@ func TestHandleAuthorizeGet_AnAdministrativeScopeTheClientMayNotRequest(t *testi
 				assert.Equal(t, http.StatusFound, rr.Code)
 				assert.True(t, strings.HasPrefix(location, redirectURI+"?"), "answered at the client, got %q", location)
 				parsed, err := url.Parse(location)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, "invalid_scope", parsed.Query().Get("error"))
 				assert.Equal(t, administrativeScopeRefusedDescription, parsed.Query().Get("error_description"))
 				assert.Equal(t, "s1", parsed.Query().Get("state"))

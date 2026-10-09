@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func getUserAccessTokenWithAccountScope_EmailVerification(t *testing.T) (string, *record.User) {
@@ -38,7 +39,7 @@ func TestAPIAccountEmailVerificationSend_Success(t *testing.T) {
 
 	var body api.AccountEmailVerificationSendResponse
 	err := json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, body.EmailVerificationSent)
 	assert.False(t, body.TooManyRequests)
 	assert.False(t, body.EmailVerified)
@@ -46,7 +47,7 @@ func TestAPIAccountEmailVerificationSend_Success(t *testing.T) {
 
 	// DB should have code and issuedAt
 	updated, err := database.GetUserById(context.Background(), nil, u.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, updated.EmailVerificationCodeEncrypted)
 	assert.True(t, updated.EmailVerificationCodeIssuedAt.Valid)
 	assert.WithinDuration(t, time.Now().UTC(), updated.EmailVerificationCodeIssuedAt.Time, 3*time.Second)
@@ -74,9 +75,9 @@ func TestAPIAccountEmailVerificationSend_TooManyRequests(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 	var body api.AccountEmailVerificationSendResponse
 	err := json.NewDecoder(resp2.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, body.TooManyRequests)
-	assert.Greater(t, body.WaitInSeconds, 0)
+	assert.Positive(t, body.WaitInSeconds)
 }
 
 func TestAPIAccountEmailVerificationSend_AlreadyVerified(t *testing.T) {
@@ -87,12 +88,12 @@ func TestAPIAccountEmailVerificationSend_AlreadyVerified(t *testing.T) {
 
 	// Mark user as verified
 	user, err := database.GetUserById(context.Background(), nil, u.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	user.EmailVerified = true
 	user.EmailVerificationCodeEncrypted = nil
 	user.EmailVerificationCodeIssuedAt = sqlNullTimeFalse()
 	err = database.UpdateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification/send"
 	resp := makeAPIRequest(t, "POST", url, accessToken, map[string]string{})
@@ -124,10 +125,10 @@ func TestAPIAccountEmailVerificationSend_SMTPDisabled(t *testing.T) {
 func TestAPIAccountEmailVerificationSend_Unauthorized(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification/send"
 	req, err := http.NewRequest("POST", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	b, _ := io.ReadAll(resp.Body)
@@ -147,9 +148,9 @@ func TestAPIAccountEmailVerification_VerifySuccess(t *testing.T) {
 
 	// Load user and decrypt code
 	user, err := database.GetUserById(context.Background(), nil, u.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	code, err := dataCipher.Decrypt(user.EmailVerificationCodeEncrypted)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: code})
@@ -158,11 +159,11 @@ func TestAPIAccountEmailVerification_VerifySuccess(t *testing.T) {
 
 	var body api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, body.User.EmailVerified)
 
 	updated, err := database.GetUserById(context.Background(), nil, u.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, updated.EmailVerified)
 	assert.Nil(t, updated.EmailVerificationCodeEncrypted)
 	assert.True(t, updated.EmailVerificationCodeIssuedAt.Valid, "the issued-at stays for the resend cooldown")
@@ -192,14 +193,14 @@ func TestAPIAccountEmailVerification_VerifyExpiredCode(t *testing.T) {
 
 	// Manually set a code that is already expired
 	user, err := database.GetUserById(context.Background(), nil, u.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	codePlain := "ABC123"
 	encrypted, err := dataCipher.Encrypt(codePlain)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	user.EmailVerificationCodeEncrypted = encrypted
 	user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Add(-6 * time.Minute), Valid: true}
 	err = database.UpdateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: codePlain})
@@ -217,12 +218,12 @@ func TestAPIAccountEmailVerification_VerifyAlreadyVerified(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
 
 	user, err := database.GetUserById(context.Background(), nil, u.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	user.EmailVerified = true
 	user.EmailVerificationCodeEncrypted = nil
 	user.EmailVerificationCodeIssuedAt = sqlNullTimeFalse()
 	err = database.UpdateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: "ANY"})
@@ -255,12 +256,12 @@ func TestAPIAccountEmailVerification_VerifyInvalidRequestBody(t *testing.T) {
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	req, err := http.NewRequest("POST", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
@@ -271,10 +272,10 @@ func TestAPIAccountEmailVerification_VerifyInvalidRequestBody(t *testing.T) {
 func TestAPIAccountEmailVerification_VerifyUnauthorized(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	req, err := http.NewRequest("POST", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	b, _ := io.ReadAll(resp.Body)

@@ -136,8 +136,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		// RFC 6749 Section 5.2: invalid_client for missing client credentials
 		assert.Equal(t, "invalid_client", customErr.Code())
@@ -178,8 +179,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		// RFC 6749 Section 5.2: invalid_client for failed client authentication
 		assert.Equal(t, "invalid_client", customErr.Code())
@@ -215,8 +217,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_request", customErr.Code())
 		assert.Equal(t, "Missing required refresh_token parameter.", customErr.Description())
@@ -253,8 +256,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, "The refresh token is invalid (token is expired).", customErr.Description())
@@ -294,7 +298,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "the refresh token is invalid because it does not contain a jti claim")
 	})
 
@@ -335,12 +339,13 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
+		require.Error(t, err)
 
 		// UPDATED DELIBERATELY, not a stale assertion: this used to be a plain error,
 		// which JSONError maps to a 500. A validly signed refresh token with no row is
 		// an invalid grant, not a server fault (RFC 6749 Section 5.2, #128).
-		detail, ok := err.(*oauth.ErrorDetail)
+		var detail *oauth.ErrorDetail
+		ok := errors.As(err, &detail)
 		require.Truef(t, ok, "a missing refresh token row must be an ErrorDetail, got %T", err)
 		assert.Equal(t, "invalid_grant", detail.Code())
 		assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
@@ -407,8 +412,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Contains(t, customErr.Description(), "The refresh token is invalid because it does not belong to the client")
@@ -546,8 +552,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, "The refresh token is invalid because the associated session has expired or been terminated.", customErr.Description())
@@ -624,8 +631,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, "The refresh token is invalid because the associated session has expired or been terminated.", customErr.Description())
@@ -692,8 +700,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, "The refresh token is invalid because it has expired (offline_access_max_lifetime).", customErr.Description())
@@ -759,7 +768,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "the refresh token is invalid because it does not contain an offline_access_max_lifetime claim")
 	})
 
@@ -821,7 +830,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "the refresh token is invalid because it does not contain a valid typ claim")
 	})
 
@@ -900,8 +909,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		// invalid_scope since #425: the grant is intact and the request exceeds it, which RFC 6749
 		// section 5.2 names invalid_scope for. It answered invalid_grant before.
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_scope", customErr.Code())
 		assert.Equal(t, "Scope 'address' is not recognized. The original access token does not grant the 'address' permission.",
@@ -980,7 +990,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		grant := grantAs[*RefreshTokenGrant](t, result)
 		assert.Equal(t, refreshToken, grant.RefreshToken)
 		assert.False(t, grant.IsROPC, "a token with a code was minted by the authorization code flow")
@@ -1058,7 +1068,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		mockDB.AssertNumberOfCalls(t, "GetConsentByUserIdAndClientId", 1)
 	})
@@ -1138,7 +1148,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		grant := grantAs[*RefreshTokenGrant](t, result)
 		assert.Equal(t, refreshToken, grant.RefreshToken)
 		assert.False(t, grant.IsROPC, "a token with a code was minted by the authorization code flow")
@@ -1222,8 +1232,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Contains(t, customErr.Description(), "The user has either not given consent to this client or the previously granted consent has been revoked")
@@ -1313,8 +1324,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Contains(t, customErr.Description(), "The user has not consented to the 'email' permission")
@@ -1396,8 +1408,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Contains(t, customErr.Description(), "The user does not have the 'resource:read' permission")
@@ -1491,7 +1504,8 @@ func TestValidateTokenRequest_RefreshToken_NoPKCEUsed_PublicClient_Fails(t *test
 	result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 	assert.Nil(t, result)
-	customErr, ok := err.(*oauth.ErrorDetail)
+	var customErr *oauth.ErrorDetail
+	ok := errors.As(err, &customErr)
 	if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
@@ -1508,7 +1522,8 @@ func TestValidateTokenRequest_RefreshToken_EmptyStringCodeChallenge_PublicClient
 	result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 	assert.Nil(t, result)
-	customErr, ok := err.(*oauth.ErrorDetail)
+	var customErr *oauth.ErrorDetail
+	ok := errors.As(err, &customErr)
 	if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Contains(t, customErr.Description(), "public clients are required to use PKCE")
@@ -1523,7 +1538,7 @@ func TestValidateTokenRequest_RefreshToken_NoPKCEUsed_ConfidentialClient_Succeed
 
 	result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, result)
 }
 
@@ -1555,7 +1570,8 @@ func TestValidateTokenRequest_RefreshToken_PublicClientWithSecret_Fails(t *testi
 	})
 
 	assert.Nil(t, result)
-	customErr, ok := err.(*oauth.ErrorDetail)
+	var customErr *oauth.ErrorDetail
+	ok := errors.As(err, &customErr)
 	if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 		assert.Equal(t, "invalid_request", customErr.Code())
 		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
@@ -2046,7 +2062,8 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 	assert.Nil(t, result)
 	require.Error(t, err)
 
-	detail, ok := err.(*oauth.ErrorDetail)
+	var detail *oauth.ErrorDetail
+	ok := errors.As(err, &detail)
 	require.Truef(t, ok, "an expired refresh token must be an ErrorDetail, got %T", err)
 	assert.Equal(t, "invalid_grant", detail.Code())
 	assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
@@ -2160,7 +2177,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 	})
 
@@ -2170,8 +2187,9 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
@@ -2298,7 +2316,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 	})
 
@@ -2309,7 +2327,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 	})
 
@@ -2323,8 +2341,9 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
-		assert.ErrorIs(t, err, lookupErr)
-		_, isErrorDetail := err.(*oauth.ErrorDetail)
+		require.ErrorIs(t, err, lookupErr)
+		var errorDetail *oauth.ErrorDetail
+		isErrorDetail := errors.As(err, &errorDetail)
 		assert.False(t, isErrorDetail, "a database failure must not be reported as an OAuth error")
 	})
 
@@ -2339,7 +2358,8 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Contains(t, customErr.Description(), "offline_access_max_lifetime")
@@ -2351,8 +2371,9 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
 		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
@@ -2465,7 +2486,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 			// A 500, not a 400: an ErrorDetail here would mean the server told the client its
 			// request was bad when the tokens and the users table disagree.
 			var detail *oauth.ErrorDetail
-			assert.False(t, errors.As(err, &detail),
+			assert.NotErrorAs(t, err, &detail,
 				"expected a plain error carrying a 500, got a client-facing ErrorDetail: %v", err)
 		})
 	}

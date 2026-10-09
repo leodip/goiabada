@@ -16,7 +16,7 @@ func TestStringClaim(t *testing.T) {
 
 	t.Run("Returns empty string when claim does not exist", func(t *testing.T) {
 		token := JwtToken{Claims: map[string]interface{}{}}
-		assert.Equal(t, "", token.StringClaim("nonexistent"))
+		assert.Empty(t, token.StringClaim("nonexistent"))
 	})
 
 	t.Run("Returns empty string when claim is int (regression test for panic)", func(t *testing.T) {
@@ -25,7 +25,7 @@ func TestStringClaim(t *testing.T) {
 		// After the fix, it returns empty string safely
 		assert.NotPanics(t, func() {
 			result := token.StringClaim("test")
-			assert.Equal(t, "", result)
+			assert.Empty(t, result)
 		})
 	})
 
@@ -33,7 +33,7 @@ func TestStringClaim(t *testing.T) {
 		token := JwtToken{Claims: map[string]interface{}{"test": true}}
 		assert.NotPanics(t, func() {
 			result := token.StringClaim("test")
-			assert.Equal(t, "", result)
+			assert.Empty(t, result)
 		})
 	})
 
@@ -41,7 +41,7 @@ func TestStringClaim(t *testing.T) {
 		token := JwtToken{Claims: map[string]interface{}{"test": map[string]interface{}{"nested": "value"}}}
 		assert.NotPanics(t, func() {
 			result := token.StringClaim("test")
-			assert.Equal(t, "", result)
+			assert.Empty(t, result)
 		})
 	})
 
@@ -49,7 +49,7 @@ func TestStringClaim(t *testing.T) {
 		token := JwtToken{Claims: map[string]interface{}{"test": []string{"a", "b"}}}
 		assert.NotPanics(t, func() {
 			result := token.StringClaim("test")
-			assert.Equal(t, "", result)
+			assert.Empty(t, result)
 		})
 	})
 }

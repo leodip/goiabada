@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/gender"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // ============================================================================
@@ -81,18 +82,18 @@ func TestToken_IdToken_OIDCClaims_GlobalDisabled(t *testing.T) {
 	accessToken := data["access_token"].(string)
 	userinfoUrl := appConfig.AuthServer.BaseURL + "/userinfo"
 	req, err := http.NewRequest("GET", userinfoUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	userinfoResp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = userinfoResp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, userinfoResp.StatusCode)
 
 	var userinfo map[string]interface{}
 	err = json.NewDecoder(userinfoResp.Body).Decode(&userinfo)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, userinfo["email"], "email claim should be available via /userinfo")
 	assert.NotNil(t, userinfo["email_verified"], "email_verified claim should be available via /userinfo")
 	assert.NotNil(t, userinfo["name"], "name claim should be available via /userinfo")
@@ -154,7 +155,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
 	originalClientSetting := code.Client.IncludeOpenIDConnectClaimsInIdToken
 	code.Client.IncludeOpenIDConnectClaimsInIdToken = "on"
 	err := database.UpdateClient(context.Background(), nil, &code.Client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		code.Client.IncludeOpenIDConnectClaimsInIdToken = originalClientSetting
 		_ = database.UpdateClient(context.Background(), nil, &code.Client)
@@ -199,7 +200,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 	originalClientSetting := code.Client.IncludeOpenIDConnectClaimsInIdToken
 	code.Client.IncludeOpenIDConnectClaimsInIdToken = "off"
 	err := database.UpdateClient(context.Background(), nil, &code.Client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		code.Client.IncludeOpenIDConnectClaimsInIdToken = originalClientSetting
 		_ = database.UpdateClient(context.Background(), nil, &code.Client)
@@ -236,7 +237,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 // createAuthCodeWithUserProfile creates a user with full profile data and completes auth code flow
 func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope string) (*http.Client, *record.Code) {
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),

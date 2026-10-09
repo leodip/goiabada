@@ -2,7 +2,6 @@ package accounthandlers
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -191,7 +190,7 @@ func TestAccountEmailPages_AbsentSettingsAreAnsweredWithTheSentinel(t *testing.T
 
 			tc.build(httpHelper).ServeHTTP(httptest.NewRecorder(), tc.request)
 
-			assert.True(t, errors.Is(refusedWith, reqctx.ErrNoSettings), "answered with %v", refusedWith)
+			require.ErrorIs(t, refusedWith, reqctx.ErrNoSettings, "answered with %v", refusedWith)
 			httpHelper.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything)
 		})

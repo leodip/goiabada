@@ -7,6 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // ============================================================================
@@ -37,7 +38,7 @@ func TestToken_AuthCode_ClientSecretBasic_Success(t *testing.T) {
 
 	// Verify that the code has been marked as used
 	usedCode, err := database.GetCodeById(context.Background(), nil, code.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, usedCode.Used)
 }
 

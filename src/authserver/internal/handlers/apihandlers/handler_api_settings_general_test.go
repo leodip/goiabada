@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -30,5 +29,5 @@ func TestHandleSettingsGeneralGet_WithoutSettingsAnswersTheJSON500Envelope(t *te
 	attrs := oneErrorRecord(t, capture)
 	logged, isError := attrs["error"].(error)
 	require.True(t, isError, "the error attribute must carry the error value itself")
-	assert.True(t, errors.Is(logged, reqctx.ErrNoSettings))
+	assert.ErrorIs(t, logged, reqctx.ErrNoSettings)
 }

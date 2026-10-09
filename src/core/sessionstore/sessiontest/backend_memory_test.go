@@ -54,7 +54,7 @@ func TestMemoryBackend_LoadTreatsAnExpiredRowAsAbsent(t *testing.T) {
 				assert.Equal(t, []byte("contents"), record.Data)
 				return
 			}
-			assert.ErrorIs(t, err, sessionstore.ErrNotFound)
+			require.ErrorIs(t, err, sessionstore.ErrNotFound)
 			assert.Nil(t, record)
 		})
 	}
@@ -65,7 +65,7 @@ func TestMemoryBackend_UpdatePastExpiryAnswersNotFoundAndWritesNothing(t *testin
 
 	at(expiresAt.Add(time.Nanosecond))
 	_, err := b.Update(context.Background(), id, []byte("replaced"), true)
-	assert.ErrorIs(t, err, sessionstore.ErrNotFound)
+	require.ErrorIs(t, err, sessionstore.ErrNotFound)
 
 	// Back inside the window, the row still holds what it held: the refused update neither
 	// replaced the contents nor moved the deadline.
@@ -95,7 +95,7 @@ func TestMemoryBackend_TouchPastExpiryAnswersNotFound(t *testing.T) {
 
 	at(expiresAt)
 	_, err := b.Touch(context.Background(), id, true)
-	assert.ErrorIs(t, err, sessionstore.ErrNotFound)
+	require.ErrorIs(t, err, sessionstore.ErrNotFound)
 
 	// Nor did the refused touch revive it.
 	at(expiresAt.Add(-time.Nanosecond))
@@ -134,7 +134,7 @@ func TestMemoryBackend_UpdateNeverInserts(t *testing.T) {
 	b := NewMemoryBackend()
 
 	_, err := b.Update(context.Background(), "never-there", []byte("contents"), true)
-	assert.ErrorIs(t, err, sessionstore.ErrNotFound)
+	require.ErrorIs(t, err, sessionstore.ErrNotFound)
 
 	_, err = b.Load(context.Background(), "never-there")
 	assert.ErrorIs(t, err, sessionstore.ErrNotFound, "the refused update created nothing")

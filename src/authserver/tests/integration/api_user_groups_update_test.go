@@ -29,7 +29,7 @@ func TestAPIUserGroupsPut_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -43,7 +43,7 @@ func TestAPIUserGroupsPut_Success(t *testing.T) {
 			IncludeInIdToken: i%2 == 0, // alternate true/false
 		}
 		err = database.CreateGroup(context.Background(), nil, groups[i])
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		defer func(group *record.Group) {
 			_ = database.DeleteGroup(context.Background(), nil, group.Id)
 		}(groups[i])
@@ -56,7 +56,7 @@ func TestAPIUserGroupsPut_Success(t *testing.T) {
 			GroupId: groups[i].Id,
 		}
 		err = database.CreateUserGroup(context.Background(), nil, userGroup)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// Don't defer cleanup - the API call will modify these
 	}
 
@@ -77,7 +77,7 @@ func TestAPIUserGroupsPut_Success(t *testing.T) {
 	// Parse response
 	var updateResponse api.GetUserGroupsResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: User should be in groups 1 and 2 only
 	assert.Equal(t, testUser.Id, updateResponse.User.Id)
@@ -95,9 +95,9 @@ func TestAPIUserGroupsPut_Success(t *testing.T) {
 
 	// Verify changes were persisted to database
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = database.UserLoadGroups(context.Background(), nil, updatedUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Len(t, updatedUser.Groups, 2)
 	dbGroupIds := make(map[int64]bool)
@@ -123,7 +123,7 @@ func TestAPIUserGroupsPut_EmptyGroups(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -134,7 +134,7 @@ func TestAPIUserGroupsPut_EmptyGroups(t *testing.T) {
 		Description:     "Group to be removed",
 	}
 	err = database.CreateGroup(context.Background(), nil, testGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
@@ -144,7 +144,7 @@ func TestAPIUserGroupsPut_EmptyGroups(t *testing.T) {
 		GroupId: testGroup.Id,
 	}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test: Remove all groups (empty array)
 	updateReq := api.UpdateUserGroupsRequest{
@@ -162,18 +162,18 @@ func TestAPIUserGroupsPut_EmptyGroups(t *testing.T) {
 	// Parse response
 	var updateResponse api.GetUserGroupsResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: User should have no groups
 	assert.Equal(t, testUser.Id, updateResponse.User.Id)
-	assert.Len(t, updateResponse.Groups, 0)
+	assert.Empty(t, updateResponse.Groups)
 
 	// Verify in database
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = database.UserLoadGroups(context.Background(), nil, updatedUser)
-	assert.NoError(t, err)
-	assert.Len(t, updatedUser.Groups, 0)
+	require.NoError(t, err)
+	assert.Empty(t, updatedUser.Groups)
 }
 
 func TestAPIUserGroupsPut_NonExistentGroup(t *testing.T) {
@@ -189,7 +189,7 @@ func TestAPIUserGroupsPut_NonExistentGroup(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -269,7 +269,7 @@ func TestAPIUserGroupsPut_InvalidRequestBody(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -277,13 +277,13 @@ func TestAPIUserGroupsPut_InvalidRequestBody(t *testing.T) {
 	// Test: Invalid JSON
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
 	req, err := http.NewRequest("PUT", url, nil) // No body
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
@@ -300,7 +300,7 @@ func TestAPIUserGroupsPut_Unauthorized(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -308,11 +308,11 @@ func TestAPIUserGroupsPut_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -366,7 +366,7 @@ func TestAPIUserGroupsPut_TheGroupIdArrayIsBounded(t *testing.T) {
 				FamilyName: "User",
 			}
 			err := database.CreateUser(context.Background(), nil, testUser)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			defer func() {
 				_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 			}()
@@ -386,12 +386,12 @@ func TestAPIUserGroupsPut_TheGroupIdArrayIsBounded(t *testing.T) {
 
 			var errResp api.ErrorResponse
 			err = json.NewDecoder(resp.Body).Decode(&errResp)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, testCase.wantCode, errResp.ErrorCode)
 
 			// Nothing was written either way: the user belongs to no group afterwards.
 			err = database.UserLoadGroups(context.Background(), nil, testUser)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Empty(t, testUser.Groups)
 		})
 	}

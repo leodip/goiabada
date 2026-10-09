@@ -103,7 +103,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 
 	response, err := tokenIssuer.mintCodeRefreshTokens(ctx, nil, settings, code, refreshToken, "openid profile resource1:read")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.Equal(t, "Bearer", response.TokenType)
 	assert.Equal(t, int64(900), response.ExpiresIn) // client override
@@ -133,7 +133,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, user.Username, idClaims["preferred_username"])
 	assert.Equal(t, fmt.Sprintf("%v/account/profile", "http://localhost:8081"), idClaims["profile"])
 	_, err = uuidtest.Parse(idClaims["jti"].(string))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assertTimeClaimWithinRange(t, idClaims, "updated_at", -1*time.Hour, "updated_at should be 1 hour ago")
 
 	// validate Access token --------------------------------------------
@@ -154,7 +154,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("%v/account/profile", "http://localhost:8081"), accessClaims["profile"])
 	assert.Equal(t, "openid profile resource1:read", accessClaims["scope"])
 	_, err = uuidtest.Parse(accessClaims["jti"].(string))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assertTimeClaimWithinRange(t, accessClaims, "updated_at", -1*time.Hour, "updated_at should be 1 hour ago")
 
 	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
@@ -172,7 +172,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, "Refresh", refreshClaims["typ"])
 	assert.Equal(t, "openid profile resource1:read", refreshClaims["scope"])
 	_, err = uuidtest.Parse(refreshClaims["jti"].(string))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, sessionIdentifier, refreshClaims["sid"])
 
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 600*time.Second, "exp should be 600 seconds from now")
@@ -286,7 +286,7 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 
 	response, err := tokenIssuer.mintCodeRefreshTokens(ctx, nil, settings, code, refreshToken, "resource1:write offline_access")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.Equal(t, "Bearer", response.TokenType)
 	assert.Equal(t, int64(1200), response.ExpiresIn)
@@ -321,7 +321,7 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	assertTimeClaimWithinRange(t, accessClaims, "exp", 1200*time.Second, "exp should be 1200 seconds from now")
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -600*time.Second, "auth_time should be 600 seconds ago")
 	_, err = uuidtest.Parse(accessClaims["jti"].(string))
-	assert.NoError(t, err, "Access token jti should be a valid UUID")
+	require.NoError(t, err, "Access token jti should be a valid UUID")
 
 	// validate Refresh token --------------------------------------------
 	// RFC 6749 Section 6: New refresh token scope MUST be identical to original refresh token's scope
@@ -337,7 +337,7 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 7200*time.Second, "exp should be 7200 seconds from now")
 	assertTimeClaimWithinRange(t, refreshClaims, "offline_access_max_lifetime", 172800*time.Second, "offline_access_max_lifetime should be 172800 seconds from now")
 	_, err = uuidtest.Parse(refreshClaims["jti"].(string))
-	assert.NoError(t, err, "Refresh token jti should be a valid UUID")
+	require.NoError(t, err, "Refresh token jti should be a valid UUID")
 
 	// validate Refresh token passed to CreateRefreshToken --------------------------------------------
 	// RFC 6749 Section 6: New refresh token scope MUST be identical to original refresh token's scope
@@ -440,7 +440,7 @@ func TestMintROPCRefreshTokens(t *testing.T) {
 
 	response, err := tokenIssuer.mintROPCRefreshTokens(ctx, nil, settings, refreshToken, "openid email resource:read")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
 	assert.NotEmpty(t, response.IdToken)
@@ -550,7 +550,7 @@ func TestMintROPCRefreshTokens_ScopeDowngrade(t *testing.T) {
 	// Request only a subset of the original scopes
 	response, err := tokenIssuer.mintROPCRefreshTokens(ctx, nil, settings, refreshToken, "resource:read")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 
 	// Verify scope was downgraded

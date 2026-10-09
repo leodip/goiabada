@@ -218,7 +218,7 @@ func TestPermissionDescriptionCeiling_WhatItDoesNotReachSaves(t *testing.T) {
 			rr := serveResourcePermsWithScope(database, auditLogger, body, c.scope)
 
 			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-			assert.NoError(t, stub.BodyErr)
+			require.NoError(t, stub.BodyErr)
 			require.Len(t, updated, 1)
 			assert.Equal(t, descriptionCeilingIdOf(t, stored, c.identifier), updated[0].Id)
 			assert.Equal(t, "Re-described", updated[0].Description)

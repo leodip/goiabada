@@ -32,7 +32,7 @@ func TestAPIUserEmailPut_Success(t *testing.T) {
 		EmailVerified: false,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -54,7 +54,7 @@ func TestAPIUserEmailPut_Success(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Email data should be updated
 	assert.Equal(t, updateReq.Email, updateResponse.User.Email)
@@ -62,7 +62,7 @@ func TestAPIUserEmailPut_Success(t *testing.T) {
 
 	// Verify changes were persisted to database
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, updateReq.Email, updatedUser.Email)
 	assert.Equal(t, updateReq.EmailVerified, updatedUser.EmailVerified)
@@ -116,7 +116,7 @@ func TestAPIUserEmailPut_EmailNormalization(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -142,14 +142,14 @@ func TestAPIUserEmailPut_EmailNormalization(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Email should be normalized (lowercase, trimmed)
 	assert.Equal(t, normalizedEmail, updateResponse.User.Email)
 
 	// Verify normalization in database
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, normalizedEmail, updatedUser.Email)
 }
 
@@ -170,7 +170,7 @@ func TestAPIUserEmailPut_DuplicateEmail(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, existingUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, existingUser.Id)
 	}()
@@ -184,7 +184,7 @@ func TestAPIUserEmailPut_DuplicateEmail(t *testing.T) {
 		FamilyName: "User",
 	}
 	err = database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -204,7 +204,7 @@ func TestAPIUserEmailPut_DuplicateEmail(t *testing.T) {
 
 	// Verify original email unchanged in database
 	unchangedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, keptEmail, unchangedUser.Email)
 }
 
@@ -221,7 +221,7 @@ func TestAPIUserEmailPut_InvalidEmail(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -274,7 +274,7 @@ func TestAPIUserEmailPut_SetEmailVerified(t *testing.T) {
 		EmailVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -295,14 +295,14 @@ func TestAPIUserEmailPut_SetEmailVerified(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Email should be verified
 	assert.True(t, updateResponse.User.EmailVerified)
 
 	// Verify in database that verification code was cleared
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, updatedUser.EmailVerified)
 	assert.Nil(t, updatedUser.EmailVerificationCodeEncrypted)
 	assert.False(t, updatedUser.EmailVerificationCodeIssuedAt.Valid)
@@ -324,7 +324,7 @@ func TestAPIUserEmailPut_UnsetEmailVerified(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -345,14 +345,14 @@ func TestAPIUserEmailPut_UnsetEmailVerified(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Email should be unverified
 	assert.False(t, updateResponse.User.EmailVerified)
 
 	// Verify in database
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, updatedUser.EmailVerified)
 }
 
@@ -417,7 +417,7 @@ func TestAPIUserEmailPut_InvalidRequestBody(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -425,13 +425,13 @@ func TestAPIUserEmailPut_InvalidRequestBody(t *testing.T) {
 	// Test: Invalid JSON (no body)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/email"
 	req, err := http.NewRequest("PUT", url, nil) // No body
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
@@ -448,7 +448,7 @@ func TestAPIUserEmailPut_Unauthorized(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -456,11 +456,11 @@ func TestAPIUserEmailPut_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/email"
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -481,7 +481,7 @@ func TestAPIUserEmailPut_PartialUpdate(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -502,7 +502,7 @@ func TestAPIUserEmailPut_PartialUpdate(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Email updated, verification preserved
 	assert.Equal(t, updateReq.Email, updateResponse.User.Email)
@@ -510,7 +510,7 @@ func TestAPIUserEmailPut_PartialUpdate(t *testing.T) {
 
 	// Verify in database
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, updateReq.Email, updatedUser.Email)
 	assert.True(t, updatedUser.EmailVerified)
 }

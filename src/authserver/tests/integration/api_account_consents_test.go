@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAPIAccountConsentsGet_Success(t *testing.T) {
@@ -27,7 +28,7 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 		IsPublic:         true,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	consent := &record.UserConsent{
@@ -37,7 +38,7 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
 	err = database.CreateUserConsent(context.Background(), nil, consent)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents"
@@ -49,7 +50,7 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 
 	var getResp api.GetUserConsentsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, getResp.Consents)
 	assert.GreaterOrEqual(t, len(getResp.Consents), 1)
 
@@ -76,10 +77,10 @@ func TestAPIAccountConsentsGet_UnauthorizedAndScope(t *testing.T) {
 
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	body1, _ := io.ReadAll(resp.Body)
@@ -113,7 +114,7 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 		IsPublic:         true,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	consent := &record.UserConsent{
@@ -123,7 +124,7 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
 	err = database.CreateUserConsent(context.Background(), nil, consent)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.Id)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
@@ -134,12 +135,12 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 
 	var delResp api.SuccessResponse
 	err = json.NewDecoder(resp.Body).Decode(&delResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, delResp.Success)
 
 	// Confirm deletion
 	got, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, got)
 }
 
@@ -156,7 +157,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, user2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteUser(context.Background(), nil, user2.Id) }()
 
 	// Create client and consent for user2
@@ -167,7 +168,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 		IsPublic:         true,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	consent := &record.UserConsent{
@@ -177,7 +178,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
 	err = database.CreateUserConsent(context.Background(), nil, consent)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
 
 	// Attempt to delete using user1 token
@@ -195,7 +196,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 
 	// Ensure consent still exists
 	got, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, got)
 
 	// Sanity check user ids differ

@@ -53,7 +53,7 @@ func TestRead(t *testing.T) {
 
 		data, err := Read(httptest.NewRecorder(), multipartRequest(t, "picture", tooLarge), "picture", maxSize)
 
-		assert.ErrorIs(t, err, ErrUploadTooLarge)
+		require.ErrorIs(t, err, ErrUploadTooLarge)
 		assert.Nil(t, data)
 	})
 
@@ -63,14 +63,14 @@ func TestRead(t *testing.T) {
 
 		data, err := Read(httptest.NewRecorder(), req, "picture", maxSize)
 
-		assert.ErrorIs(t, err, ErrUploadTooLarge)
+		require.ErrorIs(t, err, ErrUploadTooLarge)
 		assert.Nil(t, data)
 	})
 
 	t.Run("a form without the field has no upload", func(t *testing.T) {
 		data, err := Read(httptest.NewRecorder(), multipartRequest(t, "other", fits), "picture", maxSize)
 
-		assert.ErrorIs(t, err, ErrNoUpload)
+		require.ErrorIs(t, err, ErrNoUpload)
 		assert.Nil(t, data)
 	})
 }

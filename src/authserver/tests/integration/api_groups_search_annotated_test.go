@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Test GET /api/v1/admin/groups/search annotated with permission (success path)
@@ -34,9 +35,9 @@ func TestAPIGroupsSearch_Annotated_Success(t *testing.T) {
 
 	// Assign permission to g1 and g3
 	err := database.CreateGroupPermission(context.Background(), nil, &record.GroupPermission{GroupId: g1.Id, PermissionId: perm.Id})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = database.CreateGroupPermission(context.Background(), nil, &record.GroupPermission{GroupId: g3.Id, PermissionId: perm.Id})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Query page 1 with a large size to increase chance our groups are returned
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&page=1&size=200"
@@ -48,7 +49,7 @@ func TestAPIGroupsSearch_Annotated_Success(t *testing.T) {
 
 	var apiResp api.SearchGroupsWithPermissionAnnotationResponse
 	err = json.NewDecoder(resp.Body).Decode(&apiResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Total should be at least the number of groups we created
 	assert.GreaterOrEqual(t, apiResp.Total, 3)
@@ -126,7 +127,7 @@ func TestAPIGroupsSearch_Unauthorized(t *testing.T) {
 	httpClient := createHttpClient(t)
 	req, _ := http.NewRequest("GET", u, nil)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)

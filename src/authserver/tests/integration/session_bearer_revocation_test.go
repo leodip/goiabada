@@ -9,6 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // extractSidClaim parses the access token (without verifying its signature)
@@ -16,7 +17,7 @@ import (
 func extractSidClaim(t *testing.T, accessToken string) string {
 	t.Helper()
 	tok, _, err := new(jwt.Parser).ParseUnverified(accessToken, jwt.MapClaims{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	claims, ok := tok.Claims.(jwt.MapClaims)
 	assert.True(t, ok)
 	if v, ok := claims["sid"].(string); ok {
@@ -46,10 +47,10 @@ func TestSession_AdminAPI_DeletedSessionRejectsBearer(t *testing.T) {
 
 	// Delete the underlying user session out from under the token.
 	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, sid)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, session, "session should exist for sid %s", sid)
 	err = database.DeleteUserSession(context.Background(), nil, session.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Post-condition: same token now rejected with 401 invalid_token.
 	resp2 := makeAPIRequest(t, "GET", adminURL, accessToken, nil)
@@ -80,10 +81,10 @@ func TestSession_AccountAPI_DeletedSessionRejectsBearer(t *testing.T) {
 
 	// Delete the underlying user session.
 	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, sid)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, session, "session should exist for sid %s", sid)
 	err = database.DeleteUserSession(context.Background(), nil, session.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Post-condition: 401 invalid_token.
 	resp2 := makeAPIRequest(t, "GET", accountURL, accessToken, nil)

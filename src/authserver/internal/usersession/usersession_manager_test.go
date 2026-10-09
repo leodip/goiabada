@@ -182,7 +182,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
 			"pwd otp", record.AcrLevel2Optional, "192.168.1.1")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, record.AcrLevel2Optional, result.AcrLevel)
 		assert.Equal(t, "pwd otp", result.AuthMethods)
@@ -210,7 +210,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
 			"pwd otp", record.AcrLevel2Mandatory, "192.168.1.1")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, record.AcrLevel2Mandatory, result.AcrLevel)
 		assert.Equal(t, "pwd otp", result.AuthMethods)
@@ -240,7 +240,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
 			"pwd otp", record.AcrLevel2Mandatory, "192.168.1.1")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, record.AcrLevel2Mandatory, result.AcrLevel)
 
@@ -269,7 +269,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
 			"pwd otp", record.AcrLevel1, "192.168.1.1")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, record.AcrLevel2Mandatory, result.AcrLevel,
 			"ACR should NOT be downgraded from level2_mandatory to level1")
@@ -296,7 +296,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
 			"pwd otp", record.AcrLevel1, "192.168.1.1")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, record.AcrLevel2Optional, result.AcrLevel,
 			"ACR should NOT be downgraded from level2_optional to level1")
@@ -324,7 +324,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
 			"pwd otp", record.AcrLevel2Optional, "192.168.1.1")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, record.AcrLevel2Optional, result.AcrLevel)
 
@@ -352,7 +352,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
 			"", record.AcrLevel1, "192.168.1.1")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, "pwd", result.AuthMethods,
 			"AuthMethods should be preserved when empty string is passed")
@@ -381,7 +381,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
 			"pwd otp", "", "192.168.1.1")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, record.AcrLevel2Optional, result.AcrLevel,
 			"AcrLevel should be preserved when empty string is passed")
@@ -410,7 +410,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		// This is the refresh token scenario - both empty
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456, "", "", "192.168.1.1")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, record.AcrLevel2Mandatory, result.AcrLevel)
 		assert.Equal(t, "pwd otp", result.AuthMethods)
@@ -440,7 +440,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
 			"pwd otp", record.AcrLevel2Optional, "192.168.1.1")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, "pwd otp", result.AuthMethods)
 
@@ -459,10 +459,10 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		result, err := manager.BumpUserSession(context.Background(), "non-existent-session", 456,
 			"pwd", record.AcrLevel1, "192.168.1.1")
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "can't bump user session because user session is nil")
-		assert.Error(t, stub.BodyErr, "the transaction rolled back, and nothing was written")
+		require.Error(t, stub.BodyErr, "the transaction rolled back, and nothing was written")
 
 		database.AssertExpectations(t)
 		database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything, mock.Anything)
@@ -505,7 +505,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 		// Add new client 200
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 200, "", "", "192.168.1.1")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Len(t, result.Clients, 2, "Should have 2 clients now")
 
@@ -544,7 +544,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 		// Same client 100 again
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 100, "", "", "192.168.1.1")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Len(t, result.Clients, 1, "Should still have 1 client")
 

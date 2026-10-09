@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestInitRoutes_EveryApiRouteRefusesToBeStored is goal 5 of #247, and it is the reason this seam
@@ -61,7 +62,7 @@ func TestInitRoutes_EveryApiRouteRefusesToBeStored(t *testing.T) {
 		routes = append(routes, apiRoute{method: method, pattern: route, target: routeTestTarget(route), first: first})
 		return nil
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// A chi.Walk that silently enumerated nothing would make every assertion below vacuous, and
 	// so would a walk that reached one group and not the other. Both prefixes are named because

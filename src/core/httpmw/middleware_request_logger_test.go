@@ -263,7 +263,7 @@ func TestRequestLogger_TheClipIsLossy(t *testing.T) {
 	// If that answer changes, this row changes with it.
 	first := strings.Repeat("p", 128) + "AAAAAAAA"
 	second := strings.Repeat("p", 128) + "BBBBBBBB"
-	assert.Equal(t, len(first), len(second), "the two must be the same length to collide")
+	assert.Len(t, second, len(first), "the two must be the same length to collide")
 
 	logged := make([]string, 0, 2)
 	for _, requestId := range []string{first, second} {

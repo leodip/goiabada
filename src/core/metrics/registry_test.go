@@ -79,7 +79,7 @@ func TestRegistry_FamiliesDescribesWhatWasDeclared(t *testing.T) {
 	assert.Equal(t, "A.", families[0].Help)
 	require.Len(t, families[0].Labels, 1)
 	assert.Equal(t, "kind", families[0].Labels[0].Name())
-	assert.Equal(t, "", families[0].Labels[0].Description())
+	assert.Empty(t, families[0].Labels[0].Description())
 	assert.Equal(t, []string{"x", "y"}, families[0].Labels[0].Values())
 
 	assert.Equal(t, "b_seconds", families[1].Name)

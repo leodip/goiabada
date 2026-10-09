@@ -81,7 +81,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
@@ -166,7 +166,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
@@ -271,7 +271,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
@@ -368,7 +368,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
@@ -474,7 +474,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
@@ -549,7 +549,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
@@ -631,7 +631,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
@@ -746,7 +746,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
@@ -855,7 +855,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
@@ -969,7 +969,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
@@ -1054,7 +1054,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
@@ -1136,7 +1136,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
@@ -1223,7 +1223,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
@@ -1345,7 +1345,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
@@ -1433,7 +1433,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)

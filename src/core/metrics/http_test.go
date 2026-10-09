@@ -192,7 +192,7 @@ func TestHTTPRequests_DeclaresTheRouteTable(t *testing.T) {
 	}, route.Values())
 
 	assert.Equal(t, "method", method.Name())
-	assert.Equal(t, "", method.Description())
+	assert.Empty(t, method.Description())
 	assert.Equal(t, []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "CONNECT", "OPTIONS", "TRACE"}, method.Values())
 
 	assert.Equal(t, "status", status.Name())

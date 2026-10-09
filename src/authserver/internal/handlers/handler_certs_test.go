@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHandleCertsGet(t *testing.T) {
@@ -23,7 +24,7 @@ func TestHandleCertsGet(t *testing.T) {
 		handler := HandleCertsGet(jsonWriter, database)
 
 		req, err := http.NewRequest("GET", "/certs", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
@@ -66,7 +67,7 @@ func TestHandleCertsGet(t *testing.T) {
 		handler := HandleCertsGet(jsonWriter, database)
 
 		req, err := http.NewRequest("GET", "/certs", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
@@ -99,7 +100,7 @@ func TestHandleCertsGet(t *testing.T) {
 		handler := HandleCertsGet(jsonWriter, database)
 
 		req, err := http.NewRequest("GET", "/certs", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
@@ -122,7 +123,7 @@ func TestHandleCertsGet(t *testing.T) {
 		handler := HandleCertsGet(jsonWriter, database)
 
 		req, err := http.NewRequest("GET", "/certs", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
@@ -152,7 +153,7 @@ func TestHandleCertsGet(t *testing.T) {
 		handler := HandleCertsGet(jsonWriter, database)
 
 		req, err := http.NewRequest("GET", "/certs", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
@@ -182,7 +183,7 @@ func TestHandleCertsGet(t *testing.T) {
 		handler := HandleCertsGet(jsonWriter, database)
 
 		req, err := http.NewRequest("GET", "/certs", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 

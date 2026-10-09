@@ -258,7 +258,7 @@ func theOneLoggedError(t *testing.T, fn func()) error {
 	assert.NotEmpty(t, errorRecords[0].Attrs["request_id"],
 		"the record must carry request_id, which is what joins it to the request log; nothing in "+
 			"this file names it, so it can only have come from chi's id on the context (#320 decision 2)")
-	require.NotNil(t, logged, "the error attribute must carry the error value itself, not its text")
+	require.Error(t, logged, "the error attribute must carry the error value itself, not its text")
 	return logged
 }
 

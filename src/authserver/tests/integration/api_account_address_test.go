@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func getUserAccessTokenWithAccountScope_Address(t *testing.T) (string, *record.User) {
@@ -42,7 +43,7 @@ func TestAPIAccountAddressPut_Success(t *testing.T) {
 
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, u.Id, updateResp.User.Id)
 	assert.Equal(t, reqBody.AddressLine1, updateResp.User.AddressLine1)
 	assert.Equal(t, reqBody.AddressLine2, updateResp.User.AddressLine2)
@@ -53,7 +54,7 @@ func TestAPIAccountAddressPut_Success(t *testing.T) {
 
 	// Verify persisted changes
 	updatedUser, err := database.GetUserById(context.Background(), nil, u.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, reqBody.AddressLine1, updatedUser.AddressLine1)
 	assert.Equal(t, reqBody.AddressLine2, updatedUser.AddressLine2)
@@ -79,13 +80,13 @@ func TestAPIAccountAddressPut_PartialAddress(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, reqBody.AddressLine1, updateResp.User.AddressLine1)
-	assert.Equal(t, "", updateResp.User.AddressLine2)
+	assert.Empty(t, updateResp.User.AddressLine2)
 	assert.Equal(t, reqBody.AddressLocality, updateResp.User.AddressLocality)
-	assert.Equal(t, "", updateResp.User.AddressRegion)
-	assert.Equal(t, "", updateResp.User.AddressPostalCode)
-	assert.Equal(t, "", updateResp.User.AddressCountry)
+	assert.Empty(t, updateResp.User.AddressRegion)
+	assert.Empty(t, updateResp.User.AddressPostalCode)
+	assert.Empty(t, updateResp.User.AddressCountry)
 }
 
 func TestAPIAccountAddressPut_ClearAllFields(t *testing.T) {
@@ -100,13 +101,13 @@ func TestAPIAccountAddressPut_ClearAllFields(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
-	assert.NoError(t, err)
-	assert.Equal(t, "", updateResp.User.AddressLine1)
-	assert.Equal(t, "", updateResp.User.AddressLine2)
-	assert.Equal(t, "", updateResp.User.AddressLocality)
-	assert.Equal(t, "", updateResp.User.AddressRegion)
-	assert.Equal(t, "", updateResp.User.AddressPostalCode)
-	assert.Equal(t, "", updateResp.User.AddressCountry)
+	require.NoError(t, err)
+	assert.Empty(t, updateResp.User.AddressLine1)
+	assert.Empty(t, updateResp.User.AddressLine2)
+	assert.Empty(t, updateResp.User.AddressLocality)
+	assert.Empty(t, updateResp.User.AddressRegion)
+	assert.Empty(t, updateResp.User.AddressPostalCode)
+	assert.Empty(t, updateResp.User.AddressCountry)
 }
 
 func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
@@ -200,7 +201,7 @@ func TestAPIAccountAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, line1, updateResp.User.AddressLine1)
 }
 
@@ -209,10 +210,10 @@ func TestAPIAccountAddressPut_UnauthorizedAndScope(t *testing.T) {
 
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	body1, _ := io.ReadAll(resp.Body)
@@ -241,12 +242,12 @@ func TestAPIAccountAddressPut_InvalidRequestBody(t *testing.T) {
 
 	// Invalid JSON (no body)
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse

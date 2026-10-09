@@ -134,7 +134,7 @@ func TestImplicitFlow_ResponseModeFormPost_PostsTheTokens(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(payload), requestNonce, "the ID token echoes the request's nonce")
 	assert.Contains(t, string(payload), user.Subject, "the ID token names the user who signed in")
-	assert.Equal(t, 3, len(strings.Split(inputs["access_token"], ".")), "access_token is a JWT")
+	assert.Len(t, strings.Split(inputs["access_token"], "."), 3, "access_token is a JWT")
 }
 
 // The parameters follow the response type, as the fragment's do: each type's form carries the tokens

@@ -27,6 +27,7 @@ package main
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"go/format"
 	"io"
@@ -211,7 +212,7 @@ func parseCSV(data []byte) ([]country, error) {
 	var list []country
 	for {
 		rec, err := r.Read()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

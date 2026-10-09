@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // DELETE /api/v1/admin/resources/{id}
@@ -30,7 +31,7 @@ func TestAPIResourceDelete_Success(t *testing.T) {
 
 	var success api.SuccessResponse
 	err := json.NewDecoder(resp.Body).Decode(&success)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, success.Success)
 
 	// Verify resource is gone
@@ -72,7 +73,7 @@ func TestAPIResourceDelete_SystemLevelResource(t *testing.T) {
 
 	// Find system-level resource (authserver)
 	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, sysRes)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10)
@@ -94,10 +95,10 @@ func TestAPIResourceDelete_UnauthorizedAndScope(t *testing.T) {
 
 	// No token
 	req, err := http.NewRequest("DELETE", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 

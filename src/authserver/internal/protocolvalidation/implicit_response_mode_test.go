@@ -1,6 +1,7 @@
 package protocolvalidation
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 
@@ -65,7 +66,8 @@ func TestValidateRequest_ImplicitFlow_ResponseModeQueryRefused(t *testing.T) {
 			err := validator.ValidateRequest(implicitRequest(responseType, "query"))
 
 			require.Error(t, err)
-			detail, ok := err.(*oauth.ErrorDetail)
+			var detail *oauth.ErrorDetail
+			ok := errors.As(err, &detail)
 			require.True(t, ok, "the refusal is a protocol error, not a localized page")
 			assert.Equal(t, "invalid_request", detail.Code())
 			assert.Equal(t, implicitQueryRefusal, detail.Description())
@@ -103,7 +105,8 @@ func TestValidateRequest_ImplicitFlow_UnsupportedResponseModeIsTheGeneralRefusal
 			err := validator.ValidateRequest(implicitRequest("token", mode))
 
 			require.Error(t, err)
-			detail, ok := err.(*oauth.ErrorDetail)
+			var detail *oauth.ErrorDetail
+			ok := errors.As(err, &detail)
 			require.True(t, ok)
 			assert.Equal(t, "invalid_request", detail.Code())
 			assert.Equal(t, "Invalid response_mode parameter. Supported values are: query, fragment, form_post.",

@@ -50,7 +50,7 @@ func TestDebugResponseWriter_WriteTeesToBufferAndForwards(t *testing.T) {
 
 	n, err := rw.Write([]byte(`{"hello":"world"}`))
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, len(`{"hello":"world"}`), n, "the byte count must come from the real writer")
 	assert.Equal(t, `{"hello":"world"}`, rw.body.String(), "the body must be captured for logging")
 	assert.Equal(t, `{"hello":"world"}`, recorder.Body.String(), "and still reach the client")
@@ -61,9 +61,9 @@ func TestDebugResponseWriter_MultipleWritesAccumulate(t *testing.T) {
 	rw := &responseWriter{ResponseWriter: recorder, statusCode: http.StatusOK, body: &bytes.Buffer{}}
 
 	_, err := rw.Write([]byte("first "))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = rw.Write([]byte("second"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, "first second", rw.body.String())
 	assert.Equal(t, "first second", recorder.Body.String())
@@ -834,7 +834,8 @@ func TestDebugLog_LogsBodiesOnTheAcceptedSideOfEveryBound(t *testing.T) {
 		// json.Decoder answers io.EOF for zero bytes, so the unguarded path would write
 		// "0 bytes, not logged (EOF)" here and a bodyless request would read like a body
 		// that could not be shown.
-		assert.Equal(t, "", records[0].Attrs["request_body"],
+		assert.Contains(t, records[0].Attrs, "request_body")
+		assert.Empty(t, records[0].Attrs["request_body"],
 			"a bodyless request must stay distinguishable from a refused body")
 	})
 
@@ -948,11 +949,11 @@ func TestAPIDebug_DoesNotLogARealOTPEnrollmentResponse(t *testing.T) {
 
 	generator := otp.KeyGenerator{}
 	keyURL, err := generator.GenerateKeyURL("seam2@example.com", "Goiabada")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	base64Image, err := otp.RenderQRCodeImage(keyURL)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	secretKey, err := otp.SecretFromKeyURL(keyURL)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// What the handler wrote, captured as it writes it, so the comparison below is
 	// against the real bytes rather than against a second encode of the same struct.
@@ -998,12 +999,12 @@ func TestAPIDebug_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
 
 	generator := otp.KeyGenerator{}
 	keyURL, err := generator.GenerateKeyURL("seam2@example.com", "Goiabada")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	secretKey, err := otp.SecretFromKeyURL(keyURL)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	otpCode, err := totp.GenerateCode(secretKey, time.Now())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	sent := api.UpdateAccountOTPRequest{
 		Enabled:  true,
@@ -1021,7 +1022,7 @@ func TestAPIDebug_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
 		"otpCode":   sent.OtpCode,
 		"secretKey": secretKey,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	router := debugAPIRouter(t, http.MethodPut, "/otp", func(w http.ResponseWriter, r *http.Request) {
 		var received api.UpdateAccountOTPRequest

@@ -1,7 +1,6 @@
 package protocolvalidation
 
 import (
-	"errors"
 	"net/http"
 	"net/url"
 	"testing"
@@ -56,7 +55,7 @@ func TestValidateNoRepeatedParameters(t *testing.T) {
 	refusal := func(t *testing.T, err error) *oauth.ErrorDetail {
 		t.Helper()
 		var detail *oauth.ErrorDetail
-		require.True(t, errors.As(err, &detail), "an ErrorDetail, which both endpoints answer as is")
+		require.ErrorAs(t, err, &detail, "an ErrorDetail, which both endpoints answer as is")
 		assert.Equal(t, "invalid_request", detail.Code())
 		assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 		return detail

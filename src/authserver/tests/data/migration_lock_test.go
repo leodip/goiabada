@@ -333,7 +333,7 @@ func TestMigrationLock_AStopDuringTheMigrationsGivesTheLockBack(t *testing.T) {
 	}
 
 	var stopped migrator.StoppedError
-	require.Truef(t, errors.As(res.err, &stopped), "a stop is answered as one on %s: %v", dbType(), res.err)
+	require.ErrorAsf(t, res.err, &stopped, "a stop is answered as one on %s: %v", dbType(), res.err)
 	assert.NotContainsf(t, res.err.Error(), "migration lock",
 		"the release ran whatever became of the start's context, so nothing about the lock joins the stop on %s", dbType())
 	require.Len(t, recordsNamed(capture, "database migration stopped"), 1)

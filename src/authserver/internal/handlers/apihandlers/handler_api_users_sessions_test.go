@@ -163,7 +163,7 @@ func TestHandleUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
 	for i := range payloads {
 		actor, ok := payloads[i]["logged_in_user"]
 		assert.True(t, ok, "the key is present even with no caller to name")
-		assert.Equal(t, "", actor)
+		assert.Empty(t, actor)
 	}
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
@@ -190,7 +190,7 @@ func TestHandleUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	database.AssertExpectations(t)
-	assert.EqualError(t, stub.BodyErr, "the session delete failed", "the body hands its error to the helper, which rolls back")
+	require.EqualError(t, stub.BodyErr, "the session delete failed", "the body hands its error to the helper, which rolls back")
 	// NEITHER event. deleted_user_session would otherwise claim a deletion that rolled back, and
 	// the two emitters are adjacent in the handler, so it is easy to leave the first one outside the
 	// error check.

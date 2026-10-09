@@ -225,7 +225,7 @@ func TestHandleUserGroupsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
 	rr := serveUserGroupsSave(t, database, auditLogger, []int64{4, 6}, []int64{3, 4})
 
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-	assert.NoError(t, stub.BodyErr)
+	require.NoError(t, stub.BodyErr)
 	assert.Equal(t, []int64{21}, deleted, "the removed membership's row, and nothing kept")
 	assert.Equal(t, []int64{6}, added, "the new membership, and nothing already stored")
 	assert.Equal(t, []auditRecord{audited(audit.EventUserAddedToGroup, 6), audited(audit.EventUserRemovedFromGroup, 3)}, *records)
@@ -414,7 +414,7 @@ func TestHandleUserGroupsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, rr.Code)
 	code, _ := decodeErrorEnvelope(t, rr)
 	assert.Equal(t, "CONCURRENT_UPDATE", code)
-	assert.ErrorIs(t, stub.BodyErr, errListChanged, "the body refuses, so the helper rolls back")
+	require.ErrorIs(t, stub.BodyErr, errListChanged, "the body refuses, so the helper rolls back")
 	database.AssertExpectations(t)
 	assertNotAttemptedOnClientDatabase(t, database, "CreateUserGroup", "DeleteUserGroup", "UserLoadGroups")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)

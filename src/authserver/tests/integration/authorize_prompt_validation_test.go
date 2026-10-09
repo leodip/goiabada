@@ -58,7 +58,7 @@ func TestPromptNone_ValidSession_SilentCodeIssuance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 1, len(userSessions))
+	assert.Len(t, userSessions, 1)
 	originalSession := userSessions[0]
 	originalAuthTime := originalSession.AuthTime
 
@@ -124,7 +124,7 @@ func TestPromptLogin_WithSession_ForcesReAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 1, len(userSessions))
+	assert.Len(t, userSessions, 1)
 	originalSessionAuthTime := userSessions[0].AuthTime
 
 	// Wait to ensure new auth_time will be different

@@ -143,7 +143,7 @@ func assertRefreshTokenFamilyRevocationsKey(t *testing.T, h *isolatedDB, when st
 	require.Zerof(t, count(), "the table starts empty %s", when)
 
 	require.NoErrorf(t, insert(jti), "the first record of a family is accepted %s", when)
-	assert.Errorf(t, insert(jti), "a second record of the same family is refused by the key %s", when)
+	require.Errorf(t, insert(jti), "a second record of the same family is refused by the key %s", when)
 	assert.Equalf(t, 1, count(), "and writes nothing %s", when)
 
 	assert.NoErrorf(t, insert("fam-"+fake.UUID()), "a record of another family is accepted %s", when)
@@ -153,7 +153,7 @@ func assertRefreshTokenFamilyRevocationsKey(t *testing.T, h *isolatedDB, when st
 	_, err := h.SQL.ExecContext(ctx, fmt.Sprintf(
 		"INSERT INTO refresh_token_family_revocations (first_refresh_token_jti, reason, revoked_at) "+
 			"VALUES ('fam-%s', NULL, '2026-01-02 03:04:05')", fake.UUID()))
-	assert.Errorf(t, err, "a record with no reason is refused: reason is NOT NULL %s", when)
+	require.Errorf(t, err, "a record with no reason is refused: reason is NOT NULL %s", when)
 
 	// Leave the table as it was found, so the second call in this test starts empty too.
 	_, err = h.SQL.ExecContext(ctx, "DELETE FROM refresh_token_family_revocations")

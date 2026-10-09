@@ -156,7 +156,7 @@ func TestIssueImplicitTx_NoSessionRowIsRefusedBeforeAnythingIsRead(t *testing.T)
 
 	require.ErrorIs(t, err, ErrIssuingSessionGone)
 	assert.Nil(t, response, "nothing is signed for a session that is gone")
-	assert.ErrorIs(t, stub.BodyErr, ErrIssuingSessionGone, "the body returned the sentinel, so the transaction rolled back")
+	require.ErrorIs(t, stub.BodyErr, ErrIssuingSessionGone, "the body returned the sentinel, so the transaction rolled back")
 	f.mockDB.AssertNotCalled(t, "GetCurrentSigningKey", mock.Anything, mock.Anything)
 	f.mockDB.AssertNotCalled(t, "UserLoadGroups", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -175,7 +175,7 @@ func TestIssueImplicitTx_AnEmptySessionIdentifierIsTheCallersErrorNotAGoneSessio
 	response, err := f.issuer.IssueImplicitTx(context.Background(), f.settings, f.input, true, true)
 
 	require.ErrorIs(t, err, refused)
-	assert.NotErrorIs(t, err, ErrIssuingSessionGone)
+	require.NotErrorIs(t, err, ErrIssuingSessionGone)
 	assert.Nil(t, response)
 }
 
@@ -190,7 +190,7 @@ func TestIssueImplicitTx_AFailedAcquisitionIsNotASessionGone(t *testing.T) {
 	response, err := f.issuer.IssueImplicitTx(context.Background(), f.settings, f.input, true, true)
 
 	require.ErrorIs(t, err, boom)
-	assert.NotErrorIs(t, err, ErrIssuingSessionGone)
+	require.NotErrorIs(t, err, ErrIssuingSessionGone)
 	assert.Nil(t, response)
 }
 

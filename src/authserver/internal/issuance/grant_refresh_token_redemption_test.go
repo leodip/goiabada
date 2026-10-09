@@ -3,7 +3,6 @@ package issuance
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log/slog"
 	"testing"
@@ -235,7 +234,7 @@ func TestIssueRefreshTokenGrant_ClaimsMintsThenBumpsTheSession(t *testing.T) {
 	// The claim, the family's record, the mint and the child's insert are inside the transaction; the
 	// bump opens a transaction of its own and so follows the commit.
 	assert.Equal(t, []string{"begin", "acquire", "claim", "family", "reread", "mint", "insert", "commit", "bump"}, order)
-	assert.NoError(t, stub.BodyErr)
+	require.NoError(t, stub.BodyErr)
 	require.Len(t, sessions.bumps, 1)
 	bump := sessions.bumps[0]
 	assert.Equal(t, "sid-1", bump.sessionIdentifier)
@@ -413,10 +412,10 @@ func TestIssueRefreshTokenGrant_AFailedContainmentIsAFault(t *testing.T) {
 
 			response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
-			assert.ErrorIs(t, err, failure)
+			require.ErrorIs(t, err, failure)
 			var replayErr *RefreshTokenReplayedError
-			assert.False(t, errors.As(err, &replayErr))
-			assert.ErrorIs(t, stub.BodyErr, failure, "the transaction rolled back")
+			assert.NotErrorAs(t, err, &replayErr)
+			require.ErrorIs(t, stub.BodyErr, failure, "the transaction rolled back")
 			assert.Nil(t, response)
 			assert.Nil(t, outcome)
 			mockDB.AssertExpectations(t)
@@ -451,8 +450,8 @@ func TestIssueRefreshTokenGrant_AContainmentThatLosesTheKeyRunsOnceMore(t *testi
 		require.ErrorAs(t, err, &replayErr)
 		assert.False(t, replayErr.FamilyRecorded, "the winner wrote the record, so this containment did not")
 		assert.Zero(t, replayErr.FamilyRevokedCount)
-		assert.ErrorIs(t, first.BodyErr, data.ErrUniqueViolation)
-		assert.NoError(t, second.BodyErr)
+		require.ErrorIs(t, first.BodyErr, data.ErrUniqueViolation)
+		require.NoError(t, second.BodyErr)
 		mockDB.AssertExpectations(t)
 	})
 
@@ -469,9 +468,9 @@ func TestIssueRefreshTokenGrant_AContainmentThatLosesTheKeyRunsOnceMore(t *testi
 
 		_, _, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
-		assert.ErrorIs(t, err, data.ErrUniqueViolation)
+		require.ErrorIs(t, err, data.ErrUniqueViolation)
 		var replayErr *RefreshTokenReplayedError
-		assert.False(t, errors.As(err, &replayErr))
+		assert.NotErrorAs(t, err, &replayErr)
 		mockDB.AssertExpectations(t)
 	})
 }
@@ -532,9 +531,9 @@ func TestIssueRefreshTokenGrant_FlowGate(t *testing.T) {
 			assert.Nil(t, response)
 			assert.Nil(t, outcome)
 			if tc.refused {
-				assert.ErrorIs(t, err, ErrRefreshFlowDisabled)
+				require.ErrorIs(t, err, ErrRefreshFlowDisabled)
 			} else {
-				assert.ErrorIs(t, err, ErrRefreshTokenNotClaimed, "an accepted row reaches the claim")
+				require.ErrorIs(t, err, ErrRefreshTokenNotClaimed, "an accepted row reaches the claim")
 			}
 			// The strict double: a refused row opens no transaction and reaches neither containment
 			// nor the claim.
@@ -575,7 +574,7 @@ func TestIssueRefreshTokenGrant_ContainmentPrecedesTheFlowGate(t *testing.T) {
 			var replayErr *RefreshTokenReplayedError
 			require.ErrorAs(t, err, &replayErr, "the replay answers, not the gate")
 			assert.Equal(t, int64(2), replayErr.FamilyRevokedCount)
-			assert.False(t, errors.Is(err, ErrRefreshFlowDisabled))
+			require.NotErrorIs(t, err, ErrRefreshFlowDisabled)
 			mockDB.AssertExpectations(t)
 		})
 	}
@@ -597,8 +596,8 @@ func TestIssueRefreshTokenGrant_ALostClaimContainsAndMintsNothing(t *testing.T) 
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
-	assert.ErrorIs(t, err, ErrRefreshTokenNotClaimed)
-	assert.ErrorIs(t, stub.BodyErr, ErrRefreshTokenNotClaimed)
+	require.ErrorIs(t, err, ErrRefreshTokenNotClaimed)
+	require.ErrorIs(t, stub.BodyErr, ErrRefreshTokenNotClaimed)
 	assert.Nil(t, response)
 	assert.Nil(t, outcome)
 	assert.Empty(t, sessions.bumps)
@@ -623,8 +622,8 @@ func TestIssueRefreshTokenGrant_AClaimFailureIsAFault(t *testing.T) {
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
-	assert.ErrorIs(t, err, failure)
-	assert.False(t, errors.Is(err, ErrRefreshTokenNotClaimed))
+	require.ErrorIs(t, err, failure)
+	require.NotErrorIs(t, err, ErrRefreshTokenNotClaimed)
 	assert.Nil(t, response)
 	assert.Nil(t, outcome)
 	mockDB.AssertExpectations(t)
@@ -655,9 +654,9 @@ func TestIssueRefreshTokenGrant_AFamilyRevokedInTheGapRollsTheRotationBack(t *te
 
 			response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), tc.input)
 
-			assert.ErrorIs(t, err, ErrRefreshFamilyRevoked)
-			assert.False(t, errors.Is(err, ErrRefreshTokenNotClaimed), "it is its own refusal, not a lost claim")
-			assert.ErrorIs(t, stub.BodyErr, ErrRefreshFamilyRevoked, "the body asked for the rollback")
+			require.ErrorIs(t, err, ErrRefreshFamilyRevoked)
+			require.NotErrorIs(t, err, ErrRefreshTokenNotClaimed, "it is its own refusal, not a lost claim")
+			require.ErrorIs(t, stub.BodyErr, ErrRefreshFamilyRevoked, "the body asked for the rollback")
 			assert.Equal(t, []string{"begin", "acquire", "claim", "family", "rollback"}, order)
 			assert.Nil(t, response)
 			assert.Nil(t, outcome)
@@ -684,9 +683,9 @@ func TestIssueRefreshTokenGrant_AFailedFamilyReadIsAFault(t *testing.T) {
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
-	assert.ErrorIs(t, err, failure)
-	assert.False(t, errors.Is(err, ErrRefreshFamilyRevoked))
-	assert.ErrorIs(t, stub.BodyErr, failure)
+	require.ErrorIs(t, err, failure)
+	require.NotErrorIs(t, err, ErrRefreshFamilyRevoked)
+	require.ErrorIs(t, stub.BodyErr, failure)
 	assert.Nil(t, response)
 	assert.Nil(t, outcome)
 	assert.Empty(t, sessions.bumps)
@@ -707,8 +706,8 @@ func TestIssueRefreshTokenGrant_AFailedMintBumpsNothing(t *testing.T) {
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
-	assert.ErrorIs(t, err, failure)
-	assert.ErrorIs(t, stub.BodyErr, failure, "the claim is rolled back with the failed mint")
+	require.ErrorIs(t, err, failure)
+	require.ErrorIs(t, stub.BodyErr, failure, "the claim is rolled back with the failed mint")
 	assert.Nil(t, response)
 	assert.Nil(t, outcome)
 	assert.Empty(t, sessions.bumps)
@@ -728,8 +727,8 @@ func TestIssueRefreshTokenGrant_AFailedROPCMintIsAFault(t *testing.T) {
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
-	assert.ErrorIs(t, err, failure)
-	assert.ErrorIs(t, stub.BodyErr, failure)
+	require.ErrorIs(t, err, failure)
+	require.ErrorIs(t, stub.BodyErr, failure)
 	assert.Nil(t, response)
 	assert.Nil(t, outcome)
 	assert.Empty(t, sessions.bumps)
@@ -755,7 +754,7 @@ func TestIssueRefreshTokenGrant_ARefusedCommitHandsOutNothing(t *testing.T) {
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
-	assert.ErrorIs(t, err, commitFailure)
+	require.ErrorIs(t, err, commitFailure)
 	assert.Nil(t, response)
 	assert.Nil(t, outcome)
 	assert.Empty(t, sessions.bumps)
@@ -800,7 +799,7 @@ func TestIssueRefreshTokenGrant_TakesTheTokensOwnersRowFirst(t *testing.T) {
 
 			_, _, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
-			assert.ErrorIs(t, err, ErrRefreshTokenNotClaimed)
+			require.ErrorIs(t, err, ErrRefreshTokenNotClaimed)
 			assert.Equal(t, []string{"begin", "acquire", "claim", "rollback"}, order)
 			mockDB.AssertExpectations(t)
 		})
@@ -821,9 +820,9 @@ func TestIssueRefreshTokenGrant_AFailedAcquisitionIsAFaultBeforeTheClaim(t *test
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
-	assert.ErrorIs(t, err, failure)
-	assert.False(t, errors.Is(err, ErrRefreshTokenNotClaimed))
-	assert.ErrorIs(t, stub.BodyErr, failure)
+	require.ErrorIs(t, err, failure)
+	require.NotErrorIs(t, err, ErrRefreshTokenNotClaimed)
+	require.ErrorIs(t, stub.BodyErr, failure)
 	assert.Nil(t, response)
 	assert.Nil(t, outcome)
 	assert.Empty(t, sessions.bumps)
@@ -903,9 +902,9 @@ func TestIssueRefreshTokenGrant_ATokenThatCannotBeReadBackIsAFault(t *testing.T)
 			response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
 			require.Error(t, err)
-			assert.False(t, errors.Is(err, ErrRefreshTokenNotClaimed))
-			assert.False(t, errors.Is(err, ErrRefreshFamilyRevoked))
-			assert.Error(t, stub.BodyErr, "the claim is rolled back with the transaction")
+			require.NotErrorIs(t, err, ErrRefreshTokenNotClaimed)
+			require.NotErrorIs(t, err, ErrRefreshFamilyRevoked)
+			require.Error(t, stub.BodyErr, "the claim is rolled back with the transaction")
 			assert.Nil(t, response)
 			assert.Nil(t, outcome)
 			assert.Empty(t, sessions.bumps)
@@ -929,7 +928,7 @@ func TestIssueRefreshTokenGrant_AFailedBumpIsAFault(t *testing.T) {
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
-	assert.ErrorIs(t, err, failure)
+	require.ErrorIs(t, err, failure)
 	assert.Nil(t, response)
 	assert.Nil(t, outcome)
 	assert.Len(t, sessions.bumps, 1)

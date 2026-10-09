@@ -111,7 +111,7 @@ func TestMigration000043_BrowserSessionsDataText(t *testing.T) {
 	// fail to be if the CREATE ran against the wrong name.
 	_, err = h.SQL.Exec(`INSERT INTO browser_sessions (owner, session_id_hash, last_accessed, expires_at)
 		VALUES ('authserver', 'hash-000043', '2026-01-01 00:00:00', '2030-01-01 00:00:00')`)
-	assert.Error(t, err, "(owner, session_id_hash) is still unique after the rebuild")
+	require.Error(t, err, "(owner, session_id_hash) is still unique after the rebuild")
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), sqliteVersionBefore000043), "roll back 000043")
 	rolledBack := dumpTable(t, h, "browser_sessions")

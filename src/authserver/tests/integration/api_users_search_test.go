@@ -45,7 +45,7 @@ func TestAPIUsersSearch_Success(t *testing.T) {
 	var searchResponse api.SearchUsersResponse
 	err := json.NewDecoder(resp.Body).Decode(&searchResponse)
 	_ = resp.Body.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	t.Logf("Search returned %d users matching suffix '%s'", searchResponse.Total, uniqueSuffix)
 
@@ -88,7 +88,7 @@ func TestAPIUsersSearch_WithQuery(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, user1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, user1.Id)
@@ -110,7 +110,7 @@ func TestAPIUsersSearch_WithQuery(t *testing.T) {
 	// Parse response
 	var searchResponse api.SearchUsersResponse
 	err = json.NewDecoder(resp.Body).Decode(&searchResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should find our test user
 	assert.Equal(t, searchQuery, searchResponse.Query)
@@ -158,7 +158,7 @@ func TestAPIUsersSearch_WithPagination(t *testing.T) {
 	// Parse response
 	var searchResponse api.SearchUsersResponse
 	err := json.NewDecoder(resp.Body).Decode(&searchResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Pagination parameters
 	assert.Equal(t, 1, searchResponse.Page)
@@ -171,11 +171,11 @@ func TestAPIUsersSearch_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search"
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -228,7 +228,7 @@ func TestAPIUsersSearch_InvalidParameters(t *testing.T) {
 			// Parse response
 			var searchResponse api.SearchUsersResponse
 			err := json.NewDecoder(resp.Body).Decode(&searchResponse)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			// Assert: Should fallback to default values
 			assert.Equal(t, tc.expPage, searchResponse.Page, "Page should fallback to default")
@@ -254,7 +254,7 @@ func TestAPIUsersSearch_SizeLimit(t *testing.T) {
 
 	var searchResponse api.SearchUsersResponse
 	err := json.NewDecoder(resp.Body).Decode(&searchResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should accept maximum size
 	assert.Equal(t, 200, searchResponse.Size, "Should accept size=200")
@@ -267,7 +267,7 @@ func TestAPIUsersSearch_SizeLimit(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	err = json.NewDecoder(resp.Body).Decode(&searchResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should fallback to default size
 	assert.Equal(t, 10, searchResponse.Size, "Size over 200 should fallback to default")
@@ -292,11 +292,11 @@ func TestAPIUsersSearch_NoResults(t *testing.T) {
 	// Parse response
 	var searchResponse api.SearchUsersResponse
 	err := json.NewDecoder(resp.Body).Decode(&searchResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return empty results but valid structure
 	assert.Equal(t, 0, searchResponse.Total, "Total should be 0 for no results")
-	assert.Equal(t, 0, len(searchResponse.Users), "Users array should be empty")
+	assert.Empty(t, searchResponse.Users, "Users array should be empty")
 	assert.Equal(t, 1, searchResponse.Page, "Page should be 1")
 	assert.Equal(t, 10, searchResponse.Size, "Size should be default 10")
 	assert.Equal(t, "nonexistent-user-12345", searchResponse.Query, "Query should be preserved")
@@ -334,7 +334,7 @@ func TestAPIUsersSearch_SpecialCharacters(t *testing.T) {
 			// Parse response
 			var searchResponse api.SearchUsersResponse
 			err := json.NewDecoder(resp.Body).Decode(&searchResponse)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			// Assert: Query should be preserved correctly
 			assert.Equal(t, tc.expectedQuery, searchResponse.Query, "Query should be URL decoded correctly")
@@ -379,7 +379,7 @@ func TestAPIUsersSearch_MultiplePages(t *testing.T) {
 
 	var searchResponse1 api.SearchUsersResponse
 	err := json.NewDecoder(resp1.Body).Decode(&searchResponse1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test: Second page
 	url2 := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?size=5&page=2"
@@ -390,7 +390,7 @@ func TestAPIUsersSearch_MultiplePages(t *testing.T) {
 
 	var searchResponse2 api.SearchUsersResponse
 	err = json.NewDecoder(resp2.Body).Decode(&searchResponse2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Pagination parameters
 	assert.Equal(t, 1, searchResponse1.Page, "First page should be 1")

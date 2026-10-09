@@ -117,7 +117,7 @@ func TestHandleResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testing.
 	// structured attribute (#279 decision 7).
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", response["error_code"])
 	assert.Contains(t, response["error_description"], "An unexpected server error has occurred")
 
@@ -244,7 +244,7 @@ func TestHandleResourcePermissionsPut_SavesTheExactPlanInOneTransaction(t *testi
 	rr := serveResourcePerms(database, auditLogger, resourcePermsBody(t, resourcePermsEdit(), loadedEntries(resourcePermsStored())))
 
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-	assert.NoError(t, stub.BodyErr)
+	require.NoError(t, stub.BodyErr)
 	require.Len(t, updated, 1, "the re-described row, and not the unchanged one")
 	assert.Equal(t, int64(31), updated[0].Id)
 	assert.Equal(t, "read", updated[0].PermissionIdentifier)
@@ -328,7 +328,7 @@ func TestHandleResourcePermissionsPut_AUniqueKeyRaceAnswersConflict(t *testing.T
 	assert.Equal(t, http.StatusConflict, rr.Code)
 	code, _ := decodeErrorEnvelope(t, rr)
 	assert.Equal(t, "CONCURRENT_UPDATE", code)
-	assert.ErrorIs(t, stub.BodyErr, data.ErrUniqueViolation, "the body hands the refusal to the helper, which rolls back")
+	require.ErrorIs(t, stub.BodyErr, data.ErrUniqueViolation, "the body hands the refusal to the helper, which rolls back")
 	database.AssertExpectations(t)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -472,7 +472,7 @@ func TestHandleResourcePermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T
 			assert.Equal(t, http.StatusConflict, rr.Code)
 			code, _ := decodeErrorEnvelope(t, rr)
 			assert.Equal(t, "CONCURRENT_UPDATE", code)
-			assert.ErrorIs(t, stub.BodyErr, errListChanged, "the body refuses, so the helper rolls back")
+			require.ErrorIs(t, stub.BodyErr, errListChanged, "the body refuses, so the helper rolls back")
 			database.AssertExpectations(t)
 			assertNotAttemptedOnClientDatabase(t, database, "CreatePermission", "UpdatePermission", "DeletePermission")
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
@@ -672,7 +672,7 @@ func TestHandleResourcePermissionsPut_ANamedRowGoneByTheTransactionIsRefused(t *
 	rr := serveResourcePerms(database, auditLogger, resourcePermsBody(t, loadedEntries(stored), loadedEntries(stored[:2])))
 
 	assert.Equal(t, http.StatusConflict, rr.Code)
-	assert.ErrorIs(t, stub.BodyErr, errListChanged)
+	require.ErrorIs(t, stub.BodyErr, errListChanged)
 	database.AssertExpectations(t)
 	assertNotAttemptedOnClientDatabase(t, database, "CreatePermission", "UpdatePermission", "DeletePermission")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)

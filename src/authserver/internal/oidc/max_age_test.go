@@ -36,7 +36,7 @@ func TestParseMaxAge(t *testing.T) {
 
 	t.Run("empty is absent", func(t *testing.T) {
 		got, err := ParseMaxAge("")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, got)
 	})
 
@@ -57,7 +57,7 @@ func TestParseMaxAge(t *testing.T) {
 	for _, tc := range refused {
 		t.Run("refuses "+tc.name, func(t *testing.T) {
 			got, err := ParseMaxAge(tc.raw)
-			assert.Error(t, err)
+			require.Error(t, err)
 			assert.Nil(t, got)
 		})
 	}

@@ -389,7 +389,7 @@ func TestHTTPBackend_APersistent401StopsAfterOneRefresh(t *testing.T) {
 
 	_, err := backend.Load(context.Background(), httpTestSessionId)
 	require.Error(t, err)
-	assert.NotErrorIs(t, err, sessionstore.ErrNotFound)
+	require.NotErrorIs(t, err, sessionstore.ErrNotFound)
 	assert.Len(t, stub.recorded(), 2)
 	assert.Equal(t, 1, tokens.invalidated, "exactly one refresh, however many 401s arrive")
 }
@@ -434,7 +434,7 @@ func TestHTTPBackend_TrailingSlashInTheBaseURLDoesNotDoubleUp(t *testing.T) {
 	recorded := stub.recorded()
 	require.Len(t, recorded, 1)
 	assert.Equal(t, "/api/v1/sessions/load", recorded[0].path)
-	assert.False(t, strings.Contains(recorded[0].path, "//"))
+	assert.NotContains(t, recorded[0].path, "//")
 }
 
 // TestHTTPBackend_ACancelledContextIsNotRetried. The retry is for a connection that died on
@@ -482,7 +482,7 @@ func TestHTTPBackend_AnAnswerThatCouldNotBeReadIsNotRetried(t *testing.T) {
 
 	_, err := backend.Create(context.Background(), httpTestSessionId, []byte("ciphertext"), true)
 	require.Error(t, err)
-	assert.NotErrorIs(t, err, sessionstore.ErrNotFound)
+	require.NotErrorIs(t, err, sessionstore.ErrNotFound)
 	assert.Len(t, stub.recorded(), 1, "the create is not sent a second time: the first one committed")
 }
 
@@ -540,7 +540,7 @@ func TestHTTPBackend_RefusesAResponseOverTheCap(t *testing.T) {
 	_, err := backend.Load(context.Background(), httpTestSessionId)
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge),
+	require.ErrorIs(t, err, boundedread.ErrResponseTooLarge,
 		"the answer is refused as oversized rather than decoded from a prefix: %v", err)
 	assert.Len(t, stub.recorded(), 1, "an oversized answer is not a transport failure, so it is not retried")
 }

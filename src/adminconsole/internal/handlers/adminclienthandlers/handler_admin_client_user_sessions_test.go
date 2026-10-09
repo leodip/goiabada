@@ -265,8 +265,8 @@ func TestHandleUserSessionsGet_AnAbsentOwnerLeavesTheColumnsEmpty(t *testing.T) 
 	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 1)
-	assert.Equal(t, "", sessions[0].UserEmail)
-	assert.Equal(t, "", sessions[0].UserFullName)
+	assert.Empty(t, sessions[0].UserEmail)
+	assert.Empty(t, sessions[0].UserFullName)
 	assert.Equal(t, "Firefox", sessions[0].DeviceName)
 }
 
@@ -399,6 +399,6 @@ func TestHandleUserSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T
 	HandleUserSessionsPost(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	httpHelper.AssertExpectations(t)
-	require.NotNil(t, captured, "the handler answered nothing")
+	require.Error(t, captured, "the handler answered nothing")
 	assert.Empty(t, apiClient.deleted, "nothing may be deleted on an answer the handler cannot make")
 }
