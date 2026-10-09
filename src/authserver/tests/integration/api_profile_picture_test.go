@@ -63,7 +63,7 @@ func makeMultipartRequest(t *testing.T, method, url, accessToken, fieldName stri
 func createTestUserForProfilePicture(t *testing.T) *record.User {
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:      fake.UUID(),
@@ -92,7 +92,7 @@ func TestAPIAccountProfilePictureGet_Success_NoPicture(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, response["hasPicture"].(bool))
 	assert.Nil(t, response["pictureUrl"])
 }
@@ -102,10 +102,10 @@ func TestAPIAccountProfilePictureGet_Unauthorized(t *testing.T) {
 
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
@@ -132,7 +132,7 @@ func TestAPIAccountProfilePicturePost_Success(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, response["success"].(bool))
 	assert.Contains(t, response["pictureUrl"].(string), user.Subject)
 
@@ -142,7 +142,7 @@ func TestAPIAccountProfilePicturePost_Success(t *testing.T) {
 
 	var getResponse map[string]interface{}
 	err = json.NewDecoder(getResp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, getResponse["hasPicture"].(bool))
 	assert.NotNil(t, getResponse["pictureUrl"])
 }
@@ -166,7 +166,7 @@ func TestAPIAccountProfilePicturePost_UpdateExisting(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp2.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, response["success"].(bool))
 }
 
@@ -182,7 +182,7 @@ func TestAPIAccountProfilePicturePost_InvalidImage(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "validator.image.unsupported_type", response["error_code"])
 }
 
@@ -197,12 +197,12 @@ func TestAPIAccountProfilePicturePost_Unauthorized(t *testing.T) {
 	_ = writer.Close()
 
 	req, err := http.NewRequest("POST", url, &body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
@@ -232,7 +232,7 @@ func TestAPIAccountProfilePictureDelete_Success(t *testing.T) {
 
 	var deleteResponse map[string]interface{}
 	err := json.NewDecoder(deleteResp.Body).Decode(&deleteResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, deleteResponse["success"].(bool))
 
 	// Verify it's gone
@@ -258,10 +258,10 @@ func TestAPIAccountProfilePictureDelete_Unauthorized(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 
 	req, err := http.NewRequest("DELETE", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
@@ -282,7 +282,7 @@ func TestAPIUserProfilePictureGet_Success(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, response["hasPicture"].(bool))
 }
 
@@ -319,7 +319,7 @@ func TestAPIUserProfilePicturePost_Success(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, response["success"].(bool))
 	assert.Contains(t, response["pictureUrl"].(string), user.Subject)
 
@@ -329,7 +329,7 @@ func TestAPIUserProfilePicturePost_Success(t *testing.T) {
 
 	var getResponse map[string]interface{}
 	err = json.NewDecoder(getResp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, getResponse["hasPicture"].(bool))
 }
 
@@ -357,7 +357,7 @@ func TestAPIUserProfilePicturePost_InvalidImage(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "validator.image.unsupported_type", response["error_code"])
 }
 
@@ -380,7 +380,7 @@ func TestAPIUserProfilePictureDelete_Success(t *testing.T) {
 
 	var deleteResponse map[string]interface{}
 	err := json.NewDecoder(deleteResp.Body).Decode(&deleteResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, deleteResponse["success"].(bool))
 
 	// Verify it's gone
@@ -419,10 +419,10 @@ func TestUserinfoPicture_Success(t *testing.T) {
 	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, user.Subject)
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", pictureUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -430,8 +430,8 @@ func TestUserinfoPicture_Success(t *testing.T) {
 
 	// Verify we got image data back
 	body, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	assert.True(t, len(body) > 0)
+	require.NoError(t, err)
+	assert.NotEmpty(t, body)
 
 	// Verify it's a valid PNG (starts with PNG magic bytes)
 	assert.True(t, bytes.HasPrefix(body, []byte{0x89, 0x50, 0x4E, 0x47}))
@@ -444,10 +444,10 @@ func TestUserinfoPicture_NotFound(t *testing.T) {
 
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", pictureUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -458,10 +458,10 @@ func TestUserinfoPicture_InvalidSubject(t *testing.T) {
 
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", pictureUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Should return 400 Bad Request or 404 Not Found depending on implementation
@@ -476,10 +476,10 @@ func TestUserinfoPicture_UserHasNoPicture(t *testing.T) {
 
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", pictureUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -499,10 +499,10 @@ func TestUserinfoPicture_CacheHeaders(t *testing.T) {
 	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, user.Subject)
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", pictureUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -547,7 +547,7 @@ func TestProfilePicture_FullWorkflow(t *testing.T) {
 	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, user.Subject)
 	httpClient := createHttpClient(t)
 	pictureResp, err := httpClient.Get(pictureUrl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = pictureResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, pictureResp.StatusCode)
 	assert.Equal(t, "image/png", pictureResp.Header.Get("Content-Type"))
@@ -572,7 +572,7 @@ func TestProfilePicture_FullWorkflow(t *testing.T) {
 
 	// 9. Verify public endpoint returns 404
 	pictureResp2, err := httpClient.Get(pictureUrl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = pictureResp2.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, pictureResp2.StatusCode)
 }

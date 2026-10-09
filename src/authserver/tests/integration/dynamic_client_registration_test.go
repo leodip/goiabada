@@ -38,7 +38,7 @@ func TestDCR_Disabled_Returns403(t *testing.T) {
 
 	var errorResp oidc.DynamicClientRegistrationError
 	err := json.NewDecoder(resp.Body).Decode(&errorResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "access_denied", errorResp.Error)
 	assert.Contains(t, errorResp.ErrorDescription, "not enabled")
 }
@@ -65,13 +65,13 @@ func TestDCR_PublicClient_MCP_UseCase_Success(t *testing.T) {
 
 	var response oidc.DynamicClientRegistrationResponse
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify response (RFC 7591 §3.2.1)
 	assert.NotEmpty(t, response.ClientID)
 	assert.True(t, strings.HasPrefix(response.ClientID, "dcr_"))
 	assert.Empty(t, response.ClientSecret, "Public clients should not receive a client_secret")
-	assert.Greater(t, response.ClientIDIssuedAt, int64(0))
+	assert.Positive(t, response.ClientIDIssuedAt)
 	assert.Equal(t, int64(0), response.ClientSecretExpiresAt, "Secret never expires")
 	assert.Equal(t, reqBody.RedirectURIs, response.RedirectURIs)
 	assert.Equal(t, "none", response.TokenEndpointAuthMethod)
@@ -80,7 +80,7 @@ func TestDCR_PublicClient_MCP_UseCase_Success(t *testing.T) {
 
 	// Verify database state
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, client)
 	assert.Equal(t, "MCP Remote Client", client.Description)
 	assert.True(t, client.IsPublic)
@@ -93,7 +93,7 @@ func TestDCR_PublicClient_MCP_UseCase_Success(t *testing.T) {
 
 	// Verify redirect URIs saved
 	redirectURIs, err := database.GetRedirectURIsByClientId(context.Background(), nil, client.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, redirectURIs, 1)
 	assert.Equal(t, "http://localhost:8080/callback", redirectURIs[0].URI)
 }
@@ -116,7 +116,7 @@ func TestDCR_ConfidentialClient_Success(t *testing.T) {
 
 	var response oidc.DynamicClientRegistrationResponse
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Confidential clients MUST receive a client_secret (RFC 7591 §3.2.1)
 	assert.NotEmpty(t, response.ClientSecret)
@@ -125,7 +125,7 @@ func TestDCR_ConfidentialClient_Success(t *testing.T) {
 
 	// Verify database state
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, client.IsPublic)
 	assert.True(t, client.AuthorizationCodeEnabled)
 	assert.True(t, client.ClientCredentialsEnabled)
@@ -133,7 +133,7 @@ func TestDCR_ConfidentialClient_Success(t *testing.T) {
 
 	// Verify secret can be decrypted and matches
 	decryptedSecret, err := dataCipher.Decrypt(client.ClientSecretEncrypted)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, response.ClientSecret, decryptedSecret)
 }
 
@@ -154,7 +154,7 @@ func TestDCR_DefaultValues_Applied(t *testing.T) {
 
 	var response oidc.DynamicClientRegistrationResponse
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify defaults (RFC 7591 §2)
 	assert.Equal(t, "client_secret_basic", response.TokenEndpointAuthMethod, "Default auth method")
@@ -163,7 +163,7 @@ func TestDCR_DefaultValues_Applied(t *testing.T) {
 
 	// Verify database
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, client.IsPublic)
 	assert.True(t, client.AuthorizationCodeEnabled)
 	assert.False(t, client.ClientCredentialsEnabled)
@@ -318,7 +318,7 @@ func TestDCR_RedirectURI_Validation(t *testing.T) {
 			if tc.expectedStatus == http.StatusBadRequest {
 				var errorResp oidc.DynamicClientRegistrationError
 				err := json.NewDecoder(resp.Body).Decode(&errorResp)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedError, errorResp.Error)
 			}
 		})
@@ -377,7 +377,7 @@ func TestDCR_GrantType_Validation(t *testing.T) {
 			if tc.expectedStatus == http.StatusBadRequest {
 				var errorResp oidc.DynamicClientRegistrationError
 				err := json.NewDecoder(resp.Body).Decode(&errorResp)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedError, errorResp.Error)
 			}
 		})
@@ -507,7 +507,7 @@ func TestDCR_ClientName_Validation(t *testing.T) {
 			if tc.expectedStatus == http.StatusBadRequest {
 				var errorResp oidc.DynamicClientRegistrationError
 				err := json.NewDecoder(resp.Body).Decode(&errorResp)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedError, errorResp.Error)
 			}
 		})
@@ -523,14 +523,14 @@ func TestDCR_WellKnown_Metadata(t *testing.T) {
 		wellKnownURL := appConfig.AuthServer.BaseURL + "/.well-known/openid-configuration"
 
 		resp, fetchErr := httpClient.Get(wellKnownURL)
-		assert.NoError(t, fetchErr)
+		require.NoError(t, fetchErr)
 		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 		var metadata map[string]interface{}
 		fetchErr = json.NewDecoder(resp.Body).Decode(&metadata)
-		assert.NoError(t, fetchErr)
+		require.NoError(t, fetchErr)
 
 		registrationEndpoint, ok := metadata["registration_endpoint"].(string)
 		assert.True(t, ok, "registration_endpoint should be present")
@@ -544,14 +544,14 @@ func TestDCR_WellKnown_Metadata(t *testing.T) {
 		wellKnownURL := appConfig.AuthServer.BaseURL + "/.well-known/openid-configuration"
 
 		resp, err := httpClient.Get(wellKnownURL)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 		var metadata map[string]interface{}
 		err = json.NewDecoder(resp.Body).Decode(&metadata)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		_, ok := metadata["registration_endpoint"]
 		assert.False(t, ok, "registration_endpoint should be absent when DCR disabled")
@@ -580,16 +580,16 @@ func TestDCR_MultipleRedirectURIs(t *testing.T) {
 
 	var response oidc.DynamicClientRegistrationResponse
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Len(t, response.RedirectURIs, 3)
 
 	// Verify all URIs saved in database
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	redirectURIs, err := database.GetRedirectURIsByClientId(context.Background(), nil, client.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, redirectURIs, 3)
 
 	uris := make([]string, len(redirectURIs))
@@ -617,17 +617,17 @@ func TestDCR_ConfidentialClient_DefaultAcrLevel(t *testing.T) {
 
 	var response oidc.DynamicClientRegistrationResponse
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify database defaults
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, record.AcrLevel2Optional, client.DefaultAcrLevel, "Should default to level 2 optional")
 
 	// Verify token expiration uses global settings
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, settings.TokenExpirationInSeconds, client.TokenExpirationInSeconds)
 	assert.Equal(t, settings.RefreshTokenOfflineIdleTimeoutInSeconds, client.RefreshTokenOfflineIdleTimeoutInSeconds)
 	assert.Equal(t, settings.RefreshTokenOfflineMaxLifetimeInSeconds, client.RefreshTokenOfflineMaxLifetimeInSeconds)

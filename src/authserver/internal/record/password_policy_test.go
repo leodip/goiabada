@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestPasswordPolicy_String owns the total String decision 16 of #385 settled for this type. This is
@@ -39,7 +40,7 @@ func TestPasswordPolicyFromString(t *testing.T) {
 	for _, policy := range all {
 		t.Run(policy.String(), func(t *testing.T) {
 			parsed, err := PasswordPolicyFromString(policy.String())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, policy, parsed)
 		})
 	}
@@ -47,7 +48,7 @@ func TestPasswordPolicyFromString(t *testing.T) {
 	t.Run("an unrecognized policy is refused", func(t *testing.T) {
 		for _, raw := range []string{"", "extreme", "High", "2"} {
 			parsed, err := PasswordPolicyFromString(raw)
-			assert.Error(t, err, "%q must not parse", raw)
+			require.Error(t, err, "%q must not parse", raw)
 			assert.Equal(t, PasswordPolicyNone, parsed, "the refused value returns the zero policy")
 		}
 	})

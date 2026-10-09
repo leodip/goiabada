@@ -29,7 +29,7 @@ func TestAPIUserPermissionsGet_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -67,7 +67,7 @@ func TestAPIUserPermissionsGet_Success(t *testing.T) {
 	// Parse response
 	var getResponse api.GetUserPermissionsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: User information
 	assert.Equal(t, testUser.Id, getResponse.User.Id)
@@ -136,7 +136,7 @@ func TestAPIUserPermissionsGet_NoPermissions(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -152,10 +152,10 @@ func TestAPIUserPermissionsGet_NoPermissions(t *testing.T) {
 	// Parse response
 	var getResponse api.GetUserPermissionsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return empty permissions array
-	assert.Len(t, getResponse.Permissions, 0)
+	assert.Empty(t, getResponse.Permissions)
 	assert.Equal(t, testUser.Id, getResponse.User.Id)
 }
 
@@ -169,7 +169,7 @@ func TestAPIUserPermissionsGet_Unauthorized(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -177,11 +177,11 @@ func TestAPIUserPermissionsGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -203,7 +203,7 @@ func TestAPIUserPermissionsPut_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -246,12 +246,12 @@ func TestAPIUserPermissionsPut_Success(t *testing.T) {
 	// Parse response
 	var updateResponse api.SuccessResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, updateResponse.Success)
 
 	// Verify changes were persisted: Load user permissions
 	err = database.UserLoadPermissions(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should have exactly 2 permissions (perm2 and perm3)
 	assert.Len(t, testUser.Permissions, 2)
@@ -279,7 +279,7 @@ func TestAPIUserPermissionsPut_RemoveAllPermissions(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -314,17 +314,17 @@ func TestAPIUserPermissionsPut_RemoveAllPermissions(t *testing.T) {
 	// Parse response
 	var updateResponse api.SuccessResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, updateResponse.Success)
 
 	// Verify permission was removed
 	err = database.UserLoadPermissions(context.Background(), nil, testUser)
-	assert.NoError(t, err)
-	assert.Len(t, testUser.Permissions, 0)
+	require.NoError(t, err)
+	assert.Empty(t, testUser.Permissions)
 
 	// Verify the UserPermission record was deleted
 	deletedUserPerm, err := database.GetUserPermissionById(context.Background(), nil, userPerm.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, deletedUserPerm)
 }
 
@@ -359,7 +359,7 @@ func TestAPIUserPermissionsPut_PermissionNotFound(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -391,7 +391,7 @@ func TestAPIUserPermissionsPut_InvalidRequestBody(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -399,13 +399,13 @@ func TestAPIUserPermissionsPut_InvalidRequestBody(t *testing.T) {
 	// Test: Invalid JSON
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
@@ -422,7 +422,7 @@ func TestAPIUserPermissionsPut_Unauthorized(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -430,11 +430,11 @@ func TestAPIUserPermissionsPut_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized

@@ -26,16 +26,16 @@ func TestSchemaDump_RefusesWhatItCannotRead(t *testing.T) {
 	// arm to SQLite, so in the generator's four-engine process a misspelling would have read
 	// SQLite's catalog against another engine's connection and reported success.
 	_, err := schemadump.DumpTable(context.Background(), h.SQL, data.Dialect("postgresql"), "refresh_tokens")
-	assert.ErrorContains(t, err, "unrecognised database dialect",
+	require.ErrorContains(t, err, "unrecognised database dialect",
 		"an unrecognised dialect must be refused, not treated as SQLite")
 	_, err = schemadump.Tables(context.Background(), h.SQL, data.Dialect(""))
-	assert.ErrorContains(t, err, "unrecognised database dialect",
+	require.ErrorContains(t, err, "unrecognised database dialect",
 		"the zero Dialect selects no engine")
 
 	// A table that does not exist. Every catalog answers with an empty row set rather than
 	// an error, so this is the dumper's own guard and not the driver's.
 	_, err = schemadump.DumpTable(context.Background(), h.SQL, dbType(), "no_such_table")
-	assert.ErrorContains(t, err, "read no columns",
+	require.ErrorContains(t, err, "read no columns",
 		"a table with no columns is not something any of the four engines can produce")
 
 	// A name the package would have to interpolate into a catalog query.
@@ -61,7 +61,7 @@ func TestSchemaDump_RefusesAnEmptyTableList(t *testing.T) {
 	require.NoErrorf(t, err, "drop schema_migrations on %s", dbType())
 
 	_, err = schemadump.Tables(context.Background(), h.SQL, dbType())
-	assert.ErrorContains(t, err, "reported no tables at all",
+	require.ErrorContains(t, err, "reported no tables at all",
 		"an empty dump compared against an empty golden file reads as no change and passes")
 	_, err = schemadump.Dump(context.Background(), h.SQL, dbType())
 	assert.ErrorContains(t, err, "reported no tables at all",

@@ -151,7 +151,7 @@ func TestMigration000041_SchemaMigrationsShape(t *testing.T) {
 	// dirty is the column whose NOT NULL is genuinely enforced, and it is the one that
 	// matters: a NULL there is what breaks Version()'s scan.
 	_, err = h.SQL.Exec("INSERT INTO schema_migrations (version, dirty) VALUES (0, NULL)")
-	assert.Error(t, err, "the pinned shape refuses a NULL dirty")
+	require.Error(t, err, "the pinned shape refuses a NULL dirty")
 
 	// version is the surprise, pinned here so nobody later reads NOT NULL as a rejection
 	// and "tidies" the migration on that reading. SQLite REPLACES a NULL in an INTEGER

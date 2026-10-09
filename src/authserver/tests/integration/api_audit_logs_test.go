@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // GET /api/v1/admin/audit-logs
@@ -253,10 +254,10 @@ func TestAPIAuditLogs_UnauthorizedAndScope(t *testing.T) {
 
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	bodyBytes, _ := io.ReadAll(resp.Body)
@@ -295,11 +296,11 @@ func auditedPutWithRequestId(t *testing.T, accessToken string, requestId string)
 		AuditLogsInDatabaseEnabled: true,
 		AuditLogRetentionDays:      33,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	req, err := http.NewRequest("PUT", appConfig.AuthServer.BaseURL+settingsAuditLogsURL,
 		bytes.NewReader(body))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 	if requestId != "" {
@@ -307,7 +308,7 @@ func auditedPutWithRequestId(t *testing.T, accessToken string, requestId string)
 	}
 
 	resp, err := createHttpClient(t).Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }

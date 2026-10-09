@@ -80,7 +80,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Add settings to context
 		settings := &record.Settings{PKCERequired: true}
@@ -161,7 +161,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Add settings to context
 		settings := &record.Settings{PKCERequired: true}
@@ -222,7 +222,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=invalid-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
@@ -271,7 +271,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// jwt is JARM, which this server does not implement, and it is what a client asking for an
 		// unsupported mode most plausibly asks for.
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&response_mode=jwt", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
@@ -324,7 +324,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&response_mode=query", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
@@ -395,7 +395,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		seen := map[string]bool{}
 		for i := 0; i < 2; i++ {
 			req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 			rr := httptest.NewRecorder()
 
@@ -437,7 +437,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=invalid&scope=openid", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Add settings to context
 		settings := &record.Settings{PKCERequired: true}
@@ -488,7 +488,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=invalid", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Add settings to context
 		settings := &record.Settings{PKCERequired: true}
@@ -549,7 +549,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=invalid", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
@@ -613,7 +613,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=invalid", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
@@ -674,7 +674,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=invalid", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
@@ -728,7 +728,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Add settings to context
 		settings := &record.Settings{PKCERequired: true}
@@ -798,7 +798,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 
 		rr := httptest.NewRecorder()
@@ -843,7 +843,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Add settings to context
 		settings := &record.Settings{PKCERequired: true}
@@ -925,7 +925,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		form.Set("scope", "openid")
 
 		req, err := http.NewRequest(http.MethodPost, "/authorize", strings.NewReader(form.Encode()))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		settings := &record.Settings{PKCERequired: true}
@@ -992,7 +992,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		form.Set("state", "abc123")
 
 		req, err := http.NewRequest(http.MethodPost, "/authorize", strings.NewReader(form.Encode()))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		settings := &record.Settings{PKCERequired: true}
@@ -1052,7 +1052,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req, err := http.NewRequest("GET",
 			"/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&ui_locales=pt-BR%20es",
 			nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{PKCERequired: true}
 		ctx := reqctx.WithSettings(req.Context(), settings)
@@ -1121,7 +1121,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		form.Set("ui_locales", "pt-BR es")
 
 		req, err := http.NewRequest(http.MethodPost, "/authorize", strings.NewReader(form.Encode()))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		settings := &record.Settings{PKCERequired: true}
@@ -2157,7 +2157,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Add settings to context with implicit flow enabled
 		settings := &record.Settings{
@@ -2224,7 +2224,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=id_token%20token&scope=openid&nonce=test-nonce", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{
 			PKCERequired:        false,
@@ -2289,7 +2289,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{
 			PKCERequired:        false,
@@ -2348,7 +2348,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{
 			PKCERequired:        false,
@@ -2462,7 +2462,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=bad-jwt-token", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{
 			PKCERequired: true,
@@ -2521,7 +2521,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-wrong-issuer", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{
 			PKCERequired: true,
@@ -2589,7 +2589,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=an-access-token", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{
 			PKCERequired: true,
@@ -2658,7 +2658,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-no-sub", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{
 			PKCERequired: true,
@@ -2723,7 +2723,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=expired-jwt-token", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{
 			PKCERequired: true,
@@ -2807,7 +2807,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-token", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{
 			PKCERequired: true,
@@ -2893,7 +2893,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		sessionSubject := fake.UUID()
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=different-user-jwt", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{
 			PKCERequired: true,
@@ -2976,7 +2976,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none&id_token_hint=valid-jwt-token", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// The silent reuse bumps the session with the browser's address, read as the rest of the
 		// server reads it, so the session records the latest address it was seen from (#243).
 		req.RemoteAddr = "203.0.113.7:4444"
@@ -3098,7 +3098,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		const requestedScope = "openid res:offline_access_read"
 		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid%20res:offline_access_read&prompt=none&id_token_hint=valid-jwt-token", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{
 			PKCERequired: true,
@@ -3205,7 +3205,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		sessionSubject := fake.UUID()
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{
 			PKCERequired: true,
@@ -3299,7 +3299,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		sessionSubject := fake.UUID()
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{
 			PKCERequired: true,
@@ -3397,7 +3397,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		sessionSubject := fake.UUID()
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{
 			PKCERequired: true,
@@ -3487,7 +3487,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		sessionSubject := fake.UUID()
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{
 			PKCERequired: true,
@@ -3574,7 +3574,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&state=abc123&request=foo", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
@@ -3623,7 +3623,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&state=xyz&request_uri=https://example.com/x", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
@@ -3671,7 +3671,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&request=", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()

@@ -139,7 +139,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
@@ -277,7 +277,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
@@ -417,7 +417,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
@@ -561,7 +561,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
@@ -722,7 +722,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
@@ -887,7 +887,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
@@ -1040,7 +1040,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
@@ -1197,7 +1197,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
@@ -1358,7 +1358,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
@@ -1523,7 +1523,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
@@ -2322,7 +2322,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ElevenScope
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, user.Id, code.User.Id)
-	assert.Equal(t, false, code.Used)
+	assert.False(t, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {

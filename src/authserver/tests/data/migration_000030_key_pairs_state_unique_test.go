@@ -125,7 +125,7 @@ func assertKeyPairsStateIndex000030(t *testing.T, h *isolatedDB, phase string) {
 	require.EqualValuesf(t, 1, before, "[%s] expected one current row before the duplicate attempt", phase)
 
 	_, err := h.SQL.Exec(insertKeyPair000030SQL("current"))
-	assert.Errorf(t, err, "[%s] a second row in state 'current' must be refused", phase)
+	require.Errorf(t, err, "[%s] a second row in state 'current' must be refused", phase)
 	assert.EqualValuesf(t, 1, countKeyPairs000030(t, h, "current"),
 		"[%s] the refused insert must leave no row behind", phase)
 }

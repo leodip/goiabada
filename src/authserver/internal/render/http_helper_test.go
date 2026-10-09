@@ -158,7 +158,7 @@ func TestRenderTemplate(t *testing.T) {
 		res := w.Result()
 		defer func() { _ = res.Body.Close() }()
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "text/html; charset=UTF-8", res.Header.Get("Content-Type"))
 		assertNoStore(t, res.Header)
 		assert.Contains(t, w.Body.String(), "Hello, John!")
@@ -180,7 +180,7 @@ func TestRenderTemplate(t *testing.T) {
 		res := w.Result()
 		defer func() { _ = res.Body.Close() }()
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "text/html; charset=UTF-8", res.Header.Get("Content-Type"))
 		assertNoStore(t, res.Header)
 		assert.Contains(t, w.Body.String(), "Hello, Jane!")
@@ -205,7 +205,7 @@ func TestRenderTemplate(t *testing.T) {
 		res := w.Result()
 		defer func() { _ = res.Body.Close() }()
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Empty(t, res.Header.Get("Content-Type"))
 		assert.Empty(t, res.Header.Get("Cache-Control"))
 		assert.Empty(t, res.Header.Get("Pragma"))
@@ -345,7 +345,7 @@ func TestJSONError(t *testing.T) {
 
 	var response map[string]string
 	err2 := json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err2)
+	require.NoError(t, err2)
 
 	assert.Equal(t, "test_error", response["error"])
 	// The detail names no status, so it defaults to 500 and the description picks up the request
@@ -370,7 +370,7 @@ func TestEncodeJSON(t *testing.T) {
 
 	var response map[string]string
 	err := json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, "value", response["key"])
 }
@@ -386,7 +386,7 @@ func TestQueryOrFormValue(t *testing.T) {
 		req := newRequest("POST", "/", bytes.NewBufferString("key=value"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		err := req.ParseForm()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		value := QueryOrFormValue(req, "key")
 		assert.Equal(t, "value", value)
 	})

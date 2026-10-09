@@ -77,7 +77,7 @@ func TestCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransaction
 
 	assert.Equal(t, []string{"user row", "permission row"}, calls,
 		"the permission insert follows the user insert, inside the same transaction, and names the id it assigned")
-	assert.NoError(t, stub.BodyErr, "the body asked the helper to commit")
+	require.NoError(t, stub.BodyErr, "the body asked the helper to commit")
 	assert.Equal(t, int64(77), user.Id)
 	assert.True(t, user.Enabled)
 	assert.Equal(t, "ada@example.com", user.Email)
@@ -102,7 +102,7 @@ func TestCreator_CreateUser_AFailedUserInsertReachesTheHelperAndWritesNoPermissi
 
 	require.ErrorIs(t, err, boom)
 	assert.Nil(t, user, "no user is returned alongside an error")
-	assert.ErrorIs(t, stub.BodyErr, boom, "the body handed the failure to the helper, which rolls back")
+	require.ErrorIs(t, stub.BodyErr, boom, "the body handed the failure to the helper, which rolls back")
 	db.AssertNotCalled(t, "CreateUserPermission", mock.Anything, mock.Anything, mock.Anything)
 }
 

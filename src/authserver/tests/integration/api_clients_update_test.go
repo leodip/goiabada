@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIClientUpdatePut_Success verifies a successful update including ACR change when auth code is enabled
@@ -40,7 +41,7 @@ func TestAPIClientUpdatePut_Success(t *testing.T) {
 
 	var updateResp api.UpdateClientResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Response reflects updates (description trimmed by sanitizer)
 	assert.Equal(t, updateReq.ClientIdentifier, updateResp.Client.ClientIdentifier)
@@ -52,7 +53,7 @@ func TestAPIClientUpdatePut_Success(t *testing.T) {
 
 	// Verify DB persisted changes
 	refreshed, err2 := database.GetClientById(context.Background(), nil, client.Id)
-	assert.NoError(t, err2)
+	require.NoError(t, err2)
 	assert.NotNil(t, refreshed)
 	assert.Equal(t, updateReq.ClientIdentifier, refreshed.ClientIdentifier)
 	assert.Equal(t, "Updated description", refreshed.Description)
@@ -87,7 +88,7 @@ func TestAPIClientUpdatePut_ValidationErrors(t *testing.T) {
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 			var body map[string]interface{}
 			err := json.NewDecoder(resp.Body).Decode(&body)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			msg := body["error_description"].(string)
 			assert.Contains(t, msg, tc.expectedMsg)
 		})
@@ -110,7 +111,7 @@ func TestAPIClientUpdatePut_DuplicateIdentifier(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	msg := body["error_description"].(string)
 	assert.Contains(t, msg, "already in use")
 }
@@ -193,12 +194,12 @@ func TestAPIClientUpdatePut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	// Invalid body
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
@@ -210,9 +211,9 @@ func TestAPIClientUpdatePut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 
 	// Unauthorized
 	req2, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	resp2, err := httpClient.Do(req2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }
@@ -276,7 +277,7 @@ func TestAPIClientUpdatePut_WhitespaceHandling(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 	var updateResp api.UpdateClientResponse
 	err := json.NewDecoder(resp2.Body).Decode(&updateResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "Spaced desc", updateResp.Client.Description)
 }
 
@@ -290,7 +291,7 @@ func TestAPIClientUpdatePut_SystemLevelClientAllowed(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var listResp api.GetClientsResponse
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var sysId int64
 	for _, c := range listResp.Clients {
@@ -312,7 +313,7 @@ func TestAPIClientUpdatePut_SystemLevelClientAllowed(t *testing.T) {
 
 	var updatedClient api.GetClientResponse
 	err = json.NewDecoder(resp2.Body).Decode(&updatedClient)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "admin-console-client", updatedClient.Client.ClientIdentifier)
 	assert.Equal(t, "Updated description", updatedClient.Client.Description)
 }
@@ -329,7 +330,7 @@ func TestAPIClientUpdatePut_SystemLevelClientIdentifierChangeBlocked(t *testing.
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var listResp api.GetClientsResponse
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var sysId int64
 	for _, c := range listResp.Clients {
@@ -361,7 +362,7 @@ func TestAPIClientUpdatePut_SystemLevelClientIdentifierChangeBlocked(t *testing.
 
 			var errResp api.ErrorResponse
 			err := json.NewDecoder(resp2.Body).Decode(&errResp)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode)
 			assert.Equal(t, "The identifier of a system-level client cannot be changed.", errResp.ErrorDescription)
 		})
@@ -405,14 +406,14 @@ func TestAPIClientUpdatePut_SelfRegisteredClientIdentifierChangeBlocked(t *testi
 
 			var errResp api.ErrorResponse
 			err := json.NewDecoder(resp.Body).Decode(&errResp)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode)
 			assert.Equal(t, "The identifier of a self-registered client cannot be changed.", errResp.ErrorDescription)
 
 			// The refusal has to leave the row alone as well as answer 400: a guard that rejects the
 			// response after writing the rename would report a block it did not perform.
 			refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, client.ClientIdentifier, refreshed.ClientIdentifier)
 			assert.Equal(t, client.Description, refreshed.Description,
 				"and nothing else in the refused request lands either")
@@ -458,7 +459,7 @@ func TestAPIClientUpdatePut_SelfRegisteredClientRemainsEditable(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, refreshed.ConsentRequired, "an administrator can still untick consent for a client they reviewed")
 	assert.Equal(t, "Reviewed Portal", refreshed.DisplayName)
 	assert.True(t, refreshed.CreatedViaDCR, "and how it was created is not something the update can rewrite")
@@ -502,17 +503,17 @@ func TestAPIClientUpdatePut_WebsiteURLValidation(t *testing.T) {
 			if tc.expectedStatus == http.StatusOK {
 				var updateResp api.UpdateClientResponse
 				err := json.NewDecoder(resp.Body).Decode(&updateResp)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.websiteURL, updateResp.Client.WebsiteURL)
 
 				// Verify DB persistence
 				refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.websiteURL, refreshed.WebsiteURL)
 			} else {
 				var body map[string]interface{}
 				err := json.NewDecoder(resp.Body).Decode(&body)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				msg := body["error_description"].(string)
 				assert.Contains(t, msg, tc.expectedMsg)
 			}
@@ -613,7 +614,7 @@ func TestAPIClientUpdatePut_AngleBracketsRejected(t *testing.T) {
 
 			// Refused before the write, so the row is untouched.
 			stored, err := database.GetClientById(context.Background(), nil, client.Id)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, client.Description, stored.Description)
 			assert.Equal(t, client.DisplayName, stored.DisplayName)
 		})
@@ -642,12 +643,12 @@ func TestAPIClientUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 
 	var updateResp api.UpdateClientResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `R&D "phase 2"`, updateResp.Client.Description)
 	assert.Equal(t, `Tom & Jerry`, updateResp.Client.DisplayName)
 
 	stored, err := database.GetClientById(context.Background(), nil, client.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `R&D "phase 2"`, stored.Description)
 	assert.Equal(t, `Tom & Jerry`, stored.DisplayName)
 }

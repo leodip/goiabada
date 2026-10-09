@@ -9,6 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // GET /api/v1/admin/settings/tokens
@@ -17,7 +18,7 @@ func TestAPISettingsTokensGet_Success(t *testing.T) {
 
 	// Read current settings from DB for comparison
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, settings)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/tokens"
@@ -29,7 +30,7 @@ func TestAPISettingsTokensGet_Success(t *testing.T) {
 
 	var body api.SettingsTokensResponse
 	err = json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, settings.TokenExpirationInSeconds, body.TokenExpirationInSeconds)
 	assert.Equal(t, settings.RefreshTokenOfflineIdleTimeoutInSeconds, body.RefreshTokenOfflineIdleTimeoutInSeconds)
@@ -60,7 +61,7 @@ func TestAPISettingsTokensPut_Success(t *testing.T) {
 
 	var body api.SettingsTokensResponse
 	err := json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, req.TokenExpirationInSeconds, body.TokenExpirationInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineIdleTimeoutInSeconds, body.RefreshTokenOfflineIdleTimeoutInSeconds)
@@ -70,7 +71,7 @@ func TestAPISettingsTokensPut_Success(t *testing.T) {
 
 	// Verify DB persisted
 	settings, err2 := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err2)
+	require.NoError(t, err2)
 	assert.Equal(t, req.TokenExpirationInSeconds, settings.TokenExpirationInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineIdleTimeoutInSeconds, settings.RefreshTokenOfflineIdleTimeoutInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineMaxLifetimeInSeconds, settings.RefreshTokenOfflineMaxLifetimeInSeconds)
@@ -190,12 +191,12 @@ func TestAPISettingsTokens_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 
 	// Invalid body (nil/empty)
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
@@ -207,9 +208,9 @@ func TestAPISettingsTokens_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 
 	// Unauthorized (no Authorization header) - PUT
 	req2, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	resp2, err := httpClient.Do(req2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }
@@ -219,10 +220,10 @@ func TestAPISettingsTokens_UnauthorizedAndScope(t *testing.T) {
 
 	// No token - GET
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	bodyBytes, _ := io.ReadAll(resp.Body)

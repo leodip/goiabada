@@ -1003,7 +1003,7 @@ func TestRequireValidSession(t *testing.T) {
 		require.Len(t, records, 1)
 		logged, isError := records[0].Attrs["error"].(error)
 		require.True(t, isError, "the error attribute must carry the error value itself")
-		assert.ErrorIs(t, logged, reqctx.ErrNoSettings)
+		require.ErrorIs(t, logged, reqctx.ErrNoSettings)
 		// The 500 path answers a server fault, not a challenge, so no WWW-Authenticate.
 		assert.Empty(t, rr.Header().Get("WWW-Authenticate"))
 	})
@@ -1106,7 +1106,7 @@ func TestRequireValidSession(t *testing.T) {
 			ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
-		assert.True(t, strings.Contains(rr.Body.String(), "Session has been terminated"))
+		assert.Contains(t, rr.Body.String(), "Session has been terminated")
 	})
 }
 
@@ -1500,7 +1500,7 @@ func TestRequireValidSession_Table(t *testing.T) {
 					rr.Header().Get("WWW-Authenticate"), "challenge")
 
 				var body api.ErrorResponse
-				assert.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body),
+				require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body),
 					"response body should be the standard error envelope")
 				assert.Equal(t, "INVALID_TOKEN", body.ErrorCode, "error_code")
 				assert.Equal(t, tc.wantDescription, body.ErrorDescription, "error_description")
@@ -1692,7 +1692,7 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
 
 	var body api.ErrorResponse
-	assert.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", body.ErrorCode)
 	assert.Contains(t, body.ErrorDescription, requestId)
 

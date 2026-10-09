@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestThreeStateSetting_String owns the total String decision 16 of #385 settled for this type. The
@@ -36,7 +37,7 @@ func TestThreeStateSettingFromString(t *testing.T) {
 	for _, setting := range all {
 		t.Run(setting.String(), func(t *testing.T) {
 			parsed, err := ThreeStateSettingFromString(setting.String())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, setting, parsed)
 		})
 	}
@@ -44,7 +45,7 @@ func TestThreeStateSettingFromString(t *testing.T) {
 	t.Run("an unrecognized setting is refused", func(t *testing.T) {
 		for _, raw := range []string{"", "inherit", "On", "1"} {
 			parsed, err := ThreeStateSettingFromString(raw)
-			assert.Error(t, err, "%q must not parse", raw)
+			require.Error(t, err, "%q must not parse", raw)
 			assert.Equal(t, ThreeStateSettingOn, parsed, "the refused value returns the zero setting")
 		}
 	})

@@ -234,7 +234,7 @@ func TestHandleListGet_ASearchIsCarriedIntoTheSecondQuery(t *testing.T) {
 
 	HandleListGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
-	require.Equal(t, 2, len(apiClient.queries), "the clamp should have cost a second query")
+	require.Len(t, apiClient.queries, 2, "the clamp should have cost a second query")
 	assert.Equal(t, []string{"ana", "ana"}, apiClient.queries, "the search text was dropped on the way")
 	assert.Equal(t, []string{"an-access-token", "an-access-token"}, apiClient.tokens,
 		"the access token was dropped on the way")

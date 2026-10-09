@@ -23,7 +23,7 @@ func TestCreateAuditLog(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify ID was assigned
-		assert.Greater(t, auditLog.Id, int64(0))
+		assert.Positive(t, auditLog.Id)
 
 		// Verify CreatedAt was set
 		assert.False(t, auditLog.CreatedAt.IsZero())
@@ -54,7 +54,7 @@ func TestCreateAuditLog(t *testing.T) {
 		}
 
 		err := database.CreateAuditLog(context.Background(), nil, auditLog)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "empty audit_event")
 	})
 
@@ -66,7 +66,7 @@ func TestCreateAuditLog(t *testing.T) {
 
 		err := database.CreateAuditLog(context.Background(), nil, auditLog)
 		require.NoError(t, err)
-		assert.Greater(t, auditLog.Id, int64(0))
+		assert.Positive(t, auditLog.Id)
 	})
 
 	// #328: the request id written is the request id read back, on every engine, and a row
@@ -188,23 +188,23 @@ func TestGetAuditLogsPaginated(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, 0, total)
-		assert.Len(t, logs, 0)
+		assert.Empty(t, logs)
 	})
 
 	t.Run("Invalid page defaults to 1", func(t *testing.T) {
 		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 0, 10, "", "")
 		require.NoError(t, err)
 
-		assert.Greater(t, total, 0)
-		assert.Greater(t, len(logs), 0)
+		assert.Positive(t, total)
+		assert.NotEmpty(t, logs)
 	})
 
 	t.Run("Invalid page size defaults to 20", func(t *testing.T) {
 		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 0, "", "")
 		require.NoError(t, err)
 
-		assert.Greater(t, total, 0)
-		assert.Greater(t, len(logs), 0)
+		assert.Positive(t, total)
+		assert.NotEmpty(t, logs)
 	})
 }
 
@@ -226,8 +226,8 @@ func TestGetAuditLogsPaginated_Sorting(t *testing.T) {
 		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, "", "")
 		require.NoError(t, err)
 
-		assert.Greater(t, total, 0)
-		assert.Greater(t, len(logs), 0)
+		assert.Positive(t, total)
+		assert.NotEmpty(t, logs)
 
 		// Verify newest first (event_5 was created last)
 		// Find event_5 in the results
@@ -296,7 +296,7 @@ func TestGetAuditLogsPaginated_RequestIdFilter(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, 0, total)
-		assert.Len(t, logs, 0)
+		assert.Empty(t, logs)
 	})
 
 	t.Run("an empty id is no filter at all", func(t *testing.T) {

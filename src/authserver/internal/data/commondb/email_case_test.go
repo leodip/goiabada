@@ -80,7 +80,7 @@ func TestScanEmailCase_ReturnsTheQueryFailureRatherThanAnEmptyTable(t *testing.T
 	rows, err := db.ScanEmailCase(context.Background())
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, errStorage, "the sentinel must stay discoverable through the wrapping")
+	require.ErrorIs(t, err, errStorage, "the sentinel must stay discoverable through the wrapping")
 	assert.Nil(t, rows, "a refused query must not read as a table with nothing in it")
 }
 
@@ -122,6 +122,6 @@ func TestScanEmailCase_ReturnsAnIterationFailureRatherThanThePartialRead(t *test
 	rows, err := db.ScanEmailCase(context.Background())
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, errStorage)
+	require.ErrorIs(t, err, errStorage)
 	assert.Nil(t, rows, "a truncated read must not be answered as the whole table")
 }

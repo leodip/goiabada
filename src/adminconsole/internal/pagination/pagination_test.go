@@ -530,6 +530,6 @@ func TestNew_HugeTotalDoesNotOverflow(t *testing.T) {
 func TestNew_TableIsComplete(t *testing.T) {
 	rows, marked := parseTable(t)
 
-	assert.Equal(t, 363, len(rows), "case rows in the table")
+	assert.Len(t, rows, 363, "case rows in the table")
 	assert.Equal(t, 73, marked, "rows where this package departs from the library it replaced")
 }

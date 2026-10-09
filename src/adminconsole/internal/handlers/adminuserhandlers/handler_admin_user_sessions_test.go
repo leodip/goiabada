@@ -277,6 +277,6 @@ func TestHandleSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
 	HandleSessionsPost(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	httpHelper.AssertExpectations(t)
-	require.NotNil(t, captured, "the handler answered nothing")
+	require.Error(t, captured, "the handler answered nothing")
 	assert.Empty(t, apiClient.deleted, "nothing may be deleted on an answer the handler cannot make")
 }

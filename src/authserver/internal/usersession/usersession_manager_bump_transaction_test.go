@@ -94,8 +94,8 @@ func TestBumpUserSession_ALostAssociationKeyRunsOnceMoreAndFindsThePair(t *testi
 	result, err := manager.BumpUserSession(context.Background(), bumpSessionIdentifier, 456, "", "", "")
 
 	require.NoError(t, err, "a loser on the key is rerun, and the rerun finds the row")
-	assert.ErrorIs(t, attempt1.BodyErr, data.ErrUniqueViolation, "the first attempt lost the key and rolled back")
-	assert.NoError(t, attempt2.BodyErr, "the second committed")
+	require.ErrorIs(t, attempt1.BodyErr, data.ErrUniqueViolation, "the first attempt lost the key and rolled back")
+	require.NoError(t, attempt2.BodyErr, "the second committed")
 	assert.Same(t, second, result, "the session returned is the committed attempt's, not the first attempt's")
 	require.Len(t, result.Clients, 1, "one association for the client, never two")
 	assert.Equal(t, int64(9), result.Clients[0].Id)
@@ -119,7 +119,7 @@ func TestBumpUserSession_ASecondLossIsAFaultAndIsNotRetriedAgain(t *testing.T) {
 
 	result, err := manager.BumpUserSession(context.Background(), bumpSessionIdentifier, 456, "", "", "")
 
-	assert.ErrorIs(t, err, data.ErrUniqueViolation)
+	require.ErrorIs(t, err, data.ErrUniqueViolation)
 	assert.Nil(t, result)
 	database.AssertExpectations(t)
 }
@@ -161,9 +161,9 @@ func TestBumpUserSession_AFailureOtherThanTheKeyIsNotRetried(t *testing.T) {
 
 			result, err := manager.BumpUserSession(context.Background(), bumpSessionIdentifier, 456, "", "", "")
 
-			assert.ErrorIs(t, err, boom)
+			require.ErrorIs(t, err, boom)
 			assert.Nil(t, result)
-			assert.ErrorIs(t, stub.BodyErr, boom, "the transaction rolled back")
+			require.ErrorIs(t, stub.BodyErr, boom, "the transaction rolled back")
 			database.AssertExpectations(t)
 		})
 	}
@@ -185,7 +185,7 @@ func TestBumpUserSession_ARefusedCommitReturnsNoSession(t *testing.T) {
 
 	result, err := manager.BumpUserSession(context.Background(), bumpSessionIdentifier, 456, "", "", "")
 
-	assert.ErrorIs(t, err, refused)
+	require.ErrorIs(t, err, refused)
 	assert.Nil(t, result)
 }
 

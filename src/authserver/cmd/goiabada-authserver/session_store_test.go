@@ -35,7 +35,7 @@ func TestNewSessionStore_TheEndUsersCookieFollowsTheRowsExpiry(t *testing.T) {
 
 			setCookie := w.Result().Header.Values("Set-Cookie")
 			require.Len(t, setCookie, 1)
-			assert.True(t, strings.Contains(setCookie[0], "Max-Age="),
+			assert.Contains(t, setCookie[0], "Max-Age=",
 				"the cookie carries an expiry, so single sign-on survives a browser restart: %s", setCookie[0])
 
 			cookie := w.Result().Cookies()[0]

@@ -207,7 +207,7 @@ func TestLastAdministrator_TheLastHolderIsRefusedAndTheWriteRolledBack(t *testin
 			code, description := decodeErrorEnvelope(t, rr)
 			assert.Equal(t, "LAST_ADMINISTRATOR", code)
 			assert.Equal(t, "This change would leave no enabled user holding authserver:manage. Grant it to another user first.", description)
-			assert.ErrorIs(t, stub.BodyErr, errLastAdministrator, "the body refuses, so the helper rolls the write back")
+			require.ErrorIs(t, stub.BodyErr, errLastAdministrator, "the body refuses, so the helper rolls the write back")
 			assert.Equal(t, "AcquireManagePermissionRow", firstCallOn(database, removal.tx), "the lock is the transaction's first statement")
 			database.AssertExpectations(t)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
@@ -235,7 +235,7 @@ func TestLastAdministrator_AWriteWhereNoHolderWasLeftIsNotRefused(t *testing.T) 
 		rr := removal.serve(database, auditLogger)
 
 		assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-		assert.NoError(t, stub.BodyErr)
+		require.NoError(t, stub.BodyErr)
 		database.AssertExpectations(t)
 	})
 }
@@ -257,6 +257,6 @@ func TestLastAdministrator_OneOfTwoHoldersIsRemoved(t *testing.T) {
 	rr := removal.serve(database, auditLogger)
 
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-	assert.NoError(t, stub.BodyErr)
+	require.NoError(t, stub.BodyErr)
 	database.AssertExpectations(t)
 }

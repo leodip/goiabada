@@ -143,10 +143,10 @@ func TestHandleUserEnabledPut_RevocationConditionality(t *testing.T) {
 			if stub != nil && !tc.transitioned {
 				// Already disabled: the body leaves the helper on the sentinel, so the empty
 				// transaction rolls back rather than commits, and the caller still answers 200.
-				assert.ErrorIs(t, stub.BodyErr, errUserAlreadyDisabled)
+				require.ErrorIs(t, stub.BodyErr, errUserAlreadyDisabled)
 			}
 			if stub != nil && tc.transitioned {
-				assert.NoError(t, stub.BodyErr)
+				require.NoError(t, stub.BodyErr)
 			}
 			database.AssertExpectations(t)
 			auditLogger.AssertExpectations(t)
@@ -158,7 +158,7 @@ func TestHandleUserEnabledPut_RevocationConditionality(t *testing.T) {
 				// Nothing preserved on this site, reported as "" rather than omitted.
 				value, present := revocationPayload["preserved_session_identifier"]
 				assert.True(t, present)
-				assert.Equal(t, "", value)
+				assert.Empty(t, value)
 			} else {
 				// No generation advance and no revocation event. Both matter: the first is the
 				// state change, the second is the claim about it.
@@ -195,7 +195,7 @@ func TestHandleUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	database.AssertExpectations(t)
-	assert.ErrorIs(t, stub.BodyErr, assert.AnError, "the body hands its error to the helper, which rolls back")
+	require.ErrorIs(t, stub.BodyErr, assert.AnError, "the body hands its error to the helper, which rolls back")
 	// Not even the pre-existing event: the disable did not happen, so recording it as a user
 	// detail update would be false.
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
@@ -260,7 +260,7 @@ func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 	assert.Equal(t, userId, payload["user_id"])
 	value, present := payload["preserved_session_identifier"]
 	assert.True(t, present)
-	assert.Equal(t, "", value)
+	assert.Empty(t, value)
 }
 
 // TestHandleUserOTPPut_DisableCommitsBothWritesAtomically is the admin half of #111 decision 13.

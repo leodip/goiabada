@@ -11,13 +11,14 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // helper to set a user's password to a known value
 func setUserPassword(t *testing.T, user *record.User, newPassword string) {
 	t.Helper()
 	hash, err := passwordhash.Hash(newPassword)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	user.PasswordHash = hash
 	err = database.UpdateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
@@ -51,12 +52,12 @@ func TestAPIAccountPasswordPut_Success(t *testing.T) {
 	// Parse response
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, u.Id, updateResp.User.Id)
 
 	// Verify password updated in DB and matches
 	updatedUser, err := database.GetUserById(context.Background(), nil, u.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, passwordhash.Verify(updatedUser.PasswordHash, reqBody.NewPassword))
 }
 
@@ -117,10 +118,10 @@ func TestAPIAccountPasswordPut_UnauthorizedAndScope(t *testing.T) {
 
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	body1, _ := io.ReadAll(resp.Body)
@@ -149,13 +150,13 @@ func TestAPIAccountPasswordPut_InvalidRequestBody(t *testing.T) {
 
 	// No JSON body
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)

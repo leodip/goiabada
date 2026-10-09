@@ -39,7 +39,7 @@ func TestDiscovery_PromptValuesSupported(t *testing.T) {
 	// Verify it's the expected array
 	promptValuesArr, ok := promptValues.([]interface{})
 	assert.True(t, ok, "prompt_values_supported should be a JSON array")
-	assert.Equal(t, 3, len(promptValuesArr), "prompt_values_supported should have 3 values")
+	assert.Len(t, promptValuesArr, 3, "prompt_values_supported should have 3 values")
 
 	// Verify exact values
 	promptStrings := make([]string, len(promptValuesArr))
@@ -77,13 +77,13 @@ func TestDiscovery_PromptValuesSupportedIsArray(t *testing.T) {
 
 	// Verify it's a JSON array (starts with '[') not a string (starts with '"')
 	rawBytes := []byte(promptRaw)
-	assert.True(t, len(rawBytes) > 0, "prompt_values_supported should not be empty")
+	assert.NotEmpty(t, rawBytes, "prompt_values_supported should not be empty")
 	assert.Equal(t, byte('['), rawBytes[0], "prompt_values_supported should be a JSON array, not a string")
 
 	// Verify it deserializes as an array of strings
 	var promptArr []string
 	err = json.Unmarshal(promptRaw, &promptArr)
-	assert.NoError(t, err, "prompt_values_supported should deserialize as []string")
+	require.NoError(t, err, "prompt_values_supported should deserialize as []string")
 	assert.Equal(t, []string{"none", "login", "consent"}, promptArr)
 }
 

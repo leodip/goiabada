@@ -22,8 +22,8 @@ func TestAll_CountAndUniqueness(t *testing.T) {
 	for _, c := range countries.All() {
 		total += len(c.CallingCodes)
 	}
-	assert.Equal(t, total, len(pcs), "one phone entry per (country, code)")
-	assert.Equal(t, 252, len(pcs), "expected 252 phone entries for the current dataset")
+	assert.Len(t, pcs, total, "one phone entry per (country, code)")
+	assert.Len(t, pcs, 252, "expected 252 phone entries for the current dataset")
 
 	seenId := map[string]bool{}
 	seenName := map[string]bool{}
@@ -113,7 +113,7 @@ func TestAll_Isolation(t *testing.T) {
 	}
 
 	second := All()
-	assert.Equal(t, 252, len(second))
+	assert.Len(t, second, 252)
 	assert.Equal(t, second, build(countries.All()), "All changed after a caller edited its copy")
 	br, ok := ByUniqueID("BRA_0")
 	if assert.True(t, ok, "BRA_0 found") {

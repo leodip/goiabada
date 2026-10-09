@@ -18,7 +18,7 @@ import (
 func assertSendFailure(t *testing.T, err error, want SendFailureKind) {
 	t.Helper()
 	var sendErr *SendError
-	require.True(t, errors.As(err, &sendErr), "the failure carries no kind: %v", err)
+	require.ErrorAs(t, err, &sendErr, "the failure carries no kind: %v", err)
 	assert.Equal(t, want, sendErr.Kind, "labelled with the wrong kind: %v", err)
 	assert.Equal(t, want, SendFailureKindOf(err))
 }

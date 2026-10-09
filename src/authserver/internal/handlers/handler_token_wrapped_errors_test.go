@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -180,7 +181,8 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 	assert.Equal(t, int64(7), auditedCodeId, "the reuse row must name the replayed code")
 	// The same pointer: the handler hands the validator's own detail through unrebuilt, and the
 	// writer conforms the sentence on its way to the wire (#213, #435).
-	answered, ok := (*captured).(*oauth.ErrorDetail)
+	var answered *oauth.ErrorDetail
+	ok := errors.As(*captured, &answered)
 	require.True(t, ok, "expected an *oauth.ErrorDetail, got %T", *captured)
 	assert.Same(t, reuse.Detail, answered)
 	assert.Equal(t, http.StatusBadRequest, answered.HTTPStatus())

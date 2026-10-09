@@ -3,7 +3,6 @@ package migrator
 import (
 	"context"
 	"database/sql/driver"
-	"errors"
 	"io/fs"
 	"sync"
 	"testing"
@@ -139,12 +138,12 @@ func TestUpToHead_AStopWhileAFileRunsFinishesThatFileAndStartsNoOther(t *testing
 	err := awaitResult(t, done)
 
 	var stopped StoppedError
-	require.Truef(t, errors.As(err, &stopped), "a stop is answered as one, not as a failure: %v", err)
+	require.ErrorAsf(t, err, &stopped, "a stop is answered as one, not as a failure: %v", err)
 	assert.Equal(t, NilVersion, stopped.From, "the database had never been migrated")
 	assert.Equal(t, 2, stopped.Reached, "the file running when the stop arrived ran to its end")
 	assert.Equal(t, 2, stopped.Applied, "000001 and 000002")
 	assert.Equal(t, 1, stopped.Remaining, "000005 never started")
-	assert.ErrorIs(t, err, context.Canceled, "and the stop's cause is matchable, so the start can tell it from a failure")
+	require.ErrorIs(t, err, context.Canceled, "and the stop's cause is matchable, so the start can tell it from a failure")
 
 	assert.Equal(t, []RecordedVersion{{Version: 2, Dirty: false}}, recorded(t, db),
 		"the schema is clean at the version the stop reached")
@@ -173,7 +172,7 @@ func TestUpToHead_AStopBeforeTheFirstFileRunsNothing(t *testing.T) {
 
 	assert.False(t, migrated)
 	var stopped StoppedError
-	require.Truef(t, errors.As(err, &stopped), "a stop is answered as one, not as a failure: %v", err)
+	require.ErrorAsf(t, err, &stopped, "a stop is answered as one, not as a failure: %v", err)
 	assert.Equal(t, NilVersion, stopped.From)
 	assert.Equal(t, NilVersion, stopped.Reached)
 	assert.Equal(t, 0, stopped.Applied)
@@ -206,7 +205,7 @@ func TestMigrate_AStopWhileARollbackRunsFinishesThatFile(t *testing.T) {
 	err = awaitResult(t, done)
 
 	var stopped StoppedError
-	require.Truef(t, errors.As(err, &stopped), "a stop is answered as one, not as a failure: %v", err)
+	require.ErrorAsf(t, err, &stopped, "a stop is answered as one, not as a failure: %v", err)
 	assert.Equal(t, 5, stopped.From)
 	assert.Equal(t, 2, stopped.Reached, "000005's rollback ran to its end and recorded 000002")
 	assert.Equal(t, 1, stopped.Applied)

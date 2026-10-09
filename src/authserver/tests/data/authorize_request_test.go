@@ -2,7 +2,6 @@ package datatests
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -178,13 +177,13 @@ func TestAuthorizeRequest_RefusesWhatCannotBeKeyed(t *testing.T) {
 	now := time.Now().UTC()
 
 	err := database.CreateAuthorizeRequest(context.Background(), nil, &record.AuthorizeRequest{RequestForm: "a=b", ExpiresAt: now.Add(time.Hour)})
-	assert.Error(t, err, "an empty handle hash names no row")
+	require.Error(t, err, "an empty handle hash names no row")
 
 	err = database.CreateAuthorizeRequest(context.Background(), nil, &record.AuthorizeRequest{HandleHash: sha256Hex("x"), RequestForm: "a=b"})
-	assert.Error(t, err, "a request that never expires is a row nothing would ever sweep")
+	require.Error(t, err, "a request that never expires is a row nothing would ever sweep")
 
 	_, err = database.GetAuthorizeRequestByHandleHash(context.Background(), nil, "", now)
-	assert.Error(t, err, "an empty hash is a caller bug, not a filter that matches every row")
+	require.Error(t, err, "an empty hash is a caller bug, not a filter that matches every row")
 
 	_, err = database.ClaimAuthorizeRequest(context.Background(), nil, 0)
 	assert.Error(t, err)
@@ -199,7 +198,7 @@ func TestAuthorizeRequest_TheHandleHashIsUnique(t *testing.T) {
 	err := database.CreateAuthorizeRequest(context.Background(), nil, duplicate)
 
 	require.Error(t, err, "two rows for one handle would let one link run two ceremonies")
-	assert.True(t, errors.Is(err, data.ErrUniqueViolation), "and the engine's refusal must reach the caller classified: %v", err)
+	require.ErrorIs(t, err, data.ErrUniqueViolation, "and the engine's refusal must reach the caller classified: %v", err)
 	assert.Zero(t, duplicate.Id, "a refused insert reports no id")
 	assert.False(t, duplicate.CreatedAt.Valid, "and leaves the model as it found it")
 }

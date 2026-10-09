@@ -311,7 +311,7 @@ func assertWebOriginsIndex000034(t *testing.T, h *isolatedDB, clientAId, clientB
 
 	// Enforced, not merely declared.
 	dup := &record.WebOrigin{Origin: "https://dup.example.com", ClientId: clientAId}
-	assert.Errorf(t, h.DB.CreateWebOrigin(context.Background(), nil, dup),
+	require.Errorf(t, h.DB.CreateWebOrigin(context.Background(), nil, dup),
 		"[%s] a second row with the same origin for the same client must be refused", phase)
 
 	// And enforced no more widely than that.

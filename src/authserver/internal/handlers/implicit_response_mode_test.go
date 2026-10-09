@@ -237,7 +237,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 
 				err := issueImplicitTokens(w, r, web.TemplateFS(), "form_post", redirectURI, "s", implicitTokenResponse())
 
-				assert.Error(t, err, "checkRedirectURIEmittable must refuse %q before the form is built", redirectURI)
+				require.Error(t, err, "checkRedirectURIEmittable must refuse %q before the form is built", redirectURI)
 				assert.Empty(t, w.Body.String(), "no page may be written")
 				assert.NotContains(t, w.Body.String(), "access-token-123")
 				assert.Empty(t, w.Header().Get("Cache-Control"), "nothing was rendered, so no header was written")
@@ -254,7 +254,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 		err := issueImplicitTokens(w, r, fstest.MapFS{}, "form_post", "https://example.com/callback", "s",
 			implicitTokenResponse())
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Empty(t, w.Body.String())
 		assert.Empty(t, w.Header().Get("Cache-Control"))
 	})

@@ -222,15 +222,15 @@ func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
-			require.NotNil(t, captured, "the handler answered nothing")
+			require.Error(t, captured, "the handler answered nothing")
 
 			var detail *oauth.ErrorDetail
 			if testCase.wantStatus == 0 {
-				assert.False(t, errors.As(captured, &detail),
+				assert.NotErrorAs(t, captured, &detail,
 					"expected JSONError's generic 500 arm, got a status-carrying %v", captured)
 				return
 			}
-			require.True(t, errors.As(captured, &detail),
+			require.ErrorAs(t, captured, &detail,
 				"expected an *ErrorDetail carrying a status, got %v", captured)
 			assert.Equal(t, testCase.wantStatus, detail.HTTPStatus())
 			assert.Equal(t, testCase.wantCode, detail.Code())
@@ -342,15 +342,15 @@ func TestAccountProfilePictureDelete_AnswersThroughTheSharedJsonWriters(t *testi
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
-			require.NotNil(t, captured, "the handler answered nothing")
+			require.Error(t, captured, "the handler answered nothing")
 
 			var detail *oauth.ErrorDetail
 			if testCase.wantStatus == 0 {
-				assert.False(t, errors.As(captured, &detail),
+				assert.NotErrorAs(t, captured, &detail,
 					"expected JSONError's generic 500 arm, got a status-carrying %v", captured)
 				return
 			}
-			require.True(t, errors.As(captured, &detail),
+			require.ErrorAs(t, captured, &detail,
 				"expected an *ErrorDetail carrying a status, got %v", captured)
 			assert.Equal(t, testCase.wantStatus, detail.HTTPStatus())
 		})

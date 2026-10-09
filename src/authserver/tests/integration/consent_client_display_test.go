@@ -7,7 +7,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
@@ -28,12 +28,12 @@ func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create user
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:      fake.UUID(),
@@ -42,7 +42,7 @@ func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Navigate to consent screen
 	httpClient := createHttpClient(t)
@@ -77,12 +77,12 @@ func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create user
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:      fake.UUID(),
@@ -91,7 +91,7 @@ func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Navigate to consent screen
 	httpClient := createHttpClient(t)
@@ -126,12 +126,12 @@ func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create user
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:      fake.UUID(),
@@ -140,7 +140,7 @@ func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Navigate to consent screen
 	httpClient := createHttpClient(t)
@@ -178,12 +178,12 @@ func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create user
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:      fake.UUID(),
@@ -192,7 +192,7 @@ func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Navigate to consent screen
 	httpClient := createHttpClient(t)
@@ -231,12 +231,12 @@ func TestConsent_ClientDisplay_AllDisabled(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create user
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:      fake.UUID(),
@@ -245,7 +245,7 @@ func TestConsent_ClientDisplay_AllDisabled(t *testing.T) {
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Navigate to consent screen
 	httpClient := createHttpClient(t)

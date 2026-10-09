@@ -2,7 +2,6 @@ package reqctx
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -132,7 +131,7 @@ func TestReqctx_EachWriterSetsOnlyItsOwnValue(t *testing.T) {
 }
 
 func TestReqctx_ErrNoSettingsMatchesThroughAWrap(t *testing.T) {
-	assert.True(t, errors.Is(errs.Wrap(ErrNoSettings, "x"), ErrNoSettings))
+	assert.ErrorIs(t, errs.Wrap(ErrNoSettings, "x"), ErrNoSettings)
 }
 
 // TestReqctx_SubjectsAreTrimmedAndBlankIsAbsent: BearerSubject and ValidatedSubject are the one

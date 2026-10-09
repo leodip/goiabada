@@ -3,6 +3,7 @@ package protocolvalidation
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 	"time"
 
@@ -64,8 +65,9 @@ func TestValidateTokenRequest(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_request", customErr.Code())
 		assert.Equal(t, "Missing required client_id parameter.", customErr.Description())
@@ -85,8 +87,9 @@ func TestValidateTokenRequest(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_client", customErr.Code())
 		assert.Equal(t, "Client does not exist.", customErr.Description())
@@ -112,8 +115,9 @@ func TestValidateTokenRequest(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*oauth.ErrorDetail)
+		require.Error(t, err)
+		var customErr *oauth.ErrorDetail
+		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_client", customErr.Code())
 		assert.Equal(t, "Client is disabled.", customErr.Description())
@@ -244,12 +248,13 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				})
 
 				if tc.wantAccepted {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					assert.NotNil(t, result)
 					return
 				}
 				assert.Nil(t, result)
-				customErr, ok := err.(*oauth.ErrorDetail)
+				var customErr *oauth.ErrorDetail
+				ok := errors.As(err, &customErr)
 				if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 					assert.Equal(t, "invalid_grant", customErr.Code())
 				}
@@ -342,12 +347,13 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				})
 
 				if tc.wantAccepted {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					assert.NotNil(t, result)
 					return
 				}
 				assert.Nil(t, result)
-				customErr, ok := err.(*oauth.ErrorDetail)
+				var customErr *oauth.ErrorDetail
+				ok := errors.As(err, &customErr)
 				if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 					assert.Equal(t, "invalid_grant", customErr.Code())
 				}
@@ -413,12 +419,13 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				})
 
 				if tc.wantAccepted {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					assert.NotNil(t, result)
 					return
 				}
 				assert.Nil(t, result)
-				customErr, ok := err.(*oauth.ErrorDetail)
+				var customErr *oauth.ErrorDetail
+				ok := errors.As(err, &customErr)
 				if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 					assert.Equal(t, "invalid_grant", customErr.Code())
 				}
@@ -489,7 +496,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			})
 
 			assert.Nil(t, result)
-			customErr, ok := err.(*oauth.ErrorDetail)
+			var customErr *oauth.ErrorDetail
+			ok := errors.As(err, &customErr)
 			if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 				assert.Equal(t, "invalid_grant", customErr.Code())
 				// Generic on purpose: the message must not tell a caller that the session was
@@ -536,7 +544,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 				RedirectURI:  "https://example.com/cb",
 			})
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, result)
 		})
 
@@ -574,7 +582,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			})
 
 			assert.Nil(t, result)
-			customErr, ok := err.(*oauth.ErrorDetail)
+			var customErr *oauth.ErrorDetail
+			ok := errors.As(err, &customErr)
 			if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 				// PKCE, not the revoked check. If this reads "Code is invalid." the revoked
 				// check has moved ahead of PKCE, which is what decision 7 forbids.
@@ -619,7 +628,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			})
 
 			assert.Nil(t, result)
-			customErr, ok := err.(*oauth.ErrorDetail)
+			var customErr *oauth.ErrorDetail
+			ok := errors.As(err, &customErr)
 			if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 				// Client authentication, not the revoked check. An unauthenticated presenter
 				// of a stolen code must not learn that its session was terminated.
@@ -672,7 +682,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			})
 
 			assert.Nil(t, result)
-			customErr, ok := err.(*oauth.ErrorDetail)
+			var customErr *oauth.ErrorDetail
+			ok := errors.As(err, &customErr)
 			if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 				assert.Equal(t, "invalid_client", customErr.Code())
 				assert.Equal(t, "Client authentication failed. Please review your client_secret.",
@@ -723,7 +734,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			})
 
 			assert.Nil(t, result)
-			reuseErr, ok := err.(*AuthCodeReusedError)
+			var reuseErr *AuthCodeReusedError
+			ok := errors.As(err, &reuseErr)
 			if assert.True(t, ok, "expected *AuthCodeReusedError, got %T: %v", err, err) {
 				assert.Equal(t, code, reuseErr.Code,
 					"the reuse error must carry the code entity, or the containment cascade has nothing to act on")
@@ -793,7 +805,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			})
 
 			assert.Nil(t, result)
-			customErr, ok := err.(*oauth.ErrorDetail)
+			var customErr *oauth.ErrorDetail
+			ok := errors.As(err, &customErr)
 			if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 				assert.Equal(t, "invalid_grant", customErr.Code())
 			}
@@ -834,7 +847,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 				RefreshToken: "the-refresh-token",
 			})
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, result)
 		})
 
@@ -863,7 +876,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			})
 
 			assert.Nil(t, result)
-			customErr, ok := err.(*oauth.ErrorDetail)
+			var customErr *oauth.ErrorDetail
+			ok := errors.As(err, &customErr)
 			if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 				assert.Equal(t, "invalid_grant", customErr.Code())
 				assert.Equal(t, "The refresh token is invalid because it does not belong to the client.",
@@ -916,7 +930,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			RefreshToken: "ropc_refresh_token",
 		})
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, grantAs[*RefreshTokenGrant](t, result).IsROPC)
 	})
 }
@@ -950,7 +964,7 @@ func TestAsTokenGrant_ARefusalIsANilInterface(t *testing.T) {
 	grant, err := asTokenGrant((*AuthorizationCodeGrant)(nil), refused)
 
 	assert.Same(t, refused, err)
-	assert.True(t, grant == nil, "a refusal came back as a non-nil %T", grant)
+	assert.Nil(t, grant, "a refusal came back as a non-nil %T", grant)
 
 	accepted := &AuthorizationCodeGrant{Code: &record.Code{Id: 7}}
 	grant, err = asTokenGrant(accepted, nil)

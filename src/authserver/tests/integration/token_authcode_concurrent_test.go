@@ -12,6 +12,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // concurrentTokenPost performs a token-endpoint POST and is safe to call from
@@ -86,7 +87,7 @@ func TestToken_AuthCode_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 
 	successes := 0
 	for i := 0; i < concurrency; i++ {
-		assert.NoErrorf(t, reqErrs[i], "request %d failed at the transport level", i)
+		require.NoErrorf(t, reqErrs[i], "request %d failed at the transport level", i)
 
 		accessToken := ""
 		if bodies[i] != nil {
@@ -112,6 +113,6 @@ func TestToken_AuthCode_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 
 	// The code must be durably consumed.
 	stored, err := database.GetCodeById(context.Background(), nil, code.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, stored.Used, "the code must be marked used after the race")
 }

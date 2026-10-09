@@ -37,7 +37,7 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 		handler := HandleForgotPasswordGet(pageRenderer)
 
 		req, err := http.NewRequest("GET", "/forgot-password", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
@@ -64,7 +64,7 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 		handler := HandleForgotPasswordGet(pageRenderer)
 
 		req, err := http.NewRequest("GET", "/forgot-password", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
@@ -291,7 +291,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		// value it wrote, rather than from a value the test chose: a hash of anything
 		// else would leave the user unable to reset at all.
 		issuedCode, err := testDataCipher.Decrypt(storedEncrypted)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		expectedHash := hashutil.HashString(issuedCode)
 		assert.Equal(t, expectedHash, storedHash,
 			"the stored hash must be the hash of the code that was issued")

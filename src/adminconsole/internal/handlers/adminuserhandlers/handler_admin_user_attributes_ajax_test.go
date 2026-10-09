@@ -2,7 +2,6 @@ package adminuserhandlers
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -175,15 +174,15 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 			}
 
 			httpHelper.AssertExpectations(t)
-			require.NotNil(t, captured, "the handler answered nothing")
+			require.Error(t, captured, "the handler answered nothing")
 
 			var detail *oauth.ErrorDetail
 			if testCase.wantStatus == 0 {
-				assert.False(t, errors.As(captured, &detail),
+				assert.NotErrorAs(t, captured, &detail,
 					"expected JSONError's generic 500 arm, got a status-carrying %v", captured)
 				return
 			}
-			require.True(t, errors.As(captured, &detail),
+			require.ErrorAs(t, captured, &detail,
 				"expected an *ErrorDetail carrying a status, got %v", captured)
 			assert.Equal(t, testCase.wantStatus, detail.HTTPStatus())
 		})
@@ -227,7 +226,7 @@ func TestUserConsents_MalformedBodyAnswers400AsJson(t *testing.T) {
 
 			httpHelper.AssertExpectations(t)
 			var detail *oauth.ErrorDetail
-			require.True(t, errors.As(captured, &detail),
+			require.ErrorAs(t, captured, &detail,
 				"expected an *ErrorDetail carrying 400, got %v", captured)
 			assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 			assert.Equal(t, "invalid_request_body", detail.Code())

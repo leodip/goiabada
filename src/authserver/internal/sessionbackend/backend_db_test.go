@@ -41,7 +41,7 @@ func testBackend(database *datamocks.Database, owner string) *dbBackend {
 func requireWrappedCause(t *testing.T, err, cause error) {
 	t.Helper()
 	require.Error(t, err)
-	assert.ErrorIs(t, err, cause)
+	require.ErrorIs(t, err, cause)
 	assert.NotErrorIs(t, err, sessionstore.ErrNotFound)
 }
 
@@ -191,7 +191,7 @@ func TestDatabaseBackend_Update(t *testing.T) {
 
 		_, err := testBackend(database, owner).Update(settingsContext(), id, []byte("ciphertext"), true)
 
-		assert.ErrorIs(t, err, sessionstore.ErrNotFound)
+		require.ErrorIs(t, err, sessionstore.ErrNotFound)
 		database.AssertNotCalled(t, "UpdateBrowserSessionData", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
@@ -273,7 +273,7 @@ func TestDatabaseBackend_Touch(t *testing.T) {
 
 		_, err := testBackend(database, owner).Touch(settingsContext(), id, true)
 
-		assert.ErrorIs(t, err, sessionstore.ErrNotFound)
+		require.ErrorIs(t, err, sessionstore.ErrNotFound)
 		database.AssertNotCalled(t, "TouchBrowserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 

@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIClientDelete_Success verifies successful deletion of a non-system client
@@ -25,7 +26,7 @@ func TestAPIClientDelete_Success(t *testing.T) {
 		IsPublic:         true,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Delete via API
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
@@ -35,7 +36,7 @@ func TestAPIClientDelete_Success(t *testing.T) {
 
 	var success api.SuccessResponse
 	err = json.NewDecoder(resp.Body).Decode(&success)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, success.Success)
 
 	// Further GET should return 404
@@ -56,7 +57,7 @@ func TestAPIClientDelete_SystemLevelRejected(t *testing.T) {
 
 	var listResp api.GetClientsResponse
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var sysId int64
 	for _, c := range listResp.Clients {
@@ -100,9 +101,9 @@ func TestAPIClientDelete_NotFoundAndInvalidId(t *testing.T) {
 	// Unauthorized
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("DELETE", appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/1", nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	resp2, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }
@@ -118,13 +119,13 @@ func TestAPIClientGetPermissions_IncludesPermissions(t *testing.T) {
 		IsPublic:         true,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	resource := createResource(t)
 	perm := createPermission(t, resource.Id)
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientId: client.Id, PermissionId: perm.Id})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Call GET client permissions by id
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
@@ -134,7 +135,7 @@ func TestAPIClientGetPermissions_IncludesPermissions(t *testing.T) {
 
 	var getResp api.GetClientPermissionsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Expect at least one permission present
 	assert.GreaterOrEqual(t, len(getResp.Permissions), 1)
@@ -161,7 +162,7 @@ func TestAPIClientDelete_InsufficientScope(t *testing.T) {
 		IsPublic:         true,
 	}
 	err := database.CreateClient(context.Background(), nil, target)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10)
@@ -181,21 +182,21 @@ func TestAPIClientDelete_CascadesLinkedData(t *testing.T) {
 		IsPublic:         true,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create permission and assign to client
 	resource := createResource(t)
 	perm := createPermission(t, resource.Id)
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientId: client.Id, PermissionId: perm.Id})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create user and consent to the client
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email()}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	consent := &record.UserConsent{ClientId: client.Id, UserId: user.Id, Scope: "openid"}
 	err = database.CreateUserConsent(context.Background(), nil, consent)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Delete client via API
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
@@ -205,11 +206,11 @@ func TestAPIClientDelete_CascadesLinkedData(t *testing.T) {
 
 	// Assert client permissions removed
 	cps, err := database.GetClientPermissionsByClientId(context.Background(), nil, client.Id)
-	assert.NoError(t, err)
-	assert.True(t, len(cps) == 0)
+	require.NoError(t, err)
+	assert.Empty(t, cps)
 
 	// Assert user consent removed
 	uc, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, uc)
 }

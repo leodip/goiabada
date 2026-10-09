@@ -478,7 +478,7 @@ func TestSymbolOwnership_CircularEvidenceJustifiesNothing(t *testing.T) {
 	computed := computedOver(t, files)
 
 	for _, name := range []string{"core/ring.Level", "core/ring.LevelLow", "core/ring.LevelHigh", "core/ring.NewLevel"} {
-		assert.Equal(t, "", computed[name], "%s has no evidence outside its own package", name)
+		assert.Empty(t, computed[name], "%s has no evidence outside its own package", name)
 	}
 }
 
@@ -543,7 +543,7 @@ var (
 	// rather than a gap in it.
 	assert.Equal(t, justificationOwnPackage, computed["core/ring.LevelLow"])
 	assert.Equal(t, justificationOwnPackage, computed["core/ring.LevelHigh"])
-	assert.Equal(t, "", computed["core/ring.NewLevel"])
+	assert.Empty(t, computed["core/ring.NewLevel"])
 
 	rows := append(symbolBaselineRows(),
 		"core/ring Level moving #385 carries it to the auth server.",
@@ -763,8 +763,8 @@ func Sort(list []string) string {
 	// through New alone: the shadowing file added no evidence.
 	assert.Equal(t, justificationReachable, computed["core/shared.Cog"])
 	assert.Equal(t, justificationOwnPackage, computed["core/shared.Limit"])
-	assert.Equal(t, "", computed["core/shared.Envelope"])
-	assert.Equal(t, "", computed["core/shared.Sort"])
+	assert.Empty(t, computed["core/shared.Envelope"])
+	assert.Empty(t, computed["core/shared.Sort"])
 }
 
 // TestSymbolOwnership_AShadowedNameDoesNotJustifyItsNamesake is the same rule where it could
@@ -810,7 +810,7 @@ var (
 	computed := computedOver(t, files)
 
 	assert.Equal(t, JustificationBothApps, computed["core/shared.Reset"])
-	assert.Equal(t, "", computed["core/shared.Orphan"], "the local spelled Orphan is not a reference to the type")
+	assert.Empty(t, computed["core/shared.Orphan"], "the local spelled Orphan is not a reference to the type")
 }
 
 // TestSymbolOwnership_OneNameInAValueSpecDoesNotVouchForItsSiblings: `var Ready, discarded = true,
@@ -855,7 +855,7 @@ var (
 	computed := computedOver(t, files)
 
 	assert.Equal(t, JustificationBothApps, computed["core/shared.Ready"])
-	assert.Equal(t, "", computed["core/shared.Orphan"],
+	assert.Empty(t, computed["core/shared.Orphan"],
 		"only discarded's initializer names Orphan, and nothing justifies discarded")
 }
 
@@ -1002,7 +1002,7 @@ var (
 	computed := computedOver(t, files)
 
 	assert.Equal(t, JustificationBothApps, computed["core/shared.Repeated"])
-	assert.Equal(t, "", computed["core/shared.Tick"],
+	assert.Empty(t, computed["core/shared.Tick"],
 		"Repeated inherits the 1; only alsoDiscarded inherits the expression naming Tick")
 }
 
@@ -1052,7 +1052,7 @@ var (
 	computed := computedOver(t, files)
 
 	assert.Equal(t, JustificationBothApps, computed["core/shared.Reset"])
-	assert.Equal(t, "", computed["core/shared.Tick"],
+	assert.Empty(t, computed["core/shared.Tick"],
 		"Reset is its type's zero value; it repeats nothing and names nothing")
 }
 
@@ -1153,7 +1153,7 @@ var (
 	computed := computedOver(t, files)
 
 	assert.Equal(t, JustificationBothApps, computed["core/shared.Reset"])
-	assert.Equal(t, "", computed["core/shared.Tick"],
+	assert.Empty(t, computed["core/shared.Tick"],
 		"Reset inherits the untyped 2 above it, which carries no type slot with it")
 }
 
@@ -1245,7 +1245,7 @@ var (
 	computed := computedOver(t, files)
 
 	assert.Equal(t, JustificationBothApps, computed["core/shared.ToneWarm"])
-	assert.Equal(t, "", computed["core/shared.Tone"],
+	assert.Empty(t, computed["core/shared.Tone"],
 		"a value never justifies the type it is declared with, whichever slot that type is spelled in")
 }
 
@@ -1295,7 +1295,7 @@ var (
 	computed := computedOver(t, files)
 
 	assert.Equal(t, JustificationBothApps, computed["core/shared.Default"])
-	assert.Equal(t, "", computed["core/shared.Box"],
+	assert.Empty(t, computed["core/shared.Box"],
 		"an instantiated generic type slot spells the value's own type as surely as a bare one")
 	assert.Equal(t, justificationReachable, computed["core/shared.Knob"],
 		"the type argument is not the value's own type, so it stays an ordinary reference")
@@ -1361,7 +1361,7 @@ var (
 
 	assert.Equal(t, JustificationBothApps, computed["core/shared.Default"])
 	assert.Equal(t, JustificationBothApps, computed["core/shared.Generated"])
-	assert.Equal(t, "", computed["core/shared.Pair"],
+	assert.Empty(t, computed["core/shared.Pair"],
 		"a two-argument instantiation spells the value's own type, in the slot and at the head of an initializer alike")
 	assert.Equal(t, justificationReachable, computed["core/shared.Knob"],
 		"the first type argument is not the value's own type, so the slot names it as an ordinary reference")
@@ -1418,7 +1418,7 @@ var (
 	computed := computedOver(t, files)
 
 	assert.Equal(t, JustificationBothApps, computed["core/shared.Default"])
-	assert.Equal(t, "", computed["core/shared.Tone"],
+	assert.Empty(t, computed["core/shared.Tone"],
 		"a composite literal at the head of an initializer is the value's own type, not a use of it")
 }
 
@@ -1473,7 +1473,7 @@ var (
 
 	assert.Equal(t, JustificationBothApps, computed["core/shared.ToneWarm"])
 	assert.Equal(t, JustificationBothApps, computed["core/shared.ToneCool"])
-	assert.Equal(t, "", computed["core/shared.Tone"],
+	assert.Empty(t, computed["core/shared.Tone"],
 		"an asserted type is the value's own type, not a use of it, in either form of the assertion")
 }
 

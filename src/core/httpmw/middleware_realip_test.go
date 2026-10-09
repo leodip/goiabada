@@ -274,7 +274,7 @@ func TestParseTrustedProxies(t *testing.T) {
 		} {
 			t.Run(name, func(t *testing.T) {
 				got, err := ParseTrustedProxies(entries)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Nil(t, got)
 			})
 		}

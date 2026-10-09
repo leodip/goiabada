@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // GET /api/v1/admin/settings/general
@@ -19,7 +20,7 @@ func TestAPISettingsGeneralGet_Success(t *testing.T) {
 
 	// Fetch current settings directly from DB for expected values
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, settings)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
@@ -31,7 +32,7 @@ func TestAPISettingsGeneralGet_Success(t *testing.T) {
 
 	var body api.SettingsGeneralResponse
 	err = json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, settings.AppName, body.AppName)
 	assert.Equal(t, settings.Issuer, body.Issuer)
@@ -63,22 +64,22 @@ func TestAPISettingsGeneralPut_Success(t *testing.T) {
 
 	var body api.SettingsGeneralResponse
 	err := json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// App name should be trimmed
 	assert.Equal(t, "My New App", body.AppName)
 	assert.Equal(t, req.Issuer, body.Issuer)
-	assert.Equal(t, true, body.SelfRegistrationEnabled)
-	assert.Equal(t, true, body.SelfRegistrationRequiresEmailVerification)
+	assert.True(t, body.SelfRegistrationEnabled)
+	assert.True(t, body.SelfRegistrationRequiresEmailVerification)
 	assert.Equal(t, strings.ToLower(req.PasswordPolicy), strings.ToLower(body.PasswordPolicy))
 
 	// Verify DB persisted
 	settings, err2 := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err2)
+	require.NoError(t, err2)
 	assert.Equal(t, "My New App", settings.AppName)
 	assert.Equal(t, req.Issuer, settings.Issuer)
-	assert.Equal(t, true, settings.SelfRegistrationEnabled)
-	assert.Equal(t, true, settings.SelfRegistrationRequiresEmailVerification)
+	assert.True(t, settings.SelfRegistrationEnabled)
+	assert.True(t, settings.SelfRegistrationRequiresEmailVerification)
 }
 
 // PUT: disabling self-registration should force RequiresEmailVerification to false
@@ -112,14 +113,14 @@ func TestAPISettingsGeneralPut_DisableSelfRegForcesVerificationFalse(t *testing.
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 	var body api.SettingsGeneralResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&body)
-	assert.Equal(t, false, body.SelfRegistrationEnabled)
-	assert.Equal(t, false, body.SelfRegistrationRequiresEmailVerification)
+	assert.False(t, body.SelfRegistrationEnabled)
+	assert.False(t, body.SelfRegistrationRequiresEmailVerification)
 
 	// Also verify DB persisted override
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-	assert.Equal(t, false, settings.SelfRegistrationEnabled)
-	assert.Equal(t, false, settings.SelfRegistrationRequiresEmailVerification)
+	require.NoError(t, err)
+	assert.False(t, settings.SelfRegistrationEnabled)
+	assert.False(t, settings.SelfRegistrationRequiresEmailVerification)
 }
 
 func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
@@ -234,12 +235,12 @@ func TestAPISettingsGeneralPut_ImplicitFlowEnabled(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var body api.SettingsGeneralResponse
 	err := json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, body.ImplicitFlowEnabled, "ImplicitFlowEnabled should be true in response")
 
 	// Verify DB persisted
 	updatedSettings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, updatedSettings.ImplicitFlowEnabled, "ImplicitFlowEnabled should be true in DB")
 
 	// Now disable implicit flow
@@ -250,12 +251,12 @@ func TestAPISettingsGeneralPut_ImplicitFlowEnabled(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 	var body2 api.SettingsGeneralResponse
 	err = json.NewDecoder(resp2.Body).Decode(&body2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, body2.ImplicitFlowEnabled, "ImplicitFlowEnabled should be false in response")
 
 	// Verify DB persisted
 	updatedSettings2, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, updatedSettings2.ImplicitFlowEnabled, "ImplicitFlowEnabled should be false in DB")
 }
 
@@ -264,7 +265,7 @@ func TestAPISettingsGeneralGet_IncludesImplicitFlowEnabled(t *testing.T) {
 
 	// Get current settings
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -273,7 +274,7 @@ func TestAPISettingsGeneralGet_IncludesImplicitFlowEnabled(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var body api.SettingsGeneralResponse
 	err = json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify ImplicitFlowEnabled matches database value
 	assert.Equal(t, settings.ImplicitFlowEnabled, body.ImplicitFlowEnabled, "ImplicitFlowEnabled should match DB value")
@@ -304,12 +305,12 @@ func TestAPISettingsGeneralPut_ResourceOwnerPasswordCredentialsEnabled(t *testin
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var body api.SettingsGeneralResponse
 	err := json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, body.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be true in response")
 
 	// Verify DB persisted
 	updatedSettings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, updatedSettings.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be true in DB")
 
 	// Now disable ROPC
@@ -320,12 +321,12 @@ func TestAPISettingsGeneralPut_ResourceOwnerPasswordCredentialsEnabled(t *testin
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 	var body2 api.SettingsGeneralResponse
 	err = json.NewDecoder(resp2.Body).Decode(&body2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, body2.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be false in response")
 
 	// Verify DB persisted
 	updatedSettings2, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, updatedSettings2.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be false in DB")
 }
 
@@ -334,7 +335,7 @@ func TestAPISettingsGeneralGet_IncludesROPCEnabled(t *testing.T) {
 
 	// Get current settings
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -343,7 +344,7 @@ func TestAPISettingsGeneralGet_IncludesROPCEnabled(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var body api.SettingsGeneralResponse
 	err = json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify ResourceOwnerPasswordCredentialsEnabled matches database value
 	assert.Equal(t, settings.ResourceOwnerPasswordCredentialsEnabled, body.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should match DB value")
@@ -354,10 +355,10 @@ func TestAPISettingsGeneral_UnauthorizedAndScope(t *testing.T) {
 
 	// No token - GET
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	// Assert error text
@@ -382,9 +383,9 @@ func TestAPISettingsGeneral_UnauthorizedAndScope(t *testing.T) {
 
 	// Also test PUT unauthorized
 	req2, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	resp4, err := httpClient.Do(req2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp4.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp4.StatusCode)
 }
@@ -426,7 +427,7 @@ func TestAPISettingsGeneralPut_AngleBracketsRejected(t *testing.T) {
 			assert.Equal(t, tc.wantCode, errResp.ErrorCode)
 
 			stored, err := database.GetSettingsById(context.Background(), nil, 1)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, before.AppName, stored.AppName)
 			assert.Equal(t, before.Issuer, stored.Issuer)
 		})
@@ -451,10 +452,10 @@ func TestAPISettingsGeneralPut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 
 	var body api.SettingsGeneralResponse
 	err := json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `R&D "labs"`, body.AppName)
 
 	stored, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `R&D "labs"`, stored.AppName)
 }

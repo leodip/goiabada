@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIUserPasswordPut tests the PUT /api/v1/admin/users/{id}/password endpoint
@@ -33,7 +34,7 @@ func TestAPIUserPasswordPut_Success(t *testing.T) {
 		PasswordHash:  "old-password-hash",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -53,14 +54,14 @@ func TestAPIUserPasswordPut_Success(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: User ID should match
 	assert.Equal(t, testUser.Id, updateResponse.User.Id)
 
 	// Verify password was actually updated in database
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEqual(t, "old-password-hash", updatedUser.PasswordHash)
 
 	// Verify new password can be validated
@@ -81,7 +82,7 @@ func TestAPIUserPasswordPut_ValidationError(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -154,7 +155,7 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 		Issuer:      "test",
 		AccountName: otpEmail,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	testUser := &record.User{
 		Subject:            fake.UUID(),
@@ -167,7 +168,7 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, secret.Secret()),
 	}
 	err = database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -187,7 +188,7 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: User ID should match and OTP should be disabled
 	assert.Equal(t, testUser.Id, updateResponse.User.Id)
@@ -195,7 +196,7 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 
 	// Verify OTP was actually disabled in database
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, updatedUser.OTPEnabled)
 	// The seed itself is gone, not merely unreachable (#98).
 	assert.Empty(t, updatedUser.OTPSecretEncrypted)
@@ -218,11 +219,11 @@ func TestAPIUserOTPPut_DisableResetsConsumedStep(t *testing.T) {
 	setUserPasswordForOTP(t, user.Id, "Correct1!")
 
 	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: "adminreset@otp.test"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	secret := key.Secret()
 
 	code, err := totp.GenerateCode(secret, time.Now())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	enable := api.UpdateAccountOTPRequest{
 		Enabled:  true,
@@ -273,7 +274,7 @@ func TestAPIUserOTPPut_EnableNotSupported(t *testing.T) {
 		OTPEnabled:    false,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -321,7 +322,7 @@ func TestAPIUserOTPPut_OTPNotEnabled(t *testing.T) {
 		OTPEnabled:    false,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -353,7 +354,7 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -373,7 +374,7 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 		UserId:            testUser.Id,
 	}
 	err = database.CreateUserSession(context.Background(), nil, testSession)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUserSession(context.Background(), nil, testSession.Id)
 	}()
@@ -390,7 +391,7 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 	// Parse response
 	var getSessionResponse api.GetUserSessionResponse
 	err = json.NewDecoder(resp.Body).Decode(&getSessionResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Session data should match
 	assert.Equal(t, testSession.SessionIdentifier, getSessionResponse.Session.SessionIdentifier)

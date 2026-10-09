@@ -2,7 +2,6 @@ package publicsettings
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -58,7 +57,7 @@ func TestClient_RefusesAnOversizedAnswerRatherThanDecodingAPrefix(t *testing.T) 
 		GetPublicSettings(context.Background())
 	require.Error(t, err)
 	assert.Nil(t, settings)
-	assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge), "got %v", err)
+	assert.ErrorIs(t, err, boundedread.ErrResponseTooLarge, "got %v", err)
 }
 
 func TestClient_CarriesTheCallersContext(t *testing.T) {
@@ -76,7 +75,7 @@ func TestClient_CarriesTheCallersContext(t *testing.T) {
 
 	_, err := NewClient(server.URL, nil).GetPublicSettings(ctx)
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, context.Canceled), "got %v", err)
+	assert.ErrorIs(t, err, context.Canceled, "got %v", err)
 }
 
 // The deadline is read off the client rather than waited out, as apiclient's executor test does:

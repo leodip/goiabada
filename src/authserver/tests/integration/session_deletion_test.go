@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestSessionDeletedDuringAuthFlow_LoginSucceeds tests that when a user's database session
@@ -40,18 +41,18 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:      fake.UUID(),
@@ -60,7 +61,7 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Step 2: Complete a full login to create a session in the database
 	httpClient := createHttpClient(t)
@@ -80,7 +81,7 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 		"&nonce=" + requestNonce
 
 	resp, err := httpClient.Get(destUrl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
@@ -112,18 +113,18 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 
 	// Step 3: Verify a session was created in the database
 	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(userSessions), "Should have exactly one session after login")
+	require.NoError(t, err)
+	assert.Len(t, userSessions, 1, "Should have exactly one session after login")
 
 	userSession := userSessions[0]
 
 	// Step 4: Delete the session from the database (simulating expiry/deployment)
 	err = database.DeleteUserSession(context.Background(), nil, userSession.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify session is deleted
 	deletedSession, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, userSession.SessionIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, deletedSession, "Session should be deleted from database")
 
 	// Step 5: Start a NEW auth flow with the same httpClient (which still has the old session cookie)
@@ -142,7 +143,7 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 		"&nonce=" + requestNonce2
 
 	resp2, err := httpClient.Get(destUrl2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp2.Body.Close() }()
 
 	// Should redirect to /auth/level1 (starting the auth flow)
@@ -183,8 +184,8 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 
 	// Verify a new session was created
 	userSessions2, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(userSessions2), "Should have a new session after second login")
+	require.NoError(t, err)
+	assert.Len(t, userSessions2, 1, "Should have a new session after second login")
 }
 
 // TestSessionEndedOnConsentScreen_NoCodeIsIssued is the third of this file's paired
@@ -218,18 +219,18 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 		DefaultAcrLevel: record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:      fake.UUID(),
@@ -238,7 +239,7 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// One HTTP client throughout, so the cookie is shared and this is one browser's ceremony
 	// rather than two.
@@ -255,7 +256,7 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 		"&nonce=" + fake.LetterN(8)
 
 	resp, err := httpClient.Get(destUrl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
@@ -288,14 +289,14 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	// The session exists at this point, created by /auth/completed while it was legitimately
 	// reached. Ending it is what the rest of the case turns on.
 	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(userSessions), "the ceremony should have created one session before consent")
+	require.NoError(t, err)
+	assert.Len(t, userSessions, 1, "the ceremony should have created one session before consent")
 
 	// Deleting the row directly, as this file's other tests do: that the two DELETE endpoints
 	// also revoke the session's grants is covered by api_users_sessions_test.go and
 	// api_account_sessions_test.go, and what this case needs is the session gone.
 	err = database.DeleteUserSession(context.Background(), nil, userSessions[0].Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Through the shared helper rather than a hand-built body, so the ceremony id comes off the
 	// consent page this ceremony rendered. Deleting the session row does not disturb it: the
@@ -323,8 +324,8 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	assertRedirect(t, resp, "/auth/pwd")
 
 	userSessionsAfter, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, len(userSessionsAfter),
+	require.NoError(t, err)
+	assert.Empty(t, userSessionsAfter,
 		"the ended session must not be recreated by a ceremony waiting on the consent screen")
 }
 
@@ -366,8 +367,8 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 	}
 
 	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(userSessions), "the level 1 login should have left one session")
+	require.NoError(t, err)
+	assert.Len(t, userSessions, 1, "the level 1 login should have left one session")
 	userSession := userSessions[0]
 
 	// A second authorization request on the same browser, asking for level 2. The session
@@ -388,7 +389,7 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 		"&acr_values=" + record.AcrLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Straight to level1completed: the session covers level 1, no password is asked for.
@@ -409,7 +410,7 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 	// the two DELETE endpoints revoke the session's grants as well is covered by
 	// api_users_sessions_test.go and api_account_sessions_test.go.
 	err = database.DeleteUserSession(context.Background(), nil, userSession.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
@@ -434,8 +435,8 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 	assertRedirect(t, resp, "/auth/pwd")
 
 	userSessionsAfter, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, len(userSessionsAfter),
+	require.NoError(t, err)
+	assert.Empty(t, userSessionsAfter,
 		"the ended session must not be recreated by a ceremony that only verified OTP")
 }
 
@@ -457,8 +458,8 @@ func TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(userSessions), "the level 1 login should have left one session")
+	require.NoError(t, err)
+	assert.Len(t, userSessions, 1, "the level 1 login should have left one session")
 	userSession := userSessions[0]
 
 	// A second authorization on the same browser, silent this time. The client does not
@@ -475,7 +476,7 @@ func TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired(t *testing.T) {
 		"&prompt=none"
 
 	resp, err := httpClient.Get(destUrl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// handlePromptNone accepted the session and handed off. Asserting that rather than an
@@ -486,7 +487,7 @@ func TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired(t *testing.T) {
 	// window in gap 3 and the only one prompt=none can sit in, since it never waits for a
 	// person.
 	err = database.DeleteUserSession(context.Background(), nil, userSession.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
@@ -504,13 +505,13 @@ func TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired(t *testing.T) {
 	assert.Equal(t, requestState, state, "the client's state must survive the error response")
 
 	parsedLocation, err := url.Parse(location)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, parsedLocation.Query().Get("code"),
 		"no authorization code may reach the client once the session backing the ceremony is gone")
 
 	userSessionsAfter, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, len(userSessionsAfter),
+	require.NoError(t, err)
+	assert.Empty(t, userSessionsAfter,
 		"a refused silent ceremony must not recreate the ended session")
 
 	// The refusal also has to leave the browser with no ceremony to replay, and only a

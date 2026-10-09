@@ -30,7 +30,7 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -47,7 +47,7 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err = database.CreateClient(context.Background(), nil, testClient)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
@@ -69,7 +69,7 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 		LastAccessed:  now.Add(-time.Minute * 5),
 	}
 	err = database.CreateUserSessionClient(context.Background(), nil, sessionClient1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	sessionClient2 := &record.UserSessionClient{
 		UserSessionId: session2.Id,
 		ClientId:      testClient.Id,
@@ -77,7 +77,7 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 		LastAccessed:  now.Add(-time.Minute * 5),
 	}
 	err = database.CreateUserSessionClient(context.Background(), nil, sessionClient2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test: Get user sessions
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
@@ -91,14 +91,14 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 	// Parse response
 	var getResponse api.GetUserSessionsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return both sessions
 	assert.Len(t, getResponse.Sessions, 2)
 
 	// Verify session data structure
 	for _, session := range getResponse.Sessions {
-		assert.Greater(t, session.Id, int64(0))
+		assert.Positive(t, session.Id)
 		assert.NotEmpty(t, session.SessionIdentifier)
 		require.NotNil(t, session.Started)
 		require.NotNil(t, session.LastAccessed)
@@ -128,7 +128,7 @@ func TestAPIUserSessionsGet_EmptySessions(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -144,10 +144,10 @@ func TestAPIUserSessionsGet_EmptySessions(t *testing.T) {
 	// Parse response
 	var getResponse api.GetUserSessionsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return empty sessions array
-	assert.Len(t, getResponse.Sessions, 0)
+	assert.Empty(t, getResponse.Sessions)
 }
 
 func TestAPIUserSessionsGet_UserNotFound(t *testing.T) {
@@ -198,7 +198,7 @@ func TestAPIUserSessionsGet_Unauthorized(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -206,11 +206,11 @@ func TestAPIUserSessionsGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -231,7 +231,7 @@ func TestAPIUserSessionsGet_SessionsWithNoClients(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -253,11 +253,11 @@ func TestAPIUserSessionsGet_SessionsWithNoClients(t *testing.T) {
 	// Parse response
 	var getResponse api.GetUserSessionsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return session with empty client identifiers
 	assert.Len(t, getResponse.Sessions, 1)
-	assert.Len(t, getResponse.Sessions[0].ClientIdentifiers, 0)
+	assert.Empty(t, getResponse.Sessions[0].ClientIdentifiers)
 }
 
 // TestAPIUserSessionDelete tests the DELETE /api/v1/admin/user-sessions/{id} endpoint
@@ -275,7 +275,7 @@ func TestAPIUserSessionDelete_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -295,14 +295,14 @@ func TestAPIUserSessionDelete_Success(t *testing.T) {
 	// Parse response
 	var deleteResponse api.SuccessResponse
 	err = json.NewDecoder(resp.Body).Decode(&deleteResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Success response
 	assert.True(t, deleteResponse.Success)
 
 	// Verify session was actually deleted from database
 	deletedSession, err := database.GetUserSessionById(context.Background(), nil, session.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, deletedSession)
 }
 
@@ -405,7 +405,7 @@ func TestAPIUserSessionDelete_Unauthorized(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -418,11 +418,11 @@ func TestAPIUserSessionDelete_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
 	req, err := http.NewRequest("DELETE", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -430,7 +430,7 @@ func TestAPIUserSessionDelete_Unauthorized(t *testing.T) {
 
 	// Verify session was not deleted
 	stillExists, err := database.GetUserSessionById(context.Background(), nil, session.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, stillExists)
 }
 
@@ -444,7 +444,7 @@ func TestAPIUserSessionDelete_InvalidToken(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -464,7 +464,7 @@ func TestAPIUserSessionDelete_InvalidToken(t *testing.T) {
 
 	// Verify session was not deleted
 	stillExists, err := database.GetUserSessionById(context.Background(), nil, session.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, stillExists)
 }
 
@@ -483,7 +483,7 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -503,7 +503,7 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 		UserId:            testUser.Id,
 	}
 	err = database.CreateUserSession(context.Background(), nil, validSession)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUserSession(context.Background(), nil, validSession.Id)
 	}()
@@ -523,7 +523,7 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 		UserId:            testUser.Id,
 	}
 	err = database.CreateUserSession(context.Background(), nil, expiredSession)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUserSession(context.Background(), nil, expiredSession.Id)
 	}()
@@ -539,7 +539,7 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 	// Parse response
 	var getResponse api.GetUserSessionsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should only return valid session, expired session should be filtered out
 	assert.Len(t, getResponse.Sessions, 1)

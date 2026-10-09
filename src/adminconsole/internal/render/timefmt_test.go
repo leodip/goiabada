@@ -61,9 +61,9 @@ func TestFormatDateTime_LayoutCarriesNoEnglish(t *testing.T) {
 
 func TestFormatDateTime_NilAndZeroRenderEmpty(t *testing.T) {
 	ctx := localeCtx("en")
-	assert.Equal(t, "", formatDateTime(ctx, nil))
+	assert.Empty(t, formatDateTime(ctx, nil))
 	var zero time.Time
-	assert.Equal(t, "", formatDateTime(ctx, &zero))
+	assert.Empty(t, formatDateTime(ctx, &zero))
 }
 
 // TestFormatDateTime_MissingLayoutFallsBackToANumericLayout drives the
@@ -132,9 +132,9 @@ func TestFormatSince_UnitsAndPlurals(t *testing.T) {
 func TestFormatSince_NilAndZeroRenderEmpty(t *testing.T) {
 	ctx := localeCtx("en")
 	now := timeFmtInstant
-	assert.Equal(t, "", formatSince(ctx, nil, now))
+	assert.Empty(t, formatSince(ctx, nil, now))
 	var zero time.Time
-	assert.Equal(t, "", formatSince(ctx, &zero, now))
+	assert.Empty(t, formatSince(ctx, &zero, now))
 }
 
 // TestFormatSince_UnknownLocaleFallsBackToEnglish holds the phrase keys to the

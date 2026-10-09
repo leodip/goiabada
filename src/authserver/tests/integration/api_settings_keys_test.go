@@ -78,12 +78,12 @@ func TestAPISettingsKeysRotatePost_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var ok api.SuccessResponse
 	err := json.NewDecoder(resp.Body).Decode(&ok)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, ok.Success)
 
 	// After rotate: expect 3 keys: next, current, previous
 	after := getKeys(t, accessToken)
-	assert.Equal(t, 3, len(after))
+	assert.Len(t, after, 3)
 	assert.Equal(t, "next", after[0].State)
 	assert.Equal(t, "current", after[1].State)
 	assert.Equal(t, "previous", after[2].State)
@@ -101,7 +101,7 @@ func TestAPISettingsKeysRotatePost_DeletesPrevious(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys/rotate"
 	_ = makeAPIRequest(t, "POST", url, accessToken, map[string]any{})
 	first := getKeys(t, accessToken)
-	assert.Equal(t, 3, len(first))
+	assert.Len(t, first, 3)
 	prevId := first[2].Id
 	currId := first[1].Id
 
@@ -114,7 +114,7 @@ func TestAPISettingsKeysRotatePost_DeletesPrevious(t *testing.T) {
 	// Get a fresh admin token to continue requests.
 	accessToken, _ = createAdminClientWithToken(t)
 	second := getKeys(t, accessToken)
-	assert.Equal(t, 3, len(second))
+	assert.Len(t, second, 3)
 	// The old previous must be gone
 	for _, k := range second {
 		assert.NotEqual(t, prevId, k.Id)
@@ -130,7 +130,7 @@ func TestAPISettingsKeyDelete_Success(t *testing.T) {
 	urlRotate := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys/rotate"
 	_ = makeAPIRequest(t, "POST", urlRotate, accessToken, map[string]any{})
 	keys := getKeys(t, accessToken)
-	assert.Equal(t, 3, len(keys))
+	assert.Len(t, keys, 3)
 	prevId := keys[2].Id
 
 	// Delete previous
@@ -143,7 +143,7 @@ func TestAPISettingsKeyDelete_Success(t *testing.T) {
 	accessToken, _ = createAdminClientWithToken(t)
 	// Now only next and current remain
 	keys2 := getKeys(t, accessToken)
-	assert.Equal(t, 2, len(keys2))
+	assert.Len(t, keys2, 2)
 	for _, k := range keys2 {
 		assert.NotEqual(t, prevId, k.Id)
 	}
@@ -177,10 +177,10 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
 	// Unauthorized - GET
 	listURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys"
 	req, err := http.NewRequest("GET", listURL, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp3, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp3.StatusCode)
 	body3, _ := io.ReadAll(resp3.Body)
@@ -191,7 +191,7 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
 	rotateURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys/rotate"
 	req4, _ := http.NewRequest("POST", rotateURL, strings.NewReader("{}"))
 	resp4, err := httpClient.Do(req4)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp4.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp4.StatusCode)
 
@@ -199,7 +199,7 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
 	delURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys/1"
 	req5, _ := http.NewRequest("DELETE", delURL, nil)
 	resp5, err := httpClient.Do(req5)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp5.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp5.StatusCode)
 }

@@ -3,6 +3,7 @@ package protocolvalidation
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -335,7 +336,8 @@ func TestValidateTokenRequest_MalformedVerifierOnAReusedCodeDoesNotCascade(t *te
 		CodeVerifier: testCodeVerifier[:42],
 	})
 
-	_, isSentinel := err.(*AuthCodeReusedError)
+	var authCodeReusedError *AuthCodeReusedError
+	isSentinel := errors.As(err, &authCodeReusedError)
 	assert.False(t, isSentinel, "a malformed code_verifier must not yield the revocation sentinel")
 	assertRefusal(t, err, verifierGrammarWant)
 }

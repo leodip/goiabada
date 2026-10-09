@@ -97,7 +97,7 @@ func TestUpToHead(t *testing.T) {
 		migrated, err := m.UpToHead(context.Background(), release, nil)
 
 		require.Error(t, err, "a lock that did not come back must stop the start, not be read as nothing to do")
-		assert.ErrorIs(t, err, unlockErr, "the failure that blocks every other migrator is what is reported")
+		require.ErrorIs(t, err, unlockErr, "the failure that blocks every other migrator is what is reported")
 		assert.False(t, migrated)
 		assert.Truef(t, strings.HasPrefix(err.Error(), prefix), "got %s", err.Error())
 	})
@@ -144,7 +144,7 @@ func TestStartupRefusal_DatabaseAheadOfTheBinaryNamesEveryFactAnOperatorNeeds(t 
 // interrupted step is known, and an explanation layered on top of it here would either
 // duplicate that or contradict it.
 func TestStartupRefusal_LeavesEverythingElseExactlyAsItWas(t *testing.T) {
-	assert.NoError(t, StartupRefusal(nil, "v1.6.0"), "nil is not a refusal")
+	require.NoError(t, StartupRefusal(nil, "v1.6.0"), "nil is not a refusal")
 
 	dirty := DirtyError{Version: 40, Applied: 40, Below: 39, Above: 41, Carried: true}
 	assert.Equal(t, error(dirty), StartupRefusal(dirty, "v1.6.0"),

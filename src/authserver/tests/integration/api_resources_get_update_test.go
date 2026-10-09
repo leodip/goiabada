@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // GET /api/v1/admin/resources/{id}
@@ -30,7 +31,7 @@ func TestAPIResourceGet_Success(t *testing.T) {
 
 	var getResp api.GetResourceResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, res.Id, getResp.Resource.Id)
 	assert.Equal(t, res.ResourceIdentifier, getResp.Resource.ResourceIdentifier)
@@ -69,10 +70,10 @@ func TestAPIResourceGet_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/1"
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
@@ -108,7 +109,7 @@ func TestAPIResourceUpdatePut_Success(t *testing.T) {
 
 	var updResp api.UpdateResourceResponse
 	err := json.NewDecoder(resp.Body).Decode(&updResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, res.Id, updResp.Resource.Id)
 	assert.Equal(t, updateReq.ResourceIdentifier, updResp.Resource.ResourceIdentifier)
@@ -116,7 +117,7 @@ func TestAPIResourceUpdatePut_Success(t *testing.T) {
 
 	// Verify DB persisted
 	stored, err := database.GetResourceById(context.Background(), nil, res.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, stored)
 	assert.Equal(t, updateReq.ResourceIdentifier, stored.ResourceIdentifier)
 	assert.Equal(t, "Updated desc", stored.Description)
@@ -177,7 +178,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceAllowed(t *testing.T) {
 
 	// Find system-level resource (authserver)
 	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, sysRes)
 
 	// Update with same identifier (should succeed)
@@ -192,7 +193,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceAllowed(t *testing.T) {
 
 	var updatedRes api.GetResourceResponse
 	err = json.NewDecoder(resp.Body).Decode(&updatedRes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, builtin.AuthServerResourceIdentifier, updatedRes.Resource.ResourceIdentifier)
 	assert.Equal(t, newDesc, updatedRes.Resource.Description)
 }
@@ -202,7 +203,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceIdentifierChangeBlocked(t *test
 
 	// Find system-level resource (authserver)
 	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, sysRes)
 
 	// Attempt to change identifier (should fail)
@@ -216,7 +217,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceIdentifierChangeBlocked(t *test
 
 	var errResp api.ErrorResponse
 	err = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, errResp.ErrorDescription, "identifier of a system-level resource cannot be changed")
 }
 
@@ -242,12 +243,12 @@ func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
 	// Build request manually with empty body
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/1"
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
@@ -261,10 +262,10 @@ func TestAPIResourceUpdatePut_UnauthorizedAndScope(t *testing.T) {
 
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
@@ -304,7 +305,7 @@ func TestAPIResourceUpdatePut_AngleBracketsRejected(t *testing.T) {
 	// The old sanitizer rewrote a bare ">" to the literal "&gt;" and stored it; nothing is stored
 	// now.
 	stored, err := database.GetResourceById(context.Background(), nil, res.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "Original", stored.Description)
 }
 
@@ -326,6 +327,6 @@ func TestAPIResourceUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	stored, err := database.GetResourceById(context.Background(), nil, res.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `Tom & Jerry said "hi"`, stored.Description)
 }

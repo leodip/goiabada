@@ -2,7 +2,6 @@ package oauthclient
 
 import (
 	"context"
-	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -99,7 +98,7 @@ func TestTokenClient_RefusesAnAnswerOverTheCap(t *testing.T) {
 				NewTokenClient(testTokenURL, "ci", "cs", clientReturning(http.StatusOK, body), nil))
 
 			require.Error(t, err)
-			assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge),
+			require.ErrorIs(t, err, boundedread.ErrResponseTooLarge,
 				"the answer is refused as oversized rather than reaching the decoder truncated: %v", err)
 			assert.Nil(t, tokenResponse, "nothing is decoded out of an answer that was refused")
 
@@ -206,7 +205,7 @@ func TestTokenClient_TheSingleUseGrantsSurviveACancelledCallerAndKeepItsRequestI
 			require.Error(t, err)
 			assert.Nil(t, tokenResponse)
 			require.True(t, outbound.called.Load(), "the request was sent, cancelled caller or not")
-			assert.NoError(t, outbound.ctxErr,
+			require.NoError(t, outbound.ctxErr,
 				"the request runs on a context detached from the caller's, which is already cancelled")
 
 			require.True(t, outbound.hasLimit, "detached, but not unbounded")
@@ -255,7 +254,7 @@ func TestClientCredentials_KeepsTheCallersCancellationUnderTheSharedDeadline(t *
 
 		require.Error(t, err)
 		require.True(t, outbound.called.Load())
-		assert.NoError(t, outbound.ctxErr)
+		require.NoError(t, outbound.ctxErr)
 		require.True(t, outbound.hasLimit, "a browser context carries no deadline, so the client sets one")
 		assert.LessOrEqual(t, time.Until(outbound.deadline), TokenExchangeTimeout)
 		assert.Greater(t, time.Until(outbound.deadline), TokenExchangeTimeout-time.Second)

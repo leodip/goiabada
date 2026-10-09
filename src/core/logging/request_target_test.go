@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // -----------------------------------------------------------------------------
@@ -183,7 +184,7 @@ func TestRequestTargetForLog(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			u, err := url.ParseRequestURI(test.target)
-			assert.NoError(t, err, "the test's own input must be a valid request target")
+			require.NoError(t, err, "the test's own input must be a valid request target")
 
 			got := RequestTargetForLog(u)
 
@@ -282,11 +283,11 @@ func TestRequestTargetForLog_WholeTargetCap(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			u, err := url.ParseRequestURI(test.target)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			got := RequestTargetForLog(u)
 
-			assert.Equal(t, test.wantLen, len(got))
+			assert.Len(t, got, test.wantLen)
 			assert.True(t, strings.HasSuffix(got, test.wantEnd),
 				"expected the output to end with %q, got the tail %q",
 				test.wantEnd, got[max(0, len(got)-64):])
@@ -304,14 +305,14 @@ func TestRequestTargetForLog_QueryComponentCap(t *testing.T) {
 		name := strings.Repeat("n", 900)
 
 		u, err := url.ParseRequestURI("/auth/authorize?" + name + "=x")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		got := RequestTargetForLog(u)
 
 		// 512 retained + "[truncated, 512 of 900 bytes]" (29 bytes), then "=" and the
 		// redacted value: 15 + 1 + 512 + 29 + 1 + 10 = 568.
 		assert.Equal(t, "/auth/authorize?"+name[:512]+"[truncated, 512 of 900 bytes]=[redacted]", got)
-		assert.Equal(t, 568, len(got))
+		assert.Len(t, got, 568)
 	})
 
 	t.Run("an allowlisted value over the bound is clipped, the misbuilt-RP shape", func(t *testing.T) {
@@ -322,10 +323,10 @@ func TestRequestTargetForLog_QueryComponentCap(t *testing.T) {
 		// 21 + 500 + 28 = 549 bytes, so the signature starts at byte 521 and a
 		// 512-byte prefix cannot reach it.
 		token := "eyJhbGciOiJSUzI1NiJ9." + strings.Repeat("P", 500) + ".SIGNATURE-SENTINEL-abcdefgh"
-		assert.Equal(t, 549, len(token), "the row's arithmetic depends on this length")
+		assert.Len(t, token, 549, "the row's arithmetic depends on this length")
 
 		u, err := url.ParseRequestURI("/auth/authorize?client_id=" + token)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		got := RequestTargetForLog(u)
 
@@ -347,7 +348,7 @@ func TestRequestTargetForLog_QueryComponentCap(t *testing.T) {
 		}
 
 		u, err := url.ParseRequestURI("/auth/authorize?" + strings.Join(parts, "&"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		got := RequestTargetForLog(u)
 
@@ -363,7 +364,7 @@ func TestRequestTargetForLog_QueryComponentCap(t *testing.T) {
 		// than after, which would put a truncation marker on a value that was never
 		// written.
 		u, err := url.ParseRequestURI("/auth/authorize?id_token_hint=" + strings.Repeat("Z", 900))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		got := RequestTargetForLog(u)
 
@@ -387,7 +388,7 @@ func TestRequestTargetForLog_ParseQueryParameterLimit(t *testing.T) {
 	query := strings.Join(parts, "&")
 
 	u, err := url.ParseRequestURI("/auth/authorize?" + query)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	got := RequestTargetForLog(u)
 

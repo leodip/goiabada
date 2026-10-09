@@ -238,7 +238,7 @@ func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
 
 	survivor, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil,
 		sessionkeys.AuthServerSessionName, hashTestSessionId(id), time.Now().UTC())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, survivor, "deleting through the admin console's endpoint must not reach an auth server session")
 }
 

@@ -25,7 +25,7 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 	// Create a confidential client with auth code enabled
 	clientSecret := securerandom.String(60)
 	enc, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	client := &record.Client{
 		ClientIdentifier:         "weborig-succ-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
@@ -36,16 +36,16 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Seed existing web origins
 	originA := "https://a.example.com"
 	originB := "https://b.example.com"
 	err = database.CreateWebOrigin(context.Background(), nil, &record.WebOrigin{ClientId: client.Id, Origin: originA})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = database.CreateWebOrigin(context.Background(), nil, &record.WebOrigin{ClientId: client.Id, Origin: originB})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Desired: keep A (with spaces and uppercase to test trimming+lowercasing), remove B, add C
 	originAMixed := "  HTTPS://A.EXAMPLE.COM  "
@@ -62,7 +62,7 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 
 	var updateResp api.UpdateClientResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Response should include exactly a.example.com and c.example.com in lowercase
 	got := map[string]bool{}
@@ -75,9 +75,9 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 
 	// Verify DB reflects the change
 	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = database.ClientLoadWebOrigins(context.Background(), nil, refreshed)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	gotDB := map[string]bool{}
 	for _, wo := range refreshed.WebOrigins {
 		gotDB[wo.Origin] = true
@@ -108,7 +108,7 @@ func TestAPIClientWebOriginsPut_AuthCodeDisabledAccepted(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	origin := "https://spa-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
@@ -120,15 +120,15 @@ func TestAPIClientWebOriginsPut_AuthCodeDisabledAccepted(t *testing.T) {
 
 	var updateResp api.UpdateClientResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, updateResp.Client.WebOrigins, 1)
 	assert.Equal(t, origin, updateResp.Client.WebOrigins[0].Origin)
 
 	// And it really landed, rather than being echoed back from the request.
 	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = database.ClientLoadWebOrigins(context.Background(), nil, refreshed)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, refreshed.WebOrigins, 1)
 	assert.Equal(t, origin, refreshed.WebOrigins[0].Origin)
 }
@@ -150,7 +150,7 @@ func TestAPIClientWebOriginsPut_StoresTheCanonicalOrigin(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	host := "canon-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
@@ -181,9 +181,9 @@ func TestAPIClientWebOriginsPut_StoresTheCanonicalOrigin(t *testing.T) {
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 			refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			err = database.ClientLoadWebOrigins(context.Background(), nil, refreshed)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Len(t, refreshed.WebOrigins, 1)
 			assert.Equal(t, tc.want, refreshed.WebOrigins[0].Origin)
 		})
@@ -198,7 +198,7 @@ func TestAPIClientWebOriginsPut_SystemLevelClientAllowed(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	var listResp api.GetClientsResponse
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var sysId int64
 	for _, c := range listResp.Clients {
@@ -243,7 +243,7 @@ func TestAPIClientWebOriginsPut_ValidationErrors(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
@@ -344,7 +344,7 @@ func TestAPIClientWebOriginsPut_TheBoundIsTheLongestStandardOrigin(t *testing.T)
 		AuthorizationCodeEnabled: true,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
@@ -362,7 +362,7 @@ func TestAPIClientWebOriginsPut_TheBoundIsTheLongestStandardOrigin(t *testing.T)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
-	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
 	assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode)
 	assert.Contains(t, errResp.ErrorDescription, "too long")
 	assert.Equal(t, []string{atTheBound}, getClientWebOrigins(t, accessToken, client.Id),
@@ -479,17 +479,17 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, client2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client2.Id) }()
 
 	urlIB := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client2.Id, 10) + "/web-origins"
 	req, err := http.NewRequest("PUT", urlIB, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 	httpClient := createHttpClient(t)
 	resp3, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var ib map[string]interface{}
@@ -501,9 +501,9 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
 
 	// Unauthorized
 	req2, err := http.NewRequest("PUT", urlIB, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	resp4, err := httpClient.Do(req2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp4.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp4.StatusCode)
 }
@@ -521,7 +521,7 @@ func TestAPIClientWebOriginsPut_InsufficientScope(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, target)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/web-origins"

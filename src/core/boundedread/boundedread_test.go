@@ -55,7 +55,7 @@ func TestRead_RefusesABodyOneByteOverTheCeiling(t *testing.T) {
 	body, err := Read(over, 16)
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrResponseTooLarge), "got %v", err)
+	require.ErrorIs(t, err, ErrResponseTooLarge, "got %v", err)
 	assert.Nil(t, body, "nothing is handed back, so no prefix can reach a decoder")
 	assert.Equal(t, int64(17), over.read.Load(), "one byte past the ceiling is read, and no more")
 }
@@ -68,7 +68,7 @@ func TestRead_ReadsOnlyOneBytePastTheCeilingOfAMuchLargerBody(t *testing.T) {
 	_, err := Read(huge, 16)
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrResponseTooLarge), "got %v", err)
+	require.ErrorIs(t, err, ErrResponseTooLarge, "got %v", err)
 	assert.Equal(t, int64(17), huge.read.Load())
 }
 
@@ -93,8 +93,8 @@ func TestRead_ReturnsWhatArrivedWhenTheReadFailsPartway(t *testing.T) {
 	body, err := Read(&failingReader{}, 16)
 
 	require.Error(t, err)
-	assert.False(t, errors.Is(err, ErrResponseTooLarge), "a dropped read is not an overrun")
-	assert.True(t, errors.Is(err, errConnectionDropped))
+	require.NotErrorIs(t, err, ErrResponseTooLarge, "a dropped read is not an overrun")
+	require.ErrorIs(t, err, errConnectionDropped)
 	assert.Equal(t, []byte("partial"), body,
 		"the partial body is handed back, for the callers that treat a failed read as a success")
 }

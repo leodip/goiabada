@@ -124,7 +124,9 @@ func TestHandleUIThemePost_OnlyASessionEndedListReadStopsTheRedraw(t *testing.T)
 			}
 
 			require.NotNil(t, bind, "the refused form is redrawn")
-			assert.Equal(t, tc.updateErr.(*apiclient.APIError).Message, bind["error"])
+			var apiErr *apiclient.APIError
+			require.ErrorAs(t, tc.updateErr, &apiErr)
+			assert.Equal(t, apiErr.Message, bind["error"])
 			assert.Equal(t, tc.themes, bind["uiThemes"])
 			assert.Equal(t, SettingsUITheme{UITheme: "purple"}, bind["settings"], "with what was typed")
 		})

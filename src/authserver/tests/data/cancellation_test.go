@@ -3,7 +3,6 @@ package datatests
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"testing"
 	"time"
 
@@ -37,7 +36,7 @@ func TestBeginTransaction_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	tx, err := database.BeginTransaction(cancelled())
 
 	require.Error(t, err, "a cancelled caller must not be given a transaction")
-	assert.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
+	require.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
 	assert.Nil(t, tx, "nothing is returned to roll back")
 }
 
@@ -50,7 +49,7 @@ func TestRunInTransaction_WithACancelledContextNeverRunsTheBody(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Zero(t, ran, "the body never ran, so nothing was written and nothing needs undoing")
 }
 
@@ -118,7 +117,7 @@ func TestBeginTransaction_OnSqliteABlockedOpenReturnsOnItsDeadline(t *testing.T)
 	}
 
 	require.Error(t, result.err, "the second open cannot succeed while the only connection is held")
-	assert.True(t, errors.Is(result.err, context.DeadlineExceeded),
+	require.ErrorIs(t, result.err, context.DeadlineExceeded,
 		"the deadline is what ended the wait, and it must be matchable: got %v", result.err)
 	assert.Nil(t, result.tx)
 	assert.Less(t, time.Since(started), 5*time.Second)
@@ -139,7 +138,7 @@ func TestGetUserById_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	got, err := database.GetUserById(cancelled(), nil, user.Id)
 
 	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
+	require.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
 	assert.Nil(t, got, "no row is returned alongside the refusal")
 }
 
@@ -157,7 +156,7 @@ func TestCreateUser_RefusesAnAlreadyCancelledContextAndInsertsNothing(t *testing
 	err := database.CreateUser(cancelled(), nil, user)
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 
 	found, err := database.GetUserByEmail(context.Background(), nil, user.Email)
 	require.NoError(t, err, "the read that checks the table must itself succeed")
@@ -173,7 +172,7 @@ func TestUserLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	err := database.UserLoadPermissions(cancelled(), nil, user)
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Empty(t, user.Permissions, "nothing was loaded onto the model")
 }
 
@@ -193,7 +192,7 @@ func TestGetUserSessionBySessionIdentifier_RefusesAnAlreadyCancelledContext(t *t
 	got, err := database.GetUserSessionBySessionIdentifier(cancelled(), nil, session.SessionIdentifier)
 
 	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
+	require.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
 	assert.Nil(t, got, "no row is returned alongside the refusal")
 }
 
@@ -226,7 +225,7 @@ func TestCreateCode_RefusesAnAlreadyCancelledContextAndInsertsNothing(t *testing
 	err := database.CreateCode(cancelled(), nil, code)
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 
 	found, err := database.GetCodeByCodeHash(context.Background(), nil, code.CodeHash, false)
 	require.NoError(t, err, "the read that checks the table must itself succeed")
@@ -244,7 +243,7 @@ func TestUserSessionLoadClients_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	err := database.UserSessionLoadClients(cancelled(), nil, session)
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Empty(t, session.Clients, "nothing was loaded onto the model")
 }
 
@@ -263,7 +262,7 @@ func TestAcquireUserSessionRow_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	live, err := database.AcquireUserSessionRow(cancelled(), tx, session.SessionIdentifier)
 
 	require.Error(t, err, "a refusal, not a report that the row is gone")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.False(t, live)
 }
 
@@ -282,7 +281,7 @@ func TestGetClientByClientIdentifier_RefusesAnAlreadyCancelledContext(t *testing
 	got, err := database.GetClientByClientIdentifier(cancelled(), nil, client.ClientIdentifier)
 
 	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
+	require.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
 	assert.Nil(t, got, "no row is returned alongside the refusal")
 }
 
@@ -300,7 +299,7 @@ func TestCreateClient_RefusesAnAlreadyCancelledContextAndInsertsNothing(t *testi
 	err := database.CreateClient(cancelled(), nil, client)
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 
 	found, err := database.GetClientByClientIdentifier(context.Background(), nil, client.ClientIdentifier)
 	require.NoError(t, err, "the read that checks the table must itself succeed")
@@ -331,7 +330,7 @@ func TestClientLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	err := database.ClientLoadPermissions(cancelled(), nil, client)
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Empty(t, client.Permissions, "nothing was loaded onto the model")
 }
 
@@ -348,7 +347,7 @@ func TestGetClientPermissionsByClientId_RefusesAnAlreadyCancelledContext(t *test
 	got, err := database.GetClientPermissionsByClientId(cancelled(), nil, client.Id)
 
 	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
+	require.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
 	assert.Empty(t, got, "no rows are returned alongside the refusal")
 }
 
@@ -366,7 +365,7 @@ func TestGetPermissionsByIds_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	got, err := database.GetPermissionsByIds(cancelled(), nil, []int64{permission.Id})
 
 	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
+	require.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
 	assert.Empty(t, got, "no rows are returned alongside the refusal")
 }
 
@@ -400,6 +399,6 @@ func TestWebOriginExists_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	exists, err := database.WebOriginExists(cancelled(), nil, origin.Origin)
 
 	require.Error(t, err, "the refusal must reach the caller as an error, not as a false")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.False(t, exists)
 }

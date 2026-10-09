@@ -3,7 +3,6 @@ package datatests
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -114,7 +113,7 @@ func TestConnectionPool_TheConfiguredCapIsTheHandlesMaximum(t *testing.T) {
 	defer cancel()
 	_, err = handle.BeginTx(waitCtx, nil)
 	require.Error(t, err, "a transaction past the cap must wait for a connection, not open one")
-	assert.Truef(t, errors.Is(err, context.DeadlineExceeded), "it waited until its context ended: %v", err)
+	require.ErrorIsf(t, err, context.DeadlineExceeded, "it waited until its context ended: %v", err)
 
 	stats := handle.Stats()
 	assert.Equal(t, wantCap, stats.OpenConnections, "no connection was opened past the cap")
@@ -186,7 +185,7 @@ func TestConnectionPool_TheScrapeReportsThePoolAsItIs(t *testing.T) {
 	waitCtx, cancel := context.WithTimeout(ctx, waited)
 	defer cancel()
 	_, err = handle.BeginTx(waitCtx, nil)
-	require.Truef(t, errors.Is(err, context.DeadlineExceeded), "a transaction past the cap waits until its context ends: %v", err)
+	require.ErrorIsf(t, err, context.DeadlineExceeded, "a transaction past the cap waits until its context ends: %v", err)
 
 	atCap := poolSamples(t, reg)
 	assert.Equal(t, map[string]string{

@@ -640,7 +640,7 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 1, len(userSessions))
+	assert.Len(t, userSessions, 1)
 
 	advanceOtpConfigGeneration(t, user.Id)
 
@@ -706,7 +706,7 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 1, len(userSessions))
+	assert.Len(t, userSessions, 1)
 	snapshotBefore := userSessions[0].OtpConfigGeneration
 
 	silentRequest := func() string {
@@ -743,7 +743,7 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 1, len(after))
+	assert.Len(t, after, 1)
 	assert.Equal(t, snapshotBefore, after[0].OtpConfigGeneration,
 		"the refusals must not have moved the session's snapshot")
 }
@@ -757,7 +757,7 @@ func TestPromptNone_OtpConfigChangedLevel1Target_Success(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 1, len(userSessions))
+	assert.Len(t, userSessions, 1)
 
 	advanceOtpConfigGeneration(t, user.Id)
 
@@ -864,7 +864,7 @@ func TestPromptNone_SessionBumped_Success(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 1, len(userSessions))
+	assert.Len(t, userSessions, 1)
 	originalLastAccessed := userSessions[0].LastAccessed
 
 	// Wait a bit to ensure different timestamp
@@ -910,7 +910,7 @@ func TestPromptNone_SessionBumped_Success(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 1, len(userSessions))
+	assert.Len(t, userSessions, 1)
 
 	assert.True(t, userSessions[0].LastAccessed.After(originalLastAccessed),
 		"LastAccessed should be updated (was: %v, now: %v)",

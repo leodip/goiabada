@@ -47,7 +47,7 @@ func TestSendEmail(t *testing.T) {
 	}
 
 	err := emailSender.SendEmail(context.Background(), smtpConfig, input)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	sent := mailpit.New(mailpitURL).AssertEmailSent(t, recipient, "<p>This is a test email</p>")
 
@@ -577,7 +577,7 @@ func TestSendEmail_PlainRepeatedChallenge(t *testing.T) {
 		HtmlBody: "<p>hello</p>",
 	})
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "unexpected server challenge")
+	require.ErrorContains(t, err, "unexpected server challenge")
 	// The mechanism refusing a challenge the server should not have sent is neither a reply nor a
 	// broken connection.
 	assertSendFailure(t, err, SendFailureOther)

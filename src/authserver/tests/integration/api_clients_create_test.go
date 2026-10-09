@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAPIClientCreate_Success(t *testing.T) {
@@ -33,7 +34,7 @@ func TestAPIClientCreate_Success(t *testing.T) {
 	// Decode generically to avoid tight coupling
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	client := response["client"].(map[string]interface{})
 	assert.Equal(t, reqBody.ClientIdentifier, client["clientIdentifier"])
 	assert.Equal(t, true, client["enabled"])
@@ -117,7 +118,7 @@ func TestAPIClientCreate_Validation(t *testing.T) {
 
 			var response map[string]interface{}
 			err := json.NewDecoder(resp.Body).Decode(&response)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Contains(t, response["error_description"].(string), tc.expectedError)
 		})
 	}
@@ -141,7 +142,7 @@ func TestAPIClientCreate_Duplicate(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "VALIDATION_ERROR", errResp["error_code"])
 	assert.Contains(t, errResp["error_description"].(string), "already in use")
 }
@@ -153,9 +154,9 @@ func TestAPIClientCreate_Unauthorized(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
@@ -190,7 +191,7 @@ func TestAPIClientCreate_WithDisplayName(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	client := response["client"].(map[string]interface{})
 	assert.Equal(t, "My App", client["displayName"])
 	assert.Equal(t, true, client["showDisplayName"])
@@ -214,9 +215,10 @@ func TestAPIClientCreate_EmptyDisplayName(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	client := response["client"].(map[string]interface{})
-	assert.Equal(t, "", client["displayName"])
+	assert.Contains(t, client, "displayName")
+	assert.Empty(t, client["displayName"])
 	assert.Equal(t, false, client["showDisplayName"])
 }
 
@@ -238,7 +240,7 @@ func TestAPIClientCreate_DisplayNameTooLong(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, response["error_description"].(string), "maximum length of 100 characters")
 }
 
@@ -260,7 +262,7 @@ func TestAPIClientCreate_DisplayNameTrimmed(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	client := response["client"].(map[string]interface{})
 	assert.Equal(t, "My App", client["displayName"])
 	assert.Equal(t, true, client["showDisplayName"])
@@ -303,7 +305,7 @@ func TestAPIClientCreate_AngleBracketsRejected(t *testing.T) {
 
 			// Nothing was created.
 			stored, err := database.GetClientByClientIdentifier(context.Background(), nil, tc.body.ClientIdentifier)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Nil(t, stored)
 		})
 	}
@@ -330,14 +332,14 @@ func TestAPIClientCreate_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	client := response["client"].(map[string]interface{})
 	assert.Equal(t, `Tom & Jerry said "hi"`, client["description"])
 	assert.Equal(t, `AT&T "Wireless"`, client["displayName"])
 	assert.Equal(t, true, client["showDisplayName"])
 
 	stored, err := database.GetClientByClientIdentifier(context.Background(), nil, ident)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, stored)
 	assert.Equal(t, `Tom & Jerry said "hi"`, stored.Description)
 	assert.Equal(t, `AT&T "Wireless"`, stored.DisplayName)
@@ -362,7 +364,7 @@ func TestAPIClientCreate_DescriptionOnlyBackwardCompat(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	client := response["client"].(map[string]interface{})
 	assert.Equal(t, "some desc", client["description"])
 	assert.Equal(t, false, client["showDisplayName"])
@@ -387,7 +389,7 @@ func TestAPIClientCreate_BothDescriptionAndDisplayName(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	client := response["client"].(map[string]interface{})
 	assert.Equal(t, "some desc", client["description"])
 	assert.Equal(t, "My App", client["displayName"])

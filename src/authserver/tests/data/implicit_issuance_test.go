@@ -181,7 +181,7 @@ func TestIssueImplicit_NoSessionIdentifierIsACallerError(t *testing.T) {
 		implicitInput(client, user, ""), true, true)
 
 	require.Error(t, err)
-	assert.NotErrorIs(t, err, issuance.ErrIssuingSessionGone)
+	require.NotErrorIs(t, err, issuance.ErrIssuingSessionGone)
 	assert.Nil(t, response)
 }
 

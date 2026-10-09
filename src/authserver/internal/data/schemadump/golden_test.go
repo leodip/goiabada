@@ -208,10 +208,10 @@ func reverse[T any](s []T) {
 // changed" and passes, which is the one outcome that would make the whole check worthless.
 func TestEncodeRefusesAnEmptyDump(t *testing.T) {
 	_, err := Encode(Golden{Dialect: data.SQLite, Migrated: sampleMigrated, Schema: Schema{}})
-	assert.Error(t, err, "an empty schema is a fault, not a result")
+	require.Error(t, err, "an empty schema is a fault, not a result")
 
 	_, err = Encode(Golden{Dialect: data.SQLite, Migrated: sampleMigrated, Schema: Schema{{Name: "t"}}})
-	assert.Error(t, err, "a table with no columns is a fault, not a result")
+	require.Error(t, err, "a table with no columns is a fault, not a result")
 
 	_, err = Encode(Golden{Dialect: data.Dialect("oracle"), Migrated: sampleMigrated, Schema: sampleSchema()})
 	assert.Error(t, err, "an unrecognised dialect must not be encoded")
@@ -227,7 +227,7 @@ func TestEncodeRefusesAnEmptyDump(t *testing.T) {
 func TestEncodeRefusesAnUnmigratedVersion(t *testing.T) {
 	for _, migrated := range []int{0, -1} {
 		_, err := Encode(Golden{Dialect: data.SQLite, Migrated: migrated, Schema: sampleSchema()})
-		assert.Errorf(t, err, "migration version %d is not a migrated database", migrated)
+		require.Errorf(t, err, "migration version %d is not a migrated database", migrated)
 	}
 
 	_, err := Encode(Golden{Dialect: data.SQLite, Migrated: 1, Schema: sampleSchema()})
@@ -291,9 +291,7 @@ func TestParseRefusesADamagedFile(t *testing.T) {
 		// of reporting it as a leniency the parser does not have.
 		require.NotEqualf(t, string(good), tc.file, "the fixture for %s must actually damage the file", tc.name)
 		_, err := Parse([]byte(tc.file))
-		if !assert.Errorf(t, err, "Parse must refuse %s", tc.name) {
-			continue
-		}
+		require.Errorf(t, err, "Parse must refuse %s", tc.name)
 		if tc.mentions != "" {
 			assert.Containsf(t, err.Error(), tc.mentions,
 				"the refusal of %s must name what is wrong so the file can be fixed", tc.name)
@@ -315,7 +313,7 @@ func TestGoldenPath(t *testing.T) {
 		assert.Equalf(t, filepath.Join(root, "authserver", "internal", "data", string(d)+"db", "schema.golden"), path,
 			"the %s golden file sits beside that engine's migrations", d)
 		_, statErr := os.Stat(filepath.Dir(path))
-		assert.NoErrorf(t, statErr, "the directory holding the %s golden file exists", d)
+		require.NoErrorf(t, statErr, "the directory holding the %s golden file exists", d)
 	}
 
 	_, err = GoldenPath(data.Dialect("oracle"))

@@ -134,7 +134,7 @@ func TestServeAndDrain_CancellationWaitsForTheHeldRequest(t *testing.T) {
 	assert.Equal(t, http.StatusOK, got.status)
 	assert.Equal(t, "the held response", got.body)
 
-	assert.NoError(t, waitFor(t, returned, "serveAndDrain to return"),
+	require.NoError(t, waitFor(t, returned, "serveAndDrain to return"),
 		"a cancellation is a clean stop, and http.ErrServerClosed from the drained listener is not a failure")
 
 	records := logs.Records()
@@ -184,8 +184,8 @@ func TestServeAndDrain_AFailedListenerDrainsTheOtherFirst(t *testing.T) {
 
 	err := waitFor(t, returned, "serveAndDrain to return")
 	require.Error(t, err)
-	assert.ErrorIs(t, err, errBind, "the listener's own failure is what main reports")
-	assert.NotErrorIs(t, err, http.ErrServerClosed, "a drained listener is not a failure")
+	require.ErrorIs(t, err, errBind, "the listener's own failure is what main reports")
+	require.NotErrorIs(t, err, http.ErrServerClosed, "a drained listener is not a failure")
 	assert.Contains(t, err.Error(), "127.0.0.1:0", "the failure names the listener it came from")
 
 	records := logs.Records()

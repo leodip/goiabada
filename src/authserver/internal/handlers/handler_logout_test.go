@@ -239,7 +239,7 @@ func TestHandleLogoutGet(t *testing.T) {
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		location, err := url.Parse(rr.Header().Get("Location"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, hintedRegisteredURI, location.Scheme+"://"+location.Host+location.Path)
 		assert.Equal(t, []string{"aB+cd/efgh==#&x=1"}, location.Query()["state"],
 			"exactly one state, byte-identical to what the RP sent")
@@ -435,7 +435,8 @@ func TestHandleLogoutGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Equal(t, "", bound["clientId"],
+		assert.Contains(t, bound, "clientId")
+		assert.Empty(t, bound["clientId"],
 			"a rejected hint's client_id must not survive the consent hop, or it authorizes the redirect decision 15 denies")
 		assert.Equal(t, hintedRegisteredURI, bound["postLogoutRedirectUri"],
 			"the target still travels, so the signed-out page can say a return was attempted and refused")
@@ -483,7 +484,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		result, err := decryptIDTokenHint(context.Background(), jwe, "test_client", database, testDataCipher)
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, innerToken, result)
 	})
 
@@ -495,7 +496,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		_, err := decryptIDTokenHint(context.Background(), "a.b.c.d.e", "invalid_client", database, testDataCipher)
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "client_id names no client")
 
 		// Warn, where this used to be Error. A client_id naming no client is a request refused
@@ -520,7 +521,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		_, err := decryptIDTokenHint(context.Background(), "not.a.valid.jwe.token", "test_client", database, testDataCipher)
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to decrypt the id_token_hint")
 
 		// Warn for the same reason as the no-client case above: the hint is a value the relying
@@ -546,7 +547,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		_, err = decryptIDTokenHint(context.Background(), jwe, "test_client", database, testDataCipher)
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to decrypt the id_token_hint")
 	})
 }
@@ -573,7 +574,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 		err := handleExistingSessionOnLogout(r, "test-session", &record.Client{}, database, auditLogger)
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "lookup exploded")
 		database.AssertExpectations(t)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
@@ -588,7 +589,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 		err := handleExistingSessionOnLogout(r, "test-session", &record.Client{}, database, auditLogger)
 
-		assert.NoError(t, err, "a session that is not there is nothing to tear down, not a failure")
+		require.NoError(t, err, "a session that is not there is nothing to tear down, not a failure")
 		database.AssertExpectations(t)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
@@ -634,7 +635,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
@@ -672,7 +673,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
@@ -705,7 +706,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger)
 
-		assert.NoError(t, err) // The function should not return an error if the client is not found in the session
+		require.NoError(t, err) // The function should not return an error if the client is not found in the session
 		database.AssertExpectations(t)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
@@ -755,11 +756,11 @@ func hintedRequest(t *testing.T, method string, form url.Values, sessionIdentifi
 	var err error
 	if method == http.MethodPost {
 		req, err = http.NewRequest(method, "/auth/logout", strings.NewReader(form.Encode()))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	} else {
 		req, err = http.NewRequest(method, "/auth/logout?"+form.Encode(), nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Issuer: hintedIssuer})
@@ -862,7 +863,7 @@ func mustParseURL(t *testing.T, raw string) *url.URL {
 func logoutPostRequest(t *testing.T, form url.Values) *http.Request {
 	t.Helper()
 	req, err := http.NewRequest("POST", "/auth/logout", strings.NewReader(form.Encode()))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 }
@@ -1006,7 +1007,7 @@ func TestHandleLogoutPost(t *testing.T) {
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		location, err := url.Parse(rr.Header().Get("Location"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/out", location.Scheme+"://"+location.Host+location.Path)
 		assert.Equal(t, []string{"aB+cd/efgh==#&x=1"}, location.Query()["state"],
 			"exactly one state, byte-identical to what the RP sent")
@@ -1857,11 +1858,11 @@ func TestBuildPostLogoutRedirect(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := buildPostLogoutRedirect(tc.registeredURI, tc.state, tc.statePresent)
 			if tc.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Empty(t, result)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
@@ -2067,7 +2068,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			hintValue: strPtr("a.b.c.d.e"),
 			stubDB: func(database *datamocks.Database) {
 				secret, err := testDataCipher.Encrypt("some_client_secret")
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientId).
 					Return(&record.Client{ClientIdentifier: theClientId, ClientSecretEncrypted: secret}, nil)
 			},
@@ -2082,7 +2083,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			innerToken: strPtr("inner.signed.token"),
 			stubDB: func(database *datamocks.Database) {
 				secret, err := testDataCipher.Encrypt("some_client_secret")
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientId).
 					Return(&record.Client{Id: theClientDbId, ClientIdentifier: theClientId, ClientSecretEncrypted: secret}, nil)
 				resolvesOwnedSessionRows(database)
@@ -2399,7 +2400,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			}
 
 			req, err := http.NewRequest("GET", "/auth/logout?"+query.Encode(), nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			ctx := req.Context()
 			if !tc.noSession {
 				ctx = reqctx.WithSessionIdentifier(ctx, theSessionId)
@@ -2434,9 +2435,9 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			got, err := classifyIdTokenHint(req, theIssuer, database, tokenParser, testDataCipher)
 
 			if tc.wantErr {
-				assert.Error(t, err, "a database failure in either lookup that decides whether the hint's session may be trusted must propagate")
+				require.Error(t, err, "a database failure in either lookup that decides whether the hint's session may be trusted must propagate")
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 			assert.Equal(t, tc.want, got.state, "gate: %s", tc.gate)
 

@@ -1,7 +1,6 @@
 package web
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,7 +13,7 @@ func TestOpenAPISpec(t *testing.T) {
 	spec := OpenAPISpec()
 
 	assert.NotEmpty(t, spec, "the embedded openapi.yaml must not be empty")
-	assert.True(t, strings.Contains(string(spec), "openapi:"),
+	assert.Contains(t, string(spec), "openapi:",
 		"the embedded file must look like an OpenAPI document")
 }
 

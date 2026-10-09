@@ -73,7 +73,7 @@ func TestHandleSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 
 	// Sorted by id descending, so the legacy row comes first.
 	assert.Equal(t, int64(2), sessions[0].UserSessionId)
-	assert.Equal(t, "", sessions[0].UserAgent, "a legacy row has no header to show")
+	assert.Empty(t, sessions[0].UserAgent, "a legacy row has no header to show")
 
 	assert.Equal(t, int64(1), sessions[1].UserSessionId)
 	assert.Equal(t, header, sessions[1].UserAgent)
@@ -275,6 +275,6 @@ func TestHandleSessionsEndSessionPost_AListTheApiCannotReadStopsTheDelete(t *tes
 		ServeHTTP(httptest.NewRecorder(), req)
 
 	httpHelper.AssertExpectations(t)
-	require.NotNil(t, captured, "the handler answered nothing")
+	require.Error(t, captured, "the handler answered nothing")
 	assert.Empty(t, apiClient.deleted, "nothing may be deleted on an answer the handler cannot make")
 }

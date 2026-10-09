@@ -237,11 +237,11 @@ func TestMigrate_NoChangeWhenAlreadyThere(t *testing.T) {
 	m := newTestMigrator(t, db, threeVersions())
 	require.NoError(t, m.Up(context.Background()))
 
-	assert.ErrorIs(t, m.Migrate(context.Background(), 5), ErrNoChange)
-	assert.ErrorIs(t, m.Up(context.Background()), ErrNoChange)
+	require.ErrorIs(t, m.Migrate(context.Background(), 5), ErrNoChange)
+	require.ErrorIs(t, m.Up(context.Background()), ErrNoChange)
 	// And on a database nothing has touched, where current and target are both the nil version.
 	fresh := openTestDB(t)
-	assert.ErrorIs(t, newTestMigrator(t, fresh, threeVersions()).Migrate(context.Background(), NilVersion), ErrNoChange)
+	require.ErrorIs(t, newTestMigrator(t, fresh, threeVersions()).Migrate(context.Background(), NilVersion), ErrNoChange)
 	assertPoolReturned(t, db)
 }
 
@@ -287,7 +287,7 @@ func TestPlan_ListsTheMigrationsThatWouldRunInBothDirections(t *testing.T) {
 	assert.Equal(t, []int{5, 2, 1}, toFloor)
 
 	_, err = m.Plan(context.Background(), 5)
-	assert.ErrorIs(t, err, ErrNoChange)
+	require.ErrorIs(t, err, ErrNoChange)
 	assertPoolReturned(t, db)
 }
 
@@ -311,7 +311,7 @@ func TestVersion_EmptyTableIsNeverMigrated(t *testing.T) {
 	m := newTestMigrator(t, db, threeVersions())
 
 	_, _, err := m.Version(context.Background())
-	assert.ErrorIs(t, err, ErrNilVersion)
+	require.ErrorIs(t, err, ErrNilVersion)
 
 	require.NoError(t, m.Migrate(context.Background(), 2))
 	v, dirty, err := m.Version(context.Background())
@@ -335,10 +335,10 @@ func TestVersion_RefusesMoreThanOneRow(t *testing.T) {
 	assert.Contains(t, err.Error(), "000002")
 	assert.Contains(t, err.Error(), "000005")
 
-	assert.ErrorAs(t, m.Up(context.Background()), &multi)
-	assert.ErrorAs(t, m.Migrate(context.Background(), 1), &multi)
+	require.ErrorAs(t, m.Up(context.Background()), &multi)
+	require.ErrorAs(t, m.Migrate(context.Background(), 1), &multi)
 	_, planErr := m.Plan(context.Background(), 1)
-	assert.ErrorAs(t, planErr, &multi)
+	require.ErrorAs(t, planErr, &multi)
 
 	assert.False(t, tableExists(t, db, "t1"), "nothing ran")
 	assertPoolReturned(t, db)
@@ -356,7 +356,7 @@ func TestVersionRead_FailsClosedRatherThanRerunningTheChain(t *testing.T) {
 
 		_, _, err = m.Version(context.Background())
 		require.Error(t, err)
-		assert.NotErrorIs(t, err, ErrNilVersion)
+		require.NotErrorIs(t, err, ErrNilVersion)
 		require.Error(t, m.Up(context.Background()))
 		_, planErr := m.Plan(context.Background(), 5)
 		require.Error(t, planErr)
@@ -377,7 +377,7 @@ func TestVersionRead_FailsClosedRatherThanRerunningTheChain(t *testing.T) {
 
 		_, _, err = m.Version(context.Background())
 		require.Error(t, err)
-		assert.NotErrorIs(t, err, ErrNilVersion)
+		require.NotErrorIs(t, err, ErrNilVersion)
 		require.Error(t, m.Up(context.Background()))
 
 		assert.False(t, tableExists(t, db, "t1"), "no migration file ran")
@@ -459,7 +459,7 @@ func TestMigrate_RefusesADirtyDatabase(t *testing.T) {
 	var dirty DirtyError
 	require.ErrorAs(t, m.Up(context.Background()), &dirty)
 	assert.Equal(t, 2, dirty.Version)
-	assert.ErrorAs(t, m.Migrate(context.Background(), 1), &dirty)
+	require.ErrorAs(t, m.Migrate(context.Background(), 1), &dirty)
 
 	assert.False(t, tableExists(t, db, "t1"), "nothing ran")
 	assertPoolReturned(t, db)
@@ -501,7 +501,7 @@ func TestMigrate_RefusesAVersionThisBinaryDoesNotCarry(t *testing.T) {
 		assert.Contains(t, unknown.Error(), "000005")
 
 		_, planErr := m.Plan(context.Background(), 3)
-		assert.ErrorAs(t, planErr, &unknown)
+		require.ErrorAs(t, planErr, &unknown)
 
 		assert.Equal(t, []RecordedVersion{{Version: 1, Dirty: false}}, recorded(t, db), "nothing moved")
 		assertPoolReturned(t, db)
@@ -844,7 +844,7 @@ func TestRun_AFailedUnlockIsReportedAndTheSessionIsDiscarded(t *testing.T) {
 	// And the operation's own error is joined rather than replaced when there is one.
 	err = m.Migrate(context.Background(), 2)
 	require.ErrorIs(t, err, ErrNoChange)
-	assert.ErrorIs(t, err, unlockErr)
+	require.ErrorIs(t, err, unlockErr)
 
 	assertPoolReturned(t, db)
 }
@@ -865,7 +865,7 @@ func TestRun_ALockThatFailsIsRefusedAndNothingRuns(t *testing.T) {
 	m, err := New(db, threeVersions(), "migrations", eng)
 	require.NoError(t, err)
 
-	assert.ErrorIs(t, m.Up(context.Background()), lockErr)
+	require.ErrorIs(t, m.Up(context.Background()), lockErr)
 	assert.Empty(t, recorded(t, db))
 	assert.False(t, tableExists(t, db, "t1"))
 	assertPoolReturned(t, db)
@@ -889,7 +889,7 @@ func TestRun_ATryThatFailsIsRefusedAndNothingRuns(t *testing.T) {
 	require.NoError(t, err)
 
 	err = m.Up(context.Background())
-	assert.ErrorIs(t, err, tryErr)
+	require.ErrorIs(t, err, tryErr)
 	assert.Empty(t, recorded(t, db))
 	assertPoolReturned(t, db)
 }

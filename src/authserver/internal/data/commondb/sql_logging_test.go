@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
-	"strings"
 	"testing"
 
 	"github.com/huandu/go-sqlbuilder"
@@ -102,6 +101,6 @@ func TestDatabaseLog_LogsTheStatementTextAsWritten(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, logs.Records(), 1)
-	assert.True(t, strings.Contains(logs.Records()[0].Attrs["statement"].(string), "'literal'"),
+	assert.Contains(t, logs.Records()[0].Attrs["statement"].(string), "'literal'",
 		"the statement is logged as written, placeholders and all")
 }

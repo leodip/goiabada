@@ -41,19 +41,19 @@ func createROPCClientAllowing(t *testing.T, clientSecret string, isPublic bool, 
 
 	if !isPublic && clientSecret != "" {
 		clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
-		assert.Nil(t, err)
+		require.NoError(t, err)
 		client.ClientSecretEncrypted = clientSecretEncrypted
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	return client
 }
@@ -61,7 +61,7 @@ func createROPCClientAllowing(t *testing.T, clientSecret string, isPublic bool, 
 // Helper function to create a user for ROPC tests
 func createROPCUser(t *testing.T, password string) *record.User {
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	user := &record.User{
 		Subject:      fake.UUID(),
@@ -73,7 +73,7 @@ func createROPCUser(t *testing.T, password string) *record.User {
 	}
 
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	return user
 }
@@ -166,7 +166,7 @@ func TestROPC_GlobalDisabled(t *testing.T) {
 		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	user := createROPCUser(t, password)
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
@@ -203,7 +203,7 @@ func TestROPC_ClientOverrideDisabled(t *testing.T) {
 		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	password := fake.Password(12)
 	user := createROPCUser(t, password)
@@ -335,7 +335,7 @@ func TestROPC_DisabledUser(t *testing.T) {
 
 	// Create disabled user
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      false, // Disabled
@@ -343,7 +343,7 @@ func TestROPC_DisabledUser(t *testing.T) {
 		PasswordHash: passwordHashed,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
@@ -469,7 +469,7 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 
 	// Create user with 2FA (OTP) enabled
 	passwordHashed, err := passwordhash.Hash(password)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
@@ -479,7 +479,7 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP"),
 	}
 	err = database.CreateUser(context.Background(), nil, user)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
@@ -639,14 +639,14 @@ func TestROPC_RefreshToken_StopsWhenROPCDisabled(t *testing.T) {
 			disable: func(t *testing.T, client *record.Client) {
 				ropcDisabled := false
 				client.ResourceOwnerPasswordCredentialsEnabled = &ropcDisabled
-				assert.Nil(t, database.UpdateClient(context.Background(), nil, client))
+				assert.NoError(t, database.UpdateClient(context.Background(), nil, client))
 			},
 		},
 		{
 			name: "the client inherits and the global switch is turned off",
 			disable: func(t *testing.T, client *record.Client) {
 				client.ResourceOwnerPasswordCredentialsEnabled = nil
-				assert.Nil(t, database.UpdateClient(context.Background(), nil, client))
+				require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
 				changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = false })
 			},

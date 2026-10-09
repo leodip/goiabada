@@ -1085,7 +1085,7 @@ func TestHandleActivatePost_AddressTaken(t *testing.T) {
 		handler := HandleActivatePost(pageRenderer, store, database, userCreator, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 		handler.ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash))
 
-		assert.ErrorIs(t, stub.BodyErr, data.ErrUniqueViolation, "the body handed the refused insert to the helper, which rolls back")
+		require.ErrorIs(t, stub.BodyErr, data.ErrUniqueViolation, "the body handed the refused insert to the helper, which rolls back")
 		assertRefusalNotLogged(t, logs)
 		database.AssertExpectations(t)
 		userCreator.AssertExpectations(t)
@@ -1178,7 +1178,7 @@ func TestHandleActivatePost_AFailureCommitsNothing(t *testing.T) {
 			handler.ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash))
 
 			if tc.wantBodyErr {
-				assert.Error(t, stub.BodyErr, "the body handed the failure to the helper, which rolls back")
+				require.Error(t, stub.BodyErr, "the body handed the failure to the helper, which rolls back")
 			}
 			database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
@@ -1219,7 +1219,7 @@ func TestHandleActivatePost_DeletedMeanwhile(t *testing.T) {
 	handler := HandleActivatePost(pageRenderer, store, database, userCreator, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 	handler.ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash))
 
-	assert.Error(t, stub.BodyErr, "the refusal leaves the transaction through the helper's rollback, account included")
+	require.Error(t, stub.BodyErr, "the refusal leaves the transaction through the helper's rollback, account included")
 	assertRefusalNotLogged(t, logs)
 	database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertExpectations(t)

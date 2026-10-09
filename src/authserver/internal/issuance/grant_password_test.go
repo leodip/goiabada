@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // TestIssuePasswordGrant_BasicOpenIDScope tests ROPC with basic openid scope
@@ -78,7 +79,7 @@ func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
 	assert.NotEmpty(t, response.IdToken)
@@ -177,14 +178,14 @@ func TestIssuePasswordGrant_WithOfflineAccess(t *testing.T) {
 
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
 	assert.NotEmpty(t, response.IdToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "Bearer", response.TokenType)
 	assert.Contains(t, response.Scope, "offline_access")
-	assert.True(t, response.RefreshExpiresIn > 0)
+	assert.Positive(t, response.RefreshExpiresIn)
 
 	// Verify access token doesn't have sid for ROPC tokens
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -259,7 +260,7 @@ func TestIssuePasswordGrant_WithProfileScope(t *testing.T) {
 
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.IdToken)
 
@@ -336,7 +337,7 @@ func TestIssuePasswordGrant_WithEmailScope(t *testing.T) {
 
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.IdToken)
 
@@ -410,7 +411,7 @@ func TestIssuePasswordGrant_WithResourcePermissions(t *testing.T) {
 
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
 	assert.Contains(t, response.Scope, "myapi:read")
@@ -496,7 +497,7 @@ func TestIssuePasswordGrant_WithGroups(t *testing.T) {
 
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.IdToken)
 
@@ -577,7 +578,7 @@ func TestIssuePasswordGrant_WithoutOpenID(t *testing.T) {
 
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
 	assert.Empty(t, response.IdToken) // No openid scope = no id_token
@@ -623,7 +624,7 @@ func TestIssuePasswordGrant_DatabaseError_GetSigningKey(t *testing.T) {
 
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, response)
 	assert.Contains(t, err.Error(), "database connection error")
 
@@ -691,7 +692,7 @@ func TestIssuePasswordGrant_DatabaseError_CreateRefreshToken(t *testing.T) {
 
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, response)
 	assert.Contains(t, err.Error(), "refresh token creation failed")
 
@@ -761,7 +762,7 @@ func TestIssuePasswordGrant_ClientTokenExpiration(t *testing.T) {
 
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.Equal(t, int64(1800), response.ExpiresIn) // Client override should be used
 
@@ -831,7 +832,7 @@ func TestIssuePasswordGrant_GlobalTokenExpiration(t *testing.T) {
 
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.Equal(t, int64(600), response.ExpiresIn) // Global setting should be used
 

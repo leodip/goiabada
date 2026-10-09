@@ -233,8 +233,8 @@ func TestPromptNone_ImplicitAuthTimeCorrect(t *testing.T) {
 	// Since we waited 1.1 seconds, if auth_time were set to "now" it would be > T1
 	// The auth_time should be <= now - 1 second (approximately T1)
 	now := float64(time.Now().Unix())
-	assert.True(t, authTime < now, "auth_time should be from original login, not current time")
-	assert.True(t, authTime <= now-1, "auth_time should be at least 1 second in the past (from original login)")
+	assert.Less(t, authTime, now, "auth_time should be from original login, not current time")
+	assert.LessOrEqual(t, authTime, now-1, "auth_time should be at least 1 second in the past (from original login)")
 }
 
 func TestPromptNone_ImplicitMissingNonce(t *testing.T) {

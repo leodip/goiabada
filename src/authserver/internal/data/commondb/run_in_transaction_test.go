@@ -183,7 +183,7 @@ func TestRunInTransaction_ThreeDeadlocksExhaustTheAttemptsAndTheLastOneSurfaces(
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, errDeadlock, "the error unwraps to the last deadlock, so the caller can still see what it was")
+	require.ErrorIs(t, err, errDeadlock, "the error unwraps to the last deadlock, so the caller can still see what it was")
 	assert.Contains(t, err.Error(), "all 3 attempts", "and says the attempts were spent")
 	assert.Equal(t, 3, ran, "three attempts, no more")
 	c := d.settled(t)
@@ -215,8 +215,8 @@ func TestRunInTransaction_AVictimTheEngineAlreadyRolledBackIsStillRerun(t *testi
 
 	require.Error(t, err)
 	assert.Equal(t, 3, ran, "the rollback's complaint does not stop the rerun")
-	assert.ErrorIs(t, err, errDeadlock, "and what surfaces at exhaustion is the deadlock")
-	assert.NotErrorIs(t, err, rolledBackAlready, "never the rollback failure")
+	require.ErrorIs(t, err, errDeadlock, "and what surfaces at exhaustion is the deadlock")
+	require.NotErrorIs(t, err, rolledBackAlready, "never the rollback failure")
 	assert.Equal(t, 3, rollbackWarnings(logs),
 		"a rollback that failed on a LIVE context is still recorded, once per attempt; this is the negative that keeps the cancelled-transaction suppression narrow")
 }
@@ -250,7 +250,7 @@ func TestRunInTransaction_ThreeDeadlocksAtCommitExhaustTheAttempts(t *testing.T)
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, errDeadlock)
+	require.ErrorIs(t, err, errDeadlock)
 	assert.Equal(t, 3, ran)
 	assert.Equal(t, 3, d.settled(t).commits)
 }
@@ -270,7 +270,7 @@ func TestRunInTransaction_ACommitThatFailsForAnyOtherReasonIsNotReplayed(t *test
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, boom, "the commit's own failure comes back")
+	require.ErrorIs(t, err, boom, "the commit's own failure comes back")
 	assert.NotContains(t, err.Error(), "attempts", "with no retry wrapping, because there was no retry")
 	assert.Equal(t, 1, ran, "ONE attempt")
 	assert.Equal(t, 1, d.settled(t).commits)
@@ -345,7 +345,7 @@ func TestInTransaction_OnlyTheOwnerRetries(t *testing.T) {
 		err = db.inTransaction(context.Background(), tx, oneStatement(db, &ran))
 
 		require.Error(t, err)
-		assert.ErrorIs(t, err, errDeadlock, "the owner gets the deadlock and decides")
+		require.ErrorIs(t, err, errDeadlock, "the owner gets the deadlock and decides")
 		assert.Equal(t, 1, ran, "no retry from inside a transaction it does not own")
 		held := d.counts()
 		assert.Zero(t, held.commits, "and it neither commits nor rolls back what is not its own")
@@ -380,7 +380,7 @@ func TestRunInTransaction_ACancelledContextIsRefusedBeforeTheFirstAttempt(t *tes
 	err := db.RunInTransaction(ctx, oneStatement(db, &ran))
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.Canceled, "the context error is what the caller matches on")
+	require.ErrorIs(t, err, context.Canceled, "the context error is what the caller matches on")
 	assert.Zero(t, ran, "the body never ran")
 	c := d.settled(t)
 	assert.Zero(t, c.openTx, "and no transaction was ever opened")
@@ -408,7 +408,7 @@ func TestRunInTransaction_ADeadlineInsideTheBodyComesBackUnretried(t *testing.T)
 	err := db.RunInTransaction(ctx, oneStatementOn(ctx, db, &ran))
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.DeadlineExceeded, "the deadline the statement met is what surfaces")
+	require.ErrorIs(t, err, context.DeadlineExceeded, "the deadline the statement met is what surfaces")
 	assert.Equal(t, 1, ran, "one attempt: a context error is not a deadlock and is not rerun")
 	c := d.settled(t)
 	assert.Equal(t, 1, c.rollbacks, "the open transaction was rolled back on the way out")
@@ -470,7 +470,7 @@ func TestRunInTransaction_ACancelledTransactionsRollbackIsNotRecordedAsAFailure(
 	err := db.RunInTransaction(ctx, oneStatementOn(ctx, db, &ran))
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.DeadlineExceeded, "the deadline is still what the caller gets")
+	require.ErrorIs(t, err, context.DeadlineExceeded, "the deadline is still what the caller gets")
 	assert.Zero(t, rollbackWarnings(logs),
 		"the transaction database/sql had already rolled back is not a rollback failure")
 	assert.Equal(t, 1, d.settled(t).rollbacks, "and it was rolled back exactly once")
@@ -495,7 +495,7 @@ func TestRunInTransaction_AnAlreadyDoneRollbackOnALiveContextIsStillRecorded(t *
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, boom, "the body's error is still what the caller gets")
+	require.ErrorIs(t, err, boom, "the body's error is still what the caller gets")
 	assert.Equal(t, 1, rollbackWarnings(logs),
 		"a transaction that was already finished with nothing cancelled is worth the record")
 }
@@ -522,8 +522,8 @@ func TestRunInTransaction_ACancellationDuringTheBackoffStopsTheRerun(t *testing.
 	err := db.RunInTransaction(ctx, oneStatement(db, &ran))
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.Canceled, "the context error wins")
-	assert.ErrorIs(t, err, errDeadlock, "and the deadlock that caused the retry is joined to it, not dropped")
+	require.ErrorIs(t, err, context.Canceled, "the context error wins")
+	require.ErrorIs(t, err, errDeadlock, "and the deadlock that caused the retry is joined to it, not dropped")
 	assert.Equal(t, 1, ran, "the rerun never happened")
 	c := d.settled(t)
 	assert.Equal(t, 1, c.rollbacks)
@@ -554,8 +554,8 @@ func TestRunInTransaction_ACancellationBetweenADeadlockAndItsRerunStopsTheLoop(t
 	})
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.Canceled)
-	assert.ErrorIs(t, err, errDeadlock, "errors.Is still reaches the engine's abort")
+	require.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, errDeadlock, "errors.Is still reaches the engine's abort")
 	assert.Equal(t, 1, ran, "one attempt, and no second one")
 	assert.Empty(t, *requested, "the loop stopped before the pause, so no backoff was requested")
 	assert.Zero(t, retryWarnings(logs))
@@ -587,15 +587,15 @@ func TestRunInTransaction_ACancellationInsideARerunJoinsTheDeadlockItWasRerunFor
 	err := db.RunInTransaction(ctx, oneStatementCapturing(ctx, db, &ran, &captured))
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.DeadlineExceeded, "the deadline is what decided the outcome")
-	assert.ErrorIs(t, err, errDeadlock, "and the abort the helper was rerunning for stays reachable")
+	require.ErrorIs(t, err, context.DeadlineExceeded, "the deadline is what decided the outcome")
+	require.ErrorIs(t, err, errDeadlock, "and the abort the helper was rerunning for stays reachable")
 	// The third fact, and the one the two above cannot see: it is the RERUN'S OWN ERROR that is
 	// joined and not the context's. Joining ctx.Err() instead would satisfy both assertions above
 	// -- the deadline is reachable either way, and so is the deadlock -- while dropping the
 	// failing statement's wrapping, which is the only thing in the tree that says WHERE the
 	// cancellation was noticed.
 	require.Error(t, captured, "the rerun's statement answered before the helper classified it")
-	assert.ErrorIs(t, err, captured, "the attempt's own error is what was joined, wrapping and all")
+	require.ErrorIs(t, err, captured, "the attempt's own error is what was joined, wrapping and all")
 	assert.Contains(t, captured.Error(), "unable to execute SQL", "which is the statement's wrapping")
 	assert.Contains(t, err.Error(), "unable to execute SQL", "and it survives into the joined tree")
 	assert.Contains(t, err.Error(), "transaction abandoned after the engine aborted it")
@@ -616,10 +616,10 @@ func TestRunInTransaction_AnExhaustedRunIsStillTheDeadlockAndNotAContextError(t 
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, errDeadlock)
+	require.ErrorIs(t, err, errDeadlock)
 	assert.Contains(t, err.Error(), "all 3 attempts")
-	assert.NotErrorIs(t, err, context.Canceled, "a live context contributes nothing to the error")
-	assert.NotErrorIs(t, err, context.DeadlineExceeded)
+	require.NotErrorIs(t, err, context.Canceled, "a live context contributes nothing to the error")
+	require.NotErrorIs(t, err, context.DeadlineExceeded)
 	assert.Equal(t, 3, ran)
 }
 

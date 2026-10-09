@@ -116,11 +116,11 @@ func TestInternalServerError_WithoutSettingsAnswersThePlainTextFallback(t *testi
 	require.Len(t, records, 2)
 	reported, isError := loggedErrorOf(t, records[0])
 	require.True(t, isError)
-	assert.ErrorIs(t, reported, reqctx.ErrNoSettings)
+	require.ErrorIs(t, reported, reqctx.ErrNoSettings)
 	assert.Equal(t, "unable to render the error page", records[1].Message)
 	renderErr, isError := loggedErrorOf(t, records[1])
 	require.True(t, isError)
-	assert.ErrorIs(t, renderErr, reqctx.ErrNoSettings)
+	require.ErrorIs(t, renderErr, reqctx.ErrNoSettings)
 
 	requestId, isString := records[1].Attrs["request_id"].(string)
 	require.True(t, isString, "request_id must be a string attribute")

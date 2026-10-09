@@ -63,12 +63,12 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 
 	var out api.AccountLogoutRedirectResponse
 	err := json.NewDecoder(resp.Body).Decode(&out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, out.LogoutUrl)
 
 	// Parse returned logout URL and verify parameters
 	u, err := url.Parse(out.LogoutUrl)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "/auth/logout", u.Path)
 	q := u.Query()
 	assert.NotEmpty(t, q.Get("id_token_hint"))
@@ -79,11 +79,11 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 	// nothing else this specification does not define
 	req1, _ := http.NewRequest("GET", out.LogoutUrl, nil)
 	resp1, err := httpClientWithCookies.Do(req1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusFound, resp1.StatusCode)
 	loc1, err := url.Parse(resp1.Header.Get("Location"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, code.RedirectURI, loc1.Scheme+"://"+loc1.Host+loc1.Path)
 	assert.Equal(t, reqBody.State, loc1.Query().Get("state"))
 	// RP-Initiated Logout 1.0 defines exactly one parameter on the way back to the RP. sid belongs to
@@ -97,11 +97,11 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 	httpClientNoCookies := createHttpClient(t)
 	req2, _ := http.NewRequest("GET", out.LogoutUrl, nil)
 	resp2, err := httpClientNoCookies.Do(req2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusFound, resp2.StatusCode)
 	loc2, err := url.Parse(resp2.Header.Get("Location"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, code.RedirectURI, loc2.Scheme+"://"+loc2.Host+loc2.Path)
 	assert.Equal(t, reqBody.State, loc2.Query().Get("state"))
 	assert.NotContains(t, loc2.RawQuery, "sid=", "sid is not a parameter RP-initiated logout defines")
@@ -163,7 +163,7 @@ func TestLogout_WithEncryptedIdTokenHint_LogsTheUserOut(t *testing.T) {
 
 	hint, err := idtokenhint.Encrypt(idToken, grant.clientSecret)
 	require.NoError(t, err)
-	require.Equal(t, 5, len(strings.Split(hint, ".")),
+	require.Len(t, strings.Split(hint, "."), 5,
 		"the hint must reach the endpoint as a compact JWE, or it takes the plain-token path instead")
 
 	before, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
@@ -402,7 +402,7 @@ func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
 	reqNoTok, _ := http.NewRequest("POST", urlLogoutReq, nil)
 	httpClient := createHttpClient(t)
 	resp3, err := httpClient.Do(reqNoTok)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp3.StatusCode)
 

@@ -162,7 +162,7 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	assert.NotNil(t, data["id_token"])
 
 	usedCode, err := database.GetCodeById(context.Background(), nil, code.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, usedCode.Used)
 }
 

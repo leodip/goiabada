@@ -202,7 +202,7 @@ func TestUnique_PermissionIdentifierPerResource(t *testing.T) {
 		ResourceId:           resource.Id,
 	}
 	err := database.CreatePermission(context.Background(), nil, duplicate)
-	assert.Error(t, err, "a resource must not have two permissions with the same identifier")
+	require.Error(t, err, "a resource must not have two permissions with the same identifier")
 
 	// The same identifier on a different resource is legitimate, and is what
 	// makes permissions resource-scoped rather than global.

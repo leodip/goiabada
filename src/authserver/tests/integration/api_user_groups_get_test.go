@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIUserGroupsGet tests the GET /api/v1/admin/users/{id}/groups endpoint
@@ -28,7 +29,7 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -40,7 +41,7 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 		IncludeInIdToken: true,
 	}
 	err = database.CreateGroup(context.Background(), nil, testGroup1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup1.Id)
 	}()
@@ -51,7 +52,7 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 		IncludeInIdToken: false,
 	}
 	err = database.CreateGroup(context.Background(), nil, testGroup2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup2.Id)
 	}()
@@ -62,7 +63,7 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 		GroupId: testGroup1.Id,
 	}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
 	}()
@@ -79,7 +80,7 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 	// Parse response
 	var getResponse api.GetUserGroupsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: User data should be correct
 	assert.Equal(t, testUser.Id, getResponse.User.Id)
@@ -107,7 +108,7 @@ func TestAPIUserGroupsGet_NoGroups(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -123,11 +124,11 @@ func TestAPIUserGroupsGet_NoGroups(t *testing.T) {
 	// Parse response
 	var getResponse api.GetUserGroupsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return user with empty groups array
 	assert.Equal(t, testUser.Id, getResponse.User.Id)
-	assert.Len(t, getResponse.Groups, 0)
+	assert.Empty(t, getResponse.Groups)
 }
 
 func TestAPIUserGroupsGet_UserNotFound(t *testing.T) {
@@ -178,7 +179,7 @@ func TestAPIUserGroupsGet_Unauthorized(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -186,11 +187,11 @@ func TestAPIUserGroupsGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized

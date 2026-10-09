@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
@@ -26,7 +27,7 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 		FamilyName:    "Code",
 		EmailVerified: false,
 	}
-	assert.NoError(t, database.CreateUser(context.Background(), nil, user))
+	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, user.Id)
 	}()
@@ -40,7 +41,7 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 
 	var body api.GenerateUserEmailVerificationCodeResponse
 	err := json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, body.VerificationCode)
 	assert.NotNil(t, body.VerificationCodeExpiresAt)
 	assert.Equal(t, user.Id, body.UserId)
@@ -48,14 +49,14 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 	assert.WithinDuration(t, time.Now().UTC().Add(5*time.Minute), *body.VerificationCodeExpiresAt, 5*time.Second)
 
 	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, updatedUser.EmailVerificationCodeEncrypted)
 	assert.True(t, updatedUser.EmailVerificationCodeIssuedAt.Valid)
 	assert.False(t, updatedUser.EmailVerified)
 	assert.WithinDuration(t, time.Now().UTC(), updatedUser.EmailVerificationCodeIssuedAt.Time, 3*time.Second)
 
 	decrypted, err := dataCipher.Decrypt(updatedUser.EmailVerificationCodeEncrypted)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, body.VerificationCode, decrypted)
 }
 
@@ -70,7 +71,7 @@ func TestAPIUserEmailVerificationCodePost_VerifiedUser(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	assert.NoError(t, database.CreateUser(context.Background(), nil, user))
+	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, user.Id)
 	}()
@@ -84,19 +85,19 @@ func TestAPIUserEmailVerificationCodePost_VerifiedUser(t *testing.T) {
 
 	var body api.GenerateUserEmailVerificationCodeResponse
 	err := json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, body.VerificationCode)
 	assert.Equal(t, user.Id, body.UserId)
 	assert.Equal(t, user.Email, body.Email)
 
 	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, updatedUser.EmailVerificationCodeEncrypted)
 	assert.True(t, updatedUser.EmailVerificationCodeIssuedAt.Valid)
 	assert.False(t, updatedUser.EmailVerified)
 
 	decrypted, err := dataCipher.Decrypt(updatedUser.EmailVerificationCodeEncrypted)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, body.VerificationCode, decrypted)
 }
 
@@ -131,11 +132,11 @@ func TestAPIUserEmailVerificationCodePost_InvalidUserId(t *testing.T) {
 func TestAPIUserEmailVerificationCodePost_Unauthorized(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/1/email/verification-code"
 	req, err := http.NewRequest("POST", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -178,7 +179,7 @@ func TestAPIUserEmailVerificationCodePost_RegeneratesCode(t *testing.T) {
 		FamilyName:    "Code",
 		EmailVerified: false,
 	}
-	assert.NoError(t, database.CreateUser(context.Background(), nil, user))
+	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, user.Id)
 	}()
@@ -190,7 +191,7 @@ func TestAPIUserEmailVerificationCodePost_RegeneratesCode(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp1.StatusCode)
 
 	updated1, err := database.GetUserById(context.Background(), nil, user.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, updated1.EmailVerificationCodeIssuedAt.Valid)
 	issuedAt1 := updated1.EmailVerificationCodeIssuedAt.Time
 
@@ -201,7 +202,7 @@ func TestAPIUserEmailVerificationCodePost_RegeneratesCode(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 
 	updated2, err := database.GetUserById(context.Background(), nil, user.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, updated2.EmailVerificationCodeIssuedAt.Valid)
 	assert.True(t, updated2.EmailVerificationCodeIssuedAt.Time.After(issuedAt1))
 }

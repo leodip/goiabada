@@ -162,7 +162,7 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 				if a.want != nil {
 					assertRefusal(t, err, *a.want)
 				} else {
-					assert.ErrorIs(t, err, a.familyLookup)
+					require.ErrorIs(t, err, a.familyLookup)
 				}
 				if a.reachesFamily {
 					mockDB.AssertCalled(t, "IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti)

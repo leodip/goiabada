@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/uithemes"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // GET /api/v1/admin/settings/ui-theme
@@ -18,7 +19,7 @@ func TestAPISettingsUIThemeGet_Success(t *testing.T) {
 
 	// Fetch current settings directly from DB for expected values
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, settings)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/ui-theme"
@@ -30,7 +31,7 @@ func TestAPISettingsUIThemeGet_Success(t *testing.T) {
 
 	var body api.SettingsUIThemeResponse
 	err = json.NewDecoder(resp.Body).Decode(&body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, settings.UITheme, body.UITheme)
 	// available themes should match core list
@@ -61,7 +62,7 @@ func TestAPISettingsUIThemePut_Success(t *testing.T) {
 
 	// DB persisted
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, valid, settings.UITheme)
 
 	// Clear to default (empty string allowed)
@@ -70,13 +71,13 @@ func TestAPISettingsUIThemePut_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 	var body2 api.SettingsUIThemeResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&body2)
-	assert.Equal(t, "", body2.UITheme)
+	assert.Empty(t, body2.UITheme)
 	assert.ElementsMatch(t, uithemes.Get(), body2.AvailableThemes)
 
 	// DB persisted default
 	settings2, err2 := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err2)
-	assert.Equal(t, "", settings2.UITheme)
+	require.NoError(t, err2)
+	assert.Empty(t, settings2.UITheme)
 }
 
 // PUT /api/v1/admin/settings/ui-theme - validation errors
@@ -101,12 +102,12 @@ func TestAPISettingsUITheme_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 
 	// Invalid body (nil) - PUT
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
@@ -118,9 +119,9 @@ func TestAPISettingsUITheme_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 
 	// Unauthorized - GET
 	req2, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	resp2, err := httpClient.Do(req2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }
@@ -130,10 +131,10 @@ func TestAPISettingsUITheme_UnauthorizedAndScope(t *testing.T) {
 
 	// No token - GET
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	bodyBytes, _ := io.ReadAll(resp.Body)

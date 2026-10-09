@@ -82,7 +82,7 @@ func TestContributingPage_NamesEveryRegenerator(t *testing.T) {
 
 	for _, g := range regenerators {
 		_, err := os.Stat(filepath.Join(root, g.dir, filepath.FromSlash(g.needs)))
-		assert.NoError(t, err, "src/%s/%s, which %q needs, does not exist", g.dir, g.needs, g.command)
+		require.NoError(t, err, "src/%s/%s, which %q needs, does not exist", g.dir, g.needs, g.command)
 		assert.True(t, slices.ContainsFunc(tableRows(section), func(row []string) bool {
 			return len(row) == 3 && strings.Contains(row[1], "`"+g.command+"`") && strings.Contains(row[2], "`src/"+g.dir+"`")
 		}), "%s, %s: no row runs %q from src/%s", contributingPage, generatedHeading, g.command, g.dir)

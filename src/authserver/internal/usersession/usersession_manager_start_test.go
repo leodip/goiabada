@@ -231,7 +231,7 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 	result, _, err := m.manager.StartNewUserSession(recorder, req, 123, 7, "pwd otp", record.AcrLevel2Mandatory, 0, nil, credentialAcceptedAt, "192.168.1.50", nil)
 	after := time.Now().UTC()
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Same(t, *captured, result, "the persisted session must be the one returned")
 
@@ -243,7 +243,7 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 	// The identifier must be a fresh UUID, since it is what the browser cookie
 	// carries and what every later lookup keys on.
 	parsed, parseErr := uuidtest.Parse(result.SessionIdentifier)
-	assert.NoError(t, parseErr, "the session identifier must be a valid UUID")
+	require.NoError(t, parseErr, "the session identifier must be a valid UUID")
 	// uuidtest.Parse accepts the nil UUID, so "non-empty" would pass against a hard-coded
 	// one. Compare against the nil spelling itself.
 	assert.NotEqual(t, "00000000-0000-0000-0000-000000000000", parsed)
@@ -296,7 +296,7 @@ func TestStartNewUserSession_BoundsTheUserAgentToTheColumnWidth(t *testing.T) {
 	result, _, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), req, 123, 7, "pwd", record.AcrLevel1, 0, nil, someCredentialInstant(), "192.168.1.50", nil)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Same(t, *captured, result)
 	assert.Len(t, result.UserAgent, 512, "the persisted header must be cut to the column width")
 	assert.True(t, strings.HasPrefix(overlong, result.UserAgent),
@@ -319,7 +319,7 @@ func TestStartNewUserSession_RecordsTheClient(t *testing.T) {
 
 	result, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", record.AcrLevel1, 0, nil, someCredentialInstant(), "192.168.1.50", nil)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, result.Clients, 1)
 	assert.Equal(t, int64(7), result.Clients[0].ClientId)
 
@@ -371,7 +371,7 @@ func TestStartNewUserSession_DeletesMatchingSessionFromSameDeviceAndIp(t *testin
 	_, removed, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), req, 123, 7, "pwd", record.AcrLevel1, 0, nil, someCredentialInstant(), "192.168.1.50", nil)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, []int64{42}, removedIds(removed), "the swept row is reported so the caller can audit it")
 }
 
@@ -899,7 +899,7 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 				httptest.NewRecorder(), req,
 				123, 7, "pwd", record.AcrLevel1, 0, nil, someCredentialInstant(), "192.168.1.50", nil)
 
-			assert.Error(t, err)
+			require.Error(t, err)
 			assert.Nil(t, result, "no session may be returned alongside an error")
 			assert.Empty(t, removed, "no case here swept a row that committed")
 			if alsoAssert != nil {
@@ -1007,8 +1007,8 @@ func TestStartNewUserSession_DeletesTheRowEvenWhenTheRequestWasCancelled(t *test
 		123, 7, "pwd", record.AcrLevel1, 0, nil, someCredentialInstant(), "192.168.1.50", nil)
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, errCreateRefused, "the caller is still told why the ceremony failed")
-	assert.Error(t, ctx.Err(), "the request really was cancelled before the compensation ran")
+	require.ErrorIs(t, err, errCreateRefused, "the caller is still told why the ceremony failed")
+	require.Error(t, ctx.Err(), "the request really was cancelled before the compensation ran")
 	m.db.AssertExpectations(t)
 }
 
@@ -1036,7 +1036,7 @@ func TestStartNewUserSession_AFailedCompensationKeepsTheOriginalError(t *testing
 
 	assert.Nil(t, result)
 	require.ErrorIs(t, err, errCreateRefused, "the original failure must survive a failed cleanup")
-	assert.ErrorIs(t, err, deleteErr, "the cleanup failure must not be dropped")
+	require.ErrorIs(t, err, deleteErr, "the cleanup failure must not be dropped")
 	assert.Contains(t, err.Error(), "unable to delete the user session left behind by a failed browser session write")
 }
 
@@ -1101,7 +1101,7 @@ func TestStartNewUserSession_StampsAuthStateGeneration(t *testing.T) {
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
 		123, 7, "pwd", record.AcrLevel1, 7, nil, someCredentialInstant(), "192.168.1.50", nil)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
 		assert.EqualValues(t, 7, (*captured).AuthStateGeneration,
 			"the session must carry the generation the ceremony authenticated under")
@@ -1124,7 +1124,7 @@ func TestStartNewUserSession_StampsOtpConfigGeneration(t *testing.T) {
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
 		123, 7, "pwd", record.AcrLevel1, 7, &observed, someCredentialInstant(), "192.168.1.50", nil)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
 		assert.EqualValues(t, 9, (*captured).OtpConfigGeneration,
 			"the session must carry the OTP configuration generation the ceremony answered against")
@@ -1146,7 +1146,7 @@ func TestStartNewUserSession_NilOtpConfigGenerationLandsAtZero(t *testing.T) {
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
 		123, 7, "pwd", record.AcrLevel1, 7, nil, someCredentialInstant(), "192.168.1.50", nil)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
 		assert.EqualValues(t, 0, (*captured).OtpConfigGeneration)
 	}
@@ -1178,7 +1178,7 @@ func TestStartNewUserSession_AuthTimeIsTheCapturedCredentialInstant(t *testing.T
 		123, 7, "pwd", record.AcrLevel1, 7, nil, &credentialAcceptedAt, "192.168.1.50", nil)
 	after := time.Now().UTC()
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
 		assert.True(t, (*captured).AuthTime.Equal(credentialAcceptedAt),
 			"the persisted AuthTime must be the captured credential instant, got %v want %v",
@@ -1210,7 +1210,7 @@ func TestStartNewUserSession_AuthTimeIsNormalisedToUTC(t *testing.T) {
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
 		123, 7, "pwd", record.AcrLevel1, 7, nil, &credentialAcceptedAt, "192.168.1.50", nil)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
 		assert.Equal(t, time.UTC, (*captured).AuthTime.Location(),
 			"AuthTime must be stored in UTC, like Started and LastAccessed")

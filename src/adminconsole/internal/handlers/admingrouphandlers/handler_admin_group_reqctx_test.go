@@ -1,7 +1,6 @@
 package admingrouphandlers
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -109,7 +108,7 @@ func TestAdminGroupHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing
 			tc.build(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), tc.request)
 
 			require.Len(t, answered, 1, "the handler answers once")
-			assert.True(t, errors.Is(answered[0], reqctx.ErrNoJwtInfo), "answered with %v", answered[0])
+			require.ErrorIs(t, answered[0], reqctx.ErrNoJwtInfo, "answered with %v", answered[0])
 			assert.Empty(t, apiClient.seen, "nothing is asked of the API without a token")
 		})
 	}

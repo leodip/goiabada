@@ -57,7 +57,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 		got, loopErr := database.IncrementUserOtpConfigGeneration(context.Background(), loopTx, moved.Id)
 		require.NoError(t, loopErr, "IncrementUserOtpConfigGeneration")
 		require.NoError(t, database.CommitTransaction(context.Background(), loopTx), "CommitTransaction")
-		assert.EqualValues(t, want, got)
+		assert.Equal(t, want, got)
 	}
 	assert.EqualValues(t, 3, reload(moved.Id))
 
@@ -66,7 +66,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 	// have this caller return the other caller's generation and promote it onto a session that
 	// never answered for it. IncrementUserAuthStateGeneration refuses nil for the same reason.
 	_, err = database.IncrementUserOtpConfigGeneration(context.Background(), nil, moved.Id)
-	assert.Error(t, err, "a nil transaction must be refused")
+	require.Error(t, err, "a nil transaction must be refused")
 	assert.EqualValues(t, 3, reload(moved.Id), "the refused call must not have moved anything")
 
 	// Id 0 is refused. Nothing has that id, so an unguarded call would match no row, and the
@@ -75,7 +75,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 	tx, err = database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
 	_, err = database.IncrementUserOtpConfigGeneration(context.Background(), tx, 0)
-	assert.Error(t, err, "user id 0 must be refused")
+	require.Error(t, err, "user id 0 must be refused")
 	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 
 	// An id that matches no row is an error, not a no-op. The caller is establishing or
@@ -84,7 +84,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 	tx, err = database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
 	_, err = database.IncrementUserOtpConfigGeneration(context.Background(), tx, bystander.Id+1_000_000)
-	assert.Error(t, err, "an unknown user id must be refused")
+	require.Error(t, err, "an unknown user id must be refused")
 	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 }
 
@@ -135,13 +135,13 @@ func TestPromoteUserSessionOtpConfigGeneration(t *testing.T) {
 		"the promotion is keyed on one session id: another device of the same user has not "+
 			"answered this ceremony's level 2 question and must keep owing its re-prompt")
 
-	assert.Error(t, database.PromoteUserSessionOtpConfigGeneration(context.Background(), nil, 0, 7),
+	require.Error(t, database.PromoteUserSessionOtpConfigGeneration(context.Background(), nil, 0, 7),
 		"user session id 0 must be refused")
 
 	// A promotion that matched nothing is an error rather than a no-op, as for
 	// PromoteUserSessionGeneration: the ceremony has just answered the level 2 question, and
 	// failing to record that silently leaves the session re-prompted on every later request.
-	assert.Error(t, database.PromoteUserSessionOtpConfigGeneration(context.Background(), nil, unnamed.Id+1_000_000, 7),
+	require.Error(t, database.PromoteUserSessionOtpConfigGeneration(context.Background(), nil, unnamed.Id+1_000_000, 7),
 		"an unknown user session id must be refused")
 	assert.EqualValues(t, 0, reload(unnamed.Id), "the refused calls must not have moved anything")
 }

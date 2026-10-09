@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAuthPwd_UILocales_PreservedAcrossFlow is the canary for the multi-step
@@ -34,7 +35,7 @@ func TestAuthPwd_UILocales_PreservedAcrossFlow(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 
@@ -48,9 +49,9 @@ func TestAuthPwd_UILocales_PreservedAcrossFlow(t *testing.T) {
 	// The sign-in button text in the pt-BR stub is "Entrar"; the English one is "Sign in".
 	// If ui_locales is being honored end-to-end, the pt-BR string is present
 	// and the English one is not.
-	assert.True(t, strings.Contains(body, "Entrar"),
+	assert.Contains(t, body, "Entrar",
 		"expected pt-BR login button text 'Entrar' on /auth/pwd; ui_locales did not survive the multi-step flow")
-	assert.False(t, strings.Contains(body, "Sign in"),
+	assert.NotContains(t, body, "Sign in",
 		"expected English string 'Sign in' to be absent on /auth/pwd when ui_locales=pt-BR is active")
 }
 
@@ -71,7 +72,7 @@ func TestAuthPwd_UILocales_EnglishSaysSignIn(t *testing.T) {
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 
@@ -81,6 +82,6 @@ func TestAuthPwd_UILocales_EnglishSaysSignIn(t *testing.T) {
 	doc := parseHTMLResponse(t, resp)
 	assert.Equal(t, "Sign in", strings.TrimSpace(doc.Find("h2").Text()))
 	assert.Equal(t, "Sign in", strings.TrimSpace(doc.Find("form button.btn-primary").Text()))
-	assert.False(t, strings.Contains(doc.Find("body").Text(), "Login"),
+	assert.NotContains(t, doc.Find("body").Text(), "Login",
 		"expected no 'Login' on the English /auth/pwd page")
 }

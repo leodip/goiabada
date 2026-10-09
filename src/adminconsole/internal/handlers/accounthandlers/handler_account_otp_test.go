@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -161,7 +160,7 @@ func TestHandleOtpPost_EveryEnrollmentRerenderCarriesTheQRAndTheSeed(t *testing.
 
 			if tc.updateErr != nil {
 				require.NotNil(t, client.updateReq)
-				assert.False(t, strings.Contains(mustJSON(t, client.updateReq), "secretKey"),
+				assert.NotContains(t, mustJSON(t, client.updateReq), "secretKey",
 					"the console must send no secret at all")
 			}
 		})

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // =============================================================================
@@ -225,7 +226,7 @@ func TestAcrLevelFromString(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.input, func(t *testing.T) {
 				level, err := AcrLevelFromString(tc.input)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expected, level)
 			})
 		}
@@ -252,7 +253,7 @@ func TestAcrLevelFromString(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				_, err := AcrLevelFromString(tc.input)
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), "invalid ACR level")
 			})
 		}
@@ -278,7 +279,7 @@ func TestAcrLevel_String(t *testing.T) {
 				// Convert to string and back
 				str := level.String()
 				parsed, err := AcrLevelFromString(str)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, level, parsed)
 			})
 		}
@@ -404,7 +405,7 @@ func TestAcrLevel_PriorityMapCompleteness(t *testing.T) {
 
 		for _, level := range definedLevels {
 			priority := level.Priority()
-			assert.Greater(t, priority, 0,
+			assert.Positive(t, priority,
 				"ACR level %s should have a priority > 0 (got %d)", level, priority)
 		}
 	})

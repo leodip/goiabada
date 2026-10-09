@@ -2,7 +2,6 @@ package adminclienthandlers
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -117,15 +116,15 @@ func TestClientPermissionsPost_ForwardsTheApisAnswer(t *testing.T) {
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
-			require.NotNil(t, captured, "the handler answered nothing")
+			require.Error(t, captured, "the handler answered nothing")
 
 			var detail *oauth.ErrorDetail
 			if testCase.wantStatus == 0 {
-				assert.False(t, errors.As(captured, &detail),
+				assert.NotErrorAs(t, captured, &detail,
 					"a server fault must not carry a status to the browser, got %v", captured)
 				return
 			}
-			require.True(t, errors.As(captured, &detail),
+			require.ErrorAs(t, captured, &detail,
 				"expected an *ErrorDetail carrying a status, got %v", captured)
 			assert.Equal(t, testCase.wantStatus, detail.HTTPStatus())
 			assert.Equal(t, testCase.wantCode, detail.Code())
@@ -159,7 +158,7 @@ func TestClientPermissionsPost_MalformedBodyAnswers400(t *testing.T) {
 
 	httpHelper.AssertExpectations(t)
 	var detail *oauth.ErrorDetail
-	require.True(t, errors.As(captured, &detail), "expected an *ErrorDetail carrying 400, got %v", captured)
+	require.ErrorAs(t, captured, &detail, "expected an *ErrorDetail carrying 400, got %v", captured)
 	assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 	assert.Equal(t, "invalid_request_body", detail.Code())
 }

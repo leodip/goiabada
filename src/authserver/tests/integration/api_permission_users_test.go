@@ -48,7 +48,7 @@ func TestAPIPermissionUsersGet_Success(t *testing.T) {
 
 	var apiResp api.GetUsersByPermissionResponse
 	err := json.NewDecoder(resp.Body).Decode(&apiResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Total should be at least 2; ensure u1 and u3 appear; u2 does not
 	assert.GreaterOrEqual(t, apiResp.Total, 2)
@@ -151,7 +151,7 @@ func TestAPIPermissionUsersGet_Unauthorized(t *testing.T) {
 	req, _ := http.NewRequest("GET", url, nil)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }

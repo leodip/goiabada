@@ -636,7 +636,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		form.Add("password", "password123")
 		form.Add("passwordConfirmation", "password123")
 		req, err := http.NewRequest("POST", "/register", strings.NewReader(form.Encode()))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -699,7 +699,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		form.Add("password", "password123")
 		form.Add("passwordConfirmation", "password123")
 		req, err := http.NewRequest("POST", "/register", strings.NewReader(form.Encode()))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 

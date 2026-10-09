@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIPhoneCountriesGet tests the GET /api/v1/admin/phone-countries endpoint
@@ -31,7 +32,7 @@ func TestAPIPhoneCountriesGet_Success(t *testing.T) {
 	// Parse response
 	var response api.GetPhoneCountriesResponse
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return phone countries data
 	assert.NotEmpty(t, response.PhoneCountries)
@@ -51,7 +52,7 @@ func TestAPIPhoneCountriesGet_Success(t *testing.T) {
 
 	// We expect at least some basic countries to be present
 	// Note: The actual UniqueIds depend on the phonecountries package
-	assert.True(t, len(countryMap) > 100, "Should have many countries available")
+	assert.Greater(t, len(countryMap), 100, "Should have many countries available")
 
 	// Exact "+"-prefixed calling codes across the API boundary (the +-prefix
 	// contract for GET /phone-countries).
@@ -68,11 +69,11 @@ func TestAPIPhoneCountriesGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/phone-countries"
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -104,7 +105,7 @@ func TestAPIUserPhonePut_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -127,7 +128,7 @@ func TestAPIUserPhonePut_Success(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Phone data should be updated
 	assert.Equal(t, updateReq.PhoneCountryUniqueId, updateResponse.User.PhoneNumberCountryUniqueId)
@@ -138,7 +139,7 @@ func TestAPIUserPhonePut_Success(t *testing.T) {
 
 	// Verify changes were persisted to database
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, updateReq.PhoneCountryUniqueId, updatedUser.PhoneNumberCountryUniqueId)
 	assert.Equal(t, updateReq.PhoneNumber, updatedUser.PhoneNumber)
@@ -165,7 +166,7 @@ func TestAPIUserPhonePut_ClearPhoneNumber(t *testing.T) {
 		PhoneNumberVerified:           true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -187,7 +188,7 @@ func TestAPIUserPhonePut_ClearPhoneNumber(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Phone fields should be cleared
 	assert.Empty(t, updateResponse.User.PhoneNumberCountryUniqueId)
@@ -197,7 +198,7 @@ func TestAPIUserPhonePut_ClearPhoneNumber(t *testing.T) {
 
 	// Verify changes were persisted to database
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, updatedUser.PhoneNumberCountryUniqueId)
 	assert.Empty(t, updatedUser.PhoneNumberCountryCallingCode)
 	assert.Empty(t, updatedUser.PhoneNumber)
@@ -218,7 +219,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -359,7 +360,7 @@ func TestAPIUserPhonePut_InvalidRequestBody(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -367,13 +368,13 @@ func TestAPIUserPhonePut_InvalidRequestBody(t *testing.T) {
 	// Test: Invalid JSON
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
@@ -391,7 +392,7 @@ func TestAPIUserPhonePut_Unauthorized(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -399,11 +400,11 @@ func TestAPIUserPhonePut_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -424,7 +425,7 @@ func TestAPIUserPhonePut_PhoneNumberVerifiedAutoCleared(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -447,13 +448,13 @@ func TestAPIUserPhonePut_PhoneNumberVerifiedAutoCleared(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateUserResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Phone verified should be false when phone is empty, regardless of request
 	assert.False(t, updateResponse.User.PhoneNumberVerified)
 
 	// Verify in database
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, updatedUser.PhoneNumberVerified)
 }

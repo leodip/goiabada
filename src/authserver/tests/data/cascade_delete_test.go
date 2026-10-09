@@ -151,7 +151,7 @@ func TestDeleteUser_RemovesAllDependentRows(t *testing.T) {
 
 	// codes
 	deletedCode, err := database.GetCodeById(context.Background(), nil, code.Id)
-	assert.NoError(t, err, "GetCodeById")
+	require.NoError(t, err, "GetCodeById")
 	assert.Nil(t, deletedCode, "codes must cascade from users")
 
 	// refresh_tokens, both shapes
@@ -162,50 +162,50 @@ func TestDeleteUser_RemovesAllDependentRows(t *testing.T) {
 
 	// user_attributes
 	deletedAttribute, err := database.GetUserAttributeById(context.Background(), nil, attribute.Id)
-	assert.NoError(t, err, "GetUserAttributeById")
+	require.NoError(t, err, "GetUserAttributeById")
 	assert.Nil(t, deletedAttribute, "user_attributes must cascade from users")
 
 	// user_consents
 	deletedConsent, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
-	assert.NoError(t, err, "GetUserConsentById")
+	require.NoError(t, err, "GetUserConsentById")
 	assert.Nil(t, deletedConsent, "user_consents must cascade from users")
 
 	// user_sessions
 	deletedSession, err := database.GetUserSessionById(context.Background(), nil, session.Id)
-	assert.NoError(t, err, "GetUserSessionById")
+	require.NoError(t, err, "GetUserSessionById")
 	assert.Nil(t, deletedSession, "user_sessions must cascade from users")
 
 	// user_session_clients (second hop, under user_sessions)
 	deletedSessionClient, err := database.GetUserSessionClientById(context.Background(), nil, sessionClientId)
-	assert.NoError(t, err, "GetUserSessionClientById")
+	require.NoError(t, err, "GetUserSessionClientById")
 	assert.Nil(t, deletedSessionClient, "user_session_clients must cascade from user_sessions")
 
 	// users_groups
 	deletedUserGroup, err := database.GetUserGroupById(context.Background(), nil, userGroup.Id)
-	assert.NoError(t, err, "GetUserGroupById")
+	require.NoError(t, err, "GetUserGroupById")
 	assert.Nil(t, deletedUserGroup, "users_groups must cascade from users")
 
 	// users_permissions
 	deletedUserPermission, err := database.GetUserPermissionById(context.Background(), nil, userPermission.Id)
-	assert.NoError(t, err, "GetUserPermissionById")
+	require.NoError(t, err, "GetUserPermissionById")
 	assert.Nil(t, deletedUserPermission, "users_permissions must cascade from users")
 
 	// user_profile_pictures
 	deletedPicture, err := database.GetUserProfilePictureByUserId(context.Background(), nil, user.Id)
-	assert.NoError(t, err, "GetUserProfilePictureByUserId")
+	require.NoError(t, err, "GetUserProfilePictureByUserId")
 	assert.Nil(t, deletedPicture, "user_profile_pictures must cascade from users")
 	assert.NotZero(t, profilePicture.Id, "sanity: the fixture was created")
 
 	// The group, resource and permission are independent of the user and must
 	// survive: cascade must not travel up an association table.
 	survivingGroup, err := database.GetGroupById(context.Background(), nil, group.Id)
-	assert.NoError(t, err, "GetGroupById")
+	require.NoError(t, err, "GetGroupById")
 	assert.NotNil(t, survivingGroup, "deleting a user must not delete the group")
 	survivingPermission, err := database.GetPermissionById(context.Background(), nil, permission.Id)
-	assert.NoError(t, err, "GetPermissionById")
+	require.NoError(t, err, "GetPermissionById")
 	assert.NotNil(t, survivingPermission, "deleting a user must not delete the permission")
 	survivingClient, err := database.GetClientById(context.Background(), nil, client.Id)
-	assert.NoError(t, err, "GetClientById")
+	require.NoError(t, err, "GetClientById")
 	assert.NotNil(t, survivingClient, "deleting a user must not delete the client")
 }
 
@@ -250,7 +250,7 @@ func TestDeleteClient_RemovesAllDependentRows(t *testing.T) {
 
 	// codes
 	deletedCode, err := database.GetCodeById(context.Background(), nil, code.Id)
-	assert.NoError(t, err, "GetCodeById")
+	require.NoError(t, err, "GetCodeById")
 	assert.Nil(t, deletedCode, "codes must cascade from clients")
 
 	// refresh_tokens
@@ -259,43 +259,43 @@ func TestDeleteClient_RemovesAllDependentRows(t *testing.T) {
 
 	// redirect_uris
 	deletedRedirectURI, err := database.GetRedirectURIById(context.Background(), nil, redirectURI.Id)
-	assert.NoError(t, err, "GetRedirectURIById")
+	require.NoError(t, err, "GetRedirectURIById")
 	assert.Nil(t, deletedRedirectURI, "redirect_uris must cascade from clients")
 
 	// web_origins
 	deletedWebOrigin, err := database.GetWebOriginById(context.Background(), nil, webOrigin.Id)
-	assert.NoError(t, err, "GetWebOriginById")
+	require.NoError(t, err, "GetWebOriginById")
 	assert.Nil(t, deletedWebOrigin, "web_origins must cascade from clients")
 
 	// client_logos
 	deletedLogo, err := database.GetClientLogoByClientId(context.Background(), nil, client.Id)
-	assert.NoError(t, err, "GetClientLogoByClientId")
+	require.NoError(t, err, "GetClientLogoByClientId")
 	assert.Nil(t, deletedLogo, "client_logos must cascade from clients")
 	assert.NotZero(t, logo.Id, "sanity: the fixture was created")
 
 	// clients_permissions
 	deletedClientPermission, err := database.GetClientPermissionById(context.Background(), nil, clientPermission.Id)
-	assert.NoError(t, err, "GetClientPermissionById")
+	require.NoError(t, err, "GetClientPermissionById")
 	assert.Nil(t, deletedClientPermission, "clients_permissions must cascade from clients")
 
 	// user_consents
 	deletedConsent, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
-	assert.NoError(t, err, "GetUserConsentById")
+	require.NoError(t, err, "GetUserConsentById")
 	assert.Nil(t, deletedConsent, "user_consents must cascade from clients")
 
 	// user_session_clients
 	deletedSessionClient, err := database.GetUserSessionClientById(context.Background(), nil, sessionClientId)
-	assert.NoError(t, err, "GetUserSessionClientById")
+	require.NoError(t, err, "GetUserSessionClientById")
 	assert.Nil(t, deletedSessionClient, "user_session_clients must cascade from clients")
 
 	// The user, its session and the permission are independent of the client.
 	survivingUser, err := database.GetUserById(context.Background(), nil, user.Id)
-	assert.NoError(t, err, "GetUserById")
+	require.NoError(t, err, "GetUserById")
 	assert.NotNil(t, survivingUser, "deleting a client must not delete the user")
 	survivingSession, err := database.GetUserSessionById(context.Background(), nil, session.Id)
-	assert.NoError(t, err, "GetUserSessionById")
+	require.NoError(t, err, "GetUserSessionById")
 	assert.NotNil(t, survivingSession, "deleting a client must not delete the user session")
 	survivingPermission, err := database.GetPermissionById(context.Background(), nil, permission.Id)
-	assert.NoError(t, err, "GetPermissionById")
+	require.NoError(t, err, "GetPermissionById")
 	assert.NotNil(t, survivingPermission, "deleting a client must not delete the permission")
 }

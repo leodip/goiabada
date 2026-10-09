@@ -90,6 +90,6 @@ func TestHandleLogoGet_TheLogoRefusalIsOneWarnWithASnakeKeyAndTheRequestId(t *te
 		"from chi's id on the context, with nothing at the call site naming it")
 
 	logged, _ := records[0].Attrs["error"].(error)
-	require.NotNil(t, logged, "the error rides as a value, so %+v prints the frames it captured")
+	require.Error(t, logged, "the error rides as a value, so %+v prints the frames it captured")
 	assert.Contains(t, logged.Error(), "unreachable")
 }

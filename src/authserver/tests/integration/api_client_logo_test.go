@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // createTestClientForLogo creates a client for logo tests
@@ -47,7 +48,7 @@ func TestAPIClientLogoGet_NoPicture(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, response["hasLogo"].(bool))
 	assert.Nil(t, response["logoUrl"])
 }
@@ -76,10 +77,10 @@ func TestAPIClientLogoGet_Unauthorized(t *testing.T) {
 	url := fmt.Sprintf("%s/api/v1/admin/clients/1/logo", appConfig.AuthServer.BaseURL)
 
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
@@ -107,7 +108,7 @@ func TestAPIClientLogoPost_Success(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, response["success"].(bool))
 	assert.Contains(t, response["pictureUrl"].(string), client.ClientIdentifier)
 
@@ -117,7 +118,7 @@ func TestAPIClientLogoPost_Success(t *testing.T) {
 
 	var getResponse map[string]interface{}
 	err = json.NewDecoder(getResp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, getResponse["hasLogo"].(bool))
 	assert.NotNil(t, getResponse["logoUrl"])
 }
@@ -142,7 +143,7 @@ func TestAPIClientLogoPost_UpdateExisting(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp2.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, response["success"].(bool))
 }
 
@@ -170,7 +171,7 @@ func TestAPIClientLogoPost_InvalidImage(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "validator.image.unsupported_type", response["error_code"])
 }
 
@@ -185,12 +186,12 @@ func TestAPIClientLogoPost_Unauthorized(t *testing.T) {
 	_ = writer.Close()
 
 	req, err := http.NewRequest("POST", url, &body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
@@ -221,7 +222,7 @@ func TestAPIClientLogoDelete_Success(t *testing.T) {
 
 	var deleteResponse map[string]interface{}
 	err := json.NewDecoder(deleteResp.Body).Decode(&deleteResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, deleteResponse["success"].(bool))
 
 	// Verify it's gone
@@ -258,10 +259,10 @@ func TestAPIClientLogoDelete_Unauthorized(t *testing.T) {
 	url := fmt.Sprintf("%s/api/v1/admin/clients/1/logo", appConfig.AuthServer.BaseURL)
 
 	req, err := http.NewRequest("DELETE", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
@@ -285,10 +286,10 @@ func TestClientLogo_PublicEndpoint_Success(t *testing.T) {
 	publicUrl := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", publicUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -296,8 +297,8 @@ func TestClientLogo_PublicEndpoint_Success(t *testing.T) {
 
 	// Verify we got image data back
 	body, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	assert.True(t, len(body) > 0)
+	require.NoError(t, err)
+	assert.NotEmpty(t, body)
 
 	// Verify it's a valid PNG (starts with PNG magic bytes)
 	assert.True(t, bytes.HasPrefix(body, []byte{0x89, 0x50, 0x4E, 0x47}))
@@ -308,10 +309,10 @@ func TestClientLogo_PublicEndpoint_NotFound(t *testing.T) {
 
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", publicUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -324,10 +325,10 @@ func TestClientLogo_PublicEndpoint_ClientHasNoLogo(t *testing.T) {
 
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", publicUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -348,10 +349,10 @@ func TestClientLogo_PublicEndpoint_CacheHeaders(t *testing.T) {
 	publicUrl := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", publicUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -383,9 +384,9 @@ func TestClientLogo_PublicEndpoint_ETagConditionalGet(t *testing.T) {
 
 	// First request: get the ETag
 	req1, err := http.NewRequest("GET", publicUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	resp1, err := httpClient.Do(req1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp1.StatusCode)
 	etag := resp1.Header.Get("ETag")
@@ -395,10 +396,10 @@ func TestClientLogo_PublicEndpoint_ETagConditionalGet(t *testing.T) {
 
 	// Second request: send If-None-Match with the ETag
 	req2, err := http.NewRequest("GET", publicUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req2.Header.Set("If-None-Match", etag)
 	resp2, err := httpClient.Do(req2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp2.Body.Close() }()
 
 	assert.Equal(t, http.StatusNotModified, resp2.StatusCode)
@@ -423,9 +424,9 @@ func TestClientLogo_PublicEndpoint_ETagChangesAfterUpdate(t *testing.T) {
 	assert.Equal(t, http.StatusOK, uploadResp1.StatusCode)
 
 	req1, err := http.NewRequest("GET", publicUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	resp1, err := httpClient.Do(req1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp1.Body.Close() }()
 	etag1 := resp1.Header.Get("ETag")
 	_, _ = io.ReadAll(resp1.Body)
@@ -438,9 +439,9 @@ func TestClientLogo_PublicEndpoint_ETagChangesAfterUpdate(t *testing.T) {
 
 	// Get new ETag
 	req2, err := http.NewRequest("GET", publicUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	resp2, err := httpClient.Do(req2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp2.Body.Close() }()
 	etag2 := resp2.Header.Get("ETag")
 	_, _ = io.ReadAll(resp2.Body)
@@ -450,10 +451,10 @@ func TestClientLogo_PublicEndpoint_ETagChangesAfterUpdate(t *testing.T) {
 
 	// Old ETag should not produce 304
 	req3, err := http.NewRequest("GET", publicUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req3.Header.Set("If-None-Match", etag1)
 	resp3, err := httpClient.Do(req3)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp3.Body.Close() }()
 	_, _ = io.ReadAll(resp3.Body)
 
@@ -475,14 +476,14 @@ func TestClientLogo_PublicEndpoint_ContentMatchesUpload(t *testing.T) {
 	publicUrl := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", publicUrl, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify the content hash matches what we uploaded
 	uploadHash := sha256.Sum256(logoData)
@@ -512,7 +513,7 @@ func TestClientLogo_FullWorkflow(t *testing.T) {
 	// 2. Public endpoint returns 404
 	pubReq1, _ := http.NewRequest("GET", publicUrl, nil)
 	pubResp1, err := httpClient.Do(pubReq1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = pubResp1.Body.Close() }()
 	_, _ = io.ReadAll(pubResp1.Body)
 	assert.Equal(t, http.StatusNotFound, pubResp1.StatusCode)
@@ -538,12 +539,12 @@ func TestClientLogo_FullWorkflow(t *testing.T) {
 	// 5. Fetch the actual logo via public endpoint
 	pubReq2, _ := http.NewRequest("GET", publicUrl, nil)
 	pubResp2, err := httpClient.Do(pubReq2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = pubResp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, pubResp2.StatusCode)
 	assert.Equal(t, "image/png", pubResp2.Header.Get("Content-Type"))
 	body, _ := io.ReadAll(pubResp2.Body)
-	assert.True(t, len(body) > 0)
+	assert.NotEmpty(t, body)
 
 	// 6. Update the logo
 	newLogoData := createTestPNGImage(200, 200)
@@ -566,7 +567,7 @@ func TestClientLogo_FullWorkflow(t *testing.T) {
 	// 9. Public endpoint returns 404
 	pubReq3, _ := http.NewRequest("GET", publicUrl, nil)
 	pubResp3, err := httpClient.Do(pubReq3)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = pubResp3.Body.Close() }()
 	_, _ = io.ReadAll(pubResp3.Body)
 	assert.Equal(t, http.StatusNotFound, pubResp3.StatusCode)

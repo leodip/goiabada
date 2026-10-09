@@ -46,7 +46,7 @@ func TestUp_RefusesAnAlreadyCancelledContextAndMigratesNothing(t *testing.T) {
 	err := m.Up(cancelledContext())
 
 	require.Error(t, err, "a migration must not be started on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Empty(t, recorded(t, db), "nothing was recorded, because nothing ran")
 }
 
@@ -58,7 +58,7 @@ func TestMigrate_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	err := m.Migrate(cancelledContext(), 1)
 
 	require.Error(t, err, "a step down must not be started on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Equal(t, []RecordedVersion{{Version: 5}}, recorded(t, db),
 		"the refused step moved nothing, so the database is still where Up left it")
 }

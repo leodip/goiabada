@@ -71,7 +71,7 @@ func TestCreateAuthCode(t *testing.T) {
 
 	code, err := codeIssuer.createAuthCode(context.Background(), nil, input)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, code)
 	assert.Equal(t, testClient.Id, code.ClientId)
 	assert.Equal(t, input.UserId, code.UserId)
@@ -191,7 +191,7 @@ func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {
 
 	code, err := codeIssuer.createAuthCode(context.Background(), nil, input)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, code)
 	assert.Equal(t, "query", code.ResponseMode)
 
@@ -248,7 +248,7 @@ func TestCreateAuthCode_ScopeHandling(t *testing.T) {
 
 			code, err := codeIssuer.createAuthCode(context.Background(), nil, input)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, code)
 			assert.Equal(t, tc.expectedScope, code.Scope)
 		})
@@ -277,7 +277,7 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 
 	code, err := codeIssuer.createAuthCode(context.Background(), nil, input)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, code)
 	assert.Contains(t, err.Error(), "database error")
 
@@ -409,7 +409,7 @@ func TestIssueAuthCodeTx_RefusesOnlyAfterTheRollback(t *testing.T) {
 
 			require.ErrorIs(t, err, tc.sentinel, "the caller branches on the sentinel, so it must survive the helper")
 			assert.Nil(t, code)
-			assert.ErrorIs(t, stub.BodyErr, tc.sentinel, "the body hands the sentinel to the helper, which rolls back")
+			require.ErrorIs(t, stub.BodyErr, tc.sentinel, "the body hands the sentinel to the helper, which rolls back")
 			assert.Equal(t, []string{"begin", "rollback", "returned"}, order,
 				"the sentinel reaches the caller only after the rollback")
 			mockDB.AssertNotCalled(t, "CreateCode", mock.Anything, mock.Anything, mock.Anything)
@@ -424,7 +424,7 @@ func TestIssueAuthCodeTx_RefusesOnlyAfterTheRollback(t *testing.T) {
 		_, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), issueCodeInput())
 
 		require.ErrorIs(t, err, ErrIssuingSessionGone)
-		assert.NotErrorIs(t, err, ErrIssuingClientGone, "the two refusals are distinct sentinels")
+		require.NotErrorIs(t, err, ErrIssuingClientGone, "the two refusals are distinct sentinels")
 		mockDB.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
 	})
 }
@@ -456,9 +456,9 @@ func TestIssueAuthCodeTx_FailuresAreNotRefusals(t *testing.T) {
 		code, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), issueCodeInput())
 
 		require.ErrorIs(t, err, boom)
-		assert.NotErrorIs(t, err, ErrIssuingSessionGone)
+		require.NotErrorIs(t, err, ErrIssuingSessionGone)
 		assert.Nil(t, code)
-		assert.ErrorIs(t, stub.BodyErr, boom)
+		require.ErrorIs(t, stub.BodyErr, boom)
 		mockDB.AssertNotCalled(t, "CreateCode", mock.Anything, mock.Anything, mock.Anything)
 	})
 

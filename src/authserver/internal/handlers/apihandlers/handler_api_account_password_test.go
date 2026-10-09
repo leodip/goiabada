@@ -226,7 +226,7 @@ func TestHandleAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T) {
 	// separately from its value is the only way to tell those apart in a map[string]interface{}.
 	value, present := payload["preserved_session_identifier"]
 	assert.True(t, present, "the key must be present even when nothing was preserved")
-	assert.Equal(t, "", value)
+	assert.Empty(t, value)
 }
 
 // TestHandleAccountPasswordPut_RevocationFailureIsA500 keeps this site's failure coverage
@@ -258,7 +258,7 @@ func TestHandleAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	database.AssertExpectations(t)
-	assert.EqualError(t, stub.BodyErr, "increment failed", "the body hands its error to the helper, which rolls back")
+	require.EqualError(t, stub.BodyErr, "increment failed", "the body hands its error to the helper, which rolls back")
 	// NEITHER event. changed_password would otherwise claim a password change that rolled back.
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }

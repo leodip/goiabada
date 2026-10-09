@@ -3,7 +3,6 @@ package datatests
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -530,7 +529,7 @@ func TestNewDatabase_CreateTrue_AHeldCreationLockWaitEndsWithTheCallersContext(t
 	select {
 	case got := <-done:
 		require.Errorf(t, got.err, "a constructor whose context ended while it waited on the creation lock must fail, not construct")
-		require.Truef(t, errors.Is(got.err, context.DeadlineExceeded),
+		require.ErrorIsf(t, got.err, context.DeadlineExceeded,
 			"the wait must end because the caller's context did, and say so through errors.Is; got %v", got.err)
 		require.GreaterOrEqualf(t, got.elapsed, deadline-100*time.Millisecond,
 			"the constructor returned after %s, before the deadline: it failed for some other reason than the held lock", got.elapsed)

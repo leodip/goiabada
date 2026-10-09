@@ -40,7 +40,7 @@ func TestGetAuthContext(t *testing.T) {
 
 		result, err := ceremonyStore.GetAuthContext(browserRequest(cookies))
 
-		assert.ErrorIs(t, err, errLoadRefused)
+		require.ErrorIs(t, err, errLoadRefused)
 		assert.Nil(t, result)
 	})
 
@@ -50,7 +50,7 @@ func TestGetAuthContext(t *testing.T) {
 
 		result, err := ceremonyStore.GetAuthContext(browserRequest(cookies))
 
-		assert.ErrorIs(t, err, ErrNoAuthContext)
+		require.ErrorIs(t, err, ErrNoAuthContext)
 		assert.Nil(t, result)
 		requireSessionDecoded(t, store, browserRequest(cookies))
 	})
@@ -62,7 +62,7 @@ func TestGetAuthContext(t *testing.T) {
 		result, err := ceremonyStore.GetAuthContext(browserRequest(cookies))
 
 		require.Error(t, err)
-		assert.NotErrorIs(t, err, ErrNoAuthContext, "a context that is there but will not decode is not an absent one")
+		require.NotErrorIs(t, err, ErrNoAuthContext, "a context that is there but will not decode is not an absent one")
 		assert.Nil(t, result)
 	})
 }
@@ -88,7 +88,7 @@ func TestSaveAuthContext(t *testing.T) {
 
 		err := ceremonyStore.SaveAuthContext(rr, browserRequest(cookies), &AuthContext{ClientId: "test-client"})
 
-		assert.ErrorIs(t, err, errLoadRefused)
+		require.ErrorIs(t, err, errLoadRefused)
 		assert.Empty(t, rr.Result().Cookies(), "a session that could not be read is not written")
 	})
 
@@ -99,7 +99,7 @@ func TestSaveAuthContext(t *testing.T) {
 
 		err := ceremonyStore.SaveAuthContext(rr, browserRequest(nil), &AuthContext{ClientId: "test-client"})
 
-		assert.ErrorIs(t, err, errCreateRefused)
+		require.ErrorIs(t, err, errCreateRefused)
 		assert.Empty(t, rr.Result().Cookies(), "no cookie names a row that was never written")
 	})
 }
@@ -299,7 +299,7 @@ func TestClearAuthContext(t *testing.T) {
 
 		// The row the browser's cookie names is the one the clear emptied.
 		_, err = ceremonyStore.GetAuthContext(browserRequest(cookies))
-		assert.ErrorIs(t, err, ErrNoAuthContext)
+		require.ErrorIs(t, err, ErrNoAuthContext)
 		requireSessionDecoded(t, store, browserRequest(cookies))
 	})
 
@@ -313,7 +313,7 @@ func TestClearAuthContext(t *testing.T) {
 
 		err := ceremonyStore.ClearAuthContext(rr, browserRequest(cookies))
 
-		assert.ErrorIs(t, err, errLoadRefused)
+		require.ErrorIs(t, err, errLoadRefused)
 		assert.Empty(t, rr.Result().Cookies())
 	})
 
@@ -324,7 +324,7 @@ func TestClearAuthContext(t *testing.T) {
 
 		err := ceremonyStore.ClearAuthContext(rr, browserRequest(nil))
 
-		assert.ErrorIs(t, err, errCreateRefused)
+		require.ErrorIs(t, err, errCreateRefused)
 		assert.Empty(t, rr.Result().Cookies())
 	})
 
@@ -356,7 +356,7 @@ func TestClearAuthContext(t *testing.T) {
 
 		replayed := replayThroughJar(t, res, seedRes.Cookies())
 		_, err = ceremonyStore.GetAuthContext(replayed)
-		assert.ErrorIs(t, err, ErrNoAuthContext)
+		require.ErrorIs(t, err, ErrNoAuthContext)
 		requireSessionDecoded(t, store, replayed)
 	})
 
@@ -397,7 +397,7 @@ func TestClearAuthContext(t *testing.T) {
 		// clear emptied, so the auth context is gone anyway.
 		replayed := replayThroughJar(t, res, seedRes.Cookies())
 		_, err = ceremonyStore.GetAuthContext(replayed)
-		assert.ErrorIs(t, err, ErrNoAuthContext)
+		require.ErrorIs(t, err, ErrNoAuthContext)
 		// And the session still loads, which is what separates "the clear landed" from "the
 		// browser is holding something unreadable".
 		requireSessionDecoded(t, store, replayed)
@@ -432,7 +432,7 @@ func TestClearAuthContext(t *testing.T) {
 
 		replayed := replayThroughJar(t, res, nil)
 		_, err = ceremonyStore.GetAuthContext(replayed)
-		assert.ErrorIs(t, err, ErrNoAuthContext)
+		require.ErrorIs(t, err, ErrNoAuthContext)
 		requireSessionDecoded(t, store, replayed)
 	})
 
@@ -500,7 +500,7 @@ func TestRegenerateSession(t *testing.T) {
 
 		err := ceremonyStore.RegenerateSession(rr, browserRequest(cookies))
 
-		assert.ErrorIs(t, err, errLoadRefused)
+		require.ErrorIs(t, err, errLoadRefused)
 		assert.Empty(t, rr.Result().Cookies(), "no cookie is written")
 	})
 
@@ -512,7 +512,7 @@ func TestRegenerateSession(t *testing.T) {
 
 		err := ceremonyStore.RegenerateSession(rr, browserRequest(cookies))
 
-		assert.ErrorIs(t, err, errCreateRefused)
+		require.ErrorIs(t, err, errCreateRefused)
 		assert.Empty(t, rr.Result().Cookies(), "no cookie is written")
 
 		backend.failCreate = false

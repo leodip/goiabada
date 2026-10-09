@@ -94,7 +94,7 @@ func TestHandleWebOriginsGet_AssemblesTheServerWideList(t *testing.T) {
 	handler := HandleWebOriginsGet(httpHelper, httpSession, apiClient)
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
-	assert.NoError(t, httpHelper.err)
+	require.NoError(t, httpHelper.err)
 	require.NotNil(t, httpHelper.bind, "the handler rendered nothing")
 
 	bound := reflect.ValueOf(httpHelper.bind["client"])
@@ -278,7 +278,7 @@ func TestHandleWebOriginsPost_SendsTheLoadedList(t *testing.T) {
 			assert.Equal(t, tc.wantExpected, stub.sentWebOrigins.ExpectedWebOrigins)
 
 			wire, err := json.Marshal(stub.sentWebOrigins)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if tc.wantExpected == nil {
 				assert.Contains(t, string(wire), `"expectedWebOrigins":null`)
 			} else if len(tc.wantExpected) == 0 {

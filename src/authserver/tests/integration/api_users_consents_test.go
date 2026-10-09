@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIUserConsentsGet tests the GET /api/v1/admin/users/{id}/consents endpoint
@@ -30,7 +31,7 @@ func TestAPIUserConsentsGet_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -63,7 +64,7 @@ func TestAPIUserConsentsGet_Success(t *testing.T) {
 	// Parse response
 	var getResponse api.GetUserConsentsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return both consents
 	assert.Len(t, getResponse.Consents, 2)
@@ -105,7 +106,7 @@ func TestAPIUserConsentsGet_EmptyConsents(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -121,10 +122,10 @@ func TestAPIUserConsentsGet_EmptyConsents(t *testing.T) {
 	// Parse response
 	var getResponse api.GetUserConsentsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return empty consents array
-	assert.Len(t, getResponse.Consents, 0)
+	assert.Empty(t, getResponse.Consents)
 }
 
 func TestAPIUserConsentsGet_UserNotFound(t *testing.T) {
@@ -175,7 +176,7 @@ func TestAPIUserConsentsGet_Unauthorized(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -183,11 +184,11 @@ func TestAPIUserConsentsGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/consents"
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -209,7 +210,7 @@ func TestAPIUserConsentDelete_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -235,14 +236,14 @@ func TestAPIUserConsentDelete_Success(t *testing.T) {
 	// Parse response
 	var deleteResponse api.SuccessResponse
 	err = json.NewDecoder(resp.Body).Decode(&deleteResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Success response
 	assert.True(t, deleteResponse.Success)
 
 	// Verify consent was actually deleted from database
 	deletedConsent, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, deletedConsent)
 }
 
@@ -294,7 +295,7 @@ func TestAPIUserConsentDelete_Unauthorized(t *testing.T) {
 		FamilyName: "User",
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -314,11 +315,11 @@ func TestAPIUserConsentDelete_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-consents/" + strconv.FormatInt(consent.Id, 10)
 	req, err := http.NewRequest("DELETE", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -326,7 +327,7 @@ func TestAPIUserConsentDelete_Unauthorized(t *testing.T) {
 
 	// Verify consent was not deleted
 	stillExists, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, stillExists)
 }
 
@@ -344,7 +345,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -361,7 +362,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 		TokenExpirationInSeconds: 3600,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
@@ -374,7 +375,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 		GrantedAt: sql.NullTime{Time: time.Now().UTC().Add(-24 * time.Hour), Valid: true}, // Granted 24 hours ago
 	}
 	err = database.CreateUserConsent(context.Background(), nil, consent)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// First verify the consent exists and has client details when retrieved
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/consents"
@@ -384,7 +385,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var getResponse api.GetUserConsentsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Len(t, getResponse.Consents, 1)
 	retrievedConsent := getResponse.Consents[0]
@@ -403,7 +404,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 
 	// Verify consent is actually deleted
 	deletedConsent, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, deletedConsent)
 
 	// Verify user no longer has any consents
@@ -413,8 +414,8 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 	assert.Equal(t, http.StatusOK, finalResp.StatusCode)
 	var finalResponse api.GetUserConsentsResponse
 	err = json.NewDecoder(finalResp.Body).Decode(&finalResponse)
-	assert.NoError(t, err)
-	assert.Len(t, finalResponse.Consents, 0)
+	require.NoError(t, err)
+	assert.Empty(t, finalResponse.Consents)
 }
 
 // Helper function to create a test client

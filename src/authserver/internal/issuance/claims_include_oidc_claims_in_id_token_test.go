@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // ============================================================================
@@ -38,7 +39,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	input := &tokenGenerationInput{
 		User: &record.User{
@@ -82,7 +83,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.AnythingOfType("*sql.Tx"), mock.AnythingOfType("int64")).Return(false, nil)
 
 	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
 	// Verify OIDC claims ARE included
@@ -144,7 +145,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	input := &tokenGenerationInput{
 		User: &record.User{
@@ -177,7 +178,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 	// because the code doesn't check for pictures when OIDC claims aren't included
 
 	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
 	// Verify OIDC claims ARE NOT included
@@ -229,7 +230,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	input := &tokenGenerationInput{
 		User: &record.User{
@@ -257,7 +258,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.AnythingOfType("*sql.Tx"), mock.AnythingOfType("int64")).Return(false, nil)
 
 	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
 	// Verify OIDC claims ARE included (client override wins)
@@ -294,7 +295,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	input := &tokenGenerationInput{
 		User: &record.User{
@@ -322,7 +323,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 	// NOTE: No UserHasProfilePicture mock needed - email scope doesn't check for pictures
 
 	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
 	// Verify OIDC claims ARE NOT included (client override wins)
@@ -357,7 +358,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributes
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	input := &tokenGenerationInput{
 		User: &record.User{
@@ -390,7 +391,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributes
 	// NOTE: No UserHasProfilePicture mock needed when setting is disabled
 
 	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
 	claims := verifyAndDecodeToken(t, idToken, publicKeyBytes)
@@ -488,7 +489,7 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_FullFlo
 
 	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.Equal(t, "Bearer", response.TokenType)
 	assert.NotEmpty(t, response.AccessToken)
@@ -595,7 +596,7 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_ClientO
 
 	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.IdToken)
 
@@ -634,7 +635,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAff
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	input := &tokenGenerationInput{
 		User: &record.User{
@@ -658,7 +659,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAff
 	// NOTE: No UserHasProfilePicture mock needed when setting is disabled
 
 	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
 	claims := verifyAndDecodeToken(t, idToken, publicKeyBytes)
@@ -694,7 +695,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_Global
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	input := &tokenGenerationInput{
 		User: &record.User{
@@ -718,7 +719,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_Global
 	// NOTE: No UserHasProfilePicture mock needed when scope excludes profile
 
 	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
 	claims := verifyAndDecodeToken(t, idToken, publicKeyBytes)
@@ -752,7 +753,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	input := &tokenGenerationInput{
 		User: &record.User{
@@ -782,7 +783,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 	// NOTE: No UserHasProfilePicture mock needed - email scope doesn't check for pictures
 
 	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
 	claims := verifyAndDecodeToken(t, idToken, publicKeyBytes)
@@ -829,7 +830,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	input := &tokenGenerationInput{
 		User: &record.User{
@@ -858,7 +859,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.AnythingOfType("*sql.Tx"), userId).Return(true, nil)
 
 	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
 	claims := verifyAndDecodeToken(t, idToken, publicKeyBytes)
@@ -896,7 +897,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *
 	publicKeyBytes := getTestPublicKey(t)
 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	input := &tokenGenerationInput{
 		User: &record.User{
@@ -932,7 +933,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.AnythingOfType("*sql.Tx"), mock.AnythingOfType("int64")).Return(false, nil)
 
 	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
 	claims := verifyAndDecodeToken(t, idToken, publicKeyBytes)

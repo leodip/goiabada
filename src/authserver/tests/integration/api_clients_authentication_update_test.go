@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/securerandom"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAPIClientAuthenticationPut_ConfidentialToPublic_Success(t *testing.T) {
@@ -22,7 +23,7 @@ func TestAPIClientAuthenticationPut_ConfidentialToPublic_Success(t *testing.T) {
 	// inline createConfidentialClient
 	clientSecret := securerandom.String(60)
 	enc, err := dataCipher.Encrypt(clientSecret)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	client := &record.Client{
 		ClientIdentifier:      "auth-client-" + strings.ToLower(fake.LetterN(10)),
 		Enabled:               true,
@@ -33,7 +34,7 @@ func TestAPIClientAuthenticationPut_ConfidentialToPublic_Success(t *testing.T) {
 		ClientCredentialsEnabled: true,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: true}
@@ -45,7 +46,7 @@ func TestAPIClientAuthenticationPut_ConfidentialToPublic_Success(t *testing.T) {
 
 	// Verify DB updates
 	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, refreshed)
 	assert.True(t, refreshed.IsPublic)
 	assert.Nil(t, refreshed.ClientSecretEncrypted)
@@ -68,7 +69,7 @@ func TestAPIClientAuthenticationPut_PublicToConfidential_Success(t *testing.T) {
 
 	// Verify DB updates
 	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, refreshed)
 	assert.False(t, refreshed.IsPublic)
 	assert.NotNil(t, refreshed.ClientSecretEncrypted)
@@ -80,7 +81,7 @@ func TestAPIClientAuthenticationPut_PublicToConfidential_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 	var secretResp api.GetClientSecretResponse
 	err = json.NewDecoder(resp2.Body).Decode(&secretResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, newSecret, secretResp.ClientSecret)
 }
 
@@ -158,7 +159,7 @@ func TestAPIClientAuthenticationPut_SystemLevelClientAllowed(t *testing.T) {
 
 	// Get system-level client from DB so we can save/restore state
 	sysClient, err := database.GetClientByClientIdentifier(context.Background(), nil, builtin.AdminConsoleClientIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if sysClient == nil {
 		t.Skip("system-level client not found")
 	}

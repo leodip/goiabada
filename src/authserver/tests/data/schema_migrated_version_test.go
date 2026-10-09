@@ -62,7 +62,7 @@ func TestSchemaMigratedVersion_ReadsTheRecordedVersion(t *testing.T) {
 	// describing a schema no chain produces.
 	setSchemaMigrationsDirty(t, h, true)
 	got, err = schemadump.MigratedVersion(context.Background(), h.SQL, d)
-	assert.Errorf(t, err, "a dirty row is refused on %s", dbType())
+	require.Errorf(t, err, "a dirty row is refused on %s", dbType())
 	assert.Zerof(t, got, "a refusal answers 0 alongside the error and never a usable version on %s", dbType())
 	setSchemaMigrationsDirty(t, h, false)
 
@@ -100,7 +100,7 @@ func TestSchemaMigratedVersion_ReadsTheRecordedVersion(t *testing.T) {
 	_, err = h.SQL.Exec("DROP TABLE schema_migrations")
 	require.NoErrorf(t, err, "drop schema_migrations on %s", dbType())
 	got, err = schemadump.MigratedVersion(context.Background(), h.SQL, d)
-	assert.Errorf(t, err, "a query failure is an error and not a version on %s", dbType())
+	require.Errorf(t, err, "a query failure is an error and not a version on %s", dbType())
 	assert.Zerof(t, got, "a query failure answers 0 alongside the error on %s", dbType())
 
 	_, err = schemadump.MigratedVersion(context.Background(), h.SQL, data.Dialect("oracle"))

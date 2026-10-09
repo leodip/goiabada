@@ -478,7 +478,7 @@ func TestHandleSettingsEmailPut_ARefusedDialAnswersItsCauseAndLogsTheError(t *te
 	assert.Equal(t, emailSaveRequestId, records[0].Attrs["request_id"], "logged through the request's context")
 	logged, ok := records[0].Attrs["error"].(error)
 	require.True(t, ok, "the error attribute is the error itself")
-	assert.ErrorIs(t, logged, syscall.ECONNREFUSED)
+	require.ErrorIs(t, logged, syscall.ECONNREFUSED)
 	assert.Contains(t, logged.Error(), "127.0.0.1:"+strconv.Itoa(port), "the log keeps what the answer leaves out")
 }
 

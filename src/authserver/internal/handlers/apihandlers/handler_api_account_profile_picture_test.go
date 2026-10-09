@@ -193,7 +193,7 @@ func TestHandleAccountProfilePicturePost_UserNotFound(t *testing.T) {
 	sub := fake.UUID()
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/account/profile-picture", "picture", pictureData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
@@ -268,7 +268,7 @@ func TestHandleAccountProfilePicturePost_InvalidImage(t *testing.T) {
 	// Create a request with invalid image data
 	invalidImageData := []byte("not a valid image")
 	req, err := createMultipartRequest("POST", "/api/v1/account/profile-picture", "picture", invalidImageData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
@@ -280,7 +280,7 @@ func TestHandleAccountProfilePicturePost_InvalidImage(t *testing.T) {
 
 	var response map[string]interface{}
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// The catalog key and its English sentence, through writeValidationError, as every other
 	// validator on this API answers (#435).
 	assert.Equal(t, "validator.image.unsupported_type", response["error_code"])
@@ -328,7 +328,7 @@ func TestHandleAccountProfilePicturePost_CreateNew(t *testing.T) {
 
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/account/profile-picture", "picture", pictureData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
@@ -370,7 +370,7 @@ func TestHandleAccountProfilePicturePost_UpdateExisting(t *testing.T) {
 
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/account/profile-picture", "picture", pictureData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
@@ -502,7 +502,7 @@ func TestHandleAccountProfilePictureDelete_DatabaseError(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", response["error_code"])
 
 	database.AssertExpectations(t)

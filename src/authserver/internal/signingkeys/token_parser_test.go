@@ -64,11 +64,11 @@ func TestDecodeAndValidateTokenString(t *testing.T) {
 			result, err := tp.DecodeAndValidateTokenString(context.Background(), tokenString, true)
 
 			if tt.expectedError != "" {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedError)
 				assert.Nil(t, result)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, result)
 				assert.Equal(t, tokenString, result.TokenBase64)
 				assert.Equal(t, tt.tokenClaims["sub"], result.Claims["sub"])
@@ -162,7 +162,7 @@ func TestDecodeAndValidateTokenString_TheExpirationCheckIsTheCallersChoice(t *te
 		result, err := tp.DecodeAndValidateTokenString(context.Background(), token, true)
 
 		require.Error(t, err)
-		assert.ErrorIs(t, err, jwt.ErrTokenExpired)
+		require.ErrorIs(t, err, jwt.ErrTokenExpired)
 		assert.Nil(t, result)
 	})
 }
@@ -185,7 +185,7 @@ func TestDecodeAndValidateTokenString_InvalidSignature(t *testing.T) {
 
 	result, err := tp.DecodeAndValidateTokenString(context.Background(), tokenString, true)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "token signature is invalid")
 	assert.Nil(t, result)
 }
@@ -230,8 +230,8 @@ func TestDecodeAndValidateTokenString_AFailedFallbackLookupReportsBothErrors(t *
 
 	require.Error(t, err)
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, jwt.ErrTokenSignatureInvalid)
-	assert.ErrorIs(t, err, lookupErr)
+	require.ErrorIs(t, err, jwt.ErrTokenSignatureInvalid)
+	require.ErrorIs(t, err, lookupErr)
 	assert.Contains(t, err.Error(), "unable to read the signing keys to try")
 }
 
@@ -251,7 +251,7 @@ func TestDecodeAndValidateTokenString_RejectsNonRS256Token(t *testing.T) {
 
 	result, err := tp.DecodeAndValidateTokenString(context.Background(), tokenString, true)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "signing method HS256 is invalid")
 	assert.Nil(t, result)
 }
@@ -264,9 +264,9 @@ func TestDecodeAndValidateTokenString_EmptyToken(t *testing.T) {
 
 		result, err := tp.DecodeAndValidateTokenString(context.Background(), "", withExpirationCheck)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, "", result.TokenBase64)
+		assert.Empty(t, result.TokenBase64)
 		assert.Nil(t, result.Claims)
 	}
 }

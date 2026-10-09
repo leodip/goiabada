@@ -985,7 +985,7 @@ func TestServerSideStore_SaveOnAVanishedRowFailsAndWritesNothing(t *testing.T) {
 	err = store.Save(req, w, session)
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrNotFound))
+	require.ErrorIs(t, err, ErrNotFound)
 	assert.Equal(t, 0, backend.creates, "a gone session must never be inserted back")
 	assert.Empty(t, w.Result().Cookies(), "no cookie, not even a deletion")
 }
@@ -1580,7 +1580,7 @@ func TestServerSideStore_CutoverMatrix(t *testing.T) {
 				assert.Equal(t, secure, cookie.Secure)
 
 				if owner.lifetime == PersistentCookie {
-					assert.Greater(t, cookie.MaxAge, 0,
+					assert.Positive(t, cookie.MaxAge,
 						"the end user's cookie carries an expiry, so single sign-on survives a restart")
 				} else {
 					assert.Equal(t, 0, cookie.MaxAge)

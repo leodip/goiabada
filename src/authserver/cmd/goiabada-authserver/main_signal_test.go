@@ -116,7 +116,7 @@ func TestMain_ASignalDuringALegacyBootstrapStillSaysTheServerStopped(t *testing.
 	assert.Equalf(t, "auth server stopped", messages[len(messages)-1], "and it is the last thing said\n%s", dump(records))
 
 	_, statErr := os.Stat(outFile)
-	assert.NoError(t, statErr, "the bootstrap file holding the generated credentials is in place")
+	require.NoError(t, statErr, "the bootstrap file holding the generated credentials is in place")
 	version, dirty, versionErr := schemaVersion(t, path)
 	require.NoError(t, versionErr)
 	assert.False(t, dirty, "the schema is left clean")

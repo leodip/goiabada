@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIssueImplicitTx_AccessTokenOnly(t *testing.T) {
@@ -67,7 +68,7 @@ func TestIssueImplicitTx_AccessTokenOnly(t *testing.T) {
 	armImplicitTransaction(mockDB, input.SessionIdentifier)
 
 	response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 
 	// Verify access token is issued
@@ -152,7 +153,7 @@ func TestIssueImplicitTx_IdTokenOnly(t *testing.T) {
 	armImplicitTransaction(mockDB, input.SessionIdentifier)
 
 	response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, false, true)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 
 	// Verify NO access token is issued
@@ -243,7 +244,7 @@ func TestIssueImplicitTx_BothTokens(t *testing.T) {
 	armImplicitTransaction(mockDB, input.SessionIdentifier)
 
 	response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, true)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 
 	// Verify BOTH tokens are issued
@@ -324,7 +325,7 @@ func TestIssueImplicitTx_NoRefreshToken(t *testing.T) {
 	armImplicitTransaction(mockDB, input.SessionIdentifier)
 
 	response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 
 	// ImplicitGrantResponse struct does NOT have a RefreshToken field
@@ -383,7 +384,7 @@ func TestIssueImplicitTx_ClientOverrideExpiration(t *testing.T) {
 	armImplicitTransaction(mockDB, input.SessionIdentifier)
 
 	response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 
 	// Verify client override is used
@@ -456,7 +457,7 @@ func TestIssueImplicitTx_WithGroupsAndAttributes(t *testing.T) {
 	armImplicitTransaction(mockDB, input.SessionIdentifier)
 
 	response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, true)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, response)
 
 	// Verify access token groups and attributes

@@ -477,7 +477,7 @@ func TestRun_AFailureAnywhereLeavesNothingAndTheNextStartSeeds(t *testing.T) {
 			if tc.fault.failCommit {
 				assert.Equal(t, seedWrites, faults.writes, "every write ran before the commit failed")
 			} else {
-				assert.ErrorIs(t, err, errInjected)
+				require.ErrorIs(t, err, errInjected)
 			}
 
 			isEmpty, err := db.IsEmpty(context.Background())
@@ -558,7 +558,7 @@ func TestRun_RenameFailsAfterTheCommit_KeepsAndNamesTheStagedFile(t *testing.T) 
 	outcome, err := r.run(context.Background())
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, errInjected)
+	require.ErrorIs(t, err, errInjected)
 	assert.Equal(t, Refused, outcome)
 	assert.NoFileExists(t, cfg.BootstrapEnvOutFile)
 

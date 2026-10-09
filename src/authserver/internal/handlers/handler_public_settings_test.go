@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // =============================================================================
@@ -49,7 +50,7 @@ func TestPublicSettings_Success(t *testing.T) {
 	assert.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
 
 	var body api.PublicSettingsResponse
-	assert.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
 	assert.Equal(t, "Goiabada Test", body.AppName)
 	assert.Equal(t, "dark", body.UITheme)
 	assert.True(t, body.SMTPEnabled)
@@ -216,7 +217,7 @@ func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 
 	// And no key named after a sensitive setting.
 	var asMap map[string]any
-	assert.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &asMap))
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &asMap))
 	for key := range asMap {
 		_, allowed := publicSettingsAllowedFields[key]
 		if !allowed {

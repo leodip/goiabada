@@ -78,7 +78,7 @@ func postRegisterAddress(t *testing.T, client *http.Client, email string) *http.
 
 func bodyString(t *testing.T, resp *http.Response) string {
 	b, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return string(b)
 }
 
@@ -162,13 +162,13 @@ func TestSelfRegister_Post_SMTPDisabled_RendersSuccessPage(t *testing.T) {
 	assert.NotContains(t, body, "/auth/pwd")
 
 	user, err := database.GetUserByEmail(context.Background(), nil, email)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if assert.NotNil(t, user) {
 		assert.False(t, user.EmailVerified)
 	}
 
 	preReg, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, preReg)
 }
 
@@ -192,13 +192,13 @@ func TestSelfRegister_Post_SMTPEnabled_NoVerification_RendersSuccess(t *testing.
 	assert.Contains(t, body, appConfig.AdminConsole.BaseURL+"/account/profile")
 
 	user, err := database.GetUserByEmail(context.Background(), nil, email)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if assert.NotNil(t, user) {
 		assert.False(t, user.EmailVerified)
 	}
 
 	preReg, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, preReg)
 }
 
@@ -357,11 +357,11 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	link := latestActivationLink(t, email)
 
 	user, err := database.GetUserByEmail(context.Background(), nil, email)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, user, "user should not exist before activation")
 
 	preReg, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if !assert.NotNil(t, preReg, "pre-registration should exist once its link is sent") {
 		return
 	}
@@ -369,7 +369,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	// The hash is what the link resolves to, and it must be the hash of the code that was
 	// issued or the registration is unactivatable.
 	verificationCode, err := dataCipher.Decrypt(preReg.VerificationCodeEncrypted)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, verificationCode)
 	expectedHash := hashutil.HashString(verificationCode)
 	assert.Equal(t, expectedHash, preReg.VerificationCodeHash)
@@ -391,7 +391,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	assert.Contains(t, activationBody, appConfig.AdminConsole.BaseURL+"/account/profile")
 
 	user, err = database.GetUserByEmail(context.Background(), nil, email)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if assert.NotNil(t, user, "the '+' address must complete registration end to end") {
 		assert.True(t, user.EmailVerified)
 		assert.True(t, passwordhash.Verify(user.PasswordHash, chosenPassword),
@@ -399,7 +399,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	}
 
 	preReg, err = database.GetPreRegistrationByEmail(context.Background(), nil, email)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, preReg, "pre-registration should be deleted after activation")
 }
 
@@ -689,7 +689,7 @@ func TestSelfRegister_Post_DuplicateEmail(t *testing.T) {
 		PasswordHash: "irrelevant",
 	}
 	err := database.CreateUser(context.Background(), nil, existing)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	loadRegisterPage(t, httpClient)
@@ -763,6 +763,6 @@ func TestSelfRegister_Post_PasswordMismatch(t *testing.T) {
 	assert.Contains(t, body, "password confirmation does not match")
 
 	user, err := database.GetUserByEmail(context.Background(), nil, email)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, user, "no user should be created on validation failure")
 }

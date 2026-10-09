@@ -105,7 +105,7 @@ func TestToken_Refresh_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 
 	successes := 0
 	for i := 0; i < concurrency; i++ {
-		assert.NoErrorf(t, reqErrs[i], "request %d failed at the transport level", i)
+		require.NoErrorf(t, reqErrs[i], "request %d failed at the transport level", i)
 
 		accessToken := ""
 		if bodies[i] != nil {
@@ -406,7 +406,7 @@ func TestToken_Refresh_RacingATermination_LeavesNoUsableDescendant(t *testing.T)
 
 	replacements := make([]string, 0, concurrency)
 	for i := 0; i < concurrency; i++ {
-		assert.NoErrorf(t, reqErrs[i], "request %d failed at the transport level", i)
+		require.NoErrorf(t, reqErrs[i], "request %d failed at the transport level", i)
 
 		refreshToken := ""
 		if bodies[i] != nil {

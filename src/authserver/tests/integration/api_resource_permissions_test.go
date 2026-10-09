@@ -48,7 +48,7 @@ func TestAPIResourcePermissionsGet_Success(t *testing.T) {
 	// Parse response
 	var getResponse api.GetPermissionsByResourceResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return all 3 permissions with embedded resource info
 	assert.Len(t, getResponse.Permissions, 3)
@@ -102,10 +102,10 @@ func TestAPIResourcePermissionsGet_NoPermissions(t *testing.T) {
 	// Parse response
 	var getResponse api.GetPermissionsByResourceResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return empty permissions array (not nil)
-	assert.Len(t, getResponse.Permissions, 0)
+	assert.Empty(t, getResponse.Permissions)
 	assert.NotNil(t, getResponse.Permissions, "Permissions should be empty array, not nil")
 }
 
@@ -124,10 +124,10 @@ func TestAPIResourcePermissionsGet_NonExistentResource(t *testing.T) {
 	// Parse response
 	var getResponse api.GetPermissionsByResourceResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return empty permissions array
-	assert.Len(t, getResponse.Permissions, 0)
+	assert.Empty(t, getResponse.Permissions)
 }
 
 func TestAPIResourcePermissionsGet_InvalidResourceId(t *testing.T) {
@@ -157,8 +157,8 @@ func TestAPIResourcePermissionsGet_InvalidResourceId(t *testing.T) {
 				// For successful responses, verify empty permissions
 				var getResponse api.GetPermissionsByResourceResponse
 				err := json.NewDecoder(resp.Body).Decode(&getResponse)
-				assert.NoError(t, err)
-				assert.Len(t, getResponse.Permissions, 0)
+				require.NoError(t, err)
+				assert.Empty(t, getResponse.Permissions)
 			}
 		})
 	}
@@ -211,7 +211,7 @@ func TestAPIResourcePermissionsGet_AuthServerResourceIncludesOtherPermissions(t 
 
 	// Setup: Get the AuthServer resource
 	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if authServerResource == nil {
 		t.Skip("AuthServer resource not found in database - skipping permission inclusion test")
 	}
@@ -233,7 +233,7 @@ func TestAPIResourcePermissionsGet_AuthServerResourceIncludesOtherPermissions(t 
 	// Parse response
 	var getResponse api.GetPermissionsByResourceResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should include our test permission
 	found := false
@@ -277,7 +277,7 @@ func TestAPIResourcePermissionsGet_NonAuthServerResourceIncludesAllPermissions(t
 	// Parse response
 	var getResponse api.GetPermissionsByResourceResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should include both permissions (no filtering for non-AuthServer resources)
 	assert.Len(t, getResponse.Permissions, 2)
@@ -307,11 +307,11 @@ func TestAPIResourcePermissionsGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -371,7 +371,7 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 	// Parse response
 	var getResponse api.GetPermissionsByResourceResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should return all permissions
 	assert.Len(t, getResponse.Permissions, numPermissions)

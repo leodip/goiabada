@@ -42,6 +42,6 @@ func TestFullNames_JoinTheSamePartsFromBothShapes(t *testing.T) {
 // looks its owner up in a map and a session whose owner is absent must leave the cell blank, not
 // take the page down.
 func TestFullNames_NilRecordIsEmpty(t *testing.T) {
-	assert.Equal(t, "", UserFullName(nil))
-	assert.Equal(t, "", SessionOwnerFullName(nil))
+	assert.Empty(t, UserFullName(nil))
+	assert.Empty(t, SessionOwnerFullName(nil))
 }

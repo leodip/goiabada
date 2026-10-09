@@ -31,7 +31,7 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, testClient)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	// Create a user
@@ -44,7 +44,7 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 		EmailVerified: true,
 	}
 	err = database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
 
 	// Create sessions
@@ -59,10 +59,10 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 	now := time.Now().UTC()
 	usc1 := &record.UserSessionClient{UserSessionId: s1.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
 	err = database.CreateUserSessionClient(context.Background(), nil, usc1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	usc2 := &record.UserSessionClient{UserSessionId: s2.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
 	err = database.CreateUserSessionClient(context.Background(), nil, usc2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Call endpoint
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
@@ -74,7 +74,7 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 
 	var out api.GetClientSessionsResponse
 	err = json.NewDecoder(resp.Body).Decode(&out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, out.Sessions, 2)
 
 	// Decision 10's normalization, at its smallest: two sessions of one person, so the array
@@ -86,7 +86,7 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 	assert.Equal(t, "User", out.Users[0].FamilyName)
 
 	for _, s := range out.Sessions {
-		assert.Greater(t, s.Id, int64(0))
+		assert.Positive(t, s.Id)
 		assert.NotEmpty(t, s.SessionIdentifier)
 		require.NotNil(t, s.Started)
 		require.NotNil(t, s.LastAccessed)
@@ -115,7 +115,7 @@ func TestAPIClientSessionsGet_EmptySessions(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, testClient)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
@@ -134,9 +134,9 @@ func TestAPIClientSessionsGet_EmptySessions(t *testing.T) {
 
 	var out api.GetClientSessionsResponse
 	err = json.Unmarshal([]byte(body), &out)
-	assert.NoError(t, err)
-	assert.Len(t, out.Sessions, 0)
-	assert.Len(t, out.Users, 0)
+	require.NoError(t, err)
+	assert.Empty(t, out.Sessions)
+	assert.Empty(t, out.Users)
 }
 
 func TestAPIClientSessionsGet_ClientNotFound(t *testing.T) {
@@ -192,15 +192,15 @@ func TestAPIClientSessionsGet_Unauthorized(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, testClient)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
@@ -220,7 +220,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, testClient)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	// User
@@ -233,7 +233,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 		EmailVerified: true,
 	}
 	err = database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
 
 	// Valid session
@@ -251,7 +251,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 		UserId:            testUser.Id,
 	}
 	err = database.CreateUserSession(context.Background(), nil, valid)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteUserSession(context.Background(), nil, valid.Id) }()
 
 	// Expired session
@@ -269,15 +269,15 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 		UserId:            testUser.Id,
 	}
 	err = database.CreateUserSession(context.Background(), nil, expired)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteUserSession(context.Background(), nil, expired.Id) }()
 
 	// Link both to client
 	now := time.Now().UTC()
 	err = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{UserSessionId: valid.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{UserSessionId: expired.Id, ClientId: testClient.Id, Started: now.Add(-26 * time.Hour), LastAccessed: now.Add(-25 * time.Hour)})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Call endpoint
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
@@ -287,7 +287,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 
 	var out api.GetClientSessionsResponse
 	err = json.NewDecoder(resp.Body).Decode(&out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, out.Sessions, 1)
 	assert.Equal(t, valid.SessionIdentifier, out.Sessions[0].SessionIdentifier)
 	assert.Equal(t, "Valid Session Device", out.Sessions[0].DeviceName)
@@ -309,7 +309,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 		ClientCredentialsEnabled: false,
 	}
 	err := database.CreateClient(context.Background(), nil, testClient)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	// User
@@ -322,7 +322,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 		EmailVerified: true,
 	}
 	err = database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
 
 	// Create many valid sessions (e.g., 120)
@@ -344,12 +344,12 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 			UserId:            testUser.Id,
 		}
 		sessionErr := database.CreateUserSession(context.Background(), nil, s)
-		assert.NoError(t, sessionErr)
+		require.NoError(t, sessionErr)
 		sessions = append(sessions, s)
 		// Link to client
 		usc := &record.UserSessionClient{UserSessionId: s.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
 		sessionErr = database.CreateUserSessionClient(context.Background(), nil, usc)
-		assert.NoError(t, sessionErr)
+		require.NoError(t, sessionErr)
 	}
 	defer func() {
 		for _, s := range sessions {
@@ -364,7 +364,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var out api.GetClientSessionsResponse
 	err = json.NewDecoder(resp.Body).Decode(&out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, out.Sessions, 50)
 
 	// Request size over cap (e.g., 200) should cap at 100
@@ -374,7 +374,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 	var out2 api.GetClientSessionsResponse
 	err = json.NewDecoder(resp2.Body).Decode(&out2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, out2.Sessions, 100)
 }
 

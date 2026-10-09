@@ -3,7 +3,6 @@ package sqlitedb
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,7 +43,7 @@ func TestNew_AnUnopenableFileIsAConnectionError(t *testing.T) {
 		"the message names SQLite's code, which is what an operator searches for; got %q", err.Error())
 
 	var sqliteErr *sqlitedriver.Error
-	require.Truef(t, errors.As(err, &sqliteErr),
+	require.ErrorAsf(t, err, &sqliteErr,
 		"the driver's error stays in the chain, so a caller can still match it with errors.As; got %v", err)
 	assert.Equal(t, sqliteCantOpen, sqliteErr.Code(), "the driver's code survives the wrap")
 }

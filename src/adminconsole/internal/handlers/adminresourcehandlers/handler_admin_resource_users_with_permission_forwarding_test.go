@@ -2,7 +2,6 @@ package adminresourcehandlers
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -122,15 +121,15 @@ func TestResourceUsersWithPermissionRemovePost_ForwardsTheApisStatusAsJson(t *te
 			router.ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
-			require.NotNil(t, captured, "the handler answered nothing")
+			require.Error(t, captured, "the handler answered nothing")
 
 			var detail *oauth.ErrorDetail
 			if testCase.wantStatus == 0 {
-				assert.False(t, errors.As(captured, &detail),
+				assert.NotErrorAs(t, captured, &detail,
 					"a server fault must not carry a status to the browser, got %v", captured)
 				return
 			}
-			require.True(t, errors.As(captured, &detail),
+			require.ErrorAs(t, captured, &detail,
 				"expected an *ErrorDetail carrying a status, got %v", captured)
 			assert.Equal(t, testCase.wantStatus, detail.HTTPStatus())
 			assert.Equal(t, testCase.wantCode, detail.Code())

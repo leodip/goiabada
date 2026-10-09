@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIGroupUpdatePut tests the PUT /api/v1/admin/groups/{id} endpoint
@@ -44,7 +45,7 @@ func TestAPIGroupUpdatePut_Success(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateGroupResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Response should reflect updates
 	assert.Equal(t, testGroup.Id, updateResponse.Group.Id)
@@ -56,7 +57,7 @@ func TestAPIGroupUpdatePut_Success(t *testing.T) {
 
 	// Verify changes were persisted to database
 	updatedGroup, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, updatedGroup)
 	assert.Equal(t, updateReq.GroupIdentifier, updatedGroup.GroupIdentifier)
 	assert.Equal(t, updateReq.Description, updatedGroup.Description)
@@ -173,7 +174,7 @@ func TestAPIGroupUpdatePut_SameIdentifier(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateGroupResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should allow update with same identifier
 	assert.Equal(t, updateReq.GroupIdentifier, updateResponse.Group.GroupIdentifier)
@@ -241,13 +242,13 @@ func TestAPIGroupUpdatePut_InvalidRequestBody(t *testing.T) {
 	// Test: Invalid JSON
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	req, err := http.NewRequest("PUT", url, nil) // No body
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return 400 Bad Request
@@ -264,11 +265,11 @@ func TestAPIGroupUpdatePut_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -311,7 +312,7 @@ func TestAPIGroupUpdatePut_WhitespaceHandling(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateGroupResponse
 	err := json.NewDecoder(resp2.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Values should be trimmed in response
 	assert.Equal(t, strings.TrimSpace(updateReq.GroupIdentifier), updateResponse.Group.GroupIdentifier)
@@ -330,7 +331,7 @@ func TestAPIGroupUpdatePut_BooleanFlags(t *testing.T) {
 		IncludeInAccessToken: false,
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
@@ -365,7 +366,7 @@ func TestAPIGroupUpdatePut_BooleanFlags(t *testing.T) {
 			// Parse response
 			var updateResponse api.UpdateGroupResponse
 			err := json.NewDecoder(resp.Body).Decode(&updateResponse)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			// Assert: Boolean values should be preserved
 			assert.Equal(t, tc.includeInIdToken, updateResponse.Group.IncludeInIdToken)
@@ -394,7 +395,7 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -404,7 +405,7 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 		GroupId: testGroup.Id,
 	}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
 	}()
@@ -427,7 +428,7 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 	// Parse response
 	var updateResponse api.UpdateGroupResponse
 	err = json.NewDecoder(resp.Body).Decode(&updateResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Response should include correct member count
 	assert.Equal(t, 1, updateResponse.Group.MemberCount, "Update response should include current member count")
@@ -464,7 +465,7 @@ func TestAPIGroupUpdatePut_AngleBracketsRejected(t *testing.T) {
 	assert.Equal(t, "validator.description.angle_brackets", errResp.ErrorCode)
 
 	stored, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, testGroup.Description, stored.Description)
 }
 
@@ -489,6 +490,6 @@ func TestAPIGroupUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	stored, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `R&D "phase 2"`, stored.Description)
 }

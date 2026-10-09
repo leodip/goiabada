@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHandleUnauthorizedGet(t *testing.T) {
@@ -17,7 +18,7 @@ func TestHandleUnauthorizedGet(t *testing.T) {
 		handler := HandleUnauthorizedGet(pageRenderer)
 
 		req, err := http.NewRequest("GET", "/unauthorized", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
@@ -40,7 +41,7 @@ func TestHandleUnauthorizedGet(t *testing.T) {
 		handler := HandleUnauthorizedGet(pageRenderer)
 
 		req, err := http.NewRequest("GET", "/unauthorized", nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 

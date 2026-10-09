@@ -258,7 +258,7 @@ func getCodeAndStateFromUrl(t *testing.T, resp *http.Response) (code string, sta
 	assert.NotEmpty(t, code, "code should not be empty")
 	assert.NotEmpty(t, state, "state should not be empty")
 
-	assert.Equal(t, 128, len(code))
+	assert.Len(t, code, 128)
 
 	return code, state
 }

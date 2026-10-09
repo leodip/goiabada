@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestKeyState_String owns the total String decision 16 of #385 settled for this type. The in-range
@@ -38,7 +39,7 @@ func TestKeyStateFromString(t *testing.T) {
 	for _, state := range []KeyState{KeyStateCurrent, KeyStatePrevious, KeyStateNext} {
 		t.Run(state.String(), func(t *testing.T) {
 			parsed, err := KeyStateFromString(state.String())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, state, parsed)
 		})
 	}
@@ -46,7 +47,7 @@ func TestKeyStateFromString(t *testing.T) {
 	t.Run("an unrecognized state is refused", func(t *testing.T) {
 		for _, raw := range []string{"", "retired", "Current", "0"} {
 			parsed, err := KeyStateFromString(raw)
-			assert.Error(t, err, "%q must not parse", raw)
+			require.Error(t, err, "%q must not parse", raw)
 			assert.Equal(t, KeyStateCurrent, parsed, "the refused value returns the zero state")
 		}
 	})

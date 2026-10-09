@@ -83,7 +83,7 @@ func TestHandleIssueGet(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -93,7 +93,7 @@ func TestHandleIssueGet(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == expectedError
+			return errors.Is(err, expectedError)
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
@@ -116,7 +116,7 @@ func TestHandleIssueGet(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -243,7 +243,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// grantIsOffline reads as an offline grant, so a code issued here would produce a
 		// refresh token with a max lifetime and no session to check.
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
@@ -355,7 +355,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// and the session was ended in that hop. Restarting level 1 would render a password
 		// form, which this request forbids (#129 decision 16).
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
@@ -427,7 +427,7 @@ func TestHandleIssueGet(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -495,7 +495,7 @@ func TestHandleIssueGet(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -553,7 +553,7 @@ func TestHandleIssueGet(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -629,7 +629,7 @@ func TestHandleIssueGet(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, dbError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == dbError
+			return errors.Is(err, dbError)
 		})).Return()
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -682,7 +682,7 @@ func TestHandleIssueGet(t *testing.T) {
 		codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).Return(nil, commitError).Once()
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == commitError
+			return errors.Is(err, commitError)
 		})).Return()
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -811,7 +811,7 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 		f.ceremonyStore.On("ClearAuthContext", mock.Anything, f.req).Return(clearErr).Once()
 		f.ceremonyStore.On("ClearAuthContext", mock.Anything, f.req).Return(nil).Once()
 		f.pageRenderer.On("InternalServerError", mock.Anything, f.req, mock.MatchedBy(func(err error) bool {
-			return err == clearErr
+			return errors.Is(err, clearErr)
 		})).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).WriteHeader(http.StatusInternalServerError)
 		}).Return().Once()
@@ -1369,7 +1369,7 @@ const liveSessionIdentifier = "session-identifier-abc"
 func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.Request {
 	t.Helper()
 	req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req = withSessionSettings(req)
 	return withSessionSettings(req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)))
 }
@@ -1532,7 +1532,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// The issuer is handed the request's own settings, matched by identity below.
 		requestSettings := &record.Settings{Issuer: "https://issuer.example",
@@ -1636,7 +1636,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req = withSessionSettings(req)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
 
@@ -1727,7 +1727,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req = withSessionSettings(req)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
 
@@ -1823,7 +1823,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req = withSessionSettings(req)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
 
@@ -1892,7 +1892,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -1953,7 +1953,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
@@ -2003,7 +2003,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req = withSessionSettings(req)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
 
@@ -2030,7 +2030,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, true, false).Return(nil, tokenError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == tokenError
+			return errors.Is(err, tokenError)
 		})).Return()
 
 		stubLiveSession(database, 123)
@@ -2058,7 +2058,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "test-state", tokenResponse)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
 		location := w.Header().Get("Location")
 		assert.Contains(t, location, "https://example.com/callback#")
@@ -2082,7 +2082,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "test-state", tokenResponse)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
 		location := w.Header().Get("Location")
 		assert.Contains(t, location, "https://example.com/callback#")
@@ -2109,7 +2109,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "test-state", tokenResponse)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
 		location := w.Header().Get("Location")
 		assert.Contains(t, location, "https://example.com/callback#")
@@ -2133,7 +2133,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "", tokenResponse)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		location := w.Header().Get("Location")
 		assert.Contains(t, location, "https://example.com/callback#")
 		assert.Contains(t, location, "access_token=access-token-123")
@@ -2161,7 +2161,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "   ", tokenResponse)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=+++",
 			w.Header().Get("Location"))
 	})
@@ -2183,7 +2183,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "a b+c/d=e#f&g=h", tokenResponse)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh",
 			w.Header().Get("Location"))
 	})
@@ -2205,7 +2205,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback?state=fixed&lang=en", "client-csrf-token", tokenResponse)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback?state=fixed&lang=en#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=client-csrf-token",
 			w.Header().Get("Location"))
 	})
@@ -2223,7 +2223,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "test-state", tokenResponse)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		location := w.Header().Get("Location")
 		assert.NotContains(t, location, "scope=")
 	})
@@ -2277,7 +2277,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 				err := issueImplicitTokens(w, r, nil, "", tc.redirectURI, "test-state", tokenResponse)
 
-				assert.Error(t, err, tc.why)
+				require.Error(t, err, tc.why)
 				assert.Empty(t, w.Header().Get("Location"), "no Location may be written for %q", tc.redirectURI)
 				assert.NotContains(t, w.Body.String(), "access-token-123", "the tokens must not reach the response at all")
 			})
@@ -2300,7 +2300,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -2321,7 +2321,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(nil, dbError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == dbError
+			return errors.Is(err, dbError)
 		})).Return()
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -2346,7 +2346,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
@@ -2371,7 +2371,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(nil, dbError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == dbError
+			return errors.Is(err, dbError)
 		})).Return()
 
 		stubLiveSession(database, 123)
@@ -2397,7 +2397,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req = withSessionSettings(req)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
 
@@ -2433,7 +2433,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(clearError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == clearError
+			return errors.Is(err, clearError)
 		})).Return()
 
 		stubLiveSession(database, 123)
@@ -2535,7 +2535,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "query")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
 		assert.Equal(t, "https://example.com/callback?code=test_code&state=test_state", w.Header().Get("Location"))
 	})
@@ -2552,7 +2552,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "fragment")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
 		assert.Equal(t, "https://example.com/callback#code=test_code&state=test_state", w.Header().Get("Location"))
 	})
@@ -2576,7 +2576,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 		err := issueAuthCode(w, r, templateFS, code, "form_post")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Contains(t, w.Body.String(), `<form method="post" action="https://example.com/callback">`)
 		assert.Contains(t, w.Body.String(), `<input type="hidden" name="code" value="test_code">`)
@@ -2595,7 +2595,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
 		assert.Equal(t, "https://example.com/callback?code=test_code&state=test_state", w.Header().Get("Location"))
 	})
@@ -2616,7 +2616,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 		err := issueAuthCode(w, r, templateFS, code, "form_post")
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to parse template")
 	})
 
@@ -2685,7 +2685,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 					err := issueAuthCode(w, r, templateFS, code, mode.value)
 
-					assert.Error(t, err, tc.why)
+					require.Error(t, err, tc.why)
 					assert.Empty(t, w.Header().Get("Location"), "no Location may be written for %q", tc.redirectURI)
 					assert.Empty(t, w.Body.String(), "no form action may be written for %q", tc.redirectURI)
 				})
@@ -2717,7 +2717,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "query")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
 		assert.Equal(t, "http://127.0.0.1/cb?a=1&code=test_code&state=test_state", w.Header().Get("Location"))
 	})
@@ -2748,7 +2748,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "query")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// Whole-string, not url.Values: parsing is the step that hid the duplicate, since Get
 		// answers with the first of the two and reports nothing wrong.
 		assert.Equal(t, "https://example.com/callback?lang=en&code=test_code&state=client-csrf-token",
@@ -2767,7 +2767,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "query")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// Not a hypothetical variant of the state case: an RP whose callback is reached from more
 		// than one place could register a "code" of its own, and two of them would leave which
 		// authorization code gets redeemed to the parser. RFC 6749 section 3.1 forbids the shape
@@ -2788,7 +2788,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "query")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// The retention half of the fix, which has nothing to do with state. url.Query discards
 		// ParseQuery's error, so this field used to be deleted outright and the client was sent to
 		// a URI it had not registered.
@@ -2808,7 +2808,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "fragment")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// The two branches construct differently and that difference is observable here: the
 		// registered "state=fixed" in the query is NOT replaced, because the response parameters
 		// are going into the fragment and the query is not the field list being written.
@@ -2831,7 +2831,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "query")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// This is the redirect carrying the authorization code, so a state on it is what an RP's
 		// RFC 9700 2.1 CSRF check compares against. A client that sent none must read none back
 		// rather than a value it never bound to the user agent.
@@ -2851,7 +2851,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "query")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// Otherwise the callback says success and failure at once, and an RP that checks for
 		// "error" before reading "code", which is the usual order, treats the authorization the
 		// user just granted as a refusal.
@@ -2878,7 +2878,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "query")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback?code=test_code", w.Header().Get("Location"))
 	})
 
@@ -2890,7 +2890,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "fragment")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback#code=test_code", w.Header().Get("Location"))
 	})
 
@@ -2902,7 +2902,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "query")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback?code=test_code&state=+++", w.Header().Get("Location"))
 	})
 
@@ -2914,7 +2914,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "fragment")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback#code=test_code&state=+++", w.Header().Get("Location"))
 	})
 }
@@ -2935,7 +2935,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "query")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback?code=test_code&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh",
 			w.Header().Get("Location"))
 	})
@@ -2948,7 +2948,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 
 		err := issueAuthCode(w, r, nil, code, "fragment")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback#code=test_code&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh",
 			w.Header().Get("Location"))
 	})
@@ -2967,7 +2967,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 
 		err := issueAuthCode(w, r, templateFS, code, "form_post")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// html/template escapes "+" as &#43; and "&" as &amp; in an attribute; both decode back to
 		// the byte the client sent, which is what "exact value" asks for in this transport.
 		assert.Equal(t, `<input name="state" value="a b&#43;c/d=e#f&amp;g=h">`, w.Body.String())
@@ -2993,7 +2993,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 
 		err := issueAuthCode(w, r, templateFS, code, "form_post")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "no-store", w.Header().Get("Cache-Control"))
 		assert.Equal(t, "no-cache", w.Header().Get("Pragma"))
 	})
@@ -3013,7 +3013,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 
 		err := issueAuthCode(w, r, templateFS, code, "form_post")
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Empty(t, w.Header().Get("Cache-Control"))
 		assert.Empty(t, w.Header().Get("Pragma"))
 	})
@@ -3042,7 +3042,7 @@ func TestIssueAuthCode_FormPostRenderIsBuffered(t *testing.T) {
 
 	err := issueAuthCode(w, r, templateFS, code, "form_post")
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to execute template")
 	assert.Empty(t, w.Body.String(), "a failed render must leave the response body untouched")
 	assert.NotContains(t, w.Body.String(), "test_code", "the authorization code must not reach a half-written page")
@@ -3099,7 +3099,7 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 
 				err := issueAuthCode(w, r, templateFS, code, "form_post")
 
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.want, w.Body.String())
 			})
 		}
@@ -3129,7 +3129,7 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 					testRedirectError("access_denied", "Access denied", "form_post",
 						"https://example.com/callback", tc.state, "code"))
 
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.want, w.Body.String())
 			})
 		}
@@ -3167,7 +3167,7 @@ func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
 
 				err := issueAuthCode(w, r, web.TemplateFS(), code, "form_post")
 
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				body := w.Body.String()
 				// The code input is asserted in every row so that a template failing to render at
 				// all cannot pass the absent-state row for the wrong reason.
@@ -3202,7 +3202,7 @@ func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
 					testRedirectError("access_denied", "Access denied", "form_post",
 						"https://example.com/callback", tc.state, "code"))
 
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				body := w.Body.String()
 				assert.Contains(t, body, `<input type="hidden" name="error" value="access_denied" />`)
 				if tc.wantState {
@@ -3316,7 +3316,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -3401,7 +3401,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -3479,7 +3479,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -3549,7 +3549,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
@@ -3690,7 +3690,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 

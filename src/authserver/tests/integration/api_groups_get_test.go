@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIGroupsGet tests the GET /api/v1/admin/groups endpoint
@@ -27,7 +28,7 @@ func TestAPIGroupsGet_Success(t *testing.T) {
 		IncludeInAccessToken: false,
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup1.Id)
 	}()
@@ -39,7 +40,7 @@ func TestAPIGroupsGet_Success(t *testing.T) {
 		IncludeInAccessToken: true,
 	}
 	err = database.CreateGroup(context.Background(), nil, testGroup2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup2.Id)
 	}()
@@ -56,7 +57,7 @@ func TestAPIGroupsGet_Success(t *testing.T) {
 	// Parse response
 	var getResponse api.GetGroupsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Should include our test groups (may include others from database)
 	assert.GreaterOrEqual(t, len(getResponse.Groups), 2)
@@ -109,13 +110,13 @@ func TestAPIGroupsGet_EmptyGroups(t *testing.T) {
 
 	// Debug: Read raw response body first
 	body, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	t.Logf("Raw response body: %s", string(body))
 
 	// Parse response
 	var getResponse api.GetGroupsResponse
 	err = json.Unmarshal(body, &getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Debug: Print the response to see what we're getting
 	t.Logf("Response Groups: %+v", getResponse.Groups)
@@ -125,7 +126,7 @@ func TestAPIGroupsGet_EmptyGroups(t *testing.T) {
 	// Let's also test manual JSON unmarshaling
 	var testResp map[string]interface{}
 	err = json.Unmarshal(body, &testResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	t.Logf("Raw map parsing - groups value: %+v", testResp["groups"])
 	t.Logf("Raw map parsing - groups type: %T", testResp["groups"])
 
@@ -137,11 +138,11 @@ func TestAPIGroupsGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -170,7 +171,7 @@ func TestAPIGroupsGet_EnhancedResponseStructure(t *testing.T) {
 		IncludeInAccessToken: true,
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
@@ -187,7 +188,7 @@ func TestAPIGroupsGet_EnhancedResponseStructure(t *testing.T) {
 	// Parse response
 	var getResponse api.GetGroupsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Find our test group
 	var foundGroup *api.GroupResponse
@@ -202,7 +203,7 @@ func TestAPIGroupsGet_EnhancedResponseStructure(t *testing.T) {
 	assert.NotNil(t, foundGroup, "Enhanced test group should be found")
 
 	// Assert: All enhanced fields should be present and properly typed
-	assert.Greater(t, foundGroup.Id, int64(0), "Id should be a positive integer")
+	assert.Positive(t, foundGroup.Id, "Id should be a positive integer")
 	assert.Equal(t, "enhanced-test-group", foundGroup.GroupIdentifier)
 	assert.Equal(t, "Enhanced Test Group", foundGroup.Description)
 	assert.True(t, foundGroup.IncludeInIdToken, "IncludeInIdToken should be true")
@@ -250,7 +251,7 @@ func TestAPIGroupsGet_MixedTokenInclusion(t *testing.T) {
 			IncludeInAccessToken: tc.includeInAccessToken,
 		}
 		err := database.CreateGroup(context.Background(), nil, group)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		createdGroups = append(createdGroups, group)
 	}
 
@@ -272,7 +273,7 @@ func TestAPIGroupsGet_MixedTokenInclusion(t *testing.T) {
 	// Parse response
 	var getResponse api.GetGroupsResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify each test group has correct token inclusion settings
 	groupMap := make(map[string]api.GroupResponse)
@@ -310,7 +311,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser1.Id)
 	}()
@@ -324,7 +325,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 		EmailVerified: true,
 	}
 	err = database.CreateUser(context.Background(), nil, testUser2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser2.Id)
 	}()
@@ -335,7 +336,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 		GroupId: testGroup.Id,
 	}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUserGroup(context.Background(), nil, userGroup1.Id)
 	}()
@@ -345,7 +346,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 		GroupId: testGroup.Id,
 	}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUserGroup(context.Background(), nil, userGroup2.Id)
 	}()
@@ -361,7 +362,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	// Parse response
 	var getResponse api.GetGroupsResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Find our test group
 	var foundGroup *api.GroupResponse
@@ -378,7 +379,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 
 	// Test: Remove one member and verify count decreases
 	err = database.DeleteUserGroup(context.Background(), nil, userGroup2.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test: Get groups again to verify member count updated
 	resp2 := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -388,7 +389,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 
 	var getResponse2 api.GetGroupsResponse
 	err = json.NewDecoder(resp2.Body).Decode(&getResponse2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Find our test group again
 	var foundGroup2 *api.GroupResponse

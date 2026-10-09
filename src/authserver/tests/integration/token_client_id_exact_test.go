@@ -27,7 +27,7 @@ func createClientForClientIdComparison(t *testing.T) *record.Client {
 		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	return client
 }
 

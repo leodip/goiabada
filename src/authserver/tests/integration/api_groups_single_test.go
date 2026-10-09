@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIGroupGet tests the GET /api/v1/admin/groups/{id} endpoint
@@ -36,7 +37,7 @@ func TestAPIGroupGet_Success(t *testing.T) {
 	// Parse response
 	var getResponse api.GetGroupResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Assert: Group data should match
 	assert.Equal(t, testGroup.Id, getResponse.Group.Id)
@@ -97,11 +98,11 @@ func TestAPIGroupGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	req, err := http.NewRequest("GET", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should be unauthorized
@@ -128,7 +129,7 @@ func TestAPIGroupGet_MemberCountAccuracy(t *testing.T) {
 		EmailVerified: true,
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
@@ -143,7 +144,7 @@ func TestAPIGroupGet_MemberCountAccuracy(t *testing.T) {
 
 	var getResponse api.GetGroupResponse
 	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, 0, getResponse.Group.MemberCount, "Group should have 0 members initially")
 
@@ -153,7 +154,7 @@ func TestAPIGroupGet_MemberCountAccuracy(t *testing.T) {
 		GroupId: testGroup.Id,
 	}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
 	}()
@@ -167,7 +168,7 @@ func TestAPIGroupGet_MemberCountAccuracy(t *testing.T) {
 
 	var getResponse2 api.GetGroupResponse
 	err = json.NewDecoder(resp2.Body).Decode(&getResponse2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, 1, getResponse2.Group.MemberCount, "Group should have 1 member after adding user")
 }

@@ -65,14 +65,14 @@ func TestAPIAccountEmailPut_Success(t *testing.T) {
 
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, u.Id, updateResp.User.Id)
 	assert.Equal(t, newEmail, updateResp.User.Email)
 	assert.False(t, updateResp.User.EmailVerified)
 
 	// Verify persisted changes
 	updatedUser, err := database.GetUserById(context.Background(), nil, u.Id)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, newEmail, updatedUser.Email)
 	assert.False(t, updatedUser.EmailVerified)
@@ -117,7 +117,7 @@ func TestAPIAccountEmailPut_EmailAlreadyExists(t *testing.T) {
 	otherEmail := "existing_" + strings.ToLower(fake.LetterN(6)) + "@example.com"
 	otherUser := &record.User{Email: otherEmail, Enabled: true, Subject: fake.UUID()}
 	err := database.CreateUser(context.Background(), nil, otherUser)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = database.DeleteUser(context.Background(), nil, otherUser.Id) }()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
@@ -135,10 +135,10 @@ func TestAPIAccountEmailPut_UnauthorizedAndScope(t *testing.T) {
 
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	body1, _ := io.ReadAll(resp.Body)
@@ -160,12 +160,12 @@ func TestAPIAccountEmailPut_InvalidRequestBody(t *testing.T) {
 
 	// Invalid JSON (no body)
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse

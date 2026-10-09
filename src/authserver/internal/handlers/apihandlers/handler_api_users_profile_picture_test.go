@@ -51,7 +51,7 @@ func TestHandleUserProfilePictureGet_NoUserId(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
@@ -70,7 +70,7 @@ func TestHandleUserProfilePictureGet_InvalidUserId(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
@@ -91,7 +91,7 @@ func TestHandleUserProfilePictureGet_UserNotFound(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "NOT_FOUND", response["error_code"])
 
 	database.AssertExpectations(t)
@@ -160,7 +160,7 @@ func TestHandleUserProfilePicturePost_NoUserId(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
@@ -180,7 +180,7 @@ func TestHandleUserProfilePicturePost_InvalidUserId(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
@@ -192,7 +192,7 @@ func TestHandleUserProfilePicturePost_UserNotFound(t *testing.T) {
 
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/users/123/profile-picture", "picture", pictureData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
@@ -204,7 +204,7 @@ func TestHandleUserProfilePicturePost_UserNotFound(t *testing.T) {
 
 	var response map[string]interface{}
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "NOT_FOUND", response["error_code"])
 
 	database.AssertExpectations(t)
@@ -221,7 +221,7 @@ func TestHandleUserProfilePicturePost_InvalidImage(t *testing.T) {
 
 	invalidImageData := []byte("not a valid image")
 	req, err := createMultipartRequest("POST", "/api/v1/admin/users/123/profile-picture", "picture", invalidImageData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
@@ -233,7 +233,7 @@ func TestHandleUserProfilePicturePost_InvalidImage(t *testing.T) {
 
 	var response map[string]interface{}
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// The catalog key and its English sentence, through writeValidationError, as every other
 	// validator on this API answers (#435).
 	assert.Equal(t, "validator.image.unsupported_type", response["error_code"])
@@ -282,7 +282,7 @@ func TestHandleUserProfilePicturePost_CreateNew(t *testing.T) {
 
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/users/123/profile-picture", "picture", pictureData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req = setChiURLParam(req, "id", "123")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
@@ -325,7 +325,7 @@ func TestHandleUserProfilePicturePost_UpdateExisting(t *testing.T) {
 
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/users/123/profile-picture", "picture", pictureData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req = setChiURLParam(req, "id", "123")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
@@ -365,7 +365,7 @@ func TestHandleUserProfilePictureDelete_NoUserId(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
@@ -385,7 +385,7 @@ func TestHandleUserProfilePictureDelete_InvalidUserId(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
@@ -407,7 +407,7 @@ func TestHandleUserProfilePictureDelete_UserNotFound(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "NOT_FOUND", response["error_code"])
 
 	database.AssertExpectations(t)
@@ -469,7 +469,7 @@ func TestHandleUserProfilePictureDelete_DatabaseError(t *testing.T) {
 
 	var response map[string]interface{}
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", response["error_code"])
 
 	database.AssertExpectations(t)

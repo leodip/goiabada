@@ -193,8 +193,10 @@ func TestHandleIndexGet_ReadsTheSignedInAdministratorFromTheTokenSet(t *testing.
 
 	anonymous := serve()
 	assert.Equal(t, false, anonymous["IsAuthenticated"])
-	assert.Equal(t, "", anonymous["LoggedInUser"])
-	assert.Equal(t, "", anonymous["LogoutLink"])
+	assert.Contains(t, anonymous, "LoggedInUser")
+	assert.Empty(t, anonymous["LoggedInUser"])
+	assert.Contains(t, anonymous, "LogoutLink")
+	assert.Empty(t, anonymous["LogoutLink"])
 
 	// The page links to the auth server's public base URL it was built with, signed in or not.
 	for name, bind := range map[string]map[string]interface{}{"signed in": signedIn, "anonymous": anonymous} {

@@ -3,7 +3,6 @@ package datatests
 import (
 	"bytes"
 	"context"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -154,7 +153,7 @@ func TestMigrationLock_MigrateToInterruptedAtThePreCreateLeavesTheDatabaseUnchan
 			migrationLockHoldBudget, stdout.String(), stderr.String())
 	}
 	var exitErr *exec.ExitError
-	require.Truef(t, errors.As(err, &exitErr), "migrate must exit non-zero on a stop: %v\nstdout: %s\nstderr: %s",
+	require.ErrorAsf(t, err, &exitErr, "migrate must exit non-zero on a stop: %v\nstdout: %s\nstderr: %s",
 		err, stdout.String(), stderr.String())
 	assert.Equalf(t, 1, exitErr.ExitCode(), "the target was not reached, so the stop exits 1\nstderr: %s", stderr.String())
 	assert.Equalf(t, "stopped by a signal before any migration ran: the database is unchanged\n", stdout.String(),

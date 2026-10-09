@@ -38,7 +38,7 @@ func TestAPIClientTokensPut_Success(t *testing.T) {
 
 	var updateResp api.UpdateClientResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, req.TokenExpirationInSeconds, updateResp.Client.TokenExpirationInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineIdleTimeoutInSeconds, updateResp.Client.RefreshTokenOfflineIdleTimeoutInSeconds)
@@ -47,7 +47,7 @@ func TestAPIClientTokensPut_Success(t *testing.T) {
 	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIdToken, updateResp.Client.IncludeOpenIDConnectClaimsInIdToken)
 
 	refreshed, err2 := database.GetClientById(context.Background(), nil, client.Id)
-	assert.NoError(t, err2)
+	require.NoError(t, err2)
 	assert.NotNil(t, refreshed)
 	assert.Equal(t, req.TokenExpirationInSeconds, refreshed.TokenExpirationInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineIdleTimeoutInSeconds, refreshed.RefreshTokenOfflineIdleTimeoutInSeconds)
@@ -135,7 +135,7 @@ func TestAPIClientTokensPut_SystemLevelClientAllowed(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var listResp api.GetClientsResponse
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var sysId int64
 	for _, c := range listResp.Clients {
@@ -185,12 +185,12 @@ func TestAPIClientTokensPut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 
 	// Invalid body (nil/empty)
 	req, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var body map[string]interface{}
@@ -202,9 +202,9 @@ func TestAPIClientTokensPut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 
 	// Unauthorized (no Authorization header)
 	req2, err := http.NewRequest("PUT", url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	resp2, err := httpClient.Do(req2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }

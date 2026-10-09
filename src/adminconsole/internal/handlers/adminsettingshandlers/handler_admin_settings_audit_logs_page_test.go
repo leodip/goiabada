@@ -206,7 +206,7 @@ func TestHandleAuditLogViewerGet_TheEventFilterSurvivesTheSecondQuery(t *testing
 
 	HandleAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
-	require.Equal(t, 2, len(apiClient.asked), "the clamp should have cost a second query")
+	require.Len(t, apiClient.asked, 2, "the clamp should have cost a second query")
 	assert.Equal(t, []string{"UserAuthSuccess", "UserAuthSuccess"}, apiClient.events,
 		"the event filter was dropped on the way")
 }
@@ -336,7 +336,7 @@ func TestHandleAuditLogViewerGet_TheRequestIdFilterReachesTheApiAndThePage(t *te
 func TestHandleAuditLogViewerGet_TheRequestIdFilterSurvivesTheSecondQuery(t *testing.T) {
 	_, apiClient := renderAuditLogsWithQuery(t, "page=99&auditEvent=user_login&requestId=an-id", 50)
 
-	require.Equal(t, 2, len(apiClient.asked), "the clamp should have cost a second query")
+	require.Len(t, apiClient.asked, 2, "the clamp should have cost a second query")
 	assert.Equal(t, []string{"an-id", "an-id"}, apiClient.requestIds,
 		"the request id filter was dropped on the way")
 	assert.Equal(t, []string{"user_login", "user_login"}, apiClient.events,

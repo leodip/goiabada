@@ -68,7 +68,7 @@ func TestLoadSigningKey(t *testing.T) {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)
 				if tc.readErr != nil {
-					assert.ErrorIs(t, err, tc.readErr)
+					require.ErrorIs(t, err, tc.readErr)
 				}
 				assert.Nil(t, privKey)
 				assert.Empty(t, keyIdentifier, "no identifier is handed out beside a key that failed")
