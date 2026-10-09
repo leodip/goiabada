@@ -26,7 +26,9 @@ jobs:
   build-and-push:
     name: Docs
     runs-on: ubuntu-latest
-    # Mandatory: the Docker credentials exist only in this environment.
+    # The push credentials, DOCKER_USERNAME and DOCKER_PASSWORD, exist only in this environment,
+    # which admits main and v* tags alone, and GitHub exposes environment secrets only to jobs
+    # that declare it. The Check workflow pulls with a separate read-only token.
     environment: prod
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
