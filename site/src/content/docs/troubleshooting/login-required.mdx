@@ -26,8 +26,8 @@ Your app sent an authorization request, usually with `prompt=none` to check for 
 It's surprising when you expected a session. The common reasons:
 
 - **The session timed out.** A session ends after 2 hours without activity, or 24 hours after sign-in, unless an administrator changed **User session - idle timeout in seconds** or **User session - max lifetime in seconds** under **Admin**, **Sessions**.
-- **The session was ended,** by the user signing out, by an administrator, by another user signing in on the same browser, or because the user's password was changed or reset.
-- **The browser didn't send the session cookie.** The auth server's session cookie is `SameSite=Lax`. A silent request in a hidden iframe is a cross-site request when your app runs on another site, and a browser blocking third-party cookies won't send it.
+- **The session was ended,** by the user signing out, by an administrator, by another user signing in on the same browser, because the user's password was changed or reset, or because the user was disabled.
+- **The browser didn't send the session cookie.** The auth server's session cookie is `SameSite=Lax`, so a browser never sends it to a hidden iframe on a page of another site, whatever its third-party cookie setting. A silent request in an iframe works only when your app and the auth server are on the same site, such as `app.example.com` and `auth.example.com`.
 - **The hint names another user.** Your app sent the `id_token_hint` of a user who has since signed out, and someone else signed in on that browser.
 
 ## Fix it
@@ -36,7 +36,7 @@ Treat `login_required` as "show the user a sign-in": send the same authorization
 
 For the hint mismatch, drop the `id_token_hint` of the previous user, or sign that user out of your app first.
 
-If silent requests fail in an iframe on every browser that blocks third-party cookies, don't rely on them there. Use a refresh token to keep the user signed in to your app, or redirect the whole page with `prompt=none` rather than using an iframe.
+If your app is on another site than the auth server, silent requests in an iframe never carry the session, so don't rely on them. Use a refresh token to keep the user signed in to your app, or redirect the whole page with `prompt=none` rather than using an iframe.
 
 ## What `prompt=none` checks
 
@@ -48,7 +48,7 @@ With `prompt=none`, the auth server runs every check it would otherwise show the
 | `interaction_required` | "Additional authentication setup required" | set up two-factor authentication, which `urn:goiabada:level2_mandatory` requires. |
 | `interaction_required` | "Authentication configuration has changed" | enter their code again, since their two-factor authentication changed. |
 | `consent_required` | "User consent is required" or "Additional consent is required" | approve the scopes on the consent screen. |
-| `access_denied` | "The user account is disabled" | nothing: an administrator disabled the user. |
+| `access_denied` | "The user account is disabled" | nothing: an administrator disabled the user. Disabling a user also ends their sessions, so this request usually gets `login_required` instead. |
 | `access_denied` | "The user is not authorized to access any of the requested scopes" | nothing: the user holds none of the permissions asked for. |
 
 An `id_token_hint` without `prompt=none` changes what the user sees, not the result: a browser signed in as another user is asked to sign in again, and if the person who signs in isn't the hint's user, the request ends in `login_required` too.

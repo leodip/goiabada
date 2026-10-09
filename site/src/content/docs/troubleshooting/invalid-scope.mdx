@@ -47,6 +47,8 @@ A scope is either an OpenID Connect scope, `openid`, `profile`, `email`, `addres
 
 When a client signs a user in, the token carries only the permissions the user holds, directly or through a group. A permission the user lacks is **left out of the token without an error**, and the `scope` in the token response says what was granted. Only when nothing is left does the auth server refuse with `access_denied` and "The user is not authorized to access any of the requested scopes".
 
+The [password grant](/legacy-flows/ropc/) is the exception: it refuses a permission the user lacks with `invalid_scope` and "The user does not have permission for scope '...'.", rather than leave it out.
+
 **Fix it:** grant the user the permission, or add them to a group that has it, and have your app send a new authorization request. The scope is decided during the sign-in, and a refresh keeps it.
 
 ### A refresh asked for more

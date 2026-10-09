@@ -26,7 +26,7 @@ So the usual causes are:
 - **The issuer doesn't match:** the ClusterIssuer isn't named `letsencrypt-prod`, isn't ready, or its solver's `parentRefs` names another Gateway or namespace than the one you deployed into.
 - **DNS doesn't point at the Gateway yet,** so Let's Encrypt fetches the token from somewhere else.
 - **Port 80 doesn't reach Envoy:** a firewall or security group in front of the load balancer, or the `Local` traffic policy with nodes that have no Envoy pod.
-- **The solver pod is refused,** because the namespace enforces the `restricted` Pod Security standard. The generated namespace only warns, but if you added `pod-security.kubernetes.io/enforce: restricted`, cert-manager's solver pods are refused there.
+- **The solver pod is refused,** because the namespace enforces the `restricted` Pod Security standard and the pod doesn't meet it. The generated namespace only warns, and cert-manager's own solver pod meets `restricted`, but a `podTemplate` in the ClusterIssuer's solver that sets its own security context, or cert-manager run with `--acme-http01-solver-run-as-non-root=false`, can break that. `kubectl get events -n goiabada` shows a refused pod.
 
 ## Fix it
 
@@ -64,21 +64,21 @@ So the usual causes are:
 
    If your load balancer still can't reach Envoy, switch to the `Cluster` traffic policy, whose `gatewayclass.yaml` has no `envoyDaemonSet`. Goiabada then sees a node's address for every client. If your `eg` GatewayClass has no `parametersRef` to the EnvoyProxy at all, apply the `gatewayclass.yaml` for your traffic policy from [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/#set-it-up).
 
-5. Once the cause is fixed, delete the failed challenges so cert-manager tries again:
+5. Once the cause is fixed, a challenge still pending passes at cert-manager's next check. One Let's Encrypt has already refused ends that attempt, and cert-manager waits before the next one, an hour after the first failure and longer after each later one. To try again at once, renew with [cmctl](https://cert-manager.io/docs/reference/cmctl/), cert-manager's command-line tool:
 
    ```bash
-   kubectl delete challenges -n goiabada --all
+   cmctl renew --namespace goiabada --all
    ```
 
 </Steps>
 
 <Aside type="caution">
-Let's Encrypt limits how many failed validations it accepts for one host name in an hour. Fix the cause before you retry, rather than deleting challenges in a loop.
+Let's Encrypt limits how many failed validations it accepts for one host name in an hour. Fix the cause before you retry, rather than renewing in a loop.
 </Aside>
 
 ## How the certificates are served and renewed
 
-The Gateway terminates TLS for both host names, with the certificate in each listener's Secret. Goiabada's own HTTPRoutes attach only to the two HTTPS listeners, so the `http` listener on port 80 carries nothing but cert-manager's challenges. cert-manager renews each certificate before it expires the same way, so port 80 has to stay reachable after the first issue too.
+The Gateway terminates TLS for both host names, with the certificate in each listener's Secret. On the `http` listener on port 80, Goiabada's one HTTPRoute, `goiabada-https-redirect`, answers every request with a `301` to HTTPS. cert-manager's challenge route matches the exact path `/.well-known/acme-challenge/<token>`, which takes precedence over it, so the challenges still reach the solver. cert-manager renews each certificate before it expires the same way, so port 80 has to stay reachable after the first issue too.
 
 ## Next steps
 

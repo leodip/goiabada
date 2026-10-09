@@ -56,14 +56,14 @@ Fix it in one of these ways:
 
 ## How redirect URIs are checked
 
-The checks run in this order, before anything else in the request, and each failure shows the page:
+The checks run in this order, and each failure shows the page:
 
 1. `client_id` is missing, names no client, names a disabled client, or names a client without the authorization code flow.
 2. `redirect_uri` is missing.
 3. `redirect_uri` isn't absolute: it has no scheme, has a fragment, has a malformed percent-escape, or is `http` or `https` with no host.
 4. `redirect_uri` isn't registered on the client.
 
-These pages answer `200`, not an error status.
+These pages answer `200`, not an error status. Two checks come before them and answer `400` on the same page: a request the auth server can't read, and `client_id`, `redirect_uri`, `response_type` or `response_mode` sent twice.
 
 **Loopback addresses are the one exception to the exact match.** When a registered redirect URI is `http` on `127.0.0.1`, `[::1]` or `localhost`, the port may differ, for `response_type=code` only. See [loopback redirect URIs](/concepts/clients/#loopback-redirect-uris).
 
