@@ -17,14 +17,14 @@ A client is any application that asks the auth server for tokens: a web app your
 
 2. Enter a **Client identifier**. It's the `client_id` your app will send, such as `my-web-app`.
 
-3. Turn on the flows your app uses:
+3. Turn on the flows your app uses, and turn off the ones it doesn't. **Authorization code flow with PKCE** starts on:
 
    - **Authorization code flow with PKCE** if users sign in to your app.
    - **Client credentials flow** if your app is a service that calls an API on its own behalf.
 
 4. Click **Create**. You're back on the list of clients. Click **Manage** next to your new client.
 
-5. If your app runs in a browser or on a phone, open **Authentication**, choose **Public client** and click **Save**. Otherwise, copy the **Client secret** from there and keep it on your server.
+5. If your app runs in a browser or on a phone, open **Authentication**, choose **Public client**, click **Save**, and confirm with **Yes**. Otherwise, copy the **Client secret** from there and keep it on your server.
 
 6. If users sign in to your app, open **Redirect URIs** and add the address your app receives the authorization code at, such as `https://app.example.com/callback`.
 
