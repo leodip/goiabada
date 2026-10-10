@@ -155,7 +155,7 @@ An email is written in its recipient's language: the **Locale** on their profile
 
 The text of every page, message and email subject is in two built-in catalogs, English, which is complete, and Portuguese (Brazil). A key with no text in the chosen language shows in English.
 
-`GOIABADA_I18N_OVERRIDES_DIR` names a folder whose `catalogs` subfolder holds `active.<language>.toml` files. Nothing else in the folder is read. Each file is merged over the built-in catalog of its language, key by key, and the file wins. A value left empty removes the built-in text, so the key shows in English. Every value is a plain string: a `[table]` section stops the server at start.
+`GOIABADA_I18N_OVERRIDES_DIR` names a folder whose `catalogs` subfolder holds `active.<language>.toml` files. Nothing else in the folder is read: files put in the folder itself are ignored, and the server logs `override directory has no catalogs subdirectory, skipping it` when it starts. Each file is merged over the built-in catalog of its language, key by key, and the file wins. A value left empty removes the built-in text, so the key shows in English. Every value is a plain string: a `[table]` section stops the server at start.
 
 The names of countries and phone country codes, and the country in each time zone's label, come from Unicode's CLDR data, in the page's language, and each language on the **Locale** list is named in itself and in English, so none of them needs translating.
 
