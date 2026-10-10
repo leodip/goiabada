@@ -139,7 +139,7 @@ func (s *Server) Start(ctx context.Context) error {
 		"port", httpPort)
 
 	if httpEnabled && !httpsEnabled {
-		logHttpWithoutTlsWarning()
+		logPlainHTTP(s.cfg.AdminConsole.BaseURL, s.cfg.AdminConsole.TrustProxyHeaders)
 	}
 
 	// The metrics listener is enabled by its own setting rather than by a host and port, since its
@@ -597,11 +597,18 @@ func (s *Server) serveStaticFiles() {
 	})
 }
 
-// logHttpWithoutTlsWarning reports a deployment listening on HTTP with no HTTPS
-// listener configured. The auth server's copy is the same record about the other
-// server, and the two cannot be shared: each names the server it is about, and
-// neither module imports the other (#320 decision 6).
-func logHttpWithoutTlsWarning() {
+// logPlainHTTP reports a deployment listening on HTTP with no HTTPS listener. Behind a proxy
+// that says so, an https base URL with the forwarded headers trusted, as every configuration the
+// setup wizard writes for a proxy sets, that is the deployment working as intended, and the record
+// is Info: as a Warn it greeted every healthy install behind a proxy with a warning (#542).
+// Otherwise nothing says a proxy ends TLS in front of the server, and it stays the Warn #320
+// decision 6 collapsed from an eleven-line banner. The other server's copy is the same records
+// about itself: each names the server it is about, and neither module imports the other.
+func logPlainHTTP(baseURL string, trustProxyHeaders bool) {
+	if trustProxyHeaders && strings.HasPrefix(strings.ToLower(baseURL), "https://") {
+		slog.Info("the admin console is listening on HTTP behind a reverse proxy that terminates HTTPS")
+		return
+	}
 	slog.Warn("the admin console is listening on HTTP with no TLS, which is insecure outside development unless a reverse proxy in front of it terminates HTTPS",
 		"remedy", "configure the HTTPS listener, or make sure the reverse proxy handles HTTPS")
 }

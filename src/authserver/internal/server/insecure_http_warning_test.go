@@ -17,10 +17,10 @@ import (
 //
 // The condition that reaches it is Start's, and is not under test here: Start binds listeners and
 // blocks. What is under test is the record an operator reads when it fires.
-func TestLogHttpWithoutTlsWarning_IsOneWarnNamingTheServerAndTheRemedy(t *testing.T) {
+func TestLogPlainHTTP_IsOneWarnNamingTheServerAndTheRemedy(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 
-	logHttpWithoutTlsWarning()
+	logPlainHTTP("http://localhost:9090", false)
 
 	records := logs.Records()
 	require.Len(t, records, 1, "one record for one condition, where the banner wrote eleven")
@@ -33,4 +33,31 @@ func TestLogHttpWithoutTlsWarning_IsOneWarnNamingTheServerAndTheRemedy(t *testin
 		"and what the condition is, since the message is what gets grepped for")
 	assert.Contains(t, records[0].Attrs["remedy"], "HTTPS",
 		"the remedy is the reader's next action, so it is an attribute rather than eight lines of prose")
+}
+
+// Behind a proxy that says it ends TLS, an https base URL with the forwarded headers trusted, as the
+// setup wizard writes for every proxy, plain HTTP is the deployment working as intended: one Info
+// record and no remedy, where a Warn greeted every healthy install (#542). Either half alone is no
+// such statement, and keeps the Warn.
+func TestLogPlainHTTP_IsInfoBehindAProxyThatEndsTLS(t *testing.T) {
+	for _, tc := range []struct {
+		baseURL string
+		trusted bool
+		level   slog.Level
+	}{
+		{"https://auth.example.com", true, slog.LevelInfo},
+		{"HTTPS://auth.example.com", true, slog.LevelInfo},
+		{"https://auth.example.com", false, slog.LevelWarn},
+		{"http://auth.example.com", true, slog.LevelWarn},
+	} {
+		logs := logtest.CaptureSlog(t)
+		logPlainHTTP(tc.baseURL, tc.trusted)
+		records := logs.Records()
+		require.Len(t, records, 1, "%s, trusted %v", tc.baseURL, tc.trusted)
+		assert.Equal(t, tc.level, records[0].Level, "%s, trusted %v", tc.baseURL, tc.trusted)
+		assert.Contains(t, records[0].Message, "auth server")
+		if tc.level == slog.LevelInfo {
+			assert.NotContains(t, records[0].Attrs, "remedy", "nothing is wrong, so there is nothing to remedy")
+		}
+	}
 }
