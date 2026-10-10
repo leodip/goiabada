@@ -145,6 +145,11 @@ func printKubernetesInstructions(out *console, config *Config, paths outputPaths
 	out.println("  4. Deploy Goiabada, the Secrets first, so no pod starts with an older copy of them:")
 	out.printf("     %s%s%s\n", out.cyan, kubernetesApplyCommand(paths), out.reset)
 	out.println()
+	out.printf("     %sFor a deployment that already runs, apply only %s.%s %s holds\n", out.bold, filepath.Base(paths.description), out.reset, filepath.Base(paths.secrets))
+	out.println("     newly generated secrets, which its database wasn't set up with: a pod reads its")
+	out.println("     Secrets only when it starts, so nothing changes until the next restart, and then")
+	out.println("     the auth server refuses to start.")
+	out.println()
 	out.println("  5. Point DNS at the Gateway. Read its address, which can take a minute to appear:")
 	out.printf("     %skubectl get gateway goiabada -n %s -o jsonpath='{.status.addresses[0].value}'%s\n", out.cyan, config.K8sNamespace, out.reset)
 	out.println("     Then create a record for each host name, an A record when the address is an IP")
@@ -293,8 +298,9 @@ func printMetricsNotes(out *console, config *Config) {
 func printEnvoyProxyPrerequisite(out *console, policy trafficPolicy) {
 	if policy == trafficPolicyLocal {
 		out.println("  2. The GatewayClass the manifest names, with externalTrafficPolicy: Local and Envoy")
-		out.println("     on every node as a DaemonSet, so Goiabada sees each client's address and no node")
-		out.println("     drops the load balancer's traffic (save as gatewayclass.yaml):")
+		out.println("     on every node as a DaemonSet, so no node drops the load balancer's traffic and,")
+		out.println("     behind a load balancer that passes connections through, Goiabada sees each client's")
+		out.println("     address (save as gatewayclass.yaml):")
 	} else {
 		out.println("  2. The GatewayClass the manifest names, with externalTrafficPolicy: Cluster")
 		out.println("     for better compatibility (save as gatewayclass.yaml):")

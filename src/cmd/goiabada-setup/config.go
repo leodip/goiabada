@@ -98,7 +98,7 @@ func (c *Config) rateLimiterComment() []string {
 		lines = append(lines,
 			"Under the gateway's Local traffic policy the per-IP limits count each client alone when",
 			"the load balancer passes connections through; one that proxies them shows every client",
-			"with its own address, and they count every client together.",
+			"with the load balancer's address, and they count every client together.",
 			"With it on, the auth server logs a warning at every start that it trusts one proxy hop",
 			"with no list; behind Envoy alone, that is expected.")
 	case c.Deployment.behindProxy:

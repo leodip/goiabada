@@ -45,6 +45,14 @@ func (p outputPaths) separate() bool {
 	return p.description != p.secrets
 }
 
+// files are the files a run writes, each once.
+func (p outputPaths) files() []string {
+	if p.separate() {
+		return []string{p.description, p.secrets}
+	}
+	return []string{p.description}
+}
+
 // defaultPaths are the deployment's files under their default names, in no directory.
 func (d *deployment) defaultPaths() outputPaths {
 	if d.secretsFile == "" {

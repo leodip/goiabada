@@ -367,6 +367,8 @@ func generateKubernetesSecrets(config *Config, paths outputPaths) string {
 	fmt.Fprintf(&sb, "# The Secrets %s reads. Apply it before the manifest, so no pod starts with an\n", filepath.Base(paths.description))
 	sb.WriteString("# older copy of them; it creates the namespace too:\n")
 	fmt.Fprintf(&sb, "#   %s\n", kubernetesApplyCommand(paths))
+	sb.WriteString("# Only for a new deployment: these are newly generated secrets, and applied over one that\n")
+	sb.WriteString("# already runs they replace the keys its database was set up with.\n")
 	sb.WriteString("# base64 is an encoding, not encryption: anyone who can read this file reads every secret.\n")
 	sb.WriteString("# Keep it out of version control, readable by its owner alone.\n")
 	sb.WriteString("\n")
