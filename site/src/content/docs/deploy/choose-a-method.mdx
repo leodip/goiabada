@@ -9,13 +9,13 @@ This page helps you pick how to run Goiabada in production.
 
 Most people want **Cloudflare Tunnel**: no open port, no certificate to renew and no Nginx. Already run Nginx, or don't use Cloudflare? Pick by what you have:
 
-| Method | TLS | Exposed to the internet | Effort | Setup wizard | Database | Suits |
-|---|---|---|---|---|---|---|
-| [Cloudflare Tunnel](/deploy/cloudflare-tunnel/) | Cloudflare's certificates | Nothing: `cloudflared` connects out | Least | Production with reverse proxy | MySQL, PostgreSQL, SQL Server or SQLite, in the Compose file | One server, with your domain on Cloudflare |
-| [Cloudflare + Nginx](/deploy/cloudflare-nginx/) | Cloudflare's, and Let's Encrypt's on Nginx | Ports 80 and 443 | Some | Production with reverse proxy | The same | A server already running Nginx, with your domain on Cloudflare |
-| [Reverse proxy](/deploy/reverse-proxy/) | Let's Encrypt's on Nginx | Ports 80 and 443 | Some | Production with reverse proxy | The same | One server, without Cloudflare |
-| [Kubernetes](/deploy/kubernetes/overview/) | cert-manager's, on the Gateway | The Gateway's load balancer | Most | Kubernetes cluster | MySQL, PostgreSQL or SQL Server, run by you | Several replicas, on a cluster you already run |
-| [Native binaries](/deploy/native-binaries/) | Your reverse proxy's, or each server's own | Your proxy's ports, or each server's | Some | Native binaries | MySQL, PostgreSQL or SQL Server run by you, or SQLite | A server without Docker |
+| Method | TLS | Exposed to the internet | Setup wizard | Database | Suits |
+|---|---|---|---|---|---|
+| [Cloudflare Tunnel](/deploy/cloudflare-tunnel/)<br/>Least effort | Cloudflare's certificates | Nothing: `cloudflared` connects out | Production with reverse proxy | MySQL, PostgreSQL, SQL Server or SQLite, in the Compose file | One server, with your domain on Cloudflare |
+| [Cloudflare + Nginx](/deploy/cloudflare-nginx/)<br/>Some effort | Cloudflare's, and Let's Encrypt's on Nginx | Ports 80 and 443 | Production with reverse proxy | The same | A server already running Nginx, with your domain on Cloudflare |
+| [Reverse proxy](/deploy/reverse-proxy/)<br/>Some effort | Let's Encrypt's on Nginx | Ports 80 and 443 | Production with reverse proxy | The same | One server, without Cloudflare |
+| [Kubernetes](/deploy/kubernetes/overview/)<br/>Most effort | cert-manager's, on the Gateway | The Gateway's load balancer | Kubernetes cluster | MySQL, PostgreSQL or SQL Server, run by you | Several replicas, on a cluster you already run |
+| [Native binaries](/deploy/native-binaries/)<br/>Some effort | Your reverse proxy's, or each server's own | Your proxy's ports, or each server's | Native binaries | MySQL, PostgreSQL or SQL Server run by you, or SQLite | A server without Docker |
 
 The first three run the [Docker Compose](/deploy/docker-compose/) files the setup wizard writes, and differ only in what sits in front of them.
 

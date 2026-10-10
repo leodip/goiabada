@@ -25,32 +25,32 @@ You rarely need to start from scratch: the [setup wizard](/deploy/setup-wizard/)
 
 The auth server reads these when it starts on an empty database, to create the first administrator and the admin console's client. See [the first start](#the-first-start).
 
-| Variable | Flag | Default | Read by | What it does |
-|---|---|---|---|---|
-| `GOIABADA_ADMIN_EMAIL` | `--admin-email` | `admin@example.com` | auth server | The first administrator's email address. |
-| `GOIABADA_ADMIN_PASSWORD` | `--admin-password` | empty | auth server | The first administrator's password. **Required on the first start**: at least 15 characters, at most 72 bytes, and never `changeme`. |
-| `GOIABADA_APPNAME` | `--appname` | `Goiabada` | auth server | The name the UI shows. Change it later under **Admin**, **General** in the admin console. |
-| `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` | `--adminconsole-oauth-client-secret` | empty | both | The admin console's client secret. The admin console needs it to call the auth server's API, and refuses to start when the auth server refuses it. The auth server reads it only on the first start, as the secret of the client it creates for the admin console. |
-| `GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE` | `--authserver-bootstrap-env-outfile` | empty | auth server | A file for the two-step first start. The auth server writes the credentials it generated there, then exits. |
+| Variable | What it does |
+|---|---|
+| `GOIABADA_ADMIN_EMAIL`<br/>Flag: `--admin-email`<br/>Default: `admin@example.com`<br/>Read by: auth server | The first administrator's email address. |
+| `GOIABADA_ADMIN_PASSWORD`<br/>Flag: `--admin-password`<br/>Default: empty<br/>Read by: auth server | The first administrator's password. **Required on the first start**: at least 15 characters and at most 72 bytes. |
+| `GOIABADA_APPNAME`<br/>Flag: `--appname`<br/>Default: `Goiabada`<br/>Read by: auth server | The name the UI shows. Change it later under **Admin**, **General** in the admin console. |
+| `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET`<br/>Flag: `--adminconsole-oauth-client-secret`<br/>Default: empty<br/>Read by: both | The admin console's client secret. The admin console needs it to call the auth server's API, and refuses to start when the auth server refuses it. The auth server reads it only on the first start, as the secret of the client it creates for the admin console. |
+| `GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE`<br/>Flag: `--authserver-bootstrap-env-outfile`<br/>Default: empty<br/>Read by: auth server | A file for the two-step first start. The auth server writes the credentials it generated there, then exits. |
 
 ### Database
 
 Only the auth server talks to the database. The admin console reaches your data through the auth server's API.
 
-| Variable | Flag | Default | Read by | What it does |
-|---|---|---|---|---|
-| `GOIABADA_DB_TYPE` | `--db-type` | `sqlite` | auth server | The database engine: `sqlite`, `mysql`, `postgres` or `mssql`. |
-| `GOIABADA_DB_HOST` | `--db-host` | `localhost` | auth server | The database host. An IPv6 address works with or without brackets. |
-| `GOIABADA_DB_PORT` | `--db-port` | `3306` | auth server | The database port. |
-| `GOIABADA_DB_NAME` | `--db-name` | `goiabada` | auth server | The database name. |
-| `GOIABADA_DB_USERNAME` | `--db-username` | `root` | auth server | The database user. |
-| `GOIABADA_DB_PASSWORD` | `--db-password` | empty | auth server | The database user's password. |
-| `GOIABADA_DB_CREATE` | `--db-create` | `true` | auth server | Create the database if it doesn't exist. Set it to `false` when you [create the database yourself](/deploy/database/). |
-| `GOIABADA_DB_DSN` | `--db-dsn` | `file::memory:?cache=shared` | auth server | The SQLite connection string. The default keeps everything in memory, so it's gone when the server stops. See [SQLite](#sqlite). |
-| `GOIABADA_DB_MAX_OPEN_CONNS` | `--db-max-open-conns` | `20` | auth server | The most connections open at once. At least `1`. |
-| `GOIABADA_DB_MAX_IDLE_CONNS` | `--db-max-idle-conns` | `20` | auth server | The most idle connections kept for reuse, from `0` up to the open limit. Unset, it follows `GOIABADA_DB_MAX_OPEN_CONNS`. |
-| `GOIABADA_DB_CONN_MAX_LIFETIME` | `--db-conn-max-lifetime` | `30m` | auth server | How long a connection is reused before it's replaced. `0` means no limit. |
-| `GOIABADA_DB_CONN_MAX_IDLE_TIME` | `--db-conn-max-idle-time` | `5m` | auth server | How long a connection can sit idle before it's closed. `0` means no limit. |
+| Variable | What it does |
+|---|---|
+| `GOIABADA_DB_TYPE`<br/>Flag: `--db-type`<br/>Default: `sqlite`<br/>Read by: auth server | The database engine: `sqlite`, `mysql`, `postgres` or `mssql`. |
+| `GOIABADA_DB_HOST`<br/>Flag: `--db-host`<br/>Default: `localhost`<br/>Read by: auth server | The database host. An IPv6 address works with or without brackets. |
+| `GOIABADA_DB_PORT`<br/>Flag: `--db-port`<br/>Default: `3306`<br/>Read by: auth server | The database port. |
+| `GOIABADA_DB_NAME`<br/>Flag: `--db-name`<br/>Default: `goiabada`<br/>Read by: auth server | The database name. |
+| `GOIABADA_DB_USERNAME`<br/>Flag: `--db-username`<br/>Default: `root`<br/>Read by: auth server | The database user. |
+| `GOIABADA_DB_PASSWORD`<br/>Flag: `--db-password`<br/>Default: empty<br/>Read by: auth server | The database user's password. |
+| `GOIABADA_DB_CREATE`<br/>Flag: `--db-create`<br/>Default: `true`<br/>Read by: auth server | Create the database if it doesn't exist. Set it to `false` when you [create the database yourself](/deploy/database/). |
+| `GOIABADA_DB_DSN`<br/>Flag: `--db-dsn`<br/>Default: `file::memory:?cache=shared`<br/>Read by: auth server | The SQLite connection string. The default keeps everything in memory, so it's gone when the server stops. See [SQLite](#sqlite). |
+| `GOIABADA_DB_MAX_OPEN_CONNS`<br/>Flag: `--db-max-open-conns`<br/>Default: `20`<br/>Read by: auth server | The most connections open at once. At least `1`. |
+| `GOIABADA_DB_MAX_IDLE_CONNS`<br/>Flag: `--db-max-idle-conns`<br/>Default: `20`<br/>Read by: auth server | The most idle connections kept for reuse, from `0` up to the open limit. Unset, it follows `GOIABADA_DB_MAX_OPEN_CONNS`. |
+| `GOIABADA_DB_CONN_MAX_LIFETIME`<br/>Flag: `--db-conn-max-lifetime`<br/>Default: `30m`<br/>Read by: auth server | How long a connection is reused before it's replaced. `0` means no limit. |
+| `GOIABADA_DB_CONN_MAX_IDLE_TIME`<br/>Flag: `--db-conn-max-idle-time`<br/>Default: `5m`<br/>Read by: auth server | How long a connection can sit idle before it's closed. `0` means no limit. |
 
 The last four size the [connection pool](#the-connection-pool).
 
@@ -58,64 +58,64 @@ The last four size the [connection pool](#the-connection-pool).
 
 A base URL is the address browsers and clients use. A listener is where the server accepts connections on its own machine, which can be quite different behind a proxy.
 
-| Variable | Flag | Default | Read by | What it does |
-|---|---|---|---|---|
-| `GOIABADA_AUTHSERVER_BASEURL` | `--authserver-baseurl` | `http://localhost:9090` | both | The auth server's public URL. The first start also makes it the issuer that tokens carry. An `https://` URL marks the auth server's cookies `Secure`. |
-| `GOIABADA_AUTHSERVER_INTERNALBASEURL` | `--authserver-internalbaseurl` | empty | both | Where the admin console calls the auth server's API, such as `http://goiabada-authserver:9090` inside a cluster. Empty, it uses the public URL. The auth server only reports it in its startup log. |
-| `GOIABADA_ADMINCONSOLE_BASEURL` | `--adminconsole-baseurl` | `http://localhost:9091` | both | The admin console's public URL. The auth server links to it in its emails and sends visitors of `/` there. An `https://` URL marks the admin console's cookies `Secure`. The auth server's first start also registers it, and it followed by `/auth/callback`, as the admin console client's redirect URIs; change it later and update those on the client's **Redirect URIs** tab too. |
-| `GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP` | `--authserver-listen-host-http` | `0.0.0.0` | auth server | The address the auth server's HTTP listener binds. Set it empty to turn that listener off. See [listen addresses](#listen-addresses). |
-| `GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP` | `--authserver-listen-port-http` | `9090` | auth server | The auth server's HTTP port. |
-| `GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS` | `--authserver-listen-host-https` | `0.0.0.0` | auth server | The address the auth server's HTTPS listener binds. It listens only once the certificate and key files are set. |
-| `GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS` | `--authserver-listen-port-https` | `9443` | auth server | The auth server's HTTPS port. |
-| `GOIABADA_AUTHSERVER_CERTFILE` | `--authserver-certfile` | empty | auth server | The TLS certificate file for the auth server's HTTPS listener. Behind a proxy that handles TLS, you don't need it. |
-| `GOIABADA_AUTHSERVER_KEYFILE` | `--authserver-keyfile` | empty | auth server | The TLS private key file for the auth server's HTTPS listener. |
-| `GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP` | `--adminconsole-listen-host-http` | `0.0.0.0` | admin console | The address the admin console's HTTP listener binds. Set it empty to turn that listener off. |
-| `GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP` | `--adminconsole-listen-port-http` | `9091` | admin console | The admin console's HTTP port. |
-| `GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS` | `--adminconsole-listen-host-https` | `0.0.0.0` | admin console | The address the admin console's HTTPS listener binds. It listens only once the certificate and key files are set. |
-| `GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS` | `--adminconsole-listen-port-https` | `9444` | admin console | The admin console's HTTPS port. |
-| `GOIABADA_ADMINCONSOLE_CERTFILE` | `--adminconsole-certfile` | empty | admin console | The TLS certificate file for the admin console's HTTPS listener. |
-| `GOIABADA_ADMINCONSOLE_KEYFILE` | `--adminconsole-keyfile` | empty | admin console | The TLS private key file for the admin console's HTTPS listener. |
+| Variable | What it does |
+|---|---|
+| `GOIABADA_AUTHSERVER_BASEURL`<br/>Flag: `--authserver-baseurl`<br/>Default: `http://localhost:9090`<br/>Read by: both | The auth server's public URL. The first start also makes it the issuer that tokens carry. An `https://` URL marks the auth server's cookies `Secure`. |
+| `GOIABADA_AUTHSERVER_INTERNALBASEURL`<br/>Flag: `--authserver-internalbaseurl`<br/>Default: empty<br/>Read by: both | Where the admin console calls the auth server's API, such as `http://goiabada-authserver:9090` inside a cluster. Empty, it uses the public URL. The auth server only reports it in its startup log. |
+| `GOIABADA_ADMINCONSOLE_BASEURL`<br/>Flag: `--adminconsole-baseurl`<br/>Default: `http://localhost:9091`<br/>Read by: both | The admin console's public URL. The auth server links to it in its emails and sends visitors of `/` there. An `https://` URL marks the admin console's cookies `Secure`. The auth server's first start also registers it, and it followed by `/auth/callback`, as the admin console client's redirect URIs; change it later and update those on the client's **Redirect URIs** tab too. |
+| `GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP`<br/>Flag: `--authserver-listen-host-http`<br/>Default: `0.0.0.0`<br/>Read by: auth server | The address the auth server's HTTP listener binds. Set it empty to turn that listener off. See [listen addresses](#listen-addresses). |
+| `GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP`<br/>Flag: `--authserver-listen-port-http`<br/>Default: `9090`<br/>Read by: auth server | The auth server's HTTP port. |
+| `GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS`<br/>Flag: `--authserver-listen-host-https`<br/>Default: `0.0.0.0`<br/>Read by: auth server | The address the auth server's HTTPS listener binds. It listens only once the certificate and key files are set. |
+| `GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS`<br/>Flag: `--authserver-listen-port-https`<br/>Default: `9443`<br/>Read by: auth server | The auth server's HTTPS port. |
+| `GOIABADA_AUTHSERVER_CERTFILE`<br/>Flag: `--authserver-certfile`<br/>Default: empty<br/>Read by: auth server | The TLS certificate file for the auth server's HTTPS listener. Behind a proxy that handles TLS, you don't need it. |
+| `GOIABADA_AUTHSERVER_KEYFILE`<br/>Flag: `--authserver-keyfile`<br/>Default: empty<br/>Read by: auth server | The TLS private key file for the auth server's HTTPS listener. |
+| `GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP`<br/>Flag: `--adminconsole-listen-host-http`<br/>Default: `0.0.0.0`<br/>Read by: admin console | The address the admin console's HTTP listener binds. Set it empty to turn that listener off. |
+| `GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP`<br/>Flag: `--adminconsole-listen-port-http`<br/>Default: `9091`<br/>Read by: admin console | The admin console's HTTP port. |
+| `GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS`<br/>Flag: `--adminconsole-listen-host-https`<br/>Default: `0.0.0.0`<br/>Read by: admin console | The address the admin console's HTTPS listener binds. It listens only once the certificate and key files are set. |
+| `GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS`<br/>Flag: `--adminconsole-listen-port-https`<br/>Default: `9444`<br/>Read by: admin console | The admin console's HTTPS port. |
+| `GOIABADA_ADMINCONSOLE_CERTFILE`<br/>Flag: `--adminconsole-certfile`<br/>Default: empty<br/>Read by: admin console | The TLS certificate file for the admin console's HTTPS listener. |
+| `GOIABADA_ADMINCONSOLE_KEYFILE`<br/>Flag: `--adminconsole-keyfile`<br/>Default: empty<br/>Read by: admin console | The TLS private key file for the admin console's HTTPS listener. |
 
 ### Proxies
 
-| Variable | Flag | Default | Read by | What it does |
-|---|---|---|---|---|
-| `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS` | `--authserver-trust-proxy-headers` | `false` | auth server | Take the client's IP address from `X-Forwarded-For` or `X-Real-IP`. Turn it on behind a reverse proxy, and leave it off without one. See [client IP addresses](#client-ip-addresses). |
-| `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` | `--authserver-trusted-proxies` | empty | auth server | Your proxies' addresses, as comma-separated IP addresses or CIDR ranges, such as `10.0.0.0/8,192.168.1.5`. |
-| `GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS` | `--adminconsole-trust-proxy-headers` | `false` | admin console | The same switch for the admin console, which records the address in its logs. |
-| `GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES` | `--adminconsole-trusted-proxies` | empty | admin console | The same list for the admin console. |
+| Variable | What it does |
+|---|---|
+| `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS`<br/>Flag: `--authserver-trust-proxy-headers`<br/>Default: `false`<br/>Read by: auth server | Take the client's IP address from `X-Forwarded-For` or `X-Real-IP`. Turn it on behind a reverse proxy, and leave it off without one. See [client IP addresses](#client-ip-addresses). |
+| `GOIABADA_AUTHSERVER_TRUSTED_PROXIES`<br/>Flag: `--authserver-trusted-proxies`<br/>Default: empty<br/>Read by: auth server | Your proxies' addresses, as comma-separated IP addresses or CIDR ranges, such as `10.0.0.0/8,192.168.1.5`. |
+| `GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS`<br/>Flag: `--adminconsole-trust-proxy-headers`<br/>Default: `false`<br/>Read by: admin console | The same switch for the admin console, which records the address in its logs. |
+| `GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES`<br/>Flag: `--adminconsole-trusted-proxies`<br/>Default: empty<br/>Read by: admin console | The same list for the admin console. |
 
 ### Keys
 
 Each of these is random bytes written as hex. Generate them as [Session keys](#session-keys) and [the data encryption key](#the-data-encryption-key) show. They have no flags, so they stay out of process listings.
 
-| Variable | Flag | Default | Read by | What it does |
-|---|---|---|---|---|
-| `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY` | none | empty | auth server | **Required.** 64 bytes that seal the auth server's sessions. |
-| `GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY` | none | empty | auth server | **Required.** 32 bytes that encrypt the auth server's sessions. |
-| `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS` | none | empty | auth server | The old authentication key, set only while you rotate the session keys. |
-| `GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS` | none | empty | auth server | The old encryption key, set only while you rotate the session keys. |
-| `GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY` | none | empty | admin console | **Required.** 64 bytes that seal the admin console's sessions. |
-| `GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY` | none | empty | admin console | **Required.** 32 bytes that encrypt the admin console's sessions. |
-| `GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS` | none | empty | admin console | The old authentication key, set only while you rotate the session keys. |
-| `GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS` | none | empty | admin console | The old encryption key, set only while you rotate the session keys. |
-| `GOIABADA_AES_ENCRYPTION_KEY` | none | empty | auth server | **Required.** 32 bytes that encrypt secrets in the database. |
-| `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` | none | empty | auth server | The old data encryption key, set only while you rotate it. |
+| Variable | What it does |
+|---|---|
+| `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY`<br/>Flag: none<br/>Default: empty<br/>Read by: auth server | **Required.** 64 bytes that seal the auth server's sessions. |
+| `GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY`<br/>Flag: none<br/>Default: empty<br/>Read by: auth server | **Required.** 32 bytes that encrypt the auth server's sessions. |
+| `GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS`<br/>Flag: none<br/>Default: empty<br/>Read by: auth server | The old authentication key, set only while you rotate the session keys. |
+| `GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS`<br/>Flag: none<br/>Default: empty<br/>Read by: auth server | The old encryption key, set only while you rotate the session keys. |
+| `GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY`<br/>Flag: none<br/>Default: empty<br/>Read by: admin console | **Required.** 64 bytes that seal the admin console's sessions. |
+| `GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY`<br/>Flag: none<br/>Default: empty<br/>Read by: admin console | **Required.** 32 bytes that encrypt the admin console's sessions. |
+| `GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS`<br/>Flag: none<br/>Default: empty<br/>Read by: admin console | The old authentication key, set only while you rotate the session keys. |
+| `GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS`<br/>Flag: none<br/>Default: empty<br/>Read by: admin console | The old encryption key, set only while you rotate the session keys. |
+| `GOIABADA_AES_ENCRYPTION_KEY`<br/>Flag: none<br/>Default: empty<br/>Read by: auth server | **Required.** 32 bytes that encrypt secrets in the database. |
+| `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS`<br/>Flag: none<br/>Default: empty<br/>Read by: auth server | The old data encryption key, set only while you rotate it. |
 
 ### Logging
 
 Both servers write their logs to standard error.
 
-| Variable | Flag | Default | Read by | What it does |
-|---|---|---|---|---|
-| `GOIABADA_AUTHSERVER_LOG_LEVEL` | `--authserver-log-level` | `info` | auth server | The lowest level written: `debug`, `info`, `warn` or `error`. `debug` adds a few diagnostic records; for one record per request, turn on `GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS`. |
-| `GOIABADA_AUTHSERVER_LOG_FORMAT` | `--authserver-log-format` | `text` | auth server | `text` for one `key=value` line per record, or `json` for one JSON object per record. |
-| `GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS` | `--authserver-log-http-requests` | `false` | auth server | Write one record per request, except health checks, static files and the favicon. Query values are redacted, apart from a short list of safe ones. |
-| `GOIABADA_AUTHSERVER_LOG_SQL` | `--authserver-log-sql` | `false` | auth server | Write one record per SQL statement, with its text but not the values it ran with. |
-| `GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS` | `--authserver-debug-api-requests` | `false` | auth server | Write one record per API call, with its method, target, status, duration and both bodies. Credentials in the bodies and the `Authorization` header are redacted. |
-| `GOIABADA_ADMINCONSOLE_LOG_LEVEL` | `--adminconsole-log-level` | `info` | admin console | The lowest level written: `debug`, `info`, `warn` or `error`. |
-| `GOIABADA_ADMINCONSOLE_LOG_FORMAT` | `--adminconsole-log-format` | `text` | admin console | `text` or `json`, as for the auth server. |
-| `GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS` | `--adminconsole-log-http-requests` | `false` | admin console | Write one record per request, as the auth server's switch does. |
+| Variable | What it does |
+|---|---|
+| `GOIABADA_AUTHSERVER_LOG_LEVEL`<br/>Flag: `--authserver-log-level`<br/>Default: `info`<br/>Read by: auth server | The lowest level written: `debug`, `info`, `warn` or `error`. `debug` adds a few diagnostic records; for one record per request, turn on `GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS`. |
+| `GOIABADA_AUTHSERVER_LOG_FORMAT`<br/>Flag: `--authserver-log-format`<br/>Default: `text`<br/>Read by: auth server | `text` for one `key=value` line per record, or `json` for one JSON object per record. |
+| `GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS`<br/>Flag: `--authserver-log-http-requests`<br/>Default: `false`<br/>Read by: auth server | Write one record per request, except health checks, static files and the favicon. Query values are redacted, apart from a short list of safe ones. |
+| `GOIABADA_AUTHSERVER_LOG_SQL`<br/>Flag: `--authserver-log-sql`<br/>Default: `false`<br/>Read by: auth server | Write one record per SQL statement, with its text but not the values it ran with. |
+| `GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS`<br/>Flag: `--authserver-debug-api-requests`<br/>Default: `false`<br/>Read by: auth server | Write one record per API call, with its method, target, status, duration and both bodies. Credentials in the bodies and the `Authorization` header are redacted. |
+| `GOIABADA_ADMINCONSOLE_LOG_LEVEL`<br/>Flag: `--adminconsole-log-level`<br/>Default: `info`<br/>Read by: admin console | The lowest level written: `debug`, `info`, `warn` or `error`. |
+| `GOIABADA_ADMINCONSOLE_LOG_FORMAT`<br/>Flag: `--adminconsole-log-format`<br/>Default: `text`<br/>Read by: admin console | `text` or `json`, as for the auth server. |
+| `GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS`<br/>Flag: `--adminconsole-log-http-requests`<br/>Default: `false`<br/>Read by: admin console | Write one record per request, as the auth server's switch does. |
 
 A level or format spelled any other way, uppercase included, stops the server at start. To set the time zone of the timestamps, see [time zone](#time-zone).
 
@@ -123,55 +123,55 @@ A level or format spelled any other way, uppercase included, stops the server at
 
 Each server can serve Prometheus metrics on a listener of its own, which answers `GET /metrics` and nothing else. It has no authentication, so **never** publish its port to the internet. [Monitoring](/deploy/monitoring/) covers what it reports.
 
-| Variable | Flag | Default | Read by | What it does |
-|---|---|---|---|---|
-| `GOIABADA_AUTHSERVER_METRICS_ENABLED` | `--authserver-metrics-enabled` | `false` | auth server | Serve the auth server's metrics listener. Off, nothing listens on its port. |
-| `GOIABADA_AUTHSERVER_LISTEN_HOST_METRICS` | `--authserver-listen-host-metrics` | `0.0.0.0` | auth server | The address the auth server's metrics listener binds. Use `127.0.0.1` when the scraper runs on the same host. |
-| `GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS` | `--authserver-listen-port-metrics` | `9190` | auth server | The auth server's metrics port. |
-| `GOIABADA_ADMINCONSOLE_METRICS_ENABLED` | `--adminconsole-metrics-enabled` | `false` | admin console | Serve the admin console's metrics listener. Off, nothing listens on its port. |
-| `GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS` | `--adminconsole-listen-host-metrics` | `0.0.0.0` | admin console | The address the admin console's metrics listener binds. |
-| `GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS` | `--adminconsole-listen-port-metrics` | `9191` | admin console | The admin console's metrics port. |
+| Variable | What it does |
+|---|---|
+| `GOIABADA_AUTHSERVER_METRICS_ENABLED`<br/>Flag: `--authserver-metrics-enabled`<br/>Default: `false`<br/>Read by: auth server | Serve the auth server's metrics listener. Off, nothing listens on its port. |
+| `GOIABADA_AUTHSERVER_LISTEN_HOST_METRICS`<br/>Flag: `--authserver-listen-host-metrics`<br/>Default: `0.0.0.0`<br/>Read by: auth server | The address the auth server's metrics listener binds. Use `127.0.0.1` when the scraper runs on the same host. |
+| `GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS`<br/>Flag: `--authserver-listen-port-metrics`<br/>Default: `9190`<br/>Read by: auth server | The auth server's metrics port. |
+| `GOIABADA_ADMINCONSOLE_METRICS_ENABLED`<br/>Flag: `--adminconsole-metrics-enabled`<br/>Default: `false`<br/>Read by: admin console | Serve the admin console's metrics listener. Off, nothing listens on its port. |
+| `GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS`<br/>Flag: `--adminconsole-listen-host-metrics`<br/>Default: `0.0.0.0`<br/>Read by: admin console | The address the admin console's metrics listener binds. |
+| `GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS`<br/>Flag: `--adminconsole-listen-port-metrics`<br/>Default: `9191`<br/>Read by: admin console | The admin console's metrics port. |
 
 ### Customization
 
-| Variable | Flag | Default | Read by | What it does |
-|---|---|---|---|---|
-| `GOIABADA_AUTHSERVER_STATICDIR` | `--authserver-staticdir` | empty | auth server | A directory to serve the auth server's static files from, instead of the built-in ones. See [Change the templates](/guides/customize-and-translate-the-pages/#change-the-templates). |
-| `GOIABADA_AUTHSERVER_TEMPLATEDIR` | `--authserver-templatedir` | empty | auth server | A directory to load the auth server's page templates from, instead of the built-in ones. |
-| `GOIABADA_ADMINCONSOLE_STATICDIR` | `--adminconsole-staticdir` | empty | admin console | The same, for the admin console's static files. |
-| `GOIABADA_ADMINCONSOLE_TEMPLATEDIR` | `--adminconsole-templatedir` | empty | admin console | The same, for the admin console's page templates. |
-| `GOIABADA_I18N_OVERRIDES_DIR` | none | empty | both | A directory whose `catalogs` subfolder holds `active.<language>.toml` files, merged key by key over the built-in text. Without a `catalogs` subfolder nothing is loaded. Set it on both servers. See [Add a language](/guides/customize-and-translate-the-pages/#add-a-language). |
-| `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` | none | `3145728` | auth server | The largest profile picture or client logo the API accepts, in bytes. The default is 3 MiB. The admin console's upload form stops at 3 MiB, whatever this says. |
+| Variable | What it does |
+|---|---|
+| `GOIABADA_AUTHSERVER_STATICDIR`<br/>Flag: `--authserver-staticdir`<br/>Default: empty<br/>Read by: auth server | A directory to serve the auth server's static files from, instead of the built-in ones. See [Change the templates](/guides/customize-and-translate-the-pages/#change-the-templates). |
+| `GOIABADA_AUTHSERVER_TEMPLATEDIR`<br/>Flag: `--authserver-templatedir`<br/>Default: empty<br/>Read by: auth server | A directory to load the auth server's page templates from, instead of the built-in ones. |
+| `GOIABADA_ADMINCONSOLE_STATICDIR`<br/>Flag: `--adminconsole-staticdir`<br/>Default: empty<br/>Read by: admin console | The same, for the admin console's static files. |
+| `GOIABADA_ADMINCONSOLE_TEMPLATEDIR`<br/>Flag: `--adminconsole-templatedir`<br/>Default: empty<br/>Read by: admin console | The same, for the admin console's page templates. |
+| `GOIABADA_I18N_OVERRIDES_DIR`<br/>Flag: none<br/>Default: empty<br/>Read by: both | A directory whose `catalogs` subfolder holds `active.<language>.toml` files, merged key by key over the built-in text. Without a `catalogs` subfolder nothing is loaded. Set it on both servers. See [Add a language](/guides/customize-and-translate-the-pages/#add-a-language). |
+| `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES`<br/>Flag: none<br/>Default: `3145728`<br/>Read by: auth server | The largest profile picture or client logo the API accepts, in bytes. The default is 3 MiB. The admin console's upload form stops at 3 MiB, whatever this says. |
 
 ### Rate limiting
 
-| Variable | Flag | Default | Read by | What it does |
-|---|---|---|---|---|
-| `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` | `--authserver-ratelimiter-enabled` | `false` | auth server | Turn on the [rate limits](#rate-limits) below that are counted by an IP address or an email. Those counted by a user apply whether or not it's on. The setup wizard asks whether you want them. |
+| Variable | What it does |
+|---|---|
+| `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`<br/>Flag: `--authserver-ratelimiter-enabled`<br/>Default: `false`<br/>Read by: auth server | Turn on the [rate limits](#rate-limits) below that are counted by an IP address or an email. Those counted by a user apply whether or not it's on. The setup wizard asks whether you want them. |
 
 ## Rate limits
 
 The auth server limits these endpoints. The limits counted by a user, the one signing in or an access token's, always apply: only someone already past the password, or holding the user's token, can spend them, so they can't lock a stranger out. The others, counted by an IP address or by an email anyone can type, apply only with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on. A refused request gets `429 Too Many Requests`, in the format the endpoint usually answers with. The limiter is the name the `rate_limit_exceeded` [audit event](/concepts/audit-log/) and the `goiabada_rate_limit_refusals_total` [metric](/deploy/monitoring/) give it.
 
-| Endpoint | Limiter | Limit | Counts | Counted by |
-|---|---|---|---|---|
-| `POST /auth/pwd` (password sign-in) | `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and email, shared with the password grant |
-| `POST /auth/pwd` | `pwd_account` | 100 per 60 minutes | failed sign-ins | email, shared with the password grant |
-| `POST /auth/pwd` | `pwd_ip` | 30 per minute | every request | IP address |
-| `POST /auth/otp` (authenticator code) | `otp` | 5 per 15 minutes | failed codes | user |
-| `POST /api/v1/account/email/verification` | `email_verification` | 5 per 15 minutes | failed codes | the token's user |
-| `POST /api/v1/account/email/verification/send` | `email_verification_send` | 5 per 60 minutes | every request | the token's user |
-| `PUT /api/v1/account/password`, `PUT /api/v1/account/otp` and `PUT /api/v1/account/email` | `account_password` | 5 per 15 minutes, for the three together | failed passwords | the token's user |
-| `POST /forgot-password` | `forgot_pwd_email` | 5 per 5 minutes | every request | email |
-| `POST /forgot-password` | `forgot_pwd_ip` | 20 per 5 minutes | every request | IP address |
-| `GET /reset-password` and `POST /reset-password` | `reset_pwd` | 30 per 5 minutes, for the two together | every request | IP address |
-| `POST /account/register` (self-registration) | `register_email` | 5 per 5 minutes | every request | email |
-| `POST /account/register` | `register` | 20 per 5 minutes | every request | IP address |
-| `GET /account/activate` and `POST /account/activate` | `activate` | 30 per 5 minutes, for the two together | every request | IP address |
-| `POST /connect/register` (dynamic client registration) | `dcr` | 10 per minute | every request | IP address |
-| `POST /auth/token` with `grant_type=password` | `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and username, shared with `POST /auth/pwd` |
-| `POST /auth/token` with `grant_type=password` | `pwd_account` | 100 per 60 minutes | failed sign-ins | username, shared with `POST /auth/pwd` |
-| `POST /auth/token` with `grant_type=password` | `ropc_ip` | 30 per minute | every request | IP address |
+| Endpoint | Limit | Counts | Counted by |
+|---|---|---|---|
+| `POST /auth/pwd` (password sign-in)<br/>Limiter: `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and email, shared with the password grant |
+| `POST /auth/pwd`<br/>Limiter: `pwd_account` | 100 per 60 minutes | failed sign-ins | email, shared with the password grant |
+| `POST /auth/pwd`<br/>Limiter: `pwd_ip` | 30 per minute | every request | IP address |
+| `POST /auth/otp` (authenticator code)<br/>Limiter: `otp` | 5 per 15 minutes | failed codes | user |
+| `POST /api/v1/account/email/verification`<br/>Limiter: `email_verification` | 5 per 15 minutes | failed codes | the token's user |
+| `POST /api/v1/account/email/verification/send`<br/>Limiter: `email_verification_send` | 5 per 60 minutes | every request | the token's user |
+| `PUT /api/v1/account/password`, `PUT /api/v1/account/otp` and `PUT /api/v1/account/email`<br/>Limiter: `account_password` | 5 per 15 minutes, for the three together | failed passwords | the token's user |
+| `POST /forgot-password`<br/>Limiter: `forgot_pwd_email` | 5 per 5 minutes | every request | email |
+| `POST /forgot-password`<br/>Limiter: `forgot_pwd_ip` | 20 per 5 minutes | every request | IP address |
+| `GET /reset-password` and `POST /reset-password`<br/>Limiter: `reset_pwd` | 30 per 5 minutes, for the two together | every request | IP address |
+| `POST /account/register` (self-registration)<br/>Limiter: `register_email` | 5 per 5 minutes | every request | email |
+| `POST /account/register`<br/>Limiter: `register` | 20 per 5 minutes | every request | IP address |
+| `GET /account/activate` and `POST /account/activate`<br/>Limiter: `activate` | 30 per 5 minutes, for the two together | every request | IP address |
+| `POST /connect/register` (dynamic client registration)<br/>Limiter: `dcr` | 10 per minute | every request | IP address |
+| `POST /auth/token` with `grant_type=password`<br/>Limiter: `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and username, shared with `POST /auth/pwd` |
+| `POST /auth/token` with `grant_type=password`<br/>Limiter: `pwd_account` | 100 per 60 minutes | failed sign-ins | username, shared with `POST /auth/pwd` |
+| `POST /auth/token` with `grant_type=password`<br/>Limiter: `ropc_ip` | 30 per minute | every request | IP address |
 
 A few rules make these work:
 
