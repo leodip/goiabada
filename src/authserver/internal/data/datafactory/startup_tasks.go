@@ -4,12 +4,21 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// ErrDataKeyMismatch is stored data that GOIABADA_AES_ENCRYPTION_KEY does not decrypt, nor
+// GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS when one is set: the key is not the one this database was set
+// up with. Every start refuses it. A start that went on served 500s from the first token request,
+// "cipher: message authentication failed", while /health answered 200, so on Kubernetes a pod given
+// newly generated Secrets by mistake replaced the working ones; refused, it never becomes ready and
+// the rollout waits with them still serving (#542).
+var ErrDataKeyMismatch = errors.New("the stored data does not decrypt under GOIABADA_AES_ENCRYPTION_KEY")
 
 // keyRotationStore is what the startup task reads and writes: the signing keys, one of which is
 // the canary, and the re-key the decision ends in.
@@ -47,7 +56,7 @@ func runStartupDataTasks(ctx context.Context, database keyRotationStore, envKey 
 	}
 	rotated, err := rotateDataKeyIfNeeded(context.WithoutCancel(ctx), database, envKey, previousKey)
 	if err != nil {
-		return errs.Wrap(err, "AES data key rotation failed")
+		return errs.Wrap(err, "the data encryption key check failed")
 	}
 	if rotated {
 		slog.InfoContext(ctx, "rotated data-at-rest encryption to the new GOIABADA_AES_ENCRYPTION_KEY")
@@ -55,32 +64,29 @@ func runStartupDataTasks(ctx context.Context, database keyRotationStore, envKey 
 	return nil
 }
 
-// rotateDataKeyIfNeeded is the env-to-env rotation of the data key (#83): given the current key and
-// an optional previous one, it decides whether the stored data is already under the current key
-// (nothing to do) or still under the previous one (re-key it), and reports whether it re-keyed.
+// rotateDataKeyIfNeeded checks the data key against the stored data and is the env-to-env rotation
+// of it (#83): given the current key and an optional previous one, it decides whether the stored
+// data is under the current key (nothing to do), still under the previous one (re-key it), or under
+// neither (refuse), and reports whether it re-keyed.
 //
 // Detection uses a canary, the first non-empty RSA private key PEM, which is encrypted and always
 // present once the database is seeded. Reading it first is what makes the task idempotent, so
 // GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS can be left set across restarts: after the first startup the
 // canary opens under the current key and nothing is re-keyed again.
 //
-// It answers false and touches nothing when the previous key is absent, not 32 bytes, or equal to
-// the current one, and when no key pair holds a PEM yet (a database not yet seeded). A canary that
-// opens under neither key is a misconfiguration and is refused, rather than guessed at by re-keying
-// data the process cannot prove it can read.
+// It is read at every start, with or without a previous key: a key that opens nothing is refused
+// with ErrDataKeyMismatch rather than discovered at the first request that decrypts (#542). Only a
+// database not yet seeded, with no PEM to read, passes unchecked. A previous key that is not 32
+// bytes, or equals the current one, takes no part.
 //
 // The canary is read outside ReencryptToKey's transaction, exactly as it was when the decision and
 // the re-key were one method in commondb. The decision moved here so that each branch is one mock
 // call away rather than four engines away; what it decides, and when, did not change (#438
 // decision 8).
 func rotateDataKeyIfNeeded(ctx context.Context, database keyRotationStore, currentKey, previousKey []byte) (bool, error) {
-	if len(previousKey) != 32 || bytes.Equal(previousKey, currentKey) {
-		return false, nil
-	}
-
 	keys, err := database.GetAllSigningKeys(ctx, nil)
 	if err != nil {
-		return false, errs.Wrap(err, "unable to load signing keys for rotation check")
+		return false, errs.Wrap(err, "unable to load signing keys to check the data key")
 	}
 	var canary []byte
 	for _, k := range keys {
@@ -96,8 +102,11 @@ func rotateDataKeyIfNeeded(ctx context.Context, database keyRotationStore, curre
 	if _, err := encryption.DecryptText(canary, currentKey); err == nil {
 		return false, nil // already encrypted under the current key
 	}
+	if len(previousKey) != 32 || bytes.Equal(previousKey, currentKey) {
+		return false, errs.WithStack(ErrDataKeyMismatch)
+	}
 	if _, err := encryption.DecryptText(canary, previousKey); err != nil {
-		return false, errs.New(
+		return false, errs.Wrap(ErrDataKeyMismatch,
 			"data-at-rest decrypts under neither GOIABADA_AES_ENCRYPTION_KEY nor GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS")
 	}
 
