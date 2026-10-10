@@ -16,6 +16,7 @@ package datafactory
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"log/slog"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -43,6 +45,9 @@ import (
 type Migratable interface {
 	data.Database
 	NewMigrator(ctx context.Context, progress migrator.Progress) (*migrator.Migrator, error)
+	// ScanEmailCaseOn is ScanEmailCase read on the migration runner's connection, which is where
+	// the startup pre-flight runs, under the migration lock (#542 decision 2).
+	ScanEmailCaseOn(ctx context.Context, conn *sql.Conn) ([]record.EmailCaseRow, error)
 }
 
 // OpenDatabase constructs the concrete database for the configured engine and returns it having
@@ -189,7 +194,8 @@ func mssqlConfig(c *config.DatabaseConfig) *mssqldb.DatabaseConfig {
 // NewDatabase opens the configured database, refuses it if the stored email addresses cannot
 // survive migration 000047, brings the schema to head and then runs the startup data tasks.
 //
-// One migrator serves both the pre-flight's version read and the step to head, and the startup
+// The migrator runs the pre-flight under its lock, on the version it read there, and then steps to
+// head, and the startup
 // records are written here, by the process starting, rather than by the runner or by each engine:
 // the runner, and SQL Server's schema_migrations pre-create before it, report a wait for the
 // migration lock, and the runner the migration around its files, through startupProgress, and the
@@ -229,11 +235,8 @@ func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []
 		return nil, errs.Wrap(err, "unable to prepare the migration runner")
 	}
 
-	if preflightEmailCaseErr := preflightEmailCase(ctx, database, m); preflightEmailCaseErr != nil {
-		return nil, preflightEmailCaseErr
-	}
-
-	migrated, err := m.UpToHead(ctx, buildinfo.Version, progress)
+	// The email case pre-flight runs inside the migration, under its lock: see emailCasePreflight.
+	migrated, err := m.UpToHead(ctx, buildinfo.Version, progress, emailCasePreflight(database))
 	if err != nil {
 		var stopped migrator.StoppedError
 		if errors.As(err, &stopped) {

@@ -9,12 +9,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -360,8 +362,10 @@ type faultDB struct {
 	failAt     int
 	afterWrite bool
 	failCommit bool
-	onWrite    func()
-	writes     int
+	// failWith is the error the failing write answers, errInjected when nil.
+	failWith error
+	onWrite  func()
+	writes   int
 }
 
 func (f *faultDB) write(create func() error) error {
@@ -369,14 +373,18 @@ func (f *faultDB) write(create func() error) error {
 	if f.onWrite != nil {
 		f.onWrite()
 	}
+	injected := errInjected
+	if f.failWith != nil {
+		injected = f.failWith
+	}
 	if f.writes == f.failAt && !f.afterWrite {
-		return errInjected
+		return injected
 	}
 	if err := create(); err != nil {
 		return err
 	}
 	if f.writes == f.failAt {
-		return errInjected
+		return injected
 	}
 	return nil
 }
@@ -664,5 +672,79 @@ type stopAfterTheEmptinessCheck struct {
 func (s *stopAfterTheEmptinessCheck) IsEmpty(ctx context.Context) (bool, error) {
 	isEmpty, err := s.runDatabase.IsEmpty(ctx)
 	s.stop()
+	return isEmpty, err
+}
+
+// TestRun_ASeedThatLosesTheRaceCarriesOn is several replicas starting at once on an empty database
+// (#542 decision 2): this start and another both find it empty, the other's seed commits first, and
+// this one's first insert loses on the admin console client's unique key. Its transaction rolls back
+// whole, the database reads as seeded, and it carries on as a start a moment later would, where it
+// used to exit 1 on the duplicate key and be restarted to find the database seeded.
+func TestRun_ASeedThatLosesTheRaceCarriesOn(t *testing.T) {
+	for name, loserConfig := range map[string]func(t *testing.T) Config{
+		"single-step": func(*testing.T) Config { return singleStepConfig() },
+		"two-step":    twoStepConfig,
+	} {
+		t.Run(name, func(t *testing.T) {
+			db := newSeedDB(t)
+			winner := singleStepConfig()
+			racing := &seedAfterTheEmptinessCheck{runDatabase: db, other: func() {
+				outcome, err := testRunner(db, winner).run(context.Background())
+				require.NoError(t, err, "the other instance seeds")
+				require.Equal(t, Continue, outcome)
+			}}
+			faults := &faultDB{runDatabase: racing}
+			cfg := loserConfig(t)
+			logs := logtest.CaptureSlog(t)
+
+			outcome, err := testRunner(faults, cfg).run(context.Background())
+
+			require.NoError(t, err, "a seed lost to another instance is not a failed start")
+			assert.Equal(t, Continue, outcome, "it carries on with the database the other instance seeded")
+			assert.Equal(t, 1, faults.writes, "it lost at its first write")
+			assertSeeded(t, db, winner)
+			assert.Contains(t, recordMessages(logs),
+				"another instance seeded the database while this one was seeding it, proceeding with normal startup")
+			if cfg.BootstrapEnvOutFile != "" {
+				entries, err := os.ReadDir(filepath.Dir(cfg.BootstrapEnvOutFile))
+				require.NoError(t, err)
+				assert.Empty(t, entries, "the loser publishes no file and leaves no staged one")
+			}
+		})
+	}
+}
+
+// A unique violation is a lost race only when the database now reads as seeded. On one that still
+// reads as empty it is a fault, refused with the seed's own error, as is a re-check that fails.
+func TestRun_AUniqueViolationOnADatabaseStillEmptyIsRefused(t *testing.T) {
+	db := newSeedDB(t)
+	faults := &faultDB{runDatabase: db, failAt: 1,
+		failWith: errs.Wrap(data.ErrUniqueViolation, "a unique key nobody else holds")}
+
+	outcome, err := testRunner(faults, singleStepConfig()).run(context.Background())
+
+	require.ErrorIs(t, err, data.ErrUniqueViolation)
+	assert.Contains(t, err.Error(), "unable to seed the database")
+	assert.Equal(t, Refused, outcome)
+	isEmpty, err := db.IsEmpty(context.Background())
+	require.NoError(t, err)
+	assert.True(t, isEmpty)
+}
+
+// seedAfterTheEmptinessCheck answers the first emptiness check and then has another instance seed
+// the database, which is the moment two starts racing on an empty database both pass: the other
+// commits while this one is about to begin its own seed.
+type seedAfterTheEmptinessCheck struct {
+	runDatabase
+	other   func()
+	checked bool
+}
+
+func (s *seedAfterTheEmptinessCheck) IsEmpty(ctx context.Context) (bool, error) {
+	isEmpty, err := s.runDatabase.IsEmpty(ctx)
+	if !s.checked {
+		s.checked = true
+		s.other()
+	}
 	return isEmpty, err
 }

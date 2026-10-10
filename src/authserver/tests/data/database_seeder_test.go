@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/bootstrap"
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
@@ -225,4 +227,111 @@ func TestSeed_AFailedFirstSeedLeavesNothingAndTheNextSeeds(t *testing.T) {
 			assert.NotNil(t, client)
 		})
 	}
+}
+
+// TestSeed_SeveralStartsOnOneEmptyDatabaseAllCarryOn is several replicas starting at once on an
+// empty database, on every engine (#542 decision 2). Each finds it empty and seeds; one seed
+// commits, and every other loses its first insert on the admin console client's unique key, which
+// each engine reports its own way and the data layer answers as ErrUniqueViolation. Each loser
+// rolls back whole and carries on with the database the winner seeded, where it used to exit 1 on
+// the duplicate key and be restarted to find just that.
+//
+// The starts are held together after their emptiness checks, so every one of them seeds: left to
+// themselves, a start arriving after the winner's commit would read the database as seeded and
+// carry on without racing at all, and the test would pass with the race unhandled.
+func TestSeed_SeveralStartsOnOneEmptyDatabaseAllCarryOn(t *testing.T) {
+	h := migratedIsolatedDB(t)
+	const starts = 3
+
+	var together sync.WaitGroup
+	together.Add(starts)
+	outcomes := make([]bootstrap.Outcome, starts)
+	failures := make([]error, starts)
+	var done sync.WaitGroup
+	for i := range starts {
+		done.Go(func() {
+			db := &checkEmptinessTogether{Database: h.DB, together: &together}
+			outcomes[i], failures[i] = bootstrap.Run(context.Background(), db, dataCipher, seedConfig("admin@example.com"))
+		})
+	}
+	done.Wait()
+
+	for i := range starts {
+		require.NoErrorf(t, failures[i], "start %d carries on, whichever of them seeded", i)
+		assert.Equalf(t, bootstrap.Continue, outcomes[i], "start %d", i)
+	}
+	counts := seededRowCounts(t, h)
+	assert.Equal(t, 1, counts["clients"], "one seed committed, and only one")
+	assert.Equal(t, 1, counts["users"])
+	assert.Equal(t, 1, counts["settings"])
+	assert.Equal(t, 2, counts["key_pairs"])
+}
+
+// checkEmptinessTogether holds each start after its first emptiness check until every start has
+// made one, which is the moment several replicas starting together all pass.
+type checkEmptinessTogether struct {
+	data.Database
+	together *sync.WaitGroup
+	once     sync.Once
+}
+
+func (c *checkEmptinessTogether) IsEmpty(ctx context.Context) (bool, error) {
+	isEmpty, err := c.Database.IsEmpty(ctx)
+	c.once.Do(func() {
+		c.together.Done()
+		c.together.Wait()
+	})
+	return isEmpty, err
+}
+
+// TestFirstStart_SeveralReplicasOnOneEmptyDatabaseAllComeUp is a whole first start as main makes
+// it up to the listener, NewDatabase and then the seed, made by three replicas at once on one empty
+// database (#542 decision 2). Every one comes up: one migrates while the others wait for the
+// migration lock and then find nothing to migrate, the email case pre-flight runs under that lock
+// and never reads a schema part way up, and the seeds race as the case above has them race.
+//
+// The migration half is not forced the way the seed is: whether a waiting start would have read the
+// schema mid-chain before the pre-flight moved under the lock depends on timing, and the migrator's
+// own tests are where that is proved deterministically. This is the composition, on the engines that
+// have replicas.
+func TestFirstStart_SeveralReplicasOnOneEmptyDatabaseAllComeUp(t *testing.T) {
+	if dbType() == data.SQLite {
+		t.Skip("a SQLite database belongs to one process; replicas need a server engine")
+	}
+	h := newIsolatedDB(t)
+	cfg := appConfig.Database
+	cfg.Name = h.Name
+	const starts = 3
+
+	var together sync.WaitGroup
+	together.Add(starts)
+	outcomes := make([]bootstrap.Outcome, starts)
+	failures := make([]error, starts)
+	var done sync.WaitGroup
+	for i := range starts {
+		done.Go(func() {
+			opened, err := datafactory.NewDatabase(context.Background(), &cfg, dataKey, nil, false)
+			if err != nil {
+				failures[i] = err
+				together.Done()
+				return
+			}
+			defer func() { _ = opened.Close() }()
+			db := &checkEmptinessTogether{Database: opened, together: &together}
+			outcomes[i], failures[i] = bootstrap.Run(context.Background(), db, dataCipher, seedConfig("admin@example.com"))
+		})
+	}
+	done.Wait()
+
+	for i := range starts {
+		require.NoErrorf(t, failures[i], "replica %d comes up", i)
+		assert.Equalf(t, bootstrap.Continue, outcomes[i], "replica %d", i)
+	}
+	version, dirty, err := h.Migrator.Version(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, h.Migrator.Head(), version, "the schema is at head")
+	assert.False(t, dirty)
+	counts := seededRowCounts(t, h)
+	assert.Equal(t, 1, counts["clients"], "one seed committed, and only one")
+	assert.Equal(t, 1, counts["settings"])
 }

@@ -9,9 +9,11 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -80,7 +82,8 @@ func newRunner(db runDatabase, dataCipher *encryption.DataCipher, cfg Config) *r
 }
 
 // Run seeds an empty database in the mode the configuration selects and answers what the process
-// does next. A database already seeded is left alone. An error means the process exits 1. Every
+// does next. A database already seeded is left alone, and so is one another instance seeds while
+// this one is seeding it (seededByAnother). An error means the process exits 1. Every
 // error but one means nothing the seed wrote was committed, so the next start, with the cause
 // fixed, seeds from the beginning. The exception is a bootstrap file that could not be moved into
 // place after the commit: the database is seeded, a restart regenerates nothing, and the error
@@ -118,6 +121,9 @@ func (r *runner) run(ctx context.Context) (Outcome, error) {
 	case r.cfg.OAuthClientSecret != "":
 		slog.InfoContext(ctx, "using single-step setup mode, because an oauth client secret is configured")
 		if err := r.seed(ctx, ""); err != nil {
+			if r.seededByAnother(ctx, err) {
+				return Continue, nil
+			}
 			return Refused, errs.Wrap(err, "unable to seed the database")
 		}
 		return Continue, nil
@@ -125,6 +131,9 @@ func (r *runner) run(ctx context.Context) (Outcome, error) {
 	case r.cfg.BootstrapEnvOutFile != "":
 		slog.InfoContext(ctx, "using legacy two-step bootstrap mode")
 		if err := r.seed(ctx, r.cfg.BootstrapEnvOutFile); err != nil {
+			if r.seededByAnother(ctx, err) {
+				return Continue, nil
+			}
 			return Refused, errs.Wrap(err, "unable to seed the database")
 		}
 		logBootstrapComplete(ctx, r.cfg.BootstrapEnvOutFile)
@@ -134,6 +143,34 @@ func (r *runner) run(ctx context.Context) (Outcome, error) {
 		logInitialSetupRequired(ctx)
 		return Refused, nil
 	}
+}
+
+// seededByAnother answers whether a seed that failed lost the database to another instance seeding
+// it at the same time, and if so says so: several replicas starting at once on an empty database
+// all find it empty and all seed (#542 decision 2). The engine's unique keys let one commit; every
+// other seed's first insert loses on one of them, and its transaction rolls back whole, leaving
+// nothing of its own. Such a start then carries on as a start arriving a moment later would, finding
+// the database seeded, where it used to exit 1 with a duplicate key and be restarted to find just
+// that.
+//
+// Only a lost unique key counts, and only when the database now reads as seeded: IsEmpty reads the
+// settings row, which the winner's transaction writes last, so a database that reads as seeded holds
+// all 18 rows. A unique violation on a database that still reads as empty is a fault, not a race,
+// and so is a re-check that fails; both are refused with the seed's own error.
+//
+// A two-step start that lost carries on rather than exiting: it wrote no bootstrap file, its staged
+// copy was removed with its rollback, and the credentials are the winner's, in the file the winner
+// published.
+func (r *runner) seededByAnother(ctx context.Context, seedErr error) bool {
+	if !errors.Is(seedErr, data.ErrUniqueViolation) {
+		return false
+	}
+	isEmpty, err := r.db.IsEmpty(ctx)
+	if err != nil || isEmpty {
+		return false
+	}
+	slog.InfoContext(ctx, "another instance seeded the database while this one was seeding it, proceeding with normal startup")
+	return true
 }
 
 // bootstrapCredentialVars are the five values a deployment has to carry over from

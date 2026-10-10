@@ -125,7 +125,7 @@ func TestUpToHead_AStopWhileAFileRunsFinishesThatFileAndStartsNoOther(t *testing
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
 	done := runInTheBackground(func() error {
-		_, err := m.UpToHead(ctx, "v1.6.0", nil)
+		_, err := m.UpToHead(ctx, "v1.6.0", nil, nil)
 		return err
 	})
 
@@ -152,7 +152,7 @@ func TestUpToHead_AStopWhileAFileRunsFinishesThatFileAndStartsNoOther(t *testing
 	assertPoolReturned(t, db)
 
 	// The lock came back and the stop is resumable: the next start carries on from 000002.
-	migrated, err := m.UpToHead(context.Background(), "v1.6.0", nil)
+	migrated, err := m.UpToHead(context.Background(), "v1.6.0", nil, nil)
 	require.NoError(t, err)
 	assert.True(t, migrated)
 	assert.Equal(t, []RecordedVersion{{Version: 5, Dirty: false}}, recorded(t, db))
@@ -168,7 +168,7 @@ func TestUpToHead_AStopBeforeTheFirstFileRunsNothing(t *testing.T) {
 	// stop arriving there is a stop between files with none applied.
 	progress := &recordingProgress{onMigrating: stop}
 
-	migrated, err := m.UpToHead(ctx, "v1.6.0", progress)
+	migrated, err := m.UpToHead(ctx, "v1.6.0", progress, nil)
 
 	assert.False(t, migrated)
 	var stopped StoppedError

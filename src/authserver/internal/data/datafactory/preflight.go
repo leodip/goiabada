@@ -2,6 +2,7 @@ package datafactory
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sort"
 	"strings"
@@ -168,21 +169,35 @@ func describeEmailCaseHazards(collisions [][]record.EmailCaseRow, unreachable []
 	return b.String()
 }
 
-// preflightEmailCase reads where this database stands, through the migrator NewDatabase is about
-// to bring it to head with, and hands the answer to CheckEmailCaseBeforeMigrating, which is where
-// the policy and every test live. It is the startup half of that check; the `migrate to`
-// subcommand has the other, because it reaches OpenDatabase directly and never comes through here
-// (#351).
-func preflightEmailCase(ctx context.Context, database emailCaseScanner, m *migrator.Migrator) error {
-	recorded, _, err := m.Version(ctx)
-	if migrator.IsNilVersion(err) {
-		recorded = migrator.NilVersion
-	} else if err != nil {
-		// A dirty database reports its version without error, so this is a read that failed. The
-		// migration about to run would fail on the same handle; say which read it was.
-		return errs.Wrap(err, "unable to read the schema version for the email case pre-flight")
-	}
+// emailCaseOnConn is the pre-flight's read on the migration runner's connection.
+type emailCaseOnConn interface {
+	ScanEmailCaseOn(ctx context.Context, conn *sql.Conn) ([]record.EmailCaseRow, error)
+}
 
-	// NewDatabase always migrates to head, so head is the target.
-	return CheckEmailCaseBeforeMigrating(ctx, database, recorded, m.Head())
+// connEmailCaseScanner is an emailCaseOnConn bound to one connection, which is the emailCaseScanner
+// CheckEmailCaseBeforeMigrating reads through.
+type connEmailCaseScanner struct {
+	database emailCaseOnConn
+	conn     *sql.Conn
+}
+
+func (s connEmailCaseScanner) ScanEmailCase(ctx context.Context) ([]record.EmailCaseRow, error) {
+	return s.database.ScanEmailCaseOn(ctx, s.conn)
+}
+
+// emailCasePreflight is the startup half of CheckEmailCaseBeforeMigrating, which is where the policy
+// and every test live; the `migrate to` subcommand has the other, because it reaches OpenDatabase
+// directly and never comes through here (#351). The migrator NewDatabase brings the schema to head
+// with runs it under the migration lock, with the version it read there and head as the target,
+// and reads the users table on its own connection.
+//
+// It ran before the migration, outside the lock, until several replicas starting at once on an
+// empty database showed why it cannot: one read the version while another was part way up the
+// chain, then read a users table that a file was still creating, and its start failed until a
+// restart found the schema settled (#542 decision 2). Under the lock the version it reads is clean,
+// since the runner refuses a dirty one first, and no other process is moving the schema.
+func emailCasePreflight(database emailCaseOnConn) migrator.BeforeMigrating {
+	return func(ctx context.Context, conn *sql.Conn, recorded, target int) error {
+		return CheckEmailCaseBeforeMigrating(ctx, connEmailCaseScanner{database: database, conn: conn}, recorded, target)
+	}
 }

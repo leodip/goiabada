@@ -65,7 +65,7 @@ func TestUpToHead_ReportsTheMigrationAroundTheFilesItRuns(t *testing.T) {
 			t1AtMigrating = tableExists(t, observer, "t1")
 		}}
 
-		migrated, err := m.UpToHead(context.Background(), "v1.6.0", progress)
+		migrated, err := m.UpToHead(context.Background(), "v1.6.0", progress, nil)
 
 		require.NoError(t, err)
 		assert.True(t, migrated)
@@ -84,7 +84,7 @@ func TestUpToHead_ReportsTheMigrationAroundTheFilesItRuns(t *testing.T) {
 		require.NoError(t, m.Migrate(context.Background(), 1))
 
 		progress := &recordingProgress{}
-		_, err := m.UpToHead(context.Background(), "v1.6.0", progress)
+		_, err := m.UpToHead(context.Background(), "v1.6.0", progress, nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, []progressEvent{
@@ -99,7 +99,7 @@ func TestUpToHead_ReportsTheMigrationAroundTheFilesItRuns(t *testing.T) {
 		require.NoError(t, m.Up(context.Background()))
 
 		progress := &recordingProgress{}
-		migrated, err := m.UpToHead(context.Background(), "v1.6.0", progress)
+		migrated, err := m.UpToHead(context.Background(), "v1.6.0", progress, nil)
 
 		require.NoError(t, err)
 		assert.False(t, migrated)
@@ -114,7 +114,7 @@ func TestUpToHead_ReportsTheMigrationAroundTheFilesItRuns(t *testing.T) {
 		}))
 
 		progress := &recordingProgress{}
-		_, err := m.UpToHead(context.Background(), "v1.6.0", progress)
+		_, err := m.UpToHead(context.Background(), "v1.6.0", progress, nil)
 
 		require.Error(t, err)
 		assert.Equal(t, []progressEvent{{Kind: "migrating", From: NilVersion, To: 2, Count: 2}}, progress.events,
@@ -126,7 +126,7 @@ func TestUpToHead_ReportsTheMigrationAroundTheFilesItRuns(t *testing.T) {
 		m := newTestMigrator(t, db, threeVersions())
 
 		progress := &recordingProgress{}
-		_, err := m.UpToHead(context.Background(), "v1.6.0", progress)
+		_, err := m.UpToHead(context.Background(), "v1.6.0", progress, nil)
 
 		require.NoError(t, err)
 		for _, e := range progress.events {
@@ -138,7 +138,7 @@ func TestUpToHead_ReportsTheMigrationAroundTheFilesItRuns(t *testing.T) {
 		db := openTestDB(t)
 		m := newTestMigrator(t, db, threeVersions())
 
-		migrated, err := m.UpToHead(context.Background(), "v1.6.0", nil)
+		migrated, err := m.UpToHead(context.Background(), "v1.6.0", nil, nil)
 
 		require.NoError(t, err)
 		assert.True(t, migrated)
@@ -180,7 +180,7 @@ func TestUpToHead_ReportsAWaitOnlyWhenTheLockIsHeld(t *testing.T) {
 		m, err := New(db, threeVersions(), "migrations", engine(&c, false, &waitBegan, progress))
 		require.NoError(t, err)
 
-		_, err = m.UpToHead(context.Background(), "v1.6.0", progress)
+		_, err = m.UpToHead(context.Background(), "v1.6.0", progress, nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, calls{Try: 1, Lock: 1, Unlock: 1}, c, "one try, then one wait, then one release")
@@ -204,7 +204,7 @@ func TestUpToHead_ReportsAWaitOnlyWhenTheLockIsHeld(t *testing.T) {
 		m, err := New(db, threeVersions(), "migrations", engine(&c, true, &waitBegan, progress))
 		require.NoError(t, err)
 
-		_, err = m.UpToHead(context.Background(), "v1.6.0", progress)
+		_, err = m.UpToHead(context.Background(), "v1.6.0", progress, nil)
 
 		require.NoError(t, err)
 		// A second lock statement after a successful try would take the lock twice. MySQL's
@@ -226,7 +226,7 @@ func TestUpToHead_ReportsAWaitOnlyWhenTheLockIsHeld(t *testing.T) {
 		require.NoError(t, m.Up(context.Background()))
 		progress.events = nil
 
-		migrated, err := m.UpToHead(context.Background(), "v1.6.0", progress)
+		migrated, err := m.UpToHead(context.Background(), "v1.6.0", progress, nil)
 
 		require.NoError(t, err)
 		assert.False(t, migrated)

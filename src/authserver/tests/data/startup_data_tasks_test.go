@@ -251,9 +251,10 @@ func TestNewDatabase_RefusesAStartupWhoseOpenFailed(t *testing.T) {
 // Dirty is the real state this arm exists for. The runner writes the marker before a file runs
 // and clears it after, so a migration cut short by a crash or a dropped connection leaves it set,
 // and Goiabada then refuses to migrate because it cannot tell how much of that file applied.
-// preflightEmailCase reads a dirty database's version without complaint -- it says so in as many
-// words -- so this arm is the only thing standing between that marker and a startup that runs the
-// data tasks anyway. Neutralizing it survived the whole sqlite data tier (#353).
+// The runner refuses that marker before the email case pre-flight it runs under its lock is
+// reached (#542 decision 2), so this arm is the only thing standing between that marker and a
+// startup that runs the data tasks anyway. Neutralizing it survived the whole sqlite data tier
+// (#353).
 //
 // sqlite only, for the reason the cases above give: a DSN to a throwaway file is the one way to
 // reach NewDatabase without touching the shared database this tier runs against. The arm under
@@ -267,8 +268,8 @@ func TestNewDatabase_RefusesADirtyDatabase(t *testing.T) {
 
 	// The marker an interrupted migration leaves behind, written through a handle of its own
 	// because the dirty flag is a raw schema_migrations column and not anything data.Database
-	// exposes. The file is already at head, so the pre-flight reads the version, skips, and this
-	// arm is the first one with anything to refuse.
+	// exposes. The runner refuses it before anything else runs, and this arm is what has to pass
+	// that refusal on.
 	marker, err := sqlitedb.New(context.Background(), cfg.DSN, false)
 	require.NoError(t, err, "the marker handle has to open before the fixture can be written")
 	res, err := marker.DB.Exec("UPDATE schema_migrations SET dirty = 1")
