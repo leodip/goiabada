@@ -49,7 +49,13 @@ func CORS(database corsDatabase) func(next http.Handler) http.Handler {
 			return false
 		},
 		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		AllowedMethods: []string{"GET", "POST", "DELETE", "OPTIONS"},
+		// HEAD beside GET, because cors answers an actual request only for a listed method, and the
+		// discovery document and JWKS answer HEAD as they answer GET (RFC 9110 section 9.3.2):
+		// left out, a cross-origin HEAD got their content's headers but no
+		// Access-Control-Allow-Origin. HEAD is a CORS-safelisted method (Fetch Standard section
+		// 2.2.1), so it never needs a preflight; the endpoints above that check an origin refuse
+		// it with 405 whatever this says.
+		AllowedMethods: []string{"GET", "HEAD", "POST", "DELETE", "OPTIONS"},
 		// Ten minutes. cors@v1.2.2 emits Access-Control-Max-Age only when maxAge > 0, so with
 		// no value set every browser fell back to its own short default and re-preflighted
 		// constantly, each one paying for the lookup above.

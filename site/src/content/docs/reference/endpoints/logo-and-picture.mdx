@@ -41,7 +41,7 @@ A client's logo works the same way: `<img src="https://auth.example.com/client/l
 
 The logo is public whatever the client's state. It's served while the client is disabled, and while **Show logo** is off: that switch decides whether the sign-in screens show the logo, not whether anyone may fetch it. The admin console's **Logo** tab previews it through this same URL.
 
-The answer carries an `ETag` and `Cache-Control: public, max-age=300, must-revalidate`, so a browser or a proxy keeps it for five minutes and then asks again. A request with an `If-None-Match` naming the current `ETag`, or `*`, is answered `304 Not Modified` with no body.
+The answer carries an `ETag` and `Cache-Control: public, max-age=300, must-revalidate`, so a browser or a proxy keeps it for five minutes and then asks again. A request with an `If-None-Match` naming the current `ETag`, or `*`, is answered `304 Not Modified` with no body. A `HEAD` request is answered as a `GET` is, with the same headers and no body, here and for the profile picture.
 
 A client that doesn't exist, or has no logo, is answered `404 Not Found`. The identifier is matched exactly, case included.
 

@@ -222,6 +222,18 @@ func metricsHandler(reg *metrics.Registry) http.Handler {
 	return mux
 }
 
+// getAndHead registers handler for GET and for HEAD on pattern. RFC 9110 section 9.1 has a
+// general-purpose server support both, and section 9.3.2 has a HEAD answered as the GET would be,
+// with the same header fields and no content, which is what net/http does by itself: its
+// ResponseWriter discards what a handler writes for a HEAD request, and http.FileServer and
+// http.Redirect answer HEAD on their own. It is for the read-only resources a cache, a monitor or a
+// link checker may probe, and only those: an endpoint whose GET starts or changes something, such
+// as /auth/authorize, stays GET-only, so a HEAD there is 405 with Allow naming GET.
+func getAndHead(r chi.Router, pattern string, handler http.HandlerFunc) {
+	r.Get(pattern, handler)
+	r.Head(pattern, handler)
+}
+
 // registerRoutes mounts everything this server answers on s.router: the root chain, the static
 // branch and the application branches, in that order. All are registered on s.router; only the
 // application branches carry the middleware initMiddleware returns, which is what keeps a
@@ -233,12 +245,12 @@ func (s *Server) registerRoutes() {
 
 	// Browsers auto-probe /favicon.ico at the site root regardless of the
 	// <link rel="icon"> tags; point it at the real asset under /static.
-	s.router.Get("/favicon.ico", http.RedirectHandler("/static/favicon/favicon.ico", http.StatusMovedPermanently).ServeHTTP)
+	getAndHead(s.router, "/favicon.ico", http.RedirectHandler("/static/favicon/favicon.ico", http.StatusMovedPermanently).ServeHTTP)
 
 	// Beside the static branch rather than on the application branch, so the probes' endpoint
 	// passes through none of the settings read and the session load, and answers whenever the process is up
 	// (see handlers.HandleHealthCheckGet, #390).
-	s.router.Get("/health", handlers.HandleHealthCheckGet())
+	getAndHead(s.router, "/health", handlers.HandleHealthCheckGet())
 
 	s.initRoutes(branches)
 }
@@ -682,9 +694,9 @@ func bodyLimitPolicy(profilePictureMaxSizeBytes int64) httpmw.BodyLimitPolicy {
 // serveStaticFiles serves the embedded static files under /static/ and redirects /static to
 // /static/. They are mounted nowhere else, so neither the path nor the file system is a parameter.
 func (s *Server) serveStaticFiles() {
-	s.router.Get("/static", http.RedirectHandler("/static/", http.StatusMovedPermanently).ServeHTTP)
+	getAndHead(s.router, "/static", http.RedirectHandler("/static/", http.StatusMovedPermanently).ServeHTTP)
 
-	s.router.Get("/static/*", func(w http.ResponseWriter, r *http.Request) {
+	getAndHead(s.router, "/static/*", func(w http.ResponseWriter, r *http.Request) {
 		rctx := chi.RouteContext(r.Context())
 		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
 		fsHandler := http.StripPrefix(pathPrefix, http.FileServer(http.FS(s.staticFS)))
