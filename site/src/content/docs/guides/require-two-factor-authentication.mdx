@@ -74,7 +74,7 @@ A user whose session already reached the client's level isn't asked for anything
 
 A user who signed in to another app with a password alone isn't asked for their password again. They're asked only for the code, which is a [step-up](/concepts/acr-and-amr/#a-session-thats-already-there), and their session keeps the higher level from then on.
 
-When a user sets up or removes an authenticator, every session of theirs goes through the code step again before it's used for a level above `urn:goiabada:level1`: the user enters a code, or, with no authenticator left, is asked for nothing at level 2 and sets up a new one at level 3.
+When a user sets up or removes an authenticator, each of their sessions is checked again for a second factor before it's used for a level above `urn:goiabada:level1`: a user with an authenticator enters a code, and a user with none left is asked for nothing at level 2 and sets up a new one at level 3.
 
 ## A user who lost their authenticator
 

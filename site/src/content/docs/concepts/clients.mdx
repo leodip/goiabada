@@ -102,7 +102,7 @@ Removing a redirect URI takes effect on sign-ins already under way: [Invalid red
 
 ### Loopback redirect URIs
 
-A desktop or command-line app often receives its callback on a temporary local server, on a port the operating system picks at startup. So for an `http` redirect URI on a loopback host, `127.0.0.1`, `[::1]` or `localhost`, the port is ignored when comparing: register `http://127.0.0.1/callback` and `http://127.0.0.1:54321/callback` matches, per [RFC 8252](https://datatracker.ietf.org/doc/html/rfc8252#section-7.3).
+A desktop or command-line app often receives its callback on a temporary local server, on a port the operating system picks at startup. So for an `http` redirect URI on a loopback host, `127.0.0.1`, `[::1]` or `localhost`, the port is ignored when comparing: register `http://127.0.0.1/callback` and `http://127.0.0.1:54321/callback` matches. [RFC 8252 section 7.3](https://datatracker.ietf.org/doc/html/rfc8252#section-7.3) asks this for the two IP addresses. Goiabada allows it for `localhost` too, as a convenience, though [section 8.3](https://datatracker.ietf.org/doc/html/rfc8252#section-8.3) advises against `localhost`, so prefer `127.0.0.1`.
 
 The port is the only part that may differ. It applies to `http` only, never `https`, and only to `response_type=code`, never the implicit flow.
 

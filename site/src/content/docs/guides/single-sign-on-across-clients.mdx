@@ -28,7 +28,7 @@ That's [single sign-on](/concepts/glossary/#single-sign-on-sso), and there's not
    Host: auth.example.com
    ```
 
-   A code means the user is signed in. `login_required` means there's no session to use, so show your sign-in button. Any other error, such as `interaction_required` or `consent_required`, means the user has a page to see: send them through the same request without `prompt=none`. See [prompt](/concepts/prompt/#check-for-a-session-silently).
+   A code means the user is signed in. `login_required` means there's no session to use, so show your sign-in button. `interaction_required` and `consent_required` mean the user has a page to see: send them through the same request without `prompt=none`. `access_denied` means the user holds none of the scopes asked for, or has been disabled, which a sign-in doesn't change. See [prompt](/concepts/prompt/#check-for-a-session-silently).
 
 </Steps>
 
