@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/gender"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/leodip/goiabada/core/locales"
 	"github.com/leodip/goiabada/core/timezones"
 )
@@ -171,7 +172,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 		}
 	}
 
-	if len(input.Website) > 96 {
+	if inputvalidation.TextLength(input.Website) > 96 {
 		return i18n.NewLocalizedError(i18n.ErrCodeProfileWebsiteTooLong, map[string]any{"max": 96})
 	}
 

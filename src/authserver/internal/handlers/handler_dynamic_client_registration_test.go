@@ -716,4 +716,16 @@ func TestValidateDCRRequest_AClientNameTakesTheDescriptionBound(t *testing.T) {
 	pastBound := oidc.DynamicClientRegistrationRequest{ClientName: strings.Repeat("a", 101)}
 	applyDCRDefaults(&pastBound)
 	require.ErrorContains(t, validateDCRRequest(&pastBound), "client_name cannot exceed 100 characters")
+
+	// Counted in characters, as the message says: a hundred é is 200 bytes and fits, the one
+	// hundred and first doesn't, and an emoji counts two, as SQL Server stores it.
+	accented := oidc.DynamicClientRegistrationRequest{ClientName: strings.Repeat("é", 100)}
+	applyDCRDefaults(&accented)
+	require.NoError(t, validateDCRRequest(&accented))
+	accentedPast := oidc.DynamicClientRegistrationRequest{ClientName: strings.Repeat("é", 101)}
+	applyDCRDefaults(&accentedPast)
+	require.Error(t, validateDCRRequest(&accentedPast))
+	emoji := oidc.DynamicClientRegistrationRequest{ClientName: strings.Repeat("🙂", 51)}
+	applyDCRDefaults(&emoji)
+	require.Error(t, validateDCRRequest(&emoji), "51 emoji are 102 UTF-16 code units")
 }

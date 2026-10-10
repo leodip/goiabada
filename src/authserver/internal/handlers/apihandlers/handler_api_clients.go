@@ -349,7 +349,7 @@ func HandleClientCreatePost(
 
 		// Validate description length
 		const maxLengthDescription = 100
-		if len(req.Description) > maxLengthDescription {
+		if inputvalidation.TextLength(req.Description) > maxLengthDescription {
 			writeJSONError(w, "The description cannot exceed a maximum length of "+strconv.Itoa(maxLengthDescription)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -362,7 +362,7 @@ func HandleClientCreatePost(
 		// Validate display name
 		trimmedDisplayName := strings.TrimSpace(req.DisplayName)
 		const maxLengthDisplayName = 100
-		if len(trimmedDisplayName) > maxLengthDisplayName {
+		if inputvalidation.TextLength(trimmedDisplayName) > maxLengthDisplayName {
 			writeJSONError(w, "The display name cannot exceed a maximum length of "+strconv.Itoa(maxLengthDisplayName)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -487,7 +487,7 @@ func HandleClientUpdatePut(
 
 		// Validate description length
 		const maxLengthDescription = 100
-		if len(updateReq.Description) > maxLengthDescription {
+		if inputvalidation.TextLength(updateReq.Description) > maxLengthDescription {
 			writeJSONError(w, "The description cannot exceed a maximum length of "+strconv.Itoa(maxLengthDescription)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -574,7 +574,7 @@ func HandleClientUpdatePut(
 		websiteURL := strings.TrimSpace(updateReq.WebsiteURL)
 		if websiteURL != "" {
 			const maxLengthWebsiteURL = 256
-			if len(websiteURL) > maxLengthWebsiteURL {
+			if inputvalidation.TextLength(websiteURL) > maxLengthWebsiteURL {
 				writeJSONError(w, "The website URL cannot exceed a maximum length of "+strconv.Itoa(maxLengthWebsiteURL)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
@@ -596,7 +596,7 @@ func HandleClientUpdatePut(
 
 		// Validate display name length
 		const maxLengthDisplayName = 100
-		if len(client.DisplayName) > maxLengthDisplayName {
+		if inputvalidation.TextLength(client.DisplayName) > maxLengthDisplayName {
 			writeJSONError(w, "The display name cannot exceed a maximum length of "+strconv.Itoa(maxLengthDisplayName)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}

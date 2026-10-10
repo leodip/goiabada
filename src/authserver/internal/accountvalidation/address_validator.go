@@ -3,6 +3,7 @@ package accountvalidation
 import (
 	"github.com/leodip/goiabada/core/countries"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 type AddressValidator struct {
@@ -24,23 +25,23 @@ type ValidateAddressInput struct {
 func (val *AddressValidator) ValidateAddress(input *ValidateAddressInput) error {
 
 	// i18n surface: C — admin/account API.
-	if len(input.AddressLine1) > 60 {
+	if inputvalidation.TextLength(input.AddressLine1) > 60 {
 		return i18n.NewLocalizedError(i18n.ErrCodeAddressLine1TooLong, map[string]any{"max": 60})
 	}
 
-	if len(input.AddressLine2) > 60 {
+	if inputvalidation.TextLength(input.AddressLine2) > 60 {
 		return i18n.NewLocalizedError(i18n.ErrCodeAddressLine2TooLong, map[string]any{"max": 60})
 	}
 
-	if len(input.AddressLocality) > 60 {
+	if inputvalidation.TextLength(input.AddressLocality) > 60 {
 		return i18n.NewLocalizedError(i18n.ErrCodeAddressLocalityTooLong, map[string]any{"max": 60})
 	}
 
-	if len(input.AddressRegion) > 60 {
+	if inputvalidation.TextLength(input.AddressRegion) > 60 {
 		return i18n.NewLocalizedError(i18n.ErrCodeAddressRegionTooLong, map[string]any{"max": 60})
 	}
 
-	if len(input.AddressPostalCode) > 30 {
+	if inputvalidation.TextLength(input.AddressPostalCode) > 30 {
 		return i18n.NewLocalizedError(i18n.ErrCodeAddressPostalCodeTooLong, map[string]any{"max": 30})
 	}
 

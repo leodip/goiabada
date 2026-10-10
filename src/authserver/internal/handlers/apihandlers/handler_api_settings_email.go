@@ -20,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/hostport"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 // HandleSettingsEmailGet - GET /api/v1/admin/settings/email
@@ -131,7 +132,7 @@ func HandleSettingsEmailPut(
 			return
 		}
 
-		if len(smtpHost) > 120 {
+		if inputvalidation.TextLength(smtpHost) > 120 {
 			writeJSONError(w, fmt.Sprintf("SMTP host must be less than %v characters.", 120), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -148,7 +149,7 @@ func HandleSettingsEmailPut(
 			return
 		}
 
-		if len(req.SMTPUsername) > 60 {
+		if inputvalidation.TextLength(req.SMTPUsername) > 60 {
 			writeJSONError(w, fmt.Sprintf("SMTP username must be less than %v characters.", 60), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -159,7 +160,7 @@ func HandleSettingsEmailPut(
 			writeJSONError(w, fmt.Sprintf("SMTP password must be at most %v bytes.", 256), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		if len(req.SMTPFromName) > 60 {
+		if inputvalidation.TextLength(req.SMTPFromName) > 60 {
 			writeJSONError(w, fmt.Sprintf("SMTP from name must be less than %v characters.", 60), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -168,7 +169,7 @@ func HandleSettingsEmailPut(
 			writeValidationError(w, r, validateNoAngleBracketsErr)
 			return
 		}
-		if len(req.SMTPFromEmail) > 60 {
+		if inputvalidation.TextLength(req.SMTPFromEmail) > 60 {
 			writeJSONError(w, fmt.Sprintf("SMTP from email must be less than %v characters.", 60), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}

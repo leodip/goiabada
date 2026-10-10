@@ -2,6 +2,7 @@ package accountvalidation
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/core/i18n"
@@ -246,4 +247,20 @@ func TestValidateAddress(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The bounds count characters, as their messages say, not bytes: sixty é is 120 bytes and fits
+// the address line's sixty, and the sixty-first is refused. Until the review before 1.7.0 it was
+// refused at thirty-one.
+func TestValidateAddress_CountsCharactersNotBytes(t *testing.T) {
+	validator := NewAddressValidator()
+
+	require.NoError(t, validator.ValidateAddress(&ValidateAddressInput{
+		AddressLine1: strings.Repeat("é", 60),
+	}))
+
+	err := validator.ValidateAddress(&ValidateAddressInput{AddressLine1: strings.Repeat("é", 61)})
+	var localized *i18n.LocalizedError
+	require.ErrorAs(t, err, &localized)
+	assert.Equal(t, i18n.ErrCodeAddressLine1TooLong, localized.Code)
 }

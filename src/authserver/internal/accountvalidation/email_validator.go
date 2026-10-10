@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 // emailValidatorDatabase is what the account email validator reads: the rows that decide whether
@@ -72,7 +73,7 @@ func (val *EmailValidator) ValidateEmailChange(ctx context.Context, email string
 		return err
 	}
 
-	if len(email) > MaxEmailLength {
+	if inputvalidation.TextLength(email) > MaxEmailLength {
 		return i18n.NewLocalizedError(i18n.ErrCodeEmailTooLong, map[string]any{"max": MaxEmailLength})
 	}
 
