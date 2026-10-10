@@ -1593,8 +1593,17 @@ func TestGetUserByForgotPasswordCodeHash_Transaction(t *testing.T) {
 // claim's predicate no longer matches (#112).
 func TestTryConsumeForgotPasswordCode(t *testing.T) {
 	user, hash := createUserWithResetCode(t)
+	// Unverified with a verification code outstanding, as a user an administrator created and
+	// emailed a link to is: redeeming the link proves the address, so the claim verifies it.
+	user.EmailVerified = false
+	user.EmailVerificationCodeEncrypted = []byte("PENDINGVERIFYCODE")
+	user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
+	if err := database.UpdateUser(context.Background(), nil, user); err != nil {
+		t.Fatalf("Failed to seed an unverified address: %v", err)
+	}
 
-	// 16. The stored hash claims, writes the password, and clears all three code columns.
+	// 16. The stored hash claims, writes the password, clears all three code columns, and
+	// marks the address verified, dropping the verification code outstanding for it.
 	claimed, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, user.Id, hash, "firstpassword")
 	if err != nil {
 		t.Fatalf("the first claim failed: %v", err)
@@ -1618,6 +1627,12 @@ func TestTryConsumeForgotPasswordCode(t *testing.T) {
 	}
 	if after.ForgotPasswordCodeHash != "" {
 		t.Errorf("the code hash must be cleared in the same statement, got %q", after.ForgotPasswordCodeHash)
+	}
+	if !after.EmailVerified {
+		t.Error("redeeming a link sent to the address must mark it verified")
+	}
+	if len(after.EmailVerificationCodeEncrypted) != 0 || after.EmailVerificationCodeIssuedAt.Valid {
+		t.Error("the outstanding verification code must be cleared in the same statement")
 	}
 
 	// 17. The same hash again claims nothing and leaves the first password standing.
