@@ -98,11 +98,11 @@
                         },
                         function() {
                             // Confirm callback - submit the form
-                            formSettings.submit();
+                            submitSettings(formSettings);
                         }
                     );
                 } else {
-                    formSettings.submit();
+                    submitSettings(formSettings);
                 }
             });
         }
@@ -112,12 +112,16 @@
         const selfRegistrationEnabled = document.getElementById('selfRegistrationEnabled');
         const selfRegistrationRequiresEmailVerification = document.getElementById('selfRegistrationRequiresEmailVerification');
 
-        if (selfRegistrationEnabled.checked) {
-            selfRegistrationRequiresEmailVerification.disabled = false;
-        } else {
-            selfRegistrationRequiresEmailVerification.checked = false;
-            selfRegistrationRequiresEmailVerification.disabled = true;
-        }
+        // Greyed out while self-registration is off, where it does nothing, but never cleared:
+        // turning self-registration back on brings back the choice made before.
+        selfRegistrationRequiresEmailVerification.disabled = !selfRegistrationEnabled.checked;
+    }
+
+    // A disabled checkbox isn't sent with the form, which would save it as off, so it's
+    // enabled just before the form goes and its value is kept.
+    function submitSettings(formSettings) {
+        document.getElementById('selfRegistrationRequiresEmailVerification').disabled = false;
+        formSettings.submit();
     }
 </script>
 
