@@ -11,9 +11,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -753,6 +755,40 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			assert.Equal(t, tc.wantDescription, answer.errorDescription)
 			assert.Equal(t, tc.wantUserDisabled, answer.userDisabled)
 			assert.Equal(t, tc.wantReads, reads)
+		})
+	}
+}
+
+// The silent flow answers every step-up a session owes with interaction_required, and anything
+// StepUp does not name, as a reason added to it later would be, is refused as well: prompt=none fails
+// closed rather than issuing a code its target was not met for (#542). StepUpOwed's error is
+// refused the same way.
+func TestSilentStepUpRefusal_FailsClosed(t *testing.T) {
+	testCases := []struct {
+		name            string
+		stepUp          ceremony.StepUp
+		err             error
+		wantRefused     bool
+		wantDescription string
+	}{
+		{"no step-up", ceremony.StepUpNone, nil, false, ""},
+		{"a higher level", ceremony.StepUpLevel, nil, true, "Higher authentication level required"},
+		{"no authenticator", ceremony.StepUpAuthenticatorMissing, nil, true, "Additional authentication setup required"},
+		{"a changed authenticator", ceremony.StepUpOtpConfigChanged, nil, true, "Authentication configuration has changed"},
+		{"a value StepUp does not name", ceremony.StepUp(99), nil, true, "Higher authentication level required"},
+		{"StepUpOwed's error", ceremony.StepUpNone, errs.New("unknown target level"), true, "Higher authentication level required"},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			code, description, refused := silentStepUpRefusal(tc.stepUp, tc.err)
+
+			assert.Equal(t, tc.wantRefused, refused)
+			assert.Equal(t, tc.wantDescription, description)
+			if tc.wantRefused {
+				assert.Equal(t, oidc.ErrorInteractionRequired, code)
+			} else {
+				assert.Empty(t, code)
+			}
 		})
 	}
 }
