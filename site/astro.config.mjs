@@ -223,7 +223,6 @@ export default defineConfig({
 					items: [
 						{ label: 'About', slug: 'about' },
 						{ label: 'Contributing', slug: 'about/contributing' },
-						{ label: 'Contact', slug: 'about/contact' },
 						{ label: 'License', slug: 'about/license' },
 					],
 				},
