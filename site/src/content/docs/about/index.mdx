@@ -1,11 +1,11 @@
 ---
 title: About
-description: Why Goiabada exists, where its name comes from, and who makes it.
+description: Why Goiabada exists, where its name comes from, who makes it, and how to get in touch.
 ---
 
-import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-This page tells you why Goiabada exists and where its name comes from.
+This page tells you why Goiabada exists, where its name comes from, and how to reach the people behind it.
 
 Goiabada is an auth server you run yourself, made to be easy to set up and easy to live with. There are plenty of alternatives; this is one person's take on how it should work.
 
@@ -21,10 +21,31 @@ Goiabada is a Brazilian sweet made from guava. It also starts with "Go", the lan
 
 Goiabada is created and maintained by Leonardo D'Ippolito, with fixes and ideas from the people who use it. You can join them: see [Contributing](/about/contributing/).
 
+## Get in touch
+
+- **A bug or a feature request:** open an issue on [GitHub](https://github.com/leodip/goiabada/issues), so everyone can follow it.
+- **A security vulnerability:** email [contact@leodip.com](mailto:contact@leodip.com), as [Report a vulnerability](/reference/security/#report-a-vulnerability) describes.
+- **Anything else:** email [contact@leodip.com](mailto:contact@leodip.com), or find Leonardo on [LinkedIn](https://www.linkedin.com/in/leodip/).
+
+<Aside type="danger">
+**Never** report a vulnerability in a public GitHub issue. Anyone can read it there, before there's a fix.
+</Aside>
+
+## Help with your project
+
+Leonardo D'Ippolito, who makes Goiabada, is available for freelance work:
+
+- **Goiabada:** integrating it with your apps, deploying it, or building a feature you need.
+- **Full-stack development:** .NET, Go, Vue.js and JavaScript.
+- **Infrastructure:** Docker, Kubernetes and SQL databases.
+- **Software in general:** architecture, implementation and performance.
+
+Email [contact@leodip.com](mailto:contact@leodip.com) to talk about your project.
+
 ## Next steps
 
 <CardGrid>
   <LinkCard title="Introduction" description="What Goiabada does for your apps." href="/get-started/introduction/" />
   <LinkCard title="Contributing" description="Build Goiabada from source and send a change." href="/about/contributing/" />
-  <LinkCard title="Contact" description="Report a bug, or get in touch." href="/about/contact/" />
+  <LinkCard title="GitHub issues" description="Report a bug or follow one." href="https://github.com/leodip/goiabada/issues" />
 </CardGrid>
