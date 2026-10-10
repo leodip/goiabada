@@ -96,7 +96,7 @@ func TestMigration000062_UserSessionPasswordAuthTime(t *testing.T) {
 		 ip_address, device_name, device_type, device_os, user_agent, user_id)
 		VALUES ('%s', %s, %s, 'pwd', 'urn:goiabada:level1', %s, '127.0.0.1', 'device', 'Desktop', 'Linux', '', %d)`,
 		fake.UUID(), ts, ts, ts, user.Id))
-	assert.Errorf(t, err, "4. a session naming no password_auth_time is refused on %s", dbType())
+	require.Errorf(t, err, "4. a session naming no password_auth_time is refused on %s", dbType())
 	assert.Zerof(t, count000062(t, h, "user_sessions"), "4. and nothing is stored on %s", dbType())
 
 	written := seedSession()
