@@ -32,7 +32,7 @@ const environmentVariablesPage = "site/src/content/docs/reference/environment-va
 // tables as it has topics.
 var environmentVariablesSection = docSection{environmentVariablesPage, "## Every variable"}
 
-// The three answers the page's Read by column gives, and the one this tier is.
+// The three answers the page's Read by lines give, and the one this tier is.
 const (
 	readByAuthServer   = "auth server"
 	readByAdminConsole = "admin console"
@@ -53,23 +53,24 @@ func TestEnvironmentVariablesDocs_ATableDisagreeingWithTheCodeFails(t *testing.T
 	root := t.TempDir()
 	writeManifestFixture(t, root, "site/env.mdx", "## Every variable\n\n"+
 		"### Network\n\n"+
-		"| Variable | Flag | Default | Read by | What it does |\n"+
-		"|---|---|---|---|---|\n"+
-		"| `GOIABADA_AUTHSERVER_BASEURL` | `--authserver-base-url` | `http://localhost:9090` | both | The public URL. |\n"+
-		"| `GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP` | `--authserver-listen-port-http` | `8080` | auth server | The port. |\n"+
-		"| `GOIABADA_AUTHSERVER_RETIRED` | none | empty | auth server | Gone from the code. |\n"+
-		"| `GOIABADA_ADMINCONSOLE_BASEURL` | `--adminconsole-baseurl` | `http://localhost:9091` | admin console | Read here too. |\n"+
-		"| `GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP` | `--adminconsole-listen-port-http` | `9091` | admin console | The console's own. |\n\n"+
+		"| Variable | What it does |\n"+
+		"|---|---|\n"+
+		"| `GOIABADA_AUTHSERVER_BASEURL`<br/>Flag: `--authserver-base-url`<br/>Default: `http://localhost:9090`<br/>Read by: both | The public URL. |\n"+
+		"| `GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP`<br/>Flag: `--authserver-listen-port-http`<br/>Default: `8080`<br/>Read by: auth server | The port. |\n"+
+		"| `GOIABADA_AUTHSERVER_RETIRED`<br/>Flag: none<br/>Default: empty<br/>Read by: auth server | Gone from the code. |\n"+
+		"| `GOIABADA_ADMINCONSOLE_BASEURL`<br/>Flag: `--adminconsole-baseurl`<br/>Default: `http://localhost:9091`<br/>Read by: admin console | Read here too. |\n"+
+		"| `GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP`<br/>Flag: `--adminconsole-listen-port-http`<br/>Default: `9091`<br/>Read by: admin console | The console's own. |\n\n"+
 		"### Keys\n\n"+
-		"| Variable | Flag | Default | Read by | What it does |\n"+
-		"|---|---|---|---|---|\n"+
-		"| `GOIABADA_AUTHSERVER_BASEURL` | `--authserver-baseurl` | `http://localhost:9090` | both | Listed twice. |\n"+
-		"| `GOIABADA_AES_ENCRYPTION_KEY` | `--aes-encryption-key` | `secret` | auth server | Neither a flag nor a default. |\n"+
-		"| `GOIABADA_DB_CONN_MAX_LIFETIME` | `--db-conn-max-lifetime` | `30m` | auth server | |\n"+
-		"| `GOIABADA_DB_CREATE` | `--db-create` | `true` | the auth server | Not a reader. |\n"+
-		"| GOIABADA_DB_TYPE | `--db-type` | `sqlite` | auth server | Not backticked. |\n"+
-		"| `GOIABADA_DB_PORT` | `--db-port` | `3306` | auth server |\n\n"+
-		"## Next\n\n| `GOIABADA_APPNAME` | `--appname` | `Goiabada` | auth server | Outside the section. |\n")
+		"| Variable | What it does |\n"+
+		"|---|---|\n"+
+		"| `GOIABADA_AUTHSERVER_BASEURL`<br/>Flag: `--authserver-baseurl`<br/>Default: `http://localhost:9090`<br/>Read by: both | Listed twice. |\n"+
+		"| `GOIABADA_AES_ENCRYPTION_KEY`<br/>Flag: `--aes-encryption-key`<br/>Default: `secret`<br/>Read by: auth server | Neither a flag nor a default. |\n"+
+		"| `GOIABADA_DB_CONN_MAX_LIFETIME`<br/>Flag: `--db-conn-max-lifetime`<br/>Default: `30m`<br/>Read by: auth server | |\n"+
+		"| `GOIABADA_DB_CREATE`<br/>Flag: `--db-create`<br/>Default: `true`<br/>Read by: the auth server | Not a reader. |\n"+
+		"| GOIABADA_DB_TYPE<br/>Flag: `--db-type`<br/>Default: `sqlite`<br/>Read by: auth server | Not backticked. |\n"+
+		"| `GOIABADA_DB_NAME`<br/>Flag: `--db-name`<br/>Default: `goiabada` | No reader. |\n"+
+		"| `GOIABADA_DB_PORT`<br/>Flag: `--db-port`<br/>Default: `3306`<br/>Read by: auth server |\n\n"+
+		"## Next\n\n| `GOIABADA_APPNAME`<br/>Flag: `--appname`<br/>Default: `Goiabada`<br/>Read by: auth server | Outside the section. |\n")
 
 	vars := []configVar{
 		{env: "GOIABADA_AUTHSERVER_BASEURL", flag: "authserver-baseurl", def: "http://localhost:9090"},
@@ -101,7 +102,8 @@ func TestEnvironmentVariablesDocs_ATableDisagreeingWithTheCodeFails(t *testing.T
 		where + " gives GOIABADA_DB_CONN_MAX_LIFETIME no meaning",
 		where + ` gives GOIABADA_DB_CREATE the reader "the auth server", want auth server, admin console or both`,
 		where + ` has a row whose variable is not one backticked GOIABADA_ variable: "GOIABADA_DB_TYPE"`,
-		where + ` has a row of 4 cells, want variable, flag, default, read by and meaning: ["` + "`GOIABADA_DB_PORT`" + `" "` + "`--db-port`" + `" "` + "`3306`" + `" "auth server"]`,
+		where + ` has a row whose variable cell is not the variable over its Flag, Default and Read by lines: "` + "`GOIABADA_DB_NAME`<br/>Flag: `--db-name`<br/>Default: `goiabada`" + `"`,
+		where + ` has a row that is not two cells, the variable and its meaning: ["` + "`GOIABADA_DB_PORT`<br/>Flag: `--db-port`<br/>Default: `3306`<br/>Read by: auth server" + `"]`,
 		where + " does not list GOIABADA_DB_TYPE",
 		where + " does not list GOIABADA_DB_PORT",
 		where + " does not list GOIABADA_APPNAME",
@@ -115,20 +117,20 @@ func TestEnvironmentVariablesDocs_ATableMatchingTheCodePasses(t *testing.T) {
 	root := t.TempDir()
 	writeManifestFixture(t, root, "site/env.mdx", "## Every variable\n\n"+
 		"### Network\n\n"+
-		"| Variable | Flag | Default | Read by | What it does |\n"+
-		"|---|---|---|---|---|\n"+
-		"| `GOIABADA_AUTHSERVER_BASEURL` | `--authserver-baseurl` | `http://localhost:9090` | both | The public URL. |\n"+
-		"| `GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP` | `--authserver-listen-port-http` | `9090` | auth server | The port. |\n"+
-		"| `GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP` | `--adminconsole-listen-port-http` | `9091` | admin console | The console's own. |\n\n"+
+		"| Variable | What it does |\n"+
+		"|---|---|\n"+
+		"| `GOIABADA_AUTHSERVER_BASEURL`<br/>Flag: `--authserver-baseurl`<br/>Default: `http://localhost:9090`<br/>Read by: both | The public URL. |\n"+
+		"| `GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP`<br/>Flag: `--authserver-listen-port-http`<br/>Default: `9090`<br/>Read by: auth server | The port. |\n"+
+		"| `GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP`<br/>Flag: `--adminconsole-listen-port-http`<br/>Default: `9091`<br/>Read by: admin console | The console's own. |\n\n"+
 		"### Everything else\n\n"+
-		"| Variable | Flag | Default | Read by | What it does |\n"+
-		"|---|---|---|---|---|\n"+
-		"| `GOIABADA_AES_ENCRYPTION_KEY` | none | empty | auth server | The data key. |\n"+
-		"| `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` | `--authserver-trusted-proxies` | empty | auth server | The proxies. |\n"+
-		"| `GOIABADA_DB_CONN_MAX_LIFETIME` | `--db-conn-max-lifetime` | `30m` | auth server | The lifetime. |\n"+
-		"| `GOIABADA_DB_CONN_MAX_IDLE_TIME` | `--db-conn-max-idle-time` | `1h` | auth server | The idle time. |\n"+
-		"| `GOIABADA_DB_CREATE` | `--db-create` | `true` | auth server | Create it. |\n"+
-		"| `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` | none | `3145728` | auth server | The size. |\n\n"+
+		"| Variable | What it does |\n"+
+		"|---|---|\n"+
+		"| `GOIABADA_AES_ENCRYPTION_KEY`<br/>Flag: none<br/>Default: empty<br/>Read by: auth server | The data key. |\n"+
+		"| `GOIABADA_AUTHSERVER_TRUSTED_PROXIES`<br/>Flag: `--authserver-trusted-proxies`<br/>Default: empty<br/>Read by: auth server | The proxies. |\n"+
+		"| `GOIABADA_DB_CONN_MAX_LIFETIME`<br/>Flag: `--db-conn-max-lifetime`<br/>Default: `30m`<br/>Read by: auth server | The lifetime. |\n"+
+		"| `GOIABADA_DB_CONN_MAX_IDLE_TIME`<br/>Flag: `--db-conn-max-idle-time`<br/>Default: `1h`<br/>Read by: auth server | The idle time. |\n"+
+		"| `GOIABADA_DB_CREATE`<br/>Flag: `--db-create`<br/>Default: `true`<br/>Read by: auth server | Create it. |\n"+
+		"| `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES`<br/>Flag: none<br/>Default: `3145728`<br/>Read by: auth server | The size. |\n\n"+
 		"## Next\n\nText.\n")
 
 	vars := []configVar{
@@ -153,8 +155,8 @@ func TestEnvironmentVariablesDocs_ATableMatchingTheCodePasses(t *testing.T) {
 func TestEnvironmentVariablesDocs_AMissingSectionStops(t *testing.T) {
 	root := t.TempDir()
 	writeManifestFixture(t, root, "site/env.mdx", "## Variables\n\n"+
-		"| Variable | Flag | Default | Read by | What it does |\n|---|---|---|---|---|\n"+
-		"| `GOIABADA_APPNAME` | `--appname` | `Goiabada` | auth server | The name. |\n")
+		"| Variable | What it does |\n|---|---|\n"+
+		"| `GOIABADA_APPNAME`<br/>Flag: `--appname`<br/>Default: `Goiabada`<br/>Read by: auth server | The name. |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
 		assertEnvironmentVariablesDocs(r, root, docSection{"site/env.mdx", "## Every variable"},
@@ -221,18 +223,24 @@ func environmentVariablesDocsFindings(root string, section docSection, vars []co
 	var findings []string
 	listed := make(map[string]bool)
 	for _, cells := range rows {
-		if len(cells) != 5 {
-			findings = append(findings, fmt.Sprintf("%s has a row of %d cells, want variable, flag, default, read by and meaning: %q",
-				where, len(cells), cells))
+		if len(cells) != 2 {
+			findings = append(findings, fmt.Sprintf("%s has a row that is not two cells, the variable and its meaning: %q",
+				where, cells))
 			continue
 		}
-		match := docVariableCell.FindStringSubmatch(cells[0])
-		if match == nil {
-			findings = append(findings, fmt.Sprintf("%s has a row whose variable is not one backticked GOIABADA_ variable: %q",
+		row, ok := docVariableLines(cells[0])
+		if !ok {
+			findings = append(findings, fmt.Sprintf("%s has a row whose variable cell is not the variable over its Flag, Default and Read by lines: %q",
 				where, cells[0]))
 			continue
 		}
-		name, flagCell, defaultCell, reader, meaning := match[1], cells[1], cells[2], cells[3], cells[4]
+		match := docVariableCell.FindStringSubmatch(row.variable)
+		if match == nil {
+			findings = append(findings, fmt.Sprintf("%s has a row whose variable is not one backticked GOIABADA_ variable: %q",
+				where, row.variable))
+			continue
+		}
+		name, flagCell, defaultCell, reader, meaning := match[1], row.flag, row.def, row.reader, cells[1]
 		if listed[name] {
 			findings = append(findings, where+" lists "+name+" twice")
 			continue
@@ -271,6 +279,31 @@ func environmentVariablesDocsFindings(root string, section docSection, vars []co
 		}
 	}
 	return findings, nil
+}
+
+// docVariableLabels are the labels of the lines under a variable's name in its cell, in order.
+var docVariableLabels = []string{"Flag: ", "Default: ", "Read by: "}
+
+// docVariableRow is a row's variable cell: the variable, and the three lines under it, each
+// without its label.
+type docVariableRow struct{ variable, flag, def, reader string }
+
+// docVariableLines splits a row's variable cell at its line breaks into the variable and its flag,
+// default and reader lines; ok is false for a cell of any other shape.
+func docVariableLines(cell string) (docVariableRow, bool) {
+	lines := strings.Split(cell, "<br/>")
+	if len(lines) != 1+len(docVariableLabels) {
+		return docVariableRow{}, false
+	}
+	values := make([]string, len(docVariableLabels))
+	for i, label := range docVariableLabels {
+		value, found := strings.CutPrefix(lines[i+1], label)
+		if !found {
+			return docVariableRow{}, false
+		}
+		values[i] = value
+	}
+	return docVariableRow{variable: lines[0], flag: values[0], def: values[1], reader: values[2]}, true
 }
 
 // docFlagCell is how the page writes a variable's flag: backticked with its two dashes, or none.
