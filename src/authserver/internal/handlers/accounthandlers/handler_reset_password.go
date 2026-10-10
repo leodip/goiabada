@@ -27,6 +27,23 @@ import (
 // after it is issued by HandleForgotPasswordPost.
 const forgotPasswordCodeLifetime = 5 * time.Minute
 
+// setupLinkLifetime bounds the same code while the account has no password: the link an
+// administrator's "send an email to set the password" sends, which the new user reads when they
+// read mail, not within minutes. Five minutes left them a link dead before they saw it, and nothing
+// to recover with, since Forgot password? sends nothing to an unverified address and nothing sends
+// the setup link again (#542). Until a password is set, a leaked link has no password to replace.
+const setupLinkLifetime = 24 * time.Hour
+
+// codeLifetime is how long the code user holds stays usable: setupLinkLifetime while the account
+// has no password, which is every account created with the setup email until its user sets one, and
+// forgotPasswordCodeLifetime once it has one.
+func codeLifetime(user *record.User) time.Duration {
+	if user.PasswordHash == "" {
+		return setupLinkLifetime
+	}
+	return forgotPasswordCodeLifetime
+}
+
 // The reasons a reset request is refused, as recorded in the audit entry.
 //
 // The whole vocabulary changed with #112, because the states the handler can distinguish
@@ -86,19 +103,19 @@ const continuationIdField = "continuationId"
 var errResetPasswordClaimLost = errors.New("the forgot password code was no longer outstanding when the password write claimed it")
 
 // isForgotPasswordCodeExpired reports whether the reset code issued to this user
-// is past its lifetime.
+// is past its lifetime, codeLifetime's.
 //
 // Consulted on the FIRST hop, where the emailed code arrives. The two steps after the
 // redirect deliberately do not re-apply it: they are bounded by the marker's own window,
 // which starts when the code was validated, so a user who clicked at 4:59 still has five
 // minutes to type a password (#112 decision 7). Worst-case total exposure is therefore the
-// code's 5 minutes plus the marker's 5, and what refuses a request after that is the marker
+// code's lifetime plus the marker's 5 minutes, and what refuses a request after that is the marker
 // expiring and the code hash no longer being outstanding.
 //
 // A user with no code issued has a zero ForgotPasswordCodeIssuedAt and is
 // therefore treated as expired, which fails closed.
 func isForgotPasswordCodeExpired(user *record.User) bool {
-	return user.ForgotPasswordCodeIssuedAt.Time.Add(forgotPasswordCodeLifetime).Before(time.Now().UTC())
+	return user.ForgotPasswordCodeIssuedAt.Time.Add(codeLifetime(user)).Before(time.Now().UTC())
 }
 
 // emailedCodeMatches compares a supplied emailed-link code, a reset code or an activation
