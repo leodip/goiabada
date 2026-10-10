@@ -34,13 +34,14 @@ A refresh token is what your app trades for a new access token when the old one 
 
    A public client sends `client_id` in the body instead of the `-u` line.
 
-3. The answer carries new tokens, a new refresh token among them:
+3. The answer carries new tokens, a new refresh token among them, and a new ID token when the scope has `openid`:
 
    ```json
    {
      "access_token": "eyJhbGciOiJSUzI1NiIs...",
      "token_type": "Bearer",
      "expires_in": 300,
+     "id_token": "eyJhbGciOiJSUzI1NiIs...",
      "refresh_token": "eyJhbGciOiJSUzI1NiIs...",
      "refresh_expires_in": 2592000,
      "scope": "openid offline_access product-api:read"
@@ -71,7 +72,7 @@ A normal refresh token follows the session it's tied to instead: it stops workin
 | Your app gets it | Without `offline_access` | With `offline_access`, and always from the [password grant](/legacy-flows/ropc/), which has no session |
 | When the session expires | It stops working | It keeps working |
 | When someone [ends the session](/concepts/ending-sessions/#end-a-session) | It's revoked | It's revoked |
-| When the user's [credentials change](/concepts/ending-sessions/#credential-changes) | It's revoked | It's revoked |
+| When the user's [credentials change](/concepts/ending-sessions/#credential-changes) | It's revoked, unless it belongs to the session the user changed their own password in | It's revoked, with the same exception |
 
 ## What a refresh checks
 
@@ -79,7 +80,7 @@ A refresh is refused with `invalid_grant` when the token can't be used any more:
 
 - it expired, or the offline grant reached its maximum lifetime;
 - a normal refresh token's session ended or expired;
-- the user was disabled, or their password changed or was reset;
+- the user was disabled, or their password changed or was reset, apart from the tokens of the session a user changed their own password in;
 - the user no longer holds a permission the token carries;
 - the user withdrew their consent to your app, when it has **Consent required** on or the token is an offline one from a sign-in.
 

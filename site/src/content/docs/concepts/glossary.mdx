@@ -36,7 +36,7 @@ The web app where you manage clients, users, groups, resources, permissions and 
 
 ### Administrator
 
-A user, group or client holding one of the administrative permissions on the `authserver` resource, such as `authserver:manage`. Only `authserver:manage` can make someone an administrator or change one. See [Administrators](/reference/api/administrators/).
+A user, group or client holding one of the administrative permissions on the `authserver` resource, such as `authserver:manage`, and also the admin console's own client, and any client allowed to request the administrative scopes. Only `authserver:manage` can make someone an administrator or change one. See [Administrators](/reference/api/administrators/).
 
 ### AMR
 
@@ -44,7 +44,7 @@ Authentication Methods References: which methods the user signed in with. Goiaba
 
 ### Attribute
 
-A name and value you add to a user or a group. A client gets a user's attributes, and those of the user's groups, in the user's claims when it asks for the `attributes` scope and the attribute is set to be included.
+A key and a value you add to a user or a group. A client gets a user's attributes, and those of the user's groups, in the user's claims when it asks for the `attributes` scope and the attribute is set to be included.
 
 ### Audit log
 
@@ -107,7 +107,7 @@ A token a client exchanges for new tokens without asking the user to sign in aga
 
 ### Refresh-token rotation
 
-What happens to a refresh token when it's used: the auth server retires it and hands back a new one, so each refresh token is good for one refresh. A retired one sent again is a replay, which revokes every live refresh token from the same sign-in. Not to be confused with [secret rotation](#secret-rotation) or [signing-key rotation](#signing-key-rotation). See [Refresh tokens](/concepts/refresh-tokens/#rotation).
+What happens to a refresh token when it's used: the auth server retires it and hands back a new one, so each refresh token is good for one refresh. A retired one sent again is a replay, which revokes every live refresh token descended from the same grant, its rotation family. Not to be confused with [secret rotation](#secret-rotation) or [signing-key rotation](#signing-key-rotation). See [Refresh tokens](/concepts/refresh-tokens/#rotation).
 
 ### Resource
 

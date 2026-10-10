@@ -23,7 +23,7 @@ A **resource** is something you protect, usually an API, such as `product-api`. 
 
    - a **user**, on the user's **Permissions** tab, or on the resource's **Users with permission** tab;
    - a **group**, on the group's **Permissions** tab, or on the resource's **Groups with permission** tab, and every member gets it;
-   - a **client**, on the client's **Permissions** tab, for a service that calls your API on its own behalf.
+   - a **client**, on the client's **Permissions** tab, for a service that calls your API on its own behalf. The tab is available while **Client credentials** is on for the client.
 
    On a **Permissions** tab, choose the **Resource** and the **Permission**, click **Grant permission**, and click **Save**: until you save, nothing is granted.
 
@@ -47,7 +47,7 @@ So reusing short names like `read`, `write` and `delete` on every resource is no
 
 ## Who holds a permission
 
-A **user** holds the permissions given to them and those of every group they're in. When your app signs a user in, the token carries only the permissions the user holds out of those it asked for. The others are left out without an error, as [invalid_scope](/troubleshooting/invalid-scope/#the-user-doesnt-hold-it) explains.
+A **user** holds the permissions given to them and those of every group they're in. When your app signs a user in, the token carries only the permissions the user holds out of those it asked for. The others are left out without an error, unless none is left: then the request is refused with `access_denied`, as [invalid_scope](/troubleshooting/invalid-scope/#the-user-doesnt-hold-it) explains.
 
 A **client's** own permissions are for the client credentials flow alone, when the client gets a token for itself. A token a client gets for a user carries the user's permissions, never the client's.
 
