@@ -283,9 +283,12 @@ func userWithCode(t *testing.T, id int64, code string, issuedAt time.Time) (*rec
 	codeHash := hashutil.HashString(code)
 
 	return &record.User{
-		Id:                          id,
-		Enabled:                     true,
-		Email:                       "test@example.com",
+		Id:      id,
+		Enabled: true,
+		Email:   "test@example.com",
+		// A password, so the code is a reset's, with forgotPasswordCodeLifetime; an account with none
+		// holds a setup link, which TestIsForgotPasswordCodeExpired_ASetupLinkLastsADay covers.
+		PasswordHash:                "$2a$10$an.existing.password.hash",
 		ForgotPasswordCodeEncrypted: encrypted,
 		ForgotPasswordCodeHash:      codeHash,
 		ForgotPasswordCodeIssuedAt:  sql.NullTime{Time: issuedAt, Valid: true},
@@ -1414,11 +1417,35 @@ func TestIsForgotPasswordCodeExpired(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			user := &record.User{ForgotPasswordCodeIssuedAt: tc.issuedAt}
+			user := &record.User{PasswordHash: "$2a$10$an.existing.password.hash", ForgotPasswordCodeIssuedAt: tc.issuedAt}
 
 			assert.Equal(t, tc.wantExpir, isForgotPasswordCodeExpired(user))
 		})
 	}
+}
+
+// An account with no password holds the setup link an administrator's "send an email to set the
+// password" sent, which lasts a day rather than five minutes; the same code on an account with a
+// password is a reset's, and keeps its five (#542).
+func TestIsForgotPasswordCodeExpired_ASetupLinkLastsADay(t *testing.T) {
+	testCases := []struct {
+		name      string
+		issuedAt  sql.NullTime
+		wantExpir bool
+	}{
+		{"an hour old", sql.NullTime{Time: time.Now().UTC().Add(-time.Hour), Valid: true}, false},
+		{"just inside a day", sql.NullTime{Time: time.Now().UTC().Add(-setupLinkLifetime + 30*time.Second), Valid: true}, false},
+		{"just outside a day", sql.NullTime{Time: time.Now().UTC().Add(-setupLinkLifetime - time.Second), Valid: true}, true},
+		{"never issued", sql.NullTime{Valid: false}, true},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.wantExpir, isForgotPasswordCodeExpired(&record.User{ForgotPasswordCodeIssuedAt: tc.issuedAt}))
+		})
+	}
+
+	assert.Equal(t, 24*time.Hour, codeLifetime(&record.User{}))
+	assert.Equal(t, 5*time.Minute, codeLifetime(&record.User{PasswordHash: "$2a$10$an.existing.password.hash"}))
 }
 
 // =============================================================================
