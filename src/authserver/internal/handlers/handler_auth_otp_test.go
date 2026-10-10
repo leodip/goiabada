@@ -1722,6 +1722,62 @@ func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 	}
 }
 
+// An enrolment form submitted after the user finished setting up an authenticator elsewhere, in
+// another tab or on their account page, ends the sign-in on the same page as a lost enrolment.
+// Until the review of the ACR and AMR page before 1.7.0 found it, the code was checked against the
+// other authenticator, refused as incorrect, and answered with this form's QR code again, whose seed
+// could never be stored: a loop no code could leave. The code isn't looked at, no step is spent, and
+// nothing is audited.
+func TestHandleAuthOtpPost_AnEnrolmentFormAfterAnEnrolmentElsewhereEndsTheSignIn(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{},
+		testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+
+	key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
+	require.NoError(t, err)
+	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
+	require.NoError(t, err)
+
+	form := url.Values{}
+	form.Add(ceremonyIdField, testCeremonyId)
+	form.Add("otp", otpCode)
+	req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
+		AuthState:  ceremony.AuthStateLevel2OTP,
+		CeremonyId: testCeremonyId,
+		UserId:     1,
+		ClientId:   "test-client",
+		OTPKeyURL:  otpTestKeyURL(key.Secret()),
+	}, nil)
+	// The account has an authenticator now, set up after this ceremony rendered its enrolment.
+	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
+		Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4}, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
+		Return(&record.Client{ClientIdentifier: "test-client"}, nil)
+
+	ceremonyStore.On("ClearAuthContext", rr, req).Return(nil).Once()
+	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
+		mock.MatchedBy(func(data map[string]interface{}) bool {
+			return data["_httpStatus"] == http.StatusConflict &&
+				data["title"] == "Your two-factor authentication settings changed"
+		})).Return(nil).Once()
+
+	handler.ServeHTTP(rr, req)
+
+	database.AssertNotCalled(t, "TryConsumeUserOTPStep", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	pageRenderer.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
+		"/auth_otp_enrollment.html", mock.Anything)
+}
+
 // TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly is seam 2 for the OTP form,
 // with the same shape and the same reason as the password one: the handler is driven
 // through a real middleware.RateLimiter, because the reservation it converts is placed by

@@ -294,6 +294,18 @@ func HandleAuthOtpPost(
 			return
 		}
 
+		// This ceremony rendered an enrolment, and the account has an authenticator now: the user
+		// finished setting one up elsewhere, in another tab or on their account page, since the
+		// form was shown. The seed on this form can never be stored, so the sign-in ends here, as
+		// it does when the change commits between this request's read and its write below. Checked
+		// before the code, which until now was verified against the other authenticator, refused
+		// as incorrect, and answered with this form's QR code again, a loop no code could leave.
+		// Found reviewing the ACR and AMR page against the code before 1.7.0.
+		if keyURL != "" && user.OTPEnabled {
+			endLostEnrolment(pageRenderer, ceremonyStore, w, r, user.Id)
+			return
+		}
+
 		// r.PostFormValue rather than r.FormValue, matching the ceremony id read above so both
 		// reads in this function agree about what a submission is: r.Form merges the URL query
 		// behind the body, so /auth/otp?otp=... would let a passcode arrive in the request
