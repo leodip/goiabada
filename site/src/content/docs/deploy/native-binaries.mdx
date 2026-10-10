@@ -7,7 +7,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 
 This page helps you run Goiabada without Docker: the two binaries from a release, one configuration file, and systemd to keep them running.
 
-You need a Linux server, a database (a MySQL, PostgreSQL or SQL Server you run, or SQLite for a single server), two hostnames under one domain, such as `auth.example.com` and `admin.example.com`, and the [setup wizard](/deploy/setup-wizard/). Both hostnames must share a registrable domain: see [What every method needs](/deploy/choose-a-method/#what-every-method-needs). A reverse proxy on the same machine, such as Nginx, serves HTTPS in front of them.
+You need a Linux server, a database (a MySQL, PostgreSQL or SQL Server you run, or SQLite for a single server), two hostnames under one domain, such as `auth.example.com` and `admin.example.com`, and the [setup wizard](/deploy/setup-wizard/). Both hostnames must share a registrable domain: see [What every method needs](/deploy/choose-a-method/#what-every-method-needs). A reverse proxy on the same machine, such as Nginx, serves HTTPS in front of them, unless the servers [serve HTTPS themselves](#serve-https-without-a-proxy).
 
 ## Set it up
 
@@ -75,13 +75,13 @@ You need a Linux server, a database (a MySQL, PostgreSQL or SQL Server you run, 
    ```bash
    sudo systemctl daemon-reload
    sudo systemctl enable --now goiabada-authserver goiabada-adminconsole
-   curl http://127.0.0.1:9090/health   # healthy
-   curl http://127.0.0.1:9091/health   # healthy
+   until curl -sf http://127.0.0.1:9090/health; do sleep 2; done; echo   # healthy
+   until curl -sf http://127.0.0.1:9091/health; do sleep 2; done; echo   # healthy
    ```
 
-   The first start seeds the database. `sudo journalctl -u goiabada-authserver -f` follows its log.
+   The first start migrates and seeds the database before the auth server listens, which takes a few seconds. The admin console listens once the auth server answers it at `GOIABADA_AUTHSERVER_INTERNALBASEURL`; until then, `sudo journalctl -u goiabada-adminconsole` shows `waiting for the auth server to issue the admin console's token`. Without a reverse proxy, check only the auth server here: the admin console reaches it at its public URL, so it listens once you [serve HTTPS](#serve-https-without-a-proxy). `sudo journalctl -u goiabada-authserver -f` follows the auth server's log.
 
-6. **Put the reverse proxy in front.** Proxy `auth.example.com` to `http://127.0.0.1:9090` and `admin.example.com` to `http://127.0.0.1:9091`, with the DNS records, Nginx configuration and certificates of [Reverse proxy](/deploy/reverse-proxy/#set-it-up), steps 1 and 3 to 6. Skip its step 2, which starts the Docker Compose files.
+6. **Put the reverse proxy in front.** Without one, skip this step and [serve HTTPS directly](#serve-https-without-a-proxy) instead; your URLs then name ports 9443 and 9444. Proxy `auth.example.com` to `http://127.0.0.1:9090` and `admin.example.com` to `http://127.0.0.1:9091`, with the DNS records, Nginx configuration and certificates of [Reverse proxy](/deploy/reverse-proxy/#set-it-up), steps 1 and 3 to 6. Skip its step 2, which starts the Docker Compose files.
 
 7. **Sign in** at `https://admin.example.com`, as [First sign-in](/get-started/first-sign-in/) describes.
 
@@ -102,9 +102,10 @@ set -a && . ./goiabada.env && set +a && ./goiabada-authserver
 
 ## The hop to the auth server
 
-The admin console calls the auth server at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, which the wizard sets to the auth server's public URL. So the admin console goes out through your reverse proxy and back in, over HTTPS, and its client secret and administrators' tokens are encrypted on the way.
+The admin console calls the auth server at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, and listens only once the auth server answers it there.
 
-With both servers on one machine, you can point it at `http://127.0.0.1:9090` instead, to skip the proxy. That hop is plain HTTP, but it never leaves the machine.
+- **With a reverse proxy on this machine,** the wizard sets it to `http://127.0.0.1:9090`, the auth server's own listener. That hop is plain HTTP, but it never leaves the machine, and it works before the proxy, the DNS records and the certificates do. If you change the auth server's listen host or port, change this URL too.
+- **Without one,** it's the auth server's public URL, over HTTPS, so the admin console's client secret and administrators' tokens are encrypted on the way, and the admin console listens once the auth server serves HTTPS there.
 
 ## Serve HTTPS without a proxy
 
@@ -120,7 +121,14 @@ GOIABADA_ADMINCONSOLE_KEYFILE="/etc/goiabada/admin.example.com-key.pem"
 GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=""
 ```
 
-The auth server then listens on port 9443 and the admin console on 9444, on every interface; `GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS` and `GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS` change them. Your public URLs must name those ports, or something must forward 443 to them. The `goiabada` user must be able to read both keys. Renewing a certificate takes a restart, since each server reads its files when it starts.
+The auth server then listens on port 9443 and the admin console on 9444, on every interface; `GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS` and `GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS` change them. Your public URLs must name those ports, or something must forward 443 to them. The `goiabada` user must be able to read both keys, and no one else:
+
+```bash
+sudo chown goiabada:goiabada /etc/goiabada/*-key.pem
+sudo chmod 600 /etc/goiabada/*-key.pem
+```
+
+Renewing a certificate takes a restart, since each server reads its files when it starts.
 
 <Aside type="note" title="macOS and Windows">
 The releases include macOS and Windows binaries, which read the same variables. Load `goiabada.env` into their environment and run them under the service manager you use there.

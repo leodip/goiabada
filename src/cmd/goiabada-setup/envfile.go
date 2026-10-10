@@ -81,10 +81,33 @@ func generateEnvFile(config *Config, paths outputPaths) string {
 	sb.WriteString("# OAuth client for admin console\n")
 	sb.WriteString("# =============================================================================\n")
 	writeEnvVariable(&sb, "GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET", config.OAuthClientSecret)
-	writeEnvVariable(&sb, "GOIABADA_AUTHSERVER_INTERNALBASEURL", config.AuthServerURL)
+	writeEnvInternalURL(&sb, config)
 	sb.WriteString("\n")
 
 	return sb.String()
+}
+
+// nativeLoopbackAuthServerURL is where the admin console reaches the auth server when a reverse proxy
+// on the same machine fronts both: the auth server's own listener, which listens on 127.0.0.1.
+const nativeLoopbackAuthServerURL = "http://127.0.0.1:9090"
+
+// writeEnvInternalURL writes the URL the admin console reaches the auth server at, under the comment
+// saying what that hop is. With a proxy on this machine it is the auth server's loopback listener,
+// as the Compose file's is the auth server's service: the admin console waits for the auth server
+// before it listens (#542), and through the public URL it would wait for the proxy, DNS and the
+// certificates of a later step, or forever on a host that cannot reach its own public address.
+// Without a proxy the auth server serves HTTPS itself on every interface, and plain HTTP goes once
+// it does, so the public URL is the one address that keeps working.
+func writeEnvInternalURL(sb *strings.Builder, config *Config) {
+	if config.LocalProxy {
+		sb.WriteString("# The admin console reaches the auth server over loopback: plain HTTP that never leaves\n")
+		sb.WriteString("# this machine. Change it too if you change the auth server's listen host or port.\n")
+		writeEnvVariable(sb, "GOIABADA_AUTHSERVER_INTERNALBASEURL", nativeLoopbackAuthServerURL)
+		return
+	}
+	sb.WriteString("# The admin console reaches the auth server at its public URL, so it waits to listen\n")
+	sb.WriteString("# until the auth server serves HTTPS there.\n")
+	writeEnvVariable(sb, "GOIABADA_AUTHSERVER_INTERNALBASEURL", config.AuthServerURL)
 }
 
 // writeEnvListenerAndTrust writes one server's HTTP listener and its proxy trust, which the answer

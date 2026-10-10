@@ -525,9 +525,10 @@ func (w *wizard) askRateLimiter() error {
 		w.out.info("Rate limiter: %s", answer)
 		return nil
 	}
-	w.out.println("The auth server always limits wrong one-time codes, and password checks on the Account")
-	w.out.println("pages, per user. Its rate limiter adds limits per client address on sign-ins, password")
-	w.out.println("resets, self-registrations and client registrations, and on wrong passwords per email.")
+	w.out.println("The auth server always limits, per user, wrong one-time codes, password checks on the")
+	w.out.println("Account pages, email verification codes and verification mails. Its rate limiter adds")
+	w.out.println("limits per client address on sign-ins, password resets, self-registrations and client")
+	w.out.println("registrations, and on wrong passwords per email.")
 	if w.config.Deployment.servedByEnvoyGateway {
 		if defaultOn {
 			w.out.println("Under the Local traffic policy Goiabada sees each client's address, so the per-IP")
