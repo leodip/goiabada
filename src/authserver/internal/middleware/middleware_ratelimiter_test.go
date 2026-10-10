@@ -1176,13 +1176,20 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 		}
 	})
 
-	t.Run("disabled limiter never blocks", func(t *testing.T) {
+	// The switch governs the tiers keyed on an address or an email anyone can send; this one
+	// counts a user already authenticated, whom no stranger can spend it for, so it holds with
+	// the limiter off too (#542).
+	t.Run("the limiter switched off still limits one-time codes", func(t *testing.T) {
 		m := newTestMiddleware(stubCeremonyStore{}, false)
-		for i := 0; i < 60; i++ {
+		for i := 0; i < budget; i++ {
 			if code, reached := run(m, 42, true); code != http.StatusTeapot || !reached {
-				t.Fatalf("attempt %d: disabled limiter should never block, got code %d, handler reached %v",
-					i+1, code, reached)
+				t.Fatalf("attempt %d of a budget of %d with the limiter off: got code %d, handler reached %v",
+					i+1, budget, code, reached)
 			}
+		}
+		if code, reached := run(m, 42, true); code != http.StatusTooManyRequests || reached {
+			t.Fatalf("attempt %d with the limiter off: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
 		}
 	})
 }
@@ -1301,13 +1308,20 @@ func TestLimitEmailVerification_PerSubject(t *testing.T) {
 		}
 	})
 
-	t.Run("disabled limiter never blocks", func(t *testing.T) {
+	// The switch governs the tiers keyed on an address or an email anyone can send; this one
+	// counts a user already authenticated, whom no stranger can spend it for, so it holds with
+	// the limiter off too (#542).
+	t.Run("the limiter switched off still limits verification codes", func(t *testing.T) {
 		m := newTestMiddleware(nil, false)
-		for i := 0; i < budget*6; i++ {
+		for i := 0; i < budget; i++ {
 			if code, reached, _ := runVerification(m, subject, true); code != http.StatusTeapot || !reached {
-				t.Fatalf("attempt %d: disabled limiter should never block, got code %d, handler reached %v",
-					i+1, code, reached)
+				t.Fatalf("attempt %d of a budget of %d with the limiter off: got code %d, handler reached %v",
+					i+1, budget, code, reached)
 			}
+		}
+		if code, reached, _ := runVerification(m, subject, true); code != http.StatusTooManyRequests || reached {
+			t.Fatalf("attempt %d with the limiter off: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
 		}
 	})
 }
@@ -1399,13 +1413,20 @@ func TestLimitEmailVerificationSend_PerSubject(t *testing.T) {
 		}
 	})
 
-	t.Run("disabled limiter never blocks", func(t *testing.T) {
+	// The switch governs the tiers keyed on an address or an email anyone can send; this one
+	// counts a user already authenticated, whom no stranger can spend it for, so it holds with
+	// the limiter off too (#542).
+	t.Run("the limiter switched off still limits verification mail", func(t *testing.T) {
 		m := newTestMiddleware(nil, false)
-		for i := 0; i < budget*6; i++ {
+		for i := 0; i < budget; i++ {
 			if code, reached, _ := runVerificationSend(m, subject); code != http.StatusTeapot || !reached {
-				t.Fatalf("attempt %d: disabled limiter should never block, got code %d, handler reached %v",
-					i+1, code, reached)
+				t.Fatalf("attempt %d of a budget of %d with the limiter off: got code %d, handler reached %v",
+					i+1, budget, code, reached)
 			}
+		}
+		if code, reached, _ := runVerificationSend(m, subject); code != http.StatusTooManyRequests || reached {
+			t.Fatalf("attempt %d with the limiter off: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
 		}
 	})
 }
@@ -1575,13 +1596,20 @@ func TestLimitAccountPassword_PerSubject(t *testing.T) {
 		assertNoRateLimitHeaders(t, rr, "the account password refusal")
 	})
 
-	t.Run("disabled limiter never blocks", func(t *testing.T) {
+	// The switch governs the tiers keyed on an address or an email anyone can send; this one
+	// counts a user already authenticated, whom no stranger can spend it for, so it holds with
+	// the limiter off too (#542).
+	t.Run("the limiter switched off still limits account password checks", func(t *testing.T) {
 		m := newTestMiddleware(nil, false)
-		for i := 0; i < budget*6; i++ {
+		for i := 0; i < budget; i++ {
 			if code, reached, _ := runAccountPassword(m, accountPasswordRoute, subject, true); code != http.StatusTeapot || !reached {
-				t.Fatalf("attempt %d: disabled limiter should never block, got code %d, handler reached %v",
-					i+1, code, reached)
+				t.Fatalf("attempt %d of a budget of %d with the limiter off: got code %d, handler reached %v",
+					i+1, budget, code, reached)
 			}
+		}
+		if code, reached, _ := runAccountPassword(m, accountPasswordRoute, subject, true); code != http.StatusTooManyRequests || reached {
+			t.Fatalf("attempt %d with the limiter off: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
 		}
 	})
 }
@@ -1935,6 +1963,9 @@ type builtLimiter struct {
 	// attribute set of the warning each refusal logs.
 	audited map[string]interface{}
 	warned  map[string]any
+	// alwaysOn is true for a tier counting a user already authenticated, which limits with the
+	// rate limiter switched off too (#542).
+	alwaysOn bool
 	// noSubject, set on a failures-per-subject limiter, builds a request with no subject to
 	// key on and the ceremony store that goes with it. Such a request reaches the handler
 	// however often it is sent.
@@ -1986,6 +2017,7 @@ func builtLimiters() []builtLimiter {
 			// identifier the audit records is not the bucket key, which is why the subject
 			// function returns both.
 			name: "LimitOtp", limit: func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitOtp },
+			alwaysOn: true,
 			request:  func() *http.Request { return limiterRequest(http.MethodPost, "/auth/otp?userId=7", nil) },
 			failures: true, budget: 5,
 			contentType: "text/html; charset=UTF-8", retryAfter: "900",
@@ -1996,6 +2028,7 @@ func builtLimiters() []builtLimiter {
 		},
 		{
 			name: "LimitEmailVerification", limit: func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitEmailVerification },
+			alwaysOn: true,
 			request:  func() *http.Request { return verificationRequest(subject) },
 			failures: true, budget: 5,
 			contentType: "application/json", retryAfter: "900",
@@ -2005,6 +2038,7 @@ func builtLimiters() []builtLimiter {
 		},
 		{
 			name: "LimitAccountPassword", limit: func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitAccountPassword },
+			alwaysOn: true,
 			request:  func() *http.Request { return accountPasswordRequest(accountPasswordRoute, subject) },
 			failures: true, budget: 5,
 			contentType: "application/json", retryAfter: "900",
@@ -2134,8 +2168,22 @@ func TestBuiltLimiters_EachKeepsItsOwnRefusal(t *testing.T) {
 				})
 			}
 
-			t.Run("disabled limiter never blocks", func(t *testing.T) {
+			t.Run("the limiter switched off", func(t *testing.T) {
 				m := newTestMiddleware(stubCeremonyStore{}, false)
+				if c.alwaysOn {
+					// A tier counting a user already authenticated holds whatever the switch says (#542).
+					for i := 0; i < c.budget; i++ {
+						if rr, reached := runBuilt(m, c, c.request(), c.failures); rr.Code != http.StatusTeapot || !reached {
+							t.Fatalf("request %d of a budget of %d with the limiter off: got code %d, handler reached %v",
+								i+1, c.budget, rr.Code, reached)
+						}
+					}
+					if rr, reached := runBuilt(m, c, c.request(), c.failures); rr.Code != http.StatusTooManyRequests || reached {
+						t.Fatalf("request %d with the limiter off: got code %d, handler reached %v; want %d and false",
+							c.budget+1, rr.Code, reached, http.StatusTooManyRequests)
+					}
+					return
+				}
 				for i := 0; i < 3*c.budget; i++ {
 					if rr, reached := runBuilt(m, c, c.request(), c.failures); rr.Code != http.StatusTeapot || !reached {
 						t.Fatalf("request %d with the limiter off: got code %d, handler reached %v; want %d and true",

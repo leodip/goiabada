@@ -147,11 +147,11 @@ Each server can serve Prometheus metrics on a listener of its own, which answers
 
 | Variable | Flag | Default | Read by | What it does |
 |---|---|---|---|---|
-| `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` | `--authserver-ratelimiter-enabled` | `false` | auth server | Turn on the [rate limits](#rate-limits) below. The setup wizard asks whether you want them. |
+| `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` | `--authserver-ratelimiter-enabled` | `false` | auth server | Turn on the [rate limits](#rate-limits) below that are counted by an IP address or an email. Those counted by a user apply whether or not it's on. The setup wizard asks whether you want them. |
 
 ## Rate limits
 
-With `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on, the auth server limits these endpoints. A refused request gets `429 Too Many Requests`, in the format the endpoint usually answers with. The limiter is the name the `rate_limit_exceeded` [audit event](/concepts/audit-log/) and the `goiabada_rate_limit_refusals_total` [metric](/deploy/monitoring/) give it.
+The auth server limits these endpoints. The limits counted by a user, the one signing in or an access token's, always apply: only someone already past the password, or holding the user's token, can spend them, so they can't lock a stranger out. The others, counted by an IP address or by an email anyone can type, apply only with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on. A refused request gets `429 Too Many Requests`, in the format the endpoint usually answers with. The limiter is the name the `rate_limit_exceeded` [audit event](/concepts/audit-log/) and the `goiabada_rate_limit_refusals_total` [metric](/deploy/monitoring/) give it.
 
 | Endpoint | Limiter | Limit | Counts | Counted by |
 |---|---|---|---|---|

@@ -92,7 +92,9 @@ func TestAPIAccountEmailVerificationSend_ConcurrentSendsMailOneCode(t *testing.T
 	stored.EmailVerificationCodeIssuedAt = sql.NullTime{}
 	require.NoError(t, database.UpdateUser(context.Background(), nil, stored))
 
-	const sends = 10
+	// Five, the verification-mail limit's budget per user, which holds whatever the rate limiter
+	// switch says (#542): a sixth send within the hour is refused before it reaches the handler.
+	const sends = 5
 	results := sendConcurrently(t, sends, http.MethodPost,
 		appConfig.AuthServer.BaseURL+"/api/v1/account/email/verification/send", accessToken,
 		func(int) any { return map[string]string{} })
@@ -142,7 +144,9 @@ func TestAPIAccountEmailPut_ConcurrentChangesNotifyThePreviousAddressOnce(t *tes
 	stored.EmailVerified = true
 	require.NoError(t, database.UpdateUser(context.Background(), nil, stored))
 
-	const changes = 8
+	// Five, the account-password limit's budget per user, which holds whatever the rate limiter
+	// switch says and counts a check still in flight against it (#542).
+	const changes = 5
 	newEmails := make([]string, changes)
 	for i := range newEmails {
 		newEmails[i] = "concurrent.to." + strings.ToLower(fake.LetterN(12)) + "@example.com"
