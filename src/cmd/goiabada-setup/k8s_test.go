@@ -851,3 +851,47 @@ func TestKubernetesManifest_GivesEachProcessAConfigMapOfItsOwn(t *testing.T) {
 		})
 	}
 }
+
+// The completion message lists its steps in the order an operator takes them, the deploy before
+// DNS and DNS before the ClusterIssuer, since an issuer created before the records exist has
+// cert-manager look the names up early, and a resolver then remembers them as missing for the zone's
+// negative-caching time, which kept a certificate waiting half an hour on a real cluster (#542). The
+// DNS step names the two host names the Gateway routes, and nothing is left to fill in but the
+// Gateway's address, which the step reads.
+func TestKubernetesInstructions_ListTheStepsInTheOrderTaken(t *testing.T) {
+	config := kubernetesConfig()
+	var buf bytes.Buffer
+	printKubernetesInstructions(&console{w: &buf}, config, outputPaths{"goiabada-k8s.yaml", "goiabada-secrets.yaml"})
+	message := buf.String()
+
+	steps := []string{
+		"kubectl apply --server-side -f https://github.com/envoyproxy/gateway/",
+		"kind: GatewayClass",
+		"kubectl apply -f https://github.com/cert-manager/cert-manager/",
+		"kubectl apply -f goiabada-secrets.yaml -f goiabada-k8s.yaml",
+		"kubectl get gateway goiabada -n identity -o jsonpath='{.status.addresses[0].value}'",
+		"kind: ClusterIssuer",
+		"kubectl get certificates -n identity",
+	}
+	last := -1
+	for _, step := range steps {
+		at := strings.Index(message, step)
+		if at < 0 {
+			t.Fatalf("the message has no %q:\n%s", step, message)
+		}
+		if at < last {
+			t.Errorf("%q comes before the step listed ahead of it:\n%s", step, message)
+		}
+		last = at
+	}
+	for _, host := range []string{"auth.example.com", "admin.example.com"} {
+		if !strings.Contains(message, "     "+host+" ") {
+			t.Errorf("the DNS step does not name %s:\n%s", host, message)
+		}
+	}
+	for _, placeholder := range []string{"<your-email>", "<auth-host>", "<admin-host>", "auth.example.com:8443"} {
+		if strings.Contains(message, placeholder) {
+			t.Errorf("the message still says %q", placeholder)
+		}
+	}
+}

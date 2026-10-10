@@ -67,6 +67,102 @@ On SQL Server, spell out the `COLLATE` clause. A database's default can't be cha
 
 `READ_COMMITTED_SNAPSHOT` is supported, on or off, and both settings are tested. Goiabada never asks for `SNAPSHOT` isolation, so `ALLOW_SNAPSHOT_ISOLATION` makes no difference to it either way.
 
+## A PostgreSQL to try Goiabada on Kubernetes
+
+A cluster you're trying Goiabada on may have no database to give it. This runs one PostgreSQL in the cluster, in a namespace of its own, with its data on a volume from the cluster's default storage class. It's for trying Goiabada out: one replica, no backups and no tuning. For production, use a database you run properly, in the cluster or outside it.
+
+<Steps>
+
+1. Save this as `postgres.yaml`:
+
+   ```yaml
+   apiVersion: v1
+   kind: Namespace
+   metadata:
+     name: postgres
+   ---
+   apiVersion: v1
+   kind: Service
+   metadata:
+     name: postgres
+     namespace: postgres
+   spec:
+     selector:
+       app: postgres
+     ports:
+     - port: 5432
+   ---
+   apiVersion: apps/v1
+   kind: StatefulSet
+   metadata:
+     name: postgres
+     namespace: postgres
+   spec:
+     serviceName: postgres
+     replicas: 1
+     selector:
+       matchLabels:
+         app: postgres
+     template:
+       metadata:
+         labels:
+           app: postgres
+       spec:
+         containers:
+         - name: postgres
+           image: postgres:18
+           env:
+           - name: POSTGRES_USER
+             value: goiabada
+           - name: POSTGRES_DB
+             value: goiabada
+           - name: POSTGRES_PASSWORD
+             valueFrom:
+               secretKeyRef:
+                 name: postgres
+                 key: password
+           # A subdirectory, since a fresh volume can hold lost+found, which initdb refuses.
+           - name: PGDATA
+             value: /var/lib/postgresql/data/pgdata
+           ports:
+           - containerPort: 5432
+           readinessProbe:
+             exec:
+               command: ["pg_isready", "-U", "goiabada", "-d", "goiabada"]
+             periodSeconds: 5
+           volumeMounts:
+           - name: data
+             mountPath: /var/lib/postgresql/data
+     volumeClaimTemplates:
+     - metadata:
+         name: data
+       spec:
+         accessModes: ["ReadWriteOnce"]
+         resources:
+           requests:
+             storage: 5Gi
+   ```
+
+2. Apply it with a generated password, and wait for it:
+
+   ```bash
+   kubectl apply -f postgres.yaml
+   kubectl create secret generic postgres -n postgres --from-literal=password="$(openssl rand -hex 24)"
+   kubectl rollout status statefulset/postgres -n postgres --timeout=5m
+   ```
+
+3. Read the password back for the setup wizard:
+
+   ```bash
+   kubectl get secret postgres -n postgres -o jsonpath='{.data.password}' | base64 -d; echo
+   ```
+
+4. Answer the wizard's database questions with **PostgreSQL**, the host `postgres.postgres.svc.cluster.local`, the port `5432`, the database `goiabada`, the username `goiabada` and that password. The host resolves inside the cluster only, so skip the wizard's connection test.
+
+</Steps>
+
+To remove it, with everything Goiabada stored: `kubectl delete namespace postgres`.
+
 ## SQLite
 
 There's nothing to create, and `GOIABADA_DB_CREATE` doesn't apply: the driver creates the file. To refuse a missing file instead of creating one, write `GOIABADA_DB_DSN` as a `file:` URI with `mode=rw`, such as `file:/data/goiabada.db?mode=rw`. After a plain path, like the one the setup wizard writes, the driver ignores `mode=rw`. [SQLite](/reference/environment-variables/#sqlite) has the connection string for a file that survives restarts.

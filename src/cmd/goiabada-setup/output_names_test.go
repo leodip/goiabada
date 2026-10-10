@@ -42,7 +42,7 @@ func TestWizard_PrintedCommandsNameTheWrittenFiles(t *testing.T) {
 				t.Fatalf("setup: %v\n%s", err, out)
 			}
 			got := runPrinted(t, dir, `kubectl() { printf '%s\n' "$@"; }`, completionLine(t, out.String(), "kubectl apply -f '"))
-			want := []string{"apply", "-f", name + ".yaml", "-f", name + "-secrets.yaml"}
+			want := []string{"apply", "-f", name + "-secrets.yaml", "-f", name + ".yaml"}
 			if !slices.Equal(got, want) {
 				t.Errorf("kubectl receives %q, want %q", got, want)
 			}
@@ -104,8 +104,8 @@ func TestGeneratedHeaders_NameTheFilesAsWritten(t *testing.T) {
 	}{
 		{
 			name: "kubernetes renamed", kind: deploymentKubernetes, output: "identity deploy.yaml",
-			header:   []string{"#   kubectl apply -f 'identity deploy.yaml' -f 'identity deploy-secrets.yaml'\n", "# This file holds no secret: every one is in identity deploy-secrets.yaml.\n"},
-			override: []string{"# The Secrets identity deploy.yaml reads.", "#   kubectl apply -f 'identity deploy.yaml' -f 'identity deploy-secrets.yaml'\n"},
+			header:   []string{"#   kubectl apply -f 'identity deploy-secrets.yaml' -f 'identity deploy.yaml'\n", "# This file holds no secret: every one is in identity deploy-secrets.yaml.\n"},
+			override: []string{"# The Secrets identity deploy.yaml reads.", "#   kubectl apply -f 'identity deploy-secrets.yaml' -f 'identity deploy.yaml'\n"},
 			defaults: []string{"goiabada-k8s.yaml", "goiabada-secrets.yaml"},
 		},
 		{

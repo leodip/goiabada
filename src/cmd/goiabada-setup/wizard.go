@@ -679,7 +679,17 @@ func (w *wizard) askDatabaseConnection() error {
 		}
 
 		w.out.println()
-		test, err := w.yesNo("Test database connection?", true)
+		// A name only the cluster's DNS answers fails here even when the pods reach it, which read as a
+		// mistyped host on a real cluster, so the test is offered but not taken by default (#542).
+		testByDefault := true
+		if c.Deployment.kind == deploymentKubernetes && clusterInternalHost(c.DBHost) {
+			testByDefault = false
+			w.out.printf("%s resolves inside the cluster only:\n", c.DBHost)
+			w.out.println("a test from this machine fails even when the pods reach the database.")
+			w.out.println("The auth server's log says if it can't connect:")
+			w.out.printf("  kubectl logs -n %s deployment/goiabada-authserver\n", c.K8sNamespace)
+		}
+		test, err := w.yesNo("Test database connection?", testByDefault)
 		if err != nil {
 			return err
 		}

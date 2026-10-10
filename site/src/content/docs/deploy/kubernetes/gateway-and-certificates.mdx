@@ -72,7 +72,31 @@ The steps install Envoy Gateway and cert-manager, and create cluster-wide resour
 
    Check the [cert-manager releases](https://github.com/cert-manager/cert-manager/releases) for a newer version.
 
-3. **Create a ClusterIssuer for Let's Encrypt,** which answers its challenge through Goiabada's Gateway. Put your email address in, and your namespace if it isn't `goiabada`, then save it as `letsencrypt-issuer.yaml`:
+3. **Prepare the database,** MySQL, PostgreSQL or SQL Server, reachable from the cluster's pods, as [Database](/deploy/database/) describes. Only trying Goiabada out? [A PostgreSQL to try Goiabada on Kubernetes](/deploy/database/#a-postgresql-to-try-goiabada-on-kubernetes) runs one in the cluster.
+
+4. **Generate the files and deploy them.** Run the [setup wizard](/deploy/setup-wizard/) and choose **Kubernetes cluster**. Then answer, in order: the database, the two public URLs (such as `https://auth.example.com` and `https://admin.example.com`), the namespace (`goiabada` unless you change it), the gateway's traffic policy, whether [NetworkPolicies](/deploy/kubernetes/security/#who-can-reach-goiabada) restrict who reaches the pods, the [rate limiter](/deploy/kubernetes/high-availability/#rate-limiting-across-replicas), whether to expose [metrics](/deploy/monitoring/#scrape-on-kubernetes), the administrator, and the database's connection details.
+
+   The wizard offers to test the database connection from your machine, which can't reach a host only the cluster resolves, such as `postgres.db.svc.cluster.local`: for one, it says so and defaults to No. It warns if the database isn't empty, and writes `goiabada-k8s.yaml` and `goiabada-secrets.yaml`. **Back up the AES key** from `goiabada-secrets.yaml` before anything else, as [Back up the AES key](/deploy/secrets/#back-up-the-aes-key) says, and **never** commit that file; the wizard warns when it writes into a git working tree.
+
+   Deploy both files, the Secrets first:
+
+   ```bash
+   kubectl apply -f goiabada-secrets.yaml -f goiabada-k8s.yaml
+   ```
+
+   A container reads its Secrets once, when it starts. Applied after the manifest, Secrets that replace older ones of the same names, from an earlier attempt in the same namespace, would arrive after the new pods had started with the old ones, and the database would be seeded with secrets the cluster no longer holds. Both files create the namespace.
+
+   For production, you can create the Secrets another way instead of from the file: see [Secrets](/deploy/kubernetes/secrets/#create-the-secrets-another-way).
+
+5. **Point DNS at the Gateway.** Read its address, which can take a minute to appear:
+
+   ```bash
+   kubectl get gateway goiabada -n goiabada -o jsonpath='{.status.addresses[0].value}'
+   ```
+
+   Then create an `A` record for each host name, `auth.example.com` and `admin.example.com`, with that address, or a `CNAME` when the address is a host name, as on AWS. If your DNS provider can proxy traffic, as Cloudflare does, leave both records unproxied, **DNS only**: Let's Encrypt has to reach the Gateway itself. Wait until both names resolve, for instance with `nslookup auth.example.com`.
+
+6. **Create a ClusterIssuer for Let's Encrypt,** which answers its challenge through Goiabada's Gateway. Put your namespace in if it isn't `goiabada`, then save it as `letsencrypt-issuer.yaml`:
 
    ```yaml
    apiVersion: cert-manager.io/v1
@@ -82,7 +106,6 @@ The steps install Envoy Gateway and cert-manager, and create cluster-wide resour
    spec:
      acme:
        server: https://acme-v02.api.letsencrypt.org/directory
-       email: your-email@example.com
        privateKeySecretRef:
          name: letsencrypt-prod
        solvers:
@@ -98,34 +121,14 @@ The steps install Envoy Gateway and cert-manager, and create cluster-wide resour
    kubectl apply -f letsencrypt-issuer.yaml
    ```
 
-4. **Prepare the database,** MySQL, PostgreSQL or SQL Server, reachable from the cluster's pods, as [Database](/deploy/database/) describes.
-
-5. **Generate the files and deploy them.** Run the [setup wizard](/deploy/setup-wizard/) and choose **Kubernetes cluster**. Then answer, in order: the database, the two public URLs (such as `https://auth.example.com` and `https://admin.example.com`), the namespace (`goiabada` unless you change it), the gateway's traffic policy, whether [NetworkPolicies](/deploy/kubernetes/security/#who-can-reach-goiabada) restrict who reaches the pods, the [rate limiter](/deploy/kubernetes/high-availability/#rate-limiting-across-replicas), whether to expose [metrics](/deploy/monitoring/#scrape-on-kubernetes), the administrator, and the database's connection details.
-
-   The wizard offers to test the database connection, warns if the database isn't empty, and writes `goiabada-k8s.yaml` and `goiabada-secrets.yaml`. **Back up the AES key** from `goiabada-secrets.yaml` before anything else, as [Back up the AES key](/deploy/secrets/#back-up-the-aes-key) says, and **never** commit that file; the wizard warns when it writes into a git working tree.
-
-   Deploy both files, the manifest first, since it creates the namespace the Secrets are in:
-
-   ```bash
-   kubectl apply -f goiabada-k8s.yaml -f goiabada-secrets.yaml
-   ```
-
-   For production, you can create the Secrets another way instead of from the file: see [Secrets](/deploy/kubernetes/secrets/#create-the-secrets-another-way).
-
-6. **Point DNS at the Gateway.** Read its address:
-
-   ```bash
-   kubectl get gateway goiabada -n goiabada -o jsonpath='{.status.addresses[0].value}'
-   ```
-
-   Then create an `A` record for each host name, `auth.example.com` and `admin.example.com`, with that address, or a `CNAME` when the address is a host name, as on AWS. cert-manager can't get the certificates until both resolve to it.
+   Create it only once both names resolve. Until it exists, cert-manager waits; from then on, it looks the names up. A name looked up before its record exists can stay missing for the cluster's resolver for as long as your zone lets it remember a missing name, often 30 minutes. Let's Encrypt needs no email address: it sends no expiry notices since June 2025.
 
 7. **Check it's up, and sign in.**
 
    ```bash
    kubectl get pods -n goiabada                    # both Running, 1/1
    kubectl get gateway,httproute -n goiabada       # the Gateway PROGRAMMED True, with an ADDRESS
-   kubectl get certificates -n goiabada            # both READY True, once DNS resolves
+   kubectl get certificates -n goiabada            # both READY True, within a few minutes
    ```
 
    Then sign in at `https://admin.example.com`, as [First sign-in](/get-started/first-sign-in/) describes. The wizard prints no secret, so read the administrator's password back out of the cluster:

@@ -25,6 +25,7 @@ So the usual causes are:
 - **No Certificates at all:** cert-manager runs without `--enable-gateway-api`, so it never reads the Gateway. Step 2 of [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/#set-it-up) turns it on, after Envoy Gateway has brought the Gateway API's resources.
 - **The issuer doesn't match:** the ClusterIssuer isn't named `letsencrypt-prod`, isn't ready, or its solver's `parentRefs` names another Gateway or namespace than the one you deployed into.
 - **DNS doesn't point at the Gateway yet,** so Let's Encrypt fetches the token from somewhere else.
+- **The names were looked up before their records existed.** Before it asks Let's Encrypt, cert-manager fetches the token itself, and a resolver that answered "no such name" then keeps that answer for as long as your zone allows, often 30 minutes, even once the records exist. The Challenge's reason ends in `no such host`, while `nslookup` from your own machine finds the address. It clears by itself; creating the ClusterIssuer only once both names resolve, as [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/#set-it-up) does, avoids it.
 - **Port 80 doesn't reach Envoy:** a firewall or security group in front of the load balancer, or the `Local` traffic policy with nodes that have no Envoy pod.
 - **The solver pod is refused,** because the namespace enforces the `restricted` Pod Security standard and the pod doesn't meet it. The generated namespace only warns, and cert-manager's own solver pod meets `restricted`, but a `podTemplate` in the ClusterIssuer's solver that sets its own security context, or cert-manager run with `--acme-http01-solver-run-as-non-root=false`, can break that. `kubectl get events -n goiabada` shows a refused pod.
 
@@ -54,7 +55,11 @@ So the usual causes are:
    nslookup auth.example.com
    ```
 
-   `PROGRAMMED` should be `True`, and both host names should resolve to the `ADDRESS` it shows.
+   `PROGRAMMED` should be `True`, and both host names should resolve to the `ADDRESS` it shows. Check what the cluster resolves too, since it can remember a name as missing after your machine finds it:
+
+   ```bash
+   kubectl run dnscheck --rm -i --restart=Never --image=busybox -- nslookup auth.example.com
+   ```
 
 4. Under the `Local` traffic policy, check that Envoy runs a pod on every node:
 

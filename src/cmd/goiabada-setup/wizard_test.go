@@ -1474,3 +1474,63 @@ func TestConsole_ThePaletteIsWhatColours(t *testing.T) {
 		t.Errorf("coloured output %q", coloured.String())
 	}
 }
+
+// A name only the cluster's DNS answers cannot be tested from the machine running the wizard: on a
+// real cluster the test failed with "no such host" and offered to re-enter details that were right.
+// For such a host on Kubernetes the wizard says why, and the test defaults to No; any other host,
+// and any other deployment, keeps the default of Yes (#542).
+func TestWizard_DoesNotTestAClusterInternalHostByDefault(t *testing.T) {
+	d, e := deployments[deploymentKubernetes], testEngine("postgres")
+	for _, tc := range []struct {
+		host, prompt string
+		internal     bool
+	}{
+		{"postgres.db.svc.cluster.local", "Test database connection? [y/N]: ", true},
+		{"postgres-service", "Test database connection? [y/N]: ", true},
+		{"db.internal", "Test database connection? [Y/n]: ", false},
+	} {
+		t.Run(tc.host, func(t *testing.T) {
+			steps := interactiveScript(d, e)
+			for i, step := range steps {
+				switch {
+				case strings.HasPrefix(step.prompt, "Database host ["):
+					steps[i].answer = tc.host
+				case strings.HasPrefix(step.prompt, "Test database connection?"):
+					steps[i].prompt = tc.prompt
+				}
+			}
+			w, in, out, calls := testWizard(t, &CLIFlags{}, steps)
+			if err := w.setup(); err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			in.assertConsumed()
+			said := strings.Contains(out.String(), tc.host+" resolves inside the cluster only:")
+			if said != tc.internal {
+				t.Errorf("the wizard says the host resolves inside the cluster only: %v, want %v\n%s", said, tc.internal, out)
+			}
+			if tested := len(*calls) > 0; tested == tc.internal {
+				t.Errorf("Enter tested the connection: %v, for a host inside the cluster: %v", tested, tc.internal)
+			}
+		})
+	}
+}
+
+func TestClusterInternalHost(t *testing.T) {
+	for host, want := range map[string]bool{
+		"postgres-service":               true,
+		"postgres.db.svc.cluster.local":  true,
+		"POSTGRES.DB.SVC.CLUSTER.LOCAL.": true,
+		"postgres.db.svc":                true,
+		"mysql.example.cluster.local":    true,
+		"db.internal":                    false,
+		"db.example.com":                 false,
+		"10.0.0.5":                       false,
+		"::1":                            false,
+		"":                               false,
+		"db.eu-west-1.example.net":       false,
+	} {
+		if got := clusterInternalHost(host); got != want {
+			t.Errorf("clusterInternalHost(%q) = %v, want %v", host, got, want)
+		}
+	}
+}

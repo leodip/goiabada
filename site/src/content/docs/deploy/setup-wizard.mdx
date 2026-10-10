@@ -73,7 +73,7 @@ Under the Cluster policy, Goiabada sees a node's address for every client. The r
 The wizard keeps every secret in one file, and the rest of the configuration in another, so you can commit the second one.
 
 - **Docker Compose:** the secrets are in `docker-compose.override.yml`. Docker Compose merges it into `docker-compose.yml` by itself, so `docker compose up -d` starts both.
-- **Kubernetes:** the secrets are in `goiabada-secrets.yaml`. Apply it after the manifest, which creates the namespace: `kubectl apply -f goiabada-k8s.yaml -f goiabada-secrets.yaml`.
+- **Kubernetes:** the secrets are in `goiabada-secrets.yaml`. Apply it before the manifest, so no pod starts with an older copy of the Secrets; both files create the namespace: `kubectl apply -f goiabada-secrets.yaml -f goiabada-k8s.yaml`.
 - **Native binaries:** `goiabada.env` is a single file that holds everything, secrets included.
 
 <Aside type="danger">
