@@ -108,6 +108,9 @@ func TestConnectionStrings_TheDriverReadsTheCaseBack(t *testing.T) {
 						t.Fatalf("%s %q: %v", conn.which, conn.dsn, err)
 					}
 					user, password, database = parsed.User, parsed.Passwd, parsed.DBName
+					if parsed.TLSConfig != "preferred" {
+						t.Errorf("%s tls is %q, want preferred as the server has it", conn.which, parsed.TLSConfig)
+					}
 					if parsed.Addr != net.JoinHostPort(host, strconv.Itoa(c.Port)) {
 						t.Errorf("%s address is %q", conn.which, parsed.Addr)
 					}
@@ -118,8 +121,8 @@ func TestConnectionStrings_TheDriverReadsTheCaseBack(t *testing.T) {
 						t.Fatalf("%s %q: %v", conn.which, conn.dsn, err)
 					}
 					user, password, gotHost, port, database = parsed.User, parsed.Password, parsed.Host, int(parsed.Port), parsed.Database
-					if parsed.Encryption != msdsn.EncryptionDisabled {
-						t.Errorf("%s encryption is %v, want disabled as the server has it", conn.which, parsed.Encryption)
+					if parsed.Encryption != msdsn.EncryptionOff || parsed.TLSConfig == nil || !parsed.TLSConfig.InsecureSkipVerify {
+						t.Errorf("%s encryption is %v, want the login encrypted and the certificate unchecked, as the server has it", conn.which, parsed.Encryption)
 					}
 				default:
 					t.Fatalf("no parser for %q", c.Engine)

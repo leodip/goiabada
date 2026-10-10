@@ -56,9 +56,12 @@ func TestDSN_RoundTripsThroughTheDriver(t *testing.T) {
 				assert.Equalf(t, tc.host, parsed.Host, "%s host", conn.which)
 				assert.Equalf(t, uint64(1433), parsed.Port, "%s port", conn.which)
 				assert.Equalf(t, conn.database, parsed.Database, "%s database", conn.which)
-				// Kept from the strings this replaced: the dev and CI servers present no certificate
-				// a client could verify.
-				assert.Equalf(t, msdsn.Encryption(msdsn.EncryptionDisabled), parsed.Encryption, "%s encrypt", conn.which)
+				// No encrypt parameter: the login is encrypted, and the whole session when the server
+				// forces encryption, as Azure SQL Database does, with the certificate unchecked, since
+				// the dev and CI servers present none a client could verify (#542).
+				assert.Equalf(t, msdsn.Encryption(msdsn.EncryptionOff), parsed.Encryption, "%s encrypt", conn.which)
+				require.NotNilf(t, parsed.TLSConfig, "%s TLS", conn.which)
+				assert.Truef(t, parsed.TLSConfig.InsecureSkipVerify, "%s certificate unchecked", conn.which)
 			}
 		})
 	}

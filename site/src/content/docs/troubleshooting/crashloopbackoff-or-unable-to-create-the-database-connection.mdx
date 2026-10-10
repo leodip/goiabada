@@ -29,7 +29,9 @@ Most often the record is `unable to create the database connection`, and its `er
 
 The rest of the `error` is the database driver's own words, such as `connection refused`, `no such host`, a refused password or a database that doesn't exist.
 
-On PostgreSQL and MySQL with `GOIABADA_DB_CREATE` on, a login that reaches the server but can't use Goiabada's database shows up later, as an `error` starting `unable to prepare the migration runner`. Check what the user may do in `GOIABADA_DB_NAME`: see [Database](/deploy/database/).
+When the database doesn't exist yet and the login can't create one, the `error` starts `unable to create database` on all three engines: create it yourself, as [Database](/deploy/database/) describes.
+
+A login that reaches the server but lacks a right in Goiabada's database gets further, and the database names the right: `permission denied for schema public` on PostgreSQL, `CREATE command denied` or `SELECT command denied` on MySQL, after `unable to prepare the migration runner` or `unable to migrate the database`. On MySQL with `GOIABADA_DB_CREATE` on, a login without the `CREATE` privilege on the database stops earlier, at `unable to create database` with `Error 1044 ... Access denied ... to database`, since `CREATE DATABASE IF NOT EXISTS` needs it even when the database exists. Check what the user may do in `GOIABADA_DB_NAME`: see [Database](/deploy/database/).
 
 ## Why it happens
 

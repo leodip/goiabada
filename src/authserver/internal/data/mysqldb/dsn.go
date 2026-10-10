@@ -34,7 +34,10 @@ func MaintenanceDSN(cfg *DatabaseConfig) string {
 }
 
 // driverConfig carries what both connections share: the credentials, the address, utf8mb4,
-// parsed times and UTC, which is what the hand-built strings asked for before #424.
+// parsed times and UTC, which is what the hand-built strings asked for before #424, and TLS when the
+// server offers it, without checking the server's certificate, which is PostgreSQL's default sslmode,
+// prefer. Until #542 it asked for no TLS at all, so a server with require_secure_transport refused
+// every connection.
 func driverConfig(cfg *DatabaseConfig) *mysqldriver.Config {
 	c := mysqldriver.NewConfig()
 	c.User = cfg.Username
@@ -43,6 +46,7 @@ func driverConfig(cfg *DatabaseConfig) *mysqldriver.Config {
 	c.Addr = hostport.Join(cfg.Host, cfg.Port)
 	c.ParseTime = true
 	c.Loc = time.UTC
+	c.TLSConfig = "preferred"
 	// Charset's option only sets a field and returns no error; Apply is the driver's one way in.
 	_ = c.Apply(mysqldriver.Charset("utf8mb4", ""))
 	return c
