@@ -82,8 +82,11 @@ func TestAPISettingsGeneralPut_Success(t *testing.T) {
 	assert.True(t, settings.SelfRegistrationRequiresEmailVerification)
 }
 
-// PUT: disabling self-registration should force RequiresEmailVerification to false
-func TestAPISettingsGeneralPut_DisableSelfRegForcesVerificationFalse(t *testing.T) {
+// PUT: disabling self-registration keeps the email verification choice, as sent. It used to be
+// forced to false, so turning self-registration off and on again lost email verification and made
+// which addresses have an account discoverable, with nothing on the page saying so. The choice does
+// nothing while self-registration is off, the registration page being a 404 then.
+func TestAPISettingsGeneralPut_DisablingSelfRegKeepsTheVerificationChoice(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -100,27 +103,27 @@ func TestAPISettingsGeneralPut_DisableSelfRegForcesVerificationFalse(t *testing.
 	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp1.StatusCode)
 
-	// Now disable self-registration but send verification flag as true to verify server overrides to false
+	// Now disable self-registration, keeping the verification flag on
 	req := api.UpdateSettingsGeneralRequest{
 		AppName:                 "App X",
 		Issuer:                  preReq.Issuer,
 		SelfRegistrationEnabled: false,
-		SelfRegistrationRequiresEmailVerification: true, // should be ignored
+		SelfRegistrationRequiresEmailVerification: true,
 		PasswordPolicy: "low",
 	}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 	var body api.SettingsGeneralResponse
-	_ = json.NewDecoder(resp2.Body).Decode(&body)
+	require.NoError(t, json.NewDecoder(resp2.Body).Decode(&body))
 	assert.False(t, body.SelfRegistrationEnabled)
-	assert.False(t, body.SelfRegistrationRequiresEmailVerification)
+	assert.True(t, body.SelfRegistrationRequiresEmailVerification)
 
-	// Also verify DB persisted override
+	// And the database holds it, so turning self-registration back on brings it back
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.False(t, settings.SelfRegistrationEnabled)
-	assert.False(t, settings.SelfRegistrationRequiresEmailVerification)
+	assert.True(t, settings.SelfRegistrationRequiresEmailVerification)
 }
 
 func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {

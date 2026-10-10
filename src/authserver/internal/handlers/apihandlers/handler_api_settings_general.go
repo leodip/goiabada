@@ -129,11 +129,12 @@ func HandleSettingsGeneralPut(
 		currentSettings.AppName = strings.TrimSpace(req.AppName)
 		currentSettings.Issuer = issuer
 		currentSettings.SelfRegistrationEnabled = req.SelfRegistrationEnabled
-		if req.SelfRegistrationEnabled {
-			currentSettings.SelfRegistrationRequiresEmailVerification = req.SelfRegistrationRequiresEmailVerification
-		} else {
-			currentSettings.SelfRegistrationRequiresEmailVerification = false
-		}
+		// Stored as sent, whether or not self-registration is on. It does nothing while
+		// self-registration is off, since the registration page is then a 404, so keeping it
+		// costs nothing, and clearing it did: an administrator who turned self-registration off
+		// and on again got it back without email verification, which makes which addresses
+		// have an account discoverable, with nothing on the page saying it had changed.
+		currentSettings.SelfRegistrationRequiresEmailVerification = req.SelfRegistrationRequiresEmailVerification
 		currentSettings.DynamicClientRegistrationEnabled = req.DynamicClientRegistrationEnabled
 		currentSettings.PasswordPolicy = passwordPolicy
 		currentSettings.PKCERequired = req.PKCERequired
