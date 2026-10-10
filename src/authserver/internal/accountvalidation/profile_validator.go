@@ -49,6 +49,10 @@ type ValidateProfileInput struct {
 	Subject             string
 }
 
+// nameMaxLength is a name's bound in inputvalidation.TextLength's units, the 48 nameShape also
+// counts in code points.
+const nameMaxLength = 48
+
 var (
 	// nameShape allows Unicode letters, spaces, apostrophes and hyphens, 2 to 48
 	// characters. Note the literal space rather than \s: tabs, newlines and other
@@ -97,7 +101,12 @@ func (val *ProfileValidator) ValidateName(name string, invalidNameCode string) e
 		return nil
 	}
 
-	if !nameShape.MatchString(name) || !nameHasLetter.MatchString(name) {
+	// The shape's 48 counts code points, and the columns hold 64 UTF-16 code units on SQL Server,
+	// so a name of letters beyond the Basic Multilingual Plane, two units each, could pass it and
+	// overflow there, a database error in place of this refusal. Bounded again in TextLength's
+	// units, the ones every text bound uses, which no engine's column can overflow.
+	if !nameShape.MatchString(name) || !nameHasLetter.MatchString(name) ||
+		inputvalidation.TextLength(name) > nameMaxLength {
 		return i18n.NewLocalizedError(invalidNameCode, nil)
 	}
 	return nil
