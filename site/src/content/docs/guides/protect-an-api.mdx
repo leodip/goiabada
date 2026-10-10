@@ -110,7 +110,7 @@ Fetch the key set from `/certs` once and cache it, then pick the key whose `kid`
 Your API trusts a valid token until it expires. Ending the user's session, disabling them or changing their password stops the next refresh, not a token already issued. That's why access tokens are short, 5 minutes in a new install.
 
 <Aside type="caution">
-If an operation must stop the moment a user is disabled or their session is ended, check the signature and also call [`/userinfo`](/reference/endpoints/userinfo/) with the token: the auth server refuses it from then on. That works for a token carrying `openid`. See [what ending a session doesn't reach](/concepts/ending-sessions/#what-it-doesnt-reach).
+If an operation must stop the moment a user is disabled or their session is ended, check the signature and also call [`/userinfo`](/reference/endpoints/userinfo/) with the token: the auth server refuses it from then on. That works for a token carrying `openid`, except one from an `offline_access` grant: it names no session, so `/userinfo` goes on accepting it after the session ends, and refuses it only once the user is disabled or their credentials change. See [what ending a session doesn't reach](/concepts/ending-sessions/#what-it-doesnt-reach).
 </Aside>
 
 ## When something goes wrong

@@ -49,7 +49,7 @@ The admin console signs administrators in through its own client, `admin-console
 </Steps>
 
 <Aside type="danger">
-**There are no backup codes.** An administrator who loses their authenticator needs another administrator to turn it off for them. Give `authserver:manage` to at least two people before you require a code, or you can **never** sign in again once the only one loses their phone. See [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-last-administrator-cant-sign-in).
+**There are no backup codes.** An administrator who loses their authenticator needs another administrator to turn it off for them, or a client of your own holding `authserver:manage`. Give `authserver:manage` to at least two people before you require a code: otherwise, once the only one loses their phone, such a client or editing the database by hand are the only ways back. See [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-last-administrator-cant-sign-in).
 </Aside>
 
 ## Setting up an authenticator
@@ -74,13 +74,13 @@ A user whose session already reached the client's level isn't asked for anything
 
 A user who signed in to another app with a password alone isn't asked for their password again. They're asked only for the code, which is a [step-up](/concepts/acr-and-amr/#a-session-thats-already-there), and their session keeps the higher level from then on.
 
-When a user sets up or removes an authenticator, every session of theirs goes through the code step again before it's used for a level above `urn:goiabada:level1`.
+When a user sets up or removes an authenticator, every session of theirs goes through the code step again before it's used for a level above `urn:goiabada:level1`: the user enters a code, or, with no authenticator left, is asked for nothing at level 2 and sets up a new one at level 3.
 
 ## A user who lost their authenticator
 
 An administrator opens **Admin**, **Users**, the user, and their **Authentication** tab, turns off **Two-factor authentication enabled**, and saves. At level 3, the user sets up a new authenticator at their next sign-in.
 
-Turning it off lowers each of the user's sessions to what a password alone reaches, so no token issued from them afterwards claims a code. Nobody is signed out, though, and apps the user was already signed in to keep refreshing their tokens with the claims they had. If the device could be in someone else's hands, also end the user's sessions: on their **Sessions** tab, choose **End session** beside each one. That signs every browser out and revokes the refresh tokens each session gave out. A session left open is enough to set up a new authenticator at a level 3 sign-in, since that asks only for what the session doesn't already have. See [Ending sessions](/concepts/ending-sessions/).
+Turning it off lowers each of the user's sessions to what a password alone reaches, so no token issued from them afterwards claims a code. Nobody is signed out, though, and apps the user was already signed in to keep refreshing their tokens with the claims they had. If the device could be in someone else's hands, also end the user's sessions: on their **Sessions** tab, choose **End session** beside each one, and confirm. That signs every browser out and revokes the refresh tokens each session gave out. A session left open is enough to set up a new authenticator at a level 3 sign-in, since that asks only for what the session doesn't already have. See [Ending sessions](/concepts/ending-sessions/).
 
 A user who still has their authenticator can turn it off themselves, with their password, under **Account**, **Two-factor authentication** and **Disable OTP**. At level 3, they then set up a new one at their next sign-in to your app.
 

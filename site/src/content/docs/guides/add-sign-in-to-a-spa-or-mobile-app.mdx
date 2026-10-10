@@ -78,7 +78,7 @@ Open the authorization request in the system browser, never in a web view inside
 
 A mobile app's redirect URI uses a scheme of its own, such as `com.example.app:/oauth2redirect`, which the phone hands to your app. Use a reverse domain name you control, so no other app claims it. A custom scheme needs no host.
 
-A desktop app can receive the code on a local server it starts on a free port. For an `http` redirect URI on `127.0.0.1`, `[::1]` or `localhost`, the auth server ignores the port when it compares, as RFC 8252 asks: register `http://127.0.0.1/callback`, and `http://127.0.0.1:54321/callback` matches. Prefer `127.0.0.1` to `localhost`. See [loopback redirect URIs](/concepts/clients/#loopback-redirect-uris).
+A desktop app can receive the code on a local server it starts on a free port. For an `http` redirect URI on `127.0.0.1`, `[::1]` or `localhost`, the auth server ignores the port when it compares. RFC 8252 asks this for the two IP addresses, and Goiabada allows it for `localhost` too, as a convenience: register `http://127.0.0.1/callback`, and `http://127.0.0.1:54321/callback` matches. Prefer `127.0.0.1` to `localhost`. See [loopback redirect URIs](/concepts/clients/#loopback-redirect-uris).
 
 ## Refresh tokens
 
