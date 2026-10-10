@@ -367,6 +367,7 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 		AuthMethods:       "pwd",
 		AcrLevel:          "urn:goiabada:pwd",
 		AuthTime:          time.Now().UTC(),
+		PasswordAuthTime:  time.Now().UTC(),
 		IpAddress:         "192.168.1.1",
 		DeviceName:        "Test Device",
 		DeviceType:        "computer",

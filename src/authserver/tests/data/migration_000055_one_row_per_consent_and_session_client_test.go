@@ -192,8 +192,8 @@ func seedDuplicates000055(t *testing.T, h *isolatedDB) *seeded000055 {
 
 	// Associations: three rows for (S1, C1), one for (S1, C2), two for (S2, C1). The same client in
 	// two sessions is two pairs, not a duplicate.
-	s.session1 = createTestUserSessionOn(t, h.DB, s.userA).Id
-	s.session2 = createTestUserSessionOn(t, h.DB, s.userA).Id
+	s.session1 = seedSession000055(t, h, s.userA)
+	s.session2 = seedSession000055(t, h, s.userA)
 	s.session1Client1Kept = seedSessionClient000055(t, h, s.session1, s.client1)
 	seedSessionClient000055(t, h, s.session1, s.client1)
 	seedSessionClient000055(t, h, s.session1, s.client1)
@@ -347,4 +347,21 @@ func (s *seeded000055) assertTheKeysRefuseADuplicate(t *testing.T, h *isolatedDB
 		"DELETE FROM user_session_clients WHERE (user_session_id = %d AND client_id = %d) OR (user_session_id = %d AND client_id = %d)",
 		s.session1, s.client3, s.session2, s.client2))
 	require.NoError(t, err)
+}
+
+// seedSession000055 inserts a session with raw SQL and answers its id: the ORM writes every column
+// the record carries, and at 000054 a column a later migration adds is not there yet.
+func seedSession000055(t *testing.T, h *isolatedDB, userId int64) int64 {
+	t.Helper()
+	const ts = "'2026-01-01 00:00:00'"
+	identifier := fake.UUID()
+	_, err := h.SQL.Exec(fmt.Sprintf(`INSERT INTO user_sessions
+		(session_identifier, started, last_accessed, auth_methods, acr_level, auth_time,
+		 ip_address, device_name, device_type, device_os, user_id)
+		VALUES ('%s', %s, %s, 'pwd', 'urn:goiabada:level1', %s, '127.0.0.1', 'device', 'Desktop', 'Linux', %d)`,
+		identifier, ts, ts, ts, userId))
+	require.NoError(t, err, "seed a session at 000054")
+	var id int64
+	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf("SELECT id FROM user_sessions WHERE session_identifier = '%s'", identifier)).Scan(&id))
+	return id
 }

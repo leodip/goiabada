@@ -55,7 +55,7 @@ A session can be used only while all of these hold:
 |---|---|---|
 | Idle timeout | The session's last activity | **User session - idle timeout in seconds** |
 | Maximum lifetime | When the session started, so activity never extends it | **User session - max lifetime in seconds** |
-| `max_age` | When the user last entered a credential, which is `auth_time` | The authorization request, when it has one |
+| `max_age` | When the user last entered a credential, which is `auth_time`. When the user's two-factor authentication is removed, it's when they entered the password, as [ACR and AMR](/concepts/acr-and-amr/#a-session-thats-already-there) explains | The authorization request, when it has one |
 
 Each bound includes its last second: a session idle for exactly the idle timeout still counts, and so does a sign-in exactly `max_age` seconds ago, as [OpenID Connect Core 1.0 section 3.1.2.1](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest) describes. The idle timeout can't be longer than the maximum lifetime.
 

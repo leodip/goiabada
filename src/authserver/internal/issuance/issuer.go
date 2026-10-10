@@ -22,6 +22,7 @@ type tokenIssuerDatabase interface {
 	CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
 	GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*record.KeyPair, error)
 	GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*record.RefreshToken, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups []record.Group) error
 	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)

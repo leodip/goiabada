@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
+	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -4720,6 +4721,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 // carries a distinct value, so a swap between two string fields fails as well as an omission.
 func TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom(t *testing.T) {
 	authenticatedAt := time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC)
+	otpClaimGeneration := int64(5)
 	authContext := &ceremony.AuthContext{
 		ClientId:            "client-identifier",
 		RedirectURI:         "https://app.example/callback",
@@ -4737,6 +4739,7 @@ func TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom(t *testing.T) {
 		AuthMethods:         "pwd otp",
 		AuthenticatedAt:     &authenticatedAt,
 		AuthStateGeneration: 9,
+		OtpClaimGeneration:  &otpClaimGeneration,
 		// Ceremony state issuance does not read, set so that copying it anywhere would show.
 		CeremonyId: "ceremony-id",
 		AuthState:  ceremony.AuthStateReadyToIssueCode,
@@ -4762,6 +4765,7 @@ func TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom(t *testing.T) {
 		AuthenticatedAt:     &authenticatedAt,
 		AuthStateGeneration: 9,
 		SessionIdentifier:   "session-identifier",
+		OTPClaim:            otpcredential.OTPClaim{Claimed: true, Generation: &otpClaimGeneration},
 	}, got)
 
 	// A field added to CreateCodeInput and not copied here is left zero, which the literal above

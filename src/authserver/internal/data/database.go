@@ -514,6 +514,11 @@ type Database interface {
 	// /auth/level2 and here must not be discharged by a ceremony that never saw it
 	// (#242, #106 decision 11).
 	PromoteUserSessionOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
+	// LowerUserSessionsToPassword lowers every session of the user that claims more than a password
+	// to what passwordMethods reached: auth_methods becomes passwordMethods, level2_mandatory
+	// becomes level2_optional, and auth_time becomes password_auth_time. One statement, so it
+	// reads each row as it writes it and never writes back a copy read earlier (#542).
+	LowerUserSessionsToPassword(ctx context.Context, tx *sql.Tx, userId int64, passwordMethods string) error
 	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	UserSessionsLoadUsers(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error
 	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error

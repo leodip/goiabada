@@ -3,6 +3,7 @@ package handlers
 import (
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,10 +36,13 @@ type issuanceWorld struct {
 	noUser          bool
 	userDisabled    bool
 	generationDrift int64
-	// claimsOTP says the ceremony's methods name a one-time code, and noAuthenticator that the user
-	// has none now; every other ceremony's user has one (#542 decision 1).
-	claimsOTP       bool
-	noAuthenticator bool
+	// claimsOTP says the ceremony's methods name a one-time code, from the authenticator at
+	// otp_config_generation 2; noAuthenticator that the user has none now, and
+	// authenticatorReplaced that the user's is another one, set up since. Every other ceremony's
+	// user still has that one (#542).
+	claimsOTP             bool
+	noAuthenticator       bool
+	authenticatorReplaced bool
 	// session is whether the identifier names a row; owned and valid are about that row, and valid
 	// is also HasValidUserSession's answer for no row, which is false.
 	session bool
@@ -52,12 +56,18 @@ type issuanceWorld struct {
 func driveIssuance(t *testing.T, world issuanceWorld) (issuanceAnswer, []issuanceFact) {
 	t.Helper()
 
+	claimGeneration := int64(2)
+	userOtpConfigGeneration := claimGeneration
+	if world.authenticatorReplaced {
+		userOtpConfigGeneration = 4
+	}
+
 	facts := issuanceFacts{
 		redirectURI:              world.redirectURI,
 		responseType:             world.responseType,
 		hintSubject:              world.hint,
 		authStateGeneration:      ceremonyGeneration,
-		claimsOTP:                world.claimsOTP,
+		otpClaim:                 otpcredential.OTPClaim{Claimed: world.claimsOTP, Generation: &claimGeneration},
 		sessionIdentifierPresent: world.identifier,
 	}
 	var asked []issuanceFact
@@ -88,6 +98,7 @@ func driveIssuance(t *testing.T, world issuanceWorld) (issuanceAnswer, []issuanc
 					Enabled:             !world.userDisabled,
 					AuthStateGeneration: ceremonyGeneration + world.generationDrift,
 					OTPEnabled:          !world.noAuthenticator,
+					OtpConfigGeneration: userOtpConfigGeneration,
 				}
 			}
 		case issuanceFactSession:
@@ -483,6 +494,13 @@ func TestDecideIssuance(t *testing.T) {
 		{
 			name:      "an implicit ceremony naming a removed authenticator restarts too",
 			world:     with(func(w *issuanceWorld) { w.responseType = "id_token"; w.claimsOTP = true; w.noAuthenticator = true }),
+			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionAuthenticatorRemoved},
+			wantReads: []issuanceFact{registration, flows, session, validity, user},
+		},
+		{
+			// Removed and another set up while the ceremony sat on a step (#542 review).
+			name:      "a ceremony naming a code from an authenticator replaced since restarts",
+			world:     with(func(w *issuanceWorld) { w.claimsOTP = true; w.authenticatorReplaced = true }),
 			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionAuthenticatorRemoved},
 			wantReads: []issuanceFact{registration, flows, session, validity, user},
 		},

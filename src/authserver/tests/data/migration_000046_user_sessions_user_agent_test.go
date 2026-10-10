@@ -2,7 +2,9 @@ package datatests
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"strings"
 	"testing"
 	"time"
@@ -56,12 +58,15 @@ func TestMigration000046_UserSessionsUserAgent(t *testing.T) {
 	userId := seedUser000046(t, h)
 	legacy := seedSessionWithoutUserAgent000046(t, h, userId)
 
-	read, err := h.DB.GetUserSessionBySessionIdentifier(context.Background(), nil, legacy)
-	require.NoError(t, err, "read back the legacy session")
-	require.NotNil(t, read, "the legacy session must be there")
-	assert.Empty(t, read.UserAgent,
+	assert.Empty(t, userAgentOf000046(t, h, legacy),
 		"a row inserted without user_agent must read back empty: that is what leaves a legacy row sweepable only by another header-less client")
 
+	// The round trips write through the ORM, which writes every column the record carries, so they
+	// run at head: at 000046 a column a later migration adds is not there yet, 000062's
+	// password_auth_time among them. user_agent is as 000046 left it.
+	if err := h.Migrator.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
+		require.NoError(t, err, "migrate to head for the round trips")
+	}
 	assertUserAgentRoundTrip000046(t, h, userId, "512 ASCII bytes", strings.Repeat("a", 512))
 
 	// 128 emoji, 4 bytes each. The rune count is asserted beside the byte length so a later edit
@@ -82,10 +87,7 @@ func TestMigration000046_UserSessionsUserAgent(t *testing.T) {
 	// unnamed one would have blocked the down, and a down that dropped it without the up putting
 	// it back would leave the column with no default at all.
 	roundTripped := seedSessionWithoutUserAgent000046(t, h, seedUser000046(t, h))
-	read, err = h.DB.GetUserSessionBySessionIdentifier(context.Background(), nil, roundTripped)
-	require.NoError(t, err, "read back the session seeded after the round trip")
-	require.NotNil(t, read)
-	assert.Empty(t, read.UserAgent, "the default must still apply after down then up")
+	assert.Empty(t, userAgentOf000046(t, h, roundTripped), "the default must still apply after down then up")
 }
 
 // assertUserAgentColumn000046 holds the declared shape: present, NOT NULL, defaulted, and the type
@@ -128,6 +130,7 @@ func assertUserAgentRoundTrip000046(t *testing.T, h *isolatedDB, userId int64, n
 			AuthMethods:       "pwd",
 			AcrLevel:          "urn:goiabada:level1",
 			AuthTime:          now,
+			PasswordAuthTime:  now,
 			IpAddress:         "127.0.0.1",
 			DeviceName:        "device",
 			DeviceType:        "Desktop",
@@ -211,4 +214,15 @@ func seedSessionWithoutUserAgent000046(t *testing.T, h *isolatedDB, userId int64
 	_, err := h.SQL.Exec(q)
 	require.NoError(t, err, "seed a session with no user_agent, as a pre-upgrade binary wrote it")
 	return identifier
+}
+
+// userAgentOf000046 reads one session's user_agent with raw SQL, as seedSessionWithoutUserAgent000046
+// writes it: the ORM reads every column the record carries, and at 000046 a column a later migration
+// adds is not there yet.
+func userAgentOf000046(t *testing.T, h *isolatedDB, identifier string) string {
+	t.Helper()
+	var userAgent string
+	q := fmt.Sprintf("SELECT user_agent FROM user_sessions WHERE session_identifier = '%s'", identifier)
+	require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&userAgent), "read back the user_agent of session %s", identifier)
+	return userAgent
 }

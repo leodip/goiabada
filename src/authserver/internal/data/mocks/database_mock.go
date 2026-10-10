@@ -11654,6 +11654,75 @@ func (_c *Database_IsRefreshTokenFamilyRevoked_Call) RunAndReturn(run func(ctx c
 	return _c
 }
 
+// LowerUserSessionsToPassword provides a mock function for the type Database
+func (_mock *Database) LowerUserSessionsToPassword(ctx context.Context, tx *sql.Tx, userId int64, passwordMethods string) error {
+	ret := _mock.Called(ctx, tx, userId, passwordMethods)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LowerUserSessionsToPassword")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string) error); ok {
+		r0 = returnFunc(ctx, tx, userId, passwordMethods)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_LowerUserSessionsToPassword_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LowerUserSessionsToPassword'
+type Database_LowerUserSessionsToPassword_Call struct {
+	*mock.Call
+}
+
+// LowerUserSessionsToPassword is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+//   - passwordMethods string
+func (_e *Database_Expecter) LowerUserSessionsToPassword(ctx any, tx any, userId any, passwordMethods any) *Database_LowerUserSessionsToPassword_Call {
+	return &Database_LowerUserSessionsToPassword_Call{Call: _e.mock.On("LowerUserSessionsToPassword", ctx, tx, userId, passwordMethods)}
+}
+
+func (_c *Database_LowerUserSessionsToPassword_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, passwordMethods string)) *Database_LowerUserSessionsToPassword_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_LowerUserSessionsToPassword_Call) Return(err error) *Database_LowerUserSessionsToPassword_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_LowerUserSessionsToPassword_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, passwordMethods string) error) *Database_LowerUserSessionsToPassword_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // MarkCodeAsUsed provides a mock function for the type Database
 func (_mock *Database) MarkCodeAsUsed(ctx context.Context, tx *sql.Tx, codeId int64) (bool, error) {
 	ret := _mock.Called(ctx, tx, codeId)

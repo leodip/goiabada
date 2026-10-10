@@ -16,10 +16,17 @@ type UserSession struct {
 	AuthMethods       string       `db:"auth_methods"`
 	AcrLevel          AcrLevel     `db:"acr_level"`
 	AuthTime          time.Time    `db:"auth_time"`
-	IpAddress         string       `db:"ip_address"`
-	DeviceName        string       `db:"device_name"`
-	DeviceType        string       `db:"device_type"`
-	DeviceOS          string       `db:"device_os"`
+	// PasswordAuthTime is when the password was last entered for this session: at the sign-in that
+	// created it, or at a later one that authenticated afresh over it (#537). A code entered after
+	// the password moves AuthTime and not this. Removing the user's authenticator lowers the session
+	// to amr ["pwd"] and AuthTime to this, so the two describe the authentication the password was
+	// (#542). Every session has one: a session is only created after a password, and migration
+	// 000062 ended the sessions stored before it was recorded.
+	PasswordAuthTime time.Time `db:"password_auth_time"`
+	IpAddress        string    `db:"ip_address"`
+	DeviceName       string    `db:"device_name"`
+	DeviceType       string    `db:"device_type"`
+	DeviceOS         string    `db:"device_os"`
 	// UserAgent is the request's User-Agent header as the browser sent it, repaired to
 	// valid UTF-8 and cut to 512 bytes by useragent.BoundRaw. With IpAddress it is the key
 	// StartNewUserSession sweeps on: two logins are the same device when both match.

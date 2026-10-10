@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -68,7 +69,7 @@ func HandleIssueGet(
 			responseType:             authContext.ResponseType,
 			hintSubject:              authContext.IdTokenHintSub,
 			authStateGeneration:      authContext.AuthStateGeneration,
-			claimsOTP:                authContext.ClaimsOTP(),
+			otpClaim:                 otpClaimOf(authContext),
 			sessionIdentifierPresent: sessionIdentifier != "",
 		}
 
@@ -372,8 +373,9 @@ type issuanceFacts struct {
 	hintSubject  string
 	// authStateGeneration is the generation the ceremony authenticated at, as its context holds it.
 	authStateGeneration int64
-	// claimsOTP is AuthContext.ClaimsOTP: the ceremony's methods name a one-time code.
-	claimsOTP bool
+	// otpClaim is the ceremony's claim to a one-time code, which stands only while the user still
+	// has the authenticator it came from (#542).
+	otpClaim otpcredential.OTPClaim
 	// sessionIdentifierPresent says the request resolved a session identifier.
 	sessionIdentifierPresent bool
 
@@ -541,7 +543,7 @@ func decideIssuance(f issuanceFacts) (issuanceAnswer, issuanceFact) {
 	if f.user.AuthStateGeneration != f.authStateGeneration {
 		return issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionGenerationStale}, issuanceFactNone
 	}
-	if f.claimsOTP && !f.user.OTPEnabled {
+	if !f.otpClaim.StandsFor(f.user) {
 		return issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionAuthenticatorRemoved}, issuanceFactNone
 	}
 
@@ -696,6 +698,14 @@ func issueAuthorizationCodeGrant(
 	// so the row is held across as few statements as possible: the implicit flow mints no code and
 	// no refresh token, so it has no durable grant for this to protect (#139 decision 6).
 	code, err := codeIssuer.IssueAuthCodeTx(r.Context(), createCodeInput)
+	if errors.Is(err, otpcredential.ErrAuthenticatorRemoved) {
+		// decideIssuance's question, asked again by the issuer under the user's row lock: an
+		// authenticator removed between the two is answered as it would have been there, and no
+		// code was written (#542).
+		refuseIssuanceUnusableSession(w, r, sessionAuthenticatorRemoved, authContext, issuingClient, ambientSession,
+			sessionIdentifier, pageRenderer, ceremonyStore, templateFS, database, auditLogger, baseURL)
+		return
+	}
 	if errors.Is(err, issuance.ErrIssuingSessionGone) || errors.Is(err, issuance.ErrIssuingClientGone) {
 		if errors.Is(err, issuance.ErrIssuingClientGone) {
 			// The client's registration went away under this ceremony, between the liveness read
@@ -775,6 +785,7 @@ func newCreateCodeInput(authContext *ceremony.AuthContext, sessionIdentifier str
 		AuthenticatedAt:     authContext.AuthenticatedAt,
 		AuthStateGeneration: authContext.AuthStateGeneration,
 		SessionIdentifier:   sessionIdentifier,
+		OTPClaim:            otpClaimOf(authContext),
 	}
 }
 
@@ -991,9 +1002,16 @@ func issueImplicitGrant(
 		AuthenticatedAt:   authenticatedAt,
 
 		AuthStateGeneration: authContext.AuthStateGeneration,
+		OTPClaim:            otpClaimOf(authContext),
 	}
 
 	tokenResponse, err := implicitTokenIssuer.IssueImplicitTx(r.Context(), settings, implicitInput, issueAccessToken, issueIdToken)
+	if errors.Is(err, otpcredential.ErrAuthenticatorRemoved) {
+		// As for a code: nothing was signed (#542).
+		refuseIssuanceUnusableSession(w, r, sessionAuthenticatorRemoved, authContext, client, ambientSession,
+			sessionIdentifier, pageRenderer, ceremonyStore, templateFS, database, auditLogger, baseURL)
+		return
+	}
 	if errors.Is(err, issuance.ErrIssuingSessionGone) {
 		// The gone shape, answered exactly as the liveness read answers it: the browser restarts at
 		// level 1 and a prompt=none ceremony is told login_required. Nothing was signed.

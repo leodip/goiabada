@@ -3,6 +3,7 @@ package handlers
 import (
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -151,13 +152,15 @@ func TestDecideCompletion(t *testing.T) {
 }
 
 // What /auth/completed does with the ceremony's user before an arm binds a session (#522 decision
-// 6). The ceremony authenticated at generation 7, and names no one-time code unless claimsOTP says.
+// 6). The ceremony authenticated at generation 7, and names no one-time code unless claimsOTP says,
+// from the authenticator at otp_config_generation claimGeneration.
 func TestDecideBeforeBinding(t *testing.T) {
 	testCases := []struct {
-		name      string
-		user      *record.User
-		claimsOTP bool
-		want      beforeBindingAnswer
+		name            string
+		user            *record.User
+		claimsOTP       bool
+		claimGeneration int64
+		want            beforeBindingAnswer
 	}{
 		{name: "an enabled user at the ceremony's generation is bound",
 			user: &record.User{Enabled: true, AuthStateGeneration: 7}, want: beforeBindingBind},
@@ -183,9 +186,16 @@ func TestDecideBeforeBinding(t *testing.T) {
 			user:      &record.User{Enabled: true, AuthStateGeneration: 7},
 			claimsOTP: true, want: beforeBindingAuthenticatorRemoved,
 		},
-		{name: "a ceremony naming a code for a user with an authenticator is bound",
-			user:      &record.User{Enabled: true, AuthStateGeneration: 7, OTPEnabled: true},
-			claimsOTP: true, want: beforeBindingBind},
+		{name: "a ceremony naming a code for a user with the authenticator it came from is bound",
+			user:      &record.User{Enabled: true, AuthStateGeneration: 7, OTPEnabled: true, OtpConfigGeneration: 2},
+			claimsOTP: true, claimGeneration: 2, want: beforeBindingBind},
+		{
+			// Removed and another set up while the ceremony was in flight: the code came from the
+			// one removed, and the new one never gave one (#542 review).
+			name:      "a ceremony naming a code from an authenticator replaced since restarts",
+			user:      &record.User{Enabled: true, AuthStateGeneration: 7, OTPEnabled: true, OtpConfigGeneration: 4},
+			claimsOTP: true, claimGeneration: 2, want: beforeBindingAuthenticatorRemoved,
+		},
 		{name: "a ceremony naming no code is bound whatever the user has",
 			user: &record.User{Enabled: true, AuthStateGeneration: 7}, want: beforeBindingBind},
 		{name: "a disabled user is refused before the authenticator is asked about",
@@ -198,7 +208,8 @@ func TestDecideBeforeBinding(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, decideBeforeBinding(tc.user, 7, tc.claimsOTP))
+			claim := otpcredential.OTPClaim{Claimed: tc.claimsOTP, Generation: &tc.claimGeneration}
+			assert.Equal(t, tc.want, decideBeforeBinding(tc.user, 7, claim))
 		})
 	}
 }

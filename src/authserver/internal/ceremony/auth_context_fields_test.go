@@ -51,6 +51,8 @@ var attemptFields = []string{
 	"AuthStateGeneration",
 	"OtpConfigGeneration",
 	"OTPKeyURL",
+	"PasswordVerifiedAt",
+	"OtpClaimGeneration",
 }
 
 // restartedTo names the two attempt fields a restart does not leave at their zero value: the

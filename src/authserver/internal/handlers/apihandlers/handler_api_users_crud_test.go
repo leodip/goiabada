@@ -291,12 +291,8 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 	// And the user's sessions are lowered to what a password alone earns, in the same transaction,
 	// so none goes on naming the authenticator once it is gone (#542 decision 1).
-	database.On("GetUserSessionsByUserId", mock.Anything, otpDisableTx, userId).
-		Return([]record.UserSession{{Id: 7, UserId: userId, AcrLevel: record.AcrLevel2Mandatory, AuthMethods: "pwd otp"}}, nil).
-		Run(func(mock.Arguments) { calls = append(calls, "sessions") }).Once()
-	database.On("UpdateUserSession", mock.Anything, otpDisableTx, mock.MatchedBy(func(session *record.UserSession) bool {
-		return session.Id == 7 && session.AcrLevel == record.AcrLevel2Optional && session.AuthMethods == "pwd"
-	})).Return(nil).Run(func(mock.Arguments) { calls = append(calls, "lower") }).Once()
+	database.On("LowerUserSessionsToPassword", mock.Anything, otpDisableTx, userId, "pwd").Return(nil).
+		Run(func(mock.Arguments) { calls = append(calls, "lower") }).Once()
 
 	// The administrator who removed it, as every other administrative event names them (#522
 	// decision 7).
@@ -320,7 +316,7 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	HandleUserOTPPut(database, auditLogger).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, []string{"begin", "remove", "reset", "increment", "sessions", "lower", "commit"}, calls,
+	assert.Equal(t, []string{"begin", "remove", "reset", "increment", "lower", "commit"}, calls,
 		"every write belongs inside one transaction, otp_enabled first per #111 decision 10, "+
 			"the counter advance per #242 decision 2 and the sessions lowered per #542 decision 1")
 	assert.False(t, user.OTPEnabled)

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
@@ -32,7 +34,6 @@ type authCompletedDatabase interface {
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	PromoteUserSessionOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
-	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 }
 
@@ -118,7 +119,7 @@ func HandleAuthCompletedGet(
 				return
 			}
 
-			switch decideBeforeBinding(user, authContext.AuthStateGeneration, authContext.ClaimsOTP()) {
+			switch decideBeforeBinding(user, authContext.AuthStateGeneration, otpClaimOf(authContext)) {
 			case beforeBindingUserMissing:
 				pageRenderer.InternalServerError(w, r, errs.New("user not found"))
 				return
@@ -134,7 +135,7 @@ func HandleAuthCompletedGet(
 					"ceremony_user_id", authContext.UserId)
 				plan = completionPlan{arm: completionArmRestart}
 			case beforeBindingAuthenticatorRemoved:
-				slog.WarnContext(r.Context(), "this ceremony names a one-time code and the user no longer has an authenticator, restarting level 1 instead of binding a session",
+				slog.WarnContext(r.Context(), "this ceremony names a one-time code from an authenticator the user no longer has, restarting level 1 instead of binding a session",
 					"ceremony_user_id", authContext.UserId)
 				plan = completionPlan{arm: completionArmRestart}
 			}
@@ -145,21 +146,25 @@ func HandleAuthCompletedGet(
 		// create arm, never the ambient one the browser happened to carry (#133).
 		var boundSession *record.UserSession
 
-		switch plan.arm {
-		case completionArmRestart:
-			// Restart route 1, taken when no session is reusable and level 1 was never completed,
-			// or when the user's generation has moved on since the ceremony authenticated, which
-			// /auth/issue would restart one step later after a consent screen whose answer it
-			// throws away. The attempt is discarded with it, so methods and the user carried in
-			// from the session that ended do not reach the session the second pass creates
-			// (#140, #436).
+		// Restart route 1, taken when no session is reusable and level 1 was never completed, or
+		// when the user's generation has moved on since the ceremony authenticated, which
+		// /auth/issue would restart one step later after a consent screen whose answer it throws
+		// away, or when the ceremony's one-time code no longer stands. The attempt is discarded
+		// with it, so methods and the user carried in from the session that ended do not reach the
+		// session the second pass creates (#140, #436).
+		restart := func() {
 			authContext.Restart()
-			err = ceremonyStore.SaveAuthContext(w, r, authContext)
-			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
+			saveErr := ceremonyStore.SaveAuthContext(w, r, authContext)
+			if saveErr != nil {
+				pageRenderer.InternalServerError(w, r, saveErr)
 				return
 			}
 			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level1", authContext), http.StatusFound)
+		}
+
+		switch plan.arm {
+		case completionArmRestart:
+			restart()
 			return
 		case completionArmReuse:
 			boundSession, err = bindReusedSession(w, r, plan, ceremonyStore, userSessionManager, database,
@@ -167,6 +172,15 @@ func HandleAuthCompletedGet(
 		default:
 			boundSession, err = bindNewSession(w, r, plan, userSessionManager, database, auditLogger,
 				authContext, client, userSession, targetAcrLevel)
+		}
+		if errors.Is(err, otpcredential.ErrAuthenticatorRemoved) {
+			// The question decideBeforeBinding asked, asked again under the user's row lock by the
+			// write itself: an authenticator removed between the two is answered as it would have
+			// been there, and nothing was written (#542).
+			slog.WarnContext(r.Context(), "this ceremony names a one-time code from an authenticator the user no longer has, restarting level 1 instead of binding a session",
+				"ceremony_user_id", authContext.UserId)
+			restart()
+			return
 		}
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
@@ -382,7 +396,7 @@ const (
 	// beforeBindingGenerationMoved restarts the ceremony at level 1 (restart route 1).
 	beforeBindingGenerationMoved
 	// beforeBindingAuthenticatorRemoved restarts the ceremony at level 1 (restart route 1): it names
-	// a one-time code and the user has no authenticator now.
+	// a one-time code from an authenticator the user no longer has.
 	beforeBindingAuthenticatorRemoved
 )
 
@@ -404,15 +418,16 @@ const (
 //     perform one step later, compared as the token endpoint compares it at redemption. It is never
 //     the user's current value read into the ceremony, which would launder a sign-in that began
 //     before a credential change into the generation that change established (#106 decision 11);
-//   - a ceremony whose methods name a one-time code (claimsOTP) for a user with no authenticator now
-//     is restarted at level 1 too. Removing an authenticator lowers the user's sessions
-//     (otpcredential.Remove), but a ceremony in flight adopted the session's methods before that,
-//     and binding it would merge otp back into the lowered session, raised to the ceremony's
-//     target, and every later SSO token would claim the removed authenticator again. A code this
-//     ceremony verified itself and the user removed since is restarted alike: what it attests is
-//     gone. The restart asks for the password, and for whatever the target needs after it
-//     (#542 decision 1).
-func decideBeforeBinding(user *record.User, ceremonyGeneration int64, claimsOTP bool) beforeBindingAnswer {
+//   - a ceremony whose methods name a one-time code is restarted at level 1 too, unless the user
+//     still has the authenticator that code came from (otpcredential.OTPClaim). Removing an
+//     authenticator lowers the user's sessions (otpcredential.Remove), but a ceremony in flight
+//     adopted the session's methods before that, and binding it would merge otp back into the
+//     lowered session, raised to the ceremony's target, and every later SSO token would claim the
+//     removed authenticator again. Whether another has been set up since makes no difference: the
+//     code came from the one removed. A code this ceremony verified itself is restarted alike. The
+//     restart asks for the password, and for whatever the target needs after it (#542 decision 1).
+//     The write asks again under the user's row lock, for a removal landing after this.
+func decideBeforeBinding(user *record.User, ceremonyGeneration int64, otpClaim otpcredential.OTPClaim) beforeBindingAnswer {
 	if user == nil {
 		return beforeBindingUserMissing
 	}
@@ -422,7 +437,7 @@ func decideBeforeBinding(user *record.User, ceremonyGeneration int64, claimsOTP 
 	if user.AuthStateGeneration != ceremonyGeneration {
 		return beforeBindingGenerationMoved
 	}
-	if claimsOTP && !user.OTPEnabled {
+	if !otpClaim.StandsFor(user) {
 		return beforeBindingAuthenticatorRemoved
 	}
 	return beforeBindingBind
@@ -457,44 +472,39 @@ func bindReusedSession(
 		}
 	}
 
-	// Bump session with current auth context's methods and target ACR level.
-	// This handles step-up authentication: if the user had a level1 session but just
-	// completed OTP for a level2 client, the session's AuthMethods and AcrLevel
-	// will be upgraded to reflect the stronger authentication that was performed.
-	// The bump only ever raises; a ceremony that authenticated afresh is written over it below.
-	bumpedSession, err := userSessionManager.BumpUserSession(r.Context(), sessionIdentifier, client.Id,
-		authContext.AuthMethods, targetAcrLevel, middleware.ClientIP(r))
+	// Bind the session with the ceremony's methods and target ACR level, in one transaction under
+	// the session's row (BindUserSession). This handles step-up authentication: if the user had a
+	// level1 session but just completed OTP for a level2 client, the session's AuthMethods and
+	// AcrLevel are raised to reflect the stronger authentication that was performed. A ceremony that
+	// authenticated afresh replaces them instead (plan.replaceAuthentication): the level it was
+	// asked for, the methods it performed and its password's instant, never merged with what the
+	// session held before. The AuthTime beside them is set too, since such a ceremony always
+	// refreshes it: the password handler that set Level1AuthCompleted set AuthenticatedAt with it
+	// (#537).
+	//
+	// The AuthTime is the one the credential handler captured, never the clock read here. auth_time
+	// is what max_age is measured against, "the last time the End-User was actively authenticated
+	// by the OP" in OIDC Core 3.1.2.1, and the browser owns the hop between the credential and this
+	// handler: reading the clock here lets a tab paused after the password was accepted and resumed
+	// hours later mint a token saying the user authenticated just now, so a relying party that asked
+	// for a fresh sign-in is told it got one (#252 decision 8). refreshAuthTime is exactly the guard
+	// that makes it safe: non-nil and non-zero.
+	authentication := usersession.Authentication{
+		UserId:      authContext.UserId,
+		AuthMethods: authContext.AuthMethods,
+		AcrLevel:    targetAcrLevel,
+		OTPClaim:    otpClaimOf(authContext),
+	}
+	if plan.refreshAuthTime {
+		authentication.AuthTime = authContext.AuthenticatedAt
+	}
+	if plan.replaceAuthentication {
+		authentication.PasswordAuthTime = authContext.PasswordVerifiedAt
+	}
+	bumpedSession, err := userSessionManager.BindUserSession(r.Context(), sessionIdentifier, client.Id,
+		authentication, plan.replaceAuthentication, middleware.ClientIP(r))
 	if err != nil {
 		return nil, err
-	}
-
-	if plan.replaceAuthentication {
-		// A new authentication replaces the session's, as decideCompletion explains: the level it
-		// was asked for and the methods it performed, never merged with what the session held
-		// before. The AuthTime beside them is written by the refreshAuthTime block below, which
-		// this ceremony always takes: the password handler that set Level1AuthCompleted set
-		// AuthenticatedAt with it (#537).
-		bumpedSession.AcrLevel = targetAcrLevel
-		bumpedSession.AuthMethods = authContext.AuthMethods
-	}
-
-	if plan.refreshAuthTime {
-		// The value is the one the credential handler captured, never the clock read here.
-		// auth_time is what max_age is measured against, "the last time the End-User was actively
-		// authenticated by the OP" in OIDC Core 3.1.2.1, and the browser owns the hop between the
-		// credential and this handler: reading the clock here lets a tab paused after the password
-		// was accepted and resumed hours later mint a token saying the user authenticated just now,
-		// so a relying party that asked for a fresh sign-in is told it got one (#252 decision 8).
-		// refreshAuthTime is exactly the guard that makes the dereference safe: non-nil and
-		// non-zero.
-		bumpedSession.AuthTime = authContext.AuthenticatedAt.UTC()
-	}
-
-	if plan.replaceAuthentication || plan.refreshAuthTime {
-		err = database.UpdateUserSession(r.Context(), nil, bumpedSession)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	// Use session's AuthTime as auth_time source of truth. For SSO reuse
@@ -507,9 +517,8 @@ func bindReusedSession(
 		authContext.AuthenticatedAt = &bumpedSession.AuthTime
 	}
 
-	// After the bump and after the AuthTime write above, both of which write the whole row:
-	// otp_config_generation is tagged dont-update so neither carries it, and this narrow write is
-	// the only thing that moves it (#242).
+	// After the bind, which writes the whole row: otp_config_generation is tagged dont-update so it
+	// does not carry it, and this narrow write is the only thing that moves it (#242).
 	if plan.promoteOtpConfigGeneration {
 		err = database.PromoteUserSessionOtpConfigGeneration(r.Context(), nil, bumpedSession.Id,
 			*authContext.OtpConfigGeneration)
@@ -613,9 +622,16 @@ func bindNewSession(
 		replacing = userSession
 	}
 	newSession, removedSessions, err := userSessionManager.StartNewUserSession(
-		w, r, authContext.UserId, client.Id, authContext.AuthMethods, targetAcrLevel,
+		w, r, client.Id, usersession.Authentication{
+			UserId:           authContext.UserId,
+			AuthMethods:      authContext.AuthMethods,
+			AcrLevel:         targetAcrLevel,
+			AuthTime:         authContext.AuthenticatedAt,
+			PasswordAuthTime: authContext.PasswordVerifiedAt,
+			OTPClaim:         otpClaimOf(authContext),
+		},
 		authContext.AuthStateGeneration, authContext.OtpConfigGeneration,
-		authContext.AuthenticatedAt, middleware.ClientIP(r), replacing)
+		middleware.ClientIP(r), replacing)
 
 	// Every row the sign-in removed is gone once its transaction committed, which includes a
 	// failure that came after the commit, so each is audited before either answer. The payload is
@@ -701,4 +717,11 @@ func decideAfterBinding(f afterBindingFacts) (afterBindingAnswer, afterBindingFa
 		return afterBindingConsent, afterBindingFactNone
 	}
 	return afterBindingIssue, afterBindingFactNone
+}
+
+// otpClaimOf is the ceremony's claim to a one-time code: whether its methods name one, and the
+// generation of the authenticator it came from, adopted from the session or recorded when the code
+// was entered (#542).
+func otpClaimOf(authContext *ceremony.AuthContext) otpcredential.OTPClaim {
+	return otpcredential.OTPClaim{Claimed: authContext.ClaimsOTP(), Generation: authContext.OtpClaimGeneration}
 }

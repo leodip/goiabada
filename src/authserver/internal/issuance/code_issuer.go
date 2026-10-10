@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/authserver/internal/uuid"
@@ -41,9 +42,11 @@ var ErrIssuingSessionGone = errors.New("the session this ceremony is issuing for
 // codeIssuerDatabase is what the code issuer needs: the session row it takes, the client it issues
 // for, the code row it writes, and the transaction the three share.
 type codeIssuerDatabase interface {
+	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	CreateCode(ctx context.Context, tx *sql.Tx, code *record.Code) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -75,6 +78,9 @@ type CreateCodeInput struct {
 	AuthenticatedAt     *time.Time
 	AuthStateGeneration int64
 	SessionIdentifier   string
+	// OTPClaim is the code's claim to a one-time code, checked on the user under the user's row lock
+	// before the code is written (#542).
+	OTPClaim otpcredential.OTPClaim
 }
 
 func NewCodeIssuer(database codeIssuerDatabase) *CodeIssuer {
@@ -141,6 +147,15 @@ func (ci *CodeIssuer) IssueAuthCodeTx(ctx context.Context, input *CreateCodeInpu
 func (ci *CodeIssuer) IssueAuthCode(ctx context.Context, tx *sql.Tx, input *CreateCodeInput) (*record.Code, error) {
 	if tx == nil {
 		return nil, errs.New("issuing an authorization code requires a transaction: the session row it takes first is released by an autocommitted statement")
+	}
+
+	// A code naming a one-time code is issued only while the user still has the authenticator it
+	// came from, asked on the user under the user's row lock, first in this transaction. /auth/issue
+	// asked a moment ago, but a removal committing since would otherwise see this code inserted after
+	// it, claiming otp, and redemption would not notice: a removal does not move the authentication
+	// generation it checks (#542).
+	if err := input.OTPClaim.Recheck(ctx, ci.database, tx, input.UserId); err != nil {
+		return nil, err
 	}
 
 	// Existence only, deliberately. Ownership and the two timeouts were asked by the caller a few

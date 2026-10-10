@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
@@ -20,9 +21,12 @@ import (
 // userSessionManagerDatabase is what the session manager needs: the session row and the clients
 // it authorized, and the transaction that changes them together.
 type userSessionManagerDatabase interface {
+	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
+	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	CreateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *record.UserSessionClient) error
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
@@ -77,6 +81,24 @@ func (u *Manager) HasValidUserSession(userSession *record.UserSession, idleTimeo
 	return userSession.IsValid(u.now(), idleTimeoutInSeconds, maxLifetimeInSeconds, requestedMaxAgeInSeconds)
 }
 
+// Authentication is what a sign-in writes onto the session it creates or binds to.
+type Authentication struct {
+	// UserId is the user who signed in, and the row an OTPClaim is checked on.
+	UserId int64
+	// AuthMethods and AcrLevel are the methods the sign-in claims and the level it reached.
+	AuthMethods string
+	AcrLevel    record.AcrLevel
+	// AuthTime, when set, becomes the session's auth_time: the instant of the credential the sign-in
+	// last entered, a code's when it entered one after the password.
+	AuthTime *time.Time
+	// PasswordAuthTime, when set, becomes the session's password_auth_time: the instant the sign-in
+	// verified the password. A new session requires it, and so does a replacing bind (#542).
+	PasswordAuthTime *time.Time
+	// OTPClaim is the sign-in's claim to a one-time code, checked on the user under the user's row
+	// lock before anything is written (otpcredential.OTPClaim.Recheck).
+	OTPClaim otpcredential.OTPClaim
+}
+
 // StartNewUserSession creates a session for a completed authentication ceremony.
 //
 // authStateGeneration comes from the AuthContext, so it is the generation the ceremony
@@ -90,7 +112,7 @@ func (u *Manager) HasValidUserSession(userSession *record.UserSession, idleTimeo
 // level 2 re-prompt whenever the user's counter is already above 0. That is the
 // fail-closed direction and the only one a nil can safely take (#242).
 //
-// authenticatedAt is the instant this ceremony's last credential was accepted, captured by
+// authentication.AuthTime is the instant this ceremony's last credential was accepted, captured by
 // the password handler and overwritten by the OTP handler. It becomes the session's AuthTime
 // and so the auth_time claim, which OIDC Core 3.1.2.1 makes max_age's reference point: "the
 // last time the End-User was actively authenticated by the OP". Reading the clock here
@@ -103,8 +125,12 @@ func (u *Manager) HasValidUserSession(userSession *record.UserSession, idleTimeo
 // has nothing true to put in auth_time, and falling back to now would recreate the false
 // freshness this parameter exists to remove, one broken caller away. The one caller cannot
 // produce it, because /auth/completed refuses to mint a session without Level1AuthCompleted
-// and only the password handler sets that, alongside authenticatedAt; the refusal is what
+// and only the password handler sets that, alongside AuthenticatedAt; the refusal is what
 // makes that invariant fail closed rather than an argument in a comment.
+// authentication.PasswordAuthTime is refused alike: it is what a removal of the authenticator
+// lowers auth_time to (#542), and the same handler sets it. authentication.OTPClaim is checked on
+// the user under the user's row lock, first in the transaction, so a session is never created
+// claiming a code from an authenticator a removal took away meanwhile (otpcredential.OTPClaim.Recheck).
 //
 // ipAddress is the browser's address as the caller read it, and becomes the session's one
 // recorded address. replacing is the session this sign-in replaces for the same user, the one the
@@ -119,19 +145,22 @@ func (u *Manager) HasValidUserSession(userSession *record.UserSession, idleTimeo
 // gone either way and each is owed its audit event. Every other failure rolled them back and
 // returns none.
 func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
-	userId int64, clientId int64, authMethods string, acrLevel record.AcrLevel,
+	clientId int64, authentication Authentication,
 	authStateGeneration int64, otpConfigGeneration *int64,
-	authenticatedAt *time.Time, ipAddress string,
-	replacing *record.UserSession) (*record.UserSession, []record.UserSession, error) {
+	ipAddress string, replacing *record.UserSession) (*record.UserSession, []record.UserSession, error) {
 
-	if authenticatedAt == nil || authenticatedAt.IsZero() {
+	userId := authentication.UserId
+	if authentication.AuthTime == nil || authentication.AuthTime.IsZero() {
 		return nil, nil, errs.New("no credential instant captured; refusing to mint a session whose auth_time would be invented")
+	}
+	if authentication.PasswordAuthTime == nil || authentication.PasswordAuthTime.IsZero() {
+		return nil, nil, errs.New("no password instant captured; refusing to mint a session whose password_auth_time would be invented")
 	}
 	if replacing != nil && replacing.UserId != userId {
 		return nil, nil, errs.Errorf("refusing to replace user session %v: it belongs to user %v, not %v",
 			replacing.Id, replacing.UserId, userId)
 	}
-	authTime := authenticatedAt.UTC()
+	authTime := authentication.AuthTime.UTC()
 
 	utcNow := time.Now().UTC()
 
@@ -150,9 +179,10 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		Started:           utcNow,
 		LastAccessed:      utcNow,
 		IpAddress:         ipAddress,
-		AuthMethods:       authMethods,
-		AcrLevel:          acrLevel,
+		AuthMethods:       authentication.AuthMethods,
+		AcrLevel:          authentication.AcrLevel,
 		AuthTime:          authTime,
+		PasswordAuthTime:  authentication.PasswordAuthTime.UTC(),
 		UserId:            userId,
 		DeviceName:        deviceName,
 		DeviceType:        deviceType,
@@ -196,6 +226,10 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	var removed []record.UserSession
 	err = u.database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 		var removedThisAttempt []record.UserSession
+
+		if claimErr := authentication.OTPClaim.Recheck(r.Context(), u.database, tx, userId); claimErr != nil {
+			return claimErr
+		}
 
 		if createUserSessionErr := u.database.CreateUserSession(r.Context(), tx, userSession); createUserSessionErr != nil {
 			return createUserSessionErr
@@ -354,13 +388,18 @@ func (u *Manager) abandonUserSession(ctx context.Context, userSession *record.Us
 // the stronger authentication that was actually performed.
 //
 // **A bump only ever raises.** It never lowers the session's level and never drops a method from
-// its methods. That is right for what calls it: SSO reuse, prompt=none, a step-up and a refresh all
-// extend the authentication the session already holds. A ceremony that authenticated afresh over the
-// session (prompt=login, an id_token_hint naming someone else, a restart: Level1AuthCompleted) is a
+// its methods. That is right for what calls it: SSO reuse, a step-up and a refresh all extend the
+// authentication the session already holds. A ceremony that authenticated afresh over the session
+// (prompt=login, an id_token_hint naming someone else, a restart: Level1AuthCompleted) is a
 // different thing, a new authentication that replaces the session's, and /auth/completed's reuse arm
-// writes that replacement itself, after this bump, from what the ceremony performed (#537). Until
-// #537 this function replaced the methods on any difference, so such a ceremony left a session at
-// level 3 with amr "pwd", every later token from it contradicting itself (#239 F4).
+// binds it with BindUserSession's replace, from what the ceremony performed (#537). Until #537
+// this function replaced the methods on any difference, so such a ceremony left a session at level
+// 3 with amr "pwd", every later token from it contradicting itself (#239 F4).
+//
+// The token endpoint and prompt=none pass no methods and no level: a refresh steps nothing up, and
+// prompt=none reuses the session only when it already holds the level asked for, so the session's
+// own values were all either could pass, and writing them back could only undo a change committed
+// since they were read (#542).
 //
 // Parameters:
 //   - authMethods: The authentication methods used in the current auth flow (e.g., "pwd otp").
@@ -381,17 +420,69 @@ func (u *Manager) abandonUserSession(ctx context.Context, userSession *record.Us
 // and its associations are read in the body: a rerun that reused the first attempt's copy would
 // decide "absent" again and insert the same pair a second time. The body is otherwise safe to run
 // twice, since it builds every value it writes from what it has just read.
+//
+// **The session's row is taken before it is read** (AcquireUserSessionRow), and that is what makes
+// writing the whole row back safe. Read without it, a removal of the user's authenticator lowering
+// the session between the read and the write was undone: the write put back the otp and the level
+// the removal had just taken away (#542). With it, a removal that got there first has committed by
+// the time the read runs, and one that arrives later waits for this write and then lowers it.
 func (u *Manager) BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
 	authMethods string, acrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error) {
+	return u.bindUserSession(ctx, sessionIdentifier, clientId,
+		Authentication{AuthMethods: authMethods, AcrLevel: acrLevel}, false, ipAddress)
+}
+
+// BindUserSession binds a completed sign-in to the session the browser arrived with, which is
+// /auth/completed's reuse arm. It is BumpUserSession with what only a sign-in brings:
+//
+//   - replace writes the sign-in's level, methods and password instant over the session's, rather
+//     than raising them, for a ceremony that authenticated afresh (#537), and requires
+//     authentication.PasswordAuthTime;
+//   - authentication.AuthTime, when set, becomes the session's auth_time;
+//   - authentication.OTPClaim is checked on the user under the user's row lock, first in the
+//     transaction (otpcredential.OTPClaim.Recheck), and the session must be authentication.UserId's.
+//
+// All of it is one transaction under the session's row, where the replacement and the auth_time
+// used to be a second whole-row write after the bump's, unlocked and outside its transaction, which
+// could undo a removal's lowering as the bump's own write could (#542).
+func (u *Manager) BindUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
+	authentication Authentication, replace bool, ipAddress string) (*record.UserSession, error) {
+	if replace && (authentication.PasswordAuthTime == nil || authentication.PasswordAuthTime.IsZero()) {
+		return nil, errs.New("no password instant captured; refusing to replace a session's authentication with a password_auth_time that would be invented")
+	}
+	return u.bindUserSession(ctx, sessionIdentifier, clientId, authentication, replace, ipAddress)
+}
+
+func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
+	authentication Authentication, replace bool, ipAddress string) (*record.UserSession, error) {
+
+	authMethods := authentication.AuthMethods
+	acrLevel := authentication.AcrLevel
 
 	var bumped *record.UserSession
 	err := data.RunInTransactionRetryingConflict(ctx, u.database, func(tx *sql.Tx) error {
+		if claimErr := authentication.OTPClaim.Recheck(ctx, u.database, tx, authentication.UserId); claimErr != nil {
+			return claimErr
+		}
+
+		live, err := u.database.AcquireUserSessionRow(ctx, tx, sessionIdentifier)
+		if err != nil {
+			return err
+		}
+		if !live {
+			return errs.New("can't bump user session because user session is nil")
+		}
+
 		userSession, err := u.database.GetUserSessionBySessionIdentifier(ctx, tx, sessionIdentifier)
 		if err != nil {
 			return err
 		}
 		if userSession == nil {
 			return errs.New("can't bump user session because user session is nil")
+		}
+		if authentication.UserId != 0 && userSession.UserId != authentication.UserId {
+			return errs.Errorf("refusing to bind user session %v of user %v to a sign-in of user %v",
+				userSession.Id, userSession.UserId, authentication.UserId)
 		}
 
 		err = u.database.UserSessionLoadClients(ctx, tx, userSession)
@@ -411,21 +502,34 @@ func (u *Manager) BumpUserSession(ctx context.Context, sessionIdentifier string,
 			userSession.IpAddress = ipAddress
 		}
 
-		// Handle step-up authentication: add the methods the current auth flow used that the
-		// session lacks, e.g. "otp" when the user just completed OTP over a pwd-only session.
-		// Merged, never replaced, so a flow listing fewer methods than the session cannot shrink
-		// them (#537).
-		if raisesAuthMethods(userSession.AuthMethods, authMethods) {
-			userSession.AuthMethods = mergeAuthMethods(userSession.AuthMethods, authMethods)
+		if replace {
+			// A new authentication replaces the session's, as /auth/completed's decideCompletion
+			// explains: the level it was asked for, the methods it performed and when it entered
+			// the password, never merged with what the session held before (#537, #542).
+			userSession.AcrLevel = acrLevel
+			userSession.AuthMethods = authMethods
+			userSession.PasswordAuthTime = authentication.PasswordAuthTime.UTC()
+		} else {
+			// Handle step-up authentication: add the methods the current auth flow used that the
+			// session lacks, e.g. "otp" when the user just completed OTP over a pwd-only session.
+			// Merged, never replaced, so a flow listing fewer methods than the session cannot
+			// shrink them (#537).
+			if raisesAuthMethods(userSession.AuthMethods, authMethods) {
+				userSession.AuthMethods = mergeAuthMethods(userSession.AuthMethods, authMethods)
+			}
+
+			// Handle step-up authentication: upgrade ACR level if a higher level was achieved.
+			// We only upgrade, never downgrade, because once a user has proven a higher level
+			// of authentication in this session, that security guarantee should be preserved.
+			// Example: User logged in with pwd+otp (level2), then visits a level1 client.
+			// The session should remain at level2 because that's what was actually achieved.
+			if acrLevel != "" && shouldUpgradeAcrLevel(userSession.AcrLevel, acrLevel) {
+				userSession.AcrLevel = acrLevel
+			}
 		}
 
-		// Handle step-up authentication: upgrade ACR level if a higher level was achieved.
-		// We only upgrade, never downgrade, because once a user has proven a higher level
-		// of authentication in this session, that security guarantee should be preserved.
-		// Example: User logged in with pwd+otp (level2), then visits a level1 client.
-		// The session should remain at level2 because that's what was actually achieved.
-		if acrLevel != "" && shouldUpgradeAcrLevel(userSession.AcrLevel, acrLevel) {
-			userSession.AcrLevel = acrLevel
+		if authentication.AuthTime != nil {
+			userSession.AuthTime = authentication.AuthTime.UTC()
 		}
 
 		// append client if not already present

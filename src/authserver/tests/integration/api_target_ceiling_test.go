@@ -290,7 +290,7 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 		prepare: func(t *testing.T, f *targetFixture) {
 			now := time.Now().UTC()
 			session := &record.UserSession{
-				SessionIdentifier: fake.UUID(), Started: now, LastAccessed: now, AuthTime: now,
+				SessionIdentifier: fake.UUID(), Started: now, LastAccessed: now, AuthTime: now, PasswordAuthTime: now,
 				AuthMethods: "pwd", AcrLevel: "urn:goiabada:level1", IpAddress: "192.0.2.1", UserId: f.userId,
 			}
 			require.NoError(t, database.CreateUserSession(context.Background(), nil, session))

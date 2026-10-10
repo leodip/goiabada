@@ -152,6 +152,7 @@ func TestUnique_UserSessionSessionIdentifier(t *testing.T) {
 		AuthMethods:       "pwd",
 		AcrLevel:          existing.AcrLevel,
 		AuthTime:          now,
+		PasswordAuthTime:  now,
 		UserId:            user.Id,
 	}
 	err := database.CreateUserSession(context.Background(), nil, duplicate)

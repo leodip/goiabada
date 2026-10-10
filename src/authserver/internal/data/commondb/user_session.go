@@ -3,6 +3,7 @@ package commondb
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
@@ -514,5 +515,58 @@ func (d *Database) PromoteUserSessionOtpConfigGeneration(ctx context.Context, tx
 		return errs.New("user session not found when promoting its otp config generation")
 	}
 
+	return nil
+}
+
+// LowerUserSessionsToPassword lowers every session of userId that claims more than a password to
+// what the password alone reached, when the user's authenticator is removed: auth_methods becomes
+// passwordMethods, a level2_mandatory session becomes level2_optional, the level a user with no
+// authenticator reaches with a password, and auth_time becomes password_auth_time, the time the
+// password was entered (#542). A session at level 1 stays at level 1.
+//
+// passwordMethods is the whole of what is kept, not what is removed: every session was created after
+// a password, and pwd and otp are the only methods there are, so a session that names anything but
+// the password alone names the code. The caller passes the password's amr value because this layer
+// imports nothing that spells it.
+//
+// ONE STATEMENT, AND THAT IS THE POINT. The lowering used to read each session and write the whole
+// row back, so a sign-in binding to the session between the read and the write was undone, and the
+// lowering could restore a level and an auth_time a prompt=login had just replaced. An UPDATE
+// evaluates each row as it writes it, and waits for a transaction writing a row it would lower.
+//
+// It does not wait for one writing a row it would not lower as committed: on PostgreSQL a session
+// claiming no code is passed over even while a sign-in is writing a code onto it. That sign-in holds
+// the user's row, though, which it takes to check its claim (otpcredential.OTPClaim.Recheck), and
+// the removal this runs in took the user's row first, so the two never overlap.
+func (d *Database) LowerUserSessionsToPassword(ctx context.Context, tx *sql.Tx, userId int64, passwordMethods string) error {
+
+	if userId == 0 {
+		return errs.New("can't lower the user sessions of user id 0")
+	}
+	if passwordMethods == "" {
+		return errs.New("can't lower user sessions to no authentication method")
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("user_sessions")
+	ub.Set(
+		ub.Assign("auth_methods", passwordMethods),
+		fmt.Sprintf("acr_level = CASE WHEN acr_level = %s THEN %s ELSE acr_level END",
+			ub.Var(record.AcrLevel2Mandatory.String()), ub.Var(record.AcrLevel2Optional.String())),
+		"auth_time = password_auth_time",
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("user_id", userId),
+		ub.Or(
+			ub.NotEqual("auth_methods", passwordMethods),
+			ub.Equal("acr_level", record.AcrLevel2Mandatory.String()),
+		),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	if _, err := d.ExecSQL(ctx, tx, query, args...); err != nil {
+		return errs.Wrap(err, "unable to lower user sessions")
+	}
 	return nil
 }

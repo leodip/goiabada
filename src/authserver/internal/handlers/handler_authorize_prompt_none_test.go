@@ -224,10 +224,10 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 				}},
 				{"BumpUserSession", func(fail bool) {
 					if fail {
-						userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "pwd", record.AcrLevel1, mock.Anything).Return(nil, fault)
+						userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.AcrLevel(""), mock.Anything).Return(nil, fault)
 						return
 					}
-					userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "pwd", record.AcrLevel1, mock.Anything).Return(userSession, nil)
+					userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.AcrLevel(""), mock.Anything).Return(userSession, nil)
 					auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 				}},
 				{"SaveAuthContext", func(fail bool) {
