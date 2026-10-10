@@ -80,7 +80,7 @@ The auth server refuses to start on these too, each with its own record and exit
 - `the auth server session keys are missing or malformed, so the auth server cannot start`: the session keys aren't set, or aren't the length they must be.
 - `the previous session key pair is incomplete or malformed, so the auth server cannot start`: only one of the two `_PREVIOUS` session key variables is set, or one is malformed. Set both while you [rotate the keys](/deploy/rotate-secrets/), or neither once you're done.
 - `bootstrap credentials are not configured, so the auth server cannot start`: `GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE` is set and the credentials it wrote haven't been copied into the two servers' configuration yet. Copy them, then restart both.
-- `unable to bootstrap the database`, with an `error` starting `GOIABADA_ADMIN_PASSWORD cannot be the first administrator's password`: on a first start, the password is empty, shorter than 15 characters, longer than 72 bytes, or `changeme`.
+- `unable to bootstrap the database`, with an `error` starting `GOIABADA_ADMIN_PASSWORD cannot be the first administrator's password`: on a first start, the password is one the auth server refuses, such as one that's empty, shorter than 15 characters or longer than 72 bytes. The rest of the error says why.
 - `the trusted proxy list is malformed, so the auth server cannot start`: `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` has an entry that isn't an address or a CIDR range.
 - `initial setup is required, because the database is empty and neither bootstrap mode is configured`: the database is empty, and neither `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` nor `GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE` is set to seed it with.
 

@@ -3,7 +3,7 @@ title: First sign-in
 description: Sign in to the admin console for the first time, and the three things worth doing right after.
 ---
 
-import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
 This page walks you through your first sign-in to the admin console, and the three settings worth checking straight after.
 
@@ -58,10 +58,6 @@ To open the **Admin** pages, a user needs the `authserver:manage` permission. Th
 The admin console's client asks for a second factor only from users who have one set up. That's why your first sign-in needs only a password, and why signing in needs a code too once you turn on two-factor authentication.
 
 The auth server reads `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD` only on its first start, when it creates the first administrator in an empty database. Changing them later does nothing, so change your password under **Account**, **Change password**. Changed them and can't sign in? See [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/).
-
-<Aside type="caution">
-The first start refuses an admin password shorter than 15 characters, longer than 72 bytes, or set to `changeme`. If your administrator's password is `changeme` anyway, anyone who reaches the sign-in page can try it: change it **now**.
-</Aside>
 
 The admin console's home page also links to the auth server's discovery document, at `/.well-known/openid-configuration` on the auth server, such as `http://localhost:9090/.well-known/openid-configuration`. It lists the auth server's endpoints, scopes and claims, and every OpenID Connect library can configure itself from it.
 

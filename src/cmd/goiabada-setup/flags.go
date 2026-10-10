@@ -175,7 +175,7 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 		p("  --admin-email EMAIL    Admin email address\n")
 		p("  --admin-password PASS  Admin password (generated if not provided; one given here\n")
 		p("                         reaches shell history and the process list). At least 15\n")
-		p("                         characters, at most 72 bytes, and not changeme\n")
+		p("                         characters and at most 72 bytes\n")
 		p("  --admin-password-file FILE\n")
 		p("                         Read the admin password from FILE, - for standard input,\n")
 		p("                         one trailing line break dropped\n\n")
