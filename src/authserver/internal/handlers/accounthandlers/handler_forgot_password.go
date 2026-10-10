@@ -20,11 +20,30 @@ import (
 	"github.com/leodip/goiabada/core/securerandom"
 )
 
+// refuseForgotPasswordWithoutEmail answers a forgot-password request on a deployment with email off
+// as a page that isn't there, which the sign-in page already implies by showing no Forgot password?
+// link. Without email no link can reach anyone, so the form issued a code nobody received, answered
+// that a link was sent, and wrote an Error record for every anonymous visitor who posted it, the
+// mail failing to dial an SMTP host that turning email off had emptied (#542).
+func refuseForgotPasswordWithoutEmail(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request) {
+	slog.WarnContext(r.Context(), "forgot-password request refused because email is not set up")
+	pageRenderer.NotFound(w, r)
+}
+
 func HandleForgotPasswordGet(
 	pageRenderer PageRenderer,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
+		if !settings.SMTPEnabled {
+			refuseForgotPasswordWithoutEmail(pageRenderer, w, r)
+			return
+		}
 
 		bind := map[string]interface{}{
 			"error": nil,
@@ -138,6 +157,15 @@ func HandleForgotPasswordPost(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
+		if !settings.SMTPEnabled {
+			refuseForgotPasswordWithoutEmail(pageRenderer, w, r)
+			return
+		}
 
 		email := r.FormValue("email")
 		email = strings.ToLower(email)

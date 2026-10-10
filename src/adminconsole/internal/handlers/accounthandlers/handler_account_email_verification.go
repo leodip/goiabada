@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -48,8 +47,10 @@ func HandleEmailVerificationGet(
 			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
+		// Without email no code can be sent, so the page isn't there, as the Account menu, which
+		// hides it, already says. It answered 500 for a reader who reached it by its URL (#542).
 		if !settings.SMTPEnabled {
-			httpHelper.InternalServerError(w, r, errs.New("SMTP is not enabled"))
+			httpHelper.NotFound(w, r)
 			return
 		}
 

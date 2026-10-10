@@ -97,14 +97,14 @@ func TestHandleEmailVerificationGet_BindsSMTPEnabledFromTheSettingsCarrier(t *te
 	assert.Equal(t, true, handlertest.Bind(t, httpHelper)["smtpEnabled"])
 }
 
-// The other arm of the same read: this page refuses outright when the auth server reports SMTP off,
-// because there is nothing to send a verification with. Without this row the case above is
-// satisfied by a handler that read the carrier once and ignored what it said.
-func TestHandleEmailVerificationGet_RefusesWhenTheCarrierReportsSMTPOff(t *testing.T) {
+// The other arm of the same read: with SMTP off there is nothing to send a verification with, so the
+// page isn't there, a 404 as the Account menu that hides it implies, rather than the 500 it answered
+// until #542. Without this row the case above is satisfied by a handler that read the carrier once
+// and ignored what it said.
+func TestHandleEmailVerificationGet_IsNotThereWhenTheCarrierReportsSMTPOff(t *testing.T) {
 	httpHelper := handlersmocks.NewHttpHelper(t)
-	var refusedWith error
-	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) { refusedWith, _ = args.Get(2).(error) }).Once()
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
 
 	req := handlertest.Request(http.MethodGet, "/account/email-verification",
 		handlertest.WithAccessToken(),
@@ -113,8 +113,7 @@ func TestHandleEmailVerificationGet_RefusesWhenTheCarrierReportsSMTPOff(t *testi
 	HandleEmailVerificationGet(httpHelper, newFlashTestStore(), settingsCarrierApiClient{}).
 		ServeHTTP(httptest.NewRecorder(), req)
 
-	require.Error(t, refusedWith, "the page must refuse rather than render a form it cannot send from")
-	assert.Contains(t, refusedWith.Error(), "SMTP")
+	httpHelper.AssertExpectations(t)
 }
 
 // verificationRefusingApiClient answers the profile the verification page reads first, then

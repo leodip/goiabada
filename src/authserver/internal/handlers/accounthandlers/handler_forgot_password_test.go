@@ -38,6 +38,7 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/forgot-password", nil)
 		require.NoError(t, err)
+		req = withEmailOn(req)
 
 		rr := httptest.NewRecorder()
 
@@ -65,6 +66,7 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/forgot-password", nil)
 		require.NoError(t, err)
+		req = withEmailOn(req)
 
 		rr := httptest.NewRecorder()
 
@@ -132,6 +134,7 @@ func forgotPasswordRequest(email string) *http.Request {
 	ctx := context.WithValue(req.Context(), chimiddleware.RequestIDKey, forgotPasswordRequestId)
 	return req.WithContext(reqctx.WithSettings(ctx, &record.Settings{
 		AppName:       "TestApp",
+		SMTPEnabled:   true,
 		SMTPHost:      "smtp.example.com",
 		SMTPPort:      587,
 		SMTPFromEmail: "noreply@example.com",
@@ -159,7 +162,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 
 		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
 
-		req := httptest.NewRequest("POST", "/forgot-password", strings.NewReader(""))
+		req := withEmailOn(httptest.NewRequest("POST", "/forgot-password", strings.NewReader("")))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		rr := httptest.NewRecorder()
@@ -708,5 +711,55 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 		assert.Equal(t, "code_issued", (*details)["outcome"])
 		pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 		assertOneErrorRecordOnTheRequest(t, capture)
+	})
+}
+
+// withEmailOn puts the settings of a deployment with email set up on req, which both forgot-password
+// handlers require.
+func withEmailOn(req *http.Request) *http.Request {
+	return req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "TestApp", SMTPEnabled: true}))
+}
+
+// With email off no link can reach anyone, so the form isn't there: both handlers answer 404 with a
+// Warn record, issue no code, look nobody up, audit nothing and hand off no mail (#542).
+func TestHandleForgotPassword_WithEmailOffThePageIsNotThere(t *testing.T) {
+	off := func(req *http.Request) *http.Request {
+		return req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "TestApp", SMTPEnabled: false}))
+	}
+
+	t.Run("GET", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		req := off(httptest.NewRequest(http.MethodGet, "/forgot-password", nil))
+		rr := httptest.NewRecorder()
+		pageRenderer.On("NotFound", rr, req).Return().Once()
+
+		HandleForgotPasswordGet(pageRenderer).ServeHTTP(rr, req)
+
+		pageRenderer.AssertExpectations(t)
+	})
+
+	t.Run("POST", func(t *testing.T) {
+		logs := logtest.CaptureSlog(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		jobs := &heldJobs{}
+		form := url.Values{"email": {"someone@example.com"}}
+		req := off(httptest.NewRequest(http.MethodPost, "/forgot-password", strings.NewReader(form.Encode())))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+		pageRenderer.On("NotFound", rr, req).Return().Once()
+
+		HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL).ServeHTTP(rr, req)
+
+		pageRenderer.AssertExpectations(t)
+		database.AssertNotCalled(t, "GetUserByEmail", mock.Anything, mock.Anything, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		assert.Empty(t, jobs.jobs, "no mail is handed off")
+		records := logs.Records()
+		require.Len(t, records, 1)
+		assert.Equal(t, slog.LevelWarn, records[0].Level)
+		assert.Equal(t, "forgot-password request refused because email is not set up", records[0].Message)
 	})
 }
