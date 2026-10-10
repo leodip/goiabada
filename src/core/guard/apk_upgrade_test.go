@@ -29,11 +29,13 @@ const (
 	apkUpgradeCommand = "RUN apk upgrade --no-cache"
 	// apkUpgradeMarkerPrefix opens the comment directly above it, naming the minor it is for.
 	apkUpgradeMarkerPrefix = "# apk-upgrade-until-alpine: "
-	// zlibFloorCheck is the instruction directly after it, which fails each platform's build of
-	// the final stage whose zlib is older than the fix: the release builds amd64 and arm64 from
-	// one Dockerfile, and the smoke test runs on CI's amd64 image alone.
-	zlibFloorCheck = `RUN zlib="$(awk '/^P:/ { p = substr($0, 3) } /^V:/ && p == "zlib" { print substr($0, 3) }' ` +
-		`/lib/apk/db/installed)"; [ -z "$zlib" ] || apk version -t "$zlib" 1.3.2-r1 | grep -qx '[=>]' || ` +
+	// zlibFloorCheck is the instruction that fails each platform's build of the final stage whose
+	// zlib is older than the fix, or whose package database it cannot read: the release builds
+	// amd64 and arm64 from one Dockerfile, and the smoke test runs on CI's amd64 image alone. It
+	// stays when the upgrade goes, directly after the upgrade while there is one.
+	zlibFloorCheck = `RUN zlib="$(awk '/^P:/ { n++; p = substr($0, 3) } /^V:/ && p == "zlib" { v = substr($0, 3) } ` +
+		`END { if (n == 0) exit 1; print v }' /lib/apk/db/installed)" || { echo "unable to read the package database" >&2; ` +
+		`exit 1; }; [ -z "$zlib" ] || apk version -t "$zlib" 1.3.2-r1 | grep -qx '[=>]' || ` +
 		`{ echo "zlib $zlib is older than 1.3.2-r1 (CVE-2026-85091)" >&2; exit 1; }`
 )
 
@@ -46,8 +48,6 @@ type dockerInstruction struct {
 }
 
 var (
-	// heredocStart finds a heredoc an instruction opens: <<WORD, <<-WORD, <<"WORD" or <<'WORD'.
-	heredocStart = regexp.MustCompile(`<<-?\s*["']?[A-Za-z_]`)
 	// escapeDirective is the parser directive that changes the continuation character.
 	escapeDirective = regexp.MustCompile(`(?i)^#\s*escape\s*=`)
 )
@@ -86,8 +86,10 @@ func dockerInstructions(src string) ([]dockerInstruction, string) {
 			comments = nil
 		}
 		continuing = strings.HasSuffix(trimmed, "\\")
-		if heredocStart.MatchString(trimmed) {
-			return nil, "uses a heredoc"
+		// Any "<<" is refused, a heredoc of whatever delimiter BuildKit accepts, digits included,
+		// and a here-string with it.
+		if strings.Contains(trimmed, "<<") {
+			return nil, "uses a heredoc, or << in some other form"
 		}
 	}
 	return out, ""
@@ -104,7 +106,7 @@ func apkUpgradeFindings(root, required string) ([]string, error) {
 	if required != "" && alpine != required {
 		return []string{"tools.alpine is now " + alpine + ", and the release images run apk upgrade for alpine:" +
 			required + "'s zlib (CVE-2026-85091): check that alpine:" + alpine + " ships zlib 1.3.2-r1 or later; " +
-			"if it does, remove the apk upgrade line, its marker and its zlib check from " + strings.Join(releaseDockerfiles, " and ") +
+			"if it does, remove the apk upgrade line and its marker, keeping the zlib check, from " + strings.Join(releaseDockerfiles, " and ") +
 			" and set apkUpgradeAlpine to \"\", and if it doesn't, set apkUpgradeAlpine and both markers to " + alpine +
 			". The image smoke test holds the built images to zlib 1.3.2-r1 either way"}, nil
 	}
@@ -130,25 +132,35 @@ func apkUpgradeFindings(root, required string) ([]string, error) {
 		if finalFrom < 0 {
 			return nil, errs.Errorf("%s has no FROM instruction", rel)
 		}
-		var upgrades []int
+		var upgrades, checks []int
 		for i, in := range instructions {
-			if strings.Contains(in.text, "apk upgrade") {
+			switch {
+			case in.text == zlibFloorCheck:
+				checks = append(checks, i)
+			case strings.Contains(in.text, "apk upgrade"):
 				upgrades = append(upgrades, i)
 			}
 		}
 		markers := strings.Count(string(src), "apk-upgrade-until-alpine")
 
+		// The zlib check, whatever apkUpgradeAlpine says: exactly once, in the final stage.
+		switch {
+		case len(checks) == 0:
+			findings = append(findings, rel+" does not check its zlib in its final stage: it must run the check "+
+				"zlibFloorCheck names, which fails each platform's build whose zlib is older than 1.3.2-r1, "+
+				"and it stays when the apk upgrade goes")
+		case len(checks) > 1:
+			findings = append(findings, rel+" checks its zlib more than once: keep the one in the final stage")
+		case checks[0] < finalFrom:
+			findings = append(findings, rel+" checks its zlib in a build stage, which never reaches the image: "+
+				"move the check to the final stage")
+		}
+
 		if required == "" {
-			floorChecks := 0
-			for _, in := range instructions {
-				if in.text == zlibFloorCheck {
-					floorChecks++
-				}
-			}
-			if len(upgrades) > 0 || markers > 0 || floorChecks > 0 {
+			if len(upgrades) > 0 || markers > 0 {
 				findings = append(findings, rel+" still runs apk upgrade or keeps its marker, and apkUpgradeAlpine "+
-					"says no Alpine image needs it: remove the upgrade, its marker and its zlib check, or set "+
-					"apkUpgradeAlpine to the minor that does")
+					"says no Alpine image needs it: remove both and keep the zlib check, or set apkUpgradeAlpine "+
+					"to the minor that does")
 			}
 			continue
 		}
@@ -170,14 +182,13 @@ func apkUpgradeFindings(root, required string) ([]string, error) {
 				findings = append(findings, rel+" runs "+in.text+", where the instruction must be exactly "+
 					apkUpgradeCommand+", so no package cache is left in the layer")
 			}
-			if upgrades[0]+1 >= len(instructions) || instructions[upgrades[0]+1].text != zlibFloorCheck {
-				findings = append(findings, rel+" does not check its zlib directly after the apk upgrade: the next "+
-					"instruction must be the floor check zlibFloorCheck names, which fails each platform's build "+
-					"whose zlib is older than 1.3.2-r1")
-			}
 			if len(in.comments) == 0 || in.comments[len(in.comments)-1] != apkUpgradeMarkerPrefix+required {
 				findings = append(findings, rel+" has no "+apkUpgradeMarkerPrefix+required+" line directly above "+
 					"its apk upgrade, so nothing in the file says when it can go")
+			}
+			if len(checks) == 1 && checks[0] != upgrades[0]+1 {
+				findings = append(findings, rel+" does not check its zlib directly after the apk upgrade, where the "+
+					"check sees what the upgrade installed")
 			}
 		}
 		if markers > 1 {
@@ -258,7 +269,9 @@ func TestApkUpgradeFindings(t *testing.T) {
 		assert.Empty(t, joined(t, "3.24", "3.24", build+"from alpine:3.24 as final\n"+marked+user))
 	})
 	t.Run("all three removed while the pinned image still needs them", func(t *testing.T) {
-		assert.Contains(t, joined(t, "3.24", "3.24", build+final+user), "no longer runs RUN apk upgrade --no-cache")
+		got := joined(t, "3.24", "3.24", build+final+user)
+		assert.Contains(t, got, "no longer runs RUN apk upgrade --no-cache")
+		assert.Contains(t, got, "does not check its zlib")
 	})
 	t.Run("the command without its marker", func(t *testing.T) {
 		assert.Contains(t, joined(t, "3.24", "3.24", build+final+upgrade+check+user), "directly above")
@@ -287,6 +300,10 @@ func TestApkUpgradeFindings(t *testing.T) {
 		altered := strings.Replace(zlibFloorCheck, "1.3.2-r1 |", "1.3.2-r0 |", 1)
 		assert.Contains(t, joined(t, "3.24", "3.24", build+final+marker+upgrade+altered+"\n"+user), "does not check its zlib")
 	})
+	t.Run("the zlib check in a build stage only", func(t *testing.T) {
+		assert.Contains(t, joined(t, "3.24", "3.24", "FROM golang:1.27.2-alpine AS build\n"+check+final+marker+upgrade+user),
+			"checks its zlib in a build stage")
+	})
 	t.Run("the upgrade in a build stage only", func(t *testing.T) {
 		assert.Contains(t, joined(t, "3.24", "3.24", "FROM golang:1.27.2-alpine AS build\n"+marked+final+user),
 			"in a build stage")
@@ -305,6 +322,10 @@ func TestApkUpgradeFindings(t *testing.T) {
 	})
 	t.Run("the marked command as a heredoc's content", func(t *testing.T) {
 		assert.Contains(t, joined(t, "3.24", "3.24", build+final+"COPY <<EOF /tmp/note\n"+marked+"EOF\n"+user),
+			"uses a heredoc")
+	})
+	t.Run("the marked command as the content of a heredoc with a numeric delimiter", func(t *testing.T) {
+		assert.Contains(t, joined(t, "3.24", "3.24", build+final+"COPY <<1 /tmp/note\n"+marked+"1\n"+user),
 			"uses a heredoc")
 	})
 	t.Run("the marked command after a terminator BuildKit doesn't recognize", func(t *testing.T) {
@@ -328,14 +349,15 @@ func TestApkUpgradeFindings(t *testing.T) {
 		assert.Contains(t, got[0], "tools.alpine is now 3.25")
 		assert.Contains(t, got[0], "set apkUpgradeAlpine to \"\"")
 	})
-	t.Run("no image needs it, and all three are gone", func(t *testing.T) {
-		assert.Empty(t, joined(t, "3.25", "", build+"FROM alpine:3.25 AS final\n"+user))
+	t.Run("no image needs it: the upgrade and its marker gone, the zlib check kept", func(t *testing.T) {
+		assert.Empty(t, joined(t, "3.25", "", build+"FROM alpine:3.25 AS final\n"+check+user))
+	})
+	t.Run("no image needs it, and the zlib check went with the upgrade", func(t *testing.T) {
+		assert.Contains(t, joined(t, "3.25", "", build+"FROM alpine:3.25 AS final\n"+user), "does not check its zlib",
+			"the check stays: the release's arm64 image is checked nowhere else")
 	})
 	t.Run("no image needs it, and the command is left", func(t *testing.T) {
-		assert.Contains(t, joined(t, "3.25", "", build+"FROM alpine:3.25 AS final\n"+marked+user), "remove the upgrade")
-	})
-	t.Run("no image needs it, and only the zlib check is left", func(t *testing.T) {
-		assert.Contains(t, joined(t, "3.25", "", build+"FROM alpine:3.25 AS final\n"+check+user), "remove the upgrade")
+		assert.Contains(t, joined(t, "3.25", "", build+"FROM alpine:3.25 AS final\n"+marked+user), "remove both")
 	})
 	t.Run("a tree it cannot read", func(t *testing.T) {
 		_, err := apkUpgradeFindings(t.TempDir(), "3.24")
