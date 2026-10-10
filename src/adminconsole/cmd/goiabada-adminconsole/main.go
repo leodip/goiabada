@@ -8,8 +8,9 @@
 // and its browser sessions are stored on the auth server as ciphertext under the console's own
 // session keys, which the auth server holds no key for (#266). A configuration it cannot use stops
 // it before it serves anything: a malformed number or boolean, or a TZ that names no zone, with one
-// line on stderr and exit 2; missing session keys, a missing client secret or a malformed trusted
-// proxy list with one record and exit 1.
+// line on stderr and exit 2; missing session keys, a missing client secret, a malformed trusted
+// proxy list or a client secret the auth server refuses with one record and exit 1. It waits for
+// the auth server to issue its token before it listens (#542).
 package main
 
 import (
@@ -226,15 +227,33 @@ func run() int {
 		publicsettings.NewClient(cfg.AuthServer.GetEffectiveBaseURL(), upstream), publicsettings.DefaultTTL, registry)
 	slog.Info("initialized settings cache with 30s TTL")
 
-	r := chi.NewRouter()
-	s := server.NewServer(r, sessionStore, settingsCache, trustedProxies, cfg, authServerHTTPClient, tokenClient, registry, upstream)
-
 	// The process owns the signals, as the auth server's does; the console just gets told when to
-	// stop. On SIGTERM (what a container runtime sends) or SIGINT, ctx is cancelled and Start
-	// drains the listeners before returning. Before #426 nothing listened, and SIGTERM cut off
-	// every request in flight.
+	// stop. On SIGTERM (what a container runtime sends) or SIGINT, ctx is cancelled: a wait for the
+	// auth server below ends, and Start drains the listeners before returning. Before #426 nothing
+	// listened, and SIGTERM cut off every request in flight.
 	ctx, stopListeningForSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopListeningForSignals()
+
+	// The auth server has to accept this console's client before the console listens, because
+	// every page needs the token asked for here. A console holding a secret the auth server's
+	// database does not hold used to start, pass /health and answer every page with 500, so on
+	// Kubernetes a rollout replaced working pods with it: a newly generated secrets file applied to
+	// a running deployment did that at the next restart. Refused, the console stops, and its pod
+	// never becomes ready, so a rollout waits with the earlier pods serving. An auth server not
+	// answering yet, as on a first start, is waited for. The token is the session store's, cached,
+	// so the first page uses it (#542).
+	if err := awaitAuthServerAcceptsClient(ctx, tokenSource, authServerRetryDelay); err != nil {
+		if ctx.Err() != nil {
+			slog.Info("admin console stopped")
+			return 0
+		}
+		logClientRefused(err)
+		return 1
+	}
+	slog.Info("the auth server issued the admin console's token")
+
+	r := chi.NewRouter()
+	s := server.NewServer(r, sessionStore, settingsCache, trustedProxies, cfg, authServerHTTPClient, tokenClient, registry, upstream)
 
 	// Start logs none of its errors: this is the one record, and the one exit, for all of them.
 	if err := s.Start(ctx); err != nil {

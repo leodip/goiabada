@@ -21,6 +21,8 @@ For up to 30 seconds after the auth server goes away, while the admin console st
 
 The admin console's own `/health` still answers `healthy`, because it doesn't check the auth server. So a container or a pod looks fine while every page fails.
 
+An admin console that starts while the auth server isn't answering waits for it before it listens, so its pod doesn't become ready meanwhile. Its log then has `waiting for the auth server to issue the admin console's token` every few seconds, with what each attempt met as its `error`. The causes below apply to the wait as well.
+
 ## Why it happens
 
 The admin console calls the auth server on every page, for its settings and for everything it shows. It calls it at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, or at `GOIABADA_AUTHSERVER_BASEURL` when the internal URL is empty. Those are the admin console's own variables: set on the auth server alone, they do nothing for the admin console.

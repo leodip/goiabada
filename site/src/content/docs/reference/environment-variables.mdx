@@ -30,7 +30,7 @@ The auth server reads these when it starts on an empty database, to create the f
 | `GOIABADA_ADMIN_EMAIL` | `--admin-email` | `admin@example.com` | auth server | The first administrator's email address. |
 | `GOIABADA_ADMIN_PASSWORD` | `--admin-password` | empty | auth server | The first administrator's password. **Required on the first start**: at least 15 characters, at most 72 bytes, and never `changeme`. |
 | `GOIABADA_APPNAME` | `--appname` | `Goiabada` | auth server | The name the UI shows. Change it later under **Admin**, **General** in the admin console. |
-| `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` | `--adminconsole-oauth-client-secret` | empty | both | The admin console's client secret. The admin console needs it to call the auth server's API. The auth server reads it only on the first start, as the secret of the client it creates for the admin console. |
+| `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` | `--adminconsole-oauth-client-secret` | empty | both | The admin console's client secret. The admin console needs it to call the auth server's API, and refuses to start when the auth server refuses it. The auth server reads it only on the first start, as the secret of the client it creates for the admin console. |
 | `GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE` | `--authserver-bootstrap-env-outfile` | empty | auth server | A file for the two-step first start. The auth server writes the credentials it generated there, then exits. |
 
 ### Database

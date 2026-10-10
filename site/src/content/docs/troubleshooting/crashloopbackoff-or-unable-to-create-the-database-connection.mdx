@@ -90,7 +90,11 @@ A variable that doesn't parse, such as a port that isn't a number, stops it even
 
 `/health` answers only once the auth server listens, and it opens and migrates the database before it does. So a pod that can't reach the database never becomes ready, and nothing else in the cluster calls it in the meantime. Once it runs, `/health` doesn't check the database at all, so a database outage later doesn't restart every pod at once.
 
-The admin console doesn't open the database. On Kubernetes it keeps running while the auth server crash-loops, and answers every page with [Unable to load the configuration from the auth server](/troubleshooting/unable-to-load-the-configuration-from-the-auth-server/). Under Docker Compose, the generated file starts it only once the auth server is healthy, so it doesn't start at all.
+The admin console doesn't open the database. On Kubernetes, one already running keeps running while the auth server crash-loops, and answers every page with [Unable to load the configuration from the auth server](/troubleshooting/unable-to-load-the-configuration-from-the-auth-server/). One that starts meanwhile waits for the auth server before it listens, so its pod doesn't become ready either. Under Docker Compose, the generated file starts it only once the auth server is healthy, so it doesn't start at all.
+
+## When it's the admin console that crash-loops
+
+The admin console stops at start, with exit status 1, when the auth server refuses its client secret. Its record is `the auth server does not accept the admin console's client secret, so the admin console cannot start`: see [the admin console's client secret changed](/troubleshooting/locked-out-of-the-admin-console/#the-admin-consoles-client-secret-changed). It also stops on missing or malformed session keys, or a missing client secret, each with a record saying which.
 
 ## Next steps
 
