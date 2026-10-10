@@ -58,6 +58,15 @@ WORKDIR /app
 # TZ against it before its first record, so the base image needs no tzdata. CI's
 # build validation starts this image with TZ set to prove it (#331).
 
+# Alpine's fixes published since the alpine image was last built. alpine:3.24 still
+# ships zlib 1.3.2-r0, CVE-2026-85091, which Docker Hub's scan rates High; 1.3.2-r1 has
+# the fix (#542). Nothing here links zlib: the package manager does, with OpenSSL, which
+# this upgrades too. The marker below names the minor this was added for: when
+# ./version-manager.sh update moves tools.alpine past it, a core unit test fails until
+# this line and its marker are removed, once the new image is checked to carry the fix.
+# apk-upgrade-until-alpine: 3.24
+RUN apk upgrade --no-cache
+
 # The server runs as uid and gid 10001, named goiabada, and never as root (#396).
 # USER is numeric so a Kubernetes runAsNonRoot can verify it without reading
 # /etc/passwd, and the docs tell an operator to make a mounted file readable to
