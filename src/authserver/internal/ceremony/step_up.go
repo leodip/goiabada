@@ -15,6 +15,11 @@ const (
 	// authenticator has changed since the session last answered the level 2 question, and the
 	// target asks that question.
 	StepUpOtpConfigChanged
+	// StepUpAuthenticatorMissing means the target is urn:goiabada:level2_mandatory and the session
+	// reached it, but the user has no authenticator now: they or an administrator removed it since.
+	// The code the session answered can't be asked again, so the user sets one up, as at a sign-in
+	// with no session.
+	StepUpAuthenticatorMissing
 )
 
 // TargetRequiresSecondFactor reports whether a ceremony aiming at target has to answer the level 2
@@ -55,6 +60,14 @@ func StepUpOwed(target record.AcrLevel, session *record.UserSession) (StepUp, er
 	}
 	if target.IsHigherThan(sessionAcrLevel) {
 		return StepUpLevel, nil
+	}
+	// Checked apart from the generation, because a level 2 optional ceremony answers a changed
+	// generation by skipping the code when the user has no authenticator, and promotes it. Keyed on
+	// the generation alone, a session at level 3 whose user then removed their authenticator went
+	// on answering level 3 after any such sign-in, with no authenticator to answer it, while
+	// prompt=none refused the same request.
+	if target == record.AcrLevel2Mandatory && !session.User.OTPEnabled {
+		return StepUpAuthenticatorMissing, nil
 	}
 	if session.OtpConfigGeneration != session.User.OtpConfigGeneration && TargetRequiresSecondFactor(target) {
 		return StepUpOtpConfigChanged, nil
