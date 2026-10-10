@@ -66,6 +66,7 @@ export default defineConfig({
 				}),
 			],
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/leodip/goiabada' }],
+			components: { SocialIcons: './src/components/SocialIcons.astro' },
 			favicon: '/favicon.ico',
 			customCss: ['./src/styles/custom.css'],
 			head: [
