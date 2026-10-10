@@ -27,13 +27,17 @@ var passwordFieldTokens = map[string]bool{"current-password": true, "new-passwor
 // matters most are pinned by name.
 func TestTemplates_EveryPasswordFieldNamesItsAutocomplete(t *testing.T) {
 	pinned := map[string]map[string]string{
-		"template/admin_settings_email.html":       {"password": "new-password"},
-		"template/admin_users_new.html":            {"email": "off", "password": "new-password"},
-		"template/admin_users_authentication.html": {"newPassword": "new-password"},
-		"template/account_change_password.html":    {"currentPassword": "current-password", "newPassword": "new-password"},
-		"template/account_otp.html":                {"password": "current-password", "otp": "one-time-code"},
+		"template/admin_settings_email.html":         {"password": "new-password"},
+		"template/admin_users_new.html":              {"email": "off", "password": "new-password"},
+		"template/admin_users_authentication.html":   {"newPassword": "new-password"},
+		"template/account_change_password.html":      {"currentPassword": "current-password", "newPassword": "new-password"},
+		"template/account_otp.html":                  {"password": "current-password", "otp": "one-time-code"},
+		"template/account_email.html":                {"email": "email", "currentPassword": "current-password"},
+		"template/account_phone_verify.html":         {"code": "one-time-code"},
+		"template/admin_clients_authentication.html": {"clientSecret": "off"},
 	}
 	checked := 0
+	seen := map[string]bool{}
 	err := fs.WalkDir(templateFS, "template", func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".html") {
 			return err
@@ -57,8 +61,11 @@ func TestTemplates_EveryPasswordFieldNamesItsAutocomplete(t *testing.T) {
 					t.Errorf("%s: password field %q has autocomplete %q, want current-password, new-password or off", path, name, token)
 				}
 			}
-			if want, ok := pinned[path][name]; ok && token != want {
-				t.Errorf("%s: field %q has autocomplete %q, want %q", path, name, token, want)
+			if want, ok := pinned[path][name]; ok {
+				seen[path+" "+name] = true
+				if token != want {
+					t.Errorf("%s: field %q has autocomplete %q, want %q", path, name, token, want)
+				}
 			}
 		}
 		return nil
@@ -68,5 +75,13 @@ func TestTemplates_EveryPasswordFieldNamesItsAutocomplete(t *testing.T) {
 	}
 	if checked == 0 {
 		t.Fatal("no password field was read")
+	}
+	// A pinned field that is gone, renamed or moved would otherwise pass unchecked.
+	for path, fields := range pinned {
+		for name := range fields {
+			if !seen[path+" "+name] {
+				t.Errorf("%s: no input named %q, which this test pins", path, name)
+			}
+		}
 	}
 }

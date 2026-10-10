@@ -764,3 +764,27 @@ func TestInitRoutes_TheCredentialTiersCountInTheDatabaseOnTheServerEngines(t *te
 		}), accountPasswordWindow, shapeAPI)
 	})
 }
+
+// With email off, both forgot-password routes are a 404 ahead of the limiter: past the per-address
+// budget the same address is still answered 404, never 429, and once email is on that address
+// finds its whole budget unspent (#542). Behind the limiter, as the check first sat in the handlers,
+// the sixth request was a 429 the page's 404 did not describe.
+func TestInitRoutes_ForgotPasswordWithEmailOffSpendsNoBudget(t *testing.T) {
+	server := newRoutesTestServer(t)
+	emailOff := func(r *http.Request) *http.Request {
+		settings := routesTestSettings()
+		settings.SMTPEnabled = false
+		return r.WithContext(reqctx.WithSettings(r.Context(), settings))
+	}
+
+	for i := 0; i < forgotPwdEmailBudget+3; i++ {
+		assert.Equal(t, http.StatusNotFound,
+			serve(server, emailOff(browserForm(http.MethodPost, "/forgot-password", "email=one@example.com"))).Code,
+			"request %d", i+1)
+	}
+	assert.Equal(t, http.StatusNotFound, serve(server, emailOff(browserRequest(http.MethodGet, "/forgot-password"))).Code)
+
+	assertRefused(t, exhaust(t, server, forgotPwdEmailBudget, func(int) *http.Request {
+		return browserForm(http.MethodPost, "/forgot-password", "email=one@example.com")
+	}), forgotPwdWindow, shapeBrowser)
+}

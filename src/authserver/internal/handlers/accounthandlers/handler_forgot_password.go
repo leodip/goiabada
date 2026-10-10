@@ -20,14 +20,31 @@ import (
 	"github.com/leodip/goiabada/core/securerandom"
 )
 
-// refuseForgotPasswordWithoutEmail answers a forgot-password request on a deployment with email off
-// as a page that isn't there, which the sign-in page already implies by showing no Forgot password?
-// link. Without email no link can reach anyone, so the form issued a code nobody received, answered
-// that a link was sent, and wrote an Error record for every anonymous visitor who posted it, the
-// mail failing to dial an SMTP host that turning email off had emptied (#542).
-func refuseForgotPasswordWithoutEmail(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request) {
-	slog.WarnContext(r.Context(), "forgot-password request refused because email is not set up")
-	pageRenderer.NotFound(w, r)
+// ForgotPasswordRequiresEmail fronts both forgot-password routes, answering every request as a page
+// that isn't there while email is off, which the sign-in page already implies by showing no Forgot
+// password? link. Without email no link can reach anyone, so the form issued a code nobody received,
+// answered that a link was sent, and wrote an Error record for every anonymous visitor who posted
+// it, the mail failing to dial an SMTP host that turning email off had emptied (#542).
+//
+// It is middleware, mounted ahead of the routes' rate limiter, rather than a check in the handlers:
+// behind the limiter, a refused request still spent its address's budget and was answered 429 once
+// that ran out, and the page said 404.
+func ForgotPasswordRequiresEmail(pageRenderer PageRenderer) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			settings, ok := reqctx.SettingsFrom(r.Context())
+			if !ok {
+				pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
+				return
+			}
+			if !settings.SMTPEnabled {
+				slog.WarnContext(r.Context(), "forgot-password request refused because email is not set up")
+				pageRenderer.NotFound(w, r)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func HandleForgotPasswordGet(
@@ -35,15 +52,6 @@ func HandleForgotPasswordGet(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		settings, ok := reqctx.SettingsFrom(r.Context())
-		if !ok {
-			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
-			return
-		}
-		if !settings.SMTPEnabled {
-			refuseForgotPasswordWithoutEmail(pageRenderer, w, r)
-			return
-		}
 
 		bind := map[string]interface{}{
 			"error": nil,
@@ -157,15 +165,6 @@ func HandleForgotPasswordPost(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		settings, ok := reqctx.SettingsFrom(r.Context())
-		if !ok {
-			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
-			return
-		}
-		if !settings.SMTPEnabled {
-			refuseForgotPasswordWithoutEmail(pageRenderer, w, r)
-			return
-		}
 
 		email := r.FormValue("email")
 		email = strings.ToLower(email)
