@@ -728,7 +728,8 @@ func writeKubernetesTrust(sb *strings.Builder, server string, policy trafficPoli
 	sb.WriteString("  # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list.\n")
 	if policy == trafficPolicyLocal {
 		sb.WriteString("  # Under the gateway's Local traffic policy, with Envoy on every node, Envoy receives each\n")
-		sb.WriteString("  # connection from the client itself, so the servers see the client's address.\n")
+		sb.WriteString("  # connection from the address the load balancer leaves on it: the client's address when\n")
+		sb.WriteString("  # the load balancer passes connections through, and its own when it proxies them.\n")
 	} else {
 		sb.WriteString("  # Under the gateway's Cluster traffic policy, Envoy receives each connection from a node,\n")
 		sb.WriteString("  # so the servers see a node's address for every client rather than the client's own.\n")

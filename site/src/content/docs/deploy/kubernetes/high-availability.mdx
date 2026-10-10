@@ -60,7 +60,7 @@ The manifest emits no HorizontalPodAutoscaler. You can add one; settle two thing
 The auth server's rate limiter is off unless you turn it on, with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`. The wizard asks, and writes the answer into the auth server's ConfigMap either way; `--rate-limiter=true` or `=false` answers without the prompt. Its default follows the [gateway's traffic policy](/deploy/kubernetes/gateway-and-certificates/#the-gateways-traffic-policy):
 
 - **Under `Cluster`, off.** Goiabada sees a node's address for every client, so a per-IP limit counts together every user the load balancer sends through one node: 30 password posts a minute and 20 forgot-password requests per 5 minutes per node, for example, which throttles sign-ins on a busy site. Turn it on anyway if the limits on failed passwords and codes, which don't depend on the address, matter more to you.
-- **Under `Local`, on.** Goiabada sees each client's address, so each per-IP limit counts one client.
+- **Under `Local`, on.** Goiabada sees each client's address, so each per-IP limit counts one client, behind a load balancer that passes connections through. One that proxies them shows Goiabada its own address for every client, and the per-IP limits then count every client together, as under `Cluster`. [The gateway's traffic policy](/deploy/kubernetes/gateway-and-certificates/#the-gateways-traffic-policy) has how to tell.
 
 With the limiter on, not every limit holds across replicas:
 

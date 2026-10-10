@@ -398,7 +398,9 @@ func (w *wizard) askTrafficPolicy() error {
 	w.out.println("  1. Cluster: works behind every load balancer. Goiabada sees a node's address for")
 	w.out.println("     every client, not the client's own.")
 	w.out.println("  2. Local, with Envoy on every node as a DaemonSet: Goiabada sees the client's address,")
-	w.out.println("     at the cost of an Envoy pod on every node.")
+	w.out.println("     at the cost of an Envoy pod on every node, when the load balancer passes each")
+	w.out.println("     connection through. One that proxies connections, as some do, shows Goiabada its")
+	w.out.println("     own address under either policy.")
 	w.out.println("The EnvoyProxy and GatewayClass that set it are cluster-wide: on a cluster that already")
 	w.out.println("runs Envoy Gateway, the choice belongs to whoever runs it.")
 	w.out.println()
@@ -485,7 +487,9 @@ func (w *wizard) askRateLimiter() error {
 		w.out.println("in the database every pod shares, so they hold under either traffic policy.")
 		if defaultOn {
 			w.out.println("Under the Local traffic policy Goiabada sees each client's address, so the per-IP")
-			w.out.println("limits count each client alone.")
+			w.out.println("limits count each client alone, when the load balancer passes connections through.")
+			w.out.println("If it proxies them, every client shares the load balancer's address: check the")
+			w.out.println("ip= of your own request in the auth server's log once it runs.")
 		} else {
 			w.out.println("Its per-IP limits do not: under the Cluster traffic policy Goiabada sees a node's")
 			w.out.println("address, so they count every user the load balancer sends through one node together")

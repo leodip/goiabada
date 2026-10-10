@@ -331,8 +331,9 @@ func TestKubernetesInstructions_FollowTheTrafficPolicy(t *testing.T) {
 }
 
 // Both ConfigMaps say, beside the trust they set, which address the servers see under the traffic
-// policy chosen: a node's under Cluster, where Envoy receives each connection from a node, and the
-// client's under Local, where it receives it from the client itself (#396 decision 4).
+// policy chosen: a node's under Cluster, where Envoy receives each connection from a node, and under
+// Local the client's, or the load balancer's when it proxies connections, as a real cluster's did:
+// Local alone carries no client address through a proxying load balancer (#396 decision 4, #542).
 func TestKubernetesManifest_SaysWhichAddressTheServersSee(t *testing.T) {
 	for _, testCase := range []struct {
 		policy       trafficPolicy
@@ -357,6 +358,9 @@ func TestKubernetesManifest_SaysWhichAddressTheServersSee(t *testing.T) {
 				}
 				if strings.Contains(comment, testCase.unsaid) {
 					t.Errorf("line %d's comment says the servers see %s under %s: %q", i+1, testCase.unsaid, testCase.policy, comment)
+				}
+				if testCase.policy == trafficPolicyLocal && (!strings.Contains(comment, "passes connections through") || !strings.Contains(comment, "proxies them")) {
+					t.Errorf("line %d's comment does not say Local keeps the client's address only through a load balancer that passes connections through: %q", i+1, comment)
 				}
 				checked++
 			}

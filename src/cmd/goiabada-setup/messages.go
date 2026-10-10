@@ -220,6 +220,14 @@ func printKubernetesInstructions(out *console, config *Config, paths outputPaths
 		out.println("      apply the one in step 2 above")
 	}
 	out.println()
+	if config.GatewayTrafficPolicy == trafficPolicyLocal {
+		out.println("  • Under Local, check that Goiabada sees your own address: request any page, then read the")
+		out.println("    ip= of that request in the auth server's log. The same address for every client is the")
+		out.println("    load balancer's, which proxies connections, and the per-IP limits then count every")
+		out.println("    client together.")
+		out.printf("      %skubectl logs -n %s deployment/goiabada-authserver | grep 'http request' | tail -3%s\n", out.cyan, config.K8sNamespace, out.reset)
+		out.println()
+	}
 	if config.NetworkPolicy {
 		out.println("  • A connection a NetworkPolicy blocks either times out or is refused at once, depending on")
 		out.println("    the network plugin. If a workload cannot reach a server, check what the policies admit:")
