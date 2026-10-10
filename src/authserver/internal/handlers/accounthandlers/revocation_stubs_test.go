@@ -37,3 +37,11 @@ func stubRevocationSweepTx(database *datamocks.Database, userId int64, newGenera
 	database.On("GetUserSessionsByUserId", mock.Anything, revokeTx, userId).
 		Return([]record.UserSession{}, nil).Once()
 }
+
+// stubResetRowRead stubs the reset claim's first two statements: the user's row taken, and read
+// under that hold, holding the verification state given.
+func stubResetRowRead(database *datamocks.Database, userId int64, emailVerified bool) {
+	database.On("AcquireUserRow", mock.Anything, revokeTx, userId).Return(nil).Once()
+	database.On("GetUserById", mock.Anything, revokeTx, userId).
+		Return(&record.User{Id: userId, Enabled: true, EmailVerified: emailVerified}, nil).Once()
+}
