@@ -31,6 +31,14 @@
 #     mount point the image lacks owned by root, so these two directories are what
 #     lets a fresh SQLite volume or bootstrap volume be written at all.
 #
+# Each image's packages are then held to the floors PACKAGE_FLOORS names, read
+# from the image's own package database with no network: a package older than its
+# floor fails the run, and one the image doesn't carry passes. zlib 1.3.2-r1 fixes
+# CVE-2026-85091, which alpine:3.24 ships without; the release Dockerfiles' final
+# stage runs apk upgrade to get it, and this is what proves an image has it,
+# whatever its Dockerfile says (#542). A floor costs nothing once the base image
+# carries the fix, so it can stay.
+#
 # Usage: ./smoke-test-images.sh --version <version> <image>...
 set -euo pipefail
 
@@ -50,6 +58,7 @@ RUN_TIMEOUT=60
 UNKNOWN_TZ="Not/AZone"
 RUN_AS="10001:10001"
 AUTHSERVER_WRITABLE_DIRS=(/data /bootstrap)
+PACKAGE_FLOORS=("zlib 1.3.2-r1")
 failed=0
 
 fail() {
@@ -82,6 +91,26 @@ read_user() {
     ' sh "$@"
 }
 
+# Prints, from inside the image and with no network, each floor's package with its
+# installed version and how that compares with the floor: "<", "=" or ">", or the
+# word absent when the image doesn't carry it. A shell replaces the entrypoint and
+# nothing else, as in read_user.
+read_packages() {
+    local image="$1"
+    docker run --rm --network none --entrypoint /bin/sh "$image" -c '
+        for floor in "$@"; do
+            name=${floor%% *}
+            min=${floor#* }
+            version=$(awk -v p="$name" "/^P:/ { current = substr(\$0, 3) } /^V:/ { if (current == p) print substr(\$0, 3) }" /lib/apk/db/installed)
+            if [ -z "$version" ]; then
+                echo "$name absent"
+                continue
+            fi
+            echo "$name $version $(apk version -t "$version" "$min" 2>/dev/null || echo "?") $min"
+        done
+    ' sh "${PACKAGE_FLOORS[@]}"
+}
+
 # Fails unless the read_user output in USER_OUTPUT carries the line exactly.
 expect_line() {
     local image="$1" line="$2"
@@ -107,6 +136,17 @@ for image in "${IMAGES[@]}"; do
     for dir in "${writable_dirs[@]}"; do
         expect_line "$image" "$dir writable"
     done
+
+    echo "=== $image, its package floors"
+    PACKAGES_OUTPUT=$(read_packages "$image" 2>&1) ||
+        fail "$image: unable to read its packages: $PACKAGES_OUTPUT"
+    echo "$PACKAGES_OUTPUT"
+    while read -r name version comparison floor; do
+        case "$version $comparison" in
+            "absent "|*" ="|*" >") ;;
+            *) fail "$image: $name $version is older than $floor, or could not be compared with it" ;;
+        esac
+    done <<<"$PACKAGES_OUTPUT"
 
     echo "=== $image, TZ=Asia/Kolkata"
     run_image "$image" "Asia/Kolkata"

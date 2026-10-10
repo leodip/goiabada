@@ -64,8 +64,10 @@ WORKDIR /app
 # the fix (#542). Nothing here links zlib: the package manager does, with OpenSSL, which
 # this upgrades too. The marker below names the minor this is for, as apkUpgradeAlpine in
 # src/core/guard/apk_upgrade_test.go records it: that test fails if this line goes while
-# tools.alpine is still that minor, and, once ./version-manager.sh update moves
-# tools.alpine past it, until the new image is checked to carry the fix.
+# tools.alpine is still that minor, and once ./version-manager.sh update moves tools.alpine
+# past it, saying to check the new image before removing this. What proves an image has
+# the fix is build/smoke-test-images.sh, which fails any image whose zlib is older than
+# 1.3.2-r1.
 # apk-upgrade-until-alpine: 3.24
 RUN apk upgrade --no-cache
 
