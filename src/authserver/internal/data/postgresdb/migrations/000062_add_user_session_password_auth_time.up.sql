@@ -6,3 +6,6 @@ ALTER TABLE user_sessions ADD COLUMN password_auth_time timestamp(6) without tim
 ALTER TABLE user_sessions ALTER COLUMN password_auth_time DROP DEFAULT;
 
 DELETE FROM user_sessions;
+
+-- Every code not yet redeemed is revoked with the sessions: see the sqlite migration.
+UPDATE codes SET revoked = true WHERE used = false AND revoked = false;

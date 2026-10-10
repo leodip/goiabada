@@ -9,8 +9,12 @@
 -- It can't be recovered for a session already stored: for every session that stepped up, auth_time
 -- is the code's. So every session is ended and its user signs in again. Each row's
 -- user_session_clients go with it (ON DELETE CASCADE); refresh tokens bound to a session stop, as
--- they do when it expires, and offline ones are kept. A code issued just before the upgrade can
--- still be redeemed: its claims are those of the sign-in that issued it, which did happen.
+-- they do when it expires, and offline ones are kept.
+--
+-- Every code not yet redeemed is revoked with them, as ending a session revokes the codes it
+-- authorized. A code issued just before the upgrade would otherwise be consumed at redemption and
+-- then fail, since minting its session-bound refresh token reads a session that is gone; revoked,
+-- it is refused with invalid_grant before anything is consumed, and the client signs in again.
 --
 -- Emptying the table first is what lets SQLite add the column NOT NULL with no default. SQLite is
 -- one process, so nothing can insert between the two. The other three engines order it the other
@@ -18,3 +22,5 @@
 DELETE FROM user_sessions;
 
 ALTER TABLE user_sessions ADD COLUMN password_auth_time DATETIME NOT NULL;
+
+UPDATE codes SET revoked = 1 WHERE used = 0 AND revoked = 0;

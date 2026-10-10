@@ -26,7 +26,9 @@ const (
 //
 // The properties:
 //
-//  1. Every session stored before it is gone, and the clients each one authorized with it.
+//  1. Every session stored before it is gone, and the clients each one authorized with it; every
+//     code not yet redeemed is revoked, so redeeming one is refused before it is consumed, and a
+//     redeemed one is left as it was.
 //  2. user_sessions.password_auth_time exists, NOT NULL, and a session written at head round-trips it.
 //  3. The down migration drops the column and keeps the sessions written since, and 000062 applies
 //     again after it.
@@ -67,6 +69,10 @@ func TestMigration000062_UserSessionPasswordAuthTime(t *testing.T) {
 	}
 	seedSession()
 	seedSession()
+	pending := createTestCodeOn(t, h.DB, client.Id, user.Id)
+	redeemed := createTestCodeOn(t, h.DB, client.Id, user.Id)
+	redeemed.Used = true
+	require.NoError(t, h.DB.UpdateCode(ctx, nil, redeemed))
 
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, beforePasswordAuthTime000062), "roll back to 000061 on %s", dbType())
 	_, exists := columnNames000046(dumpTable(t, h, "user_sessions"))["password_auth_time"]
@@ -77,6 +83,8 @@ func TestMigration000062_UserSessionPasswordAuthTime(t *testing.T) {
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, passwordAuthTime000062), "apply 000062 on %s", dbType())
 	assert.Zerof(t, count000062(t, h, "user_sessions"), "1. every stored session is ended on %s", dbType())
 	assert.Zerof(t, count000062(t, h, "user_session_clients"), "1. and the clients each one authorized on %s", dbType())
+	assert.Truef(t, codeRevoked000062(t, h, pending.Id), "1. a code not yet redeemed is revoked on %s", dbType())
+	assert.Falsef(t, codeRevoked000062(t, h, redeemed.Id), "1. a redeemed code is left as it was on %s", dbType())
 
 	// 2.
 	column := dumpTable(t, h, "user_sessions").column(t, "password_auth_time")
@@ -108,4 +116,12 @@ func count000062(t *testing.T, h *isolatedDB, table string) int {
 	var n int
 	require.NoErrorf(t, h.SQL.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s", table)).Scan(&n), "count %s on %s", table, dbType())
 	return n
+}
+
+func codeRevoked000062(t *testing.T, h *isolatedDB, codeId int64) bool {
+	t.Helper()
+	var revoked bool
+	require.NoErrorf(t, h.SQL.QueryRow(fmt.Sprintf("SELECT revoked FROM codes WHERE id = %d", codeId)).Scan(&revoked),
+		"read code %d on %s", codeId, dbType())
+	return revoked
 }
