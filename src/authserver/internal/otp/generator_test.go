@@ -215,3 +215,12 @@ func TestKeyURLRefusals(t *testing.T) {
 		})
 	}
 }
+
+// An App name of thirty characters, the most the settings take, enrols whatever its script: the
+// generator counts characters as the settings do. Counted in bytes, its own bound of 32 refused a
+// thirty-character accented name the settings page had accepted, and two-factor enrolment failed.
+func TestGenerateKeyURL_AnAccentedAppNameAtTheSettingsBoundEnrols(t *testing.T) {
+	keyURL, err := NewKeyGenerator().GenerateKeyURL("josé@example.com", strings.Repeat("é", 30))
+	require.NoError(t, err)
+	assert.NotEmpty(t, keyURL)
+}

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
+	"github.com/leodip/goiabada/core/inputvalidation"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -281,7 +282,7 @@ func HandleRegisterPost(
 		// shape and before either lookup. Without it an address the columns cannot hold answered
 		// the 500 page on MySQL, PostgreSQL and SQL Server and registered on SQLite (#207 decision
 		// 11). The shape admits ASCII alone, so the byte length is the character count.
-		if len(email) > accountvalidation.MaxEmailLength {
+		if inputvalidation.TextLength(email) > accountvalidation.MaxEmailLength {
 			// i18n surface: A — browser-flow form rerender.
 			refuseAddress(i18n.NewLocalizedError(i18n.ErrCodeEmailTooLong,
 				map[string]any{"max": accountvalidation.MaxEmailLength}).Localize(r.Context()))

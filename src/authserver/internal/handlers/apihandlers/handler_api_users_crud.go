@@ -28,6 +28,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/leodip/goiabada/core/securerandom"
 )
 
@@ -351,7 +352,7 @@ func HandleUserCreatePost(
 		}
 
 		// Email length validation
-		if len(req.Email) > 60 {
+		if inputvalidation.TextLength(req.Email) > 60 {
 			writeJSONError(w, "The email address cannot exceed a maximum length of 60 characters", "EMAIL_TOO_LONG", http.StatusBadRequest)
 			return
 		}

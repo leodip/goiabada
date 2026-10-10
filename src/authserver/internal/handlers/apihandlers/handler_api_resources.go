@@ -74,7 +74,7 @@ func HandleResourceCreatePost(
 
 		// Validate description length
 		const maxLengthDescription = 100
-		if len(createReq.Description) > maxLengthDescription {
+		if inputvalidation.TextLength(createReq.Description) > maxLengthDescription {
 			writeJSONError(w, "The description cannot exceed a maximum length of "+strconv.Itoa(maxLengthDescription)+" characters", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -203,7 +203,7 @@ func HandleResourceUpdatePut(
 
 		// Validate description length
 		const maxLengthDescription = 100
-		if len(updateReq.Description) > maxLengthDescription {
+		if inputvalidation.TextLength(updateReq.Description) > maxLengthDescription {
 			writeJSONError(w, "The description cannot exceed a maximum length of "+strconv.Itoa(maxLengthDescription)+" characters", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/phonecountries"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 // phoneNumberShape is digits in groups separated by at most one space or hyphen.
@@ -53,7 +54,7 @@ func (val *PhoneValidator) ValidatePhone(input *ValidatePhoneInput) error {
 		if !phoneNumberShape.MatchString(input.PhoneNumber) {
 			return i18n.NewLocalizedError(i18n.ErrCodePhoneInvalidFormat, nil)
 		}
-		if len(input.PhoneNumber) > 30 {
+		if inputvalidation.TextLength(input.PhoneNumber) > 30 {
 			return i18n.NewLocalizedError(i18n.ErrCodePhoneNumberTooLong, map[string]any{"max": 30})
 		}
 

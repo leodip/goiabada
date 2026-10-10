@@ -163,7 +163,7 @@ func HandleUserAttributeCreatePost(
 
 		// Validate attribute value length
 		const maxLengthAttrValue = 250
-		if len(req.Value) > maxLengthAttrValue {
+		if inputvalidation.TextLength(req.Value) > maxLengthAttrValue {
 			writeJSONError(w, "The attribute value cannot exceed a maximum length of 250 characters", "VALUE_TOO_LONG", http.StatusBadRequest)
 			return
 		}
@@ -272,7 +272,7 @@ func HandleUserAttributeUpdatePut(
 
 		// Validate attribute value length
 		const maxLengthAttrValue = 250
-		if len(req.Value) > maxLengthAttrValue {
+		if inputvalidation.TextLength(req.Value) > maxLengthAttrValue {
 			writeJSONError(w, "The attribute value cannot exceed a maximum length of 250 characters", "VALUE_TOO_LONG", http.StatusBadRequest)
 			return
 		}

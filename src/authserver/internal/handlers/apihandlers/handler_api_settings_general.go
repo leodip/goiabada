@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 // HandleSettingsGeneralGet - GET /api/v1/admin/settings/general
@@ -68,7 +69,7 @@ func HandleSettingsGeneralPut(
 
 		// Validation: AppName
 		const appNameMaxLength = 30
-		if len(req.AppName) > appNameMaxLength {
+		if inputvalidation.TextLength(req.AppName) > appNameMaxLength {
 			writeJSONError(w, fmt.Sprintf("App name is too long. The maximum length is %v characters.", appNameMaxLength), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -104,7 +105,7 @@ func HandleSettingsGeneralPut(
 			}
 		}
 		const issuerMaxLength = 60
-		if len(issuer) > issuerMaxLength {
+		if inputvalidation.TextLength(issuer) > issuerMaxLength {
 			writeJSONError(w, fmt.Sprintf("Issuer is too long. The maximum length is %v characters.", issuerMaxLength), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}

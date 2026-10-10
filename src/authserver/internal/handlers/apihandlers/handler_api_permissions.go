@@ -159,7 +159,7 @@ func HandleResourcePermissionsPut(
 			}
 
 			const maxLengthDescription = 100
-			if len(rawDescription) > maxLengthDescription {
+			if inputvalidation.TextLength(rawDescription) > maxLengthDescription {
 				writeJSONError(w, fmt.Sprintf("The description cannot exceed a maximum length of %d characters.", maxLengthDescription), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}

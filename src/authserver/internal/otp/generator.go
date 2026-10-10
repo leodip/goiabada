@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/inputvalidation"
 	pquernaotp "github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 )
@@ -45,11 +46,11 @@ func (g *KeyGenerator) GenerateKeyURL(email string, appName string) (string, err
 		return "", errs.New("app name is empty")
 	}
 
-	if len(email) > 64 {
+	if inputvalidation.TextLength(email) > 64 {
 		return "", errs.New("email is too long")
 	}
 
-	if len(appName) > 32 {
+	if inputvalidation.TextLength(appName) > 32 {
 		return "", errs.New("app name is too long")
 	}
 

@@ -61,7 +61,7 @@ The body is a JSON object. The auth server reads four fields and ignores every o
 | `redirect_uris` | Where the auth server may send the browser back. Required when the client uses the authorization code flow. See [redirect URIs](#redirect-uris) below. |
 | `token_endpoint_auth_method` | `none` makes a public client, with no secret. `client_secret_basic`, the default, or `client_secret_post` makes a confidential one, with a secret. |
 | `grant_types` | Any of `authorization_code`, the default, `refresh_token` and `client_credentials`. A public client can't ask for `client_credentials`, and the [legacy flows](/legacy-flows/implicit/) can't be asked for at all: the client is registered with both off, whatever the global settings under **Admin**, **General**. |
-| `client_name` | The name the consent screen shows, up to 100 bytes, the bound of the client's description it's stored as, with no `<` or `>`. An accented or non-Latin character takes two bytes or more. |
+| `client_name` | The name the consent screen shows, up to 100 characters, the bound of the client's description it's stored as, with no `<` or `>`. |
 
 `refresh_token` is accepted and sets nothing of its own: a client that may use the authorization code flow can redeem the refresh tokens it gets.
 

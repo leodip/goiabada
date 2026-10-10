@@ -282,7 +282,7 @@ func HandleValidatePermissionPost(
 		}
 
 		const maxLengthDescription = 100
-		if len(description) > maxLengthDescription {
+		if inputvalidation.TextLength(description) > maxLengthDescription {
 			// i18n surface: A — admin browser-flow, JSON to in-page handler.
 			result.Error = i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionTooLong, map[string]any{"max": maxLengthDescription}).Localize(r.Context())
 			httpHelper.EncodeJSON(w, r, result)

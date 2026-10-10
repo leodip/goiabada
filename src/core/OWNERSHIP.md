@@ -405,6 +405,7 @@ command itself and fails on a tree it changed.
 | `core/inputvalidation` | `ContainsAngleBrackets` | both-apps | — |
 | `core/inputvalidation` | `IdentifierValidator` | own-package | — |
 | `core/inputvalidation` | `NewIdentifierValidator` | both-apps | — |
+| `core/inputvalidation` | `TextLength` | both-apps | — |
 | `core/internal/pinnedfetch` | `CheckSHA256` | kernel | — |
 | `core/internal/pinnedfetch` | `Doer` | kernel | — |
 | `core/internal/pinnedfetch` | `Get` | kernel | — |
