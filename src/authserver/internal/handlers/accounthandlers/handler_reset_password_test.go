@@ -941,7 +941,9 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 	const codeHash = "the-code-hash"
 	const newPassword = "Str0ngP4ss!"
 
-	user := &record.User{Id: 1, Enabled: true, Email: "test@example.com", PasswordHash: "the-previous-hash"}
+	// Verified, as every address a forgot-password link goes to is, so the reset writes no
+	// verified_email entry: the strict audit mock refuses one.
+	user := &record.User{Id: 1, Enabled: true, Email: "test@example.com", EmailVerified: true, PasswordHash: "the-previous-hash"}
 
 	passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword).Return(nil).Once()
 	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
@@ -994,6 +996,50 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 	// concurrent admin disable (#106 decision 14).
 	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "SetUserPasswordHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+// The link an administrator emails a new user goes to an address nobody has verified yet.
+// Setting a password through it proves the user reads that mailbox, so the claim marks the
+// address verified, and the reset records it as verified_email beside revoked_user_auth_state.
+// Until the review of the email flows before 1.7.0 such a user stayed unverified, and so could
+// never recover a password on their own.
+func TestHandleResetPasswordPost_TheAdministratorsLinkVerifiesTheAddress(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
+	passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	store := newMarkerTestStore()
+
+	const codeHash = "the-code-hash"
+	const newPassword = "Str0ngP4ss!"
+
+	user := &record.User{Id: 1, Enabled: true, Email: "new@example.com", EmailVerified: false}
+
+	passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword).Return(nil).Once()
+	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
+	database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
+		Return(true, nil).Once()
+	stubRevocationSweepTx(database, 1, 4)
+
+	var events []string
+	auditLogger.On("Log", mock.Anything, audit.EventRevokedUserAuthState, mock.Anything).
+		Run(func(mock.Arguments) { events = append(events, audit.EventRevokedUserAuthState) }).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventVerifiedEmail, map[string]interface{}{"user_id": int64(1)}).
+		Run(func(mock.Arguments) { events = append(events, audit.EventVerifiedEmail) }).Return().Once()
+
+	pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html", "/reset_password.html",
+		mock.MatchedBy(func(data map[string]interface{}) bool {
+			done, ok := data["passwordReset"].(bool)
+			return ok && done
+		})).Return(nil).Once()
+
+	handler := HandleResetPasswordPost(pageRenderer, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+	rr := httptest.NewRecorder()
+	req := postWithMarker(t, store, newPassword, newPassword, emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, []string{audit.EventRevokedUserAuthState, audit.EventVerifiedEmail}, events,
+		"both are recorded after the commit, the verification once the reset is")
 }
 
 // A disabled account is refused at every step of recovery, with the response that step gives

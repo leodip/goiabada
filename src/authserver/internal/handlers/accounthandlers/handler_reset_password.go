@@ -531,6 +531,17 @@ func HandleResetPasswordPost(
 		// on SUCCESS: until now it logged only failures (auditFailedResetPasswordCode).
 		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id, revocation.ReasonPasswordReset, "", result)
 
+		// The claim also marked the address verified: the link went to it, and dies when it
+		// changes. That changes something only for the link an administrator emails a new
+		// user, whose address isn't verified yet; a forgot-password link only goes to a
+		// verified one. It is recorded as the account page's verification is, so the audit log
+		// says when and how an address became verified.
+		if !user.EmailVerified {
+			auditLogger.Log(r.Context(), audit.EventVerifiedEmail, map[string]interface{}{
+				"user_id": user.Id,
+			})
+		}
+
 		// Hygiene, and not the thing that makes the marker single-use: the claim above is.
 		// A failure here is logged rather than answered with a 500, because the password has
 		// already changed and telling the caller the reset failed would be false. The stale

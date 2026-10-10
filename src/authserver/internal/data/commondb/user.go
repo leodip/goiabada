@@ -1221,9 +1221,9 @@ func (d *Database) TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userId in
 	return rowsAffected == 1, nil
 }
 
-// TryConsumeForgotPasswordCode writes a new password hash and claims the outstanding
-// reset code in one conditional UPDATE, reporting whether this call is the one that made
-// the transition. The claim is codeHash matching what the row still carries, so a second
+// TryConsumeForgotPasswordCode writes a new password hash, claims the outstanding reset
+// code and marks the address verified in one conditional UPDATE, reporting whether this
+// call is the one that made the transition. The claim is codeHash matching what the row still carries, so a second
 // call with the same hash matches no row, returns false, and leaves the first call's
 // password in place.
 //
@@ -1272,11 +1272,22 @@ func (d *Database) TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx,
 	// The same narrow write SetUserPasswordHash performs, plus the hash clear. Narrow
 	// rather than a full-row UpdateUser so a concurrent admin disable cannot be undone
 	// by it (#106). See SetUserPasswordHash for why the clears are raw SQL.
+	//
+	// It also marks the address verified, and drops any verification code outstanding for
+	// it. A reset link is sent to the address the row holds and dies when that address
+	// changes, so redeeming it proves the user reads that mailbox, as entering a
+	// verification code does. A forgot-password link only ever goes to a verified address,
+	// so this changes nothing there; the link an administrator has emailed to a new user
+	// goes to an unverified one, which until this stayed unverified after the user set
+	// their password through it, and so could not recover a password later.
 	ub.Set(
 		ub.Assign("password_hash", passwordHash),
 		"forgot_password_code_encrypted = NULL",
 		"forgot_password_code_issued_at = NULL",
 		"forgot_password_code_hash = ''",
+		ub.Assign("email_verified", true),
+		"email_verification_code_encrypted = NULL",
+		"email_verification_code_issued_at = NULL",
 		ub.Assign("updated_at", time.Now().UTC()),
 	)
 	// enabled is in the predicate so a disable landing between the reset handler's read and

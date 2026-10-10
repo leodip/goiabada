@@ -204,9 +204,10 @@ type Database interface {
 	// cooldown. It reports whether it did. Narrow rather than writing back the row the
 	// request loaded, which could undo a concurrent admin disable or email change (#404).
 	TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte) (bool, error)
-	// TryConsumeForgotPasswordCode writes a password hash and claims the outstanding
-	// reset code in one conditional UPDATE, reporting whether this call is the one that
-	// made the transition. Compare-and-set for the same reason MarkCodeAsUsed is: a
+	// TryConsumeForgotPasswordCode writes a password hash, claims the outstanding reset
+	// code and marks the address verified, since redeeming a link sent to it proves it, in
+	// one conditional UPDATE, reporting whether this call is the one that made the
+	// transition. Compare-and-set for the same reason MarkCodeAsUsed is: a
 	// read-then-unconditional-write lets two concurrent requests both believe they
 	// completed the reset.
 	//
