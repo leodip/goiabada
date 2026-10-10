@@ -141,16 +141,17 @@ You need a server with Docker and Nginx, two hostnames under one domain, such as
    sudo nginx -t && sudo systemctl reload nginx
    ```
 
-5. **Open only 80 and 443,** besides SSH. With ufw, allow the port your SSH server listens on first, so turning the firewall on keeps your session. `sudo ss -tlnp | grep sshd` shows it; it's 22 unless you changed it:
+5. **Open only 80 and 443,** besides SSH. With ufw, allow your SSH port first, so turning the firewall on keeps your access. The port your current session came in on is the last field of `$SSH_CONNECTION`; `sudo ss -tlnp` lists every listening port, where SSH shows as `sshd`, or as `systemd` on a host that starts it through socket activation, as recent Ubuntu releases do.
 
    ```bash
-   sudo ufw allow 22/tcp    # your SSH port
+   echo "${SSH_CONNECTION##* }"          # your SSH port
+   sudo ufw allow <your-ssh-port>/tcp
    sudo ufw allow 80/tcp
    sudo ufw allow 443/tcp
    sudo ufw enable
    ```
 
-   ufw comes with Ubuntu; on Debian, `sudo apt-get install ufw` first, or open the same ports in the firewall you use.
+   Before you close this session, open a second SSH connection to check that you still get in. ufw comes with Ubuntu; on Debian, `sudo apt-get install ufw` first, or open the same ports in the firewall you use.
 
    **Never** open 9090 or 9091: a caller that reaches Goiabada around Nginx picks the IP address it's rate limited and audited under.
 
