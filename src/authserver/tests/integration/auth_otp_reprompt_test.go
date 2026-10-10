@@ -177,3 +177,75 @@ func TestOtpCeremony_BrowserEnrolmentDoesNotOweAnImmediatePrompt(t *testing.T) {
 		"a session created by the ceremony that enrolled must not owe another second factor at "+
 			"once: it answered the level 2 question by establishing the authenticator")
 }
+
+// TestOtpCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3 is the other way a level 2 obligation
+// can be answered: by a level2_optional ceremony for a user who no longer has an authenticator,
+// which skips the code and promotes the generation, as #242 decision 3 requires. That ceremony
+// answers the level 2 optional question; it does not make the session's level 3 true again.
+//
+// The user signed in at level 3, then lost their authenticator and an administrator turned it off.
+// Their next sign-in is at a level 2 optional client, by SSO with no prompt. The one after it, at
+// the level 3 client, must ask them to set up a new authenticator, which is what Require two-factor
+// authentication promises. Until the step-up rule checked for an authenticator apart from the
+// generation, it reached /auth/issue instead and issued a level 3 code from the session's old
+// code, while prompt=none at the same client answered interaction_required.
+func TestOtpCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
+	client, redirectUri, user, password, otpSecret := createLevel2MandatoryUser(t, true)
+
+	// Ceremony one: password and OTP, which leaves a live level 3 session on this jar.
+	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
+	firstCode, err := totp.GenerateCode(otpSecret, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, firstCode)
+	_ = otpPage.Body.Close()
+	redirectLocation := assertRedirect(t, resp, "/auth/completed")
+	_ = resp.Body.Close()
+	resp = loadPage(t, httpClient, redirectLocation)
+	redirectLocation = assertRedirect(t, resp, "/auth/issue")
+	_ = resp.Body.Close()
+	resp = loadPage(t, httpClient, redirectLocation)
+	_ = resp.Body.Close()
+
+	// The authenticator is turned off. Standing in for the disable handlers, which clear the
+	// secret, reset the consumed step and move the counter in one transaction.
+	user.OTPEnabled = false
+	user.OTPSecretEncrypted = nil
+	if err = database.UpdateUser(context.Background(), nil, user); err != nil {
+		t.Fatal(err)
+	}
+	if err = database.ResetUserOTPStep(context.Background(), nil, user.Id); err != nil {
+		t.Fatal(err)
+	}
+	advanceOtpConfigGeneration(t, user.Id)
+
+	// Ceremony two, at a level 2 optional client: no authenticator, so no code, straight through.
+	optionalClient := &record.Client{
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
+	}
+	if err = database.CreateClient(context.Background(), nil, optionalClient); err != nil {
+		t.Fatal(err)
+	}
+	optionalRedirectUri := &record.RedirectURI{ClientId: optionalClient.Id, URI: fake.URL()}
+	if err = database.CreateRedirectURI(context.Background(), nil, optionalRedirectUri); err != nil {
+		t.Fatal(err)
+	}
+	where, page, _ := authorizeOnExistingSession(t, httpClient, optionalClient, optionalRedirectUri)
+	_ = page.Body.Close()
+	assert.Equal(t, "/auth/issue", where,
+		"a level 2 optional sign-in asks a user with no authenticator for no code")
+
+	// Ceremony three, at the level 3 client, is the whole point.
+	where, page, _ = authorizeOnExistingSession(t, httpClient, client, redirectUri)
+	defer func() { _ = page.Body.Close() }()
+	assert.Equal(t, "/auth/otp", where,
+		"a level 3 sign-in of a user with no authenticator must set one up, whatever answered the "+
+			"changed generation before it")
+	if where == "/auth/otp" {
+		assert.NotEmpty(t, getOtpSecretFromEnrollmentPage(t, page), "the OTP page must be the enrolment page")
+	}
+}

@@ -468,7 +468,10 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			sessionAcrLevel  record.AcrLevel
 			targetAcrLevel   record.AcrLevel
 			otpConfigChanged bool
-			expectedRedirect string
+			// userHasNoAuthenticator is a user who removed their authenticator, or had it removed,
+			// after the session reached its level. Every other row's user has one.
+			userHasNoAuthenticator bool
+			expectedRedirect       string
 		}{
 			{
 				name:             "AcrLevel1 to AcrLevel1",
@@ -538,6 +541,22 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				otpConfigChanged: true,
 				expectedRedirect: "/auth/level2",
 			},
+			// The authenticator was removed, and a level 2 optional sign-in has answered the moved
+			// generation since by skipping the code. Level 3 still asks the user to set one up.
+			{
+				name:                   "AcrLevel2Mandatory to AcrLevel2Mandatory (authenticator removed, generation answered)",
+				sessionAcrLevel:        record.AcrLevel2Mandatory,
+				targetAcrLevel:         record.AcrLevel2Mandatory,
+				userHasNoAuthenticator: true,
+				expectedRedirect:       "/auth/level2",
+			},
+			{
+				name:                   "AcrLevel2Mandatory to AcrLevel2Optional (authenticator removed, generation answered)",
+				sessionAcrLevel:        record.AcrLevel2Mandatory,
+				targetAcrLevel:         record.AcrLevel2Optional,
+				userHasNoAuthenticator: true,
+				expectedRedirect:       "/auth/completed",
+			},
 		}
 
 		for _, tt := range tests {
@@ -581,7 +600,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 					UserId:              1,
 					AcrLevel:            tt.sessionAcrLevel,
 					OtpConfigGeneration: 0,
-					User:                record.User{Id: 1, OtpConfigGeneration: userGeneration},
+					User:                record.User{Id: 1, OTPEnabled: !tt.userHasNoAuthenticator, OtpConfigGeneration: userGeneration},
 				}
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 				database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)

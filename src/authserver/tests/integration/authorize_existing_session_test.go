@@ -1065,9 +1065,18 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_OtpDisabled(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Mandatory(t)
 
+	// The client's level is a floor that acr_values never lowers (#240), so the request below is at
+	// level 2 optional only once the client is. At the helper's level 3 it was a level 3 request
+	// from a user with no authenticator, which sets one up now (#542 live check).
+	client.DefaultAcrLevel = record.AcrLevel2Optional
+	err := database.UpdateClient(context.Background(), nil, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Disable OTP for the user
 	user.OTPEnabled = false
-	err := database.UpdateUser(context.Background(), nil, user)
+	err = database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}

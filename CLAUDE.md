@@ -150,7 +150,7 @@ Defined in `src/authserver/internal/record/acr_level.go`:
 - **`urn:goiabada:level2_optional`** - Password + OTP if user has OTP enabled (skip if not)
 - **`urn:goiabada:level2_mandatory`** - Password + OTP required (user must enroll if not already)
 
-Target ACR determined by: `acr_values` param in authorize request → falls back to `Client.DefaultAcrLevel`
+Target ACR determined by: the first level in the `acr_values` param of the authorize request, raised to `Client.DefaultAcrLevel`, which is a floor `acr_values` never lowers (#240); with no `acr_values`, the client's level
 
 ### Auth States (State Machine)
 The values below are the string constants declared in `src/authserver/internal/ceremony/auth_context.go`, and
@@ -249,6 +249,7 @@ one definition, `protocolvalidation.IsSupportedResponseMode`, shared by the hand
 - Otherwise the session is reused (the `level1_existing_session` SSO shortcut), and:
 - If session ACR is `level1` and target is `level2_*` → redirect to level2
 - If session ACR is `level2_optional` and target is `level2_mandatory` → redirect to level2
+- If the target is `level2_mandatory` and the user has no authenticator now (removed since the session reached level 3) → redirect to level2, where they set one up. Checked apart from the generation, because a `level2_optional` ceremony answers a moved generation for such a user by skipping the code and promoting it
 - If the session's `OtpConfigGeneration` differs from the user's → re-auth level2 (user changed OTP settings). This block writes nothing: the obligation is discharged at `/auth/completed`
 - Otherwise → auth completed
 
@@ -296,6 +297,7 @@ One rule, `StepUpOwed`, read by `HandleAuthLevel1CompletedGet` and `handlePrompt
 
 **With valid session:**
 - Target ACR higher than session ACR → redirect to level2 (step-up)
+- Target `level2_mandatory` and the user has no authenticator → redirect to level2 to set one up (`StepUpAuthenticatorMissing`; `prompt=none` answers "Additional authentication setup required")
 - Session `OtpConfigGeneration` != user's + target requires level2 → re-prompt OTP
 - Otherwise → SSO succeeds, bump session
 

@@ -1037,8 +1037,8 @@ type silentAuthenticationAnswer struct {
 //  7. the user's authenticator has not changed since the session last answered the level 2
 //     question, when the target asks it. A reader only: it refuses and promotes nothing, because no
 //     interaction happened, which is what makes an identical second prompt=none request get the
-//     identical answer (#242 decision 1). Steps 5 and 7 are the step-up rule's two answers, and
-//     step 6 sits between them so the order of the refusals is kept;
+//     identical answer (#242 decision 1). Steps 5 to 7 are the step-up rule's three answers, in
+//     the order it gives them;
 //  8. the user holds at least one requested scope;
 //  9. when the client requires consent or offline_access is asked for, a consent covers every
 //     scope.
@@ -1086,7 +1086,7 @@ func decideSilentAuthentication(f silentAuthenticationFacts) (silentAuthenticati
 	if stepUpErr != nil || stepUp == ceremony.StepUpLevel {
 		return refuse(oidc.ErrorInteractionRequired, "Higher authentication level required")
 	}
-	if f.target == record.AcrLevel2Mandatory && !user.OTPEnabled {
+	if stepUp == ceremony.StepUpAuthenticatorMissing {
 		return refuse(oidc.ErrorInteractionRequired, "Additional authentication setup required")
 	}
 	if stepUp == ceremony.StepUpOtpConfigChanged {

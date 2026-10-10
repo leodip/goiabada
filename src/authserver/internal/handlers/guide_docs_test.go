@@ -44,6 +44,7 @@ var (
 	registrationExampleSection = conceptSection{registrationGuide, "## Register your app"}
 	alreadySignedInSection     = conceptSection{twoFactorGuide, "## Users who are already signed in"}
 	requireACodeSection        = conceptSection{twoFactorGuide, "## Require a code for your app"}
+	lostAuthenticatorSection   = conceptSection{twoFactorGuide, "## A user who lost their authenticator"}
 )
 
 // registrationExample is the request a section shows and the answer it shows for it.
@@ -93,7 +94,7 @@ func TestGuideDocs_ASessionAtTheLevelIsReusedWithoutACode(t *testing.T) {
 	session := &record.UserSession{
 		AcrLevel:            record.AcrLevel2Mandatory,
 		OtpConfigGeneration: 2,
-		User:                record.User{OtpConfigGeneration: 2},
+		User:                record.User{OTPEnabled: true, OtpConfigGeneration: 2},
 	}
 	step, err := ceremony.StepUpOwed(record.AcrLevel2Mandatory, session)
 	if err != nil {
@@ -104,6 +105,30 @@ func TestGuideDocs_ASessionAtTheLevelIsReusedWithoutACode(t *testing.T) {
 	}
 	assertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), alreadySignedInSection, []string{
 		"A user whose session already reached the client's level isn't asked for anything: the session is reused",
+	})
+}
+
+// Require two-factor authentication says that a user whose authenticator an administrator turned off
+// sets up a new one at their next level 3 sign-in. Their sessions at level 3 stay, so that holds only
+// because StepUpOwed owes a level 3 session of a user with no authenticator a setup, even after a
+// level 2 optional sign-in has answered the moved generation by skipping the code. Keyed on the
+// generation alone, such a session answered level 3 with no authenticator to answer it (#542 live
+// check).
+func TestGuideDocs_ALostAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
+	session := &record.UserSession{
+		AcrLevel:            record.AcrLevel2Mandatory,
+		OtpConfigGeneration: 3,
+		User:                record.User{OTPEnabled: false, OtpConfigGeneration: 3},
+	}
+	step, err := ceremony.StepUpOwed(record.AcrLevel2Mandatory, session)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if step == ceremony.StepUpNone {
+		t.Fatal("a level 3 session of a user with no authenticator owes nothing at level 3, so the guide's sentence no longer holds")
+	}
+	assertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), lostAuthenticatorSection, []string{
+		"At level 3, the user sets up a new authenticator at their next sign-in.",
 	})
 }
 

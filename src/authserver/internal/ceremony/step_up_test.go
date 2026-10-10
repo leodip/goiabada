@@ -98,10 +98,58 @@ func TestStepUpOwed_Session(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			// Every row's user has an authenticator. TestStepUpOwed_UserWithNoAuthenticator is the
+			// table for a user without one.
 			session := &record.UserSession{
 				AcrLevel:            tc.sessionAcr,
 				OtpConfigGeneration: tc.sessionOtpGen,
-				User:                record.User{OtpConfigGeneration: tc.userOtpGen},
+				User:                record.User{OTPEnabled: true, OtpConfigGeneration: tc.userOtpGen},
+			}
+
+			got, err := StepUpOwed(tc.target, session)
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// A session at level 3 whose user has no authenticator now, because they or an administrator
+// removed it. Level 3 asks them to set one up whether or not a level 2 optional sign-in has
+// answered the changed generation since: that sign-in skips the code for a user with no
+// authenticator and promotes the generation, and keyed on the generation alone the session went on
+// answering level 3 with nothing to answer it, while prompt=none refused the same request.
+func TestStepUpOwed_UserWithNoAuthenticator(t *testing.T) {
+	const (
+		level1    = record.AcrLevel1
+		optional  = record.AcrLevel2Optional
+		mandatory = record.AcrLevel2Mandatory
+	)
+
+	testCases := []struct {
+		name          string
+		target        record.AcrLevel
+		sessionAcr    record.AcrLevel
+		sessionOtpGen int64
+		userOtpGen    int64
+		want          StepUp
+	}{
+		{"mandatory target, mandatory session, generation answered", mandatory, mandatory, 3, 3, StepUpAuthenticatorMissing},
+		{"mandatory target, mandatory session, generation moved", mandatory, mandatory, 2, 3, StepUpAuthenticatorMissing},
+		// A level the session has not reached is the level answer, as for any user.
+		{"mandatory target, optional session", mandatory, optional, 3, 3, StepUpLevel},
+		// Level 2 optional needs no authenticator: a moved generation is answered by the skip.
+		{"optional target, mandatory session, generation answered", optional, mandatory, 3, 3, StepUpNone},
+		{"optional target, mandatory session, generation moved", optional, mandatory, 2, 3, StepUpOtpConfigChanged},
+		{"level1 target, mandatory session", level1, mandatory, 2, 3, StepUpNone},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			session := &record.UserSession{
+				AcrLevel:            tc.sessionAcr,
+				OtpConfigGeneration: tc.sessionOtpGen,
+				User:                record.User{OTPEnabled: false, OtpConfigGeneration: tc.userOtpGen},
 			}
 
 			got, err := StepUpOwed(tc.target, session)
