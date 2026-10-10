@@ -16,6 +16,12 @@
 -- then fail, since minting its session-bound refresh token reads a session that is gone; revoked,
 -- it is refused with invalid_grant before anything is consumed, and the client signs in again.
 --
+-- Except a redemption already under way. During a rolling upgrade the previous release can claim a
+-- code after the sessions are deleted and before this revokes it, and its mint then fails on the
+-- missing session, as a redemption does when its session is ended in the middle: the code is spent
+-- and the client signs in again. Nothing orders a redemption against this, nor against an ending,
+-- and for a code that lives 60 seconds that failure is the accepted price (IssueAuthorizationCodeGrant).
+--
 -- Emptying the table first is what lets SQLite add the column NOT NULL with no default. SQLite is
 -- one process, so nothing can insert between the two. The other three engines order it the other
 -- way for a rolling upgrade, as the mysql migration of the same number explains.
