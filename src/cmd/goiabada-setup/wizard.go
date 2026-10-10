@@ -479,23 +479,23 @@ func (w *wizard) askRateLimiter() error {
 		w.out.info("Rate limiter: %s", answer)
 		return nil
 	}
-	w.out.println("The auth server's built-in rate limiter caps sign-ins, password resets,")
-	w.out.println("self-registrations and client registrations per client address, and failed")
-	w.out.println("passwords and codes per account.")
+	w.out.println("The auth server always limits wrong one-time codes, and password checks on the Account")
+	w.out.println("pages, per user. Its rate limiter adds limits per client address on sign-ins, password")
+	w.out.println("resets, self-registrations and client registrations, and on wrong passwords per email.")
 	if w.config.Deployment.servedByEnvoyGateway {
-		w.out.println("Its limits on failed passwords and codes are keyed on the email or the user and counted")
-		w.out.println("in the database every pod shares, so they hold under either traffic policy.")
 		if defaultOn {
 			w.out.println("Under the Local traffic policy Goiabada sees each client's address, so the per-IP")
 			w.out.println("limits count each client alone, when the load balancer passes connections through.")
 			w.out.println("If it proxies them, every client shares the load balancer's address: check the")
 			w.out.println("ip= of your own request in the auth server's log once it runs.")
 		} else {
-			w.out.println("Its per-IP limits do not: under the Cluster traffic policy Goiabada sees a node's")
-			w.out.println("address, so they count every user the load balancer sends through one node together")
-			w.out.println("(30 password posts a minute and 20 forgot-password requests per 5 minutes per node,")
-			w.out.println("for example), which throttles sign-ins on a busy site. That is why it is off by")
-			w.out.println("default here.")
+			w.out.println("Under the Cluster traffic policy Goiabada sees a node's address, so the per-address")
+			w.out.println("limits count every user the load balancer sends through one node together (30 password")
+			w.out.println("posts a minute and 20 forgot-password requests per 5 minutes per node, for example),")
+			w.out.println("which throttles sign-ins on a busy site. That is why it is off by default here.")
+			w.out.println("Off, nothing limits guessing a user's password. On, every client through a node counts")
+			w.out.println("as one network, so anyone who knows an email can block its password sign-ins for 15")
+			w.out.println("minutes with 10 wrong passwords.")
 		}
 	}
 	w.out.printf("The limits are listed at %s\n", rateLimitsDocsURL)

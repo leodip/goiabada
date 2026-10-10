@@ -79,16 +79,19 @@ func aesKeyComment() []string {
 // output's proxy trust, which the auth server logs only with the limiter on.
 func (c *Config) rateLimiterComment() []string {
 	lines := []string{
-		"The auth server's built-in rate limiter: per-IP limits on sign-in, password reset,",
-		"self-registration and client registration, and limits on failed passwords and codes per",
-		"account. The server's own default is off. The limits are listed at",
+		"The auth server's rate limiter: per-IP limits on sign-in, password reset,",
+		"self-registration and client registration, and a limit on wrong passwords per email.",
+		"The server's own default is off. Its limits on wrong one-time codes and Account-page",
+		"password checks, per user, apply either way. The limits are listed at",
 		rateLimitsDocsURL,
 	}
 	switch {
 	case c.Deployment.servedByEnvoyGateway && c.GatewayTrafficPolicy == trafficPolicyCluster:
 		lines = append(lines,
 			"Under the gateway's Cluster traffic policy the servers see a node's address, so the",
-			"per-IP limits count every client arriving through one node together.",
+			"per-IP limits count every client arriving through one node together. Off, nothing limits",
+			"guessing a password; on, anyone who knows an email can block its password sign-ins for",
+			"15 minutes, since every client through a node counts as one network.",
 			"With it on, the auth server logs a warning at every start that it trusts one proxy hop",
 			"with no list; behind Envoy alone, that is expected.")
 	case c.Deployment.servedByEnvoyGateway:

@@ -9,7 +9,7 @@ This page helps you when Goiabada's rate limiter refuses a request, and especial
 
 ## What you see
 
-The rate limiter is off until you set `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` to `true`. Once it's on, a refused request gets `429 Too Many Requests` with a `Retry-After` header, in the format the endpoint usually answers with:
+The limits on one-time codes, on the Account pages' password checks and on email verification always apply. The others, counted by an IP address or an email, apply once you set `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` to `true`. A refused request gets `429 Too Many Requests` with a `Retry-After` header, in the format the endpoint usually answers with:
 
 - **A sign-in, two-factor, registration, activation or password reset page** shows "Too many attempts" and "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again."
 - **The token endpoint's password grant and `POST /connect/register`** answer `{"error": "invalid_request", "error_description": "Too many requests. Please wait and try again later."}`.

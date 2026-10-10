@@ -136,6 +136,17 @@ const (
 	countedByTokenUser
 )
 
+// countsAnAuthenticatedUser reports whether a tier counts a user something has already
+// authenticated: the signing-in user, past the password, or an access token's subject. Only
+// someone past that check can spend such a budget, so it can lock no stranger out, and it runs
+// whatever GOIABADA_AUTHSERVER_RATELIMITER_ENABLED says. The switch governs the tiers keyed on an
+// address, or on an email anyone can type: off, it was turning the code and account-password
+// limits off with them, and a Kubernetes install, whose wizard turns it off under the Cluster
+// traffic policy, had no bound on guessing a 6-digit code (#542).
+func (k countedBy) countsAnAuthenticatedUser() bool {
+	return k == countedBySigningInUser || k == countedByTokenUser
+}
+
 func (k countedBy) String() string {
 	switch k {
 	case countedByIP:
@@ -643,6 +654,12 @@ func (m *RateLimiter) LimitPwd(next http.Handler) http.Handler {
 	})
 }
 
+// applies reports whether a tier limits this server: every tier when the limiter is on, and a tier
+// counting an authenticated user always (countedBy.countsAnAuthenticatedUser).
+func (m *RateLimiter) applies(t *tier) bool {
+	return m.enabled || t.countedBy.countsAnAuthenticatedUser()
+}
+
 // limitFailuresPerSubject writes the body of a limiter only a failed credential check can
 // spend, keyed on the subject its tier counts by, refusing in the shape class names. LimitOtp,
 // LimitEmailVerification and LimitAccountPassword are this over their own tier (#439).
@@ -662,8 +679,7 @@ func (m *RateLimiter) LimitPwd(next http.Handler) http.Handler {
 // since the verdict is not known until the handler has returned.
 func (m *RateLimiter) limitFailuresPerSubject(next http.Handler, t *failureTier, class rejectClass) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip rate limiting if disabled
-		if !m.enabled {
+		if !m.applies(&t.tier) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -776,8 +792,7 @@ func tokenSubjectRateLimitKey(r *http.Request) (string, bool) {
 // itself, for limitFailuresPerSubject's reason; a client block is never absent.
 func (m *RateLimiter) limitRequests(next http.Handler, t *requestTier, class rejectClass) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip rate limiting if disabled
-		if !m.enabled {
+		if !m.applies(&t.tier) {
 			next.ServeHTTP(w, r)
 			return
 		}

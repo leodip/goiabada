@@ -1417,8 +1417,9 @@ func TestWizard_AsksWhetherToTurnTheRateLimiterOn(t *testing.T) {
 }
 
 // Under the Cluster traffic policy the question says why it is off by default: the per-IP limits,
-// with two of their budgets, would count every user arriving through one node together, while the
-// limits on failed credentials hold under either policy (#396 decision 9).
+// with two of their budgets, would count every user arriving through one node together (#396
+// decision 9). It says what each answer costs there, and that the limits per user apply either way
+// (#542).
 func TestWizard_TheRateLimiterQuestionSaysWhyItIsOffUnderCluster(t *testing.T) {
 	w, in, out, _ := testWizard(t, &CLIFlags{}, withAnswers(t, deploymentKubernetes, nil))
 	if err := w.setup(); err != nil {
@@ -1430,7 +1431,9 @@ func TestWizard_TheRateLimiterQuestionSaysWhyItIsOffUnderCluster(t *testing.T) {
 		"through one node together",
 		"30 password posts a minute",
 		"20 forgot-password requests per 5 minutes",
-		"hold under either traffic policy",
+		"always limits wrong one-time codes",
+		"nothing limits guessing a user's password",
+		"block its password sign-ins for 15 minutes",
 		rateLimitsDocs,
 	} {
 		if !strings.Contains(said, want) {

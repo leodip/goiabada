@@ -163,8 +163,11 @@ func noticeTestRequest(capture *smtpCapture, target string, body string, claims 
 // any change landed: the worst case, made certain rather than likely. A handler that acted on its
 // read rather than on what the write reported would notify the previous address once per request.
 func TestInitRoutes_ConcurrentEmailChangesNotifyThePreviousAddressOnce(t *testing.T) {
+	// Five, the account-password limit's budget: that limit holds whatever the rate limiter switch
+	// says, and counts a check still in flight against it, so a sixth concurrent change from the
+	// one user would be refused before reaching the handler (#542).
 	const (
-		changes       = 8
+		changes       = 5
 		previousEmail = "previous@example.com"
 		password      = "the account's real password"
 	)
