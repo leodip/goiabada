@@ -64,12 +64,12 @@ With `prompt=none`, the auth server makes the checks it would otherwise show the
 | The session's user is the one the `id_token_hint` names, when there's a hint | `login_required` | "The current session user does not match the id_token_hint" |
 | The session reached the request's [ACR level](/concepts/acr-and-amr/) | `interaction_required` | "Higher authentication level required" |
 | The user has two-factor authentication, when the level is `urn:goiabada:level2_mandatory` | `interaction_required` | "Additional authentication setup required" |
-| The user's two-factor authentication hasn't changed since the session last went through the code step, when the level is above `urn:goiabada:level1` | `interaction_required` | "Authentication configuration has changed" |
+| The user's two-factor authentication hasn't changed since the session was last checked for a second factor, when the level is above `urn:goiabada:level1` | `interaction_required` | "Authentication configuration has changed" |
 | The user holds at least one of the scopes asked for | `access_denied` | "The user is not authorized to access any of the requested scopes" |
 | The user has consented to the client, when it requires consent or the request asks for `offline_access` | `consent_required` | "User consent is required" |
 | That consent covers every scope the user would get | `consent_required` | "Additional consent is required" |
 
-When every check passes, the auth server issues the code and records the session's activity, so it doesn't idle out. Just before it does, it checks the user again: when the session's methods include `otp` and the user no longer has an authenticator, the answer is `login_required` with "User authentication is required". That's an authenticator removed while the request was under way. The ID token's `auth_time` is when the user last signed in, not the time of the silent request, and its `acr` is the session's level when that's higher than the one asked for.
+When every check passes, the auth server issues the code and records the session's activity, so it doesn't idle out. Just before it does, it checks the user again: when the session's methods include `otp` and the user no longer has the authenticator that code came from, the answer is `login_required` with "User authentication is required". That's an authenticator removed while the request was under way, whether or not the user set up another one since. The ID token's `auth_time` is when the user last signed in, not the time of the silent request, and its `acr` is the session's level when that's higher than the one asked for.
 
 The auth server redirects each error to your redirect URI with your `state`, in the request's response mode. A request with `prompt=none` that fails validation, such as one with a scope that doesn't exist, is answered at once too, rather than after a sign-in.
 

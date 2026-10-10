@@ -71,7 +71,7 @@ A user changing their own password normally stays signed in to the app they did 
 These end nothing:
 
 - **Changing an email address.** The change already asks for the current password, so signing other devices out would protect nothing that person couldn't do again. Tokens issued before it carry the old `email` claim until they're refreshed or expire.
-- **Setting up or removing two-factor authentication.** Each session goes through the one-time code step again before it's used for a level above `urn:goiabada:level1`, and removing it also lowers each session to what a password alone reaches. See [ACR and AMR](/concepts/acr-and-amr/#a-session-thats-already-there). For a lost or stolen device, end the user's sessions as well: see [A user who lost their authenticator](/guides/require-two-factor-authentication/#a-user-who-lost-their-authenticator).
+- **Setting up or removing two-factor authentication.** Each session is checked again for a second factor before it's used for a level above `urn:goiabada:level1`, and removing it also lowers each session to what a password alone reaches. See [ACR and AMR](/concepts/acr-and-amr/#a-session-thats-already-there). For a lost or stolen device, end the user's sessions as well: see [A user who lost their authenticator](/guides/require-two-factor-authentication/#a-user-who-lost-their-authenticator).
 
 ## A different user signs in on the same browser
 
