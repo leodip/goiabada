@@ -7,7 +7,7 @@ import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
 This page helps you choose how strongly users sign in to your app, and check how they did.
 
-Two claims in every ID token and access token tell your app about the sign-in:
+Two claims in every ID token, and in every access token issued for a user, tell your app about the sign-in:
 
 - **`acr`** (Authentication Context Class Reference) is how strongly the user signed in. Goiabada has three levels, from a password alone to a password and a one-time code.
 - **`amr`** (Authentication Methods References) is what the user did: `pwd` for a password, and `otp` for a one-time code from an authenticator app, which is what [two-factor authentication](/concepts/glossary/#two-factor-authentication) adds.
@@ -16,7 +16,7 @@ Two claims in every ID token and access token tell your app about the sign-in:
 
 <Steps>
 
-1. Set the least a sign-in to your app must reach. In the admin console, open your client, choose its **Default ACR level** on the **Settings** tab, and click the **Save** at the bottom of the tab. See [Clients](/concepts/clients/#default-acr-level).
+1. Set the least a sign-in to your app must reach. In the admin console, open your client, choose its **Default ACR level** on the **Settings** tab, and click the **Save** at the bottom of the tab. The field shows only while **Authorization code with PKCE** is on. See [Clients](/concepts/clients/#default-acr-level).
 
 2. To ask for more on one request, such as before a payment, add `acr_values` to the authorization request:
 
@@ -90,7 +90,7 @@ When a user sets up or removes two-factor authentication, each of their sessions
 
 ## Setting up two-factor authentication during a sign-in
 
-At `urn:goiabada:level2_mandatory`, a user with no authenticator sets one up before they enter a code. The new authenticator is stored only while the account's two-factor settings are still the ones the sign-in read. If they change meanwhile, for example because the same user finished setting one up in another tab or on their account page, nothing is stored, and the sign-in ends on a page saying "Your two-factor authentication settings changed". That sign-in can't go on: the user goes back to the app and signs in again, which starts from the account's current settings.
+At `urn:goiabada:level2_mandatory`, a user with no authenticator sets one up before they enter a code. The new authenticator is stored only while the account still has none. If it gains one meanwhile, because the same user finished setting one up in another tab or on their account page, nothing is stored, and the sign-in ends on a page saying "Your two-factor authentication settings changed". That sign-in can't go on: the user goes back to the app and signs in again, which starts from the account's current settings.
 
 ## Next steps
 
