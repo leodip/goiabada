@@ -1,0 +1,21 @@
+---
+// The header's links: the two llms files, written at build time by checks/llms.mjs for an AI
+// agent reading these docs, ahead of the social icons Starlight renders from the config.
+import Default from '@astrojs/starlight/components/SocialIcons.astro';
+---
+
+<a href="/llms.txt" class="llms-link" title="An index of these docs, for AI agents">llms.txt</a>
+<a href="/llms-full.txt" class="llms-link" title="All of these docs in one file, for AI agents">llms-full.txt</a>
+<Default />
+
+<style>
+	.llms-link {
+		color: var(--sl-color-text-accent);
+		font-size: var(--sl-text-sm);
+		text-decoration: none;
+		white-space: nowrap;
+	}
+	.llms-link:hover {
+		color: var(--sl-color-white);
+	}
+</style>
