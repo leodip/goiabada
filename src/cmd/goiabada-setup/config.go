@@ -81,8 +81,9 @@ func (c *Config) rateLimiterComment() []string {
 	lines := []string{
 		"The auth server's rate limiter: per-IP limits on sign-in, password reset,",
 		"self-registration and client registration, and a limit on wrong passwords per email.",
-		"The server's own default is off. Its limits on wrong one-time codes and Account-page",
-		"password checks, per user, apply either way. The limits are listed at",
+		"The server's own default is off. Its limits per user, on wrong one-time codes, Account-page",
+		"password checks, email verification codes and verification mails, apply either way. The",
+		"limits are listed at",
 		rateLimitsDocsURL,
 	}
 	switch {

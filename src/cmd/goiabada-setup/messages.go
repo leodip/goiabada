@@ -357,7 +357,9 @@ func printNativeInstructions(out *console, config *Config, paths outputPaths) {
 		out.println("    and have it set X-Forwarded-For and X-Forwarded-Proto.")
 	} else {
 		out.println("  • Both servers listen on every interface and serve plain HTTP until you set")
-		out.printf("    their CERTFILE and KEYFILE in %s, as its comments say.\n", filepath.Base(paths.description))
+		out.printf("    their CERTFILE and KEYFILE in %s, as its comments say. The admin console\n", filepath.Base(paths.description))
+		out.println("    reaches the auth server at its public URL, so it waits to listen until the")
+		out.println("    auth server serves HTTPS there.")
 	}
 	out.println()
 	out.println("  • The database must be empty for a fresh deployment. Goiabada will")

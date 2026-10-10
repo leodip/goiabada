@@ -216,8 +216,14 @@ func TestHostileGolden_KubernetesReadsBackEveryAnswer(t *testing.T) {
 	}
 }
 
-// hostileEnvWant is every interpolated assignment of the env file with the answer it must carry.
+// hostileEnvWant is every interpolated assignment of the env file with the answer it must carry. The
+// internal URL carries the auth server's URL only without a local proxy: with one it is the loopback
+// listener, a constant, and the hostile URL is still read back through GOIABADA_AUTHSERVER_BASEURL.
 func hostileEnvWant(config *Config) map[string]string {
+	internalURL := config.AuthServerURL
+	if config.LocalProxy {
+		internalURL = nativeLoopbackAuthServerURL
+	}
 	return map[string]string{
 		"GOIABADA_ADMIN_EMAIL":                config.AdminEmail,
 		"GOIABADA_ADMIN_PASSWORD":             config.AdminPassword,
@@ -228,7 +234,7 @@ func hostileEnvWant(config *Config) map[string]string {
 		"GOIABADA_DB_USERNAME":                config.DBUsername,
 		"GOIABADA_DB_PASSWORD":                config.DBPassword,
 		"GOIABADA_AUTHSERVER_BASEURL":         config.AuthServerURL,
-		"GOIABADA_AUTHSERVER_INTERNALBASEURL": config.AuthServerURL,
+		"GOIABADA_AUTHSERVER_INTERNALBASEURL": internalURL,
 		"GOIABADA_ADMINCONSOLE_BASEURL":       config.AdminConsoleURL,
 	}
 }
