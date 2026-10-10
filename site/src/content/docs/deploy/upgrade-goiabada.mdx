@@ -51,7 +51,7 @@ You don't migrate the database yourself. The auth server brings the schema up to
        kubectl rollout status deployment/goiabada-authserver deployment/goiabada-adminconsole -n goiabada
        ```
 
-       If you regenerate the manifest with the setup wizard instead, apply only the new `goiabada-k8s.yaml`: the `goiabada-secrets.yaml` written beside it holds new secrets, which the database wasn't set up with.
+       If you regenerate the manifest with the setup wizard instead, apply only the new `goiabada-k8s.yaml`: the `goiabada-secrets.yaml` written beside it holds new secrets, which the database isn't under.
      </TabItem>
    </Tabs>
 

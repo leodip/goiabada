@@ -196,7 +196,8 @@ func run() int {
 		if errors.Is(err, datafactory.ErrDataKeyMismatch) {
 			slog.Error("the data encryption key does not decrypt the stored data, so the auth server cannot start",
 				"error", err,
-				"remedy", "set GOIABADA_AES_ENCRYPTION_KEY back to the key this database was set up with, from your backup of it")
+				"remedy", "set GOIABADA_AES_ENCRYPTION_KEY to the last key the stored data was encrypted under, from your backup of it: "+
+					"the key the database was set up with, or after a rotation the key it was rotated to")
 			return 1
 		}
 		slog.Error("unable to create the database connection", "error", err)
