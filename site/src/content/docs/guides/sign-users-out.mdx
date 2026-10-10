@@ -19,17 +19,14 @@ Ending your app's own session isn't enough. The auth server keeps a [session](/c
 
 3. When the user clicks your app's sign-out button, read the ID token from their session, end your app's own session, and delete every token your app kept for them.
 
-4. Send the browser to `/auth/logout` with the ID token as `id_token_hint`, the address from step 2 as `post_logout_redirect_uri`, and a new random `state`. A POST keeps the ID token out of the address bar and the browser's history, so post the parameters from a form your page submits on its own:
+4. Answer with a redirect that sends the browser to `/auth/logout`, with the ID token as `id_token_hint`, the address from step 2 as `post_logout_redirect_uri`, and a new random `state`:
 
    ```http
-   POST /auth/logout HTTP/1.1
-   Host: auth.example.com
-   Content-Type: application/x-www-form-urlencoded
-
-   id_token_hint=eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...&post_logout_redirect_uri=https%3A%2F%2Fapp.example.com%2Fsigned-out&state=af0ifjsldkj
+   HTTP/1.1 302 Found
+   Location: https://auth.example.com/auth/logout?id_token_hint=eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...&post_logout_redirect_uri=https%3A%2F%2Fapp.example.com%2Fsigned-out&state=af0ifjsldkj
    ```
 
-   A link that sends the same parameters in the query string of a GET works too.
+   The browser follows it with a GET, which is what most OpenID Connect libraries send. To keep the ID token out of the browser's history, post the parameters instead: see [Hiding the hint](#hiding-the-hint).
 
 5. The auth server signs the user out at once, without asking, and sends the browser back with your `state`:
 
@@ -67,7 +64,17 @@ The auth server adds `state` exactly as you sent it, and nothing else.
 
 ## Hiding the hint
 
-The hint is the user's ID token, and anyone who decodes it can read the claims about the user in it. Posting it, as in step 4, keeps it out of the browser's history and the `Referer` header of the next page.
+The hint is the user's ID token, and anyone who decodes it can read the claims about the user in it. In the query string of a GET, it's kept in the browser's history, and in the access log of any proxy in front of the auth server. The auth server's own request log leaves it out.
+
+To keep it out of both, post the parameters from a form your page submits on its own:
+
+```http
+POST /auth/logout HTTP/1.1
+Host: auth.example.com
+Content-Type: application/x-www-form-urlencoded
+
+id_token_hint=eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...&post_logout_redirect_uri=https%3A%2F%2Fapp.example.com%2Fsigned-out&state=af0ifjsldkj
+```
 
 A confidential client can go further and encrypt the hint with a key made from its client secret, so it's unreadable wherever it's seen or logged on the way. Send `client_id` beside an encrypted hint, so the auth server knows whose secret decrypts it. [Encrypting the hint](/reference/endpoints/logout/#encrypting-the-hint) gives the scheme.
 
