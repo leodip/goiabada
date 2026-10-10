@@ -201,10 +201,10 @@ func TestEstablish_ARefusedTransactionWritesNothing(t *testing.T) {
 		mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
-// Seam 2, the remove half. The compare-and-set, the step reset and the counter advance are one
-// transaction, in decision 10's order: otp_enabled cleared before the marker (#111 decisions 4,
-// 10 and 13). The compare-and-set expects OTP on at the generation the user was read with (#471
-// decision 2).
+// Seam 2, the remove half. The compare-and-set, the step reset, the counter advance and the
+// lowering of the user's sessions are one transaction, in decision 10's order: otp_enabled cleared
+// before the marker (#111 decisions 4, 10 and 13, #542 decision 1). The compare-and-set expects
+// OTP on at the generation the user was read with (#471 decision 2).
 func TestRemove_ClearsDisablesResetsAndAdvancesInOneTransaction(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	user := enrolledUser(t)
@@ -230,13 +230,25 @@ func TestRemove_ClearsDisablesResetsAndAdvancesInOneTransaction(t *testing.T) {
 			return 4, nil
 		}).Once()
 
+	database.EXPECT().GetUserSessionsByUserId(mock.Anything, otpTx, otpUserId).
+		RunAndReturn(func(context.Context, *sql.Tx, int64) ([]record.UserSession, error) {
+			calls = append(calls, "sessions")
+			return []record.UserSession{{Id: 1, UserId: otpUserId, AcrLevel: record.AcrLevel2Mandatory, AuthMethods: "pwd otp"}}, nil
+		}).Once()
+	database.EXPECT().UpdateUserSession(mock.Anything, otpTx, mock.Anything).
+		RunAndReturn(func(context.Context, *sql.Tx, *record.UserSession) error {
+			calls = append(calls, "lower")
+			return nil
+		}).Once()
+
 	removed, err := Remove(context.Background(), database, user)
 	require.NoError(t, err)
 	assert.True(t, removed)
 
-	assert.Equal(t, []string{"begin", "remove", "reset", "increment", "commit"}, calls,
+	assert.Equal(t, []string{"begin", "remove", "reset", "increment", "sessions", "lower", "commit"}, calls,
 		"the disable and the marker reset commit together: separately, an enrollment landing between "+
-			"them leaves a consumed code claimable again (#111 decision 13)")
+			"them leaves a consumed code claimable again (#111 decision 13); and the sessions are "+
+			"lowered with them, so none still names the authenticator once it is gone (#542)")
 	assert.False(t, user.OTPEnabled)
 	assert.Empty(t, user.OTPSecretEncrypted, "the seed goes with the authenticator")
 	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
@@ -260,7 +272,87 @@ func TestRemove_ALostCompareAndSetWritesNothingElse(t *testing.T) {
 	require.NoError(t, stub.BodyErr)
 	database.AssertNotCalled(t, "ResetUserOTPStep", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetUserSessionsByUserId", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything, mock.Anything)
 	assert.True(t, user.OTPEnabled, "the user must not report a removal that did not happen")
+}
+
+// What a removal leaves each of the user's sessions claiming: what a password alone earns for a
+// user with no authenticator (#542 decision 1). otp leaves the methods and level 3 drops to level 2
+// optional; a session already there is not written, and auth_time and everything else stay.
+func TestRemove_LowersEverySessionToWhatAPasswordEarns(t *testing.T) {
+	authTime := time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)
+	sessions := []record.UserSession{
+		{Id: 1, UserId: otpUserId, AcrLevel: record.AcrLevel2Mandatory, AuthMethods: "pwd otp", AuthTime: authTime},
+		{Id: 2, UserId: otpUserId, AcrLevel: record.AcrLevel2Optional, AuthMethods: "pwd otp", AuthTime: authTime},
+		{Id: 3, UserId: otpUserId, AcrLevel: record.AcrLevel2Optional, AuthMethods: "pwd", AuthTime: authTime},
+		{Id: 4, UserId: otpUserId, AcrLevel: record.AcrLevel1, AuthMethods: "pwd", AuthTime: authTime},
+		// A level 3 session with no code named, which no ceremony writes, is still capped.
+		{Id: 5, UserId: otpUserId, AcrLevel: record.AcrLevel2Mandatory, AuthMethods: "pwd", AuthTime: authTime},
+	}
+	want := map[int64]record.UserSession{
+		1: {Id: 1, UserId: otpUserId, AcrLevel: record.AcrLevel2Optional, AuthMethods: "pwd", AuthTime: authTime},
+		2: {Id: 2, UserId: otpUserId, AcrLevel: record.AcrLevel2Optional, AuthMethods: "pwd", AuthTime: authTime},
+		5: {Id: 5, UserId: otpUserId, AcrLevel: record.AcrLevel2Optional, AuthMethods: "pwd", AuthTime: authTime},
+	}
+
+	database := datamocks.NewDatabase(t)
+	datamocks.ExpectRunInTransaction(database, otpTx)
+	database.EXPECT().TryRemoveUserOTP(mock.Anything, otpTx, otpUserId, otpReadGeneration).Return(true, nil).Once()
+	database.EXPECT().ResetUserOTPStep(mock.Anything, otpTx, otpUserId).Return(nil).Once()
+	database.EXPECT().IncrementUserOtpConfigGeneration(mock.Anything, otpTx, otpUserId).Return(6, nil).Once()
+	database.EXPECT().GetUserSessionsByUserId(mock.Anything, otpTx, otpUserId).Return(sessions, nil).Once()
+	written := map[int64]record.UserSession{}
+	database.EXPECT().UpdateUserSession(mock.Anything, otpTx, mock.Anything).
+		RunAndReturn(func(_ context.Context, _ *sql.Tx, session *record.UserSession) error {
+			written[session.Id] = *session
+			return nil
+		})
+
+	removed, err := Remove(context.Background(), database, enrolledUser(t))
+
+	require.NoError(t, err)
+	assert.True(t, removed)
+	assert.Equal(t, want, written, "each session naming a code or above level 2 optional is lowered, and only those")
+}
+
+// A lowering that fails fails the removal: committed without it, the authenticator is gone and a
+// session still claims it, which is the state the lowering exists to prevent.
+func TestRemove_AFailedLoweringFailsTheRemoval(t *testing.T) {
+	readErr := errors.New("sessions unreadable")
+	writeErr := errors.New("session write refused")
+
+	for _, tc := range []struct {
+		name    string
+		readErr error
+		want    error
+	}{
+		{name: "the sessions cannot be read", readErr: readErr, want: readErr},
+		{name: "a session cannot be written", want: writeErr},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			user := enrolledUser(t)
+			stub := datamocks.ExpectRunInTransaction(database, otpTx)
+			database.EXPECT().TryRemoveUserOTP(mock.Anything, otpTx, otpUserId, otpReadGeneration).Return(true, nil).Once()
+			database.EXPECT().ResetUserOTPStep(mock.Anything, otpTx, otpUserId).Return(nil).Once()
+			database.EXPECT().IncrementUserOtpConfigGeneration(mock.Anything, otpTx, otpUserId).Return(6, nil).Once()
+			if tc.readErr != nil {
+				database.EXPECT().GetUserSessionsByUserId(mock.Anything, otpTx, otpUserId).Return(nil, tc.readErr).Once()
+			} else {
+				database.EXPECT().GetUserSessionsByUserId(mock.Anything, otpTx, otpUserId).
+					Return([]record.UserSession{{Id: 1, UserId: otpUserId, AcrLevel: record.AcrLevel2Mandatory, AuthMethods: "pwd otp"}}, nil).Once()
+				database.EXPECT().UpdateUserSession(mock.Anything, otpTx, mock.Anything).Return(writeErr).Once()
+			}
+
+			removed, err := Remove(context.Background(), database, user)
+
+			require.ErrorIs(t, err, tc.want)
+			assert.False(t, removed)
+			require.ErrorIs(t, stub.BodyErr, tc.want)
+			assert.True(t, user.OTPEnabled, "the user must not report a removal that rolled back")
+		})
+	}
 }
 
 // The counter advance is not best-effort. A removal that commits without it is exactly the state

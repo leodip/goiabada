@@ -1074,18 +1074,17 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 		t.Fatal(err)
 	}
 
-	// Disable OTP for the user
-	user.OTPEnabled = false
-	err = database.UpdateUser(context.Background(), nil, user)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// An administrator turns the user's two-factor authentication off, which lowers the level 3
+	// session to what a password alone earns: level 2 optional, "pwd" (#542 decision 1).
+	removeAuthenticatorAsAdministrator(t, user.Id)
 
 	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
 	userSession1 := userSessions[0]
+	assert.Equal(t, record.AcrLevel2Optional, userSession1.AcrLevel)
+	assert.Equal(t, oidc.AuthMethodPassword.String(), userSession1.AuthMethods)
 
 	time.Sleep(200 * time.Millisecond)
 
@@ -1111,6 +1110,12 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	defer func() { _ = resp.Body.Close() }()
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	// The removal moved the user's OTP generation, so the level 2 question is asked again, and a
+	// user with no authenticator answers it by skipping the code (#242 decision 3).
+	redirectLocation = assertRedirect(t, resp, "/auth/level2")
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -1143,8 +1148,10 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
+	// The level and methods the lowered session holds: the code no longer names the removed
+	// authenticator, where it said level 3 and "pwd otp" before the removal lowered the session.
+	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)

@@ -80,6 +80,8 @@ When a user sets up or removes an authenticator, every session of theirs goes th
 
 An administrator opens **Admin**, **Users**, the user, and their **Authentication** tab, turns off **Two-factor authentication enabled**, and saves. At level 3, the user sets up a new authenticator at their next sign-in.
 
+Turning it off lowers each of the user's sessions to what a password alone reaches, so no token issued from them afterwards claims a code. Nobody is signed out, though, and apps the user was already signed in to keep refreshing their tokens with the claims they had. If the device could be in someone else's hands, also end the user's sessions: on their **Sessions** tab, choose **End session** beside each one. That signs every browser out and revokes the refresh tokens each session gave out. A session left open is enough to set up a new authenticator at a level 3 sign-in, since that asks only for what the session doesn't already have. See [Ending sessions](/concepts/ending-sessions/).
+
 A user who still has their authenticator can turn it off themselves, with their password, under **Account**, **Two-factor authentication** and **Disable OTP**. At level 3, they then set up a new one at their next sign-in to your app.
 
 ## What a code can't protect
