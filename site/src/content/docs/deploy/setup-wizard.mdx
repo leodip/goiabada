@@ -55,7 +55,7 @@ The wizard asks only the questions that apply to your deployment, in this order,
 | Database type | Every deployment. MySQL, PostgreSQL, SQL Server or SQLite. Kubernetes doesn't offer SQLite. | 1, MySQL (`--db` has none) |
 | Domain names | The auth server's and the admin console's URLs, for every deployment but local testing, which uses `http://localhost:9090` and `http://localhost:9091`. On Kubernetes, each URL needs a host of its own. | `https://auth.example.com`, then the admin console's on the same domain: `https://admin.example.com` |
 | Kubernetes namespace | Kubernetes | `goiabada` |
-| Gateway traffic policy | Kubernetes. Cluster works behind every load balancer, but Goiabada then sees a node's address for every client. Local runs Envoy on every node and keeps each client's own address. | Cluster |
+| Gateway traffic policy | Kubernetes. Cluster works behind every load balancer, but Goiabada then sees a node's address for every client. Local runs Envoy on every node and keeps each client's own address, behind a load balancer that passes connections through rather than proxying them. | Cluster |
 | Network policy | Kubernetes. Yes admits only Envoy to both servers, and the admin console to the auth server. It needs a network plugin that enforces NetworkPolicies. | No |
 | Reverse proxy | Native binaries. Yes has both servers listen on `127.0.0.1` and trust the proxy's forwarded headers. No has them listen on every interface and trust no forwarded header, and you set up their HTTPS yourself. | Yes |
 | Rate limiter | Every deployment but local testing, which leaves it off. See [why it's off under Cluster](#the-rate-limiter-under-the-cluster-traffic-policy). | On, but off on Kubernetes under the Cluster policy |

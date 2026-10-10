@@ -40,7 +40,8 @@ data:
   # Envoy, the one gateway in front, appends the address it received each connection from
   # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list.
   # Under the gateway's Local traffic policy, with Envoy on every node, Envoy receives each
-  # connection from the client itself, so the servers see the client's address.
+  # connection from the address the load balancer leaves on it: the client's address when
+  # the load balancer passes connections through, and its own when it proxies them.
   # Set the list only when a CDN or a second load balancer sits in front of Envoy, naming
   # every hop, the Envoy pods included. A pod that calls the Service directly, around Envoy,
   # chooses the address it is counted and audited under: a NetworkPolicy admitting only
@@ -51,6 +52,9 @@ data:
   # self-registration and client registration, and limits on failed passwords and codes per
   # account. The server's own default is off. The limits are listed at
   # https://goiabada.dev/reference/environment-variables/#rate-limits
+  # Under the gateway's Local traffic policy the per-IP limits count each client alone when
+  # the load balancer passes connections through; one that proxies them shows every client
+  # with its own address, and they count every client together.
   # With it on, the auth server logs a warning at every start that it trusts one proxy hop
   # with no list; behind Envoy alone, that is expected.
   GOIABADA_AUTHSERVER_RATELIMITER_ENABLED: "true"
@@ -78,7 +82,8 @@ data:
   # Envoy, the one gateway in front, appends the address it received each connection from
   # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list.
   # Under the gateway's Local traffic policy, with Envoy on every node, Envoy receives each
-  # connection from the client itself, so the servers see the client's address.
+  # connection from the address the load balancer leaves on it: the client's address when
+  # the load balancer passes connections through, and its own when it proxies them.
   # Set the list only when a CDN or a second load balancer sits in front of Envoy, naming
   # every hop, the Envoy pods included. A pod that calls the Service directly, around Envoy,
   # chooses the address it is counted and audited under: a NetworkPolicy admitting only

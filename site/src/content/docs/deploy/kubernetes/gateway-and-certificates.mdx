@@ -158,7 +158,7 @@ The traffic policy of the load balancer in front of Envoy decides which address 
 
 **`Cluster`,** the wizard's default, works behind every load balancer: the load balancer may send a connection to any node, and the node forwards it to an Envoy pod wherever one runs. The node replaces the client's address with its own, so Goiabada sees a node's address for every client.
 
-**`Local`, with Envoy on every node** (`--gateway-traffic-policy=local`), keeps the client's address: a node delivers a connection only to an Envoy pod on that same node, so nothing rewrites its source. A node with no Envoy pod drops what the load balancer sends it, which is why Envoy runs as a DaemonSet here, at the cost of one Envoy pod per node. Save this as `gatewayclass.yaml` instead:
+**`Local`, with Envoy on every node** (`--gateway-traffic-policy=local`), keeps the client's address behind a load balancer that passes each connection through: a node delivers a connection only to an Envoy pod on that same node, so nothing rewrites its source. A load balancer that proxies connections instead, opening its own to the nodes, as some clouds' do, shows Goiabada its own address under either policy, and only Proxy Protocol, below, carries the client's. Check which you have once Goiabada runs: request any page, then read that request's `ip=` in the auth server's log with `kubectl logs -n goiabada deployment/goiabada-authserver`. Your own address means `Local` works; one address for every client is the load balancer's. A node with no Envoy pod drops what the load balancer sends it, which is why Envoy runs as a DaemonSet here, at the cost of one Envoy pod per node. Save this as `gatewayclass.yaml` instead:
 
 ```yaml
 apiVersion: gateway.envoyproxy.io/v1alpha1
@@ -187,7 +187,7 @@ spec:
     namespace: envoy-gateway-system
 ```
 
-An empty `envoyDaemonSet` is a DaemonSet with every default; an EnvoyProxy takes it or `envoyDeployment`, not both. This variant follows Envoy Gateway v1.9.1's API and hasn't been tried on a load-balanced cluster by the project, so check that a pod runs on every node after applying it: `kubectl get daemonset -n envoy-gateway-system`.
+An empty `envoyDaemonSet` is a DaemonSet with every default; an EnvoyProxy takes it or `envoyDeployment`, not both. This variant follows Envoy Gateway v1.9.1's API. On a managed cluster whose load balancer proxies connections, applying it over the `Cluster` file replaced Envoy's Deployment with a DaemonSet, the load balancer kept its address and traffic flowed, and Goiabada saw the load balancer's address for every client. Check that a pod runs on every node after applying it: `kubectl get daemonset -n envoy-gateway-system`. Changing the policy on a running cluster replaces Envoy rather than rolling it: switching back to `Cluster` there failed requests for about 15 seconds, so change it when an interruption is acceptable.
 
 A third way keeps the client's address without an Envoy pod per node: Proxy Protocol, where the load balancer prepends the client's address to each connection. It needs annotations on the load balancer's Service that differ from cloud to cloud, so the wizard doesn't offer it; Envoy Gateway's [client traffic policy](https://gateway.envoyproxy.io/docs/tasks/traffic/client-traffic-policy/) documentation covers the Envoy side.
 
