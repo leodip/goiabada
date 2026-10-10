@@ -22,7 +22,7 @@ func TestUpToHead(t *testing.T) {
 		db := openTestDB(t)
 		m := newTestMigrator(t, db, threeVersions())
 
-		migrated, err := m.UpToHead(context.Background(), release, nil)
+		migrated, err := m.UpToHead(context.Background(), release, nil, nil)
 
 		require.NoError(t, err)
 		assert.True(t, migrated, "migrations ran, so the caller must not write that nothing needed to")
@@ -33,10 +33,10 @@ func TestUpToHead(t *testing.T) {
 	t.Run("at head nothing runs and that is not a failure", func(t *testing.T) {
 		db := openTestDB(t)
 		m := newTestMigrator(t, db, threeVersions())
-		_, err := m.UpToHead(context.Background(), release, nil)
+		_, err := m.UpToHead(context.Background(), release, nil, nil)
 		require.NoError(t, err)
 
-		migrated, err := m.UpToHead(context.Background(), release, nil)
+		migrated, err := m.UpToHead(context.Background(), release, nil, nil)
 
 		require.NoError(t, err, "ErrNoChange is the ordinary restart, and must never stop one")
 		assert.False(t, migrated, "nothing ran, which is what the caller's startup record reports")
@@ -49,7 +49,7 @@ func TestUpToHead(t *testing.T) {
 		require.NoError(t, err)
 		m := newTestMigrator(t, db, threeVersions())
 
-		migrated, err := m.UpToHead(context.Background(), release, nil)
+		migrated, err := m.UpToHead(context.Background(), release, nil, nil)
 
 		require.Error(t, err)
 		assert.False(t, migrated)
@@ -70,7 +70,7 @@ func TestUpToHead(t *testing.T) {
 		require.NoError(t, err)
 		m := newTestMigrator(t, db, threeVersions())
 
-		migrated, err := m.UpToHead(context.Background(), release, nil)
+		migrated, err := m.UpToHead(context.Background(), release, nil, nil)
 
 		require.Error(t, err)
 		assert.False(t, migrated)
@@ -91,15 +91,130 @@ func TestUpToHead(t *testing.T) {
 		db := openTestDB(t)
 		m, err := New(db, threeVersions(), "migrations", eng)
 		require.NoError(t, err)
-		_, err = m.UpToHead(context.Background(), release, nil)
+		_, err = m.UpToHead(context.Background(), release, nil, nil)
 		require.ErrorIs(t, err, unlockErr, "the chain runs and the unlock fails")
 
-		migrated, err := m.UpToHead(context.Background(), release, nil)
+		migrated, err := m.UpToHead(context.Background(), release, nil, nil)
 
 		require.Error(t, err, "a lock that did not come back must stop the start, not be read as nothing to do")
 		require.ErrorIs(t, err, unlockErr, "the failure that blocks every other migrator is what is reported")
 		assert.False(t, migrated)
 		assert.Truef(t, strings.HasPrefix(err.Error(), prefix), "got %s", err.Error())
+	})
+}
+
+// TestUpToHead_BeforeMigrating is the check a starting process makes before its schema moves, which
+// the email case pre-flight is: under the migration lock, on the runner's own connection, with the
+// clean version the runner read there, and only when there is something to migrate (#542 decision
+// 2). It ran before the lock until several replicas starting at once on an empty database showed
+// that a check there reads a schema another process is part way through.
+func TestUpToHead_BeforeMigrating(t *testing.T) {
+	const release = "v1.6.0"
+
+	// lockedEngine is SQLite's engine with a session lock that records whether it is held, which
+	// SQLite's own in-process mutex gives no way to observe.
+	lockedEngine := func(held *bool) Engine {
+		eng := SQLite()
+		eng.lock = func(context.Context, *sql.Conn) error { *held = true; return nil }
+		eng.unlock = func(context.Context, *sql.Conn) error { *held = false; return nil }
+		return eng
+	}
+
+	t.Run("it runs under the lock, on the lock's connection, before any file", func(t *testing.T) {
+		db := openTestDB(t)
+		var held bool
+		m, err := New(db, threeVersions(), "migrations", lockedEngine(&held))
+		require.NoError(t, err)
+
+		calls := 0
+		check := func(ctx context.Context, conn *sql.Conn, recorded, target int) error {
+			calls++
+			assert.True(t, held, "the check runs while the migration lock is held")
+			assert.Equal(t, NilVersion, recorded, "a database never migrated is NilVersion")
+			assert.Equal(t, 5, target, "the target is head")
+			// The pool has one connection and the runner holds it, so this read can only go
+			// through conn; a check reading through the pool would wait here for ever.
+			var tables int
+			require.NoError(t, conn.QueryRowContext(ctx,
+				"SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 't1'").Scan(&tables))
+			assert.Zero(t, tables, "no migration file has run yet")
+			return nil
+		}
+
+		migrated, err := m.UpToHead(context.Background(), release, nil, check)
+
+		require.NoError(t, err)
+		assert.True(t, migrated)
+		assert.Equal(t, 1, calls)
+		assert.False(t, held, "the lock is given back")
+		assert.Equal(t, []RecordedVersion{{Version: 5, Dirty: false}}, recorded(t, db))
+		assertPoolReturned(t, db)
+	})
+
+	t.Run("a database part way up is checked from the version it is at", func(t *testing.T) {
+		db := openTestDB(t)
+		m := newTestMigrator(t, db, threeVersions())
+		require.NoError(t, m.Migrate(context.Background(), 2))
+
+		var got [2]int
+		_, err := m.UpToHead(context.Background(), release, nil,
+			func(_ context.Context, _ *sql.Conn, recorded, target int) error {
+				got = [2]int{recorded, target}
+				return nil
+			})
+
+		require.NoError(t, err)
+		assert.Equal(t, [2]int{2, 5}, got)
+	})
+
+	t.Run("a refusal stops the start with nothing written", func(t *testing.T) {
+		db := openTestDB(t)
+		var held bool
+		m, err := New(db, threeVersions(), "migrations", lockedEngine(&held))
+		require.NoError(t, err)
+		refused := errors.New("the stored addresses cannot be migrated")
+
+		migrated, err := m.UpToHead(context.Background(), release, nil,
+			func(context.Context, *sql.Conn, int, int) error { return refused })
+
+		require.ErrorIs(t, err, refused, "the check's refusal is the start's answer")
+		assert.False(t, migrated)
+		assert.Empty(t, recorded(t, db), "not migrated and not dirty: the version table is as it was")
+		assert.False(t, tableExists(t, db, "t1"), "no file ran")
+		assert.False(t, held, "the lock is given back after a refusal too")
+		assertPoolReturned(t, db)
+	})
+
+	t.Run("a database at head is not checked", func(t *testing.T) {
+		db := openTestDB(t)
+		m := newTestMigrator(t, db, threeVersions())
+		_, err := m.UpToHead(context.Background(), release, nil, nil)
+		require.NoError(t, err)
+
+		migrated, err := m.UpToHead(context.Background(), release, nil,
+			func(context.Context, *sql.Conn, int, int) error {
+				t.Error("nothing is about to be migrated, so there is nothing to check")
+				return nil
+			})
+
+		require.NoError(t, err)
+		assert.False(t, migrated)
+	})
+
+	t.Run("a dirty database is refused before the check reads it", func(t *testing.T) {
+		db := openTestDB(t)
+		_, err := db.Exec("INSERT INTO schema_migrations (version, dirty) VALUES (2, 1)")
+		require.NoError(t, err)
+		m := newTestMigrator(t, db, threeVersions())
+
+		_, err = m.UpToHead(context.Background(), release, nil,
+			func(context.Context, *sql.Conn, int, int) error {
+				t.Error("a dirty version is a schema part way through a file, which the check must never read")
+				return nil
+			})
+
+		var dirty DirtyError
+		require.ErrorAs(t, err, &dirty)
 	})
 }
 

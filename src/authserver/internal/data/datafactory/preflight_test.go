@@ -2,6 +2,7 @@ package datafactory
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"github.com/stretchr/testify/mock"
 	"strings"
@@ -186,4 +187,43 @@ func TestCheckEmailCaseBeforeMigrating_AScanFailureIsFatal(t *testing.T) {
 	assert.Contains(t, err.Error(), "unable to read stored email addresses",
 		"the message must name what failed: this is the only thing the operator is told")
 	assert.ErrorIs(t, err, boom, "the cause must survive, or the storage failure is invisible under a message about email")
+}
+
+// emailCaseOnConnFake answers ScanEmailCaseOn with rows and records the connection it was asked to
+// read on.
+type emailCaseOnConnFake struct {
+	rows []record.EmailCaseRow
+	conn *sql.Conn
+}
+
+func (f *emailCaseOnConnFake) ScanEmailCaseOn(_ context.Context, conn *sql.Conn) ([]record.EmailCaseRow, error) {
+	f.conn = conn
+	return f.rows, nil
+}
+
+// The startup half reads on the connection the migrator hands it, the one holding the migration
+// lock, and applies the same policy (#542 decision 2): through the pool, it would wait for ever on
+// SQLite, whose pool has that one connection.
+func TestEmailCasePreflight_ReadsOnTheMigratorsConnection(t *testing.T) {
+	conn := &sql.Conn{}
+	scanner := &emailCaseOnConnFake{rows: []record.EmailCaseRow{
+		row(1, "Alice@example.com"),
+		row(2, "alice@example.com"),
+	}}
+
+	err := emailCasePreflight(scanner)(context.Background(), conn, LowercaseEmailsVersion-1, LowercaseEmailsVersion)
+
+	require.Error(t, err, "a collision is refused here as it is anywhere the policy runs")
+	assert.Contains(t, err.Error(), "users.id=1")
+	assert.Same(t, conn, scanner.conn, "the read goes through the migrator's connection")
+}
+
+// And it skips as the policy does, reading nothing: a database never migrated has no users table.
+func TestEmailCasePreflight_SkipsADatabaseNeverMigrated(t *testing.T) {
+	scanner := &emailCaseOnConnFake{}
+
+	err := emailCasePreflight(scanner)(context.Background(), &sql.Conn{}, migrator.NilVersion, LowercaseEmailsVersion)
+
+	require.NoError(t, err)
+	assert.Nil(t, scanner.conn, "nothing is read")
 }

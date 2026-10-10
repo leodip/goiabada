@@ -2,6 +2,7 @@ package migrator
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"time"
 
@@ -34,10 +35,28 @@ func (noProgress) WaitingForLock()                       {}
 func (noProgress) Migrating(int, int, int)               {}
 func (noProgress) Migrated(int, int, int, time.Duration) {}
 
+// BeforeMigrating is a check a starting process makes before its schema moves: UpToHead runs it
+// under the migration lock, once it has read a clean recorded version and found files to apply, and
+// before the first of them. recorded is that version, NilVersion for a database never migrated,
+// and target is head. A non-nil answer stops the start with nothing written: not migrated, not
+// dirty.
+//
+// Under the lock, so the check reads a schema no other process is moving. Before the lock, a server
+// starting while another migrated the same database could read a version mid-chain, dirty included,
+// and then the tables a file was still creating, and fail its start on a read of half a schema,
+// which several replicas starting at once on an empty database did (#542 decision 2).
+//
+// conn is the runner's connection, the one holding the lock, and a check reads on it rather than
+// through the pool: on SQLite it is the pool's only connection, so a read through the pool would
+// wait for it for ever.
+type BeforeMigrating func(ctx context.Context, conn *sql.Conn, recorded, target int) error
+
 // UpToHead is the one way a starting process brings its database to head: Up, with "nothing to
 // do" answered as (false, nil) and every failure explained by StartupRefusal. migrated reports
 // whether any migration ran, so the caller, which owns the startup record, can say so; nothing
-// here logs. progress is told what happens on the way, and may be nil.
+// here logs. progress is told what happens on the way, and may be nil. beforeMigrating, which may
+// be nil, is run under the lock before any file is, and a refusal from it is answered as a
+// failure.
 //
 // ctx is the start's: its end cancels a wait, for a connection or for the migration lock, and
 // stops the chain between two files, answered as StoppedError and not wrapped as a refusal, since
@@ -51,11 +70,12 @@ func (noProgress) Migrated(int, int, int, time.Duration) {}
 //
 // The wrap is the text each engine's own Migrate used before this replaced the four of them, so
 // what an operator reads when a start is refused did not move (#438).
-func (m *Migrator) UpToHead(ctx context.Context, goiabadaVersion string, progress Progress) (migrated bool, err error) {
+func (m *Migrator) UpToHead(ctx context.Context, goiabadaVersion string, progress Progress,
+	beforeMigrating BeforeMigrating) (migrated bool, err error) {
 	if progress == nil {
 		progress = noProgress{}
 	}
-	err = m.up(ctx, progress)
+	err = m.up(ctx, progress, beforeMigrating)
 	if IsNoChange(err) {
 		return false, nil
 	}

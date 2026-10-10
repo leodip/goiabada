@@ -84,14 +84,15 @@ func (m *Migrator) Version(ctx context.Context) (version int, dirty bool, err er
 // migrated: the recorded version is simply not among its files, and running its own chain from
 // there would apply migrations that have already been applied.
 func (m *Migrator) Up(ctx context.Context) error {
-	return m.up(ctx, noProgress{})
+	return m.up(ctx, noProgress{}, nil)
 }
 
 // up is Up, telling progress what it does: the wait for the lock, if there is one, and the
 // migration around its files, if there are any. Nothing is reported for a database at head,
 // which the caller learns from ErrNoChange, or after a file fails, since the schema did not reach
-// head.
-func (m *Migrator) up(ctx context.Context, progress Progress) error {
+// head. beforeMigrating, when there is one, runs once there is something to migrate, under the
+// lock and before the first file; its refusal is up's answer, with nothing written.
+func (m *Migrator) up(ctx context.Context, progress Progress, beforeMigrating BeforeMigrating) error {
 	return m.run(ctx, progress, func(ctx context.Context, conn *sql.Conn) error {
 		current, err := m.currentVersion(ctx, conn)
 		if err != nil {
@@ -101,6 +102,11 @@ func (m *Migrator) up(ctx context.Context, progress Progress) error {
 		steps, err := m.stepsFrom(current, head)
 		if err != nil {
 			return err
+		}
+		if beforeMigrating != nil {
+			if err := beforeMigrating(ctx, conn, current, head); err != nil {
+				return err
+			}
 		}
 		progress.Migrating(current, head, len(steps))
 		started := time.Now()

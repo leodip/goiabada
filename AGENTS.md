@@ -67,8 +67,8 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/{encryption,passwordhash,oidc,rsakey,urlmatch,uuid}/` - The authserver-only utilities #360 moved out of `core`: AES and bcrypt, discovery metadata, RSA key generation, redirect-URI and origin predicates, UUIDs (#360); `oidc` also holds the grant type list every grant-type reader consults and the `amr` values (#437); the encrypted id_token_hint's JWE, keyed from a client secret and sharing nothing with the data cipher, left `encryption` for `internal/idtokenhint` (#434)
 - `internal/record/` - The persistence records (Client, User, Permission, Group, etc.), one struct per table: no cryptography, no claim construction, and nothing imported but the standard library, `core/builtin` and `core/errs` (#359, #387, #442)
 - `internal/data/` - The composition-only `Database` interface, `commondb/`, the four engine adapters, and the generated `Database` mock that every narrow port is tested through (#354, #359, #386)
-- `internal/data/datafactory/` - Database composition: engine selection, config mapping, the email-case pre-flight, the startup data tasks (#353, #438)
-- `internal/bootstrap/` - The first run: which of the three bootstrap modes applies, and the seed, whose 18 writes commit in one transaction with the bootstrap file published only after it (#424)
+- `internal/data/datafactory/` - Database composition: engine selection, config mapping, the email-case pre-flight, which the migrator runs under its lock on its own connection (#542), the startup data tasks (#353, #438)
+- `internal/bootstrap/` - The first run: which of the three bootstrap modes applies, and the seed, whose 18 writes commit in one transaction with the bootstrap file published only after it (#424). A seed that loses an empty database to another instance seeding it at once (a unique key, and the database now reads as seeded) carries on as a later start would (#542)
 - `internal/server/routes.go` - All route definitions
 - `web/template/` - HTML templates
 - `tests/integration/` - Integration tests

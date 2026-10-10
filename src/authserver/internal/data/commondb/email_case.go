@@ -2,6 +2,8 @@ package commondb
 
 import (
 	"context"
+	"database/sql"
+
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
@@ -23,11 +25,33 @@ import (
 // that makes it a collision. It runs once per upgrade, before the migration chain, and never
 // again afterwards.
 func (d *Database) ScanEmailCase(ctx context.Context) ([]record.EmailCaseRow, error) {
+	return d.scanEmailCase(func(query string, args []any) (*sql.Rows, error) {
+		return d.QuerySQL(ctx, nil, query, args...)
+	})
+}
+
+// ScanEmailCaseOn is ScanEmailCase read on conn: the migration runner's own connection, which holds
+// the migration lock while a starting server runs the pre-flight under it (#542 decision 2). On
+// SQLite that connection is the pool's only one, so the read must go through it rather than the
+// pool, which would wait for it for ever.
+func (d *Database) ScanEmailCaseOn(ctx context.Context, conn *sql.Conn) ([]record.EmailCaseRow, error) {
+	return d.scanEmailCase(func(query string, args []any) (*sql.Rows, error) {
+		d.log(ctx, query)
+		rows, err := conn.QueryContext(ctx, query, args...)
+		if err != nil {
+			return nil, d.wrapSQLError(err, "unable to execute SQL")
+		}
+		return rows, nil
+	})
+}
+
+// scanEmailCase is the read both run, through query.
+func (d *Database) scanEmailCase(query func(query string, args []any) (*sql.Rows, error)) ([]record.EmailCaseRow, error) {
 	sb := sqlbuilder.NewSelectBuilder()
 	sb.Select("id", "email", "LOWER(email)").From("users")
-	query, args := sb.BuildWithFlavor(d.Flavor)
+	statement, args := sb.BuildWithFlavor(d.Flavor)
 
-	rows, err := d.QuerySQL(ctx, nil, query, args...)
+	rows, err := query(statement, args)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query users for the email case pre-flight")
 	}
