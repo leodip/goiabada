@@ -1163,6 +1163,14 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_OtpEnabled(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Mandatory(t)
 
+	// As in the OtpDisabled case above: the client's level is a floor acr_values never lowers
+	// (#240), so the request is at level 2 optional only once the client is.
+	client.DefaultAcrLevel = record.AcrLevel2Optional
+	err := database.UpdateClient(context.Background(), nil, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Ensure OTP is enabled for the user
 	if !user.OTPEnabled {
 		t.Fatal("Expected user to have OTP enabled")

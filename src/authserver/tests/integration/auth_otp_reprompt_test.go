@@ -239,6 +239,32 @@ func TestOtpCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
 	assert.Equal(t, "/auth/issue", where,
 		"a level 2 optional sign-in asks a user with no authenticator for no code")
 
+	// That sign-in answered the moved generation, which a silent request at the same client shows:
+	// before the answer it would be sent back with interaction_required. Without this, ceremony
+	// three reaching the OTP form would not tell the fix from a promotion that never happened,
+	// since an unanswered generation sends it there too.
+	silentUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + optionalClient.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(optionalRedirectUri.URI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + fake.LetterN(43) +
+		"&scope=openid" +
+		"&state=" + fake.LetterN(8) +
+		"&prompt=none"
+	silent, err := httpClient.Get(silentUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = silent.Body.Close()
+	silentLocation, err := url.Parse(silent.Header.Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Empty(t, silentLocation.Query().Get("error"),
+		"the level 2 optional sign-in must have answered the moved generation")
+	assert.Equal(t, "/auth/issue", silentLocation.Path,
+		"a silent request that passes every check goes on to issue its code")
+
 	// Ceremony three, at the level 3 client, is the whole point.
 	where, page, _ = authorizeOnExistingSession(t, httpClient, client, redirectUri)
 	defer func() { _ = page.Body.Close() }()
