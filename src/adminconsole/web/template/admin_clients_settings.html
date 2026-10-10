@@ -12,7 +12,7 @@
     var originalClientIdentifier = "{{.storedClient.ClientIdentifier}}";
     var originallyEnabled = {{if .storedClient.Enabled}}true{{else}}false{{end}};
     var isSystemLevel = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
-    var originallyAllowedAdministrativeScopes = {{if .client.AdministrativeScopesAllowed}}true{{else}}false{{end}};
+    var originallyAllowedAdministrativeScopes = {{if .storedClient.AdministrativeScopesAllowed}}true{{else}}false{{end}};
 
     document.addEventListener("DOMContentLoaded", function() {
         const btnSave = document.getElementById("btnSave");
@@ -32,22 +32,19 @@
             }
         }
 
-        // Allowing a client makes it an administrator client, so switching the allowance on asks
-        // first; switching it off does not.
-        const btnSaveAdministrativeScopes = document.getElementById("btnSaveAdministrativeScopes");
+        // Allowing a client makes it an administrator client, so a save that switches the allowance
+        // on asks first; one that switches it off, or leaves it, does not.
         const administrativeScopesAllowed = document.getElementById("administrativeScopesAllowed");
-        const formAdministrativeScopes = document.getElementById("formAdministrativeScopes");
-        if (btnSaveAdministrativeScopes) {
-            btnSaveAdministrativeScopes.addEventListener("click", function(event) {
-                if (!originallyAllowedAdministrativeScopes && administrativeScopesAllowed.checked) {
-                    event.preventDefault();
-                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
-                        dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" }}"]),
-                        function() { /* cancel */ },
-                        function() { formAdministrativeScopes.submit(); }
-                    );
-                }
-            });
+        function confirmAllowanceThenSubmit() {
+            if (!originallyAllowedAdministrativeScopes && administrativeScopesAllowed && administrativeScopesAllowed.checked) {
+                showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
+                    dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" }}"]),
+                    function() { /* cancel */ },
+                    function() { submitForm(); }
+                );
+            } else {
+                submitForm();
+            }
         }
 
         if(btnSave) {
@@ -59,17 +56,17 @@
                     function() {
                     },
                     function() {
-                        submitForm();
+                        confirmAllowanceThenSubmit();
                     });
                 } else if(originallyEnabled && enabledDisabled.checked === false) {
                     showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.settings.modal.disabled_warning" }}"]),
                     function() {
                     },
                     function() {
-                        submitForm();
+                        confirmAllowanceThenSubmit();
                     });
                 } else {
-                    submitForm();
+                    confirmAllowanceThenSubmit();
                 }
             });
         }
@@ -196,7 +193,7 @@
                         </div>
                     </span>
                 </label>
-                <select class="select select-bordered" name="defaultAcrLevel" >
+                <select class="w-full select select-bordered" name="defaultAcrLevel" >
                     <option value="urn:goiabada:level1" {{if eq .client.DefaultAcrLevel "urn:goiabada:level1"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_clients.settings.acr_level1" }}</option>
                     <option value="urn:goiabada:level2_optional" {{if eq .client.DefaultAcrLevel "urn:goiabada:level2_optional"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_clients.settings.acr_level2_optional" }}</option>
                     <option value="urn:goiabada:level2_mandatory" {{if eq .client.DefaultAcrLevel "urn:goiabada:level2_mandatory"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_clients.settings.acr_level2_mandatory" }}</option>
@@ -231,9 +228,8 @@
                 </label>
             </div>
 
-            <!-- The allowance belongs to formAdministrativeScopes, below the settings form, through
-                 the form attribute: it is saved on its own route by its own Save, never by the
-                 settings form's (#499 decision 5). -->
+            <!-- Saved by the form's one Save: the console writes it to the auth server's own route for
+                 it, which only authserver:manage may write, when it changed (#499, #542). -->
             <div class="w-full mt-6 form-control">
                 <label class="cursor-pointer label">
                     <span class="label-text">
@@ -249,22 +245,17 @@
                         </div>
                     </span>
                     <input id="administrativeScopesAllowed" type="checkbox" name="administrativeScopesAllowed"
-                        form="formAdministrativeScopes" class="ml-2 toggle"
-                        {{if .client.AdministrativeScopesAllowed}}checked{{end}} {{if .client.IsSystemLevelClient}}disabled{{end}} />
+                        class="ml-2 toggle"
+                        {{if .client.AdministrativeScopesAllowed}}checked{{end}} {{if or .client.IsSystemLevelClient (not $.isAdmin)}}disabled{{end}} />
                 </label>
                 {{if .client.IsSystemLevelClient}}
                 <p class="mt-1 text-sm">{{ T $.ctx "adminconsole.admin_clients.settings.administrative_scopes_always_allowed" }}</p>
+                {{else if not $.isAdmin}}
+                <p class="mt-1 text-sm">{{ T $.ctx "adminconsole.admin_clients.settings.administrative_scopes_manage_only" }}</p>
                 {{end}}
                 {{if .administrativeScopesError}}
                 <p class="mt-2 text-right text-error">{{.administrativeScopesError}}</p>
                 {{end}}
-                {{if .administrativeScopesSaved}}
-                <p class="mt-2 text-right text-success">&#10004; {{ T $.ctx "adminconsole.admin_clients.settings.administrative_scopes_saved" }}</p>
-                {{end}}
-                <div class="mt-2 text-right">
-                    <button id="btnSaveAdministrativeScopes" type="submit" form="formAdministrativeScopes"
-                        class="btn btn-primary" {{if .client.IsSystemLevelClient}}disabled{{end}}>{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
-                </div>
             </div>
 
             <div class="w-full mt-6 form-control">
@@ -372,8 +363,6 @@
     </div>
 
 </form>
-
-<form id="formAdministrativeScopes" method="post" action="/admin/clients/{{.client.ClientId}}/settings/administrative-scopes"></form>
 
 {{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
 

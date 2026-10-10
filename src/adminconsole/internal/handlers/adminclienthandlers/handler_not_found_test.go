@@ -42,6 +42,10 @@ func (*notFoundClientApiClient) UpdateClient(context.Context, string, int64, *ap
 	panic("unexpected call to UpdateClient")
 }
 
+func (*notFoundClientApiClient) UpdateClientAdministrativeScopes(context.Context, string, int64, *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
+	panic("UpdateClientAdministrativeScopes is not part of this test")
+}
+
 func TestClient_StaleOrMalformedUrlAnswers404(t *testing.T) {
 	const routePattern = "/admin/clients/{clientId}/settings"
 

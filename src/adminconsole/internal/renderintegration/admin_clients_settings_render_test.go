@@ -24,45 +24,51 @@ import (
 // allowanceSwitchRe matches the administrative scopes switch, whatever order its attributes come in.
 var allowanceSwitchRe = regexp.MustCompile(`<input id="administrativeScopesAllowed"[^>]*>`)
 
-// allowanceFormRe matches the allowance's own form element.
-var allowanceFormRe = regexp.MustCompile(`<form id="formAdministrativeScopes"[^>]*>`)
-
-// allowanceSaveRe matches the allowance's own Save button.
-var allowanceSaveRe = regexp.MustCompile(`<button id="btnSaveAdministrativeScopes"[^>]*>`)
+// buttonRe matches every button the page draws.
+var buttonRe = regexp.MustCompile(`<button[^>]*>`)
 
 func renderClientSettings(t *testing.T, client adminclienthandlers.ClientSettings, extra map[string]interface{}) string {
 	t.Helper()
-	bind := map[string]interface{}{"client": client, "storedClient": client, "savedSuccessfully": false}
+	// isAdmin as the renderer binds it for an administrator holding authserver:manage; a case
+	// rendering for anyone else overrides it.
+	bind := map[string]interface{}{"client": client, "storedClient": client, "savedSuccessfully": false, "isAdmin": true}
 	for k, v := range extra {
 		bind[k] = v
 	}
 	return renderMenuPage(t, "/admin_clients_settings.html", bind)
 }
 
-// The allowance is a switch of its own on the Settings tab, under Consent required, in its own form
-// posting to its own route, with its own Save: the settings form's Save never carries it, so a
-// settings save cannot switch it either way (#499 decision 5).
-func TestRender_AdminClientSettings_TheAllowanceHasItsOwnForm(t *testing.T) {
+// The allowance is a field of the settings form, under Consent required, saved by the tab's one Save
+// (#542). It had a Save of its own in the middle of the form, which saved it alone and reloaded the
+// page, dropping every other change; nothing here may bring a second form or a second Save back.
+func TestRender_AdminClientSettings_TheAllowanceIsSavedByTheTabsOneSave(t *testing.T) {
 	out := renderClientSettings(t, adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "ops-tool"}, nil)
 
-	form := allowanceFormRe.FindString(out)
-	require.NotEmpty(t, form, "the allowance's form is rendered")
-	assert.Contains(t, form, `method="post"`)
-	assert.Contains(t, form, `action="/admin/clients/7/settings/administrative-scopes"`)
+	formStart := strings.Index(out, `<form id="formClientSettings"`)
+	require.NotEqual(t, -1, formStart, "the settings form is rendered")
+	formEnd := strings.Index(out[formStart:], "</form>") + formStart
+	assert.NotContains(t, out, "formAdministrativeScopes", "no form of the allowance's own")
+	assert.NotContains(t, out, "/settings/administrative-scopes", "and no route of its own")
 
 	toggle := allowanceSwitchRe.FindString(out)
 	require.NotEmpty(t, toggle, "the switch is rendered")
 	assert.Contains(t, toggle, `name="administrativeScopesAllowed"`)
-	assert.Contains(t, toggle, `form="formAdministrativeScopes"`, "the switch belongs to its own form, not the settings form")
+	assert.NotContains(t, toggle, `form=`, "the switch belongs to the settings form")
+	switchAt := strings.Index(out, `id="administrativeScopesAllowed"`)
+	assert.True(t, switchAt > formStart && switchAt < formEnd, "inside the settings form")
 
-	save := allowanceSaveRe.FindString(out)
-	require.NotEmpty(t, save, "the allowance has its own Save")
-	assert.Contains(t, save, `form="formAdministrativeScopes"`)
+	var saves []string
+	for _, button := range buttonRe.FindAllString(out, -1) {
+		if !strings.Contains(button, `id="btnSave"`) && strings.Contains(button, "btn-primary") && !strings.Contains(button, "modal") {
+			saves = append(saves, button)
+		}
+	}
+	assert.Empty(t, saves, "no primary button but the one Save")
+	assert.Equal(t, 1, strings.Count(out, `id="btnSave"`))
 
 	assert.Contains(t, out, "Pode solicitar escopos administrativos", "the label, in pt-BR")
 
 	consentAt := strings.Index(out, `name="consentRequired"`)
-	switchAt := strings.Index(out, `id="administrativeScopesAllowed"`)
 	showLogoAt := strings.Index(out, `name="showLogo"`)
 	require.NotEqual(t, -1, consentAt)
 	require.NotEqual(t, -1, showLogoAt)
@@ -70,9 +76,8 @@ func TestRender_AdminClientSettings_TheAllowanceHasItsOwnForm(t *testing.T) {
 	assert.Less(t, switchAt, showLogoAt, "and before the next setting")
 }
 
-// The switch shows the stored allowance: on for an allowed client, off for one that is not, and for
-// the admin console's own client on and disabled, with its Save disabled and a sentence saying why
-// (#499 decision 5).
+// The switch shows the allowance: on for an allowed client, off for one that is not, and for the
+// admin console's own client on and disabled, with a sentence saying why (#499 decision 5).
 func TestRender_AdminClientSettings_TheSwitchShowsTheAllowance(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -108,34 +113,39 @@ func TestRender_AdminClientSettings_TheSwitchShowsTheAllowance(t *testing.T) {
 			require.NotEmpty(t, toggle, "the switch is rendered")
 			assert.Equal(t, tc.wantChecked, strings.Contains(toggle, "checked"), "checked: %s", toggle)
 			assert.Equal(t, tc.wantDisabled, strings.Contains(toggle, "disabled"), "disabled: %s", toggle)
-
-			save := allowanceSaveRe.FindString(out)
-			require.NotEmpty(t, save)
-			assert.Equal(t, tc.wantDisabled, strings.Contains(save, "disabled"), "the Save: %s", save)
-
 			assert.Equal(t, tc.wantDisabled, strings.Contains(out, alwaysAllowed))
 		})
 	}
 }
 
-// A refused switch and a saved one are each announced beside the allowance's Save, in their own
-// slots, so neither reads as the outcome of the settings form.
-func TestRender_AdminClientSettings_TheAllowanceAnswersBesideItsOwnSave(t *testing.T) {
+// A refused allowance is shown beside the switch, and the settings, written before it, as saved.
+func TestRender_AdminClientSettings_ARefusedAllowanceIsShownBesideTheSwitch(t *testing.T) {
 	client := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "ops-tool"}
 
-	refused := renderClientSettings(t, client, map[string]interface{}{
+	out := renderClientSettings(t, client, map[string]interface{}{
+		"savedSuccessfully":         true,
 		"administrativeScopesError": "Only authserver:manage may switch this.",
 	})
-	assert.Contains(t, refused, "Only authserver:manage may switch this.")
-	assert.NotContains(t, refused, "Configurações do cliente salvas com sucesso")
 
-	saved := renderClientSettings(t, client, map[string]interface{}{"administrativeScopesSaved": true})
-	assert.Contains(t, saved, "Autorização para escopos administrativos salva com sucesso")
-	assert.NotContains(t, saved, "Configurações do cliente salvas com sucesso",
-		"the settings form was not saved")
+	refusalAt := strings.Index(out, "Only authserver:manage may switch this.")
+	require.NotEqual(t, -1, refusalAt)
+	assert.Greater(t, refusalAt, strings.Index(out, `id="administrativeScopesAllowed"`), "under the switch")
+	assert.Less(t, refusalAt, strings.Index(out, `name="showLogo"`), "and before the next setting")
+	assert.Contains(t, out, "Configurações do cliente salvas com sucesso")
+}
 
-	settingsSaved := renderClientSettings(t, client, map[string]interface{}{"savedSuccessfully": true})
-	assert.NotContains(t, settingsSaved, "Autorização para escopos administrativos salva com sucesso")
+// The question asked before a save that switches the allowance on compares against the stored
+// allowance, not the switch as a refused save drew it again: otherwise the second save of the same
+// switch would ask nothing.
+func TestRender_AdminClientSettings_TheSwitchingOnQuestionComparesWithTheStoredAllowance(t *testing.T) {
+	typed := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "ops-tool", AdministrativeScopesAllowed: true}
+	stored := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "ops-tool"}
+
+	out := renderMenuPage(t, "/admin_clients_settings.html", map[string]interface{}{
+		"client": typed, "storedClient": stored, "savedSuccessfully": false,
+	})
+
+	assert.Contains(t, out, `var originallyAllowedAdministrativeScopes = false;`)
 }
 
 // identifierInputRe matches the client identifier input, whatever order its attributes come in.
@@ -200,6 +210,12 @@ func (s *settingsTabAPI) GetClientById(_ context.Context, _ string, _ int64) (*a
 func (s *settingsTabAPI) UpdateClient(_ context.Context, _ string, _ int64,
 	_ *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
 	return nil, &apiclient.APIError{Code: "VALIDATION_ERROR", Message: s.refusal, StatusCode: http.StatusBadRequest}
+}
+
+// UpdateClientAdministrativeScopes is never reached: the settings' write before it is refused.
+func (s *settingsTabAPI) UpdateClientAdministrativeScopes(_ context.Context, _ string, _ int64,
+	_ *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
+	return nil, &apiclient.APIError{Code: "UNEXPECTED", Message: "the allowance was written after a refused save", StatusCode: http.StatusInternalServerError}
 }
 
 // postClientSettings drives the Settings tab's save through the real renderer, in pt-BR, and
@@ -271,4 +287,22 @@ func TestRender_AdminClientSettings_ARefusedSaveKeepsASelfRegisteredIdentifierRe
 	require.NotEmpty(t, input)
 	assert.Contains(t, input, "readonly")
 	assert.Contains(t, out, selfRegisteredIdentifierLine)
+}
+
+// For an administrator without authserver:manage the switch is drawn disabled, with a sentence saying
+// who can change it, since the auth server would refuse the change (#499 decision 4).
+func TestRender_AdminClientSettings_WithoutManageTheSwitchIsDisabled(t *testing.T) {
+	const manageOnly = "Somente um administrador com authserver:manage pode alterar isto."
+	client := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "ops-tool", AdministrativeScopesAllowed: true}
+
+	out := renderClientSettings(t, client, map[string]interface{}{"isAdmin": false})
+	toggle := allowanceSwitchRe.FindString(out)
+	require.NotEmpty(t, toggle)
+	assert.Contains(t, toggle, "disabled")
+	assert.Contains(t, toggle, "checked", "it still shows the allowance")
+	assert.Contains(t, out, manageOnly)
+
+	asManager := renderClientSettings(t, client, nil)
+	assert.NotContains(t, allowanceSwitchRe.FindString(asManager), "disabled")
+	assert.NotContains(t, asManager, manageOnly)
 }

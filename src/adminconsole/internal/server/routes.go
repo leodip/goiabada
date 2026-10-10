@@ -144,7 +144,6 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.Get("/clients", adminclienthandlers.HandleListGet(httpHelper, apiClient))
 		r.Get("/clients/{clientId}/settings", adminclienthandlers.HandleSettingsGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/clients/{clientId}/settings", adminclienthandlers.HandleSettingsPost(httpHelper, s.sessionStore, apiClient, baseURL))
-		r.Post("/clients/{clientId}/settings/administrative-scopes", adminclienthandlers.HandleAdministrativeScopesPost(httpHelper, s.sessionStore, apiClient, baseURL))
 		r.Get("/clients/{clientId}/tokens", adminclienthandlers.HandleTokensGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/clients/{clientId}/tokens", adminclienthandlers.HandleTokensPost(httpHelper, s.sessionStore, apiClient, baseURL))
 		r.Get("/clients/{clientId}/authentication", adminclienthandlers.HandleAuthenticationGet(httpHelper, s.sessionStore, apiClient))

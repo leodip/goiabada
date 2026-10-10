@@ -13,7 +13,7 @@ That's [two-factor authentication](/concepts/glossary/#two-factor-authentication
 
 <Steps>
 
-1. In the admin console, open your client under **Admin**, **Clients**. On the **Settings** tab, set **Default ACR level** to **ACR level 3 - password + mandatory OTP**, which is `urn:goiabada:level2_mandatory`, and click the **Save** at the bottom of the tab. The **Save** just under **May request administrative scopes** saves that switch alone. Sign-ins that start after the change use it.
+1. In the admin console, open your client under **Admin**, **Clients**. On the **Settings** tab, set **Default ACR level** to **ACR level 3 - password + mandatory OTP**, which is `urn:goiabada:level2_mandatory`, and click **Save**. Sign-ins that start after the change use it.
 
 2. Sign in to your app as a user with no authenticator. After the password, the sign-in page asks you to set one up: scan the QR code with an authenticator app, then enter the code it shows. From then on, a sign-in that starts a new session asks for your password and then a code. While your session lasts, it's reused: signing in to your app again, or to another app at the same level, asks for neither. A request that asks for a fresh sign-in, with `prompt=login`, asks for both, whatever the session already gave. See [Users who are already signed in](#users-who-are-already-signed-in).
 
@@ -42,7 +42,7 @@ The admin console signs administrators in through its own client, `admin-console
 
 1. Set up an authenticator for yourself first, under **Account**, **Two-factor authentication**. That way you know it works before it's required.
 
-2. Open **Admin**, **Clients**, `admin-console-client`, and on the **Settings** tab set **Default ACR level** to **ACR level 3 - password + mandatory OTP**, then click the **Save** at the bottom of the tab. Only an administrator with `authserver:manage` can change this client.
+2. Open **Admin**, **Clients**, `admin-console-client`, and on the **Settings** tab set **Default ACR level** to **ACR level 3 - password + mandatory OTP**, then click **Save**. Only an administrator with `authserver:manage` can change this client.
 
 3. The next time each administrator signs in to the admin console, they're asked for a code, and one without an authenticator sets one up first.
 

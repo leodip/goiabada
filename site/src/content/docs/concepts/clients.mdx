@@ -152,7 +152,7 @@ The ACR level is how strongly a user must sign in to use the client:
 | `urn:goiabada:level2_optional` | ACR level 2 - password + OTP (if enabled by the user) | A password, plus a one-time code if they've set up two-factor authentication |
 | `urn:goiabada:level2_mandatory` | ACR level 3 - password + mandatory OTP | A password and a one-time code, setting up two-factor authentication first if they haven't |
 
-New clients start at `urn:goiabada:level2_optional`. The field shows only while **Authorization code with PKCE** is on. Change it on the client's **Settings** tab and click the **Save** at the bottom of the tab: the **Save** just under **May request administrative scopes** saves that switch alone, and the page reloads without your change.
+New clients start at `urn:goiabada:level2_optional`. The field shows only while **Authorization code with PKCE** is on. Change it on the client's **Settings** tab and click **Save**.
 
 The default is a floor. An authorization request can ask for a stronger level with `acr_values`, but never a weaker one: the auth server uses the stronger of the two. A change applies to sign-ins that start after it. See [ACR and AMR](/concepts/acr-and-amr/).
 
@@ -161,7 +161,7 @@ The default is a floor. An authorization request can ask for a stronger level wi
 Six permissions on the `authserver` resource let whoever holds them administer Goiabada: `authserver:manage`, `authserver:admin-read`, `authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings` and `authserver:browser-sessions`. A token carrying one of them on a user's behalf acts at the Admin API with that user's authority. So **only a client allowed to request the administrative scopes may get one**:
 
 - **The admin console's own client,** always. Its allowance can't be switched off.
-- **Any other client you allow.** Turn on **May request administrative scopes** on the client's **Settings** tab, save it with that switch's own **Save** button, and confirm with **Yes**, or call [the Admin API](/reference/api/admin/operations/updateclientadministrativescopes/). Only an administrator with `authserver:manage` can switch it, on or off.
+- **Any other client you allow.** Turn on **May request administrative scopes** on the client's **Settings** tab, click **Save**, and confirm with **Yes**, or call [the Admin API](/reference/api/admin/operations/updateclientadministrativescopes/). Only an administrator with `authserver:manage` can switch it, on or off. Any other administrator can still save the tab's other settings: the switch is saved only when it changed, and otherwise the page says the settings were saved and shows the refusal under the switch.
 
 Every other client starts not allowed, including one that registers itself, which has no way to ask.
 
