@@ -124,18 +124,24 @@ func TestServeAndDrain_CancellationWaitsForTheHeldRequest(t *testing.T) {
 	var workerStops int
 	var recordsWhenTheWorkerStopped []string
 	var answeredWhenTheWorkerStopped bool
-	afterDrain := func() {
+	afterDrain := func() bool {
 		workerStops++
 		if workerStops == 1 {
 			recordsWhenTheWorkerStopped = messages(logs.Records())
 			answeredWhenTheWorkerStopped = held.answered.Load()
 		}
+		return true
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	returned := make(chan error, 1)
-	go func() { returned <- serveAndDrain(ctx, []listener{served}, afterDrain) }()
+	var drained bool
+	go func() {
+		var err error
+		drained, err = serveAndDrain(ctx, []listener{served}, httpShutdownTimeout, afterDrain)
+		returned <- err
+	}()
 
 	response := requestInBackground(served.server.Addr)
 	waitFor(t, held.entered, "the request to reach the handler")
@@ -157,6 +163,7 @@ func TestServeAndDrain_CancellationWaitsForTheHeldRequest(t *testing.T) {
 
 	require.NoError(t, waitFor(t, returned, "serveAndDrain to return"),
 		"a cancellation is a clean stop, and http.ErrServerClosed from the drained listener is not a failure")
+	assert.True(t, drained, "every request finished and the background work stopped, so the database may close")
 
 	assert.Equal(t, 1, workerStops, "the worker is stopped once")
 	assert.True(t, answeredWhenTheWorkerStopped, "the worker must stop only after the listeners have drained")
@@ -166,6 +173,55 @@ func TestServeAndDrain_CancellationWaitsForTheHeldRequest(t *testing.T) {
 	records := logs.Records()
 	assert.Equal(t, []string{"shutdown signal received", "listeners drained", "shutdown complete"}, messages(records))
 	assertNoErrorRecord(t, records)
+}
+
+// A request still running when the shutdown timeout ends is not drained: Shutdown returns at its
+// deadline and leaves the handler running, so serveAndDrain says so, and main leaves the database
+// open for the process exit rather than close the pool under that handler (#542 review). The
+// background work still stops, and the shutdown is still said complete.
+func TestServeAndDrain_ARequestOutlivingTheTimeoutIsNotDrained(t *testing.T) {
+	logtest.CaptureSlog(t)
+
+	held := newHeldHandler()
+	served := servedOnLoopback(t, held)
+	defer close(held.release)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	var afterDrainRan atomic.Bool
+	type result struct {
+		drained bool
+		err     error
+	}
+	returned := make(chan result, 1)
+	go func() {
+		drained, err := serveAndDrain(ctx, []listener{served}, 100*time.Millisecond,
+			func() bool { afterDrainRan.Store(true); return true })
+		returned <- result{drained, err}
+	}()
+
+	_ = requestInBackground(served.server.Addr)
+	waitFor(t, held.entered, "the request to reach the handler")
+	cancel()
+
+	got := waitFor(t, returned, "serveAndDrain to return at the shutdown timeout")
+	require.NoError(t, got.err, "a timed-out drain is reported as not drained, not as a listener failure")
+	assert.False(t, got.drained, "a handler still running may still use the database")
+	assert.True(t, afterDrainRan.Load(), "the background work is stopped all the same")
+}
+
+// Background work that outlives its own timeouts is not drained either: afterDrain says so, and
+// serveAndDrain passes it on with every listener drained.
+func TestServeAndDrain_BackgroundWorkOutlivingItsTimeoutIsNotDrained(t *testing.T) {
+	logtest.CaptureSlog(t)
+
+	served := servedOnLoopback(t, newHeldHandler())
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	drained, err := serveAndDrain(ctx, []listener{served}, httpShutdownTimeout, func() bool { return false })
+
+	require.NoError(t, err)
+	assert.False(t, drained, "a job or a sweep still running may still use the database")
 }
 
 // A listener that fails is no reason to cut off what the other one is answering: the function drains
@@ -191,7 +247,9 @@ func TestServeAndDrain_AFailedListenerDrainsTheOtherFirst(t *testing.T) {
 	var workerStops atomic.Int32
 	returned := make(chan error, 1)
 	go func() {
-		returned <- serveAndDrain(context.Background(), []listener{healthy, failing}, func() { workerStops.Add(1) })
+		_, err := serveAndDrain(context.Background(), []listener{healthy, failing}, httpShutdownTimeout,
+			func() bool { workerStops.Add(1); return true })
+		returned <- err
 	}()
 
 	response := requestInBackground(healthy.server.Addr)
@@ -234,9 +292,10 @@ func TestStart_WithNoListenerRefusesBeforeStartingAnything(t *testing.T) {
 	cfg.AuthServer.ListenHostHttps, cfg.AuthServer.ListenHostHttp = "", ""
 
 	s := &Server{cfg: cfg}
-	err := s.Start(context.Background())
+	drained, err := s.Start(context.Background())
 
 	require.Error(t, err)
+	assert.True(t, drained, "nothing started, so nothing is using the database")
 	assert.Contains(t, err.Error(), "no listener is enabled")
 	assert.Contains(t, err.Error(), "auth server", "the refusal names the binary it stops")
 	assertNoErrorRecord(t, logs.Records())
@@ -256,8 +315,9 @@ func TestStopBackgroundWork_WaitsForTheJobsInFlight(t *testing.T) {
 	})
 
 	stopped := make(chan struct{})
+	var done bool
 	go func() {
-		s.stopBackgroundWork()
+		done = s.stopBackgroundWork()
 		close(stopped)
 	}()
 
@@ -270,4 +330,5 @@ func TestStopBackgroundWork_WaitsForTheJobsInFlight(t *testing.T) {
 	close(release)
 	waitFor(t, stopped, "the shutdown to finish once the job did")
 	assert.True(t, finished.Load(), "the job ran to its end before the shutdown finished")
+	assert.True(t, done, "the job finished and the worker had nothing running, so the database may close")
 }

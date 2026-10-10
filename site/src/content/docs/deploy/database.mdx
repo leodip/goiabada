@@ -73,7 +73,7 @@ The auth server runs as uid 10001, so the directory holding the file must be wri
 
 ### Back up and restore SQLite
 
-While the auth server runs, part of the database is in `goiabada.db-wal` beside `goiabada.db`, so a copy of the file alone, or a copy taken while it writes, isn't a backup. Stop the auth server first: a clean stop writes everything into `goiabada.db` and removes the other two files. Copy the whole directory anyway, since a server that was killed rather than stopped leaves them, and they belong to the backup then.
+While the auth server runs, part of the database is in `goiabada.db-wal` beside `goiabada.db`, so a copy of the file alone, or a copy taken while it writes, isn't a backup. Stop the auth server first: a clean stop writes everything into `goiabada.db` and removes the other two files. Copy the whole directory anyway, since a stop that wasn't clean leaves them, and they belong to the backup then: a server that was killed, or one whose requests or background work outlived its shutdown timeouts, which leaves the database to the process exit rather than close it under them.
 
 <Tabs syncKey="platform">
 <TabItem label="Docker Compose">

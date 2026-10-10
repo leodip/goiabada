@@ -125,7 +125,12 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionsto
 // returning. It returns nil after a
 // cancellation, and otherwise the error, unlogged: main writes the one record for it and owns the
 // exit, so nothing below main decides to end the process (#426, #390).
-func (s *Server) Start(ctx context.Context) error {
+//
+// drained reports whether nothing that uses the database is still running when it returns: every
+// request finished within the shutdown timeout, and so did the handed-off work and the worker. main
+// closes the database only then. A refusal before anything started has started nothing, so it is
+// drained too.
+func (s *Server) Start(ctx context.Context) (drained bool, err error) {
 	httpsHost := s.cfg.AuthServer.ListenHostHttps
 	httpsPort := s.cfg.AuthServer.ListenPortHttps
 	certFile := s.cfg.AuthServer.CertFile
@@ -169,7 +174,7 @@ func (s *Server) Start(ctx context.Context) error {
 	// Refused before anything starts: the worker would otherwise be left running, and the routes
 	// half built, behind a process that is about to exit.
 	if !httpsEnabled && !httpEnabled {
-		return errs.New("no listener is enabled, so the auth server cannot start: configure at least one of the http and https listeners")
+		return true, errs.New("no listener is enabled, so the auth server cannot start: configure at least one of the http and https listeners")
 	}
 
 	s.registerRoutes()
@@ -208,7 +213,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	s.worker.Start()
 
-	return serveAndDrain(ctx, listeners, s.stopBackgroundWork)
+	return serveAndDrain(ctx, listeners, httpShutdownTimeout, s.stopBackgroundWork)
 }
 
 // metricsHandler is the metrics listener's whole handler: a mux of its own answering GET /metrics
@@ -262,12 +267,16 @@ func (s *Server) registerRoutes() {
 // is a request's unfinished business, a forgot-password request's code, record and mail, which a
 // graceful stop should not lose. They are given the shutdown timeout the requests themselves were
 // given, and one still running after it is left to the process's exit (#404 decision 8).
-func (s *Server) stopBackgroundWork() {
-	if !s.jobs.Wait(httpShutdownTimeout) {
+//
+// It reports whether both finished: false means a job or a sweep may still be using the database.
+func (s *Server) stopBackgroundWork() bool {
+	jobsDone := s.jobs.Wait(httpShutdownTimeout)
+	if !jobsDone {
 		slog.Warn("the work handed off after responses did not finish within the timeout, continuing shutdown",
 			"timeout", httpShutdownTimeout)
 	}
-	s.worker.Stop(workerStopTimeout)
+	workerDone := s.worker.Stop(workerStopTimeout)
+	return jobsDone && workerDone
 }
 
 // listener is one of Start's servers and the call that serves it, which is ListenAndServe or
@@ -289,7 +298,13 @@ type listener struct {
 // naming its address. http.ErrServerClosed is what a drained listener's serve call returns, so it is
 // never a failure. It writes no record of the failure: main writes the one record for whatever
 // Start returns (#426).
-func serveAndDrain(ctx context.Context, listeners []listener, afterDrain func()) error {
+//
+// drained reports whether everything stopped: every listener shut down within shutdownTimeout, so
+// no handler is still running, and afterDrain reported its own work done. Shutdown returns at its
+// deadline with handlers still running, so a false here means something may still be using the
+// database, and main leaves it open for the process exit rather than close it under them.
+func serveAndDrain(ctx context.Context, listeners []listener, shutdownTimeout time.Duration,
+	afterDrain func() bool) (drained bool, err error) {
 	// Buffered for every listener, so a serve goroutine never blocks on a send nobody receives.
 	failures := make(chan error, len(listeners))
 	var serving sync.WaitGroup
@@ -312,12 +327,14 @@ func serveAndDrain(ctx context.Context, listeners []listener, afterDrain func())
 		slog.InfoContext(ctx, "shutdown signal received")
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), httpShutdownTimeout)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
+	drained = true
 	for _, l := range listeners {
-		if err := l.server.Shutdown(shutdownCtx); err != nil {
-			slog.ErrorContext(ctx, "unable to shut down a listener", "address", l.server.Addr, "error", err)
+		if shutdownErr := l.server.Shutdown(shutdownCtx); shutdownErr != nil {
+			drained = false
+			slog.ErrorContext(ctx, "unable to shut down a listener", "address", l.server.Addr, "error", shutdownErr)
 		}
 	}
 	slog.InfoContext(ctx, "listeners drained")
@@ -330,10 +347,12 @@ func serveAndDrain(ctx context.Context, listeners []listener, afterDrain func())
 		failed = append(failed, err)
 	}
 
-	afterDrain()
+	if !afterDrain() {
+		drained = false
+	}
 	slog.InfoContext(ctx, "shutdown complete")
 
-	return errs.Join(failed...)
+	return drained, errs.Join(failed...)
 }
 
 // newHTTPServer builds one of Start's listeners, unstarted. The address comes from hostport.Join,

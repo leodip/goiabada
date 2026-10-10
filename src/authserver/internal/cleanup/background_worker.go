@@ -125,9 +125,12 @@ func (w *Worker) Start() {
 // waited out (#386). The wait stays bounded anyway, because what the driver does with a
 // cancellation is the driver's to decide and shutdown is not the place to find out. Stop is also
 // safe to call more than once, and safe to call on a worker that was never started.
-func (w *Worker) Stop(timeout time.Duration) {
+//
+// It reports whether the worker stopped: false means a sweep may still be using the database,
+// so the caller must not close it.
+func (w *Worker) Stop(timeout time.Duration) bool {
 	if w.cancel == nil {
-		return
+		return true
 	}
 
 	w.cancel()
@@ -135,9 +138,11 @@ func (w *Worker) Stop(timeout time.Duration) {
 	select {
 	case <-w.done:
 		slog.Info("background worker service stopped")
+		return true
 	case <-time.After(timeout):
 		slog.Warn("the background worker did not stop within the timeout, continuing shutdown",
 			"timeout", timeout)
+		return false
 	}
 }
 

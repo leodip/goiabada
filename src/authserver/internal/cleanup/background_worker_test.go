@@ -240,14 +240,14 @@ func TestWorker_StopBeforeStartIsANoOp(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	worker := New(mockDB, metrics.NewRegistry())
 
-	done := make(chan struct{})
+	done := make(chan bool, 1)
 	go func() {
-		worker.Stop(5 * time.Second)
-		close(done)
+		done <- worker.Stop(5 * time.Second)
 	}()
 
 	select {
-	case <-done:
+	case stopped := <-done:
+		assert.True(t, stopped, "a worker that never started has nothing left running")
 	case <-time.After(2 * time.Second):
 		t.Fatal("Stop must return immediately when the worker was never started")
 	}
@@ -286,7 +286,7 @@ func TestWorker_StopWaitsForTheRunLoop(t *testing.T) {
 
 	finished := make(chan struct{})
 	go func() {
-		worker.Stop(5 * time.Second)
+		assert.True(t, worker.Stop(5*time.Second), "a run loop that finished is reported stopped")
 		close(finished)
 	}()
 
@@ -308,9 +308,10 @@ func TestWorker_StopGivesUpAfterTheTimeout(t *testing.T) {
 	worker.done = make(chan struct{}) // never closed
 
 	start := time.Now()
-	worker.Stop(200 * time.Millisecond)
+	stopped := worker.Stop(200 * time.Millisecond)
 	elapsed := time.Since(start)
 
+	assert.False(t, stopped, "a run loop still running after the timeout is reported, so the database stays open")
 	assert.GreaterOrEqual(t, elapsed, 200*time.Millisecond, "Stop must wait for the timeout")
 	assert.Less(t, elapsed, 3*time.Second, "Stop must not wait past the timeout")
 }

@@ -197,11 +197,19 @@ func run() int {
 		return 1
 	}
 	slog.Info("created database connection")
-	// Closed on every return from here, after the server has drained, its handed-off work and its
-	// cleanup worker have stopped, which Start guarantees before it returns. On SQLite that is
-	// what checkpoints the WAL into goiabada.db, so a stopped server leaves the database in one
-	// file (#542).
-	defer closeDatabase(database)
+	// Closed on every return from here once nothing uses it: on a startup path nothing has, and
+	// after the server only when Start reports its requests, its handed-off work and its cleanup
+	// worker all finished. On SQLite the close is what checkpoints the WAL into goiabada.db, so a
+	// stopped server leaves the database in one file (#542). A stop whose work outlived its
+	// timeouts leaves the database to the process exit instead: closing the pool under that work
+	// would only turn its next query into an error a moment before the exit ends it, and SQLite
+	// replays the WAL at the next start.
+	closeOnReturn := true
+	defer func() {
+		if closeOnReturn {
+			closeDatabase(database)
+		}
+	}()
 
 	// An empty database is seeded here, in the mode the configuration selects, before the server
 	// listens. A seed commits whole or not at all and the next start retries it (#386, #424), so a
@@ -287,10 +295,15 @@ func run() int {
 		return stopCleanly()
 	}
 
-	// The server just gets told when to stop. Start has already drained whatever it started by the
-	// time it returns an error, and logs none of them: this is the one record, and the one exit,
-	// for all of them (#426).
-	if err := s.Start(signalled); err != nil {
+	// The server just gets told when to stop. Start has drained whatever it started by the time it
+	// returns, says whether all of it finished in time, and logs no error: this is the one record,
+	// and the one exit, for all of them (#426).
+	drained, err := s.Start(signalled)
+	if !drained {
+		closeOnReturn = false
+		slog.Warn("work using the database outlived the shutdown, so the database is left to the process exit")
+	}
+	if err != nil {
 		slog.Error("the auth server stopped on an error", "error", err)
 		return 1
 	}
