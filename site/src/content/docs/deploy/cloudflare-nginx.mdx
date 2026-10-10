@@ -41,10 +41,10 @@ You need a domain on Cloudflare, a server with Docker and Nginx, two hostnames u
 
 5. **Have Nginx resolve Cloudflare's addresses,** so Goiabada sees each client's address rather than Cloudflare's. [Cloudflare + Nginx](/deploy/client-ip-and-proxy-trust/#cloudflare--nginx) on Client IP and proxy trust has the file to write.
 
-6. **Open only 80 and 443,** besides SSH. With ufw:
+6. **Open only 80 and 443,** besides SSH. With ufw, allow the port your SSH server listens on first, so turning the firewall on keeps your session. `sudo ss -tlnp | grep sshd` shows it; it's 22 unless you changed it:
 
    ```bash
-   sudo ufw allow OpenSSH   # first, so turning the firewall on keeps your SSH session
+   sudo ufw allow 22/tcp    # your SSH port
    sudo ufw allow 80/tcp
    sudo ufw allow 443/tcp
    sudo ufw enable

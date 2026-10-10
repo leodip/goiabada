@@ -92,8 +92,10 @@ func (s *Server) initRoutes(branches appBranches) {
 	pages.NotFound(handlers.HandleNotFoundGet(httpHelper))
 	pages.Get("/", handlers.HandleIndexGet(adminConsoleBaseURL))
 	pages.Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
-	pages.Get(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordGet(httpHelper))
-	pages.With(rateLimiter.LimitForgotPwd).Post(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL))
+	// The email check runs ahead of the limiter, so a request refused for email being off spends
+	// no budget and is never answered 429 (#542).
+	pages.With(accounthandlers.ForgotPasswordRequiresEmail(httpHelper)).Get(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordGet(httpHelper))
+	pages.With(accounthandlers.ForgotPasswordRequiresEmail(httpHelper), rateLimiter.LimitForgotPwd).Post(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL))
 	// The two endpoints an emailed link points at register from the constants the links are
 	// built from, so a link and the endpoint it names cannot drift apart (#112, #434).
 	pages.With(rateLimiter.LimitResetPwd).Get(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
