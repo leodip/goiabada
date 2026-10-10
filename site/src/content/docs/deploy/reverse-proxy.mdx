@@ -141,14 +141,24 @@ You need a server with Docker and Nginx, two hostnames under one domain, such as
    sudo nginx -t && sudo systemctl reload nginx
    ```
 
-5. **Open only 80 and 443,** besides SSH. With ufw, allow your SSH port first, so turning the firewall on keeps your access. The port your current session came in on is the last field of `$SSH_CONNECTION`; `sudo ss -tlnp` lists every listening port, where SSH shows as `sshd`, or as `systemd` on a host that starts it through socket activation, as recent Ubuntu releases do.
+5. **Open only 80 and 443,** besides SSH. With ufw, allow your SSH port first, so turning the firewall on keeps your access.
+
+   Set `SSH_PORT` to the port your SSH server listens on. In an SSH session, it's the last field of `$SSH_CONNECTION`:
 
    ```bash
-   echo "${SSH_CONNECTION##* }"          # your SSH port
-   sudo ufw allow <your-ssh-port>/tcp
-   sudo ufw allow 80/tcp
-   sudo ufw allow 443/tcp
-   sudo ufw enable
+   SSH_PORT="${SSH_CONNECTION##* }"; echo "SSH port: ${SSH_PORT:-unknown}"
+   ```
+
+   If that prints `unknown`, or you're in a `sudo -i` or `su` shell, at a console, or in a tmux, screen or mosh session, which can keep an old value, look the port up and set it yourself, such as `SSH_PORT=2222`. `sudo ss -tlnp` shows SSH listening as `sshd`, or as `systemd` on a host that starts it through socket activation, as recent Ubuntu releases do, where `systemctl cat ssh.socket` shows its `ListenStream`.
+
+   Then add the rules. Nothing changes unless `SSH_PORT` is a port, and each command runs only if the one before it succeeded:
+
+   ```bash
+   if [[ "$SSH_PORT" =~ ^[0-9]+$ ]]; then
+     sudo ufw allow "$SSH_PORT"/tcp && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw enable
+   else
+     echo "SSH_PORT isn't set to a port; nothing was changed."
+   fi
    ```
 
    Before you close this session, open a second SSH connection to check that you still get in. ufw comes with Ubuntu; on Debian, `sudo apt-get install ufw` first, or open the same ports in the firewall you use.
