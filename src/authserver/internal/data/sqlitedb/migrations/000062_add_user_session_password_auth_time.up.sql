@@ -9,8 +9,12 @@
 -- It can't be recovered for a session already stored: for every session that stepped up, auth_time
 -- is the code's. So every session is ended and its user signs in again. Each row's
 -- user_session_clients go with it (ON DELETE CASCADE); refresh tokens bound to a session stop, as
--- they do when it expires, and offline ones are kept. Emptying the table first is also what lets
--- the column be added NOT NULL with no default, on SQLite as on the other three engines.
+-- they do when it expires, and offline ones are kept. A code issued just before the upgrade can
+-- still be redeemed: its claims are those of the sign-in that issued it, which did happen.
+--
+-- Emptying the table first is what lets SQLite add the column NOT NULL with no default. SQLite is
+-- one process, so nothing can insert between the two. The other three engines order it the other
+-- way for a rolling upgrade, as the mysql migration of the same number explains.
 DELETE FROM user_sessions;
 
 ALTER TABLE user_sessions ADD COLUMN password_auth_time DATETIME NOT NULL;

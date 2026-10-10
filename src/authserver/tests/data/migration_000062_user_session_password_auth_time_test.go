@@ -30,6 +30,11 @@ const (
 //  2. user_sessions.password_auth_time exists, NOT NULL, and a session written at head round-trips it.
 //  3. The down migration drops the column and keeps the sessions written since, and 000062 applies
 //     again after it.
+//  4. A session inserted as the previous release inserts one, naming no password_auth_time, is
+//     refused once 000062 has run, rather than stored with a time nobody entered: during a rolling
+//     upgrade that release goes on serving while this one migrates, and its sign-ins fail until it
+//     stops. The migration itself never fails on a row that release wrote, which is why the server
+//     engines add the column with a default they drop at once and delete the sessions last.
 //
 // Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
 //
@@ -76,6 +81,16 @@ func TestMigration000062_UserSessionPasswordAuthTime(t *testing.T) {
 	// 2.
 	column := dumpTable(t, h, "user_sessions").column(t, "password_auth_time")
 	assert.Falsef(t, column.Nullable, "user_sessions.password_auth_time must be NOT NULL on %s", dbType())
+	// 4.
+	const ts = "'2026-01-01 00:00:00'"
+	_, err := h.SQL.Exec(fmt.Sprintf(`INSERT INTO user_sessions
+		(session_identifier, started, last_accessed, auth_methods, acr_level, auth_time,
+		 ip_address, device_name, device_type, device_os, user_agent, user_id)
+		VALUES ('%s', %s, %s, 'pwd', 'urn:goiabada:level1', %s, '127.0.0.1', 'device', 'Desktop', 'Linux', '', %d)`,
+		fake.UUID(), ts, ts, ts, user.Id))
+	assert.Errorf(t, err, "4. a session naming no password_auth_time is refused on %s", dbType())
+	assert.Zerof(t, count000062(t, h, "user_sessions"), "4. and nothing is stored on %s", dbType())
+
 	written := seedSession()
 	read, err := h.DB.GetUserSessionById(ctx, nil, written.Id)
 	require.NoError(t, err)
