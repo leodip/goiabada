@@ -213,6 +213,8 @@ type resetPasswordDatabase interface {
 	revocation.Database
 
 	GetUserByForgotPasswordCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*record.User, error)
+	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string, passwordHash string) (bool, error)
 }
 
@@ -505,7 +507,24 @@ func HandleResetPasswordPost(
 		// Reset revokes everything, with no exceptSid: whoever is resetting a forgotten
 		// password is not necessarily the person holding the live sessions, which is the
 		// stolen-laptop case this issue exists for.
+		var wasVerified bool
 		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", func(tx *sql.Tx) error {
+			// The claim below also marks the address verified, and whether that verified it, the
+			// verified_email entry, is read here, under the user's row: taken first, as a
+			// credential change takes it, so an administrator's edit of the same address can't
+			// land between this read and the claim. Read from the row the handler loaded before
+			// the transaction, it could: an unverify meanwhile left a verification with no entry,
+			// a verify meanwhile two entries. Assigned on every attempt, since a deadlock reruns
+			// the body.
+			if acquireErr := database.AcquireUserRow(r.Context(), tx, user.Id); acquireErr != nil {
+				return acquireErr
+			}
+			current, readErr := database.GetUserById(r.Context(), tx, user.Id)
+			if readErr != nil {
+				return readErr
+			}
+			wasVerified = current == nil || current.EmailVerified
+
 			claimed, consumeErr := database.TryConsumeForgotPasswordCode(r.Context(), tx, user.Id, marker.CodeHash, passwordHash)
 			if consumeErr != nil {
 				return consumeErr
@@ -535,8 +554,8 @@ func HandleResetPasswordPost(
 		// changes. That changes something only for the link an administrator emails a new
 		// user, whose address isn't verified yet; a forgot-password link only goes to a
 		// verified one. It is recorded as the account page's verification is, so the audit log
-		// says when and how an address became verified.
-		if !user.EmailVerified {
+		// says when and how an address became verified, from the state the transaction read.
+		if !wasVerified {
 			auditLogger.Log(r.Context(), audit.EventVerifiedEmail, map[string]interface{}{
 				"user_id": user.Id,
 			})
