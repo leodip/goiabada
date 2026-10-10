@@ -21,14 +21,14 @@ That's [single sign-on](/concepts/glossary/#single-sign-on-sso), and there's not
 
 4. In the same browser, open the second app and start its sign-in, as an ordinary authorization request. The auth server finds the session and sends the browser straight back with a code, without showing a page. The second app redeems the code for tokens of its own.
 
-5. To sign the user in to the second app without even a click, send a silent request from it when its first page loads. Add `prompt=none` and redirect the whole page, rather than loading it in a hidden iframe, where browsers that block third-party cookies leave the session cookie out:
+5. To sign the user in to the second app without even a click, send a silent request from it when its first page loads. Add `prompt=none` and redirect the whole page, rather than loading it in a hidden iframe: the session cookie is `SameSite=Lax`, so a request from a frame on another site never carries it, and the auth server's pages refuse to be framed:
 
    ```http
    GET /auth/authorize?client_id=second-app&redirect_uri=https%3A%2F%2Fsecond.example.com%2Fcallback&response_type=code&scope=openid%20profile&prompt=none&code_challenge=...&code_challenge_method=S256&state=... HTTP/1.1
    Host: auth.example.com
    ```
 
-   A code means the user is signed in. `login_required` means there's no session to use, so show your sign-in button. See [prompt](/concepts/prompt/#check-for-a-session-silently).
+   A code means the user is signed in. `login_required` means there's no session to use, so show your sign-in button. Any other error, such as `interaction_required` or `consent_required`, means the user has a page to see: send them through the same request without `prompt=none`. See [prompt](/concepts/prompt/#check-for-a-session-silently).
 
 </Steps>
 
@@ -37,9 +37,9 @@ That's [single sign-on](/concepts/glossary/#single-sign-on-sso), and there's not
 A session saves the user their password, not every step. A sign-in through it still shows a page when:
 
 - **The second app needs a stronger sign-in.** When its [ACR level](/concepts/acr-and-amr/) is higher than the session reached, the user enters only what the new level adds, usually a one-time code. That's a [step-up](/concepts/acr-and-amr/#a-session-thats-already-there), and the session keeps the higher level afterwards.
-- **The second app asks for consent.** With **Consent required** on, or when it asks for `offline_access`, the user sees the consent screen. Consent is given to each client on its own, so approving the first app doesn't approve the second. See [Clients](/concepts/clients/#consent-required).
-- **The request asks for a password.** `prompt=login`, a `max_age` shorter than the time since the user last entered their password, or an `id_token_hint` naming another user each ask for the password whatever the session. See [prompt](/concepts/prompt/#promptlogin) and [Sessions](/concepts/sessions/#ask-for-a-recent-sign-in).
-- **The session can't be used.** It has been idle too long or reached its maximum lifetime, so the user signs in again. See [How long a session lasts](/concepts/sessions/#how-long-a-session-lasts). A user who has been disabled can't sign in at all: the request ends with `access_denied`.
+- **The second app asks for consent.** With **Consent required** on and no earlier approval from the user covering every scope, or whenever it asks for `offline_access`, the user sees the consent screen. Consent is given to each client on its own, so approving the first app doesn't approve the second. See [Clients](/concepts/clients/#consent-required).
+- **The request asks for a password.** `prompt=login`, a `max_age` shorter than the time since the user last entered a credential (`auth_time`), or an `id_token_hint` naming another user each ask for the password whatever the session, and for a one-time code whenever the level needs one. See [prompt](/concepts/prompt/#promptlogin) and [Sessions](/concepts/sessions/#ask-for-a-recent-sign-in).
+- **The session can't be used.** It has been idle too long or reached its maximum lifetime, so the user signs in again. See [How long a session lasts](/concepts/sessions/#how-long-a-session-lasts). A user who has been disabled can't use a session: disabling them ends their sessions, so their next sign-in answers "Your user account is disabled." once the right password is entered, and a silent request gets `login_required`.
 
 ## How long it lasts
 
@@ -56,7 +56,7 @@ The auth server doesn't tell your other apps about a sign-out. Each one keeps it
 To end the session for every app at once, the user signs out with no hint and confirms on the sign-out page. Every app's normal refresh tokens from the session stop working; offline ones keep working. Ending the session under **Account**, **Sessions** in the admin console goes further and revokes them all, offline ones included. See [Ending sessions](/concepts/ending-sessions/).
 
 <Aside>
-Every sign-in that reuses a session, silent requests included, leaves a `bumped_user_session` entry in the [audit log](/concepts/audit-log/) naming the user and the client, so you can see which apps a session reached.
+Every sign-in that reuses a session, silent requests included, leaves a `bumped_user_session` entry in the [audit log](/concepts/audit-log/) naming the user and the client, so you can see which apps the user's sessions reached. A refresh with a refresh token that isn't offline leaves one too.
 </Aside>
 
 ## Next steps
