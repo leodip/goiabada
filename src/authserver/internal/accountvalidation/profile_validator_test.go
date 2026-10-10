@@ -881,3 +881,21 @@ func TestValidateProfile_FullyPopulatedValidProfile(t *testing.T) {
 
 	assert.NoError(t, err)
 }
+
+// A name's 48 is also counted in UTF-16 code units, what SQL Server's nvarchar(64) name columns
+// hold. Thirty-three Deseret letters are 33 code points, within the shape's 48, but 66 units, past
+// the column's 64: until the review before 1.7.0 the name passed here and the write failed on SQL
+// Server with a database error. Forty-eight é, one unit each, are still a valid name.
+func TestValidateName_CountsUTF16Units(t *testing.T) {
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
+
+	require.NoError(t, validator.ValidateName(strings.Repeat("é", 48), i18n.ErrCodeProfileGivenNameInvalid))
+
+	err := validator.ValidateName(strings.Repeat("\U00010400", 33), i18n.ErrCodeProfileGivenNameInvalid)
+	var localized *i18n.LocalizedError
+	require.ErrorAs(t, err, &localized)
+	assert.Equal(t, i18n.ErrCodeProfileGivenNameInvalid, localized.Code)
+
+	require.NoError(t, validator.ValidateName(strings.Repeat("\U00010400", 24), i18n.ErrCodeProfileGivenNameInvalid),
+		"24 Deseret letters are 48 units, at the bound")
+}
