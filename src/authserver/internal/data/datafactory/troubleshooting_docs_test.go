@@ -65,8 +65,9 @@ func sqliteBelowHead(t *testing.T) int {
 
 // sqliteWithWALFilesAt writes a SQLite database migrated to version into a directory of its own,
 // beside the -wal and -shm files a server that never closed it leaves, and answers its path. They
-// are copied while the database is still open, which is the state the auth server leaves its
-// directory in when it stops: it does not close the database, so SQLite never removes them.
+// are copied while the database is still open, which is the state an auth server leaves its
+// directory in when it is killed or crashes: a server that stops cleanly closes the database, and
+// SQLite then removes them.
 func sqliteWithWALFilesAt(t *testing.T, version int) string {
 	t.Helper()
 	source := filepath.Join(t.TempDir(), "goiabada.db")
@@ -148,10 +149,10 @@ func TestReadonlyDatabasePage_QuotesWhatAStartAnswers(t *testing.T) {
 		assert.NoError(t, startSQLite(t, dsn), "a start that writes nothing is not refused, so the first request that writes is")
 	})
 
-	// What a volume written by root looks like after the auth server has run there once: the WAL's
-	// files are already there, so a directory SQLite cannot create them in costs nothing at the
-	// connection, and the start goes on to its first write like a read-only file does (#542 live
-	// check). The page used to give this directory the first refusal alone.
+	// What a volume written by root looks like when the last auth server there was killed rather
+	// than stopped: the WAL's files are still there, so a directory SQLite cannot create them in
+	// costs nothing at the connection, and the start goes on to its first write like a read-only
+	// file does (#542 live check). The page used to give this directory the first refusal alone.
 	t.Run("a directory and files the server cannot write, beside the WAL's files, with nothing to migrate", func(t *testing.T) {
 		dsn := sqliteWithWALFilesAt(t, sqliteHead(t))
 		for _, suffix := range []string{"", "-wal", "-shm"} {
@@ -162,7 +163,7 @@ func TestReadonlyDatabasePage_QuotesWhatAStartAnswers(t *testing.T) {
 		t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
 
 		require.NoError(t, startSQLite(t, dsn), "a directory already holding the WAL's files is not refused at the connection")
-		assert.Contains(t, page, "neither does a read-only directory that already holds the files SQLite keeps beside the database",
+		assert.Contains(t, page, "neither does a read-only directory that still holds the files SQLite keeps beside the database",
 			"the page says a start over such a directory is not refused")
 	})
 }

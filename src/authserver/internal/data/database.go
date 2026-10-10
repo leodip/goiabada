@@ -26,6 +26,9 @@ import (
 // The generated mock is of this interface and of no port, which is what lets a handler declaring a
 // three-method port still be tested with the double every other test uses (#386 decision 12).
 type Database interface {
+	// Close closes the connection pool. The process calls it once, after everything that uses the
+	// database has stopped; on SQLite it checkpoints the WAL into the database file.
+	Close() error
 	BeginTransaction(ctx context.Context) (*sql.Tx, error)
 	CommitTransaction(ctx context.Context, tx *sql.Tx) error
 	RollbackTransaction(ctx context.Context, tx *sql.Tx) error

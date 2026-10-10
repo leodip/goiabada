@@ -14,6 +14,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -196,6 +197,11 @@ func run() int {
 		return 1
 	}
 	slog.Info("created database connection")
+	// Closed on every return from here, after the server has drained, its handed-off work and its
+	// cleanup worker have stopped, which Start guarantees before it returns. On SQLite that is
+	// what checkpoints the WAL into goiabada.db, so a stopped server leaves the database in one
+	// file (#542).
+	defer closeDatabase(database)
 
 	// An empty database is seeded here, in the mode the configuration selects, before the server
 	// listens. A seed commits whole or not at all and the next start retries it (#386, #424), so a
@@ -291,6 +297,15 @@ func run() int {
 
 	slog.Info("auth server stopped")
 	return 0
+}
+
+// closeDatabase closes the database once the process is done with it. A close that fails stops
+// nothing, since the process is ending; on SQLite it leaves the WAL beside the database, which the
+// next start reads, so it is a warning.
+func closeDatabase(database io.Closer) {
+	if err := database.Close(); err != nil {
+		slog.Warn("unable to close the database", "error", err)
+	}
 }
 
 // watchStartup answers the context the startup steps run under, which ends when signalled does,

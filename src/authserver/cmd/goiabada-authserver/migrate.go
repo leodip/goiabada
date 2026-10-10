@@ -102,6 +102,8 @@ func migrateCommand(args []string, base config.DatabaseConfig, stdout, stderr io
 		outf(stderr, "unable to open the database: %+v\n", err)
 		return migrateExitError
 	}
+	// Closed when the subcommand ends, which on SQLite checkpoints the WAL the migrations wrote.
+	defer func() { _ = database.Close() }()
 
 	// Preparing the runner can wait for the migration lock too, on SQL Server, whose
 	// schema_migrations pre-create takes it on a database never migrated. The subcommand's output

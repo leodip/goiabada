@@ -11,12 +11,12 @@ This page helps you when the auth server can't write its SQLite database.
 
 The auth server stops right after it opens the database, and its log has `unable to create the database connection`, with one of these as its `error`:
 
-- `unable to connect to database: Attempt to write a readonly database (SQLITE_READONLY): attempt to write a readonly database (1544)`, when it can't write the **directory** holding the database file, where SQLite creates the files it keeps beside it, and those files aren't there yet.
+- `unable to connect to database: Attempt to write a readonly database (SQLITE_READONLY): attempt to write a readonly database (1544)`, when it can't write the **directory** holding the database file, where SQLite creates the files it keeps beside it. That's the usual case: an auth server that stops cleanly removes those files.
 - `unable to migrate the database: unable to clear schema_migrations: attempt to write a readonly database (8)`, when it can't write the **file**, and the new release has a migration to run.
 
 Under Docker Compose, the container restarts and stops again with the same record.
 
-When there's nothing to migrate, a read-only file doesn't stop the start, and neither does a read-only directory that already holds the files SQLite keeps beside the database, as it does after the auth server has run there once. The auth server starts, and every request that writes to the database fails instead, such as a sign-in, which shows the user an error page. Its error record ends in `attempt to write a readonly database (8)`, and so do the background cleanup's.
+When there's nothing to migrate, a read-only file doesn't stop the start, and neither does a read-only directory that still holds the files SQLite keeps beside the database, as it does when the last auth server there didn't stop cleanly: it was killed, for instance because its stop outlasted the platform's grace period, or it crashed. The auth server starts, and every request that writes to the database fails instead, such as a sign-in, which shows the user an error page. Its error record ends in `attempt to write a readonly database (8)`, and so do the background cleanup's.
 
 ## Why it happens
 
@@ -84,7 +84,7 @@ Change the owner of the whole directory, `-R` included. A database file you give
 
 ## Why it fails at the first write
 
-SQLite opens a file it can't write read-only rather than refusing it. A read-only database connects, so the auth server only finds out at its first write. On an upgrade, that's the migration's first step, recording the version it's about to apply, which is why the second message names `schema_migrations`. A directory it can't write fails sooner when the WAL files aren't there, since the database runs in WAL mode and SQLite can't create them. When they are, SQLite opens them read-only too, and the first write is again what fails.
+SQLite opens a file it can't write read-only rather than refusing it. A read-only database connects, so the auth server only finds out at its first write. On an upgrade, that's the migration's first step, recording the version it's about to apply, which is why the second message names `schema_migrations`. A directory it can't write fails sooner, since the database runs in WAL mode and SQLite can't create its WAL files. When an auth server that didn't stop cleanly left them there, SQLite opens them read-only too, and the first write is again what fails.
 
 The auth server checks nothing about the file's owner before it opens it. Nothing is written when a start fails this way, so the start after the fix migrates as usual.
 

@@ -210,6 +210,15 @@ func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []
 	if err != nil {
 		return nil, err
 	}
+	// A start that fails or is stopped past this point closes what it opened, so a SQLite
+	// migration a signal stopped part of the way leaves its WAL checkpointed, as a stopped server
+	// does. The caller owns the database only once it is returned.
+	opened := false
+	defer func() {
+		if !opened {
+			_ = database.Close()
+		}
+	}()
 
 	// One progress for the whole start: SQL Server's schema_migrations pre-create can wait for the
 	// migration lock before the runner does, and the start says it is waiting once.
@@ -252,6 +261,7 @@ func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []
 		return nil, err
 	}
 
+	opened = true
 	return database, nil
 }
 
