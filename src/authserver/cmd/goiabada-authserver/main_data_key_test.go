@@ -30,6 +30,8 @@ func TestMain_AKeyThatDoesNotOpenTheStoredDataStopsTheStart(t *testing.T) {
 	assert.Equal(t, "ERROR", refusal["level"])
 	assert.Contains(t, refusal["remedy"], "GOIABADA_AES_ENCRYPTION_KEY")
 	assert.Contains(t, refusal["remedy"], "backup")
+	assert.Contains(t, refusal["remedy"], "the last key the stored data was encrypted under",
+		"after a rotation, the key the database was set up with no longer opens it")
 	messages := messagesOf(records)
 	assert.NotContains(t, messages, "unable to create the database connection", "nor reported as a connection failure")
 	assert.NotContains(t, messages, "starting the http listener", "and it never listens")

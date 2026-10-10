@@ -83,7 +83,8 @@ func TestRunStartupDataTasks_ChecksTheKeyWithoutAUsablePreviousKey(t *testing.T)
 				err := runStartupDataTasks(context.Background(), db, currentKey, p.previous)
 				if st.mismatch {
 					require.ErrorIs(t, err, ErrDataKeyMismatch, "a key that opens nothing must stop the start")
-					assert.Contains(t, err.Error(), "GOIABADA_AES_ENCRYPTION_KEY")
+					assert.Equal(t, "the data encryption key check failed: the stored data does not decrypt under GOIABADA_AES_ENCRYPTION_KEY",
+						err.Error(), "the troubleshooting page quotes this text whole")
 				} else {
 					require.NoError(t, err)
 				}
@@ -170,10 +171,11 @@ func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 		err := runStartupDataTasks(context.Background(), db, currentKey, previousKey)
 
 		require.ErrorIs(t, err, ErrDataKeyMismatch, "re-keying data the process cannot prove it reads would corrupt it")
-		assert.Contains(t, err.Error(), "the data encryption key check failed")
-		assert.Contains(t, err.Error(),
-			"data-at-rest decrypts under neither GOIABADA_AES_ENCRYPTION_KEY nor GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS",
-			"the refusal names both variables, because one of them is what the operator has to fix")
+		assert.Equal(t, "the data encryption key check failed: "+
+			"data-at-rest decrypts under neither GOIABADA_AES_ENCRYPTION_KEY nor GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS: "+
+			"the stored data does not decrypt under GOIABADA_AES_ENCRYPTION_KEY", err.Error(),
+			"the refusal names both variables, because one of them is what the operator has to fix, "+
+				"and the troubleshooting page quotes this text whole")
 		db.AssertNotCalled(t, "ReencryptToKey", mock.Anything, mock.Anything, mock.Anything)
 	})
 
