@@ -181,10 +181,56 @@ func (w *wizard) chooseDeployment() error {
 	w.config.Deployment = target
 	// The files are placed here, before any step reports a secret, so each can say where it will be.
 	w.paths = resolveOutputPaths(target, w.flags.Output)
+	if err := w.confirmOverwrite(); err != nil {
+		return err
+	}
 	if !target.asksURLs {
 		w.config.AuthServerURL = "http://localhost:9090"
 		w.config.AdminConsoleURL = "http://localhost:9091"
 		w.defaultAdminEmail = "admin@example.com"
+	}
+	return nil
+}
+
+// confirmOverwrite stops before any other question when a file this run would write already exists.
+// Each holds the secrets of whatever deployment was set up from it, the AES key among them, and a
+// run writes newly generated ones over them: with no other copy of the old AES key, the data it
+// encrypts can never be read again, and new secrets applied to a running deployment break it at its
+// next restart, which on Kubernetes passes its health checks first (#542). So it warns in bold, and
+// an interactive run asks, defaulting to no; a run without prompts needs --overwrite.
+func (w *wizard) confirmOverwrite() error {
+	var existing []string
+	for _, path := range w.paths.files() {
+		if _, err := os.Lstat(path); err == nil {
+			existing = append(existing, path)
+		}
+	}
+	if len(existing) == 0 {
+		return nil
+	}
+	w.out.println()
+	w.out.printf("%s%s⚠️  THESE FILES ALREADY EXIST, AND THIS RUN OVERWRITES THEM:%s\n", w.out.bold, w.out.red, w.out.reset)
+	for _, path := range existing {
+		w.out.printf("%s%s     %s%s\n", w.out.bold, w.out.red, path, w.out.reset)
+	}
+	w.out.printf("%s   They hold the secrets of any deployment set up from them, its AES key among them,%s\n", w.out.bold, w.out.reset)
+	w.out.printf("%s   and this run writes newly generated ones. Without another copy of the old AES key,%s\n", w.out.bold, w.out.reset)
+	w.out.printf("%s   the data it encrypts can never be read again. Back the files up first, or write%s\n", w.out.bold, w.out.reset)
+	w.out.printf("%s   elsewhere with --output, and never apply the new secrets to a running deployment.%s\n", w.out.bold, w.out.reset)
+	w.out.println()
+	if !w.interactive {
+		if w.flags.Overwrite {
+			w.out.warning("--overwrite was given, so they are overwritten.")
+			return nil
+		}
+		return errs.New("the output files already exist: back them up and move them, choose another --output, or pass --overwrite")
+	}
+	overwrite, err := w.yesNo("Overwrite them?", false)
+	if err != nil {
+		return err
+	}
+	if !overwrite {
+		return errs.New("stopped before writing anything: back the files up and move them, or choose another --output")
 	}
 	return nil
 }
@@ -688,7 +734,7 @@ func (w *wizard) askDatabaseConnection() error {
 		testByDefault := true
 		if c.Deployment.kind == deploymentKubernetes && clusterInternalHost(c.DBHost) {
 			testByDefault = false
-			w.out.printf("%s resolves inside the cluster only:\n", c.DBHost)
+			w.out.printf("%s looks like a name only the cluster resolves:\n", c.DBHost)
 			w.out.println("a test from this machine fails even when the pods reach the database.")
 			w.out.println("The auth server's log says if it can't connect:")
 			w.out.printf("  kubectl logs -n %s deployment/goiabada-authserver\n", c.K8sNamespace)

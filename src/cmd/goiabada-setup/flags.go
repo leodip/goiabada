@@ -33,6 +33,7 @@ type CLIFlags struct {
 	DBPasswordFile    string
 	SkipDBTest        bool
 	NoColor           bool
+	Overwrite         bool
 	// LocalProxy is --local-proxy, read by native binaries alone.
 	LocalProxy optionalBool
 	// GatewayTrafficPolicy is --gateway-traffic-policy and NetworkPolicy --network-policy, read by
@@ -141,6 +142,7 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 	fs.StringVar(&flags.DBPasswordFile, "db-password-file", "", "Read the database password from a file, - for standard input")
 	fs.BoolVar(&flags.SkipDBTest, "skip-db-test", false, "Skip database connection test")
 	fs.BoolVar(&flags.NoColor, "no-color", false, "Disable colored output")
+	fs.BoolVar(&flags.Overwrite, "overwrite", false, "Overwrite output files that already exist, and the secrets in them")
 	fs.Var(&flags.GatewayTrafficPolicy, "gateway-traffic-policy", "Kubernetes: the traffic policy of Envoy Gateway's load balancer Service: cluster or local (default: cluster)")
 	fs.BoolVar(&flags.NetworkPolicy, "network-policy", false, "Kubernetes: admit only Envoy and the admin console to the servers with NetworkPolicies")
 	fs.Var(&flags.Metrics, "metrics", "Kubernetes: expose Prometheus metrics to a scraper finding them by: none, annotations or podmonitor (default: none)")
@@ -160,7 +162,8 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 		p("General Options:\n")
 		p("  -v, --version          Show version and exit\n")
 		p("  -o, --output PATH      Output file path (default: current directory)\n")
-		p("  --no-color             Disable colored output\n\n")
+		p("  --no-color             Disable colored output\n")
+		p("  --overwrite            Overwrite output files that already exist, and the secrets in them\n\n")
 		p("Deployment Options:\n")
 		p("  --type TYPE            Deployment type: %s\n", orList(deploymentNames()))
 		p("  --db TYPE              Database: %s\n", orList(engineNames()))

@@ -1507,7 +1507,7 @@ func TestWizard_DoesNotTestAClusterInternalHostByDefault(t *testing.T) {
 				t.Fatalf("setup: %v\n%s", err, out)
 			}
 			in.assertConsumed()
-			said := strings.Contains(out.String(), tc.host+" resolves inside the cluster only:")
+			said := strings.Contains(out.String(), tc.host+" looks like a name only the cluster resolves:")
 			if said != tc.internal {
 				t.Errorf("the wizard says the host resolves inside the cluster only: %v, want %v\n%s", said, tc.internal, out)
 			}
@@ -1527,6 +1527,7 @@ func TestClusterInternalHost(t *testing.T) {
 		"mysql.example.cluster.local":    true,
 		"db.internal":                    false,
 		"db.example.com":                 false,
+		"db.svc.example.com":             false,
 		"10.0.0.5":                       false,
 		"::1":                            false,
 		"":                               false,
@@ -1536,4 +1537,95 @@ func TestClusterInternalHost(t *testing.T) {
 			t.Errorf("clusterInternalHost(%q) = %v, want %v", host, got, want)
 		}
 	}
+}
+
+// A run that would write over its own earlier output warns in bold before any other question, since
+// those files hold the secrets a deployment was set up with, the AES key among them, and asks,
+// defaulting to no; without prompts it needs --overwrite. Refused, it leaves the files as they were
+// (#542).
+func TestWizard_AsksBeforeOverwritingItsOutput(t *testing.T) {
+	const previous = "# the previous run's secrets\n"
+	existing := func(t *testing.T) (dir, secrets string) {
+		dir = t.TempDir()
+		secrets = filepath.Join(dir, "goiabada-secrets.yaml")
+		if err := os.WriteFile(secrets, []byte(previous), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return dir, secrets
+	}
+	unchanged := func(t *testing.T, path string) {
+		t.Helper()
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(content) != previous {
+			t.Errorf("%s was written over after the refusal", path)
+		}
+	}
+	warned := func(t *testing.T, out string, path string) {
+		t.Helper()
+		if !strings.Contains(out, "ALREADY EXIST") || !strings.Contains(out, path) || !strings.Contains(out, "AES key") {
+			t.Errorf("no warning naming %s and the AES key:\n%s", path, out)
+		}
+	}
+
+	t.Run("interactive, Enter stops before any other question", func(t *testing.T) {
+		dir, secrets := existing(t)
+		steps := []scriptedStep{
+			{prompt: "Select deployment type [1-4]", answer: deployments[deploymentKubernetes].number},
+			{prompt: "Overwrite them? [y/N]: ", answer: ""},
+		}
+		w, in, out, _ := testWizard(t, &CLIFlags{Output: dir}, steps)
+		if err := w.setup(); err == nil {
+			t.Fatal("setup went on after the overwrite was refused")
+		}
+		in.assertConsumed()
+		warned(t, out.String(), secrets)
+		unchanged(t, secrets)
+	})
+
+	t.Run("interactive, y writes over them", func(t *testing.T) {
+		dir, secrets := existing(t)
+		d, e := deployments[deploymentKubernetes], testEngine("postgres")
+		steps := interactiveScript(d, e)
+		steps = append(steps[:1], append([]scriptedStep{{prompt: "Overwrite them? [y/N]: ", answer: "y"}}, steps[1:]...)...)
+		w, in, out, _ := testWizard(t, &CLIFlags{Output: dir}, steps)
+		if err := w.setup(); err != nil {
+			t.Fatalf("setup: %v\n%s", err, out)
+		}
+		in.assertConsumed()
+		content, err := os.ReadFile(secrets)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(content) == previous {
+			t.Error("the secrets file was not written after y")
+		}
+	})
+
+	t.Run("without prompts, it stops unless --overwrite", func(t *testing.T) {
+		dir, secrets := existing(t)
+		w, _, out, _ := testWizard(t, flagsFor(deploymentKubernetes, dir), nil)
+		err := w.setup()
+		if err == nil || !strings.Contains(err.Error(), "--overwrite") {
+			t.Fatalf("setup answered %v, want a refusal naming --overwrite", err)
+		}
+		warned(t, out.String(), secrets)
+		unchanged(t, secrets)
+
+		flags := flagsFor(deploymentKubernetes, dir)
+		flags.Overwrite = true
+		w, _, out, _ = testWizard(t, flags, nil)
+		if err = w.setup(); err != nil {
+			t.Fatalf("setup with --overwrite: %v\n%s", err, out)
+		}
+		content, err := os.ReadFile(secrets)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(content) == previous {
+			t.Error("--overwrite did not write the secrets file")
+		}
+	})
 }

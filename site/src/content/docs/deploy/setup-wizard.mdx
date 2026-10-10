@@ -82,7 +82,7 @@ The wizard keeps every secret in one file, and the rest of the configuration in 
 
 Every file the wizard writes can be read by its owner only. When it writes into a Git working tree, it warns you and prints the line to add to `.gitignore`. It never edits `.gitignore` itself.
 
-Running the wizard again replaces the files, with new secrets. A database seeded with the old ones can't be used with the new ones, so either start over with an empty database, or copy your existing secrets over the new ones, as [Secrets](/deploy/secrets/#when-a-secret-changes) describes.
+Running the wizard again where its files already are writes new secrets over them, so it warns first and asks before going on; without prompts, it stops unless you pass `--overwrite`. A database seeded with the old secrets can't be used with the new ones, and without another copy of the old AES key, the data it encrypts can never be read again. So back the files up first, then either start over with an empty database, or copy your existing secrets over the new ones, as [Secrets](/deploy/secrets/#when-a-secret-changes) describes. Never apply the new secrets file to a deployment that already runs.
 
 With `--output`, the files go into the directory it names. When it names a file instead, the secrets file is named after it: `compose.yaml` gets `compose.override.yaml`, and `my-k8s.yaml` gets `my-k8s-secrets.yaml`.
 
@@ -102,7 +102,7 @@ Pass `--type` and the wizard asks nothing: it takes every answer from the flags 
   --db-host=postgres.default.svc --db-password-file=/run/secrets/db-password
 ```
 
-Without `--type`, the wizard asks every question and reads only `--output` and `--no-color`.
+Without `--type`, the wizard asks every question and reads only `--output` and `--no-color`, and asks rather than reading `--overwrite`.
 
 Prefer a generated password, or a password file, to `--admin-password` and `--db-password`. A password on the command line lands in your shell history and, while the wizard runs, in the process list. A password file can be `-` to read standard input, and one trailing line break is dropped.
 
@@ -141,6 +141,7 @@ The wizard exits with 0 when it's done or when you abort it, 1 when it can't fin
 | `--local-proxy` | Native: `true` when a reverse proxy on the same machine forwards to Goiabada. Default: `true`. |
 | `--output`, `-o` | Where to write the files: a directory, or the name of the main file. Default: the current directory. |
 | `--no-color` | Turns off colored output. |
+| `--overwrite` | Without prompts: writes over output files that already exist, and the secrets in them. Without it, the wizard stops. |
 | `--version`, `-v` | Prints the wizard's version. |
 
 ## Next steps
