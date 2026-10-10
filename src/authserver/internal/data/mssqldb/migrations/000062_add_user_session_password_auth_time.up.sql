@@ -7,3 +7,6 @@ ALTER TABLE [user_sessions] ADD [password_auth_time] DATETIME2(6) NOT NULL
 ALTER TABLE [user_sessions] DROP CONSTRAINT [df_user_sessions_password_auth_time];
 
 DELETE FROM [user_sessions];
+
+-- Every code not yet redeemed is revoked with the sessions: see the sqlite migration.
+UPDATE [codes] SET [revoked] = 1 WHERE [used] = 0 AND [revoked] = 0;
