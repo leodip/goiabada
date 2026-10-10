@@ -10,10 +10,11 @@ import (
 // inputTag is one input element, which may span lines.
 var inputTag = regexp.MustCompile(`(?s)<input\b[^>]*>`)
 
-// autocompleteAttr and nameAttr read one attribute of an input element.
+// autocompleteAttr and nameAttr read one attribute of an input element. The attribute must follow
+// whitespace: a \b boundary also matched data-autocomplete and data-name, which a browser ignores.
 var (
-	autocompleteAttr = regexp.MustCompile(`\bautocomplete="([^"]*)"`)
-	nameAttr         = regexp.MustCompile(`\bname="([^"]*)"`)
+	autocompleteAttr = regexp.MustCompile(`\sautocomplete="([^"]*)"`)
+	nameAttr         = regexp.MustCompile(`\sname="([^"]*)"`)
 )
 
 // passwordFieldTokens are the autofill tokens a password field may carry (HTML Standard, 4.10.18.7,
@@ -82,5 +83,20 @@ func TestTemplates_EveryPasswordFieldNamesItsAutocomplete(t *testing.T) {
 				t.Errorf("%s: no input named %q, which this test pins", path, name)
 			}
 		}
+	}
+}
+
+// The matchers read the attributes a browser reads, and not a data- attribute that ends in the same
+// name.
+func TestAutocompleteMatchers_ReadOnlyTheRealAttributes(t *testing.T) {
+	if m := autocompleteAttr.FindStringSubmatch(`<input type="password" data-autocomplete="new-password" name="password">`); m != nil {
+		t.Errorf("data-autocomplete read as autocomplete: %v", m)
+	}
+	if m := nameAttr.FindStringSubmatch(`<input type="password" data-name="password">`); m != nil {
+		t.Errorf("data-name read as name: %v", m)
+	}
+	m := autocompleteAttr.FindStringSubmatch("<input\n\ttype=\"password\"\n\tautocomplete=\"new-password\">")
+	if m == nil || m[1] != "new-password" {
+		t.Errorf("an attribute on its own line was not read: %v", m)
 	}
 }
