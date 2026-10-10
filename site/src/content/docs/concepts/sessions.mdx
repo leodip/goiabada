@@ -74,7 +74,7 @@ Neither moves its maximum lifetime.
 
 When a browser arrives with a session that's valid and belongs to the user signing in, the user isn't asked for their password, and goes on with the session's ACR level. They're asked for a one-time code only when the client needs a higher level than the session reached, which is a [step-up](/concepts/acr-and-amr/#a-session-thats-already-there). A request whose `id_token_hint` names someone else, or with `prompt=login`, asks for a password whatever the session, and for a one-time code whenever the level needs one.
 
-A user who has been disabled can't use their session: the request ends with `access_denied` and "The user account is disabled."
+A user who has been disabled can't use a session. Disabling them ends their sessions, so their next sign-in starts from the password, which answers "Your user account is disabled." once the right password is entered, and a [silent request](/concepts/glossary/#silent-request) gets `login_required`. A session of a disabled user that's still found ends the request with `access_denied` and "The user account is disabled."
 
 ## At the end of a sign-in
 
