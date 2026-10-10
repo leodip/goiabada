@@ -38,7 +38,9 @@ func TestMain(m *testing.M) {
 
 // runMainProcess runs main in a fresh process over env and answers its exit code and stderr. The
 // environment carries the session keys and the client secret, which main refuses to start
-// without, so a case reaches whatever comes after them.
+// without, and names an auth server that issues the console its token, which main waits for
+// before it listens (#542), so a case reaches whatever comes after them. A case's env wins over
+// all three, the last value of a variable being the one a child receives.
 func runMainProcess(t *testing.T, env []string, args ...string) (int, string) {
 	t.Helper()
 
@@ -51,6 +53,7 @@ func runMainProcess(t *testing.T, env []string, args ...string) (int, string) {
 		"GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=" + strings.Repeat("b1", 64),
 		"GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=" + strings.Repeat("b2", 32),
 		"GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=process-test-secret",
+		"GOIABADA_AUTHSERVER_BASEURL=" + stubAuthServer(t).URL,
 	}, env...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr

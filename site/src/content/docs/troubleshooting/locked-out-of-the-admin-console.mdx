@@ -19,9 +19,10 @@ The admin console signs administrators in as a client of the auth server, `admin
 
 - a sign-in fails after the password, on **Sign-in failed**: "The admin console could not complete the sign-in with the auth server. This usually means the console's client secret or the auth server's address is wrong.";
 - an administrator already signed in is signed out once their access token falls due;
-- once the token the admin console holds for its sessions expires, within the access token lifetime, 5 minutes unless you changed it, or straight away after the admin console restarts, every page that needs a session answers `500` on **Server error**, starting a sign-in included.
+- once the token the admin console holds for its sessions expires, within the access token lifetime, 5 minutes unless you changed it, every page that needs a session answers `500` on **Server error**, starting a sign-in included;
+- an admin console that starts, or restarts, doesn't start at all. It asks the auth server for that token before it listens, and stops when it's refused: on Kubernetes its pod never becomes ready, so a rollout waits with the earlier pods still serving, and under Docker Compose its container keeps restarting.
 
-The admin console's log has the cause: `the auth server's token endpoint answered 401 (invalid_client: Client authentication failed. Please review your client_secret.)`.
+The admin console's log has the cause: `the auth server's token endpoint answered 401 (invalid_client: Client authentication failed. Please review your client_secret.)`. When it refused to start, the record is `the auth server does not accept the admin console's client secret, so the admin console cannot start`, with that cause as its `error`.
 
 The auth server and every other client keep working.
 

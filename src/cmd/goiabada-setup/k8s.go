@@ -174,7 +174,8 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		previousKeyRef{"GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS", goiabadaSecrets, "admin-session-enc-key-previous"},
 	)
 	writeProbes(&sb, 9091,
-		"The auth server's budget: this server starts in seconds.")
+		"The auth server's budget: this server listens once the auth server issues it a token,",
+		"which on a first start waits for the auth server to start, and then takes seconds.")
 	writePreStopPause(&sb)
 	writeResources(&sb,
 		"The auth server's numbers. This server verifies no passwords and needs less.")

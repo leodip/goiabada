@@ -389,7 +389,8 @@ spec:
               optional: true
         # Allows the container up to 5 minutes (60 failures, 5s apart) to start listening;
         # liveness and readiness wait for it, and its first success ends it.
-        # The auth server's budget: this server starts in seconds.
+        # The auth server's budget: this server listens once the auth server issues it a token,
+        # which on a first start waits for the auth server to start, and then takes seconds.
         startupProbe:
           httpGet:
             path: /health
