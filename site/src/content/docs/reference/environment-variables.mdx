@@ -188,7 +188,7 @@ Each limit that trips writes a `rate_limit_exceeded` [audit event](/concepts/aud
 
 The servers trim spaces around every value. An empty number or switch counts as unset and takes its default, but an empty text value is just empty: that's how an empty listen host turns a listener off.
 
-A number, switch or duration that doesn't parse stops the server at start. It prints one line naming every bad value and exits with code `2`, so a typo can't leave a setting quietly on its default. A switch is `true` or `false`, and a duration needs its unit, as in `30m`, `1h` or `90s`.
+A number, switch or duration that doesn't parse stops the server at start. It prints one line naming every bad value and exits with code `2`, so a typo can't leave a setting quietly on its default. A log level or log format other than the values listed, spelled in lowercase, stops it too, with `unable to install the log handler` and code `1`. A switch is `true` or `false`, and a duration needs its unit, as in `30m`, `1h` or `90s`.
 
 Each server accepts only the flags of the variables it reads. Give the admin console a flag only the auth server reads, or the other way round, and it refuses to start.
 

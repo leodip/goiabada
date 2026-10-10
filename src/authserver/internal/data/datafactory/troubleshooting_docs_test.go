@@ -63,6 +63,29 @@ func sqliteBelowHead(t *testing.T) int {
 	return plan[len(plan)-2]
 }
 
+// sqliteWithWALFilesAt writes a SQLite database migrated to version into a directory of its own,
+// beside the -wal and -shm files a server that never closed it leaves, and answers its path. They
+// are copied while the database is still open, which is the state the auth server leaves its
+// directory in when it stops: it does not close the database, so SQLite never removes them.
+func sqliteWithWALFilesAt(t *testing.T, version int) string {
+	t.Helper()
+	source := filepath.Join(t.TempDir(), "goiabada.db")
+	database, err := sqlitedb.New(context.Background(), source, false)
+	require.NoError(t, err)
+	m, err := database.NewMigrator(context.Background(), nil)
+	require.NoError(t, err)
+	require.NoError(t, m.Migrate(context.Background(), version))
+
+	dsn := filepath.Join(t.TempDir(), "goiabada.db")
+	for _, suffix := range []string{"", "-wal", "-shm"} {
+		body, readErr := os.ReadFile(source + suffix)
+		require.NoErrorf(t, readErr, "the open database has its %q file", suffix)
+		require.NoError(t, os.WriteFile(dsn+suffix, body, 0o600))
+	}
+	require.NoError(t, database.DB.Close())
+	return dsn
+}
+
 func startSQLite(t *testing.T, dsn string) error {
 	t.Helper()
 	database, err := NewDatabase(context.Background(), &config.DatabaseConfig{Type: "sqlite", DSN: dsn},
@@ -123,6 +146,24 @@ func TestReadonlyDatabasePage_QuotesWhatAStartAnswers(t *testing.T) {
 		require.NoError(t, os.Chmod(dsn, 0o444))
 
 		assert.NoError(t, startSQLite(t, dsn), "a start that writes nothing is not refused, so the first request that writes is")
+	})
+
+	// What a volume written by root looks like after the auth server has run there once: the WAL's
+	// files are already there, so a directory SQLite cannot create them in costs nothing at the
+	// connection, and the start goes on to its first write like a read-only file does (#542 live
+	// check). The page used to give this directory the first refusal alone.
+	t.Run("a directory and files the server cannot write, beside the WAL's files, with nothing to migrate", func(t *testing.T) {
+		dsn := sqliteWithWALFilesAt(t, sqliteHead(t))
+		for _, suffix := range []string{"", "-wal", "-shm"} {
+			require.NoError(t, os.Chmod(dsn+suffix, 0o444))
+		}
+		dir := filepath.Dir(dsn)
+		require.NoError(t, os.Chmod(dir, 0o555))
+		t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+
+		require.NoError(t, startSQLite(t, dsn), "a directory already holding the WAL's files is not refused at the connection")
+		assert.Contains(t, page, "neither does a read-only directory that already holds the files SQLite keeps beside the database",
+			"the page says a start over such a directory is not refused")
 	})
 }
 
