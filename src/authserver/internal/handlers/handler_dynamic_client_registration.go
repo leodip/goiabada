@@ -34,6 +34,10 @@ type dynamicClientRegistrationDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
+// clientNameMaxBytes bounds a registration's client_name, the description the admin API's client
+// create and update take at most (handler_api_clients.go).
+const clientNameMaxBytes = 100
+
 // HandleDynamicClientRegistrationPost implements RFC 7591 §3 Client Registration Endpoint
 func HandleDynamicClientRegistrationPost(
 	database dynamicClientRegistrationDatabase,
@@ -246,9 +250,12 @@ func validateDCRRequest(req *oidc.DynamicClientRegistrationRequest) error {
 		return errs.Errorf("a public client (token_endpoint_auth_method none) cannot use the client_credentials grant")
 	}
 
-	// Validate client_name length if provided (matches database column size)
-	if len(req.ClientName) > 128 {
-		return errs.Errorf("client_name cannot exceed 128 characters")
+	// client_name is written to clients.description, so it takes the bound every description
+	// write through the admin API takes, 100, and not the column's 128. At 128 a registration
+	// could store a description the client's own Settings tab then refused to save, blocking
+	// every save of that tab until an administrator shortened it.
+	if len(req.ClientName) > clientNameMaxBytes {
+		return errs.Errorf("client_name cannot exceed %d characters", clientNameMaxBytes)
 	}
 
 	// client_name is written to clients.description, the same column the admin API refuses

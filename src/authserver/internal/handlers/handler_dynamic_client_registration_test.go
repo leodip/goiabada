@@ -704,3 +704,16 @@ func TestWriteDCRResponse_AFailedWriteIsDebug(t *testing.T) {
 	require.True(t, isError, "the error attribute must carry the error value itself")
 	assert.ErrorIs(t, logged, errBodyWriteRefused)
 }
+
+// client_name is stored as the client's description, so it takes the admin API's description
+// bound, 100, rather than the column's 128: a longer name made a client whose Settings tab could
+// not be saved. Found reviewing the Clients page before 1.7.0.
+func TestValidateDCRRequest_AClientNameTakesTheDescriptionBound(t *testing.T) {
+	atBound := oidc.DynamicClientRegistrationRequest{ClientName: strings.Repeat("a", 100)}
+	applyDCRDefaults(&atBound)
+	require.NoError(t, validateDCRRequest(&atBound))
+
+	pastBound := oidc.DynamicClientRegistrationRequest{ClientName: strings.Repeat("a", 101)}
+	applyDCRDefaults(&pastBound)
+	require.ErrorContains(t, validateDCRRequest(&pastBound), "client_name cannot exceed 100 characters")
+}

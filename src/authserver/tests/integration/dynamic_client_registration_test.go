@@ -458,13 +458,13 @@ func TestDCR_ClientName_Validation(t *testing.T) {
 			expectedStatus: http.StatusCreated,
 		},
 		{
-			name:           "Max length (128 chars)",
-			clientName:     strings.Repeat("a", 128),
+			name:           "Max length (100 chars)",
+			clientName:     strings.Repeat("a", 100),
 			expectedStatus: http.StatusCreated,
 		},
 		{
-			name:           "Too long (129 chars)",
-			clientName:     strings.Repeat("a", 129),
+			name:           "Too long (101 chars), the admin API's description bound",
+			clientName:     strings.Repeat("a", 101),
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  oidc.DCRErrorInvalidClientMetadata,
 		},
