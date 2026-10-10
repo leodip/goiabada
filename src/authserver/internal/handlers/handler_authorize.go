@@ -949,9 +949,12 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 		return
 	}
 
-	// Bump the user session to update LastAccessed time
+	// Bump the user session to update LastAccessed time. It passes no methods and no level: a
+	// silent request reuses the session only when it already holds the level asked for, so the
+	// session's own were all it could pass, and writing them back would undo a removal of the
+	// user's authenticator that lowered the session after it was read above (#542).
 	_, err = userSessionManager.BumpUserSession(r.Context(), sessionIdentifier, client.Id,
-		authContext.AuthMethods, authContext.AcrLevel, middleware.ClientIP(r))
+		"", "", middleware.ClientIP(r))
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 		return

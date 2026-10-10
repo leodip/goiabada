@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"context"
 	"net/http"
-	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/oauth"
 
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -89,10 +89,9 @@ type CodeIssuer interface {
 type UserSessionManager interface {
 	HasValidUserSession(userSession *record.UserSession, idleTimeoutInSeconds int, maxLifetimeInSeconds int, requestedMaxAgeInSeconds *int64) bool
 	StartNewUserSession(w http.ResponseWriter, r *http.Request,
-		userId int64, clientId int64, authMethods string, acrLevel record.AcrLevel,
+		clientId int64, authentication usersession.Authentication,
 		authStateGeneration int64, otpConfigGeneration *int64,
-		authenticatedAt *time.Time, ipAddress string,
-		replacing *record.UserSession) (*record.UserSession, []record.UserSession, error)
+		ipAddress string, replacing *record.UserSession) (*record.UserSession, []record.UserSession, error)
 
 	// BumpUserSession updates an existing session's last accessed time and client list.
 	// It also handles ACR/AMR step-up: if the user completed a higher level of authentication
@@ -102,6 +101,12 @@ type UserSessionManager interface {
 	// A non-empty ipAddress replaces the session's recorded address; empty leaves it.
 	BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
 		authMethods string, acrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error)
+
+	// BindUserSession is BumpUserSession for a completed sign-in: under the session's row lock, it
+	// checks the sign-in's one-time code claim on the user, raises the session or, with replace,
+	// writes the sign-in's authentication over it, and sets its auth_time (#542).
+	BindUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
+		authentication usersession.Authentication, replace bool, ipAddress string) (*record.UserSession, error)
 }
 
 type TokenValidator interface {

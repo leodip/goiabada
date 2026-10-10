@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
+	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -498,6 +499,71 @@ func TestHandleIssueGet_ARemovedAuthenticatorRestartsTheCeremony(t *testing.T) {
 			assert.Equal(t, "User authentication is required", params.Get("error_description"))
 			f.assertNothingIssued(t)
 			f.ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// The issuer asks the same question again under the user's row lock, so an authenticator removed
+// after decideIssuance passed it refuses there: nothing was written or signed, and the answer is the
+// one decideIssuance would have given, written after the issuer has rolled back (#542).
+func TestHandleIssueGet_AnAuthenticatorRemovedAtTheIssuerIsAnsweredAsAtTheCheck(t *testing.T) {
+	generation := int64(2)
+	for _, tc := range []struct {
+		name         string
+		responseType string
+		inFragment   bool
+	}{
+		{"code", "code", false},
+		{"implicit", "id_token token", true},
+	} {
+		arm := func(f *recheckFixture, order *[]string) {
+			f.authContext.AuthMethods = "pwd otp"
+			f.authContext.OtpClaimGeneration = &generation
+			f.user.OTPEnabled = true
+			f.user.OtpConfigGeneration = generation
+			refused := func(mock.Arguments) { *order = append(*order, "issuer") }
+			if tc.responseType == "code" {
+				f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
+					return input.OTPClaim.Claimed && input.OTPClaim.Generation != nil && *input.OTPClaim.Generation == generation
+				})).Run(refused).Return(nil, errs.WithStack(otpcredential.ErrAuthenticatorRemoved)).Once()
+				return
+			}
+			f.implicitIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
+				return input.OTPClaim.Claimed && input.OTPClaim.Generation != nil && *input.OTPClaim.Generation == generation
+			}), true, true).Run(refused).Return(nil, errs.WithStack(otpcredential.ErrAuthenticatorRemoved)).Once()
+		}
+
+		t.Run(tc.name+", interactive, restarts at level 1", func(t *testing.T) {
+			f := newRecheckFixture(t, tc.responseType, "")
+			var order []string
+			arm(f, &order)
+			f.ceremonyStore.On("SaveAuthContext", f.rr, f.req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+				return ac.AuthState == ceremony.AuthStateRequiresLevel1 && ac.AuthMethods == ""
+			})).Run(func(mock.Arguments) { order = append(order, "save") }).Return(nil).Once()
+
+			f.serve()
+
+			require.Equal(t, http.StatusFound, f.rr.Code)
+			assert.Equal(t, testCeremonyId, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"))
+			assert.Equal(t, []string{"issuer", "save"}, order)
+			f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+			f.pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
+		})
+
+		t.Run(tc.name+", silent, is answered login_required", func(t *testing.T) {
+			f := newRecheckFixture(t, tc.responseType, "none")
+			var order []string
+			arm(f, &order)
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil).Once()
+
+			f.serve()
+
+			require.Equal(t, http.StatusFound, f.rr.Code)
+			params := answerParams(t, f.rr.Header().Get("Location"), tc.inFragment)
+			assert.Equal(t, "login_required", params.Get("error"))
+			assert.Empty(t, params.Get("code"))
+			assert.Empty(t, params.Get("access_token"))
+			f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }

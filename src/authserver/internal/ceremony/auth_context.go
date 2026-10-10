@@ -197,6 +197,25 @@ type AuthContext struct {
 	// fallback to the narrowed Scope: keeping it is the defect this field exists to remove, and the
 	// window is one ceremony per browser across the deploy.
 	RequestedScope string
+	// PasswordVerifiedAt is when this ceremony verified the password, written only by
+	// RecordPasswordVerified. AuthenticatedAt cannot carry it: a code entered after the password
+	// moves that to the code's instant, which is the session's auth_time. /auth/completed writes it
+	// as the session's password_auth_time, the time a removal of the authenticator lowers auth_time
+	// to, so a session left claiming amr ["pwd"] says when the password was entered (#542).
+	//
+	// Absent from a context written by an older binary it unmarshals as nil, and /auth/completed
+	// refuses to bind a ceremony that verified the password without it rather than invent one.
+	PasswordVerifiedAt *time.Time
+	// OtpClaimGeneration is the otp_config_generation of the authenticator the one-time code in
+	// AuthMethods came from: the session's when the ceremony adopted it, the one the code was
+	// checked against or enrolled at when the ceremony entered it. A claim stands only while the
+	// user still has that authenticator (otpcredential.OTPClaim), so an authenticator removed and
+	// another set up mid-ceremony does not let the first one's code reach a session or a token
+	// (#542).
+	//
+	// Absent from a context written by an older binary it unmarshals as nil, and a claim with no
+	// generation never stands: the ceremony starts over from the password.
+	OtpClaimGeneration *int64
 }
 
 func (ac *AuthContext) SetScope(scope string) {
@@ -239,6 +258,7 @@ func (ac *AuthContext) ParkDeferredError(code, description string) {
 //   - Level1AuthCompleted is written here and nowhere else, deliberately: RecordOTPVerified sets
 //     AuthenticatedAt as well, and level 2 alone must not stand in for level 1 at /auth/completed's
 //     create gate (#129 decisions 6 and 15).
+//   - PasswordVerifiedAt is the same instant, kept where a code entered later cannot move it (#542).
 func (ac *AuthContext) RecordPasswordVerified(user *record.User, now time.Time) {
 	ac.UserId = user.Id
 	ac.AuthStateGeneration = user.AuthStateGeneration
@@ -247,30 +267,36 @@ func (ac *AuthContext) RecordPasswordVerified(user *record.User, now time.Time) 
 	ac.AddAuthMethod(oidc.AuthMethodPassword)
 	authenticatedAt := now.UTC()
 	ac.AuthenticatedAt = &authenticatedAt
+	passwordVerifiedAt := authenticatedAt
+	ac.PasswordVerifiedAt = &passwordVerifiedAt
 	ac.Level1AuthCompleted = true
 	ac.AuthState = AuthStateLevel1PasswordCompleted
 }
 
-// RecordOTPVerified records that this ceremony verified a one-time code at now. enrolledGeneration
-// is the otp_config_generation an enrolment in this ceremony established, nil when the user was
-// already enrolled.
+// RecordOTPVerified records that this ceremony verified a one-time code at now. generation is the
+// otp_config_generation of the authenticator the code was checked against: the stored one's, or
+// the one an enrolment in this ceremony established, when enrolled is true.
 //
-//   - An enrolment overwrites what /auth/level2 captured with the value the increment returned. The
-//     ceremony asked the level 2 question against generation N and answered it by MOVING the counter
-//     to N+1, so promoting N at /auth/completed would leave the session it binds owing another
-//     second-factor prompt at once. The caller passes the read-back rather than N+1, so a concurrent
-//     change cannot be laundered into it (#242).
+//   - It becomes OtpClaimGeneration, whatever the ceremony adopted before: the otp claim is now this
+//     code's, and stands while the user still has the authenticator it came from (#542).
+//   - An enrolment also overwrites what /auth/level2 captured with the value the increment returned.
+//     The ceremony asked the level 2 question against generation N and answered it by MOVING the
+//     counter to N+1, so promoting N at /auth/completed would leave the session it binds owing
+//     another second-factor prompt at once. The caller passes the read-back rather than N+1, so a
+//     concurrent change cannot be laundered into it (#242).
 //   - Level1AuthCompleted is deliberately left alone. OTP is level 2, and a ceremony can arrive here
 //     having reused a session rather than entered a password, so verifying OTP is no proof of level
 //     1 and must not let a ceremony recreate a session that was ended mid-flight (#129 decision 15).
 //   - OTPKeyURL is cleared: the enrolment key has done its work, and leaving it set carries a spent
 //     credential through the rest of the ceremony and leaves it in the session of one abandoned
 //     after enrolling (#82, #247).
-func (ac *AuthContext) RecordOTPVerified(now time.Time, enrolledGeneration *int64) {
-	if enrolledGeneration != nil {
-		generation := *enrolledGeneration
-		ac.OtpConfigGeneration = &generation
+func (ac *AuthContext) RecordOTPVerified(now time.Time, generation int64, enrolled bool) {
+	if enrolled {
+		enrolledGeneration := generation
+		ac.OtpConfigGeneration = &enrolledGeneration
 	}
+	claimGeneration := generation
+	ac.OtpClaimGeneration = &claimGeneration
 	ac.AddAuthMethod(oidc.AuthMethodOTP)
 	authenticatedAt := now.UTC()
 	ac.AuthenticatedAt = &authenticatedAt
@@ -279,8 +305,9 @@ func (ac *AuthContext) RecordOTPVerified(now time.Time, enrolledGeneration *int6
 }
 
 // AdoptSession records that this ceremony reuses userSession rather than authenticating: the user,
-// the level and methods the session reached, and its authentication generation. /auth/authorize's
-// SSO path and prompt=none both reuse one this way.
+// the level and methods the session reached, its authentication generation, and the generation of
+// the authenticator its methods' one-time code came from, which is the session's OTP config
+// snapshot. /auth/authorize's SSO path and prompt=none both reuse one this way.
 //
 // The generation is inherited from the SESSION, never read from the user. Neither path reaches the
 // password handler, and reading the user's current generation here would launder an old session
@@ -290,6 +317,8 @@ func (ac *AuthContext) AdoptSession(userSession *record.UserSession) {
 	ac.AcrLevel = userSession.AcrLevel
 	ac.AuthMethods = userSession.AuthMethods
 	ac.AuthStateGeneration = userSession.AuthStateGeneration
+	otpClaimGeneration := userSession.OtpConfigGeneration
+	ac.OtpClaimGeneration = &otpClaimGeneration
 }
 
 // Restart sends the ceremony back to requires_level_1 keeping the request and discarding the
@@ -319,6 +348,8 @@ func (ac *AuthContext) Restart() {
 	ac.AuthStateGeneration = 0
 	ac.OtpConfigGeneration = nil
 	ac.OTPKeyURL = ""
+	ac.PasswordVerifiedAt = nil
+	ac.OtpClaimGeneration = nil
 }
 
 // AddAuthMethod records a completed factor on AuthMethods, the space-separated list that becomes
@@ -344,9 +375,7 @@ func (ac *AuthContext) AddAuthMethod(method oidc.AuthMethod) {
 }
 
 // ClaimsOTP reports whether AuthMethods names a one-time code, verified in this ceremony or adopted
-// from the session it reuses. /auth/completed and /auth/issue restart a ceremony that does when its
-// user has no authenticator any more: the code it names was from one removed since, and binding or
-// issuing it would put otp back on a session the removal lowered, or in a token (#542 decision 1).
+// from the session it reuses.
 func (ac *AuthContext) ClaimsOTP() bool {
 	return slices.Contains(strings.Fields(ac.AuthMethods), oidc.AuthMethodOTP.String())
 }

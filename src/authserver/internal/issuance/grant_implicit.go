@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -30,6 +31,9 @@ type ImplicitGrantInput struct {
 	// AuthStateGeneration comes from the AuthContext. Implicit issues no refresh token,
 	// so this ceremony's own generation is the only possible source (#106 decision 13).
 	AuthStateGeneration int64
+	// OTPClaim is the tokens' claim to a one-time code, checked on the user under the user's row
+	// lock before anything is signed (#542).
+	OTPClaim otpcredential.OTPClaim
 }
 
 // ImplicitGrantResponse contains the tokens generated for implicit flow.
@@ -104,6 +108,11 @@ func (t *TokenIssuer) IssueImplicit(ctx context.Context, tx *sql.Tx, settings *r
 	// Existence only, as IssueAuthCode asks it: ownership and the two timeouts were asked by the
 	// caller a few statements ago, and the only thing this narrower question misses is an idle
 	// timeout elapsing in the microseconds between the two (#139 decision 7).
+	// The code claim recheck IssueAuthCode makes, for the tokens signed here (#542).
+	if err := input.OTPClaim.Recheck(ctx, t.database, tx, input.User.Id); err != nil {
+		return nil, err
+	}
+
 	live, err := t.database.AcquireUserSessionRow(ctx, tx, input.SessionIdentifier)
 	if err != nil {
 		return nil, err

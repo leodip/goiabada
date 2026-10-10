@@ -166,6 +166,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		// Session starts at level1 with password only
 		userSession := createUserSession(record.AcrLevel1, "pwd")
 
+		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
@@ -196,6 +197,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 		userSession := createUserSession(record.AcrLevel1, "pwd")
 
+		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
@@ -225,6 +227,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		// Already at level2_optional with pwd+otp
 		userSession := createUserSession(record.AcrLevel2Optional, "pwd otp")
 
+		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
@@ -254,6 +257,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		// Session is at level2_mandatory
 		userSession := createUserSession(record.AcrLevel2Mandatory, "pwd otp")
 
+		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
@@ -283,6 +287,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 		userSession := createUserSession(record.AcrLevel2Optional, "pwd otp")
 
+		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
@@ -310,6 +315,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 		userSession := createUserSession(record.AcrLevel2Optional, "pwd otp")
 
+		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
@@ -337,6 +343,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 		userSession := createUserSession(record.AcrLevel1, "pwd")
 
+		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
@@ -366,6 +373,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 		userSession := createUserSession(record.AcrLevel2Optional, "pwd otp")
 
+		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
@@ -395,6 +403,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 		userSession := createUserSession(record.AcrLevel2Mandatory, "pwd otp")
 
+		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
@@ -426,6 +435,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		// (This shouldn't normally happen, but we should handle it)
 		userSession := createUserSession(record.AcrLevel2Optional, "pwd")
 
+		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
@@ -458,6 +468,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 		userSession := createUserSession(record.AcrLevel2Mandatory, "pwd otp")
 
+		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
@@ -481,10 +492,10 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
-		// The read is on the transaction, since the decision it feeds is taken there (#249).
+		// The row is taken on the transaction before anything is read, and a session that is not
+		// there is answered by the taking: nothing is read (#542).
 		stub := datamocks.ExpectRunInTransaction(database, txSentinel)
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, "non-existent-session").
-			Return(nil, nil).Once()
+		database.On("AcquireUserSessionRow", mock.Anything, txSentinel, "non-existent-session").Return(false, nil).Once()
 
 		result, err := manager.BumpUserSession(context.Background(), "non-existent-session", 456,
 			"pwd", record.AcrLevel1, "192.168.1.1")
@@ -521,6 +532,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 			},
 		}
 
+		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
@@ -560,6 +572,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 			},
 		}
 
+		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
 			Return(userSession, nil)
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
@@ -618,6 +631,7 @@ func TestBumpUserSession_RecordsTheLatestAddress(t *testing.T) {
 				Clients:           []record.UserSessionClient{},
 			}
 
+			database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
 				Return(userSession, nil)
 			database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).

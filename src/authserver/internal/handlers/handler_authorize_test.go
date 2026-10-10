@@ -3042,7 +3042,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return u.Id == 789
 		})).Return("openid", nil)
 
-		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "pwd", record.AcrLevel1, "203.0.113.7").Return(userSession, nil)
+		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "", record.AcrLevel(""), "203.0.113.7").Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["user_id"] == int64(789) && details["client_id"] == int64(1)
@@ -3157,7 +3157,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return u.Id == 789
 		})).Return(requestedScope, nil)
 
-		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "pwd", record.AcrLevel1, "").Return(userSession, nil)
+		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "", record.AcrLevel(""), "").Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["user_id"] == int64(789) && details["client_id"] == int64(1)

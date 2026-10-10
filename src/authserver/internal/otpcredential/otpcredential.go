@@ -30,8 +30,6 @@ package otpcredential
 import (
 	"context"
 	"database/sql"
-	"slices"
-	"strings"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -54,8 +52,8 @@ import (
 // between them and leave each consumer choosing which to embed.
 type Database interface {
 	ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64) error
-	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
 	IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
+	LowerUserSessionsToPassword(ctx context.Context, tx *sql.Tx, userId int64, passwordMethods string) error
 	ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
@@ -64,7 +62,6 @@ type Database interface {
 	TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64,
 		secretEncrypted []byte) (bool, error)
 	TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error)
-	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 }
 
 // VerifyOutcome is what a passcode check concluded. The three values are the three arms every
@@ -139,7 +136,7 @@ func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCiph
 		return 0, false, err
 	}
 
-	// Opened through RunInTransaction, so a deadlock reruns the three writes together (#301).
+	// Opened through RunInTransaction, so a deadlock reruns the writes together (#301).
 	// Safe to rerun: the ciphertext and the generation compared are fixed above, before this
 	// opened, and established and generation are the committing attempt's.
 	err = db.RunInTransaction(ctx, func(tx *sql.Tx) error {
@@ -217,25 +214,28 @@ func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCiph
 // nothing and it is the order the two disable sites have always written in.
 //
 // **The sessions are lowered in the same transaction** (#542 decision 1). Each of the user's
-// sessions loses otp from its methods, and one at level 3 drops to level 2 optional, which is what a
-// user with no authenticator reaches with a password: passwordOnly below. Without it a session that
-// reached level 3 with this authenticator went on saying so after it was gone, and so did every
-// token issued from it by SSO: a level 1 or level 2 client was told acr level 3 and amr
-// ["pwd","otp"] for an authenticator an administrator had just turned off, usually because the
-// device was lost. Nobody is signed out, and auth_time stays, because the password it dates was
-// entered then. In the same transaction, so no committed state has the authenticator gone and a
-// session still naming it. What this cannot reach is what was already issued: a token, and a
-// refresh token, carry the claims of the code they came from. Ending the user's sessions revokes
-// those, which is what the two-factor guide tells an administrator to do for a lost device.
+// sessions is lowered to what a user with no authenticator reaches with a password:
+// amr ["pwd"], level 2 optional at most, and auth_time back to the time the password was entered,
+// password_auth_time, so the three still describe one authentication (OIDC Core 1.0 section 2).
+// Without it a session that reached level 3 with this authenticator went on saying so after it was
+// gone, and so did every token issued from it by SSO: a level 1 or level 2 client was told acr
+// level 3 and amr ["pwd","otp"] for an authenticator an administrator had just turned off, usually
+// because the device was lost. Nobody is signed out. In the same transaction, so no committed state
+// has the authenticator gone and a session still naming it, and in one statement, which reads each
+// row as it writes it (data.Database.LowerUserSessionsToPassword). What this cannot reach is what
+// was already issued: a token, and a refresh token, carry the claims of the code they came from.
+// Ending the user's sessions revokes those, which is what the two-factor guide tells an
+// administrator to do for a lost device.
 //
-// A sign-in in flight when this commits adopted the session's methods before the lowering, so it
-// still names otp: /auth/completed and /auth/issue restart it at level 1 when the user has no
-// authenticator, rather than merging otp back into the session or issuing it in a code.
+// TryRemoveUserOTP is the first write, so this transaction takes the user's row before any session
+// row. A sign-in binding a code to a session, or issuing one, checks its claim on the user under
+// that row lock (ceremony.OTPClaim), so it either commits before this removal, which then lowers
+// what it wrote, or reads the user after it and starts over from the password.
 //
 // Shared by the two sites decision 4 names, HandleAccountOTPPut's disable branch and
 // HandleUserOTPPut. There is no third: the browser flow enrolls but never disables.
 func Remove(ctx context.Context, db Database, user *record.User) (removed bool, err error) {
-	// Opened through RunInTransaction, so a deadlock reruns the three writes together (#301).
+	// Opened through RunInTransaction, so a deadlock reruns the writes together (#301).
 	// Safe to rerun: the generation compared is the request's read, and removed is the committing
 	// attempt's; the reset and the increment carry no state between attempts.
 	err = db.RunInTransaction(ctx, func(tx *sql.Tx) error {
@@ -263,21 +263,7 @@ func Remove(ctx context.Context, db Database, user *record.User) (removed bool, 
 		if _, writeErr = db.IncrementUserOtpConfigGeneration(ctx, tx, user.Id); writeErr != nil {
 			return writeErr
 		}
-		// Read on the transaction, so a rerun lowers what it reads rather than a copy from the
-		// attempt that lost.
-		sessions, writeErr := db.GetUserSessionsByUserId(ctx, tx, user.Id)
-		if writeErr != nil {
-			return writeErr
-		}
-		for i := range sessions {
-			if !passwordOnly(&sessions[i]) {
-				continue
-			}
-			if writeErr = db.UpdateUserSession(ctx, tx, &sessions[i]); writeErr != nil {
-				return writeErr
-			}
-		}
-		return nil
+		return db.LowerUserSessionsToPassword(ctx, tx, user.Id, oidc.AuthMethodPassword.String())
 	})
 	if err != nil {
 		return false, err
@@ -289,27 +275,6 @@ func Remove(ctx context.Context, db Database, user *record.User) (removed bool, 
 	user.OTPSecretEncrypted = nil
 	user.OTPEnabled = false
 	return true, nil
-}
-
-// passwordOnly lowers a session whose user no longer has an authenticator to what a sign-in with a
-// password alone earns, and reports whether that changed it: otp leaves its methods, and level 3
-// becomes level 2 optional, the level a user with no authenticator reaches with a password. A level
-// 1 or level 2 optional session that names no code is already there. The level is capped rather
-// than set, so a level 1 session stays level 1.
-func passwordOnly(session *record.UserSession) bool {
-	otpMethod := oidc.AuthMethodOTP.String()
-	methods := strings.Fields(session.AuthMethods)
-	kept := slices.DeleteFunc(slices.Clone(methods), func(method string) bool { return method == otpMethod })
-	changed := false
-	if len(kept) != len(methods) {
-		session.AuthMethods = strings.Join(kept, " ")
-		changed = true
-	}
-	if session.AcrLevel == record.AcrLevel2Mandatory {
-		session.AcrLevel = record.AcrLevel2Optional
-		changed = true
-	}
-	return changed
 }
 
 // VerifyStored checks a passcode against the authenticator the user has enrolled, and claims the

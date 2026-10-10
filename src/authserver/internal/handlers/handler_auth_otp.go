@@ -366,9 +366,12 @@ func HandleAuthOtpPost(
 			return
 		}
 
-		// The generation an enrolment below establishes, handed to RecordOTPVerified; nil when the
-		// user was already enrolled.
-		var enrolledGeneration *int64
+		// The generation of the authenticator the code was checked against, handed to
+		// RecordOTPVerified: the stored one's, which VerifyStored bound its step claim to, or the
+		// one an enrolment below establishes. The code's otp claim stands only while the user
+		// still has that authenticator (#542).
+		verifiedGeneration := user.OtpConfigGeneration
+		enrolled := false
 		if !user.OTPEnabled {
 			// is enrolling to TOTP now. The seed is encrypted at rest, the authenticator written and
 			// the OTP configuration generation's advance committed together, so there is no state in
@@ -384,7 +387,8 @@ func HandleAuthOtpPost(
 				endLostEnrolment(pageRenderer, ceremonyStore, w, r, user.Id)
 				return
 			}
-			enrolledGeneration = &generation
+			verifiedGeneration = generation
+			enrolled = true
 
 			auditLogger.Log(r.Context(), audit.EventEnabledOTP, map[string]interface{}{
 				"user_id": user.Id,
@@ -397,7 +401,7 @@ func HandleAuthOtpPost(
 			"user_id": user.Id,
 		})
 
-		authContext.RecordOTPVerified(time.Now(), enrolledGeneration)
+		authContext.RecordOTPVerified(time.Now(), verifiedGeneration, enrolled)
 
 		// Rotate the browser session's identifier here too, for the same reason the
 		// password handler does: a credential has just been verified, and that is a

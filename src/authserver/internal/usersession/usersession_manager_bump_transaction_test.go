@@ -52,6 +52,7 @@ func TestBumpUserSession_ReadsAndWritesOnTheTransaction(t *testing.T) {
 
 	session := bumpedSession()
 	stub := datamocks.ExpectRunInTransaction(database, txSentinel)
+	database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 	database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(nil).Once()
 	database.On("UpdateUserSession", mock.Anything, txSentinel, session).Return(nil).Once()
@@ -80,7 +81,9 @@ func TestBumpUserSession_ALostAssociationKeyRunsOnceMoreAndFindsThePair(t *testi
 
 	attempt1 := datamocks.ExpectRunInTransaction(database, txSentinel)
 	attempt2 := datamocks.ExpectRunInTransaction(database, txSentinel)
+	database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(first, nil).Once()
+	database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(second, nil).Once()
 	database.On("UserSessionLoadClients", mock.Anything, txSentinel, first).Return(nil).Once()
 	database.On("UserSessionLoadClients", mock.Anything, txSentinel, second).Return(nil).Once()
@@ -111,6 +114,7 @@ func TestBumpUserSession_ASecondLossIsAFaultAndIsNotRetriedAgain(t *testing.T) {
 
 	datamocks.ExpectRunInTransaction(database, txSentinel)
 	datamocks.ExpectRunInTransaction(database, txSentinel)
+	database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Twice()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).
 		Return(bumpedSession(), nil).Twice()
 	database.On("UserSessionLoadClients", mock.Anything, txSentinel, mock.Anything).Return(nil).Twice()
@@ -134,18 +138,22 @@ func TestBumpUserSession_AFailureOtherThanTheKeyIsNotRetried(t *testing.T) {
 		arm  func(database *datamocks.Database, session *record.UserSession)
 	}{
 		{"the session read fails", func(database *datamocks.Database, _ *record.UserSession) {
+			database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(nil, boom).Once()
 		}},
 		{"the association read fails", func(database *datamocks.Database, session *record.UserSession) {
+			database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 			database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(boom).Once()
 		}},
 		{"the session write fails", func(database *datamocks.Database, session *record.UserSession) {
+			database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 			database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(nil).Once()
 			database.On("UpdateUserSession", mock.Anything, txSentinel, session).Return(boom).Once()
 		}},
 		{"the association insert fails", func(database *datamocks.Database, session *record.UserSession) {
+			database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 			database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(nil).Once()
 			database.On("UpdateUserSession", mock.Anything, txSentinel, session).Return(nil).Once()
@@ -178,6 +186,7 @@ func TestBumpUserSession_ARefusedCommitReturnsNoSession(t *testing.T) {
 	refused := errs.New("commit refused")
 	session := bumpedSession()
 	datamocks.ExpectRunInTransactionThenFail(database, txSentinel, refused)
+	database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 	database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(nil).Once()
 	database.On("UpdateUserSession", mock.Anything, txSentinel, session).Return(nil).Once()
@@ -200,7 +209,9 @@ func TestBumpUserSession_ADeadlockRerunDecidesFromAFreshRead(t *testing.T) {
 	first := bumpedSession()
 	second := bumpedSession(record.UserSessionClient{Id: 9, UserSessionId: 1, ClientId: 456})
 	stub := datamocks.ExpectRunInTransactionRerun(database, txSentinel)
+	database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(first, nil).Once()
+	database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(second, nil).Once()
 	database.On("UserSessionLoadClients", mock.Anything, txSentinel, mock.Anything).Return(nil).Twice()
 	database.On("UpdateUserSession", mock.Anything, txSentinel, mock.Anything).Return(nil).Twice()

@@ -1005,6 +1005,8 @@ func TestRecordPasswordVerified(t *testing.T) {
 			assert.True(t, now.Equal(*ac.AuthenticatedAt), "the instant verified")
 			assert.Equal(t, time.UTC, ac.AuthenticatedAt.Location(), "stored in UTC")
 			assert.True(t, ac.Level1AuthCompleted, "level 1 was performed in this ceremony (#129)")
+			require.NotNil(t, ac.PasswordVerifiedAt)
+			assert.True(t, now.Equal(*ac.PasswordVerifiedAt), "the password's instant, kept apart from AuthenticatedAt (#542)")
 			assert.Equal(t, AuthStateLevel1PasswordCompleted, ac.AuthState)
 			assert.Equal(t, "otpauth://totp/kept", ac.OTPKeyURL, "a password writes no OTP field")
 			assert.Equal(t, "openid", ac.Scope, "a password writes no request field")
@@ -1025,7 +1027,8 @@ func TestAdoptSession(t *testing.T) {
 		AcrLevel:            record.AcrLevel2Optional,
 		AuthMethods:         "pwd otp",
 		AuthStateGeneration: 3,
-		User:                record.User{Id: 42, AuthStateGeneration: 9},
+		OtpConfigGeneration: 5,
+		User:                record.User{Id: 42, AuthStateGeneration: 9, OtpConfigGeneration: 6},
 	}
 	ac := &AuthContext{
 		AuthState:           AuthStateRequiresLevel1,
@@ -1046,6 +1049,10 @@ func TestAdoptSession(t *testing.T) {
 	assert.Equal(t, "openid", ac.Scope, "adopting writes no request field")
 	require.NotNil(t, ac.OtpConfigGeneration)
 	assert.Equal(t, int64(7), *ac.OtpConfigGeneration, "the OTP snapshot is not the session's to write")
+	require.NotNil(t, ac.OtpClaimGeneration)
+	assert.Equal(t, int64(5), *ac.OtpClaimGeneration,
+		"the claim is the session's snapshot and never the user's, or a removed authenticator's code is laundered into the next one's (#542)")
+	assert.Nil(t, ac.PasswordVerifiedAt, "adopting verifies no password")
 }
 
 func TestRecordOTPVerified(t *testing.T) {
@@ -1056,8 +1063,10 @@ func TestRecordOTPVerified(t *testing.T) {
 		name                string
 		existingMethods     string
 		existingGeneration  *int64
+		adoptedClaim        *int64
 		level1Completed     bool
-		enrolledGeneration  *int64
+		verifiedGeneration  int64
+		enrolled            bool
 		wantMethods         string
 		wantOtpConfigGenNil bool
 		wantOtpConfigGen    int64
@@ -1067,6 +1076,7 @@ func TestRecordOTPVerified(t *testing.T) {
 			existingMethods:    "pwd",
 			existingGeneration: &captured,
 			level1Completed:    true,
+			verifiedGeneration: 4,
 			wantMethods:        "pwd otp",
 			wantOtpConfigGen:   4,
 		},
@@ -1077,20 +1087,23 @@ func TestRecordOTPVerified(t *testing.T) {
 			existingMethods:    "pwd",
 			existingGeneration: &captured,
 			level1Completed:    true,
-			enrolledGeneration: func() *int64 { g := int64(5); return &g }(),
+			verifiedGeneration: 5,
+			enrolled:           true,
 			wantMethods:        "pwd otp",
 			wantOtpConfigGen:   5,
 		},
 		{
 			name:               "an enrolment on a context with no capture sets it",
 			existingMethods:    "pwd",
-			enrolledGeneration: func() *int64 { g := int64(1); return &g }(),
+			verifiedGeneration: 1,
+			enrolled:           true,
 			wantMethods:        "pwd otp",
 			wantOtpConfigGen:   1,
 		},
 		{
 			name:                "no enrolment and no capture leaves nothing to promote",
 			existingMethods:     "pwd",
+			verifiedGeneration:  4,
 			wantMethods:         "pwd otp",
 			wantOtpConfigGenNil: true,
 		},
@@ -1101,14 +1114,18 @@ func TestRecordOTPVerified(t *testing.T) {
 			existingMethods:    "pwd",
 			existingGeneration: &captured,
 			level1Completed:    false,
+			verifiedGeneration: 4,
 			wantMethods:        "pwd otp",
 			wantOtpConfigGen:   4,
 		},
 		{
-			name:               "an otp verified again is listed once",
+			// The adopted session's code came from generation 2; the claim is now this code's (#542).
+			name:               "an otp verified again is listed once, and the claim is the new code's",
 			existingMethods:    "pwd otp",
 			existingGeneration: &captured,
+			adoptedClaim:       func() *int64 { g := int64(2); return &g }(),
 			level1Completed:    true,
+			verifiedGeneration: 4,
 			wantMethods:        "pwd otp",
 			wantOtpConfigGen:   4,
 		},
@@ -1120,15 +1137,19 @@ func TestRecordOTPVerified(t *testing.T) {
 				AuthState:           AuthStateLevel2OTP,
 				AuthMethods:         tc.existingMethods,
 				OtpConfigGeneration: tc.existingGeneration,
+				OtpClaimGeneration:  tc.adoptedClaim,
 				Level1AuthCompleted: tc.level1Completed,
 				OTPKeyURL:           "otpauth://totp/spent",
 				UserId:              42,
 				Scope:               "openid",
 			}
 
-			ac.RecordOTPVerified(now, tc.enrolledGeneration)
+			ac.RecordOTPVerified(now, tc.verifiedGeneration, tc.enrolled)
 
 			assert.Equal(t, tc.wantMethods, ac.AuthMethods)
+			require.NotNil(t, ac.OtpClaimGeneration)
+			assert.Equal(t, tc.verifiedGeneration, *ac.OtpClaimGeneration,
+				"the claim is the authenticator this code was checked against or enrolled at (#542)")
 			if tc.wantOtpConfigGenNil {
 				assert.Nil(t, ac.OtpConfigGeneration)
 			} else {
@@ -1143,12 +1164,6 @@ func TestRecordOTPVerified(t *testing.T) {
 			assert.Empty(t, ac.OTPKeyURL, "the spent enrolment key is cleared (#247)")
 			assert.Equal(t, int64(42), ac.UserId, "OTP writes no user")
 			assert.Equal(t, "openid", ac.Scope, "OTP writes no request field")
-
-			if tc.enrolledGeneration != nil {
-				// A copy: the caller's variable is not aliased by the ceremony.
-				*tc.enrolledGeneration += 100
-				assert.Equal(t, tc.wantOtpConfigGen, *ac.OtpConfigGeneration)
-			}
 		})
 	}
 }

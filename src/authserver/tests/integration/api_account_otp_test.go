@@ -466,6 +466,7 @@ func seedExtraSessionForOTPTest(t *testing.T, userId int64) *record.UserSession 
 		AuthMethods:         "pwd otp",
 		AcrLevel:            record.AcrLevel2Optional,
 		AuthTime:            now,
+		PasswordAuthTime:    now,
 		IpAddress:           "10.0.0.1",
 		DeviceName:          "another device",
 		DeviceType:          "mobile",

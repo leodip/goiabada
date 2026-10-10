@@ -3,6 +3,7 @@ package datatests
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -223,48 +224,55 @@ func TestBumpUserSession_ASecondBumpForTheSameClientUpdatesItsAssociation(t *tes
 	assert.Truef(t, pair[0].LastAccessed.After(firstAccessed), "last_accessed moved on: %v after %v", pair[0].LastAccessed, firstAccessed)
 }
 
-// Two bumps of one session for a client it does not hold yet, both reading the client as absent: one
-// wins the key and the other reruns, reads the association the winner committed and updates it.
-// Both succeed and the session holds the client once.
-func TestBumpUserSession_TwoBumpsThatOverlapBothSucceedAndLeaveOnePair(t *testing.T) {
+// Two bumps of one session for a client it does not hold yet. Each takes the session's row before it
+// reads anything (#542), so they queue: the second reads the association the first committed and
+// updates it, neither loses the key and neither reruns. Both succeed and the session holds the client
+// once. Until the row was taken first, both read the client as absent, one lost the key and reran
+// (#249); the rerun stays for an association written by something that does not take the row.
+//
+// The two are started behind a transaction holding the row, so both are waiting at once when it is
+// released, rather than one finishing before the other starts.
+func TestBumpUserSession_TwoBumpsThatOverlapQueueOnTheSessionAndLeaveOnePair(t *testing.T) {
 	skipWhereTransactionsCannotOverlap(t)
 
-	for round := 0; round < concurrentRounds; round++ {
-		ctx, cancel := context.WithTimeout(context.Background(), lockWaitCeiling)
-		user := createTestUser(t)
-		held := createTestClient(t)
-		added := createTestClient(t)
-		session := createTestUserSessionWithClient(t, user.Id, held.Id)
-		meet := newRendezvous(t, "the two association reads", 2)
-		callers := [2]*sessionReader{{Database: database, rendezvous: meet}, {Database: database, rendezvous: meet}}
+	ctx := context.Background()
+	user := createTestUser(t)
+	held := createTestClient(t)
+	added := createTestClient(t)
+	session := createTestUserSessionWithClient(t, user.Id, held.Id)
 
-		type outcome struct {
-			session *record.UserSession
-			err     error
-		}
-		var outcomes [2]outcome
-		var wg sync.WaitGroup
-		for i := range callers {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				manager := usersession.NewManager(nil, "", callers[i])
-				outcomes[i].session, outcomes[i].err = manager.BumpUserSession(ctx, session.SessionIdentifier, added.Id, "pwd", record.AcrLevel1, "")
-			}()
-		}
-		wg.Wait()
-		cancel()
+	holder, err := database.BeginTransaction(ctx)
+	require.NoError(t, err)
+	defer func() { _ = database.RollbackTransaction(ctx, holder) }()
+	live, err := database.AcquireUserSessionRow(ctx, holder, session.SessionIdentifier)
+	require.NoError(t, err)
+	require.True(t, live)
 
-		for i, o := range outcomes {
-			require.NoErrorf(t, o.err, "round %d: caller %d succeeds, a loser on the key is rerun", round, i)
-			require.NotNilf(t, o.session, "round %d: caller %d is handed the session it bumped", round, i)
-		}
-		pair, all := associationsOf(t, session.SessionIdentifier, added.Id)
-		require.Lenf(t, pair, 1, "round %d: the session holds the client once however the two bumps overlapped", round)
-		assert.Lenf(t, all, 2, "round %d: the client it already held, and the one the bumps added", round)
-
-		reads := [2]int32{callers[0].reads.Load(), callers[1].reads.Load()}
-		assert.Containsf(t, [][2]int32{{2, 1}, {1, 2}}, reads,
-			"round %d: exactly one bump reran, which is the lost key; reads per caller were %v", round, reads)
+	// A rendezvous of one never waits: each read is only counted.
+	callers := [2]*sessionReader{
+		{Database: secondDatabase(t), rendezvous: newRendezvous(t, "no rendezvous", 1)},
+		{Database: secondDatabase(t), rendezvous: newRendezvous(t, "no rendezvous", 1)},
 	}
+	var bumps [2]*blockedParty[error]
+	for i := range callers {
+		bumps[i] = goBlocked(t, fmt.Sprintf("bump %d", i), holder, func(reached func()) error {
+			reached()
+			_, bumpErr := usersession.NewManager(nil, "", callers[i]).
+				BumpUserSession(ctx, session.SessionIdentifier, added.Id, "pwd", record.AcrLevel1, "")
+			return bumpErr
+		})
+	}
+	for _, bump := range bumps {
+		bump.requireBlocked(t)
+	}
+	require.NoError(t, database.RollbackTransaction(ctx, holder))
+	for i, bump := range bumps {
+		require.NoErrorf(t, bump.await(t), "bump %d succeeds", i)
+	}
+
+	pair, all := associationsOf(t, session.SessionIdentifier, added.Id)
+	require.Len(t, pair, 1, "the session holds the client once")
+	assert.Len(t, all, 2, "the client it already held, and the one the bumps added")
+	assert.Equal(t, [2]int32{1, 1}, [2]int32{callers[0].reads.Load(), callers[1].reads.Load()},
+		"each bump read the associations once: queued on the session's row, neither lost the key")
 }
