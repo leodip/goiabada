@@ -33,10 +33,10 @@ These record who can administer Goiabada and who tried to reach past that. See [
 
 | Event | Written when | Details |
 |---|---|---|
-| `administrator_change_refused` | An Admin API request reached for something only `authserver:manage` may do, and was refused `403 MANAGE_SCOPE_REQUIRED`. That's creating or changing an administrator, granting or revoking an administrative permission, changing what reaches an administrator, or changing the email or audit log settings. One entry per refused request, so a client that retries leaves one per attempt. A token with none of a route's scopes is refused `INSUFFICIENT_SCOPE` instead, and writes nothing. | `logged_in_user`, `method`, `route` (the route pattern, such as `/api/v1/admin/users/{id}/permissions`), `ceiling` (`grant`, `target` or `settings`), `target_kind` and `target_id` when the request has a target, `permission_ids` for a grant or a description change, and `group_ids` for a group membership change |
+| `administrator_change_refused` | An Admin API request reached for something only `authserver:manage` may do, and was refused `403 MANAGE_SCOPE_REQUIRED`. That's creating or changing an administrator, granting or revoking an administrative permission, changing what reaches an administrator, or changing the email or audit log settings. It also covers reading an administrator client's secret, rewording an administrative permission's description, switching a client's **May request administrative scopes**, and deleting a group holding an administrative permission. One entry per refused request, so a client that retries leaves one per attempt. A token with none of a route's scopes is refused `INSUFFICIENT_SCOPE` instead, and writes nothing. | `logged_in_user`, `method`, `route` (the route pattern, such as `/api/v1/admin/users/{id}/permissions`), `ceiling` (`grant`, `target` or `settings`), `target_kind` and `target_id` when the request has a target, `permission_ids` for a grant or a description change, and `group_ids` for a group membership change |
 | `administrative_permission_changed` | An administrative permission was granted to or revoked from a user, a group or a client, or a user joined or left a group holding one. It's written after the change's own entries, such as `added_user_permission` or `user_added_to_group`, never instead of them. Deleting an administrator or an administrative group writes only its own deletion entry. | `change` (`granted` or `revoked`), `target_kind` and `target_id`, `permission_identifiers` (such as `authserver:manage`), `group_id` for a membership change, and `logged_in_user` |
 | `updated_client_administrative_scopes` | A client's **May request administrative scopes** switch was saved, on or off. An allowed client is an administrator client, so watch this beside `administrative_permission_changed`. It's written for every save, even one that keeps the value it had. | `client_id`, `client_identifier`, `allowed` (the new value) and `logged_in_user` |
-| `administrative_scope_refused` | A client that isn't allowed to ask for the administrative scopes asked for one on a signed-in user's behalf, and was refused (see the answers on [Authorize](/reference/endpoints/authorize/#administrative-scopes) and [Token](/reference/endpoints/token/#administrative-scopes)). It's written at the authorization endpoint when the browser holds a valid session, at the last step before a code or tokens are issued, and on the token endpoint's authorization code, refresh token and password grants. A refusal at the authorization endpoint with no valid session writes a Warn log record instead, since anyone can reach that endpoint. | `client_id`, `client_identifier`, `scopes`, `checkpoint` (`"authorize"`, `"issue"`, `"authorization_code"`, `"refresh_token"` or `"password"`) and `user_id` |
+| `administrative_scope_refused` | A client that isn't allowed to ask for the administrative scopes asked for one on a signed-in user's behalf, and was refused (see the answers on [Authorize](/reference/endpoints/authorize/#administrative-scopes) and [Token](/reference/endpoints/token/#administrative-scopes)). It's written at the authorization endpoint when the browser holds a valid session and the request doesn't ask for `prompt=login`, at the last step before a code or tokens are issued, and on the token endpoint's authorization code, refresh token and password grants. A refusal at the authorization endpoint with no valid session, or held back until after the password because of `prompt=login`, writes a Warn log record instead, since anyone can reach that endpoint. | `client_id`, `client_identifier`, `scopes`, `checkpoint` (`"authorize"`, `"issue"`, `"authorization_code"`, `"refresh_token"` or `"password"`) and `user_id` |
 | `viewed_client_secret` | Someone read a client's secret through `GET /api/v1/admin/clients/{id}/secret`. The admin console reads it there each time you open a confidential client's **Authentication** tab. Reading a client with no secret writes nothing. | `client_id`, `client_identifier` and `logged_in_user` |
 
 The `updated_client_permissions` entry names what a client permission save changed, the ids of the permissions it granted and of those it revoked, so you can trace a grant to a client back to the permission it was.
@@ -48,17 +48,17 @@ Each of these means the server caught something and refused it. One entry is wor
 | Event | Why it matters |
 |---|---|
 | `refresh_token_replay_detected` | A refresh token that had already been rotated came back. Either it was stolen or a client sent it twice. The server can't tell which, so it revoked the rest of that token's family. |
-| `auth_code_reuse_detected` | A client redeemed an authorization code a second time, after authenticating and passing PKCE. The server revoked the refresh tokens issued through that code's session and ended the session. |
+| `auth_code_reuse_detected` | A client redeemed an authorization code a second time, after authenticating and passing PKCE. The server revoked any refresh tokens issued through that code's session and, if it revoked any, ended the session. When the entry's list of revoked refresh tokens is empty, nothing was left to revoke. |
 | `otp_code_replay_detected` | An authenticator code that had already been used was sent again. That usually means a phishing proxy relaying a user's sign-in in real time. |
-| `rate_limit_exceeded` | A rate limiter started refusing requests, often a password or code guessing run. It's written once per limiter and key per window, not once per refused request. |
+| `rate_limit_exceeded` | A rate limiter started refusing requests, often a password or code guessing run. Each auth server instance writes it at most once per limiter and key per window, not once per refused request, and only while the rate limiter is on (`GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`). |
 
-Two more are worth watching. A run of `auth_ceremony_mismatch` against one client is a page trying to act on sign-ins its users never started. And `redemption_refused_redirect_uri` means someone who held a valid code and its PKCE verifier tried to redeem it after you removed its redirect URI.
+Two more are worth watching. A run of `auth_ceremony_mismatch` against one client is a page trying to act on sign-ins its users never started. And `redemption_refused_redirect_uri` means someone who held a valid code, and passed client authentication and PKCE, tried to redeem it after you removed its redirect URI.
 
 ## Where events go
 
 Goiabada writes each event to two places, and **Audit log settings** has a switch for each. Both are on by default.
 
-- **Log audit events to console** writes one log record per event, with the message `audit event`, the event's name in `event`, its details in `details`, and the `request_id`. Your container or host log pipeline picks it up.
+- **Log audit events to console** writes one log record per event, with the message `audit event`, the event's name in `event`, its details in `details`, and the `request_id`. Your container or host log pipeline picks it up. The record is at `INFO`, so it's written only while the auth server's log level is `info` or `debug`.
 - **Persist audit logs to database** stores the event in the `audit_logs` table. The viewer and the Admin API read it from there.
 
 Turn both off and nothing is recorded. Changing either switch, or the retention, needs `authserver:manage`. The change is recorded once it's saved, under the settings it replaced, so turning logging off still leaves an entry saying who did it.
@@ -181,7 +181,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 
 ## The Admin API
 
-- [`GET /api/v1/admin/audit-logs`](/reference/api/admin/operations/getauditlogs/) lists stored events, newest first, a page at a time: `page`, `size` (20 unless you ask, at most 200), and the `auditEvent` and `requestId` filters, each an exact match.
+- [`GET /api/v1/admin/audit-logs`](/reference/api/admin/operations/getauditlogs/) lists stored events, newest first, a page at a time: `page`, `size` (1 to 200; anything else gets the default, 20), and the `auditEvent` and `requestId` filters, each an exact match.
 - [`GET /api/v1/admin/audit-logs/event-types`](/reference/api/admin/operations/getauditeventtypes/) returns every event name the server can write. The viewer's event list comes from here, so it includes events that haven't happened yet.
 - [`GET /api/v1/admin/settings/audit-logs`](/reference/api/admin/operations/getsettingsauditlogs/) and [`PUT`](/reference/api/admin/operations/updatesettingsauditlogs/) read and change the two switches and the retention.
 
@@ -201,7 +201,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `auth_failed_otp` | An authenticator code was refused at sign-in, because it was wrong or had already been used. |
 | `otp_code_replay_detected` | An authenticator code that had already been used was sent again, at sign-in or while turning on two-factor authentication, and was refused. |
 | `user_disabled` | A disabled user was refused: at sign-in, when reusing a session, before a code or tokens were issued, at the token endpoint or at `/userinfo`. |
-| `rate_limit_exceeded` | A rate limiter started refusing requests from an IP address block, for an email address or for a user. Written once per key per window. |
+| `rate_limit_exceeded` | A rate limiter started refusing requests from an IP address block, for an email address or for a user. Each instance writes it at most once per key per window. |
 | `auth_ceremony_mismatch` | A sign-in step was refused because its page belonged to a sign-in the browser had since replaced, or named none. |
 | `started_new_user_session` | A user signed in and a new session was created for them. |
 | `bumped_user_session` | A user's existing session was reused and kept alive, by single sign-on, a `prompt=none` request or a refresh token grant. |
@@ -234,7 +234,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `token_issued_implicit_response` | The authorization endpoint issued tokens straight to a client, through the implicit flow. |
 | `token_scope_denied` | The token endpoint refused a request for a scope the client or user may not have, or an OpenID Connect scope on the client credentials grant, or a client credentials request that left `scope` out from a client holding no permissions, recorded with an empty `scope`. |
 | `ropc_auth_failed` | The token endpoint refused a password grant, because the email or password was wrong, or the user was disabled or has two-factor authentication on. |
-| `auth_code_reuse_detected` | A client redeemed an authorization code a second time. The refresh tokens issued through that code's session were revoked, and the session ended. |
+| `auth_code_reuse_detected` | A client redeemed an authorization code a second time. The refresh tokens issued through that code's session were revoked, and, if there were any, the session ended. |
 | `refresh_token_replay_detected` | A refresh token that had already been rotated came back, so the rest of its family was revoked. |
 | `redemption_refused_redirect_uri` | The token endpoint refused an authorization code because its redirect URI was removed from the client after the code was issued. |
 
@@ -254,7 +254,7 @@ These come from the Account API, which users reach through the admin console's a
 
 | Event | Meaning |
 |---|---|
-| `updated_own_profile` | A user saved their own profile: names, username, website, gender, birth date, time zone or locale. |
+| `updated_own_profile` | A user saved their own profile: names, nickname, username, website, gender, birth date, time zone or locale. |
 | `updated_own_email` | A user changed their own email address, after confirming their password. The new address starts unverified. |
 | `sent_email_verification_message` | A user asked for an email verification code, and it was sent to their address. |
 | `verified_email` | A user verified their email address with the code they were sent. |

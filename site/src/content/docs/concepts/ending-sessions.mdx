@@ -7,7 +7,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 
 This page helps you end a user's session, and know what that cuts off.
 
-A [session](/concepts/sessions/) ends in one of four ways: someone ends it from the admin console or the API, the user signs out, the user's credentials change, or a different user signs in on the same browser. Each is a security action rather than housekeeping, so each one decides what happens to the tokens the session handed out. A session that merely expires is different: it revokes nothing.
+A [session](/concepts/sessions/) ends in one of four ways: someone ends it from the admin console or the API, the user signs out, the user's credentials change, or a different user signs in on the same browser. And when an app redeems an authorization code twice, the auth server ends the session the code came from if it had refresh tokens to revoke: see `auth_code_reuse_detected` in the [audit log](/concepts/audit-log/#signs-of-an-attack). Each is a security action rather than housekeeping, so each one decides what happens to the tokens the session handed out. A session that merely expires is different: it revokes nothing.
 
 ## End a session
 

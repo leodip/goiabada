@@ -68,7 +68,7 @@ The claims about the sign-in itself, such as `sub`, `iss`, `aud`, `exp`, `auth_t
 
 A permission scope names a permission: `product-api:read` is the permission `read` on the resource `product-api`.
 
-- When your app signs a user in, the token carries the permissions the user holds, directly or through a group, out of those it asked for. The rest are left out without an error.
+- When your app signs a user in, the token carries the permissions the user holds, directly or through a group, out of those it asked for. The rest are left out without an error, unless nothing is left: then the request is refused with `access_denied`.
 - With the client credentials flow, the token carries the permissions the client itself holds. Leave `scope` out to get all of them.
 - The administrative scopes, such as `authserver:manage`, need the client to be allowed to request them. See [administrative scopes](/concepts/clients/#administrative-scopes).
 

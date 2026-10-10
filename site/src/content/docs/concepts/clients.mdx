@@ -26,7 +26,7 @@ A client is any application that asks the auth server for tokens: a web app your
 
 5. If your app runs in a browser or on a phone, open **Authentication**, choose **Public client**, click **Save**, and confirm with **Yes**. Otherwise, copy the **Client secret** from there and keep it on your server.
 
-6. If users sign in to your app, open **Redirect URIs** and add the address your app receives the authorization code at, such as `https://app.example.com/callback`.
+6. If users sign in to your app, open **Redirect URIs**, enter the address your app receives the authorization code at, such as `https://app.example.com/callback`, click **Add**, then click **Save**.
 
 </Steps>
 
@@ -43,7 +43,7 @@ New clients are confidential. Switch to public on the **Authentication** tab.
 
 ## Client identifier
 
-The client identifier is 3 to 38 characters long. It starts with a letter, ends with a letter or digit, and uses only letters, digits, `-` and `_`, with no `--` or `__`.
+A client identifier you enter is 3 to 38 characters long. (A self-registered client's, `dcr_` and a UUID, is 40.) It starts with a letter, ends with a letter or digit, and uses only letters, digits, `-` and `_`, with no `--` or `__`.
 
 It's case-sensitive: `my-app` and `My-App` are two different clients, and a request whose `client_id` differs only in case finds no client.
 
@@ -61,7 +61,7 @@ The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authenti
 
 ## Public and confidential clients
 
-A confidential client proves who it is at the token endpoint with its client secret. The **Authentication** tab shows it (**Reveal**), and the audit log records each time it's read. **Generate new secret** makes a new one, which replaces the old one when you save, so your app needs it straight away.
+A confidential client proves who it is at the token endpoint with its client secret. The **Authentication** tab shows it behind **Reveal**. Opening the tab reads the secret, and each read leaves a `viewed_client_secret` entry in the audit log, whether or not you click **Reveal**. **Generate new secret** makes a new one, which replaces the old one when you save, so your app needs it straight away.
 
 A public client has no secret, so two rules make up for it:
 
@@ -89,6 +89,7 @@ Every redirect URI must:
 - **be absolute,** with a scheme. `/callback` and `//example.com/callback` are refused.
 - **name a host,** when it's `http` or `https`. `https:///example.com/callback` is refused. A custom scheme such as `com.example.app:/oauth2redirect` needs no host.
 - **have no fragment.** `https://example.com/callback#done` is refused. An encoded `%23` is fine.
+- **have well-formed percent-escapes.** `https://example.com/a%zz` is refused.
 - **fit the limits:** at most 2048 bytes each, at most 60 per client, and no duplicates.
 
 The scheme, host and fragment rules are checked again on every authorization request, so a stored redirect URI that breaks them gets an error page instead of a redirect.
@@ -113,7 +114,7 @@ Prefer `127.0.0.1` or `[::1]` to `localhost`. Resolving `localhost` isn't guaran
 
 Register a web origin when JavaScript in the browser calls `/auth/token`, `/auth/logout` or `/userinfo` directly, such as a single-page app. Without it, the browser blocks the call (CORS).
 
-An origin is a scheme, a host and an optional port, with nothing after the host: `https://app.example.com` or `https://app.example.com:8443`. The auth server stores it lowercased, without a default port or a trailing slash, and refuses anything it can't read that way.
+An origin is a scheme, a host and an optional port, with nothing after the host: `https://app.example.com` or `https://app.example.com:8443`. The auth server stores it lowercased, without a default port, and with any path, query or fragment dropped. It refuses what a browser would send differently, such as a scheme other than `http` or `https`, a non-ASCII host, an IPv6 literal or user information.
 
 **Web origins are permitted server-wide.** A browser's CORS check doesn't say which client is calling, so an origin registered on any client is accepted for every client. The **Web origins** tab lists every origin permitted server-wide, and the client each was registered for.
 
@@ -151,7 +152,7 @@ The ACR level is how strongly a user must sign in to use the client:
 | `urn:goiabada:level2_optional` | ACR level 2 - password + OTP (if enabled by the user) | A password, plus a one-time code if they've set up two-factor authentication |
 | `urn:goiabada:level2_mandatory` | ACR level 3 - password + mandatory OTP | A password and a one-time code, setting up two-factor authentication first if they haven't |
 
-New clients start at `urn:goiabada:level2_optional`. Change it on the client's **Settings** tab and click the **Save** at the bottom of the tab: the **Save** just under **May request administrative scopes** saves that switch alone, and the page reloads without your change.
+New clients start at `urn:goiabada:level2_optional`. The field shows only while **Authorization code with PKCE** is on. Change it on the client's **Settings** tab and click the **Save** at the bottom of the tab: the **Save** just under **May request administrative scopes** saves that switch alone, and the page reloads without your change.
 
 The default is a floor. An authorization request can ask for a stronger level with `acr_values`, but never a weaker one: the auth server uses the stronger of the two. A change applies to sign-ins that start after it. See [ACR and AMR](/concepts/acr-and-amr/).
 
@@ -178,7 +179,7 @@ Each switch leaves an `updated_client_administrative_scopes` event in the [audit
 
 ## Permissions
 
-The **Permissions** tab grants permissions to the client itself, for the client credentials flow: a token the client gets for itself can carry only these permissions. It has no effect on tokens a client gets for a user, which carry the user's permissions. See [Resources and permissions](/concepts/resources-and-permissions/).
+The **Permissions** tab grants permissions to the client itself, for the client credentials flow, and is available only while **Client credentials** is on: a token the client gets for itself can carry only these permissions. It has no effect on tokens a client gets for a user, which carry the user's permissions. See [Resources and permissions](/concepts/resources-and-permissions/).
 
 ## Tokens
 
@@ -192,7 +193,7 @@ A value of 0 uses the global setting. See [Tokens](/concepts/tokens/).
 
 ## Display name, description and logo
 
-Users see a client on the password, one-time code and consent screens. By default it's shown by its client identifier. On the **Settings** tab you can give it a **Display name** and a **Description**, up to 100 characters each, and a **Website URL**, which must be `http` or `https`. Each one shows only when its switch is on: **Show display name**, **Show description** and **Show website URL**.
+Users see a client on the password, one-time code and consent screens. By default it's shown by its client identifier, or by the display name you entered when you created it, which turns **Show display name** on. On the **Settings** tab you can give it a **Display name** and a **Description**, up to 100 bytes each, fewer characters with accents or in a non-Latin script, and a **Website URL**, which must be `http` or `https`. Each one shows only when its switch is on: **Show display name**, **Show description** and **Show website URL**.
 
 The **Logo** tab uploads a logo: a JPEG, PNG, GIF or WebP file of up to 3 MiB, which you crop and which is uploaded scaled to at most 512 pixels on its longest side, a GIF as PNG. See [Logo and picture](/reference/endpoints/logo-and-picture/#uploading) for what the Admin API takes. **Show logo** on the **Settings** tab puts it on the screens.
 
@@ -245,7 +246,7 @@ Because nobody has reviewed them, self-registered clients are treated more caref
 - **They start with consent on.** The consent screen shows the name the client gave itself, with a note that it registered itself and hasn't been verified. Give it a display name and turn on **Show display name** to replace both.
 - **They're never sent an error.** An error response is a redirect to the client, and anyone can point a self-registered client anywhere. So when the user declines or the auth server refuses the request, the user sees a page naming the app and the address it asked for, and the request stops there. `prompt=none` included.
 
-Once you've reviewed a self-registered client, you can change its settings like any other, **Consent required** included.
+Once you've reviewed a self-registered client, you can change its settings like any other, **Consent required** included. Its name became its **Description**, which may be up to 128 bytes, while the **Settings** tab saves at most 100: shorten a longer one before you save.
 
 <Aside type="caution">
 **Building a self-registered client?** You get no error response when a sign-in fails: it just never comes back. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/#the-user-sees-you-have-not-been-sent-anywhere).
