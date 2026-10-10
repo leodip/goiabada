@@ -166,7 +166,7 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 | `level1_password` | `HandleAuthLevel1Get` | unconditional |
 | `level1_password_completed` | `HandleAuthPwdPost` | password verified, user enabled |
 | `level1_existing_session` | `HandleAuthorizeGet` | valid session, hint matches, user enabled. The SSO shortcut: password entry is skipped and `/auth/level1completed` accepts this state directly |
-| `requires_level_2` | `HandleAuthLevel1CompletedGet` | target ACR above the owned session's ACR, or above level 1 with no owned session, or the session's `OtpConfigGeneration` differs from the user's and the target is above level 1. A ceremony that verified the password itself (`Level1AuthCompleted`) counts no session, so it lands here whenever the target is above level 1 (#537) |
+| `requires_level_2` | `HandleAuthLevel1CompletedGet` | target ACR above the owned session's ACR, or above level 1 with no owned session, or the session's `OtpConfigGeneration` differs from the user's and the target is above level 1, or the target is `level2_mandatory` and the user has no authenticator. A ceremony that verified the password itself (`Level1AuthCompleted`) counts no session, so it lands here whenever the target is above level 1 (#537) |
 | `level2_otp` | `HandleAuthLevel2Get` | `level2_optional` with OTP enabled, or `level2_mandatory` (enrolment happens at `/auth/otp` if needed) |
 | `authentication_completed` | `HandleAuthLevel1CompletedGet` | no step-up needed |
 | | `HandleAuthLevel2Get` | `level2_optional` and no OTP enrolled, which is the skip that bypasses `/auth/otp` entirely |
@@ -361,7 +361,7 @@ columns are `dont-update` (#242).
 | level2_mandatory | Yes | pwd+otp, ACR=level2_mandatory, AMR=[pwd,otp] |
 
 **SSO (valid session exists):**
-- Session ACR >= target ACR → SSO succeeds (keeps higher ACR in token)
+- Session ACR >= target ACR → SSO succeeds (keeps higher ACR in token), unless the target is `level2_mandatory` and the user has no authenticator now, who sets one up
 - Session ACR < target ACR → step-up required (prompt for OTP)
 - Session `OtpConfigGeneration` != user's + target requires level2 → re-prompt OTP
 
