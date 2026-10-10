@@ -151,12 +151,13 @@ func TestDecideCompletion(t *testing.T) {
 }
 
 // What /auth/completed does with the ceremony's user before an arm binds a session (#522 decision
-// 6). The ceremony authenticated at generation 7.
+// 6). The ceremony authenticated at generation 7, and names no one-time code unless claimsOTP says.
 func TestDecideBeforeBinding(t *testing.T) {
 	testCases := []struct {
-		name string
-		user *record.User
-		want beforeBindingAnswer
+		name      string
+		user      *record.User
+		claimsOTP bool
+		want      beforeBindingAnswer
 	}{
 		{name: "an enabled user at the ceremony's generation is bound",
 			user: &record.User{Enabled: true, AuthStateGeneration: 7}, want: beforeBindingBind},
@@ -175,11 +176,29 @@ func TestDecideBeforeBinding(t *testing.T) {
 			name: "a generation behind the ceremony's restarts as well",
 			user: &record.User{Enabled: true, AuthStateGeneration: 6}, want: beforeBindingGenerationMoved,
 		},
+		{
+			// The authenticator was removed while the ceremony was in flight, after it adopted a
+			// session naming it or verified a code itself (#542 decision 1).
+			name:      "a ceremony naming a code for a user with no authenticator restarts",
+			user:      &record.User{Enabled: true, AuthStateGeneration: 7},
+			claimsOTP: true, want: beforeBindingAuthenticatorRemoved,
+		},
+		{name: "a ceremony naming a code for a user with an authenticator is bound",
+			user:      &record.User{Enabled: true, AuthStateGeneration: 7, OTPEnabled: true},
+			claimsOTP: true, want: beforeBindingBind},
+		{name: "a ceremony naming no code is bound whatever the user has",
+			user: &record.User{Enabled: true, AuthStateGeneration: 7}, want: beforeBindingBind},
+		{name: "a disabled user is refused before the authenticator is asked about",
+			user:      &record.User{Enabled: false, AuthStateGeneration: 7},
+			claimsOTP: true, want: beforeBindingUserDisabled},
+		{name: "a moved generation is named before a removed authenticator",
+			user:      &record.User{Enabled: true, AuthStateGeneration: 8},
+			claimsOTP: true, want: beforeBindingGenerationMoved},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, decideBeforeBinding(tc.user, 7))
+			assert.Equal(t, tc.want, decideBeforeBinding(tc.user, 7, tc.claimsOTP))
 		})
 	}
 }

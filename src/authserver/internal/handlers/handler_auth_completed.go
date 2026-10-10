@@ -118,7 +118,7 @@ func HandleAuthCompletedGet(
 				return
 			}
 
-			switch decideBeforeBinding(user, authContext.AuthStateGeneration) {
+			switch decideBeforeBinding(user, authContext.AuthStateGeneration, authContext.ClaimsOTP()) {
 			case beforeBindingUserMissing:
 				pageRenderer.InternalServerError(w, r, errs.New("user not found"))
 				return
@@ -131,6 +131,10 @@ func HandleAuthCompletedGet(
 				return
 			case beforeBindingGenerationMoved:
 				slog.WarnContext(r.Context(), "the user's authentication generation has moved on since this ceremony authenticated, restarting level 1 instead of binding a session",
+					"ceremony_user_id", authContext.UserId)
+				plan = completionPlan{arm: completionArmRestart}
+			case beforeBindingAuthenticatorRemoved:
+				slog.WarnContext(r.Context(), "this ceremony names a one-time code and the user no longer has an authenticator, restarting level 1 instead of binding a session",
 					"ceremony_user_id", authContext.UserId)
 				plan = completionPlan{arm: completionArmRestart}
 			}
@@ -377,6 +381,9 @@ const (
 	beforeBindingUserDisabled
 	// beforeBindingGenerationMoved restarts the ceremony at level 1 (restart route 1).
 	beforeBindingGenerationMoved
+	// beforeBindingAuthenticatorRemoved restarts the ceremony at level 1 (restart route 1): it names
+	// a one-time code and the user has no authenticator now.
+	beforeBindingAuthenticatorRemoved
 )
 
 // decideBeforeBinding decides on the ceremony's user before either arm binds a session (#522
@@ -396,8 +403,16 @@ const (
 //   - a generation other than the ceremony's is restarted at level 1, the restart /auth/issue would
 //     perform one step later, compared as the token endpoint compares it at redemption. It is never
 //     the user's current value read into the ceremony, which would launder a sign-in that began
-//     before a credential change into the generation that change established (#106 decision 11).
-func decideBeforeBinding(user *record.User, ceremonyGeneration int64) beforeBindingAnswer {
+//     before a credential change into the generation that change established (#106 decision 11);
+//   - a ceremony whose methods name a one-time code (claimsOTP) for a user with no authenticator now
+//     is restarted at level 1 too. Removing an authenticator lowers the user's sessions
+//     (otpcredential.Remove), but a ceremony in flight adopted the session's methods before that,
+//     and binding it would merge otp back into the lowered session, raised to the ceremony's
+//     target, and every later SSO token would claim the removed authenticator again. A code this
+//     ceremony verified itself and the user removed since is restarted alike: what it attests is
+//     gone. The restart asks for the password, and for whatever the target needs after it
+//     (#542 decision 1).
+func decideBeforeBinding(user *record.User, ceremonyGeneration int64, claimsOTP bool) beforeBindingAnswer {
 	if user == nil {
 		return beforeBindingUserMissing
 	}
@@ -406,6 +421,9 @@ func decideBeforeBinding(user *record.User, ceremonyGeneration int64) beforeBind
 	}
 	if user.AuthStateGeneration != ceremonyGeneration {
 		return beforeBindingGenerationMoved
+	}
+	if claimsOTP && !user.OTPEnabled {
+		return beforeBindingAuthenticatorRemoved
 	}
 	return beforeBindingBind
 }

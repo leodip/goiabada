@@ -380,6 +380,14 @@ func TestHandleAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T) {
 	// that is gone.
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).Return(int64(1), nil).
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
+	// And the user's sessions are lowered to what a password alone earns, in the same transaction,
+	// so none goes on naming the authenticator once it is gone (#542 decision 1).
+	database.On("GetUserSessionsByUserId", mock.Anything, otpDisableTx, user.Id).
+		Return([]record.UserSession{{Id: 7, UserId: user.Id, AcrLevel: record.AcrLevel2Mandatory, AuthMethods: "pwd otp"}}, nil).
+		Run(func(mock.Arguments) { calls = append(calls, "sessions") }).Once()
+	database.On("UpdateUserSession", mock.Anything, otpDisableTx, mock.MatchedBy(func(session *record.UserSession) bool {
+		return session.Id == 7 && session.AcrLevel == record.AcrLevel2Optional && session.AuthMethods == "pwd"
+	})).Return(nil).Run(func(mock.Arguments) { calls = append(calls, "lower") }).Once()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventDisabledOTP, map[string]interface{}{
@@ -392,9 +400,9 @@ func TestHandleAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T) {
 		ServeHTTP(rr, accountOTPDisableRequest(t, subject, password))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, []string{"begin", "remove", "reset", "increment", "commit"}, calls,
-		"all three writes belong inside one transaction, otp_enabled first per #111 decision 10, "+
-			"the counter advance last before the commit per #242 decision 2")
+	assert.Equal(t, []string{"begin", "remove", "reset", "increment", "sessions", "lower", "commit"}, calls,
+		"every write belongs inside one transaction, otp_enabled first per #111 decision 10, "+
+			"the counter advance per #242 decision 2 and the sessions lowered per #542 decision 1")
 	assert.False(t, user.OTPEnabled)
 	assert.Empty(t, user.OTPSecretEncrypted, "the authenticator's secret goes with it")
 }

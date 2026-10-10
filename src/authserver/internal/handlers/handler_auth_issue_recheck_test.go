@@ -444,6 +444,64 @@ func TestHandleIssueGet_AStaleGenerationRestartsTheCeremony(t *testing.T) {
 	})
 }
 
+// A ceremony naming a one-time code for a user whose authenticator was removed while it sat on a
+// step is not issued: the code it names is from an authenticator that is gone, and removing one
+// lowers the sessions but cannot reach a ceremony in flight. It restarts at level 1, or is answered
+// login_required when the request forbids UI, as a stale generation is (#542 decision 1).
+func TestHandleIssueGet_ARemovedAuthenticatorRestartsTheCeremony(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		responseType string
+		inFragment   bool
+	}{
+		{"code", "code", false},
+		{"implicit", "id_token token", true},
+	} {
+		t.Run(tc.name+", interactive, restarts at level 1 and writes nothing to the client", func(t *testing.T) {
+			f := newRecheckFixture(t, tc.responseType, "")
+			f.authContext.AuthMethods = "pwd otp"
+			f.user.OTPEnabled = false
+			logs := logtest.CaptureSlog(t)
+
+			var saved *ceremony.AuthContext
+			f.ceremonyStore.On("SaveAuthContext", f.rr, f.req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+				return ac.AuthState == ceremony.AuthStateRequiresLevel1
+			})).Run(func(args mock.Arguments) { saved = args.Get(2).(*ceremony.AuthContext) }).Return(nil).Once()
+
+			f.serve()
+
+			require.Equal(t, http.StatusFound, f.rr.Code)
+			assert.Equal(t, testCeremonyId, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"))
+			require.NotNil(t, saved)
+			assert.Empty(t, saved.AuthMethods, "the attempt, and the code it named, are discarded with the restart")
+			f.assertNothingIssued(t)
+			f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+
+			warning, ok := warningSaying(t, logs, "the user no longer has an authenticator")
+			if ok {
+				assert.EqualValues(t, 123, warning.Attrs["ceremony_user_id"])
+			}
+		})
+
+		t.Run(tc.name+", silent, is answered login_required", func(t *testing.T) {
+			f := newRecheckFixture(t, tc.responseType, "none")
+			f.authContext.AuthMethods = "pwd otp"
+			f.user.OTPEnabled = false
+
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil).Once()
+
+			f.serve()
+
+			require.Equal(t, http.StatusFound, f.rr.Code)
+			params := answerParams(t, f.rr.Header().Get("Location"), tc.inFragment)
+			assert.Equal(t, "login_required", params.Get("error"))
+			assert.Equal(t, "User authentication is required", params.Get("error_description"))
+			f.assertNothingIssued(t)
+			f.ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
 // The implicit grant now signs inside a transaction that takes the session row first, so the
 // session can be found gone at the signing as well as at the liveness read above it. The answer is
 // the read's, written only after the issuer has returned (its rollback), and nothing is attested

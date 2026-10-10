@@ -35,6 +35,10 @@ type issuanceWorld struct {
 	noUser          bool
 	userDisabled    bool
 	generationDrift int64
+	// claimsOTP says the ceremony's methods name a one-time code, and noAuthenticator that the user
+	// has none now; every other ceremony's user has one (#542 decision 1).
+	claimsOTP       bool
+	noAuthenticator bool
 	// session is whether the identifier names a row; owned and valid are about that row, and valid
 	// is also HasValidUserSession's answer for no row, which is false.
 	session bool
@@ -53,6 +57,7 @@ func driveIssuance(t *testing.T, world issuanceWorld) (issuanceAnswer, []issuanc
 		responseType:             world.responseType,
 		hintSubject:              world.hint,
 		authStateGeneration:      ceremonyGeneration,
+		claimsOTP:                world.claimsOTP,
 		sessionIdentifierPresent: world.identifier,
 	}
 	var asked []issuanceFact
@@ -82,6 +87,7 @@ func driveIssuance(t *testing.T, world issuanceWorld) (issuanceAnswer, []issuanc
 					Subject:             world.userSubject,
 					Enabled:             !world.userDisabled,
 					AuthStateGeneration: ceremonyGeneration + world.generationDrift,
+					OTPEnabled:          !world.noAuthenticator,
 				}
 			}
 		case issuanceFactSession:
@@ -465,6 +471,37 @@ func TestDecideIssuance(t *testing.T) {
 			name:      "a disabled user outranks a stale generation",
 			world:     with(func(w *issuanceWorld) { w.userDisabled = true; w.generationDrift = 1 }),
 			want:      issuanceAnswer{outcome: issuanceRefuseUserDisabled},
+			wantReads: []issuanceFact{registration, flows, session, validity, user},
+		},
+		{
+			// The authenticator was removed while the ceremony sat on a step (#542 decision 1).
+			name:      "a ceremony naming a code for a user with no authenticator restarts",
+			world:     with(func(w *issuanceWorld) { w.claimsOTP = true; w.noAuthenticator = true }),
+			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionAuthenticatorRemoved},
+			wantReads: []issuanceFact{registration, flows, session, validity, user},
+		},
+		{
+			name:      "an implicit ceremony naming a removed authenticator restarts too",
+			world:     with(func(w *issuanceWorld) { w.responseType = "id_token"; w.claimsOTP = true; w.noAuthenticator = true }),
+			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionAuthenticatorRemoved},
+			wantReads: []issuanceFact{registration, flows, session, validity, user},
+		},
+		{
+			name:      "a ceremony naming a code for a user who has an authenticator issues",
+			world:     with(func(w *issuanceWorld) { w.claimsOTP = true }),
+			want:      issuanceAnswer{outcome: issuanceIssueCode},
+			wantReads: []issuanceFact{registration, flows, session, validity, user, scope},
+		},
+		{
+			name:      "a ceremony naming no code issues for a user with no authenticator",
+			world:     with(func(w *issuanceWorld) { w.noAuthenticator = true }),
+			want:      issuanceAnswer{outcome: issuanceIssueCode},
+			wantReads: []issuanceFact{registration, flows, session, validity, user, scope},
+		},
+		{
+			name:      "a stale generation is named before a removed authenticator",
+			world:     with(func(w *issuanceWorld) { w.generationDrift = 1; w.claimsOTP = true; w.noAuthenticator = true }),
+			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionGenerationStale},
 			wantReads: []issuanceFact{registration, flows, session, validity, user},
 		},
 		{

@@ -772,6 +772,29 @@ func TestAddAuthMethod(t *testing.T) {
 	}
 }
 
+// ClaimsOTP reads the method list as AddAuthMethod writes it: whole values, so a name that merely
+// contains otp is not one (#542 decision 1).
+func TestClaimsOTP(t *testing.T) {
+	testCases := []struct {
+		methods string
+		want    bool
+	}{
+		{"", false},
+		{"pwd", false},
+		{"pwd otp", true},
+		{"otp", true},
+		{"otp pwd", true},
+		{"xotp", false},
+		{"pwd otpx", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.methods, func(t *testing.T) {
+			assert.Equal(t, tc.want, (&AuthContext{AuthMethods: tc.methods}).ClaimsOTP())
+		})
+	}
+}
+
 // =============================================================================
 // Tests for SetScope / HasScope
 // =============================================================================

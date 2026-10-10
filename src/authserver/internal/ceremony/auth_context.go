@@ -343,6 +343,14 @@ func (ac *AuthContext) AddAuthMethod(method oidc.AuthMethod) {
 	ac.AuthMethods = ac.AuthMethods + " " + value
 }
 
+// ClaimsOTP reports whether AuthMethods names a one-time code, verified in this ceremony or adopted
+// from the session it reuses. /auth/completed and /auth/issue restart a ceremony that does when its
+// user has no authenticator any more: the code it names was from one removed since, and binding or
+// issuing it would put otp back on a session the removal lowered, or in a token (#542 decision 1).
+func (ac *AuthContext) ClaimsOTP() bool {
+	return slices.Contains(strings.Fields(ac.AuthMethods), oidc.AuthMethodOTP.String())
+}
+
 // RequestedMaxAge is the client's max_age as every hop after /auth/authorize reads it: nil when
 // the request carried none, otherwise the value oidc.ParseMaxAge reads from the raw parameter.
 //

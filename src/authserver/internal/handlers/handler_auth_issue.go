@@ -68,6 +68,7 @@ func HandleIssueGet(
 			responseType:             authContext.ResponseType,
 			hintSubject:              authContext.IdTokenHintSub,
 			authStateGeneration:      authContext.AuthStateGeneration,
+			claimsOTP:                authContext.ClaimsOTP(),
 			sessionIdentifierPresent: sessionIdentifier != "",
 		}
 
@@ -362,7 +363,7 @@ type clientFlows struct {
 	code     bool
 }
 
-// issuanceFacts is what decideIssuance decides from. The first five are known from the ceremony
+// issuanceFacts is what decideIssuance decides from. The first six are known from the ceremony
 // and the request; every other fact is unknown until HandleIssueGet has loaded it, a nil pointer or
 // a false loaded flag.
 type issuanceFacts struct {
@@ -371,6 +372,8 @@ type issuanceFacts struct {
 	hintSubject  string
 	// authStateGeneration is the generation the ceremony authenticated at, as its context holds it.
 	authStateGeneration int64
+	// claimsOTP is AuthContext.ClaimsOTP: the ceremony's methods name a one-time code.
+	claimsOTP bool
 	// sessionIdentifierPresent says the request resolved a session identifier.
 	sessionIdentifierPresent bool
 
@@ -457,7 +460,9 @@ type issuanceFacts struct {
 //     revocation moves the user's on, and a ceremony at any other value would be issued a code that
 //     endpoint refuses, or tokens signed under a credential that is no longer current. It is
 //     restarted at level 1 instead, or told login_required when the request forbids UI, as a
-//     session that is gone is (#197, #106).
+//     session that is gone is (#197, #106). A ceremony whose methods name a one-time code is answered
+//     the same way when the user has no authenticator now: the code it names is from one removed
+//     since, which a token must not claim (#542 decision 1).
 //  6. The user holds at least one of the scopes to be issued, re-filtered against the LIVE
 //     permissions immediately before anything is minted. /auth/completed's filter is the only other
 //     live check, and nothing downstream catches a removal: the authorization_code grant never
@@ -535,6 +540,9 @@ func decideIssuance(f issuanceFacts) (issuanceAnswer, issuanceFact) {
 	}
 	if f.user.AuthStateGeneration != f.authStateGeneration {
 		return issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionGenerationStale}, issuanceFactNone
+	}
+	if f.claimsOTP && !f.user.OTPEnabled {
+		return issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionAuthenticatorRemoved}, issuanceFactNone
 	}
 
 	if f.effectiveScope == nil {
@@ -770,10 +778,10 @@ func newCreateCodeInput(authContext *ceremony.AuthContext, sessionIdentifier str
 	}
 }
 
-// sessionRefusalShape names which of the four conditions refuseIssuanceUnusableSession is answering:
-// three on the session backing a ceremony and one on the credential it authenticated with. The
+// sessionRefusalShape names which of the five conditions refuseIssuanceUnusableSession is answering:
+// three on the session backing a ceremony and two on the credentials it authenticated with. The
 // three session conditions are mutually exclusive by construction: a row that is absent cannot be
-// foreign, and a foreign one is refused on ownership before its clock is read. The fourth is
+// foreign, and a foreign one is refused on ownership before its clock is read. The other two are
 // reached only after the session has passed all three.
 type sessionRefusalShape int
 
@@ -794,13 +802,18 @@ const (
 	// or a revocation, so what this ceremony proved is no longer current. Answered like the other
 	// three, because whoever signs in next must prove it again (#197, #106).
 	sessionGenerationStale
+	// sessionAuthenticatorRemoved is a ceremony whose methods name a one-time code for a user who has
+	// no authenticator now: removed since the ceremony verified it, or since it adopted a session
+	// that named it. Removing one lowers the user's sessions, and issuing here would put the removed
+	// authenticator in a code that the lowering cannot reach (#542 decision 1).
+	sessionAuthenticatorRemoved
 )
 
 // refuseIssuanceUnusableSession is /auth/issue's one answer to "this ceremony cannot bind a grant
 // to this session", and it exists as a function because the handler reaches that conclusion at
-// several points: the liveness read above the response-type dispatch, the generation check beside
-// it, and below the dispatch the acquisition that orders the code insert, or the signing of the
-// implicit tokens, against a session termination. Decision 3 of #139 is that one condition gets one
+// several points: the liveness read above the response-type dispatch, the generation and
+// authenticator checks beside it, and below the dispatch the acquisition that orders the code
+// insert, or the signing of the implicit tokens, against a session termination. Decision 3 of #139 is that one condition gets one
 // answer wherever it is learned, and a shared implementation is what makes that checkable rather
 // than a claim about blocks that currently agree.
 //
@@ -861,6 +874,9 @@ func refuseIssuanceUnusableSession(
 		case sessionGenerationStale:
 			slog.WarnContext(r.Context(), "the user's authentication generation has moved on since this silent ceremony authenticated, returning login_required instead of issuing anything",
 				"ceremony_user_id", authContext.UserId)
+		case sessionAuthenticatorRemoved:
+			slog.WarnContext(r.Context(), "this silent ceremony names a one-time code and the user no longer has an authenticator, returning login_required instead of issuing anything",
+				"ceremony_user_id", authContext.UserId)
 		default:
 			slog.WarnContext(r.Context(), "the session backing this silent ceremony is gone, returning login_required instead of issuing a code",
 				"session_identifier", sessionIdentifier)
@@ -894,6 +910,9 @@ func refuseIssuanceUnusableSession(
 			"session_user_id", ambientSession.UserId)
 	case sessionGenerationStale:
 		slog.WarnContext(r.Context(), "the user's authentication generation has moved on since this ceremony authenticated, restarting level 1 instead of issuing anything",
+			"ceremony_user_id", authContext.UserId)
+	case sessionAuthenticatorRemoved:
+		slog.WarnContext(r.Context(), "this ceremony names a one-time code and the user no longer has an authenticator, restarting level 1 instead of issuing anything",
 			"ceremony_user_id", authContext.UserId)
 	default:
 		slog.WarnContext(r.Context(), "the session backing this ceremony is gone, restarting level 1 instead of issuing a code",

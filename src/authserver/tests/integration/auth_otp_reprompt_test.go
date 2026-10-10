@@ -24,9 +24,10 @@ import (
 // follows the redirect chain, and returns where it stopped along with the page and the URL of that
 // page.
 //
-// It stops at whichever of /auth/otp or /auth/issue it reaches. Those are the two answers these
-// cases are asking about: "the second factor was demanded again" and "SSO went straight through".
-// The caller closes the body.
+// It stops at whichever of /auth/otp, /auth/issue or /auth/level1 it reaches. The first two are the
+// answers most of these cases are asking about, "the second factor was demanded again" and "SSO
+// went straight through"; the third is the ceremony starting over, which a session naming a removed
+// authenticator gets (#542 decision 1). The caller closes the body.
 func authorizeOnExistingSession(t *testing.T, httpClient *http.Client, client *record.Client,
 	redirectUri *record.RedirectURI) (string, *http.Response, string) {
 
@@ -60,14 +61,14 @@ func authorizeOnExistingSession(t *testing.T, httpClient *http.Client, client *r
 		if err != nil {
 			t.Fatal(err)
 		}
-		if parsed.Path == "/auth/otp" || parsed.Path == "/auth/issue" {
+		if parsed.Path == "/auth/otp" || parsed.Path == "/auth/issue" || parsed.Path == "/auth/level1" {
 			return parsed.Path, loadPage(t, httpClient, location), location
 		}
 		resp = loadPage(t, httpClient, location)
 	}
 
 	_ = resp.Body.Close()
-	t.Fatal("the ceremony did not reach /auth/otp or /auth/issue within six redirects")
+	t.Fatal("the ceremony did not reach /auth/otp, /auth/issue or /auth/level1 within six redirects")
 	return "", nil, ""
 }
 
@@ -188,7 +189,9 @@ func TestOtpCeremony_BrowserEnrolmentDoesNotOweAnImmediatePrompt(t *testing.T) {
 // the level 3 client, must ask them to set up a new authenticator, which is what Require two-factor
 // authentication promises. Until the step-up rule checked for an authenticator apart from the
 // generation, it reached /auth/issue instead and issued a level 3 code from the session's old
-// code, while prompt=none at the same client answered interaction_required.
+// code, while prompt=none at the same client answered interaction_required. The removal lowers the
+// session to level 2 optional now (#542 decision 1), so the level alone sends ceremony three to set
+// one up; a session still at level 3 is TestOtpCeremony_ASessionStillNamingARemovedAuthenticatorSignsInAgain's.
 func TestOtpCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
 	client, redirectUri, user, password, otpSecret := createLevel2MandatoryUser(t, true)
 
@@ -208,17 +211,8 @@ func TestOtpCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	_ = resp.Body.Close()
 
-	// The authenticator is turned off. Standing in for the disable handlers, which clear the
-	// secret, reset the consumed step and move the counter in one transaction.
-	user.OTPEnabled = false
-	user.OTPSecretEncrypted = nil
-	if err = database.UpdateUser(context.Background(), nil, user); err != nil {
-		t.Fatal(err)
-	}
-	if err = database.ResetUserOTPStep(context.Background(), nil, user.Id); err != nil {
-		t.Fatal(err)
-	}
-	advanceOtpConfigGeneration(t, user.Id)
+	// An administrator turns the authenticator off.
+	removeAuthenticatorAsAdministrator(t, user.Id)
 
 	// Ceremony two, at a level 2 optional client: no authenticator, so no code, straight through.
 	optionalClient := &record.Client{

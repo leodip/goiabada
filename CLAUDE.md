@@ -58,7 +58,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imageupload,uithemes}/` - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, image uploads, themes
 - `internal/revocation/` - The five revocation operations, their results, reason constants and audit helpers. No handler package owns revocation orchestration or its transactions any more (#387)
 - `internal/reqctx/` - The five request-scoped values (settings, session identifier, bearer token, validated token, and the credential reservation a failures-only rate-limit tier holds), each written by one middleware and read through a typed accessor; services take theirs as parameters, and the context-value guard holds every module file to them with no exemption (#433, #439)
-- `internal/otpcredential/` - The stored TOTP credential: establish, remove, verify a stored or a supplied code, and the seed's encryption at rest. `internal/otp` underneath stays the stateless primitive (#387)
+- `internal/otpcredential/` - The stored TOTP credential: establish, remove, verify a stored or a supplied code, and the seed's encryption at rest. A removal also lowers the user's sessions to what a password alone reaches, in the same transaction (#542). `internal/otp` underneath stays the stateless primitive (#387)
 - `internal/userclaims/` - The one stored-user-to-OIDC-claims conversion, serving `/userinfo` and issuance from the same mapper, with the two places those two disagree — the base URL and which include flag filters groups and attributes — as inputs rather than merged away. `updated_at` was a third until it turned out to be a defect: it rides with the `profile` scope at every site now, which is what OIDC Core 5.4 and this repository's own docs site both say it is, where issuance used to emit it for any scope beyond a lone `openid` and, in an access token, for a lone `openid` too, because the audience loop extends the scope slice before the claim block reads it (#387, #422)
 - `internal/userconsent/` - The stored consent a user gives a client: `Record` reads the row and creates or rewrites it with the scope the consent screen granted, replacing it whole. The handler parses, decides and answers (#437)
 - `internal/authorizerequest/` - The authorization request a POST to `/auth/authorize` parks for the GET it is answered with: `Park` stores it under a one-time handle (only its digest is kept), `Consume` takes it once. The POST touches nothing of the browser's own session, because a cross-site POST arrives without the Lax cookie (#246, #437)
@@ -161,8 +161,8 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 | State | Assigned by | When |
 |---|---|---|
 | `requires_level_1` | `HandleAuthorizeGet` | four conditions: a deferred error is parked; `prompt=login`; `id_token_hint` names another user; no valid session |
-| | `HandleAuthCompletedGet` | no reusable session and `!Level1AuthCompleted`, or the user's authentication generation moved on since the ceremony authenticated, checked before any session is bound (restart route 1, through `Restart()`) |
-| | `refuseIssuanceUnusableSession` | bound session gone, expired or foreign, or the user's authentication generation moved on since the ceremony authenticated, and not `prompt=none` (restart route 2, through `Restart()`) |
+| | `HandleAuthCompletedGet` | no reusable session and `!Level1AuthCompleted`, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` and the user has no authenticator now, checked before any session is bound (restart route 1, through `Restart()`) |
+| | `refuseIssuanceUnusableSession` | bound session gone, expired or foreign, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` and the user has no authenticator now, and not `prompt=none` (restart route 2, through `Restart()`) |
 | `level1_password` | `HandleAuthLevel1Get` | unconditional |
 | `level1_password_completed` | `HandleAuthPwdPost` | password verified, user enabled |
 | `level1_existing_session` | `HandleAuthorizeGet` | valid session, hint matches, user enabled. The SSO shortcut: password entry is skipped and `/auth/level1completed` accepts this state directly |
@@ -219,9 +219,10 @@ user holds; the attempt is everything an authentication writes. A restart keeps 
 discards the attempt: `AuthContext.Restart()` zeroes every attempt field, puts `Scope` back from
 `RequestedScope` and sets `requires_level_1`, so the second pass earns its own `amr`, scope and
 consent (#140, #436). There are two restart routes: `HandleAuthCompletedGet` when no session is
-reusable and level 1 was never completed, or when the user's generation has moved on, decided before
+reusable and level 1 was never completed, or when the user's generation has moved on, or when the
+ceremony names `otp` for a user with no authenticator now (#542), decided before
 it binds a session (#522), and `refuseIssuanceUnusableSession` at `/auth/issue` when the
-bound session is gone, expired or foreign, or the user's generation has moved on, and the request is not `prompt=none`. The split is held by
+bound session is gone, expired or foreign, or the user's generation has moved on, or the ceremony names `otp` for a user with no authenticator now, and the request is not `prompt=none`. The split is held by
 `TestAuthContextFields_EveryFieldIsClassifiedOnce` in `ceremony`, which fails on a field in neither
 list. Request fields are written only in `HandleAuthorizeGet`, which
 `TestRequestFields_WrittenOnlyAtAuthorize` in `ceremony` holds with `go/types`.
@@ -249,7 +250,7 @@ one definition, `protocolvalidation.IsSupportedResponseMode`, shared by the hand
 - Otherwise the session is reused (the `level1_existing_session` SSO shortcut), and:
 - If session ACR is `level1` and target is `level2_*` → redirect to level2
 - If session ACR is `level2_optional` and target is `level2_mandatory` → redirect to level2
-- If the target is `level2_mandatory` and the user has no authenticator now (removed since the session reached level 3) → redirect to level2, where they set one up. Checked apart from the generation, because a `level2_optional` ceremony answers a moved generation for such a user by skipping the code and promoting it
+- If the target is `level2_mandatory` and the user has no authenticator now → redirect to level2, where they set one up. A removal lowers the user's sessions below level 3 (#542), so this is a session that still claims level 3 without one, such as one from an earlier release. Checked apart from the generation, because a `level2_optional` ceremony answers a moved generation for such a user by skipping the code and promoting it
 - If the session's `OtpConfigGeneration` differs from the user's → re-auth level2 (user changed OTP settings). This block writes nothing: the obligation is discharged at `/auth/completed`
 - Otherwise → auth completed
 
@@ -342,6 +343,16 @@ transaction as the write that changed it. `user_sessions.otp_config_generation` 
 that session last satisfied, so a session owes a level 2 re-prompt whenever the two differ. Being per user means one
 statement covers every session of that user.
 
+A removal also lowers each of the user's sessions, in the same transaction, to what a password alone
+reaches: `otp` leaves `auth_methods`, and `level2_mandatory` becomes `level2_optional`; `auth_time`
+stays. Without it a session that reached level 3 went on claiming level 3 and `["pwd","otp"]` in every
+SSO token after the authenticator was gone. A ceremony in flight adopted the session's methods before
+the lowering, so `/auth/completed` and `/auth/issue` restart one whose methods name `otp` for a user
+with no authenticator now (`AuthContext.ClaimsOTP`), rather than merging `otp` back into the session
+or issuing it in a code; `prompt=none` there answers `login_required`. Tokens already issued, and the
+refresh tokens that renew them, keep their claims: ending the user's sessions revokes those (#542
+decision 1).
+
 Both readers, `HandleAuthLevel1CompletedGet` and `handlePromptNone`, only compare and write nothing,
 so an abandoned ceremony spends no re-prompt. The snapshot is captured onto `AuthContext` at
 `handler_auth_pwd` and on every arm of `HandleAuthLevel2Get`, and promoted once, at
@@ -362,6 +373,7 @@ columns are `dont-update` (#242).
 
 **SSO (valid session exists):**
 - Session ACR >= target ACR → SSO succeeds (keeps higher ACR in token), unless the target is `level2_mandatory` and the user has no authenticator now, who sets one up
+- The user's authenticator removed → the session is already lowered to `level2_optional` and `pwd`, and every later token says so (#542)
 - Session ACR < target ACR → step-up required (prompt for OTP)
 - Session `OtpConfigGeneration` != user's + target requires level2 → re-prompt OTP
 

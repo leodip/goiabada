@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"errors"
@@ -1379,7 +1380,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 
-		user := &record.User{Id: 1, Enabled: true}
+		user := &record.User{Id: 1, Enabled: true, OTPEnabled: true}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
@@ -1567,7 +1568,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 
-		user := &record.User{Id: 1, Enabled: true}
+		user := &record.User{Id: 1, Enabled: true, OTPEnabled: true}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
@@ -1657,7 +1658,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
-		user := &record.User{Id: 1, Enabled: true, AuthStateGeneration: 7}
+		user := &record.User{Id: 1, Enabled: true, OTPEnabled: true, AuthStateGeneration: 7}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
@@ -2903,7 +2904,7 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 			userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
 				mock.AnythingOfType("*int64")).Return(true)
-			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true}, nil).Once()
 
 			failure := errors.New("write failed")
 			errAt := func(step int) error {
@@ -2988,11 +2989,17 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 	users := []struct {
 		name string
 		user *record.User
+		// methods is the ceremony's, "pwd" when empty.
+		methods string
 	}{
 		{name: "a disabled user", user: &record.User{Id: 1, Enabled: false, AuthStateGeneration: ceremonyGeneration}},
 		{name: "a disabled user whose generation also moved on",
 			user: &record.User{Id: 1, Enabled: false, AuthStateGeneration: ceremonyGeneration + 1}},
 		{name: "a moved-on generation", user: &record.User{Id: 1, Enabled: true, AuthStateGeneration: ceremonyGeneration + 1}},
+		// The ceremony names a code and the user's authenticator was removed while it was in
+		// flight: binding would put otp back on the session the removal lowered (#542 decision 1).
+		{name: "an authenticator removed since the ceremony named its code",
+			user: &record.User{Id: 1, Enabled: true, AuthStateGeneration: ceremonyGeneration}, methods: "pwd otp"},
 		{name: "a missing user"},
 	}
 
@@ -3026,7 +3033,7 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 					ResponseMode:        "query",
 					RedirectURI:         "https://example.com/callback",
 					State:               "some-state",
-					AuthMethods:         "pwd",
+					AuthMethods:         cmp.Or(u.methods, "pwd"),
 					AuthStateGeneration: ceremonyGeneration,
 					AuthenticatedAt:     &authenticatedAt,
 					Level1AuthCompleted: arm.level1Completed,
