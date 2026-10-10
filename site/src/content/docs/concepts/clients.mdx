@@ -161,7 +161,7 @@ The default is a floor. An authorization request can ask for a stronger level wi
 Six permissions on the `authserver` resource let whoever holds them administer Goiabada: `authserver:manage`, `authserver:admin-read`, `authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings` and `authserver:browser-sessions`. A token carrying one of them on a user's behalf acts at the Admin API with that user's authority. So **only a client allowed to request the administrative scopes may get one**:
 
 - **The admin console's own client,** always. Its allowance can't be switched off.
-- **Any other client you allow.** Turn on **May request administrative scopes** on the client's **Settings** tab and save it with that switch's own **Save** button, or call [the Admin API](/reference/api/admin/operations/updateclientadministrativescopes/). Only an administrator with `authserver:manage` can switch it, on or off.
+- **Any other client you allow.** Turn on **May request administrative scopes** on the client's **Settings** tab, save it with that switch's own **Save** button, and confirm with **Yes**, or call [the Admin API](/reference/api/admin/operations/updateclientadministrativescopes/). Only an administrator with `authserver:manage` can switch it, on or off.
 
 Every other client starts not allowed, including one that registers itself, which has no way to ask.
 
