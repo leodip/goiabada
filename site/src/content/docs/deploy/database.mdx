@@ -19,7 +19,7 @@ By default the auth server creates its database at its first start, which needs 
 
 2. Give the login Goiabada uses full rights inside that database, and nothing outside it.
 
-3. Set `GOIABADA_DB_CREATE=false`. The auth server then issues no `CREATE DATABASE`, and opens no connection to `master` or `postgres`.
+3. Set `GOIABADA_DB_CREATE=false`, so the auth server doesn't look for the database through `postgres` or `master`, which such a login may not reach. It then issues no `CREATE DATABASE` either.
 
 </Steps>
 
@@ -27,11 +27,13 @@ The auth server creates every table itself, at each start, as [Upgrade Goiabada]
 
 ## Where the database sits
 
-<Aside type="caution" title="The connection to the database isn't protected">
-Goiabada has no setting that encrypts its connection to the database and checks whose server it reached. On MySQL and SQL Server the connection is plain text. On PostgreSQL it's encrypted when the server offers TLS, without checking the server's certificate.
+<Aside type="caution" title="Goiabada doesn't check whose database server it reached">
+The auth server encrypts its connection to the database when the server offers TLS, without checking the server's certificate: on PostgreSQL and MySQL whenever the server supports TLS, and on SQL Server for the login, and for the whole session when the server forces encryption, as Azure SQL Database does. A server that requires TLS, such as a MySQL with `require_secure_transport`, is reached.
+
+Only on PostgreSQL can the auth server check the certificate: set PostgreSQL's own `PGSSLMODE=verify-full` in the auth server's environment, with `PGSSLROOTCERT` naming the file of the CA certificate that signed the database's, or `SSL_CERT_FILE` for a CA the system trusts. The auth server then refuses a server whose certificate doesn't verify, or that offers no TLS.
 </Aside>
 
-So keep the database where nobody else can read or change that traffic: on the same host as the auth server, or on a private network that only the auth server and your administrators reach. The connection carries the database password and everything Goiabada stores, apart from the secrets the [AES key](/deploy/secrets/#what-each-secret-protects) encrypts.
+So, unless you check the certificate on PostgreSQL, keep the database where nobody else can read or change that traffic: on the same host as the auth server, or on a private network that only the auth server and your administrators reach. The connection carries the database password and everything Goiabada stores, apart from the secrets the [AES key](/deploy/secrets/#what-each-secret-protects) encrypts.
 
 ## PostgreSQL
 
@@ -59,7 +61,7 @@ Keep MySQL's strict SQL mode, which is its default: `sql_mode` includes `STRICT_
 CREATE DATABASE goiabada COLLATE Latin1_General_100_CS_AS_KS_WS_SC_UTF8;
 ```
 
-Map the login into the database and add it to `db_owner`. It needs no access to `master`.
+Map the login into the database and add it to `db_owner`. It needs no rights in `master` beyond the access every login has there, and no server role such as `dbcreator`.
 
 <Aside type="caution">
 On SQL Server, spell out the `COLLATE` clause. A database's default can't be changed afterwards, because `ALTER DATABASE ... COLLATE` blocks while the application is connected, and every text column a future migration adds inherits it.

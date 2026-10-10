@@ -65,6 +65,9 @@ func TestDSN_RoundTripsThroughTheDriver(t *testing.T) {
 				assert.Truef(t, parsed.ParseTime, "%s parseTime", conn.which)
 				assert.Equalf(t, time.UTC, parsed.Loc, "%s loc", conn.which)
 				assert.Equalf(t, "utf8mb4", dsnParam(t, conn.dsn, "charset"), "%s charset", conn.which)
+				// TLS when the server offers it, the certificate unchecked: a server with
+				// require_secure_transport refused every connection without it (#542).
+				assert.Equalf(t, "preferred", parsed.TLSConfig, "%s tls", conn.which)
 			}
 		})
 	}

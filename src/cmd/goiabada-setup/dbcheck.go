@@ -73,13 +73,15 @@ func mysqlConfig(t dbTarget) *mysqldriver.Config {
 	c.Addr = hostport.Join(t.Host, t.Port)
 	c.ParseTime = true
 	c.Loc = time.UTC
+	c.TLSConfig = "preferred"
 	// Charset's option only sets a field and returns no error; Apply is the driver's one way in.
 	_ = c.Apply(mysqldriver.Charset("utf8mb4", ""))
 	return c
 }
 
-// mssqlDSN is mssqldb.DSN, encrypt=disable included: the check must reach a server the way the
-// auth server will, and go-mssqldb reads a string with no encrypt as "encrypt the login only".
+// mssqlDSN is mssqldb.DSN, with no encrypt parameter as there: the check must reach a server the way
+// the auth server will, and go-mssqldb reads that as encrypting the login, and the whole session when
+// the server forces encryption, without checking the server's certificate.
 func mssqlDSN(t dbTarget) string { return mssqlURL(t, t.Name) }
 
 // mssqlMaintenanceDSN is mssqldb.MaintenanceDSN: master, where the server creates the database.
@@ -88,7 +90,6 @@ func mssqlMaintenanceDSN(t dbTarget) string { return mssqlURL(t, "master") }
 func mssqlURL(t dbTarget, database string) string {
 	q := url.Values{}
 	q.Add("database", database)
-	q.Add("encrypt", "disable")
 	u := url.URL{
 		Scheme:   "sqlserver",
 		User:     url.UserPassword(t.Username, t.Password),

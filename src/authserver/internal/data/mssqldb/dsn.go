@@ -25,10 +25,14 @@ func MaintenanceDSN(cfg *DatabaseConfig) string {
 	return connectionURL(cfg, maintenanceDatabase)
 }
 
+// connectionURL carries no encrypt parameter, which go-mssqldb reads as encrypting the login, and the
+// whole session when the server forces encryption, as Azure SQL Database does, without checking the
+// server's certificate: what PostgreSQL's default sslmode, prefer, does there. encrypt=disable, which
+// these strings carried until #542, sent the login in the clear and could not reach a server that
+// forces encryption at all.
 func connectionURL(cfg *DatabaseConfig, database string) string {
 	q := url.Values{}
 	q.Add("database", database)
-	q.Add("encrypt", "disable")
 	u := url.URL{
 		Scheme:   "sqlserver",
 		User:     url.UserPassword(cfg.Username, cfg.Password),

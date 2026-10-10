@@ -37,8 +37,8 @@ The Docker Compose files and Kubernetes manifests the setup wizard generates set
 
 - [ ] **The database sits where nobody else can read its traffic:** on the auth server's host, or on a private network only the auth server and your administrators reach.
 
-<Aside type="caution" title="The database connection isn't encrypted">
-No setting encrypts Goiabada's connection to the database and checks the server it reached, so don't count on TLS there. See [Where the database sits](/deploy/database/#where-the-database-sits).
+<Aside type="caution" title="The database server isn't checked">
+Goiabada encrypts its connection to the database when the server offers TLS, but checks the server's certificate only on PostgreSQL, with `PGSSLMODE=verify-full`. See [Where the database sits](/deploy/database/#where-the-database-sits).
 </Aside>
 
 - [ ] **The database login has rights in Goiabada's database and nowhere else.** See [Create the database yourself](/deploy/database/#create-the-database-yourself).

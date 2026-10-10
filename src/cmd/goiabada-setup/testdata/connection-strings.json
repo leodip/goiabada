@@ -85,8 +85,8 @@
       "username": "goiabada",
       "password": "plain-Passw0rd",
       "database": "goiabada",
-      "dsn": "goiabada:plain-Passw0rd@tcp(db.example.com:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true",
-      "maintenanceDSN": "goiabada:plain-Passw0rd@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true"
+      "dsn": "goiabada:plain-Passw0rd@tcp(db.example.com:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true&tls=preferred",
+      "maintenanceDSN": "goiabada:plain-Passw0rd@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true&tls=preferred"
     },
     {
       "name": "every special character in the password",
@@ -96,8 +96,8 @@
       "username": "goiabada",
       "password": "p@ss/w?rd#%41: 'q\"&=+;\\x",
       "database": "goiabada",
-      "dsn": "goiabada:p@ss/w?rd#%41: 'q\"&=+;\\x@tcp(db.example.com:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true",
-      "maintenanceDSN": "goiabada:p@ss/w?rd#%41: 'q\"&=+;\\x@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true"
+      "dsn": "goiabada:p@ss/w?rd#%41: 'q\"&=+;\\x@tcp(db.example.com:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true&tls=preferred",
+      "maintenanceDSN": "goiabada:p@ss/w?rd#%41: 'q\"&=+;\\x@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true&tls=preferred"
     },
     {
       "name": "at in the username",
@@ -107,8 +107,8 @@
       "username": "us@r",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "us@r:pw@tcp(db.example.com:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true",
-      "maintenanceDSN": "us@r:pw@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true"
+      "dsn": "us@r:pw@tcp(db.example.com:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true&tls=preferred",
+      "maintenanceDSN": "us@r:pw@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true&tls=preferred"
     },
     {
       "name": "database name at the validator's limit",
@@ -118,8 +118,8 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-      "dsn": "goiabada:pw@tcp(db.example.com:3306)/goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx?charset=utf8mb4&multiStatements=true&parseTime=true",
-      "maintenanceDSN": "goiabada:pw@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true"
+      "dsn": "goiabada:pw@tcp(db.example.com:3306)/goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx?charset=utf8mb4&multiStatements=true&parseTime=true&tls=preferred",
+      "maintenanceDSN": "goiabada:pw@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true&tls=preferred"
     },
     {
       "name": "a port other than the default",
@@ -129,8 +129,8 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "goiabada:pw@tcp(10.0.0.5:15000)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true",
-      "maintenanceDSN": "goiabada:pw@tcp(10.0.0.5:15000)/?charset=utf8mb4&parseTime=true"
+      "dsn": "goiabada:pw@tcp(10.0.0.5:15000)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true&tls=preferred",
+      "maintenanceDSN": "goiabada:pw@tcp(10.0.0.5:15000)/?charset=utf8mb4&parseTime=true&tls=preferred"
     },
     {
       "name": "bare IPv6 host",
@@ -140,8 +140,8 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "goiabada:pw@tcp([::1]:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true",
-      "maintenanceDSN": "goiabada:pw@tcp([::1]:3306)/?charset=utf8mb4&parseTime=true"
+      "dsn": "goiabada:pw@tcp([::1]:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true&tls=preferred",
+      "maintenanceDSN": "goiabada:pw@tcp([::1]:3306)/?charset=utf8mb4&parseTime=true&tls=preferred"
     },
     {
       "name": "bracketed IPv6 host",
@@ -151,8 +151,8 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "goiabada:pw@tcp([::1]:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true",
-      "maintenanceDSN": "goiabada:pw@tcp([::1]:3306)/?charset=utf8mb4&parseTime=true"
+      "dsn": "goiabada:pw@tcp([::1]:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true&tls=preferred",
+      "maintenanceDSN": "goiabada:pw@tcp([::1]:3306)/?charset=utf8mb4&parseTime=true&tls=preferred"
     },
     {
       "name": "plain",
@@ -162,8 +162,8 @@
       "username": "goiabada",
       "password": "plain-Passw0rd",
       "database": "goiabada",
-      "dsn": "sqlserver://goiabada:plain-Passw0rd@db.example.com:1433?database=goiabada&encrypt=disable",
-      "maintenanceDSN": "sqlserver://goiabada:plain-Passw0rd@db.example.com:1433?database=master&encrypt=disable"
+      "dsn": "sqlserver://goiabada:plain-Passw0rd@db.example.com:1433?database=goiabada",
+      "maintenanceDSN": "sqlserver://goiabada:plain-Passw0rd@db.example.com:1433?database=master"
     },
     {
       "name": "every special character in the password",
@@ -173,8 +173,8 @@
       "username": "goiabada",
       "password": "p@ss/w?rd#%41: 'q\"&=+;\\x",
       "database": "goiabada",
-      "dsn": "sqlserver://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:1433?database=goiabada&encrypt=disable",
-      "maintenanceDSN": "sqlserver://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:1433?database=master&encrypt=disable"
+      "dsn": "sqlserver://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:1433?database=goiabada",
+      "maintenanceDSN": "sqlserver://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:1433?database=master"
     },
     {
       "name": "at in the username",
@@ -184,8 +184,8 @@
       "username": "us@r",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "sqlserver://us%40r:pw@db.example.com:1433?database=goiabada&encrypt=disable",
-      "maintenanceDSN": "sqlserver://us%40r:pw@db.example.com:1433?database=master&encrypt=disable"
+      "dsn": "sqlserver://us%40r:pw@db.example.com:1433?database=goiabada",
+      "maintenanceDSN": "sqlserver://us%40r:pw@db.example.com:1433?database=master"
     },
     {
       "name": "database name at the validator's limit",
@@ -195,8 +195,8 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-      "dsn": "sqlserver://goiabada:pw@db.example.com:1433?database=goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&encrypt=disable",
-      "maintenanceDSN": "sqlserver://goiabada:pw@db.example.com:1433?database=master&encrypt=disable"
+      "dsn": "sqlserver://goiabada:pw@db.example.com:1433?database=goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "maintenanceDSN": "sqlserver://goiabada:pw@db.example.com:1433?database=master"
     },
     {
       "name": "a port other than the default",
@@ -206,8 +206,8 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "sqlserver://goiabada:pw@10.0.0.5:15000?database=goiabada&encrypt=disable",
-      "maintenanceDSN": "sqlserver://goiabada:pw@10.0.0.5:15000?database=master&encrypt=disable"
+      "dsn": "sqlserver://goiabada:pw@10.0.0.5:15000?database=goiabada",
+      "maintenanceDSN": "sqlserver://goiabada:pw@10.0.0.5:15000?database=master"
     },
     {
       "name": "bare IPv6 host",
@@ -217,8 +217,8 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "sqlserver://goiabada:pw@[::1]:1433?database=goiabada&encrypt=disable",
-      "maintenanceDSN": "sqlserver://goiabada:pw@[::1]:1433?database=master&encrypt=disable"
+      "dsn": "sqlserver://goiabada:pw@[::1]:1433?database=goiabada",
+      "maintenanceDSN": "sqlserver://goiabada:pw@[::1]:1433?database=master"
     },
     {
       "name": "bracketed IPv6 host",
@@ -228,8 +228,8 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "sqlserver://goiabada:pw@[::1]:1433?database=goiabada&encrypt=disable",
-      "maintenanceDSN": "sqlserver://goiabada:pw@[::1]:1433?database=master&encrypt=disable"
+      "dsn": "sqlserver://goiabada:pw@[::1]:1433?database=goiabada",
+      "maintenanceDSN": "sqlserver://goiabada:pw@[::1]:1433?database=master"
     }
   ]
 }
