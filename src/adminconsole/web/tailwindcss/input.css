@@ -17,6 +17,19 @@
 
 @source "../template";
 @source "../static/*.js";
+/* The classes the i18n catalogs write into message HTML, which no @source reads: scanning
+   the catalogs would harvest every English word that looks like a class. The web package's
+   catalog-class test fails when a catalog uses one this line leaves out (#542). */
+@source inline("text-accent text-error");
+
+/* daisyUI, built into this stylesheet rather than loaded from a CDN, so a page makes no
+   third-party request and carries only the components its templates use. daisyui.mjs, beside
+   this file so a copy of this folder builds on its own, is the release's standalone-CLI bundle,
+   pinned with its digest in authserver/versions.yaml and fetched by version-manager.sh update. The themes are the ones internal/uithemes offers, light the
+   default, with no prefers-color-scheme switch, as the CDN stylesheet had none (#542). */
+@plugin "./daisyui.mjs" {
+  themes: light --default, dark, cupcake, bumblebee, emerald, corporate, synthwave, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset;
+}
 
 @layer base {
   *,

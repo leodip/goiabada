@@ -67,11 +67,23 @@ tools:
   alpine: "3.24"
 
 # -----------------------------------------------------------------------------
-# CDN Dependencies
+# Vendored web dependencies
 # -----------------------------------------------------------------------------
-# These versions are used in HTML templates for CDN URLs (jsdelivr.net)
-# daisyui:            UI component library for Tailwind
-# humanize-duration:  Human-readable duration formatting (admin console)
-cdn:
+# Committed into the repository by ./version-manager.sh update, which downloads the
+# pinned version and records each file's SHA-256 here; no page fetches them from a CDN
+# (#542). The web packages' tests hold the committed files to these digests.
+# daisyui:            daisyUI's standalone-CLI bundle, built into both servers' main.css:
+#                     src/{authserver,adminconsole}/web/tailwindcss/daisyui.mjs, one file
+#                     in two places, from its GitHub release
+# humanize-duration:  duration formatting in the admin console:
+#                     src/adminconsole/web/static/vendor/humanize-duration/, from npm
+# cropperjs:          image cropping in the admin console, 1.x (2.x is another API):
+#                     src/adminconsole/web/static/vendor/cropperjs/, from npm
+vendored:
   daisyui: "5.7.47"
+  daisyui-sha256: "85819d3fe86a852237b439b13f481481aac58e562ac47694cd11c3038e994f2a"
   humanize-duration: "3.35.0"
+  humanize-duration-sha256: "fa557682d97d4cf89e978aa3d32599206e9a6b54651aa05f6b6af84d78edefcc"
+  cropperjs: "1.6.2"
+  cropperjs-js-sha256: "6290a3fa581b17ccf4692cf3ec617a74ae65de88d9140c72d492ae9b47707efb"
+  cropperjs-css-sha256: "23679f552ce73499f817de22b5dcdd9e1e5a1e50cd9d77e34bbd31bf65a85186"

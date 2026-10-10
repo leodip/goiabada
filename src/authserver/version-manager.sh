@@ -125,11 +125,44 @@ get_version() {
     yq -r ".$key" "$VERSIONS_FILE"
 }
 
+# vendor_fetch downloads one pinned web dependency into the repository, and with a digest key
+# writes the file's SHA-256 beside its pin in versions.yaml, which the web packages' tests hold
+# the committed file to (#542). The digest line is rewritten with sed, as update_file does,
+# since only one yq flavour keeps the file's comments.
+# Usage: vendor_fetch URL DEST [DIGEST_KEY]
+vendor_fetch() {
+    local url="$1" dest="$2" digest_key="${3:-}"
+    local tmp
+    tmp=$(mktemp) || return 1
+    if ! curl -sSfL --max-time 120 "$url" -o "$tmp"; then
+        print_error "Unable to download $url"
+        rm -f "$tmp"
+        return 1
+    fi
+    mkdir -p "$(dirname "$dest")"
+    mv "$tmp" "$dest"
+    chmod 0644 "$dest"
+    if [ -n "$digest_key" ]; then
+        local digest
+        if command -v sha256sum >/dev/null 2>&1; then
+            digest=$(sha256sum "$dest" | cut -d' ' -f1)
+        else
+            digest=$(shasum -a 256 "$dest" | cut -d' ' -f1)
+        fi
+        if ! grep -q "^  ${digest_key}: " "$VERSIONS_FILE"; then
+            print_error "versions.yaml has no vendored.${digest_key} to record the digest under"
+            return 1
+        fi
+        sed -i "s|^  ${digest_key}: .*|  ${digest_key}: \"${digest}\"|" "$VERSIONS_FILE"
+    fi
+    print_success "$(basename "$dest") from $url"
+}
+
 # Get all versions as key=value pairs for display
 get_all_versions() {
     yq -r '
         .tools | to_entries | .[] | "tools." + .key + "=" + .value,
-        .cdn | to_entries | .[] | "cdn." + .key + "=" + .value
+        .vendored | to_entries | .[] | "vendored." + .key + "=" + .value
     ' "$VERSIONS_FILE" 2>/dev/null || {
         # Fallback: read each key individually
         echo "tools.go=$(get_version 'tools.go')"
@@ -141,8 +174,9 @@ get_all_versions() {
         echo "tools.govulncheck=$(get_version 'tools.govulncheck')"
         echo "tools.x-tools-override=$(get_version 'tools."x-tools-override"')"
         echo "tools.alpine=$(get_version 'tools.alpine')"
-        echo "cdn.daisyui=$(get_version 'cdn.daisyui')"
-        echo "cdn.humanize-duration=$(get_version 'cdn.humanize-duration')"
+        echo "vendored.daisyui=$(get_version 'vendored.daisyui')"
+        echo "vendored.humanize-duration=$(get_version 'vendored.humanize-duration')"
+        echo "vendored.cropperjs=$(get_version 'vendored.cropperjs')"
     }
 }
 
@@ -303,10 +337,11 @@ cmd_show() {
     printf "  %-23s ${GREEN}%s${NC}\n" "x-tools-override" "$(get_version 'tools."x-tools-override"')"
     printf "  %-23s ${GREEN}%s${NC}\n" "alpine" "$(get_version 'tools.alpine')"
 
-    # CDN versions
-    echo -e "\n${BOLD}CDN Dependencies:${NC}"
-    printf "  %-23s ${GREEN}%s${NC}\n" "daisyui" "$(get_version 'cdn.daisyui')"
-    printf "  %-23s ${GREEN}%s${NC}\n" "humanize-duration" "$(get_version 'cdn.humanize-duration')"
+    # Vendored web dependencies
+    echo -e "\n${BOLD}Vendored web dependencies:${NC}"
+    printf "  %-23s ${GREEN}%s${NC}\n" "daisyui" "$(get_version 'vendored.daisyui')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "humanize-duration" "$(get_version 'vendored.humanize-duration')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "cropperjs" "$(get_version 'vendored.cropperjs')"
 
     echo ""
     print_info "Edit versions.yaml to change versions, then run: ./version-manager.sh update"
@@ -463,7 +498,7 @@ cmd_check() {
 
     # --- daisyUI ---
     echo -n "Checking daisyUI... "
-    local current_daisyui=$(get_version 'cdn.daisyui')
+    local current_daisyui=$(get_version 'vendored.daisyui')
     local latest_daisyui=$(get_npm_latest "daisyui")
     if [ -n "$latest_daisyui" ]; then
         if version_lt "$current_daisyui" "$latest_daisyui"; then
@@ -478,7 +513,7 @@ cmd_check() {
 
     # --- humanize-duration ---
     echo -n "Checking humanize-duration... "
-    local current_humanize=$(get_version 'cdn.humanize-duration')
+    local current_humanize=$(get_version 'vendored.humanize-duration')
     local latest_humanize=$(get_npm_latest "humanize-duration")
     if [ -n "$latest_humanize" ]; then
         if version_lt "$current_humanize" "$latest_humanize"; then
@@ -486,6 +521,24 @@ cmd_check() {
             updates_available+=("humanize-duration|$current_humanize|$latest_humanize|https://www.npmjs.com/package/humanize-duration")
         else
             print_success "Up to date ($current_humanize)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
+
+    # --- cropperjs ---
+    # Only 1.x: 2.x is a rewrite with another API, which the admin console's croppers don't use.
+    echo -n "Checking cropperjs... "
+    local current_cropper=$(get_version 'vendored.cropperjs')
+    local latest_cropper=$(get_npm_latest "cropperjs")
+    if [ -n "$latest_cropper" ]; then
+        if [ "${latest_cropper%%.*}" != "${current_cropper%%.*}" ]; then
+            print_success "Up to date on ${current_cropper%%.*}.x ($current_cropper); $latest_cropper is another API"
+        elif version_lt "$current_cropper" "$latest_cropper"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("cropperjs|$current_cropper|$latest_cropper|https://www.npmjs.com/package/cropperjs")
+        else
+            print_success "Up to date ($current_cropper)"
         fi
     else
         print_warning "Check failed"
@@ -531,8 +584,9 @@ cmd_update() {
     local GOVULNCHECK_VERSION=$(get_version 'tools.govulncheck')
     local XTOOLS_OVERRIDE=$(get_version 'tools."x-tools-override"')
     local ALPINE_VERSION=$(get_version 'tools.alpine')
-    local DAISYUI_VERSION=$(get_version 'cdn.daisyui')
-    local HUMANIZE_VERSION=$(get_version 'cdn.humanize-duration')
+    local DAISYUI_VERSION=$(get_version 'vendored.daisyui')
+    local HUMANIZE_VERSION=$(get_version 'vendored.humanize-duration')
+    local CROPPER_VERSION=$(get_version 'vendored.cropperjs')
 
     local success_count=0
     local fail_count=0
@@ -711,35 +765,51 @@ cmd_update() {
     done
 
     # -------------------------------------------------------------------------
-    # HTML Templates (daisyUI CDN)
+    # Vendored web dependencies
     # -------------------------------------------------------------------------
-    echo -e "\n${BOLD}HTML Templates${NC}"
-
-    for html in "$BASE_DIR/src/authserver/web/template/layouts/auth_layout.html" \
-                "$BASE_DIR/src/authserver/web/template/layouts/no_menu_layout.html" \
-                "$BASE_DIR/src/adminconsole/web/template/layouts/no_menu_layout.html" \
-                "$BASE_DIR/src/adminconsole/web/template/layouts/menu_layout.html"; do
-        if [ -f "$html" ]; then
-            # daisyUI CDN: daisyui@X.Y.Z
-            if update_file "$html" \
-                "s|daisyui@[0-9.]*|daisyui@${DAISYUI_VERSION}|g" \
-                "daisyUI CDN"; then
-                ((success_count++))
-            else
-                ((fail_count++))
-            fi
-        fi
+    # The pinned version of each, downloaded into the repository with its license and
+    # its digest written beside the pin; no page loads them from a CDN (#542).
+    echo -e "\n${BOLD}Vendored web dependencies${NC}"
+    local daisyui_before
+    daisyui_before=$(get_version 'vendored."daisyui-sha256"')
+    # One bundle, beside each server's input.css, so a copy of either tailwindcss folder builds on
+    # its own, as the customization guide has operators copy it.
+    local daisyui_ok=1
+    for m in authserver adminconsole; do
+        local tw="$BASE_DIR/src/$m/web/tailwindcss"
+        vendor_fetch "https://github.com/saadeghi/daisyui/releases/download/v${DAISYUI_VERSION}/daisyui.mjs" \
+            "$tw/daisyui.mjs" "daisyui-sha256" &&
+            vendor_fetch "https://cdn.jsdelivr.net/npm/daisyui@${DAISYUI_VERSION}/LICENSE" \
+                "$tw/daisyui.LICENSE" || daisyui_ok=0
     done
-
-    # humanize-duration (only in admin console menu_layout)
-    if [ -f "$BASE_DIR/src/adminconsole/web/template/layouts/menu_layout.html" ]; then
-        if update_file "$BASE_DIR/src/adminconsole/web/template/layouts/menu_layout.html" \
-            "s|humanize-duration@[0-9.]*/|humanize-duration@${HUMANIZE_VERSION}/|g" \
-            "humanize-duration CDN"; then
-            ((success_count++))
-        else
-            ((fail_count++))
-        fi
+    if [ "$daisyui_ok" -eq 1 ]; then
+        ((success_count++))
+    else
+        ((fail_count++))
+    fi
+    local humanize_dir="$BASE_DIR/src/adminconsole/web/static/vendor/humanize-duration"
+    if vendor_fetch "https://cdn.jsdelivr.net/npm/humanize-duration@${HUMANIZE_VERSION}/humanize-duration.js" \
+            "$humanize_dir/humanize-duration.js" "humanize-duration-sha256" &&
+        vendor_fetch "https://cdn.jsdelivr.net/npm/humanize-duration@${HUMANIZE_VERSION}/LICENSE.txt" \
+            "$humanize_dir/LICENSE"; then
+        ((success_count++))
+    else
+        ((fail_count++))
+    fi
+    local cropper_dir="$BASE_DIR/src/adminconsole/web/static/vendor/cropperjs"
+    if vendor_fetch "https://cdn.jsdelivr.net/npm/cropperjs@${CROPPER_VERSION}/dist/cropper.min.js" \
+            "$cropper_dir/cropper.min.js" "cropperjs-js-sha256" &&
+        vendor_fetch "https://cdn.jsdelivr.net/npm/cropperjs@${CROPPER_VERSION}/dist/cropper.min.css" \
+            "$cropper_dir/cropper.min.css" "cropperjs-css-sha256" &&
+        vendor_fetch "https://cdn.jsdelivr.net/npm/cropperjs@${CROPPER_VERSION}/LICENSE" \
+            "$cropper_dir/LICENSE"; then
+        ((success_count++))
+    else
+        ((fail_count++))
+    fi
+    if [ "$daisyui_before" != "$(get_version 'vendored."daisyui-sha256"')" ]; then
+        print_warning "daisyUI changed: regenerate main.css with ./build.sh in src/authserver and"
+        echo "  src/adminconsole, inside the dev container, and commit it with the new bundle."
     fi
 
     # -------------------------------------------------------------------------

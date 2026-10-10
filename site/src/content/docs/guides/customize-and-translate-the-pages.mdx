@@ -131,7 +131,7 @@ The pages are styled with [Tailwind CSS](https://tailwindcss.com/), and `main.cs
    tailwindcss -i ./tailwindcss/input.css -o ./static/main.css
    ```
 
-   `input.css` looks for class names in `../template` and in the JavaScript in `../static`, so keep the three folders side by side.
+   `input.css` looks for class names in `../template` and in the JavaScript in `../static`, so keep the three folders side by side. It builds daisyUI's components in from `daisyui.mjs`, the bundle beside it, so the pages load nothing from another site.
 
 3. The new `main.css` is in the static directory you mounted, so the server serves it at once. Browsers may keep the previous one for up to five minutes: reload without the cache to check.
 
