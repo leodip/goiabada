@@ -34,7 +34,7 @@
                 <label class="label">
                     <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.otp.field.password" }}</span>
                 </label>
-                <input type="password" name="password" value="" class="w-full input input-bordered " autofocus />
+                <input type="password" name="password" autocomplete="current-password" value="" class="w-full input input-bordered " autofocus />
             </div>
         </div>
 
@@ -75,7 +75,7 @@
                     <label class="label">
                         <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.otp.field.password" }}</span>
                     </label>
-                    <input type="password" name="password" value="" class="w-full input input-bordered " autofocus />
+                    <input type="password" name="password" autocomplete="current-password" value="" class="w-full input input-bordered " autofocus />
                 </div>
 
             </div>
@@ -87,7 +87,7 @@
                     <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.otp.field.code" }}</span>
                 </label>
                 <input type="text" name="otp" value="" placeholder="123456"
-                    class="w-full input input-bordered" autocomplete="off" />
+                    class="w-full input input-bordered" autocomplete="one-time-code" />
             </div>
         </div>
 

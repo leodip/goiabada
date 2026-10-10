@@ -16,7 +16,7 @@
                 <label class="label">
                     <span class="label-text text-base-content">{{ T $.ctx "auth.pwd.email_label" }}</span>
                 </label>
-                <input type="text" name="email" value="{{.email}}" placeholder="{{ T $.ctx "auth.pwd.email_placeholder" }}"
+                <input type="text" name="email" autocomplete="username" value="{{.email}}" placeholder="{{ T $.ctx "auth.pwd.email_placeholder" }}"
                     class="w-full input input-bordered" autofocus  />
             </div>
 
@@ -24,7 +24,7 @@
                 <label class="label">
                     <span class="label-text text-base-content">{{ T $.ctx "auth.pwd.password_label" }}</span>
                 </label>
-                <input type="password" name="password" value="" placeholder="" class="w-full input input-bordered" />
+                <input type="password" name="password" autocomplete="current-password" value="" placeholder="" class="w-full input input-bordered" />
             </div>
 
         </div>

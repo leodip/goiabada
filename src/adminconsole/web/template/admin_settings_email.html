@@ -222,7 +222,7 @@
                 </label>
                 <input id="password" type="password" name="password" value="{{.settings.SMTPPassword}}"
                     {{if .settings.HasSMTPPassword}}placeholder="{{ T $.ctx "adminconsole.admin_settings.email.password_keep_placeholder" }}"{{end}}
-                    class="w-full input input-bordered" autocomplete="off" />
+                    class="w-full input input-bordered" autocomplete="new-password" />
                 <input id="hasSmtpPassword" type="hidden" name="hasSmtpPassword" value="{{if .settings.HasSMTPPassword}}true{{end}}" />
                 {{if .settings.HasSMTPPassword}}
                     <label class="justify-start cursor-pointer label">
