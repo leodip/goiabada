@@ -1085,15 +1085,8 @@ func decideSilentAuthentication(f silentAuthenticationFacts) (silentAuthenticati
 		return refuse(oidc.ErrorLoginRequired, "The current session user does not match the id_token_hint")
 	}
 
-	stepUp, stepUpErr := ceremony.StepUpOwed(f.target, f.session)
-	if stepUpErr != nil || stepUp == ceremony.StepUpLevel {
-		return refuse(oidc.ErrorInteractionRequired, "Higher authentication level required")
-	}
-	if stepUp == ceremony.StepUpAuthenticatorMissing {
-		return refuse(oidc.ErrorInteractionRequired, "Additional authentication setup required")
-	}
-	if stepUp == ceremony.StepUpOtpConfigChanged {
-		return refuse(oidc.ErrorInteractionRequired, "Authentication configuration has changed")
+	if code, description, refused := silentStepUpRefusal(ceremony.StepUpOwed(f.target, f.session)); refused {
+		return refuse(code, description)
 	}
 
 	if f.effectiveScope == nil {
@@ -1118,6 +1111,28 @@ func decideSilentAuthentication(f silentAuthenticationFacts) (silentAuthenticati
 	}
 
 	return silentAuthenticationAnswer{}, silentFactNone
+}
+
+// silentStepUpRefusal is decideSilentAuthentication's answer to the step-up a session still owes a
+// prompt=none request: none passes, each reason ceremony.StepUp names is refused with its own
+// description, and a value it does not name is refused too, so a reason added to StepUp later fails
+// closed here, rather than letting the silent flow issue a code its target was not met for, until
+// this switch names it (#542).
+func silentStepUpRefusal(stepUp ceremony.StepUp, err error) (code, description string, refused bool) {
+	if err != nil {
+		return oidc.ErrorInteractionRequired, "Higher authentication level required", true
+	}
+	switch stepUp {
+	case ceremony.StepUpNone:
+		return "", "", false
+	case ceremony.StepUpAuthenticatorMissing:
+		return oidc.ErrorInteractionRequired, "Additional authentication setup required", true
+	case ceremony.StepUpOtpConfigChanged:
+		return oidc.ErrorInteractionRequired, "Authentication configuration has changed", true
+	default:
+		// ceremony.StepUpLevel, and any value this switch does not name.
+		return oidc.ErrorInteractionRequired, "Higher authentication level required", true
+	}
 }
 
 // redirectErrorInput carries what an error response to a client is built from. It is a struct
