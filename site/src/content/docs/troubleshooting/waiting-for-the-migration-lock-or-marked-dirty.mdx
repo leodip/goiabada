@@ -12,7 +12,6 @@ Find your case first:
 - **The start's last record is `waiting for the migration lock`:** [another process is migrating](#another-process-is-migrating).
 - **The start stops with `is marked dirty, so a migration did not finish`:** [a migration was cut short](#a-migration-was-cut-short).
 - **The start stops with `which this release of Goiabada does not carry`:** [a newer release migrated the database](#a-newer-release-migrated-the-database).
-- **The start stops with `refusing to migrate: schema version 000047 lowercases every stored email address`:** an upgrade from 1.6 or earlier found accounts it can't convert, and migrated nothing. See [When it isn't the database](/troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection/#when-it-isnt-the-database).
 
 ## Another process is migrating
 

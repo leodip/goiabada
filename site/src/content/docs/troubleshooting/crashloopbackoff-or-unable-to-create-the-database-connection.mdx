@@ -81,8 +81,6 @@ The auth server refuses to start on these too, each with its own record and exit
 - `the trusted proxy list is malformed, so the auth server cannot start`: `GOIABADA_AUTHSERVER_TRUSTED_PROXIES` has an entry that isn't an address or a CIDR range.
 - `initial setup is required, because the database is empty and neither bootstrap mode is configured`: the database is empty, and neither `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET` nor `GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE` is set to seed it with.
 
-When the record is `unable to create the database connection` and its `error` starts `refusing to migrate: schema version 000047 lowercases every stored email address`, an upgrade from 1.6 or earlier found accounts it can't convert: two whose addresses differ only by case, or one the database engine can't lowercase the way Goiabada does. The `error` lists each by `users.id`. Nothing was migrated: fix those rows by hand, then start again.
-
 When the record is `unable to create the database connection` and its `error` starts `unable to migrate the database`, the database answered but its schema couldn't be brought up to date: see [Waiting for the migration lock, or marked dirty](/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/), or [attempt to write a readonly database](/troubleshooting/attempt-to-write-a-readonly-database/) on SQLite.
 
 A variable that doesn't parse, such as a port that isn't a number, stops it even sooner, with one line on standard error starting `malformed configuration:` that names the variable, and exit status 2.
