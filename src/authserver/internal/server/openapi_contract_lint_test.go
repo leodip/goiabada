@@ -358,6 +358,29 @@ func collectRoutes(fset *token.FileSet, node ast.Node, prefix string,
 		if !ok {
 			return true
 		}
+
+		// getAndHead(r, "/certs", handler) registers handler for GET and for HEAD on r (server.go),
+		// so it is read as those two registrations, each guarded as r is.
+		if fn, isIdent := call.Fun.(*ast.Ident); isIdent && fn.Name == "getAndHead" && len(call.Args) == 3 {
+			path, pathOK := stringLiteral(call.Args[1])
+			handler, handlerOK := handlerConstructor(call.Args[2])
+			if pathOK && handlerOK {
+				full := prefix + path
+				for _, verb := range []string{"get", "head"} {
+					*out = append(*out, routeRegistration{
+						method:       verb,
+						path:         full,
+						key:          routeKey(verb, full),
+						handler:      handler,
+						rateLimited:  mentionsRateLimiter(call.Args[0]),
+						scopeGuarded: groupScopeGuarded || mentionsScopeGuard(call.Args[0]),
+						line:         fset.Position(call.Pos()).Line,
+					})
+				}
+			}
+			return true
+		}
+
 		sel, ok := call.Fun.(*ast.SelectorExpr)
 		if !ok {
 			return true

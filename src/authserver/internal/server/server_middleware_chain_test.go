@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"reflect"
 	"runtime"
+	"slices"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -28,15 +29,26 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	branches.token.Post("/auth/token", probe)
 	branches.api.Get("/api/public/settings", probe)
 
+	// A route registered for more than one method, such as GET and HEAD, is walked once per
+	// method. Its chain is recorded once, and every other method of it must have the same one.
 	chains := make(map[string][]string)
-	err := chi.Walk(s.router, func(_ string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+	var differing []string
+	err := chi.Walk(s.router, func(method string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		var chain []string
 		for _, mounted := range middlewares {
-			name := runtime.FuncForPC(reflect.ValueOf(mounted).Pointer()).Name()
-			chains[route] = append(chains[route], name)
+			chain = append(chain, runtime.FuncForPC(reflect.ValueOf(mounted).Pointer()).Name())
 		}
+		if seen, ok := chains[route]; ok {
+			if !slices.Equal(seen, chain) {
+				differing = append(differing, method+" "+route)
+			}
+			return nil
+		}
+		chains[route] = chain
 		return nil
 	})
 	require.NoError(t, err)
+	assert.Empty(t, differing, "every method of a route passes through the same chain")
 
 	wantRoot := []string{
 		"github.com/go-chi/cors.(*Cors).Handler-fm",

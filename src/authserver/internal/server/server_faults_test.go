@@ -32,7 +32,9 @@ var protocolRoutes = []string{
 	"GET /userinfo",
 	"POST /userinfo",
 	"GET /certs",
+	"HEAD /certs",
 	"GET /.well-known/openid-configuration",
+	"HEAD /.well-known/openid-configuration",
 	"POST /connect/register",
 }
 

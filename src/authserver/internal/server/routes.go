@@ -98,8 +98,8 @@ func (s *Server) initRoutes(branches appBranches) {
 	// built from, so a link and the endpoint it names cannot drift apart (#112, #434).
 	pages.With(rateLimiter.LimitResetPwd).Get(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
 	pages.With(rateLimiter.LimitResetPwd).Post(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger, adminConsoleBaseURL))
-	protocol.Get("/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet(httpHelper, baseURL))
-	protocol.Get("/certs", handlers.HandleCertsGet(httpHelper, s.database))
+	getAndHead(protocol, "/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet(httpHelper, baseURL))
+	getAndHead(protocol, "/certs", handlers.HandleCertsGet(httpHelper, s.database))
 	// /userinfo takes a user's access token whose scope carries openid, which is what OIDC Core 1.0
 	// section 5.3 says the endpoint exists for (#449). The scope check comes first, as on every
 	// user-token route (#104): a client credentials token can never carry openid, since that grant
@@ -111,8 +111,8 @@ func (s *Server) initRoutes(branches appBranches) {
 	protocol.With(userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL))
 	protocol.With(userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL))
 	pages.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
-	pages.Get("/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
-	pages.Get("/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))
+	getAndHead(pages, "/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
+	getAndHead(pages, "/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))
 
 	// Dynamic Client Registration endpoint (RFC 7591)
 	// Note: Already CSRF-exempt via middleware (server-to-server API)
