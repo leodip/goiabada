@@ -282,10 +282,13 @@ var supportedResponseTypes = []string{"code", "token", "id_token", "id_token tok
 // ImplicitNotAuthorizedErrorMsg is the refusal for a client that may not use the implicit grant. Two
 // places emit it: ValidateRequest, which refuses a new request, and /auth/issue, which refuses a
 // ceremony whose client had the grant switched off while it sat on a step. They have to say the same
-// thing, as ROPCNotAuthorizedErrorMsg does for its two (#197).
+// thing, as ROPCNotAuthorizedErrorMsg does for its two (#197). The global switch is named as
+// reaching only a client that inherits it: a client's own Enabled or Disabled wins over it, and
+// every self-registered client is Disabled, so "or enable it globally" sent their operators to a
+// switch that changes nothing for them (#542 live check).
 const ImplicitNotAuthorizedErrorMsg = "The client is not authorized to use the implicit grant type. " +
-	"To enable it, go to the client's settings in the admin console under 'OAuth2 flows', " +
-	"or enable it globally in 'Admin > General'."
+	"To enable it, go to the client's settings in the admin console under 'OAuth2 flows'. " +
+	"The switch in 'Admin > General' enables it only for a client set to inherit the global setting."
 
 // SupportedResponseTypes is the discovery document's response_types_supported. It lists every
 // response type the server implements whatever the implicit switch says, as OIDC Discovery 1.0

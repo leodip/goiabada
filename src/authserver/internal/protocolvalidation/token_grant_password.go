@@ -19,10 +19,11 @@ import (
 // redemption refuses a token ROPC issued. They have to say the same thing, because an operator turning the switch off is
 // doing one act with two consequences, and a reader told two different stories about it will
 // think only new logins stopped. Exported and package-level because the second user lives in
-// the authserver module (#250).
+// the authserver module (#250). The global switch is named as reaching only a client that inherits
+// it, for the reason ImplicitNotAuthorizedErrorMsg gives.
 const ROPCNotAuthorizedErrorMsg = "The client is not authorized to use the resource owner password credentials grant type. " +
-	"To enable it, go to the client's settings in the admin console under 'OAuth2 flows', " +
-	"or enable it globally in 'Admin > General'."
+	"To enable it, go to the client's settings in the admin console under 'OAuth2 flows'. " +
+	"The switch in 'Admin > General' enables it only for a client set to inherit the global setting."
 
 // PasswordGrant is a validated resource owner password credentials request: the client, the user
 // whose password was just checked, and the scope granted to them.
