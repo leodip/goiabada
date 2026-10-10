@@ -65,15 +65,17 @@ WORKDIR /app
 # this upgrades too. The marker below names the minor this is for, as apkUpgradeAlpine in
 # src/core/guard/apk_upgrade_test.go records it: that test fails if this line goes while
 # tools.alpine is still that minor, and once ./version-manager.sh update moves tools.alpine
-# past it, saying to check the new image before removing this, with the check below.
-# The check is what proves each platform's image has the fix, and
+# past it, saying to check the new image before removing this line and its marker. The
+# check below is what proves each platform's image has the fix, and stays;
 # build/smoke-test-images.sh checks CI's image again.
 # apk-upgrade-until-alpine: 3.24
 RUN apk upgrade --no-cache
 # The fix, checked in each platform's build of this stage: the release builds amd64 and
 # arm64 from one Dockerfile, and a build whose zlib is older than 1.3.2-r1 stops here,
-# so neither image can be pushed without it. No zlib at all passes.
-RUN zlib="$(awk '/^P:/ { p = substr($0, 3) } /^V:/ && p == "zlib" { print substr($0, 3) }' /lib/apk/db/installed)"; [ -z "$zlib" ] || apk version -t "$zlib" 1.3.2-r1 | grep -qx '[=>]' || { echo "zlib $zlib is older than 1.3.2-r1 (CVE-2026-85091)" >&2; exit 1; }
+# so neither image can be pushed without it. No zlib at all passes; a package database
+# it cannot read, or reads no package from, fails. This check stays when the upgrade
+# above goes: it costs nothing once the base image carries the fix.
+RUN zlib="$(awk '/^P:/ { n++; p = substr($0, 3) } /^V:/ && p == "zlib" { v = substr($0, 3) } END { if (n == 0) exit 1; print v }' /lib/apk/db/installed)" || { echo "unable to read the package database" >&2; exit 1; }; [ -z "$zlib" ] || apk version -t "$zlib" 1.3.2-r1 | grep -qx '[=>]' || { echo "zlib $zlib is older than 1.3.2-r1 (CVE-2026-85091)" >&2; exit 1; }
 
 # The server runs as uid and gid 10001, named goiabada, and never as root (#396).
 # USER is numeric so a Kubernetes runAsNonRoot can verify it without reading

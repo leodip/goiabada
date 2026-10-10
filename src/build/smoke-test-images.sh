@@ -92,8 +92,9 @@ read_user() {
 }
 
 # Prints, from inside the image and with no network, each floor's package with its
-# installed version and how that compares with the floor: "<", "=" or ">", or the
-# word absent when the image doesn't carry it. A shell replaces the entrypoint and
+# installed version and how that compares with the floor: "<", "=" or ">", the word
+# absent when the image doesn't carry it, or unreadable when the package database
+# can't be read or holds no package, which fails the run like an older version. A shell replaces the entrypoint and
 # nothing else, as in read_user.
 read_packages() {
     local image="$1"
@@ -101,7 +102,10 @@ read_packages() {
         for floor in "$@"; do
             name=${floor%% *}
             min=${floor#* }
-            version=$(awk -v p="$name" "/^P:/ { current = substr(\$0, 3) } /^V:/ { if (current == p) print substr(\$0, 3) }" /lib/apk/db/installed)
+            if ! version=$(awk -v p="$name" "/^P:/ { n++; current = substr(\$0, 3) } /^V:/ { if (current == p) v = substr(\$0, 3) } END { if (n == 0) exit 1; print v }" /lib/apk/db/installed); then
+                echo "$name unreadable"
+                continue
+            fi
             if [ -z "$version" ]; then
                 echo "$name absent"
                 continue
