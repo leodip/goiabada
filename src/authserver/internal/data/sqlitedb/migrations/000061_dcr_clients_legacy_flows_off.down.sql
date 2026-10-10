@@ -1,0 +1,3 @@
+-- Migration 000061 down: intentional no-op. The up migration set unset legacy-flow switches off on
+-- self-registered clients, and an off written there can't be told from one an administrator saved
+-- since, so none is put back to unset.
