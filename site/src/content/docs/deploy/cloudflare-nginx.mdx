@@ -51,13 +51,17 @@ You need a domain on Cloudflare, a server with Docker and Nginx, two hostnames u
 
    If that prints `unknown`, or you're in a `sudo -i` or `su` shell, at a console, or in a tmux, screen or mosh session, which can keep an old value, look the port up and set it yourself, such as `SSH_PORT=2222`. `sudo ss -tlnp` shows SSH listening as `sshd`, or as `systemd` on a host that starts it through socket activation, as recent Ubuntu releases do, where `systemctl cat ssh.socket` shows its `ListenStream`.
 
-   Then add the rules. Nothing changes unless `SSH_PORT` is a port, and each command runs only if the one before it succeeded:
+   Then add the rules. Nothing changes unless `SSH_PORT` is a port from 1 to 65535 written without a leading zero, and each command runs only if the one before it succeeded. It runs the same in Bash and in `sh`:
 
    ```bash
-   if [[ "$SSH_PORT" =~ ^[0-9]+$ ]]; then
+   case "$SSH_PORT" in
+     [1-9] | [1-9][0-9] | [1-9][0-9][0-9] | [1-9][0-9][0-9][0-9] | [1-9][0-9][0-9][0-9][0-9]) port_ok=yes ;;
+     *) port_ok=no ;;
+   esac
+   if [ "$port_ok" = yes ] && [ "$SSH_PORT" -le 65535 ]; then
      sudo ufw allow "$SSH_PORT"/tcp && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw enable
    else
-     echo "SSH_PORT isn't set to a port; nothing was changed."
+     echo "SSH_PORT isn't a port from 1 to 65535; nothing was changed."
    fi
    ```
 
