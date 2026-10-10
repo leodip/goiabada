@@ -170,7 +170,8 @@ func runMainSignalledAt(t *testing.T, path, at string) (int, []map[string]any) {
 }
 
 // runMainSignalledAtWith is runMainSignalledAt with mode, the variables selecting how an empty
-// database is seeded, in place of the single-step ones.
+// database is seeded, in place of the single-step ones; mode is appended last, so a variable in it
+// replaces the default above. An empty at sends no signal and waits for main to exit by itself.
 func runMainSignalledAtWith(t *testing.T, path, at string, mode []string) (int, []map[string]any) {
 	t.Helper()
 
@@ -213,7 +214,7 @@ func runMainSignalledAtWith(t *testing.T, path, at string, mode []string) (int, 
 	if ctx.Err() != nil {
 		t.Fatalf("main did not exit within %s\n%s", mainProcessBound, dump(records))
 	}
-	require.Truef(t, signalled, "main never wrote %q\n%s", at, dump(records))
+	require.Truef(t, signalled || at == "", "main never wrote %q\n%s", at, dump(records))
 
 	var exitErr *exec.ExitError
 	switch {

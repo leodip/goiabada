@@ -51,14 +51,13 @@ func rotatedRecords(capture *logtest.SlogCapture) []logtest.CapturedRecord {
 	return found
 }
 
-// TestRunStartupDataTasks_SkipsWithoutAUsablePreviousKey pins the three previous keys the rotation
-// is not acted on for. Each one reads nothing: the canary is not even fetched, so a server started
-// without GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS, or with it set to the current key, costs no query.
-//
-// AssertNotCalled is spelled out rather than left to mockery's unexpected-call panic, because an
-// assertion that is only the absence of a line is not one a reader can see.
-func TestRunStartupDataTasks_SkipsWithoutAUsablePreviousKey(t *testing.T) {
-	cases := []struct {
+// TestRunStartupDataTasks_ChecksTheKeyWithoutAUsablePreviousKey pins what a start does with no
+// previous key to rotate from, or one it ignores: it still reads the canary, so a key that opens
+// nothing stops the start with ErrDataKeyMismatch, where before nothing was read and the first token
+// request answered 500 (#542). A canary under the current key, and a database not yet seeded, pass;
+// nothing is ever re-keyed.
+func TestRunStartupDataTasks_ChecksTheKeyWithoutAUsablePreviousKey(t *testing.T) {
+	previousKeys := []struct {
 		name     string
 		previous []byte
 	}{
@@ -66,15 +65,31 @@ func TestRunStartupDataTasks_SkipsWithoutAUsablePreviousKey(t *testing.T) {
 		{"a previous key of the wrong length", []byte("too short")},
 		{"a previous key equal to the current one", bytes.Clone(currentKey)},
 	}
+	stored := []struct {
+		name     string
+		keys     func(t *testing.T) []record.KeyPair
+		mismatch bool
+	}{
+		{"a canary under the current key", func(t *testing.T) []record.KeyPair { return []record.KeyPair{canaryUnder(t, currentKey)} }, false},
+		{"a database not yet seeded", func(*testing.T) []record.KeyPair { return nil }, false},
+		{"a canary under another key", func(t *testing.T) []record.KeyPair { return []record.KeyPair{canaryUnder(t, unknownKey)} }, true},
+	}
+	for _, p := range previousKeys {
+		for _, st := range stored {
+			t.Run(p.name+", "+st.name, func(t *testing.T) {
+				db := datamocks.NewDatabase(t)
+				db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(st.keys(t), nil).Once()
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			db := datamocks.NewDatabase(t)
-
-			require.NoError(t, runStartupDataTasks(context.Background(), db, currentKey, tc.previous))
-			db.AssertNotCalled(t, "GetAllSigningKeys", mock.Anything, mock.Anything)
-			db.AssertNotCalled(t, "ReencryptToKey", mock.Anything, mock.Anything, mock.Anything)
-		})
+				err := runStartupDataTasks(context.Background(), db, currentKey, p.previous)
+				if st.mismatch {
+					require.ErrorIs(t, err, ErrDataKeyMismatch, "a key that opens nothing must stop the start")
+					assert.Contains(t, err.Error(), "GOIABADA_AES_ENCRYPTION_KEY")
+				} else {
+					require.NoError(t, err)
+				}
+				db.AssertNotCalled(t, "ReencryptToKey", mock.Anything, mock.Anything, mock.Anything)
+			})
+		}
 	}
 }
 
@@ -143,7 +158,7 @@ func TestRunStartupDataTasks_RotatesACanaryUnderThePreviousKey(t *testing.T) {
 //
 // Serving on data that is half re-keyed is worse than not serving: half the rows readable under
 // the current key and half under the previous one is a database no single key opens. Each refusal
-// keeps the outer "AES data key rotation failed", the one message an operator gets.
+// keeps the outer "the data encryption key check failed", the one message an operator gets.
 func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 	boom := errors.New("storage is unavailable")
 
@@ -154,8 +169,8 @@ func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 
 		err := runStartupDataTasks(context.Background(), db, currentKey, previousKey)
 
-		require.Error(t, err, "re-keying data the process cannot prove it reads would corrupt it")
-		assert.Contains(t, err.Error(), "AES data key rotation failed")
+		require.ErrorIs(t, err, ErrDataKeyMismatch, "re-keying data the process cannot prove it reads would corrupt it")
+		assert.Contains(t, err.Error(), "the data encryption key check failed")
 		assert.Contains(t, err.Error(),
 			"data-at-rest decrypts under neither GOIABADA_AES_ENCRYPTION_KEY nor GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS",
 			"the refusal names both variables, because one of them is what the operator has to fix")
@@ -169,7 +184,7 @@ func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 		err := runStartupDataTasks(context.Background(), db, currentKey, previousKey)
 
 		require.ErrorIs(t, err, boom, "a canary nobody could read is not a canary that said nothing to do")
-		assert.Contains(t, err.Error(), "AES data key rotation failed")
+		assert.Contains(t, err.Error(), "the data encryption key check failed")
 		db.AssertNotCalled(t, "ReencryptToKey", mock.Anything, mock.Anything, mock.Anything)
 	})
 
@@ -184,7 +199,7 @@ func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 
 		require.ErrorIs(t, err, boom,
 			"a rotation failure must stop startup: half the rows would read under the current key and half under the previous one")
-		assert.Contains(t, err.Error(), "AES data key rotation failed")
+		assert.Contains(t, err.Error(), "the data encryption key check failed")
 		assert.Empty(t, rotatedRecords(capture), "a rotation that failed must not be reported as one that happened")
 	})
 }

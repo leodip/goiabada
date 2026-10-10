@@ -55,7 +55,8 @@ type Migratable interface {
 //
 // It is exported for the `migrate` subcommand, which needs an engine's migrator without the schema
 // being brought to head first, which is what NewDatabase does and what makes NewDatabase useless
-// for a rollback. Every other caller wants NewDatabase (#268).
+// for a rollback. Every other production caller wants NewDatabase (#268); the data tier opens its
+// second handle with it too, as a pool rather than a start.
 //
 // ctx is the caller's and reaches every statement the engine's constructor issues, so a start
 // waiting on an unreachable server or a held creation lock ends when the caller stops waiting

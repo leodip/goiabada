@@ -25,18 +25,17 @@ var (
 // a pool, so a second handle is a second connection on every engine, which is the only shape
 // that works on all four (#139 decision 8).
 //
-// Built once for the package and deliberately never closed. NewDatabase re-runs the migration
-// chain and the startup data tasks, both idempotent and both no-ops against an already migrated
-// catalog, but neither is free and mssql in particular does not enjoy being asked repeatedly.
+// Built once for the package and deliberately never closed, through datafactory.OpenDatabase: a
+// second pool over a database the tier has already migrated, not a start. NewDatabase would also
+// run the migration chain and the startup data tasks, and those now read the data key's canary at
+// every start (#542), which this tier's shared database fails on purpose: its tests store key pairs
+// whose PEM is under no key at all.
 //
-// CALL IT BEFORE OPENING ANY TRANSACTION. Construction reads the database it is about to share
-// with the calling test: it takes the migration lock, reads schema_migrations, and, when
-// GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS is set, reads key_pairs for the rotation canary, which SQL
-// Server under READ COMMITTED without RCSI answers only after any uncommitted key_pairs write
-// commits. A handle first built while the calling test holds such a write waits on that test's
-// own lock, and the Once then caches the error for every later test in the package. Every test
-// here therefore takes the handle on its first line, before it holds anything. (The rule once
-// rested on the OTP secret backfill, an UPDATE on users, which #359 deleted.)
+// CALL IT BEFORE OPENING ANY TRANSACTION. Construction connects to the database it is about to
+// share with the calling test, and the Once caches an error for every later test in the package, so
+// every test here takes the handle on its first line, before it holds anything. (The rule once
+// rested on the OTP secret backfill, an UPDATE on users, which #359 deleted, and then on the
+// rotation canary's read of key_pairs, which this handle no longer makes.)
 //
 // What it does NOT give is more concurrency than production has. The authserver builds one
 // data.Database, so a SQLite deployment runs the whole process on a single connection and the
@@ -46,8 +45,7 @@ func secondDatabase(t *testing.T) data.Database {
 	t.Helper()
 
 	secondHandleOnce.Do(func() {
-		secondHandle, secondHandleErr = datafactory.NewDatabase(context.Background(), &appConfig.Database,
-			dataKey, previousDataKey, false)
+		secondHandle, secondHandleErr = datafactory.OpenDatabase(context.Background(), &appConfig.Database, false)
 	})
 
 	require.NoError(t, secondHandleErr, "opening a second database handle")
