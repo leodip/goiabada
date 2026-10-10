@@ -30,6 +30,7 @@
     "yaml": "^2.9.1"
   },
   "overrides": {
-    "form-data": "^4.0.6"
+    "form-data": "^4.0.6",
+    "postcss-nested": "7.0.2"
   }
 }
