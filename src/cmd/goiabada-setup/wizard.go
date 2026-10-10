@@ -201,7 +201,7 @@ func (w *wizard) chooseDeployment() error {
 func (w *wizard) confirmOverwrite() error {
 	var existing []string
 	for _, path := range w.paths.files() {
-		if _, err := os.Lstat(path); err == nil {
+		if _, err := os.Lstat(path); err == nil { //nolint:gosec,nolintlint // G703: the paths are the ones this run writes, under the --output the operator chose, on their own machine; nolintlint because gosec v2.29.0 finds this G703 on some runs only (securego/gosec#1712, #494)
 			existing = append(existing, path)
 		}
 	}
