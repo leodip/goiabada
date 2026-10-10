@@ -35,9 +35,9 @@
 # from the image's own package database with no network: a package older than its
 # floor fails the run, and one the image doesn't carry passes. zlib 1.3.2-r1 fixes
 # CVE-2026-85091, which alpine:3.24 ships without; the release Dockerfiles' final
-# stage runs apk upgrade to get it, and this is what proves an image has it,
-# whatever its Dockerfile says (#542). A floor costs nothing once the base image
-# carries the fix, so it can stay.
+# stage runs apk upgrade to get it and checks it in each platform's build, and this
+# checks it again on the images CI builds, whatever their Dockerfile says (#542). A
+# floor costs nothing once the base image carries the fix, so it can stay.
 #
 # Usage: ./smoke-test-images.sh --version <version> <image>...
 set -euo pipefail
