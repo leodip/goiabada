@@ -3,6 +3,7 @@ package guard
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -30,8 +31,61 @@ const (
 	apkUpgradeMarkerPrefix = "# apk-upgrade-until-alpine: "
 )
 
+// dockerInstruction is one instruction of a Dockerfile as Docker reads it: the text with its
+// continuation lines joined, the comment lines inside a continuation dropped and heredoc bodies left
+// out, and the comment lines directly above it, with no blank line between.
+type dockerInstruction struct {
+	text     string
+	comments []string
+}
+
+// heredocStart finds each heredoc an instruction line opens: <<WORD, <<-WORD, <<"WORD" or <<'WORD'.
+var heredocStart = regexp.MustCompile(`<<-?\s*["']?([A-Za-z_][A-Za-z0-9_]*)["']?`)
+
+// dockerInstructions splits a Dockerfile into its instructions. A line ending in a backslash
+// continues the instruction, and a comment line inside a continuation is dropped, as Docker drops
+// it; a heredoc's body, up to its terminator, belongs to the instruction that opened it and is no
+// instruction of its own. That is what keeps an "apk upgrade" written as a heredoc's content, or
+// absorbed by a continuation, from reading as one (#542).
+func dockerInstructions(src string) []dockerInstruction {
+	var out []dockerInstruction
+	var comments, heredocs []string
+	continuing := false
+	for _, raw := range strings.Split(strings.ReplaceAll(src, "\r\n", "\n"), "\n") {
+		trimmed := strings.TrimSpace(raw)
+		switch {
+		case len(heredocs) > 0:
+			if trimmed == heredocs[0] {
+				heredocs = heredocs[1:]
+			}
+			continue
+		case continuing:
+			if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+				continue
+			}
+			current := &out[len(out)-1]
+			current.text += " " + strings.TrimSpace(strings.TrimSuffix(trimmed, "\\"))
+		case trimmed == "":
+			comments = nil
+			continue
+		case strings.HasPrefix(trimmed, "#"):
+			comments = append(comments, trimmed)
+			continue
+		default:
+			out = append(out, dockerInstruction{text: strings.TrimSpace(strings.TrimSuffix(trimmed, "\\")), comments: comments})
+			comments = nil
+		}
+		continuing = strings.HasSuffix(trimmed, "\\")
+		for _, m := range heredocStart.FindAllStringSubmatch(trimmed, -1) {
+			heredocs = append(heredocs, m[1])
+		}
+	}
+	return out
+}
+
 // apkUpgradeFindings is every way the release Dockerfiles under root disagree with required, the
-// minor needing the upgrade ("" for none), and with tools.alpine.
+// minor needing the upgrade ("" for none), and with tools.alpine. It reads instructions as Docker
+// does, so what counts is an instruction of the final stage, not a line that looks like one.
 func apkUpgradeFindings(root, required string) ([]string, error) {
 	alpine, err := pinnedTool(filepath.Join(root, "authserver", "versions.yaml"), "alpine")
 	if err != nil {
@@ -41,7 +95,8 @@ func apkUpgradeFindings(root, required string) ([]string, error) {
 		return []string{"tools.alpine is now " + alpine + ", and the release images run apk upgrade for alpine:" +
 			required + "'s zlib (CVE-2026-85091): check that alpine:" + alpine + " ships zlib 1.3.2-r1 or later; " +
 			"if it does, remove the apk upgrade line and its marker from " + strings.Join(releaseDockerfiles, " and ") +
-			" and set apkUpgradeAlpine to \"\", and if it doesn't, set apkUpgradeAlpine and both markers to " + alpine}, nil
+			" and set apkUpgradeAlpine to \"\", and if it doesn't, set apkUpgradeAlpine and both markers to " + alpine +
+			". The image smoke test holds the built images to zlib 1.3.2-r1 either way"}, nil
 	}
 
 	var findings []string
@@ -50,31 +105,26 @@ func apkUpgradeFindings(root, required string) ([]string, error) {
 		if err != nil {
 			return nil, errs.Wrapf(err, "reading %s", rel)
 		}
-		lines := strings.Split(strings.ReplaceAll(string(src), "\r\n", "\n"), "\n")
+		instructions := dockerInstructions(string(src))
 		finalFrom := -1
-		for i, line := range lines {
-			if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(line)), "FROM ") {
+		for i, in := range instructions {
+			if strings.HasPrefix(strings.ToUpper(in.text), "FROM ") {
 				finalFrom = i
 			}
 		}
 		if finalFrom < 0 {
-			return nil, errs.Errorf("%s has no FROM line", rel)
+			return nil, errs.Errorf("%s has no FROM instruction", rel)
 		}
-
-		var upgrades, markers []int
-		for i, line := range lines {
-			trimmed := strings.TrimSpace(line)
-			switch {
-			case strings.HasPrefix(trimmed, apkUpgradeMarkerPrefix) ||
-				strings.Contains(trimmed, "apk-upgrade-until-alpine"):
-				markers = append(markers, i)
-			case strings.Contains(trimmed, "apk upgrade"):
+		var upgrades []int
+		for i, in := range instructions {
+			if strings.Contains(in.text, "apk upgrade") {
 				upgrades = append(upgrades, i)
 			}
 		}
+		markers := strings.Count(string(src), "apk-upgrade-until-alpine")
 
 		if required == "" {
-			if len(upgrades) > 0 || len(markers) > 0 {
+			if len(upgrades) > 0 || markers > 0 {
 				findings = append(findings, rel+" still runs apk upgrade or keeps its marker, and apkUpgradeAlpine "+
 					"says no Alpine image needs it: remove both, or set apkUpgradeAlpine to the minor that does")
 			}
@@ -83,29 +133,29 @@ func apkUpgradeFindings(root, required string) ([]string, error) {
 
 		switch {
 		case len(upgrades) == 0:
-			findings = append(findings, rel+" no longer runs "+apkUpgradeCommand+" in its final stage, and alpine:"+
-				required+" still ships the vulnerable zlib: put it back, with its marker, or set apkUpgradeAlpine to \"\" "+
-				"once the pinned image carries the fix")
+			findings = append(findings, rel+" no longer runs "+apkUpgradeCommand+" as an instruction of its final stage, "+
+				"and alpine:"+required+" still ships the vulnerable zlib: put it back, with its marker, or set "+
+				"apkUpgradeAlpine to \"\" once the pinned image carries the fix")
 		case len(upgrades) > 1:
-			findings = append(findings, rel+" runs apk upgrade more than once: keep the one in the final stage")
+			findings = append(findings, rel+" runs apk upgrade in more than one instruction: keep the one in the final stage")
 		default:
-			i := upgrades[0]
-			if i < finalFrom {
+			in := instructions[upgrades[0]]
+			if upgrades[0] < finalFrom {
 				findings = append(findings, rel+" runs apk upgrade in a build stage, which never reaches the image: "+
 					"move it to the final stage")
 			}
-			if strings.TrimSpace(lines[i]) != apkUpgradeCommand {
-				findings = append(findings, rel+" runs "+strings.TrimSpace(lines[i])+", where the line must be exactly "+
+			if in.text != apkUpgradeCommand {
+				findings = append(findings, rel+" runs "+in.text+", where the instruction must be exactly "+
 					apkUpgradeCommand+", so no package cache is left in the layer")
 			}
-			if i == 0 || strings.TrimSpace(lines[i-1]) != apkUpgradeMarkerPrefix+required {
+			if len(in.comments) == 0 || in.comments[len(in.comments)-1] != apkUpgradeMarkerPrefix+required {
 				findings = append(findings, rel+" has no "+apkUpgradeMarkerPrefix+required+" line directly above "+
 					"its apk upgrade, so nothing in the file says when it can go")
 			}
 		}
-		if len(markers) > 1 || (len(markers) == 1 && (len(upgrades) != 1 || markers[0] != upgrades[0]-1)) {
-			findings = append(findings, rel+" keeps an apk-upgrade-until-alpine marker that is not directly above "+
-				"its one apk upgrade line")
+		if markers > 1 {
+			findings = append(findings, rel+" mentions apk-upgrade-until-alpine more than once: keep the one marker "+
+				"directly above the apk upgrade")
 		}
 	}
 	return findings, nil
@@ -187,6 +237,10 @@ func TestApkUpgradeFindings(t *testing.T) {
 		got := findings(t, "3.24", "3.24", build+final+"# apk-upgrade-until-alpine: 3.24\nWORKDIR /x\nRUN apk upgrade --no-cache\n"+user)
 		assert.NotEmpty(t, got)
 	})
+	t.Run("the marker separated from the command by a blank line", func(t *testing.T) {
+		got := findings(t, "3.24", "3.24", build+final+"# apk-upgrade-until-alpine: 3.24\n\nRUN apk upgrade --no-cache\n"+user)
+		assert.NotEmpty(t, got)
+	})
 	t.Run("the marker naming another minor", func(t *testing.T) {
 		got := findings(t, "3.24", "3.24", build+final+"# apk-upgrade-until-alpine: 3.23\nRUN apk upgrade --no-cache\n"+user)
 		assert.NotEmpty(t, got)
@@ -209,7 +263,24 @@ func TestApkUpgradeFindings(t *testing.T) {
 	t.Run("the upgrade twice", func(t *testing.T) {
 		got := findings(t, "3.24", "3.24", build+final+marked+"RUN apk upgrade --no-cache\n"+user)
 		require.NotEmpty(t, got)
-		assert.Contains(t, strings.Join(got, "\n"), "more than once")
+		assert.Contains(t, strings.Join(got, "\n"), "more than one instruction")
+	})
+	t.Run("the marked command as a heredoc's content", func(t *testing.T) {
+		got := findings(t, "3.24", "3.24", build+final+"COPY <<EOF /tmp/note\n"+marked+"EOF\n"+user)
+		require.Len(t, got, 2)
+		assert.Contains(t, got[0], "no longer runs")
+	})
+	t.Run("the marked command absorbed by a continuation", func(t *testing.T) {
+		got := findings(t, "3.24", "3.24", build+final+"RUN echo safe \\\n"+marked+user)
+		require.NotEmpty(t, got)
+		assert.Contains(t, strings.Join(got, "\n"), "must be exactly RUN apk upgrade --no-cache",
+			"Docker drops the comment and reads the upgrade as arguments to echo")
+	})
+	t.Run("a heredoc in the final stage, with the real command after it", func(t *testing.T) {
+		assert.Empty(t, findings(t, "3.24", "3.24", build+final+"COPY <<EOF /tmp/note\nRUN apk upgrade\nEOF\n"+marked+user))
+	})
+	t.Run("a lowercase from opening the final stage", func(t *testing.T) {
+		assert.Empty(t, findings(t, "3.24", "3.24", build+"from alpine:3.24 as final\n"+marked+user))
 	})
 	t.Run("the pin moved past the minor that needed it", func(t *testing.T) {
 		got := findings(t, "3.25", "3.24", build+final+marked+user)
