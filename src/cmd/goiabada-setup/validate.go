@@ -59,6 +59,18 @@ func validateURL(urlStr string) error {
 // hostOf is the host of a URL validateURL accepted, without its port, path or trailing slash:
 // what a Kubernetes host and a certificate name, and so the default admin URL too, are about.
 // Trimming the scheme alone put https://auth.example.com/ and :8443 into the Ingress (#430).
+// clusterInternalHost reports whether host is a name only a Kubernetes cluster's DNS answers: a
+// Service's short name, which has no dot, or a name under svc, such as
+// postgres.db.svc.cluster.local. An IP address never is.
+func clusterInternalHost(host string) bool {
+	h := strings.ToLower(strings.TrimSuffix(host, "."))
+	if h == "" || net.ParseIP(h) != nil {
+		return false
+	}
+	return !strings.Contains(h, ".") || strings.HasSuffix(h, ".svc") || strings.Contains(h, ".svc.") ||
+		strings.HasSuffix(h, ".cluster.local")
+}
+
 func hostOf(urlStr string) string {
 	u, err := url.Parse(urlStr)
 	if err != nil {

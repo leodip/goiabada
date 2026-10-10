@@ -5,6 +5,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -96,7 +97,8 @@ type secretRef struct {
 	secret, key string
 }
 
-// The secrets file holds two Secrets and nothing else: the AES key alone in goiabada-encryption-key,
+// The secrets file holds two Secrets, after the Namespace they are in, which it declares so it can be
+// applied before the manifest (#542), and nothing else: the AES key alone in goiabada-encryption-key,
 // so RBAC can restrict get on it by resourceNames and a secret manager can own it alone, and every
 // other secret in goiabada-secrets. Each container's secret references name a key one of them holds,
 // the admin console's none of the AES key's, but for the previous keys a rotation fills, which are
@@ -128,10 +130,13 @@ func TestKubernetesSecretsFile_HoldsTheSecretsEachContainerReads(t *testing.T) {
 	}
 	held := map[secretRef]bool{}
 	docs := yamlDocuments(t, secrets.content)
-	if len(docs) != len(wantData) {
-		t.Errorf("%s holds %d documents, want the two Secrets", secrets.name, len(docs))
+	if len(docs) != len(wantData)+1 {
+		t.Fatalf("%s holds %d documents, want the Namespace and the two Secrets", secrets.name, len(docs))
 	}
-	for _, doc := range docs {
+	if kind, name := at[string](t, docs[0], "kind"), at[string](t, docs[0], "metadata", "name"); kind != "Namespace" || name != config.K8sNamespace {
+		t.Errorf("%s opens with the %s %s, want the Namespace %s", secrets.name, kind, name, config.K8sNamespace)
+	}
+	for _, doc := range docs[1:] {
 		name := at[string](t, doc, "metadata", "name")
 		if kind := at[string](t, doc, "kind"); kind != "Secret" {
 			t.Errorf("%s holds the %s %s, want Secrets alone", secrets.name, kind, name)
@@ -494,14 +499,17 @@ func outputFrom(t *testing.T, output, marker string) string {
 	return output[at:]
 }
 
-// The completion message prints one kubectl apply naming both files, the manifest first: the
-// Secrets are namespaced and the manifest creates their Namespace, and kubectl applies its files in
-// the order given, so the command works on an empty cluster. Checked by walking its files in that
-// order, every namespaced object after the Namespace that holds it (#396 decision 14).
+// The completion message prints one kubectl apply naming both files, the Secrets first. kubectl
+// applies its files in the order given, and a container reads a Secret once, when it starts: applied
+// after the manifest, the Secrets reached a namespace that already held older ones only after its
+// new pods had started with those, which seeded the database (#542). Both files write the same
+// Namespace, so the command also works on an empty cluster. Checked by walking its files in that
+// order: every namespaced object after the Namespace that holds it, every Secret before every
+// Deployment, and the two Namespaces alike (#396 decision 14).
 func TestWizard_PrintsOneApplyThatWorksOnAnEmptyCluster(t *testing.T) {
-	for _, tc := range []struct{ output, manifest, want string }{
-		{"", "goiabada-k8s.yaml", "kubectl apply -f goiabada-k8s.yaml -f goiabada-secrets.yaml"},
-		{"identity.yaml", "identity.yaml", "kubectl apply -f identity.yaml -f identity-secrets.yaml"},
+	for _, tc := range []struct{ output, secrets, want string }{
+		{"", "goiabada-secrets.yaml", "kubectl apply -f goiabada-secrets.yaml -f goiabada-k8s.yaml"},
+		{"identity.yaml", "identity-secrets.yaml", "kubectl apply -f identity-secrets.yaml -f identity.yaml"},
 	} {
 		t.Run(tc.want, func(t *testing.T) {
 			dir := t.TempDir()
@@ -513,12 +521,14 @@ func TestWizard_PrintsOneApplyThatWorksOnAnEmptyCluster(t *testing.T) {
 			if err := w.setup(); err != nil {
 				t.Fatalf("setup: %v\n%s", err, out)
 			}
-			command := completionLine(t, out.String(), "kubectl apply -f "+tc.manifest)
+			command := completionLine(t, out.String(), "kubectl apply -f "+tc.secrets)
 			if command != tc.want {
 				t.Fatalf("the message applies with %q, want %q", command, tc.want)
 			}
 
 			created := map[string]bool{}
+			var namespaces []map[string]any
+			secrets, deploymentSeen := 0, false
 			objects := 0
 			fields := strings.Fields(command)
 			for i := 0; i < len(fields); i++ {
@@ -535,15 +545,30 @@ func TestWizard_PrintsOneApplyThatWorksOnAnEmptyCluster(t *testing.T) {
 					kind, name := at[string](t, doc, "kind"), at[string](t, doc, "metadata", "name")
 					if kind == "Namespace" {
 						created[name] = true
+						namespaces = append(namespaces, doc)
 						continue
 					}
 					if namespace := at[string](t, doc, "metadata", "namespace"); !created[namespace] {
 						t.Errorf("%s %s in %s is applied before its namespace %s is created", kind, name, fields[i], namespace)
 					}
+					switch kind {
+					case "Secret":
+						secrets++
+						if deploymentSeen {
+							t.Errorf("the Secret %s is applied after a Deployment, whose pods may start with an older copy", name)
+						}
+					case "Deployment":
+						deploymentSeen = true
+					}
 				}
 			}
-			if !created[w.config.K8sNamespace] || objects < 3 {
-				t.Errorf("the command applied %d objects, creating the namespaces %v", objects, created)
+			if !created[w.config.K8sNamespace] || objects < 3 || secrets != 2 || !deploymentSeen {
+				t.Errorf("the command applied %d objects, %d Secrets, a Deployment: %v, creating the namespaces %v",
+					objects, secrets, deploymentSeen, created)
+			}
+			if len(namespaces) != 2 || !reflect.DeepEqual(namespaces[0], namespaces[1]) {
+				t.Errorf("the files declare %d Namespaces, which must be two and alike, or every apply rewrites its labels: %v",
+					len(namespaces), namespaces)
 			}
 		})
 	}
