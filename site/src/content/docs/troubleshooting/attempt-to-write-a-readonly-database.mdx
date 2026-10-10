@@ -16,7 +16,7 @@ The auth server stops right after it opens the database, and its log has `unable
 
 Under Docker Compose, the container restarts and stops again with the same record.
 
-When there's nothing to migrate, a read-only file doesn't stop the start, and neither does a read-only directory that still holds the files SQLite keeps beside the database, as it does when the last auth server there didn't stop cleanly: it was killed, for instance because its stop outlasted the platform's grace period, or it crashed. The auth server starts, and every request that writes to the database fails instead, such as a sign-in, which shows the user an error page. Its error record ends in `attempt to write a readonly database (8)`, and so do the background cleanup's.
+When there's nothing to migrate, a read-only file doesn't stop the start, and neither does a read-only directory that still holds the files SQLite keeps beside the database, as it does when the last auth server there didn't stop cleanly: it was killed, for instance because its stop outlasted the platform's grace period, it crashed, or its requests or background work outlived its own shutdown timeouts. The auth server starts, and every request that writes to the database fails instead, such as a sign-in, which shows the user an error page. Its error record ends in `attempt to write a readonly database (8)`, and so do the background cleanup's.
 
 ## Why it happens
 
