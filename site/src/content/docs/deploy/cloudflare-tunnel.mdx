@@ -27,11 +27,11 @@ You need a domain on Cloudflare, a server with Docker, two hostnames under that 
    curl http://127.0.0.1:9091/health   # healthy
    ```
 
-2. **Create a tunnel.** In the [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com/), go to **Networks** → **Connectors**, choose **Create a tunnel**, pick **Cloudflared**, and name it, such as `goiabada`.
+2. **Create a tunnel.** In the [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com/), go to **Networks** → **Tunnels & Mesh**, choose **Create a tunnel**, pick **Cloudflared**, and name it, such as `goiabada`.
 
-3. **Install `cloudflared` on the server,** with the commands the dashboard shows for your operating system. The tunnel shows as **Healthy** once it has connected; on the server, `sudo systemctl status cloudflared` shows it running.
+3. **Install `cloudflared` on the server,** with the commands the dashboard shows for your operating system. The tunnel shows as **Healthy** once it has connected; on the server, `sudo systemctl status cloudflared` shows it running. If you run `cloudflared` in Docker instead, add `--network host` to the dashboard's `docker run`, so that `127.0.0.1` in the routes below is the server's and not the container's.
 
-4. **Route both hostnames to Goiabada.** On the tunnel's **Published application routes** tab, add two routes, each of type `HTTP`:
+4. **Route both hostnames to Goiabada.** On the tunnel's **Published application routes** tab, add two routes, each of type `HTTP`. Creating the tunnel ends on the form for the first one:
 
    | Hostname | URL |
    |---|---|

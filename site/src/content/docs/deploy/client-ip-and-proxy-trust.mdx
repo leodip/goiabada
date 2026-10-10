@@ -85,6 +85,8 @@ Then test and reload:
 sudo nginx -t && sudo nginx -s reload
 ```
 
+In the `http` context the file applies to every site this Nginx serves, which is what you want when Cloudflare fronts them all. To limit it to Goiabada's, write it to `/etc/nginx/snippets/cloudflare-real-ip.conf` instead, and add `include /etc/nginx/snippets/cloudflare-real-ip.conf;` to Goiabada's two `server` blocks that listen on 443.
+
 Debian's and Ubuntu's Nginx packages load `/etc/nginx/conf.d/*.conf` in the `http` context and include the `real_ip` module: `nginx -V 2>&1 | grep -o with-http_realip_module` shows it. Cloudflare changes its ranges rarely; run the command again when it does, or from a monthly cron job.
 
 Now Nginx's `$remote_addr` is the client's address, and the `$proxy_add_x_forwarded_for` line of the Nginx configuration passes it on. A request that reaches Nginx from outside Cloudflare's ranges keeps its own address, so a forged `CF-Connecting-IP` changes nothing.
