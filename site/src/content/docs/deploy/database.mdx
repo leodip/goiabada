@@ -51,7 +51,7 @@ CREATE DATABASE goiabada CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs;
 
 `GRANT ALL PRIVILEGES ON goiabada.* TO 'goiabada'@'%';` is enough. No server-wide privilege is needed.
 
-Keep MySQL's strict SQL mode, which is its default: `sql_mode` includes `STRICT_TRANS_TABLES`. Without it, MySQL stores a value it makes up for a column a statement left out, or cuts a value that doesn't fit, instead of refusing the statement.
+Keep MySQL's strict SQL mode, which is its default: `sql_mode` includes `STRICT_TRANS_TABLES`. Without it, MySQL doesn't refuse a statement that leaves out a `NOT NULL` column with no default, or that writes a value too long for its column: it stores a value it makes up for the first, and cuts the second short.
 
 ## SQL Server
 
