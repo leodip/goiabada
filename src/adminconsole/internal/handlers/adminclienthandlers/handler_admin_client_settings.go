@@ -15,15 +15,19 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-// clientSettingsAPI is what the client settings page needs: the client, and the write.
+// clientSettingsAPI is what the client settings page needs: the client, the settings' write, and
+// the allowance's own write.
 type clientSettingsAPI interface {
 	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
 	UpdateClient(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientSettingsRequest) (*api.ClientResponse, error)
+	UpdateClientAdministrativeScopes(ctx context.Context, accessToken string, clientId int64,
+		request *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error)
 }
 
-// ClientSettings is what the Settings tab is drawn from. AdministrativeScopesAllowed is shown
-// beside the settings, under Consent required, but saved by a form of its own on a route of its
-// own, so the settings save never carries it (#499 decision 5).
+// ClientSettings is what the Settings tab is drawn from. AdministrativeScopesAllowed is a field of
+// the settings form like the others, under Consent required, saved by the same Save. The auth server
+// keeps it on a route of its own, which only authserver:manage may write (#499 decisions 4 and 5),
+// so HandleSettingsPost writes it there, and only when it changed (#542).
 //
 // The tab binds two: "client", the values its inputs show, and "storedClient", the client as the
 // auth server holds it, which the page title and the confirmation dialogs' original identifier and
@@ -115,8 +119,7 @@ func HandleSettingsGet(
 		}
 
 		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
-		_, administrativeScopesSaved := sess.TakeFlash(administrativeScopesSavedFlash)
-		if savedSuccessfully || administrativeScopesSaved {
+		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -125,10 +128,9 @@ func HandleSettingsGet(
 		}
 
 		bind := map[string]interface{}{
-			"client":                    adminClientSettings,
-			"storedClient":              adminClientSettings,
-			"savedSuccessfully":         savedSuccessfully,
-			"administrativeScopesSaved": administrativeScopesSaved,
+			"client":            adminClientSettings,
+			"storedClient":      adminClientSettings,
+			"savedSuccessfully": savedSuccessfully,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind)
@@ -139,6 +141,22 @@ func HandleSettingsGet(
 	}
 }
 
+// HandleSettingsPost saves the Settings tab: the settings through the client's update, then the
+// administrative scopes allowance through its own route when the switch differs from the stored
+// allowance. One Save stores the whole tab; until #542 the allowance had a Save of its own in the
+// middle of the form, which saved it alone and reloaded the page, dropping every other change.
+//
+// The allowance is written only when it changed, and the auth server's record of it,
+// updated_client_administrative_scopes, with it, not for every save of the tab. It is never written
+// for a system-level client, or by an administrator without authserver:manage, the one scope the
+// auth server lets switch it: for both the switch is drawn disabled, and the stored allowance stands,
+// so such an administrator saves every other setting as before. The switch is read from the body alone: a browser submits an unticked checkbox as
+// nothing, so its absence means "not allowed", and a value in the query is no submission of this
+// form. Only the checkbox's own value switches it on.
+//
+// The two writes are two requests, so a refused allowance leaves the settings saved: the tab is drawn
+// again from the client as it now stands, saying the settings were saved, with the refusal beside
+// the switch.
 func HandleSettingsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
@@ -185,6 +203,16 @@ func HandleSettingsPost(
 
 		isSystemLevelClient := clientResp.IsSystemLevelClient
 
+		// The switch as submitted, kept for a refusal to draw again as typed. Only authserver:manage
+		// switches the allowance (#499 decision 4), so for anyone else it is drawn disabled, as it is
+		// for a system-level client, and a disabled switch is never submitted: its absence there is
+		// no "off", and the stored allowance stands.
+		allowed := r.PostFormValue("administrativeScopesAllowed") == "on"
+		mayManage := jwtInfo.HasScope(builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier)
+		if isSystemLevelClient || !mayManage {
+			allowed = clientResp.AdministrativeScopesAllowed
+		}
+
 		adminClientSettings := ClientSettings{
 			ClientId:                    id,
 			ClientIdentifier:            r.FormValue("clientIdentifier"),
@@ -193,7 +221,7 @@ func HandleSettingsPost(
 			DisplayName:                 r.FormValue("displayName"),
 			Enabled:                     enabled,
 			ConsentRequired:             consentRequired,
-			AdministrativeScopesAllowed: clientResp.AdministrativeScopesAllowed,
+			AdministrativeScopesAllowed: allowed,
 			ShowLogo:                    showLogo,
 			ShowDisplayName:             showDisplayName,
 			ShowDescription:             showDescription,
@@ -237,10 +265,36 @@ func HandleSettingsPost(
 			updateReq.DefaultAcrLevel = r.FormValue("defaultAcrLevel")
 		}
 
-		_, err = apiClient.UpdateClient(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
+		updated, err := apiClient.UpdateClient(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
+		}
+
+		if allowed != clientResp.AdministrativeScopesAllowed {
+			renderAllowanceError := func(message string) {
+				stored := clientResp
+				if updated != nil {
+					stored = updated
+				}
+				saved := clientSettingsFrom(stored)
+				bind := map[string]interface{}{
+					"client":                    saved,
+					"storedClient":              saved,
+					"savedSuccessfully":         true,
+					"administrativeScopesError": message,
+				}
+				renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind)
+				if renderErr != nil {
+					httpHelper.InternalServerError(w, r, renderErr)
+				}
+			}
+			_, err = apiClient.UpdateClientAdministrativeScopes(r.Context(), jwtInfo.TokenResponse.AccessToken, id,
+				&api.UpdateClientAdministrativeScopesRequest{Allowed: &allowed})
+			if err != nil {
+				render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderAllowanceError)
+				return
+			}
 		}
 
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
