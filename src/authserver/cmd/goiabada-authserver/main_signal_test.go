@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"os"
 	"os/exec"
@@ -86,6 +87,34 @@ func TestMain_AShutdownSignalDuringStartupStopsCleanly(t *testing.T) {
 				// The chain is dozens of files; the signal is sent as the first begins.
 				assert.NotNilf(t, recordNamed(records, "database migration stopped"),
 					"a signal sent as the migrations begin stops them part of the way\n%s", dump(records))
+			}
+		})
+	}
+}
+
+// TestMain_AStopLeavesTheSQLiteDatabaseInOneFile: a stopped auth server closes its database, which
+// on SQLite checkpoints the WAL into the database file and removes the -wal and -shm beside it.
+// Left open, as it was until #542's live check, a fresh install's data sat in the -wal beside a
+// 4 KB database file, so a copy of the database file alone backed up almost nothing, and a
+// directory another user took over afterwards still started, read-only. The signal lands in the
+// migrations, which NewDatabase answers by closing what it opened, after them, and at the running
+// server's drain, which main follows with the close.
+func TestMain_AStopLeavesTheSQLiteDatabaseInOneFile(t *testing.T) {
+	for _, at := range []string{
+		"migrating the database",
+		"database migrated",
+		"starting the http listener",
+	} {
+		t.Run("signalled at "+at, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "s.db")
+
+			code, records := runMainSignalledAt(t, path, at)
+
+			require.Equalf(t, 0, code, "a stop the platform asked for, carried out cleanly, exits 0\n%s", dump(records))
+			assert.NotContains(t, messagesOf(records), "unable to close the database")
+			for _, suffix := range []string{"-wal", "-shm"} {
+				_, err := os.Stat(path + suffix)
+				require.ErrorIsf(t, err, fs.ErrNotExist, "the database's %s file is left beside it\n%s", suffix, dump(records))
 			}
 		})
 	}
