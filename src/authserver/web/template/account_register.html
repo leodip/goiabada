@@ -15,7 +15,7 @@
                     <span class="label-text text-base-content">{{ T $.ctx "common.field.email" }}</span>
                 </label>
                 <input type="text" name="email" value="{{.email}}" placeholder="{{ T $.ctx "common.field.email_placeholder" }}"
-                    class="w-full input input-bordered" autocomplete="off" autofocus />
+                    class="w-full input input-bordered" autocomplete="username" autofocus />
             </div>
 
             {{/* With email verification the password is chosen on the form the emailed link
@@ -27,14 +27,14 @@
                     <label class="label">
                         <span class="label-text text-base-content">{{ T $.ctx "common.field.password" }}</span>
                     </label>
-                    <input type="password" name="password" value="" placeholder="" class="w-full input input-bordered" />
+                    <input type="password" name="password" autocomplete="new-password" value="" placeholder="" class="w-full input input-bordered" />
                 </div>
 
                 <div class="w-full mt-4 form-control">
                     <label class="label">
                         <span class="label-text text-base-content">{{ T $.ctx "common.field.password_confirmation" }}</span>
                     </label>
-                    <input type="password" name="passwordConfirmation" value="" placeholder="" class="w-full input input-bordered" />
+                    <input type="password" name="passwordConfirmation" autocomplete="new-password" value="" placeholder="" class="w-full input input-bordered" />
                 </div>
             {{end}}
 
