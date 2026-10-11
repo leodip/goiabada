@@ -46,10 +46,6 @@ func (s *ctxRecordingApiClient) UpdateUserPhone(ctx context.Context, _ string, _
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetPhoneCountries(ctx context.Context, _ string) ([]api.PhoneCountryResponse, error) {
-	return nil, s.record(ctx)
-}
-
 func (s *ctxRecordingApiClient) SearchUsersPaginated(ctx context.Context, _, _ string, _, _ int) ([]api.UserResponse, int, error) {
 	return nil, 0, s.record(ctx)
 }
@@ -469,9 +465,9 @@ func TestAdminUserHandlers_ThePhoneWriteCarriesTheRequestsContext(t *testing.T) 
 	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 		mock.Anything, mock.Anything).Return(nil).Maybe()
 
-	// The user read this page makes first refuses like everything else, so this case builds a
-	// client whose GetUserById succeeds and leaves the rest recording.
-	apiClient := &phoneWriteApiClient{}
+	// The write is the one call this POST makes, since its country list is core's (#563). Before,
+	// the list's read came first and refused, and the write below it was never reached.
+	apiClient := &ctxRecordingApiClient{}
 
 	request := handlertest.Request(http.MethodPost, "/admin/users/42/phone",
 		handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", "42"),
@@ -480,20 +476,9 @@ func TestAdminUserHandlers_ThePhoneWriteCarriesTheRequestsContext(t *testing.T) 
 
 	HandlePhonePost(httpHelper, nil, apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), marked)
 
-	require.NotEmpty(t, apiClient.seen, "the handler must consult its API client")
-	for i, seen := range apiClient.seen {
-		assert.Equal(t, "phone", seen.Value(userCtxMarkerKey{}),
-			"call %d carried a context that is not the request's", i)
-	}
-}
-
-// phoneWriteApiClient answers the user read so the phone write below it is reached at all.
-type phoneWriteApiClient struct {
-	ctxRecordingApiClient
-}
-
-func (s *phoneWriteApiClient) GetUserById(_ context.Context, _ string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId, Username: "jdoe"}, nil
+	require.Len(t, apiClient.seen, 1, "the handler must consult its API client for the write")
+	assert.Equal(t, "phone", apiClient.seen[0].Value(userCtxMarkerKey{}),
+		"the write carried a context that is not the request's")
 }
 
 // pictureUpload is the one request here that is not form-encoded: the upload handler reads a

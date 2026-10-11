@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/countries"
 	"github.com/leodip/goiabada/core/locales"
+	"github.com/leodip/goiabada/core/phonecountries"
 	"github.com/leodip/goiabada/core/timezones"
 
 	"github.com/stretchr/testify/assert"
@@ -22,7 +23,7 @@ func TestRender_AccountPhone(t *testing.T) {
 	bind := map[string]interface{}{
 		"selectedPhoneCountryUniqueId": "",
 		"phoneNumber":                  "",
-		"phoneCountries": []api.PhoneCountryResponse{
+		"phoneCountries": []phonecountries.PhoneCountry{
 			{UniqueId: "BRA_0", Alpha2: "BR", Emoji: "🇧🇷", CallingCode: "+55", Name: "🇧🇷 - Brazil (+55)"},
 			{UniqueId: "ITA_0", Alpha2: "IT", Emoji: "🇮🇹", CallingCode: "+39", Name: "🇮🇹 - Italy (+39)"},
 		},

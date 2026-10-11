@@ -12,13 +12,13 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/phonecountries"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-// userPhoneAPI is what the user phone page needs: the user, the phone write, and the country list
-// it renders the form from.
+// userPhoneAPI is what the user phone page needs: the user and the phone write. The country list
+// it renders the form from is core's, as the account phone page's is (#563).
 type userPhoneAPI interface {
-	GetPhoneCountries(ctx context.Context, accessToken string) ([]api.PhoneCountryResponse, error)
 	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
 	UpdateUserPhone(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPhoneRequest) (*api.UserResponse, error)
 }
@@ -28,6 +28,7 @@ func HandlePhoneGet(
 	httpSession sessionstore.Store,
 	apiClient userPhoneAPI,
 ) http.HandlerFunc {
+	phoneCountries := phonecountries.All()
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -59,12 +60,6 @@ func HandlePhoneGet(
 
 		if user == nil {
 			httpHelper.NotFound(w, r)
-			return
-		}
-
-		phoneCountries, err := apiClient.GetPhoneCountries(r.Context(), jwtInfo.TokenResponse.AccessToken)
-		if err != nil {
-			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -108,6 +103,7 @@ func HandlePhonePost(
 	apiClient userPhoneAPI,
 	baseURL string,
 ) http.HandlerFunc {
+	phoneCountries := phonecountries.All()
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -127,13 +123,6 @@ func HandlePhonePost(
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
 			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
-			return
-		}
-
-		// Get phone countries for rendering errors (if needed)
-		phoneCountries, err := apiClient.GetPhoneCountries(r.Context(), jwtInfo.TokenResponse.AccessToken)
-		if err != nil {
-			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 

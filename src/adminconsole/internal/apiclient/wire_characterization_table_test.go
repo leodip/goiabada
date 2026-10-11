@@ -837,20 +837,6 @@ func wireCharacterization() []wireCase {
 			want: []any{true, 2},
 		},
 
-		// --- phone_countries.go -----------------------------------------------------------
-		{
-			name: "GetPhoneCountries",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetPhoneCountries(ctx, charAccessToken)
-				if err != nil {
-					return nil, err
-				}
-				return got[0].UniqueId, nil
-			},
-			verb: "GET", path: "/api/v1/admin/phone-countries", contentType: charJSON,
-			successStatus: 200, reply: `{"phoneCountries":[{"uniqueId":"BRA_0"}]}`, want: "BRA_0",
-		},
-
 		// --- resources.go -----------------------------------------------------------------
 		{
 			name: "GetAllResources",
