@@ -1,0 +1,40 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: rgba(127, 127, 127, 0.12);
+  padding: 8px;
+}
+
+form {
+  display: inline-block;
+  margin: 0 8px 8px 0;
+}
+
+fieldset {
+  margin-bottom: 16px;
+}
+
+label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.ok {
+  color: green;
+}
+
+.bad {
+  color: #c00;
+}

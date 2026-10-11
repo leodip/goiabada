@@ -1,0 +1,3 @@
+# Per-machine settings, and what prepare.sh leaves for the steps after it (the admin password among it)
+.env
+.state/
