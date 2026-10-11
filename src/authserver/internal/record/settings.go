@@ -21,6 +21,9 @@ type Settings struct {
 	UserSessionMaxLifetimeInSeconds           int            `db:"user_session_max_lifetime_in_seconds"`
 	IncludeOpenIDConnectClaimsInAccessToken   bool           `db:"include_open_id_connect_claims_in_access_token"`
 	IncludeOpenIDConnectClaimsInIdToken       bool           `db:"include_open_id_connect_claims_in_id_token"`
+	// MaxUserSessionsPerUser is how many sessions one user may hold, from 0 to 1000, 0 meaning no
+	// limit (#564). Migration 000063 gives an existing installation 20, the seed's value.
+	MaxUserSessionsPerUser int `db:"max_user_sessions_per_user"`
 	// AESEncryptionKeyLegacy is the data key as historically stored in the DB.
 	// The key now comes from the environment ((*config.Config).DataKeys, issue
 	// #83). Do NOT use it for encrypt/decrypt at runtime.

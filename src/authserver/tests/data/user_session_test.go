@@ -20,6 +20,13 @@ const (
 		"AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1"
 )
 
+// testDeviceId and testDeviceIdUpdated are device identifiers as stored, a SHA-256 in hex: of
+// "a" and of "b", written out (#564).
+const (
+	testDeviceId        = "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb"
+	testDeviceIdUpdated = "3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d"
+)
+
 func TestCreateUserSession(t *testing.T) {
 	user := createTestUser(t)
 	userSession := createTestUserSession(t, user.Id)
@@ -58,6 +65,7 @@ func TestUpdateUserSession(t *testing.T) {
 	userSession.DeviceType = "tablet"
 	userSession.DeviceOS = "iOS"
 	userSession.UserAgent = testUserAgentUpdated
+	userSession.DeviceId = testDeviceIdUpdated
 	userSession.UserId = user.Id // This shouldn't change, but we'll update it to ensure it's not accidentally modified
 
 	time.Sleep(timestampTick)
@@ -346,6 +354,7 @@ func createTestUserSessionOn(t *testing.T, db data.Database, userId int64) *reco
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
 		UserAgent:         testUserAgent,
+		DeviceId:          testDeviceId,
 		UserId:            userId,
 	}
 	err := db.CreateUserSession(context.Background(), nil, userSession)
@@ -431,6 +440,9 @@ func assertUserSessionEqual(t *testing.T, expected, actual *record.UserSession) 
 	// changes which sessions supersede which (#281).
 	if actual.UserAgent != expected.UserAgent {
 		t.Errorf("Expected UserAgent %s, got %s", expected.UserAgent, actual.UserAgent)
+	}
+	if actual.DeviceId != expected.DeviceId {
+		t.Errorf("Expected DeviceId %s, got %s", expected.DeviceId, actual.DeviceId)
 	}
 	if actual.UserId != expected.UserId {
 		t.Errorf("Expected UserId %d, got %d", expected.UserId, actual.UserId)

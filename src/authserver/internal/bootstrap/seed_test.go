@@ -113,6 +113,8 @@ func assertSeeded(t *testing.T, db *seedDB, cfg Config) string {
 	require.NotNil(t, settings, "the settings row is at id 1, the id every reader asks for")
 	assert.Equal(t, cfg.AppName, settings.AppName)
 	assert.Equal(t, cfg.AuthServerBaseURL, settings.Issuer)
+	assert.Equal(t, 20, settings.MaxUserSessionsPerUser,
+		"a new installation caps a user at 20 sessions, as migration 000063 gives an existing one (#564)")
 
 	user, err := db.GetUserByEmail(ctx, nil, strings.ToLower(cfg.AdminEmail))
 	require.NoError(t, err)
