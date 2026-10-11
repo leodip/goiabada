@@ -337,6 +337,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, int64(7), deletedPayload["user_session_id"])
 		assert.Contains(t, deletedPayload, "logged_in_user")
 		assert.Empty(t, deletedPayload["logged_in_user"])
+		// And why it went, which is what tells this deletion from a sign-in's own sweep in the
+		// lifecycle stream without correlating it with the event above (#564 decision 7).
+		assert.Equal(t, "replaced_by_other_user", deletedPayload["reason"])
+		assert.Len(t, deletedPayload, 3)
 
 		// No audit event before the commit, and the reason before the replacement. An event
 		// written before the transaction commits would attest to a termination that could still
@@ -548,6 +552,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, map[string]interface{}{
 			"user_session_id": int64(7),
 			"logged_in_user":  "",
+			"reason":          "replaced_by_sign_in",
 		}).Run(recordEvent).Return().Once()
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Run(recordEvent).Return().Once()
 
@@ -560,7 +565,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1),
 			signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "203.0.113.7", ownSession).
-			Return(newSession, []record.UserSession{*ownSession}, nil)
+			Return(newSession, []usersession.Removal{{Session: *ownSession, Reason: "replaced_by_sign_in"}}, nil)
 
 		user := &record.User{Id: 1, Enabled: true, AuthStateGeneration: 3}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -600,13 +605,16 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// reports no removals, nothing is audited at all. (#243)
 	for _, tc := range []struct {
 		name    string
-		removed []record.UserSession
+		removed []usersession.Removal
 		events  []string
 	}{
 		{
-			name:    "a replacement failure after the commit audits the rows it removed and answers 500",
-			removed: []record.UserSession{{Id: 7, UserId: 1}, {Id: 9, UserId: 1}},
-			events:  []string{audit.EventDeletedUserSession, audit.EventDeletedUserSession},
+			name: "a replacement failure after the commit audits the rows it removed and answers 500",
+			removed: []usersession.Removal{
+				{Session: record.UserSession{Id: 7, UserId: 1}, Reason: "replaced_by_sign_in"},
+				{Session: record.UserSession{Id: 9, UserId: 1}, Reason: "same_device"},
+			},
+			events: []string{audit.EventDeletedUserSession, audit.EventDeletedUserSession},
 		},
 		{
 			name:    "a replacement failure that removed nothing audits nothing and answers 500",
@@ -659,11 +667,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 			var events []string
 			var auditedIds []int64
+			var auditedReasons []interface{}
 			var answered bool
 			auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, mock.Anything).Run(func(args mock.Arguments) {
 				assert.False(t, answered, "every removal is audited before the 500 is written")
 				events = append(events, args.Get(1).(string))
 				auditedIds = append(auditedIds, args.Get(2).(map[string]interface{})["user_session_id"].(int64))
+				auditedReasons = append(auditedReasons, args.Get(2).(map[string]interface{})["reason"])
 			}).Return().Maybe()
 
 			startError := errors.New("unable to rotate the browser session identifier")
@@ -678,10 +688,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			assert.True(t, answered)
 			assert.Equal(t, tc.events, events)
 			wantIds := []int64(nil)
-			for _, us := range tc.removed {
-				wantIds = append(wantIds, us.Id)
+			wantReasons := []interface{}(nil)
+			for _, removal := range tc.removed {
+				wantIds = append(wantIds, removal.Session.Id)
+				wantReasons = append(wantReasons, removal.Reason)
 			}
 			assert.Equal(t, wantIds, auditedIds)
+			assert.Equal(t, wantReasons, auditedReasons, "each event carries the reason its removal was reported with")
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything)
 			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 		})

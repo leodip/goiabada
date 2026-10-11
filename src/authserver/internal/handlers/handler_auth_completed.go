@@ -611,6 +611,7 @@ func bindNewSession(
 		auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
 			"user_session_id": userSession.Id,
 			"logged_in_user":  "",
+			"reason":          audit.DeletedUserSessionReplacedByOtherUser,
 		})
 		revocation.LogTerminatedUserSession(r.Context(), auditLogger, userSession, "", terminationResult)
 	}
@@ -645,13 +646,15 @@ func bindNewSession(
 		middleware.ClientIP(r), replacing)
 
 	// Every row the sign-in removed is gone once its transaction committed, which includes a
-	// failure that came after the commit, so each is audited before either answer. The payload is
-	// the handover's above: this is a browser ceremony with no bearer token, so there is no actor
-	// to name beyond the user the new session is for.
-	for _, removedSession := range removedSessions {
+	// failure that came after the commit, so each is audited before either answer, with the reason
+	// StartNewUserSession reported it under. The payload is otherwise the handover's above: this is
+	// a browser ceremony with no bearer token, so there is no actor to name beyond the user the new
+	// session is for.
+	for _, removal := range removedSessions {
 		auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
-			"user_session_id": removedSession.Id,
+			"user_session_id": removal.Session.Id,
 			"logged_in_user":  "",
+			"reason":          removal.Reason,
 		})
 	}
 	if err != nil {

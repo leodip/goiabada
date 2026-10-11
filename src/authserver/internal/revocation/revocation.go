@@ -880,7 +880,7 @@ func LogAuthCodeReuse(ctx context.Context, auditLogger AuditLogger, code *record
 // two different sessions, and every call site already holds it.
 //
 // Call this only after TerminateUserSessionTx returned without error, and beside rather than
-// instead of EventDeletedUserSession, whose payload decision 9 leaves untouched.
+// instead of EventDeletedUserSession, whose fields decision 9 leaves as they were.
 //
 // ctx is the request's, for the reason LogRevokedClientGrants states (#328).
 func LogTerminatedUserSession(ctx context.Context, auditLogger AuditLogger, userSession *record.UserSession,

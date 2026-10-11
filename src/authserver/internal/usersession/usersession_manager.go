@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -99,6 +100,13 @@ type Authentication struct {
 	OTPClaim otpcredential.OTPClaim
 }
 
+// Removal is a session StartNewUserSession deleted, and why. Reason is the reason the caller's
+// deleted_user_session event carries for it, one of audit's DeletedUserSessionReason values.
+type Removal struct {
+	Session record.UserSession
+	Reason  string
+}
+
 // StartNewUserSession creates a session for a completed authentication ceremony.
 //
 // authStateGeneration comes from the AuthContext, so it is the generation the ceremony
@@ -135,7 +143,7 @@ type Authentication struct {
 // ipAddress is the browser's address as the caller read it, and becomes the session's one
 // recorded address. replacing is the session this sign-in replaces for the same user, the one the
 // browser's cookie named, or nil; it is deleted with the same-device sweep's rows, and every row
-// removed is returned so the caller can audit each. A replaced session's refresh tokens that are
+// removed is returned with its reason so the caller can audit each. A replaced session's refresh tokens that are
 // bound to it stop, as they do when it expires, and its offline grants survive: a re-login
 // replaces a session and revokes nothing (#133, #243). A session of another user is not this
 // function's to end: the cross-user handover terminates it with revocation first and passes nil.
@@ -147,7 +155,7 @@ type Authentication struct {
 func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	clientId int64, authentication Authentication,
 	authStateGeneration int64, otpConfigGeneration *int64,
-	ipAddress string, replacing *record.UserSession) (*record.UserSession, []record.UserSession, error) {
+	ipAddress string, replacing *record.UserSession) (*record.UserSession, []Removal, error) {
 
 	userId := authentication.UserId
 	if authentication.AuthTime == nil || authentication.AuthTime.IsZero() {
@@ -223,9 +231,9 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	// committed session row that no cookie named, sometimes having already deleted the session the
 	// browser did have (#198). Only the browser-store write below is left after the commit, and it
 	// is compensated rather than prevented: see abandonUserSession.
-	var removed []record.UserSession
+	var removed []Removal
 	err = u.database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-		var removedThisAttempt []record.UserSession
+		var removedThisAttempt []Removal
 
 		if claimErr := authentication.OTPClaim.Recheck(r.Context(), u.database, tx, userId); claimErr != nil {
 			return claimErr
@@ -274,20 +282,25 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		// sign-in from a new address left the old session behind, still listed and still bumped by
 		// its refresh tokens, with no browser able to reach it (#243). It is matched in this read
 		// rather than deleted blindly, so a row already gone is not reported as one this sign-in
-		// removed, and a row that is both replacing and a sweep match is removed and reported once.
+		// removed, and a row that is both replacing and a sweep match is removed and reported once,
+		// as the one replaced (#564 decision 7).
 		for _, us := range allUserSessions {
 			if us.SessionIdentifier == userSession.SessionIdentifier {
 				continue
 			}
-			isReplaced := replacing != nil && us.Id == replacing.Id
-			isSameDevice := us.UserAgent == userSession.UserAgent && us.IpAddress == ipAddress
-			if !isReplaced && !isSameDevice {
+			var reason string
+			switch {
+			case replacing != nil && us.Id == replacing.Id:
+				reason = audit.DeletedUserSessionReplacedBySignIn
+			case us.UserAgent == userSession.UserAgent && us.IpAddress == ipAddress:
+				reason = audit.DeletedUserSessionSameDevice
+			default:
 				continue
 			}
 			if deleteUserSessionErr := u.database.DeleteUserSession(r.Context(), tx, us.Id); deleteUserSessionErr != nil {
 				return deleteUserSessionErr
 			}
-			removedThisAttempt = append(removedThisAttempt, us)
+			removedThisAttempt = append(removedThisAttempt, Removal{Session: us, Reason: reason})
 		}
 		removed = removedThisAttempt
 		return nil

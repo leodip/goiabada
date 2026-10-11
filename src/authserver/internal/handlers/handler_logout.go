@@ -829,6 +829,7 @@ func deleteWholeUserSession(
 	auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
 		"user_session_id": userSession.Id,
 		"logged_in_user":  "",
+		"reason":          audit.DeletedUserSessionSignedOut,
 	})
 
 	return userSession.UserId, nil

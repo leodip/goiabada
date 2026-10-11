@@ -141,8 +141,13 @@ const (
 	EventDeletedUserSessionClient = "deleted_user_session_client"
 	EventLogout                   = "logout"
 
-	EventRotatedKeys                  = "rotated_keys"
-	EventRevokedKey                   = "revoked_key"
+	EventRotatedKeys = "rotated_keys"
+	EventRevokedKey  = "revoked_key"
+	// EventDeletedUserSession records that a session row is gone: replaced or swept by a sign-in,
+	// ended by a handover to another user, by signing out, or by its user or an administrator.
+	//
+	// Payload: user_session_id, logged_in_user, and reason, one of the DeletedUserSession values
+	// below, which every row carries whatever site wrote it (#564 decision 7).
 	EventDeletedUserSession           = "deleted_user_session"
 	EventUpdatedRedirectURIs          = "updated_redirect_uris"
 	EventUpdatedClientPermissions     = "updated_client_permissions"
@@ -277,7 +282,7 @@ const (
 	//
 	// It accompanies EventDeletedUserSession rather than replacing it. The two carry different
 	// meanings, one a session-lifecycle fact and one a security action, and leaving the older
-	// event's payload untouched keeps any external consumer parsing it strictly working. The
+	// event's fields as they were keeps any external consumer parsing it strictly working. The
 	// consequence is that both are emitted per action, so THIS is the event to count for
 	// terminations and deleted_user_session is the lifecycle record beside it.
 	//
@@ -455,6 +460,29 @@ const (
 	//
 	// Payload: client_id and client_identifier, the client whose secret was read, and logged_in_user.
 	EventViewedClientSecret = "viewed_client_secret"
+)
+
+// The reason field of EventDeletedUserSession, one value per cause, which every row of that event
+// carries beside user_session_id and logged_in_user (#564 decision 7). Stored data like the event
+// names: a consumer filters on these strings, so a value here cannot change.
+const (
+	// DeletedUserSessionReplacedBySignIn is the session the browser's cookie named, which a sign-in
+	// at /auth/completed that started a new session replaced. A row that is also a same-device
+	// match is reported once, with this reason.
+	DeletedUserSessionReplacedBySignIn = "replaced_by_sign_in"
+	// DeletedUserSessionSameDevice is another session of the user from the same device, which that
+	// sign-in's sweep removed.
+	DeletedUserSessionSameDevice = "same_device"
+	// DeletedUserSessionReplacedByOtherUser is another user's session, ended because a different
+	// user signed in on the browser carrying it.
+	DeletedUserSessionReplacedByOtherUser = "replaced_by_other_user"
+	// DeletedUserSessionSignedOut is the session a user ended by signing out at /auth/logout.
+	DeletedUserSessionSignedOut = "signed_out"
+	// DeletedUserSessionEndedByUser is a session its user ended through the account API.
+	DeletedUserSessionEndedByUser = "ended_by_user"
+	// DeletedUserSessionEndedByAdministrator is a session an administrator ended through the admin
+	// API.
+	DeletedUserSessionEndedByAdministrator = "ended_by_administrator"
 )
 
 // EventTypes returns the canonical list of audit event names, which the admin console's
