@@ -39,8 +39,9 @@ docker compose -p "$project" down -v --remove-orphans --timeout 30 >/dev/null 2>
 docker volume ls -q --filter "label=com.docker.compose.project=$project" | xargs -r docker volume rm >/dev/null
 rm -rf "$E2E_REMOTE_DIR"
 
-# The generated Compose files publish the servers on 127.0.0.1:9090 and 9091.
-for port in 9090 9091; do
+# The generated Compose files publish the servers on 127.0.0.1:9090 and 9091, and testapp.sh the test
+# app on 9092 and 9093.
+for port in 9090 9091 9092 9093; do
   if ss -ltnH "sport = :$port" | grep -q .; then
     fail "port $port is taken by something outside $project: $(ss -ltnpH "sport = :$port")"
   fi
@@ -139,13 +140,8 @@ docker compose ps --format '{{.Service}}: {{.Image}} ({{.Status}})' | sed 's/^/ 
 # --- 4. nginx and the certificate -------------------------------------------------------------------
 
 umask 022
-www=/var/www/goiabada-e2e
-rm -rf "$www"
-for host in "$E2E_WEBTEST1_HOST" "$E2E_WEBTEST2_HOST"; do
-  mkdir -p "$www/$host"
-  printf '<!doctype html>\n<html><head><meta charset="utf-8"><title>%s</title></head>\n<body><h1>Hello from %s</h1></body></html>\n' \
-    "$host" "$host" >"$www/$host/index.html"
-done
+# The placeholder pages the test app hosts served before the test app was deployed there.
+rm -rf /var/www/goiabada-e2e
 
 conf=/etc/nginx/conf.d/goiabada-e2e.conf
 rendered="$(sed -e "s/__AUTH_HOST__/$E2E_AUTH_HOST/g" -e "s/__ADMIN_HOST__/$E2E_ADMIN_HOST/g" \

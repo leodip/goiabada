@@ -6,7 +6,7 @@
 # Runs from your machine and reaches the VPS over SSH as E2E_VPS_USER@E2E_VPS_HOST (see
 # e2e/.env.example). It replaces whatever environment ran before: see remote-prepare.sh.
 # Leaves e2e/.state/environment.env (URLs, tag, admin email) and e2e/.state/admin-password for the
-# steps after it.
+# steps after it. Then sets up the test app with testapp.sh, which adds e2e/.state/testapp.env.
 set -euo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -16,7 +16,7 @@ tag="${1:-}"
 [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]] || die "usage: $0 <release tag>, such as v1.7.0"
 
 step "Checking prerequisites"
-for cmd in ssh scp curl openssl python3; do
+for cmd in ssh scp curl openssl python3 tar npm; do
   command -v "$cmd" >/dev/null || die "$cmd is not installed"
 done
 curl -fsS -o /dev/null --head "https://github.com/leodip/goiabada/releases/tag/$tag" ||
@@ -38,7 +38,7 @@ done
 
 step "Generating the admin password"
 mkdir -p "$STATE_DIR" && chmod 700 "$STATE_DIR"
-rm -f "$STATE_DIR/environment.env" "$STATE_DIR/admin-password"
+rm -f "$STATE_DIR/environment.env" "$STATE_DIR/admin-password" "$STATE_DIR/testapp.env"
 (umask 077 && openssl rand -base64 48 | tr -d '/+=\n' | head -c 32 >"$STATE_DIR/admin-password")
 echo "written to e2e/.state/admin-password"
 
@@ -63,5 +63,7 @@ E2E_WEBTEST1_URL=https://$E2E_WEBTEST1_HOST
 E2E_WEBTEST2_URL=https://$E2E_WEBTEST2_HOST
 E2E_ADMIN_EMAIL=$E2E_ADMIN_EMAIL
 EOF
+
+"$E2E_DIR/infra/testapp.sh"
 
 exec "$E2E_DIR/infra/verify.sh" "$tag"

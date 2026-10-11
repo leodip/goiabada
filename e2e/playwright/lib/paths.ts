@@ -8,3 +8,6 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 export function adminStorageState(worker: number | "setup"): string {
   return path.resolve(here, `../../.state/admin-storage-state-${worker}.json`);
 }
+
+// The test app's client secrets, as e2e/infra/testapp.sh hands them to the test app on the VPS.
+export const testappEnvFile = path.resolve(here, "../../.state/testapp.env");

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Checks that the e2e environment is up and reachable from this machine: DNS, HTTPS on every host,
-# the auth server, the admin console and its sign-in hop to the auth server, the test app hosts, and
+# the auth server, the admin console and its sign-in hop to the auth server, the test app, and
 # that the VPS runs the release asked for.
 #
 #   e2e/infra/verify.sh [tag]     # the tag defaults to the one prepare.sh last deployed
@@ -122,8 +122,31 @@ admin_sign_in_reaches_auth() {
   echo "ends at /auth/pwd"
 }
 
-webtest_page() { # host
-  curl -fsS --max-time 15 "https://$1/" | grep -q "$1" || { echo "unexpected page"; return 1; }
+testapp_page() { # host
+  local body
+  body="$(curl -fsS --max-time 15 "https://$1/")" || return 1
+  grep -q "Goiabada test app" <<<"$body" || { echo "not the test app"; return 1; }
+  if grep -q "Not configured yet" <<<"$body"; then
+    echo "not configured: $(grep -o 'Not configured yet: [^.]*' <<<"$body" | head -1)"
+    return 1
+  fi
+}
+
+testapp_api_refuses_anonymous() {
+  local result
+  result="$(curl -sS -o /dev/null --max-time 15 -w '%{http_code} %header{www-authenticate}' "https://$E2E_WEBTEST1_HOST/api/products")" ||
+    return 1
+  [[ "$result" == "401 Bearer "* ]] || { echo "answered $result"; return 1; }
+  echo "401"
+}
+
+vps_runs_testapp() {
+  local states
+  states="$(ssh_vps "cd $(printf %q "$E2E_REMOTE_DIR") && docker compose ps --format '{{.Service}} {{.State}}' testapp1 testapp2")" ||
+    { echo "cannot read the Compose project"; return 1; }
+  for service in testapp1 testapp2; do
+    grep -qx "$service running" <<<"$states" || { echo "$service is not running: $(tr '\n' ';' <<<"$states")"; return 1; }
+  done
 }
 
 vps_runs_release() {
@@ -148,8 +171,10 @@ check "auth server JWKS" auth_jwks
 check "admin console home page" admin_page
 check "admin console sign-in reaches the auth server" admin_sign_in_reaches_auth
 check "Mailpit on the VPS" mailpit_answers
-check "test app host $E2E_WEBTEST1_HOST" webtest_page "$E2E_WEBTEST1_HOST"
-check "test app host $E2E_WEBTEST2_HOST" webtest_page "$E2E_WEBTEST2_HOST"
+check "VPS runs the test app" vps_runs_testapp
+check "test app on $E2E_WEBTEST1_HOST, configured" testapp_page "$E2E_WEBTEST1_HOST"
+check "test app on $E2E_WEBTEST2_HOST, configured" testapp_page "$E2E_WEBTEST2_HOST"
+check "test app API refuses a request with no token" testapp_api_refuses_anonymous
 
 echo
 if ((failed > 0)); then

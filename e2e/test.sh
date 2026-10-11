@@ -24,13 +24,8 @@ tag="$(sed -n 's/^E2E_TAG=//p' "$state")"
 prepared="$(sed -n 's/^E2E_PREPARED_AT=//p' "$state")"
 auth_url="$(sed -n 's/^E2E_AUTH_URL=//p' "$state")"
 
-command -v npm >/dev/null || die "npm is not installed"
+ensure_suite_packages
 cd "$suite" || die "no $suite"
-if [[ ! -d node_modules || package-lock.json -nt node_modules/.package-lock.json ]]; then
-  step "Installing the suite's packages"
-  npm ci --no-fund --no-audit || die "npm ci failed"
-  npx playwright install chromium || die "could not install Chromium"
-fi
 
 curl -fsS -o /dev/null --max-time 10 "$auth_url/health" ||
   die "$auth_url does not answer: check it with e2e/infra/verify.sh, or rebuild with e2e/reset.sh"

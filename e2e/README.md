@@ -1,15 +1,15 @@
 # End-to-end environment
 
 A real Goiabada deployment, built from a release tag on a VPS, for browser tests to run against.
-This is a proof of concept: it builds the environment, checks that it is reachable, and runs a first
-Playwright test. Provisioning clients and users, and the scenarios, come next.
+It builds the environment, deploys the test app beside it, checks that both are reachable, and runs
+the Playwright suite against them.
 
 | Host | What |
 |---|---|
 | `e2e-auth.goiabada.dev` | Auth server |
 | `e2e-admin.goiabada.dev` | Admin console |
-| `e2e-webtest1.goiabada.dev` | Test app (a placeholder page for now) |
-| `e2e-webtest2.goiabada.dev` | A second test app origin, for single sign-on across sites (a placeholder page for now) |
+| `e2e-webtest1.goiabada.dev` | The test app (`testapp/`): the web app, the SPA, the service and the API |
+| `e2e-webtest2.goiabada.dev` | The test app again, for its second web app: single sign-on across two sites |
 
 The deployment is the docs' [Reverse proxy](https://goiabada.dev/deploy/reverse-proxy/) method, as a
 user would follow it: the release's own setup wizard writes the Compose files (production, PostgreSQL),
@@ -44,11 +44,14 @@ They wrap the scripts in `infra/`, which can also be run on their own: `prepare.
    the stack, waits for both servers, and writes `/etc/nginx/conf.d/goiabada-e2e.conf` from
    `nginx.conf.template`. The certificate is requested only when it is missing or does not cover the
    four hosts.
-4. Writes `e2e/.state/environment.env` (URLs, tag, admin email) and runs `verify.sh`.
+4. Writes `e2e/.state/environment.env` (URLs, tag, admin email).
+5. Sets up the test app with `testapp.sh` (see [Test app](#test-app)).
+6. Runs `verify.sh`.
 
 `verify.sh` checks DNS, HTTPS and its certificate's expiry, the HTTP-to-HTTPS redirect, that the VPS
 runs the tag's images, the auth server's health, discovery and JWKS, the admin console's page, that its
-sign-in lands on the auth server's password page, and the test app hosts.
+sign-in lands on the auth server's password page, that the test app runs configured on both hosts,
+and that its API refuses a request with no token.
 
 ## Browser tests
 
@@ -86,9 +89,9 @@ reset:
 ## The VPS
 
 It is shared with other services, so the scripts touch only what is theirs: the Compose project in
-`/root/goiabada-e2e`, `/etc/nginx/conf.d/goiabada-e2e.conf`, `/var/www/goiabada-e2e`, and the
-certificate `e2e.goiabada.dev`. It needs Docker with the Compose plugin, nginx with certbot's
-`options-ssl-nginx.conf`, and certbot with a registered account, and ports 9090, 9091 and 18025 free on
+`/root/goiabada-e2e`, the test app's image (`goiabada-e2e-testapp:local`, labelled
+`goiabada-e2e=testapp`), `/etc/nginx/conf.d/goiabada-e2e.conf`, and the certificate `e2e.goiabada.dev`. It needs Docker with the Compose plugin, nginx with certbot's
+`options-ssl-nginx.conf`, and certbot with a registered account, and ports 9090 to 9093 and 18025 free on
 127.0.0.1.
 
 ## Mail
@@ -103,5 +106,19 @@ the tests in `E2E_MAILPIT_URL` (`lib/mailpit.ts`). To look at the mail yourself:
 
 ## Test app
 
-`testapp/` is the Next.js app that follows the guides, moved here from its own repository. See
-[testapp/README.md](testapp/README.md).
+`testapp/` is the Next.js app that follows the guides (see [testapp/README.md](testapp/README.md)).
+`infra/testapp.sh`, which `prepare.sh` runs, puts it in the environment:
+
+1. It sets up the app's clients and API through the admin console, as the guides tell a person to:
+   `playwright/provision/testapp.provision.ts`, run with its own config (`provision.config.ts`), so the
+   suite never runs it. It removes the `testapp-*` clients and the `product-api` resource first, so
+   they always end up the same, and writes the secrets to `e2e/.state/testapp.env`.
+2. It builds the app's image on the VPS from the source in `testapp/`, and runs it in the Compose
+   project twice (`testapp.yml`, added to `COMPOSE_FILE` like `mailpit.yml`): `testapp1` for
+   `e2e-webtest1` on 127.0.0.1:9092 and `testapp2` for `e2e-webtest2` on 9093, behind nginx. The
+   secrets reach the containers through `testapp.env` beside the Compose files, and go nowhere else.
+
+After changing the app, `e2e/infra/testapp.sh --deploy-only` builds and deploys it again with the
+same clients; with no option it sets the clients up again too. Tests must leave the `testapp-*`
+clients and `product-api` as they found them: the setup step does not sweep them, since they are not
+named with the test prefix.

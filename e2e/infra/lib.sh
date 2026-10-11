@@ -31,6 +31,9 @@ E2E_CERT_NAME="${E2E_CERT_NAME:-e2e.goiabada.dev}"
 # e2e/test.sh reaches them through an SSH tunnel.
 E2E_MAILPIT_IMAGE="${E2E_MAILPIT_IMAGE:-axllent/mailpit:v1.31.5}"
 E2E_MAILPIT_PORT="${E2E_MAILPIT_PORT:-18025}"
+# The test app (e2e/testapp), built on the VPS into this image and run twice, one container per test
+# app host, on 127.0.0.1:9092 and 9093.
+E2E_TESTAPP_IMAGE="${E2E_TESTAPP_IMAGE:-goiabada-e2e-testapp:local}"
 
 E2E_ALL_HOSTS=("$E2E_AUTH_HOST" "$E2E_ADMIN_HOST" "$E2E_WEBTEST1_HOST" "$E2E_WEBTEST2_HOST")
 
@@ -63,6 +66,18 @@ die()  { printf '%sERROR%s %s\n' "$RED" "$RESET" "$*" >&2; exit 1; }
 latest_release_tag() {
   curl -fsS --max-time 15 https://api.github.com/repos/leodip/goiabada/releases/latest |
     python3 -c 'import json, sys; print(json.load(sys.stdin)["tag_name"])'
+}
+
+# The Playwright suite's packages and Chromium, installed the first time and when package-lock.json
+# changes. Run from anywhere; leaves the working directory as it was.
+ensure_suite_packages() {
+  command -v npm >/dev/null || die "npm is not installed"
+  local suite="$E2E_DIR/playwright"
+  if [[ ! -d "$suite/node_modules" || "$suite/package-lock.json" -nt "$suite/node_modules/.package-lock.json" ]]; then
+    step "Installing the suite's packages"
+    (cd "$suite" && npm ci --no-fund --no-audit) || die "npm ci failed"
+    (cd "$suite" && npx playwright install chromium) || die "could not install Chromium"
+  fi
 }
 
 # The scripts that reach the VPS call this first; the test run does not need it.

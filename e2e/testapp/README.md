@@ -12,16 +12,18 @@ claims and answers.
 | `/service` | `testapp-service`, client credentials | Protect an API |
 | `/api/products` | (the API) | Protect an API: checks the token, answers 401 or 403 |
 
-It moved here from its own repository. The e2e environment (see [../README.md](../README.md)) does not
-deploy it yet, so the clients below are still set up by hand.
+The e2e environment (see [../README.md](../README.md)) deploys it on its two test app hosts:
+`e2e/infra/testapp.sh` sets up the clients below through the admin console, the way these steps say,
+and builds and runs the app on the VPS. The second web app runs on the second host,
+`https://e2e-webtest2.goiabada.dev/web2`, so single sign-on is tried across two sites.
 
-## Set up the clients
+## Set up the clients by hand
 
-Each step is the guide's own, so doing them is part of the check. Sign in to
+For running the app on your own machine against an auth server. Each step is the guide's own, so
+doing them is part of the check. Against the e2e environment, sign in to
 https://e2e-admin.goiabada.dev as `admin@goiabada.dev`, with the password in `e2e/.state/admin-password`,
-which `e2e/infra/prepare.sh` wrote.
-
-For local runs, add the `http://localhost:3000/...` addresses beside the `https://` ones.
+which `e2e/infra/prepare.sh` wrote, and add the `http://localhost:3000/...` addresses beside the
+`https://` ones `testapp.sh` registered.
 
 1. **The API** (Protect an API, steps 1 to 3). Under **Admin**, **Resources and permissions**,
    create `product-api`, give it the permissions `read` and `write`, and give `product-api:read`
@@ -30,7 +32,8 @@ For local runs, add the `http://localhost:3000/...` addresses beside the `https:
    Create it, leaving **Authorization code flow with PKCE** on. Redirect URIs:
    `https://e2e-webtest1.goiabada.dev/web/callback` and
    `https://e2e-webtest1.goiabada.dev/web/signed-out`. Copy its secret to `WEB_CLIENT_SECRET`.
-3. **`testapp-web2`**: the same, with `/web2/callback` and `/web2/signed-out`. Its secret goes to
+3. **`testapp-web2`**: the same, with `/web2/callback` and `/web2/signed-out` (on
+   `https://e2e-webtest2.goiabada.dev` in the e2e environment). Its secret goes to
    `WEB2_CLIENT_SECRET`.
 4. **`testapp-spa`** (Add sign-in to a SPA or mobile app, steps 1 to 4). Create it with
    **Authorization code flow with PKCE** on, choose **Public client** on **Authentication** and confirm with **Yes**, add

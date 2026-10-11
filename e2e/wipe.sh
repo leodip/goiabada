@@ -2,7 +2,7 @@
 # Remove the e2e environment from the VPS: the servers, the database and everything in it.
 #
 #   e2e/wipe.sh          # the Compose project, its volumes and directory
-#   e2e/wipe.sh --all    # also nginx's configuration, the placeholder pages and the certificate
+#   e2e/wipe.sh --all    # also nginx's configuration and the certificate
 #   e2e/wipe.sh -y       # do not ask first (combine with --all as needed)
 #
 # DNS records are never touched. e2e/reset.sh builds it again.
