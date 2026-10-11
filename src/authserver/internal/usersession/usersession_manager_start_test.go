@@ -373,16 +373,28 @@ func TestStartNewUserSession_DeletesMatchingSessionFromSameDeviceAndIp(t *testin
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{42}, removedIds(removed), "the swept row is reported so the caller can audit it")
+	assert.Equal(t, map[int64]string{42: "same_device"}, removedReasons(removed),
+		"a row the sweep matched is reported as the same device's")
 }
 
 // removedIds is the ids of the rows StartNewUserSession reported removed, in order: the row id is
 // what the caller's audit event names.
-func removedIds(removed []record.UserSession) []int64 {
+func removedIds(removed []Removal) []int64 {
 	ids := []int64{}
-	for _, us := range removed {
-		ids = append(ids, us.Id)
+	for _, removal := range removed {
+		ids = append(ids, removal.Session.Id)
 	}
 	return ids
+}
+
+// removedReasons is each reported row's id beside the reason its deleted_user_session event is to
+// carry, in order (#564 decision 7).
+func removedReasons(removed []Removal) map[int64]string {
+	reasons := map[int64]string{}
+	for _, removal := range removed {
+		reasons[removal.Session.Id] = removal.Reason
+	}
+	return reasons
 }
 
 // The reversal, and the whole of decision 1: a row whose three labels disagree with the request on
@@ -612,11 +624,14 @@ func TestStartNewUserSession_DeletesTheSessionItReplacesWhereverItWasSeen(t *tes
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{42}, removedIds(removed))
+	assert.Equal(t, map[int64]string{42: "replaced_by_sign_in"}, removedReasons(removed),
+		"the row the browser's cookie named is reported as the one this sign-in replaced")
 }
 
 // A replaced session on the sign-in's own device is both reasons at once. It is deleted once and
-// reported once, so the caller writes one event for it rather than two. DeleteUserSession answers
-// nil for a row already gone, so a second delete would not fail: the Once is the assertion.
+// reported once, as the session this sign-in replaced, so the caller writes one event for it
+// rather than two (#564 decision 7). DeleteUserSession answers nil for a row already gone, so a
+// second delete would not fail: the Once is the assertion.
 func TestStartNewUserSession_AReplacedSessionThatAlsoMatchesTheSweepIsRemovedOnce(t *testing.T) {
 	m := newStartSessionMocks(t)
 	replaced := record.UserSession{
@@ -631,6 +646,32 @@ func TestStartNewUserSession_AReplacedSessionThatAlsoMatchesTheSweepIsRemovedOnc
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{42}, removedIds(removed))
+	assert.Equal(t, map[int64]string{42: "replaced_by_sign_in"}, removedReasons(removed))
+}
+
+// One sign-in can remove rows for both reasons, and each is reported with its own: the row the
+// cookie named, seen elsewhere, as the one replaced, and another row from this device as the same
+// device's. The third row is from another device and is not the one replaced, so it survives.
+func TestStartNewUserSession_EachRemovalIsReportedWithItsOwnReason(t *testing.T) {
+	m := newStartSessionMocks(t)
+	replaced := record.UserSession{
+		Id: 42, SessionIdentifier: "the-cookie-named-this", UserId: 123,
+		IpAddress: "198.51.100.20", UserAgent: firefoxUserAgent,
+	}
+	m.expectPersistThroughCommit(123, []record.UserSession{
+		replaced,
+		{Id: 43, SessionIdentifier: "same-device", UserId: 123, IpAddress: "192.168.1.50", UserAgent: chromeUserAgent},
+		{Id: 44, SessionIdentifier: "another-device", UserId: 123, IpAddress: "198.51.100.21", UserAgent: firefoxUserAgent},
+	})
+	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
+	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(43)).Return(nil).Once()
+
+	_, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", &replaced)
+
+	require.NoError(t, err)
+	assert.Equal(t, []int64{42, 43}, removedIds(removed))
+	assert.Equal(t, map[int64]string{42: "replaced_by_sign_in", 43: "same_device"}, removedReasons(removed))
 }
 
 // A replaced session that is no longer there when the transaction reads -- a logout or the idle

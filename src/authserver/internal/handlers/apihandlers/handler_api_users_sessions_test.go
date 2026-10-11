@@ -108,7 +108,8 @@ func TestHandleUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
 	require.NotNil(t, deletedPayload)
 	assert.Equal(t, int64(100), deletedPayload["user_session_id"])
 	assert.Equal(t, adminSubject, deletedPayload["logged_in_user"])
-	assert.Len(t, deletedPayload, 2)
+	assert.Equal(t, "ended_by_administrator", deletedPayload["reason"])
+	assert.Len(t, deletedPayload, 3)
 
 	// The new event's payload, field by field. Asserted here rather than trusted because it is the
 	// only durable record of what a termination revoked, and a missing or renamed field is invisible

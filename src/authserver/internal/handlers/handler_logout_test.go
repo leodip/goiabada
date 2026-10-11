@@ -941,7 +941,8 @@ func TestHandleLogoutPost(t *testing.T) {
 		database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["user_session_id"] == int64(42) && loggedInUserIsPresentAndEmpty(details)
+			return details["user_session_id"] == int64(42) && loggedInUserIsPresentAndEmpty(details) &&
+				details["reason"] == "signed_out"
 		})).Return()
 		auditLogger.On("Log", mock.Anything, audit.EventLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["user_id"] == int64(123) &&
@@ -1280,7 +1281,8 @@ func TestHandleLogoutPost(t *testing.T) {
 				database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
 				auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
-					return details["user_session_id"] == int64(42) && loggedInUserIsPresentAndEmpty(details)
+					return details["user_session_id"] == int64(42) && loggedInUserIsPresentAndEmpty(details) &&
+						details["reason"] == "signed_out"
 				})).Return()
 				auditLogger.On("Log", mock.Anything, audit.EventLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
 					return details["user_id"] == int64(123) && details["session_identifier"] == "test-session"

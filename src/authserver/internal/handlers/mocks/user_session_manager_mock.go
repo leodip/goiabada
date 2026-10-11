@@ -308,7 +308,7 @@ func (_c *UserSessionManager_HasValidUserSession_Call) RunAndReturn(run func(use
 }
 
 // StartNewUserSession provides a mock function for the type UserSessionManager
-func (_mock *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.Request, clientId int64, authentication usersession.Authentication, authStateGeneration int64, otpConfigGeneration *int64, ipAddress string, replacing *record.UserSession) (*record.UserSession, []record.UserSession, error) {
+func (_mock *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.Request, clientId int64, authentication usersession.Authentication, authStateGeneration int64, otpConfigGeneration *int64, ipAddress string, replacing *record.UserSession) (*record.UserSession, []usersession.Removal, error) {
 	ret := _mock.Called(w, r, clientId, authentication, authStateGeneration, otpConfigGeneration, ipAddress, replacing)
 
 	if len(ret) == 0 {
@@ -316,9 +316,9 @@ func (_mock *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *h
 	}
 
 	var r0 *record.UserSession
-	var r1 []record.UserSession
+	var r1 []usersession.Removal
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, int64, usersession.Authentication, int64, *int64, string, *record.UserSession) (*record.UserSession, []record.UserSession, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, int64, usersession.Authentication, int64, *int64, string, *record.UserSession) (*record.UserSession, []usersession.Removal, error)); ok {
 		return returnFunc(w, r, clientId, authentication, authStateGeneration, otpConfigGeneration, ipAddress, replacing)
 	}
 	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, int64, usersession.Authentication, int64, *int64, string, *record.UserSession) *record.UserSession); ok {
@@ -328,11 +328,11 @@ func (_mock *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *h
 			r0 = ret.Get(0).(*record.UserSession)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(http.ResponseWriter, *http.Request, int64, usersession.Authentication, int64, *int64, string, *record.UserSession) []record.UserSession); ok {
+	if returnFunc, ok := ret.Get(1).(func(http.ResponseWriter, *http.Request, int64, usersession.Authentication, int64, *int64, string, *record.UserSession) []usersession.Removal); ok {
 		r1 = returnFunc(w, r, clientId, authentication, authStateGeneration, otpConfigGeneration, ipAddress, replacing)
 	} else {
 		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([]record.UserSession)
+			r1 = ret.Get(1).([]usersession.Removal)
 		}
 	}
 	if returnFunc, ok := ret.Get(2).(func(http.ResponseWriter, *http.Request, int64, usersession.Authentication, int64, *int64, string, *record.UserSession) error); ok {
@@ -409,12 +409,12 @@ func (_c *UserSessionManager_StartNewUserSession_Call) Run(run func(w http.Respo
 	return _c
 }
 
-func (_c *UserSessionManager_StartNewUserSession_Call) Return(userSession *record.UserSession, userSessions []record.UserSession, err error) *UserSessionManager_StartNewUserSession_Call {
-	_c.Call.Return(userSession, userSessions, err)
+func (_c *UserSessionManager_StartNewUserSession_Call) Return(userSession *record.UserSession, removals []usersession.Removal, err error) *UserSessionManager_StartNewUserSession_Call {
+	_c.Call.Return(userSession, removals, err)
 	return _c
 }
 
-func (_c *UserSessionManager_StartNewUserSession_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, clientId int64, authentication usersession.Authentication, authStateGeneration int64, otpConfigGeneration *int64, ipAddress string, replacing *record.UserSession) (*record.UserSession, []record.UserSession, error)) *UserSessionManager_StartNewUserSession_Call {
+func (_c *UserSessionManager_StartNewUserSession_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, clientId int64, authentication usersession.Authentication, authStateGeneration int64, otpConfigGeneration *int64, ipAddress string, replacing *record.UserSession) (*record.UserSession, []usersession.Removal, error)) *UserSessionManager_StartNewUserSession_Call {
 	_c.Call.Return(run)
 	return _c
 }
