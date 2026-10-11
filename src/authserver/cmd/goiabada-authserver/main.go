@@ -87,6 +87,16 @@ func run() int {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return migrateExitUsage
 	}
+	// `migrate` reads its own arguments here, for the same reason: what it refuses, its --db-*
+	// flags and the TLS settings checked against them, is the operator's to retype, and goes to
+	// stderr with nothing before it (#502).
+	var migration migrateInvocation
+	if isMigrate {
+		var ok bool
+		if migration, ok = readMigrateCommand(migrateArgs, cfg.Database, os.Stderr); !ok {
+			return migrateExitUsage
+		}
+	}
 
 	slog.Info("auth server started")
 	slog.Info("build information",
@@ -100,10 +110,11 @@ func run() int {
 	// validated, because a schema migration touches no encrypted value and the key would
 	// otherwise be a precondition for repairing a database on a deployment that has not set one
 	// (#268). Its arguments are the ones dispatch left after the word `migrate`, and the database
-	// configuration is handed over by value, so the --db-* flags it parses among them override a
-	// copy and the loaded configuration stays what the process was started with (#424).
+	// configuration was handed to readMigrateCommand by value, so the --db-* flags it parsed among
+	// them override a copy and the loaded configuration stays what the process was started with
+	// (#424).
 	if isMigrate {
-		return migrateCommand(migrateArgs, cfg.Database, os.Stdout, os.Stderr)
+		return runMigrateCommand(migration, os.Stdout, os.Stderr)
 	}
 
 	// The process owns the signals, from here to its exit, so a stop arriving while the server is

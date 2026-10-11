@@ -19,11 +19,11 @@ import (
 )
 
 // TestMain_RefusesTheConnectionsTLSSettingsBeforeOpeningAnything: a malformed mode and a CA file
-// the start cannot use stop main before anything is opened, with exit 2, the code of every
-// malformed setting, under the server and under `migrate` alike, and a flag given after `migrate`
-// is held to the same rules (#502). The server stops at the load, with one line on stderr; under
-// `migrate` the CA file and libpq's variables are checked by its own parse, against the flags given
-// after it, which answers as it does every refusal, after the start's records and with its usage.
+// the start cannot use stop main before anything is opened, with one line on stderr and exit 2, the
+// channel and code of every malformed setting, under the server and under `migrate` alike, and a
+// flag given after `migrate` is held to the same rules (#502). Under `migrate` the CA file and
+// libpq's variables are checked against the flags given after it, and still before the start's
+// first record, with no usage beside them, since the invocation was typed correctly.
 //
 // The engine is PostgreSQL on a port nothing listens on, so a child that got past the load exits
 // 1 at the connection instead: the code and the exact line are what fail.
@@ -83,10 +83,6 @@ func TestMain_RefusesTheConnectionsTLSSettingsBeforeOpeningAnything(t *testing.T
 			code, stderr := runMainProcessWith(t, decoy, append(append([]string{}, postgres...), tc.env...), tc.args...)
 
 			require.Equal(t, migrateExitUsage, code, "stderr: %s", stderr)
-			if len(tc.args) > 0 && tc.args[0] == "migrate" {
-				assert.Contains(t, stderr, "\n"+tc.want)
-				return
-			}
 			assert.Equal(t, tc.want, stderr)
 		})
 	}
@@ -98,8 +94,8 @@ func TestMain_RefusesTheConnectionsTLSSettingsBeforeOpeningAnything(t *testing.T
 
 		require.Equal(t, migrateExitUsage, code, "stderr: %s", stderr)
 		// migrate prints its usage after the refusal, as for every flag it refuses.
-		assert.Contains(t, stderr,
-			"\n"+`malformed configuration: --db-tls-mode is "strict", not one of disable, prefer, require, verify-ca, verify-full`+"\n")
+		assert.Equal(t, `malformed configuration: --db-tls-mode is "strict", not one of disable, prefer, require, verify-ca, verify-full`+
+			"\n\n"+migrateUsage+"\n", stderr)
 	})
 }
 
@@ -162,8 +158,9 @@ func TestMain_MigrateHoldsTheConnectionsTLSRulesToItsOwnFlags(t *testing.T) {
 			"migrate", "--db-tls-mode=require", "version")
 
 		require.Equal(t, migrateExitUsage, code, "stderr: %s", stderr)
-		assert.Contains(t, stderr, "\n"+`malformed configuration: GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) is "`+ca+
-			`" while GOIABADA_DB_TLS_MODE (--db-tls-mode) is require, which checks no certificate: only verify-ca and verify-full read a CA file`+"\n")
+		// One line, as from the environment alone: the CA file is a setting, not how migrate was typed.
+		assert.Equal(t, `malformed configuration: GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) is "`+ca+
+			`" while GOIABADA_DB_TLS_MODE (--db-tls-mode) is require, which checks no certificate: only verify-ca and verify-full read a CA file`+"\n", stderr)
 	})
 }
 

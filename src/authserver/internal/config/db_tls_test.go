@@ -252,9 +252,10 @@ func TestLoad_SQLiteIgnoresTheCAFile(t *testing.T) {
 	}
 }
 
-// TestCheckDatabaseFlags_HoldsTheTLSFlagsGivenAfterMigrate is the check the `migrate` subcommand
-// runs after its own parse, over a copy of the loaded configuration: a mode or a CA file given
-// after `migrate` is held to the rules one given before it is, and a CA file it names is read.
+// TestCheckDatabaseFlags_HoldsTheTLSFlagsGivenAfterMigrate is the two checks the `migrate`
+// subcommand runs after its own parse, CheckDatabaseFlags and then CheckDatabaseTLS, over a copy of
+// the loaded configuration: a mode or a CA file given after `migrate` is held to the rules one given
+// before it is, and a CA file it names is read.
 func TestCheckDatabaseFlags_HoldsTheTLSFlagsGivenAfterMigrate(t *testing.T) {
 	authority := newTestAuthority(t, "db.example.com")
 	good := writeFile(t, "ca.pem", authority.pem)
@@ -294,6 +295,9 @@ func TestCheckDatabaseFlags_HoldsTheTLSFlagsGivenAfterMigrate(t *testing.T) {
 			require.NoError(t, fs.Parse(tt.args))
 
 			err := CheckDatabaseFlags(fs, &local)
+			if err == nil {
+				err = CheckDatabaseTLS(&local)
+			}
 			if tt.want != "" {
 				require.Error(t, err)
 				assert.Equal(t, tt.want, err.Error())
@@ -399,9 +403,9 @@ func TestLoad_LeavesLibpqsVariablesAloneOtherwise(t *testing.T) {
 	})
 }
 
-// TestCheckDatabaseFlags_RefusesLibpqsTLSVariablesUnderMigrate: a type changed to postgres after
+// TestCheckDatabaseTLS_RefusesLibpqsTLSVariablesUnderMigrate: a type changed to postgres after
 // `migrate` is held to the refusal too, since migrate opens the same connection.
-func TestCheckDatabaseFlags_RefusesLibpqsTLSVariablesUnderMigrate(t *testing.T) {
+func TestCheckDatabaseTLS_RefusesLibpqsTLSVariablesUnderMigrate(t *testing.T) {
 	for name := range libpqTLSRefusals {
 		t.Setenv(name, "")
 	}
@@ -412,8 +416,9 @@ func TestCheckDatabaseFlags_RefusesLibpqsTLSVariablesUnderMigrate(t *testing.T) 
 	fs.SetOutput(io.Discard)
 	RegisterDatabaseFlags(fs, &local)
 	require.NoError(t, fs.Parse([]string{"-db-type=postgres"}))
+	require.NoError(t, CheckDatabaseFlags(fs, &local))
 
-	err := CheckDatabaseFlags(fs, &local)
+	err := CheckDatabaseTLS(&local)
 	require.Error(t, err)
 	assert.Equal(t, "malformed configuration: "+libpqTLSRefusals["PGSSLMODE"], err.Error())
 }
