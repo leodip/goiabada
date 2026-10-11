@@ -85,9 +85,11 @@ func TestValidateTokenRequest_RefreshToken_AdministrativeScope(t *testing.T) {
 		},
 		{
 			// manage-account is not administrative (decision 2), so it reaches the permission
-			// re-check as any resource scope does.
-			name:            "manage-account is not refused",
-			grant:           storedGrant{scope: "openid authserver:manage-account"},
+			// re-check as any resource scope does. The user has consented to it, which #509 owes
+			// whatever the client says.
+			name: "manage-account is not refused",
+			grant: storedGrant{scope: "openid authserver:manage-account", readsConsent: true,
+				consentScope: "openid authserver:manage-account"},
 			permissionScope: "authserver:manage-account",
 		},
 	}

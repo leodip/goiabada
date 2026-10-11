@@ -1590,6 +1590,12 @@ type storedGrant struct {
 	// consentScope, when set, makes the client require consent and is the consent row's scope.
 	// Authorization code grants only: the arm skips consent for ROPC.
 	consentScope string
+	// readsConsent keeps the client's Consent required off and still stubs the consent row, which
+	// the arm reads for a scope owed consent whatever the client says (#509): consentScope is then
+	// the row's scope, and empty means no consent is stored.
+	readsConsent bool
+	// clientIdentifier is the client's, "client1" when empty.
+	clientIdentifier string
 	// administrativeScopesAllowed is the client's stored allowance to request the administrative
 	// scopes (#499).
 	administrativeScopesAllowed bool
@@ -1614,9 +1620,13 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 		UserSessionMaxLifetimeInSeconds: 86400,
 	}
 
+	clientIdentifier := g.clientIdentifier
+	if clientIdentifier == "" {
+		clientIdentifier = "client1"
+	}
 	input := &ValidateTokenRequestInput{
 		GrantType:    "refresh_token",
-		ClientId:     "client1",
+		ClientId:     clientIdentifier,
 		RefreshToken: "stored_grant_refresh_token",
 		Scope:        requestedScope,
 	}
@@ -1628,7 +1638,7 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 	if g.ropc {
 		// Always Offline, because ROPC creates no browser session, and presented by a public
 		// client, so no secret.
-		client = &record.Client{Id: 1, ClientIdentifier: "client1", Enabled: true, IsPublic: true}
+		client = &record.Client{Id: 1, ClientIdentifier: clientIdentifier, Enabled: true, IsPublic: true}
 		refreshTokenJwt = &oauth.JwtToken{Claims: jwt.MapClaims{
 			"jti":                         "stored_grant_jti",
 			"typ":                         "Offline",
@@ -1654,11 +1664,11 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 		require.NoError(t, err)
 		client = &record.Client{
 			Id:                       1,
-			ClientIdentifier:         "client1",
+			ClientIdentifier:         clientIdentifier,
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
 			ClientSecretEncrypted:    clientSecretEncrypted,
-			ConsentRequired:          g.consentScope != "",
+			ConsentRequired:          g.consentScope != "" && !g.readsConsent,
 		}
 		input.ClientSecret = "client_secret"
 		refreshTokenJwt = &oauth.JwtToken{Claims: jwt.MapClaims{
@@ -1684,7 +1694,7 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 			Return(userSession, nil).Once()
 	}
 
-	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, clientIdentifier).Return(client, nil).Once()
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "stored_grant_refresh_token", true).
 		Return(refreshTokenJwt, nil).Once()
 	mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "stored_grant_jti").Return(refreshToken, nil).Once()
@@ -1694,9 +1704,13 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 
 	if reachesUser {
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&user, nil).Once()
-		if g.consentScope != "" {
+		switch {
+		case g.consentScope != "":
 			mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).
 				Return(&record.UserConsent{UserId: 1, ClientId: 1, Scope: g.consentScope}, nil).Once()
+		case g.readsConsent:
+			mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).
+				Return(nil, nil).Once()
 		}
 	}
 
