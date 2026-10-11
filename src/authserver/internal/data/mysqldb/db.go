@@ -6,6 +6,7 @@ package mysqldb
 
 import (
 	"context"
+	"crypto/x509"
 	"database/sql"
 	"embed"
 	"errors"
@@ -53,6 +54,11 @@ type DatabaseConfig struct {
 	// tools and the data tier's fixtures that call this constructor directly open with: the
 	// server's comes through datafactory, which always passes one (#394).
 	Pool *data.PoolConfig
+	// TLSMode is GOIABADA_DB_TLS_MODE, the zero value reading as prefer, and TLSRoots the
+	// authorities GOIABADA_DB_TLS_CA_FILE holds, nil for the system's roots. Both cover every
+	// connection the constructor opens, the maintenance one included (#502).
+	TLSMode  data.TLSMode
+	TLSRoots *x509.CertPool
 }
 
 // New opens the MySQL database dbConfig names, creating it first when dbConfig.Create says so.
@@ -63,8 +69,15 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 	// One record where five used to be, and no password: the DSN is assembled below from the
 	// same four values, so a startup problem is read off this line rather than off four
 	// consecutive ones that a collector had no way to join (#320 decision 6).
+	tlsMode := dbConfig.TLSMode.OrPrefer()
 	slog.InfoContext(ctx, "using database", "type", "mysql", "username", dbConfig.Username,
-		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name)
+		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name, "tls_mode", string(tlsMode))
+
+	// prefer is the one mode this engine's connection strings carry, so any other stops the start
+	// before anything is dialled rather than connecting as prefer under another name (#502).
+	if tlsMode != data.TLSPrefer {
+		return nil, errs.Errorf("GOIABADA_DB_TLS_MODE %s is not supported on mysql in this build: set it to prefer", tlsMode)
+	}
 
 	if dbConfig.Create {
 		tempDB, err := sql.Open("mysql", MaintenanceDSN(dbConfig))
