@@ -94,6 +94,41 @@ func TestSelfRegister_GetPage_Disabled(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
+// 1a'. With verification required and email off, the page and its submission answer the not-found
+// page, as forgot-password does without email: no activation link can reach anyone. They used to
+// fall back to creating an unverified account and to answering "already registered" for a taken
+// address, the opposite of what the setting asks for (#526 decision 2). The modes beside it are
+// served: verification off with email off by TestSelfRegister_GetPage_Enabled and
+// TestSelfRegister_Post_SMTPDisabled_RendersSuccessPage, verification on with email on by
+// TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow.
+func TestSelfRegister_RefusedWhileItRequiresVerificationAndEmailIsOff(t *testing.T) {
+	setRegSettings(t, true, true, false)
+	httpClient := createHttpClient(t)
+
+	page := loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/account/register")
+	_ = page.Body.Close()
+	assert.Equal(t, http.StatusNotFound, page.StatusCode, "the page")
+
+	email := fake.Email()
+	resp := postRegister(t, httpClient, email, "Password123!", "Password123!")
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode, "the submission")
+
+	user, err := database.GetUserByEmail(context.Background(), nil, email)
+	require.NoError(t, err)
+	assert.Nil(t, user, "no unverified account is created")
+	preReg, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
+	require.NoError(t, err)
+	assert.Nil(t, preReg, "no pending registration is written")
+
+	taken := createAccountAt(t, fake.Email())
+	resp = postRegister(t, httpClient, taken.Email, "Password123!", "Password123!")
+	body := bodyString(t, resp)
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode, "a taken address")
+	assert.NotContains(t, body, "already registered", "a taken address is not disclosed")
+}
+
 // 1b. With self-registration enabled the page renders.
 //
 // It used to also assert the form carried a CSRF token. There is no token any more: the POST below
@@ -532,6 +567,60 @@ func TestSelfRegister_ReplayedMarkerAfterActivationIsRefused(t *testing.T) {
 		"a replayed submission must not create a second account")
 	assert.Equal(t, activated.PasswordHash, after.PasswordHash,
 		"a replayed submission must not change the password")
+}
+
+// A link mailed while email was on still activates once email is turned off: following it needs
+// no mail, and proves the mailbox, as a reset link does (#526 decision 2). Registration itself is
+// refused by then, so the register-again page a spent link lands on leaves out its link to the form.
+func TestSelfRegister_ALinkMailedBeforeEmailWasTurnedOffStillActivates(t *testing.T) {
+	useMailpitSMTP(t)
+	setRegSettings(t, true, true, true)
+
+	email := registerPlusAddress()
+	browser := createHttpClient(t)
+	loadRegisterPage(t, browser)
+	resp := postRegisterAddress(t, browser, email)
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	link := latestActivationLink(t, email)
+
+	// While registration is available the register-again page links to the form.
+	unknown := loadPage(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/account/activate?code=unknown")
+	defer func() { _ = unknown.Body.Close() }()
+	require.Equal(t, http.StatusOK, unknown.StatusCode)
+	assert.Equal(t, 1, parseHTMLResponse(t, unknown).Find(`a[href^="/account/register"]`).Length(),
+		"the register-again page links to the form while registration is available")
+
+	setRegSettings(t, true, true, false)
+
+	refused := loadPage(t, browser, appConfig.AuthServer.BaseURL+"/account/register")
+	_ = refused.Body.Close()
+	require.Equal(t, http.StatusNotFound, refused.StatusCode, "registration is unavailable now")
+
+	cleanURL := followActivationLink(t, browser, link)
+	continuationId := loadActivationForm(t, browser, cleanURL, email)
+
+	const chosenPassword = "Chosen-At-Activation-1!"
+	activateResp := postActivation(t, browser, cleanURL, chosenPassword, chosenPassword, continuationId)
+	activationBody := bodyString(t, activateResp)
+	_ = activateResp.Body.Close()
+	assert.Equal(t, http.StatusOK, activateResp.StatusCode)
+	assert.Contains(t, activationBody, activationSucceededText)
+
+	user, err := database.GetUserByEmail(context.Background(), nil, email)
+	require.NoError(t, err)
+	if assert.NotNil(t, user, "the link activates with email off") {
+		assert.True(t, user.EmailVerified)
+	}
+
+	// Followed again, the spent link lands on the register-again page, which leaves out the link
+	// to a form that answers not-found.
+	spent := loadPage(t, createHttpClient(t), link)
+	defer func() { _ = spent.Body.Close() }()
+	require.Equal(t, http.StatusOK, spent.StatusCode)
+	doc := parseHTMLResponse(t, spent)
+	assert.Contains(t, doc.Text(), activationExpiredText)
+	assert.Zero(t, doc.Find(`a[href^="/account/register"]`).Length(), "no link to the refused form")
 }
 
 // The activation half of the same defect (#112 decision 13). Two pending registrations and

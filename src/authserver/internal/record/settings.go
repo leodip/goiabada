@@ -89,3 +89,16 @@ type Settings struct {
 	// clock rather than a single process's uptime.
 	LastCleanupAt sql.NullTime `db:"last_cleanup_at"`
 }
+
+// IsSelfRegistrationAvailable says whether a visitor may register: self-registration on, and either
+// verification off or email (SMTP) on. With verification required and email off no activation link
+// can reach anyone, so registration is unavailable rather than falling back to creating an
+// unverified account, which is the opposite of what the setting asks for (#526 decision 2). One
+// definition, read by the registration form, page and submission alike, and by every page that
+// links to it, so no page links to a form that answers not-found.
+//
+// It governs registering only. An activation link already mailed needs no mail to follow, so the
+// activation pages ask for SelfRegistrationEnabled alone.
+func (s *Settings) IsSelfRegistrationAvailable() bool {
+	return s.SelfRegistrationEnabled && (!s.SelfRegistrationRequiresEmailVerification || s.SMTPEnabled)
+}

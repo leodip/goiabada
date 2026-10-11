@@ -97,10 +97,20 @@ func refuseActivationLink(pageRenderer PageRenderer, auditLogger AuditLogger, w 
 // reader to register again, which is the right instruction for every one of them (#112), an
 // address with an account included, since registering again leads to the notice that it has one.
 //
+// The page links to the registration form only while registration is available: with
+// verification required and email off the form answers not-found, while the link that led here
+// still works (#526 decision 2).
+//
 // httpStatus is applied only when non-zero, as renderResetPasswordCodeInvalid applies it.
 func renderActivationLinkExpired(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request, httpStatus int) {
+	settings, ok := reqctx.SettingsFrom(r.Context())
+	if !ok {
+		pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
+		return
+	}
 	bind := map[string]interface{}{
-		"linkHasExpired": true,
+		"linkHasExpired":        true,
+		"registrationAvailable": settings.IsSelfRegistrationAvailable(),
 	}
 	if httpStatus != 0 {
 		bind["_httpStatus"] = httpStatus

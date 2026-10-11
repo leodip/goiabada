@@ -666,6 +666,73 @@ func TestHandleActivateGet_SelfRegistrationDisabled(t *testing.T) {
 	}
 }
 
+// With verification required and email off, registration is refused (#526 decision 2), but a link
+// already mailed is not: following it needs no mail, and proves the mailbox, as a reset link keeps
+// working when email is turned off. Only self-registration being off refuses it.
+func TestHandleActivateGet_ALinkMailedBeforeEmailWasTurnedOffStillWorks(t *testing.T) {
+	const code = "the-emitted-code"
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
+	store := newMarkerTestStore()
+
+	preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC().Add(-time.Minute))
+	database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
+
+	req := httptest.NewRequest("GET", emaillinks.AccountActivatePath+"?"+url.Values{"code": {code}}.Encode(), nil)
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SelfRegistrationEnabled: true,
+		SelfRegistrationRequiresEmailVerification: true, SMTPEnabled: false}))
+	rr := httptest.NewRecorder()
+
+	HandleActivateGet(pageRenderer, store, database, handlersmocks.NewAuditLogger(t), testDataCipher).ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusSeeOther, rr.Code, "the link is followed, not refused")
+	assert.Equal(t, emaillinks.AccountActivatePath, rr.Header().Get("Location"))
+}
+
+// The expired-activation page tells the reader to register again, with a link to the form. While
+// registration is unavailable that form answers not-found, so the page leaves the link out rather
+// than send the reader to it (#526 decision 2).
+func TestHandleActivateGet_TheExpiredPageLinksToRegistrationOnlyWhileItIsAvailable(t *testing.T) {
+	const code = "the-emitted-code"
+
+	for _, tc := range []struct {
+		name     string
+		settings *record.Settings
+		want     bool
+	}{
+		{"verification off and email off", &record.Settings{SelfRegistrationEnabled: true}, true},
+		{"verification on and email off", &record.Settings{SelfRegistrationEnabled: true,
+			SelfRegistrationRequiresEmailVerification: true}, false},
+		{"verification on and email on", &record.Settings{SelfRegistrationEnabled: true,
+			SelfRegistrationRequiresEmailVerification: true, SMTPEnabled: true}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), hashutil.HashString(code)).
+				Return(nil, nil).Once()
+			expectAuditFailedActivationCode(auditLogger, "unknown_code", 0)
+			var rendered map[string]interface{}
+			pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
+				"/account_register_activation_result.html", mock.Anything).
+				Run(func(args mock.Arguments) { rendered = args.Get(4).(map[string]interface{}) }).
+				Return(nil).Once()
+
+			req := httptest.NewRequest("GET", emaillinks.AccountActivatePath+"?"+url.Values{"code": {code}}.Encode(), nil)
+			req = req.WithContext(reqctx.WithSettings(req.Context(), tc.settings))
+
+			HandleActivateGet(pageRenderer, newMarkerTestStore(), database, auditLogger, testDataCipher).
+				ServeHTTP(httptest.NewRecorder(), req)
+
+			require.NotNil(t, rendered)
+			assert.Equal(t, true, rendered["linkHasExpired"])
+			assert.Equal(t, tc.want, rendered["registrationAvailable"])
+		})
+	}
+}
+
 // refuseActivationLink's audit payload, pinned directly as TestAuditFailedResetPasswordCode pins
 // the reset twin's: the two entries are one shape, so a query reads both flows (#435).
 func TestRefuseActivationLink_AuditPayload(t *testing.T) {

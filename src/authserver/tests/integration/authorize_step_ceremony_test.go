@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 	"testing"
@@ -152,16 +151,24 @@ func TestAuthorize_AStepThatNamesNoCeremonyOrAnotherIsRefused(t *testing.T) {
 	})
 }
 
-// TestAuthorize_ThePasswordPageOffersRegisterOnlyWhileSelfRegistrationIsOn: the Register link goes
-// to /account/register, which answers the not-found page while self-registration is off, so the
-// password page shows it only while it is on, as the setting's tooltip says. The re-render after a
-// refused password is checked too, because it is a second render with its own data.
-func TestAuthorize_ThePasswordPageOffersRegisterOnlyWhileSelfRegistrationIsOn(t *testing.T) {
-	for _, enabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("self-registration %v", enabled), func(t *testing.T) {
-			changeSettings(t, func(settings *record.Settings) {
-				settings.SelfRegistrationEnabled = enabled
-			})
+// TestAuthorize_ThePasswordPageOffersRegisterOnlyWhileRegistrationIsAvailable: the Register link
+// goes to /account/register, which answers the not-found page unless registration is available:
+// self-registration on, and either verification off or email on (#526 decision 2). So the password
+// page shows it only then. The re-render after a refused password is checked too, because it is a
+// second render with its own data.
+func TestAuthorize_ThePasswordPageOffersRegisterOnlyWhileRegistrationIsAvailable(t *testing.T) {
+	for _, tc := range []struct {
+		name                                  string
+		selfRegistration, verification, email bool
+		want                                  bool
+	}{
+		{"self-registration off", false, false, true, false},
+		{"verification off and email off", true, false, false, true},
+		{"verification on and email off", true, true, false, false},
+		{"verification on and email on", true, true, true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setRegSettings(t, tc.selfRegistration, tc.verification, tc.email)
 
 			client, redirectUri := createLevel1Client(t, false)
 			httpClient := createHttpClient(t)
@@ -170,14 +177,14 @@ func TestAuthorize_ThePasswordPageOffersRegisterOnlyWhileSelfRegistrationIsOn(t 
 			require.Equal(t, http.StatusOK, pwdPage.StatusCode)
 
 			links := parseHTMLResponse(t, pwdPage).Find(`a[href^="/account/register"]`).Length()
-			assert.Equal(t, map[bool]int{true: 1, false: 0}[enabled], links, "Register links on the password page")
+			assert.Equal(t, map[bool]int{true: 1, false: 0}[tc.want], links, "Register links on the password page")
 
 			refused := authenticateWithPassword(t, httpClient, pwdUrl, pwdPage, fake.Email(), fake.LetterN(16))
 			defer func() { _ = refused.Body.Close() }()
 			require.Equal(t, http.StatusOK, refused.StatusCode, "a refused password re-renders the form")
 
 			links = parseHTMLResponse(t, refused).Find(`a[href^="/account/register"]`).Length()
-			assert.Equal(t, map[bool]int{true: 1, false: 0}[enabled], links, "Register links on the form's re-render")
+			assert.Equal(t, map[bool]int{true: 1, false: 0}[tc.want], links, "Register links on the form's re-render")
 		})
 	}
 }
@@ -187,9 +194,7 @@ func TestAuthorize_ThePasswordPageOffersRegisterOnlyWhileSelfRegistrationIsOn(t 
 // link. Register from a sign-in and go back, and the visitor lands on the same sign-in's password
 // form, where a bare link would load a step naming no ceremony and get the "no longer active" page.
 func TestAuthorize_TheRegistrationLinksCarryTheSignInThroughAndBack(t *testing.T) {
-	changeSettings(t, func(settings *record.Settings) {
-		settings.SelfRegistrationEnabled = true
-	})
+	setRegSettings(t, true, false, false)
 
 	client, redirectUri := createLevel1Client(t, false)
 	httpClient := createHttpClient(t)
