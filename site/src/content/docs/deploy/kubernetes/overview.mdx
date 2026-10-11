@@ -51,6 +51,7 @@ The wizard writes two files. `goiabada-k8s.yaml` holds no secret, so you can com
 
 - **A Namespace,** labelled to warn about any pod that breaks the restricted Pod Security Standard. See [Security](/deploy/kubernetes/security/#pod-security).
 - **Two ConfigMaps,** `goiabada-authserver-config` and `goiabada-adminconsole-config`, each holding only what its server reads. The three URLs are in both, written from the same answers, so change them in both.
+- **A third ConfigMap, `goiabada-db-ca`,** only if you named a CA file for the database's certificate, mounted into the auth server's pods. See [Check the database's certificate](/deploy/kubernetes/security/#check-the-databases-certificate).
 - **Two Deployments,** one per server, at one replica each, with a rolling update that never runs fewer pods than replicas and a spread over nodes. See [High availability](/deploy/kubernetes/high-availability/).
 - **Probes, a stop pause and a grace period** on every container. See [Probes and shutdown](/deploy/kubernetes/probes-and-shutdown/).
 - **Two PodDisruptionBudgets,** one per Deployment.
