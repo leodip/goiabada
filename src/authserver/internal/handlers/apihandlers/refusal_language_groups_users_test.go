@@ -232,6 +232,12 @@ func TestAttributeRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			status: http.StatusBadRequest, code: "VALIDATION_ERROR", english: keyEnglish, portuguese: keyPortuguese,
 		},
 		{
+			// The group's id rides in the body here, not in the path, so it is no integrator's
+			// malformed target and is translated (#559 decision 1).
+			name: "a group attribute created with no group id", serve: groupCreate(`{"key":"tier","value":"gold"}`),
+			status: http.StatusBadRequest, code: "VALIDATION_ERROR", english: "Group ID is required", portuguese: "O ID do grupo é obrigatório",
+		},
+		{
 			name: "a group attribute created with a value past the bound", serve: groupCreate(`{"groupId":5,"key":"k","value":"` + longValue + `"}`),
 			status: http.StatusBadRequest, code: "VALIDATION_ERROR", english: valueEnglish, portuguese: valuePortuguese,
 		},

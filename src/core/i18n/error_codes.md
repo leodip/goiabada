@@ -171,6 +171,7 @@ failures are one key per cause, each a whole sentence.
 | `handler.group.identifier_in_use` | (none) | The group identifier is already in use |
 | `handler.group_member.already_member` | (none) | User is already a member of this group |
 | `handler.group_member.not_member` | (none) | User is not a member of this group |
+| `handler.group_attribute.group_id_required` | (none) | Group ID is required |
 | `handler.attribute.value_too_long` | `max` (int) | The attribute value cannot exceed a maximum length of {{.max}} characters |
 | `handler.user.email_required` | (none) | Email is required |
 | `handler.user.email_too_long` | `max` (int) | The email address cannot exceed a maximum length of {{.max}} characters |

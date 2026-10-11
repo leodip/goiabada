@@ -145,14 +145,15 @@ func TestInstantOf(t *testing.T) {
 	}
 }
 
-// TestTemplateFuncMap_IsThisApplicationsTwentyOne pins the split #385 made. The one map in core
+// TestTemplateFuncMap_IsThisApplicationsTwentyTwo pins the split #385 made. The one map in core
 // held twenty-two and the auth server parsed every template with all of them, though its pages
 // call four: T, Lang, args and versionComment, which are also here. The other seventeen -- the
 // five page predicates over this console's own URL paths, the JS bootstrap catalog, the
 // reference-data formatters -- are this application's alone, and a new entry here means one of its
 // templates calls it. The twenty-second was marshal, which typed the keys page's JSON as already
-// safe and went in #120, the engine escaping that value itself.
-func TestTemplateFuncMap_IsThisApplicationsTwentyOne(t *testing.T) {
+// safe and went in #120, the engine escaping that value itself. CatalogLang is the twenty-second
+// now, the catalog a page rendered from, which its scripts name back on every request (#559).
+func TestTemplateFuncMap_IsThisApplicationsTwentyTwo(t *testing.T) {
 	keys := make([]string, 0, len(templateFuncMap))
 	for k := range templateFuncMap {
 		keys = append(keys, k)
@@ -160,7 +161,7 @@ func TestTemplateFuncMap_IsThisApplicationsTwentyOne(t *testing.T) {
 	sort.Strings(keys)
 
 	want := []string{
-		"DateTime", "JSBootstrap", "Lang", "LocaleLabel", "RefCountry", "RefPhoneCountry",
+		"CatalogLang", "DateTime", "JSBootstrap", "Lang", "LocaleLabel", "RefCountry", "RefPhoneCountry",
 		"RefTimezone", "Since", "T", "add", "addUrlParam", "args", "concat", "deref",
 		"isAdminClientPage", "isAdminGroupPage", "isAdminResourcePage", "isAdminSettingsEmailPage",
 		"isAdminUserPage", "isLast", "versionComment",

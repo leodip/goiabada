@@ -8,12 +8,14 @@ import (
 	"io/fs"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/web"
+	"github.com/leodip/goiabada/core/guard"
 	"gopkg.in/yaml.v3"
 )
 
@@ -262,17 +264,69 @@ func TestOpenAPI_DescribesEveryAPIRoute(t *testing.T) {
 // time would be invisible to the scan and the spec could drift under it unnoticed, which is a
 // hole worth closing at the call sites that could open it.
 func TestAPIHandlers_WriteStatusesAsConstants(t *testing.T) {
-	// The writers that take a status, by name, with their argument count and the status's index.
-	// writeLocalizedError is writeJSONError with the description translated (#559 decision 2).
-	writers := map[string]struct{ args, status int }{
-		"writeJSONError":      {args: 4, status: 3},
-		"writeLocalizedError": {args: 5, status: 4},
+	// go test runs with the package directory as the working directory, so this is
+	// src/authserver/internal/handlers.
+	assertStatusesAsConstants(t, filepath.Join("..", "handlers"), statusWriterCallFloor)
+}
+
+// statusWriters are the writers that take a status, by name, with their argument count and the
+// status's index. writeLocalizedError is writeJSONError with the description translated (#559
+// decision 2).
+var statusWriters = map[string]struct{ args, status int }{
+	"writeJSONError":      {args: 4, status: 3},
+	"writeLocalizedError": {args: 5, status: 4},
+}
+
+// statusWriterCallFloor is how many writer calls the handlers hold at rest, as a floor so ordinary
+// growth does not move it: a scan that inspected nothing passes while guarding nothing.
+const statusWriterCallFloor = 100
+
+// assertStatusesAsConstants is the reporting half: one failure per finding of
+// statusConstantFindings, and a stop for a walk that could not be read or reached fewer writer
+// calls than floor, since a scan that inspected nothing proves nothing.
+func assertStatusesAsConstants(r guard.Reporter, root string, floor int) {
+	r.Helper()
+	findings, calls, err := statusConstantFindings(root)
+	if err != nil {
+		r.Fatalf("%v", err)
+		return
 	}
+	if calls < floor {
+		r.Fatalf("found only %d error writer calls under %s; the walk is no longer reaching the "+
+			"API handlers", calls, root)
+		return
+	}
+	for _, finding := range findings {
+		r.Errorf("%s", finding)
+	}
+}
+
+// statusConstantFindings walks the non-test Go sources under root and returns one finding per
+// statusWriters call whose status is not an http.Status constant, located relative to root's
+// parent, and how many writer calls it read. api_common.go is skipped: the helpers' own
+// signatures take the int, and their callers are the subject.
+func statusConstantFindings(root string) ([]string, int, error) {
+	var findings []string
 	calls := 0
-	forEachHandlerSource(t, func(t *testing.T, path string, fset *token.FileSet, file *ast.File) {
-		if filepath.Base(path) == "api_common.go" {
-			return // the helpers' own signatures take the int; their callers are the subject
+	base := filepath.Dir(root)
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") ||
+			d.Name() == "api_common.go" {
+			return nil
+		}
+		fset := token.NewFileSet()
+		file, pErr := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		if pErr != nil {
+			return fmt.Errorf("parsing %s: %w", path, pErr)
+		}
+		rel, relErr := filepath.Rel(base, path)
+		if relErr != nil {
+			return relErr
+		}
+		rel = filepath.ToSlash(rel)
 		ast.Inspect(file, func(n ast.Node) bool {
 			call, ok := n.(*ast.CallExpr)
 			if !ok {
@@ -282,33 +336,106 @@ func TestAPIHandlers_WriteStatusesAsConstants(t *testing.T) {
 			if !ok {
 				return true
 			}
-			writer, ok := writers[name.Name]
+			writer, ok := statusWriters[name.Name]
 			if !ok || len(call.Args) != writer.args {
 				return true
 			}
 			calls++
 			status := call.Args[writer.status]
+			line := fset.Position(status.Pos()).Line
 			sel, ok := status.(*ast.SelectorExpr)
 			if !ok {
-				t.Errorf("%s:%d: %s is called with a computed status; the "+
-					"openapi.yaml lint reads statuses lexically and cannot see it",
-					path, fset.Position(status.Pos()).Line, name.Name)
+				findings = append(findings, fmt.Sprintf("%s:%d: %s is called with a computed status; "+
+					"the openapi.yaml lint reads statuses lexically and cannot see it", rel, line, name.Name))
 				return true
 			}
 			pkg, ok := sel.X.(*ast.Ident)
 			if !ok || pkg.Name != "http" || httpStatusConstants[sel.Sel.Name] == 0 {
-				t.Errorf("%s:%d: %s is called with %s rather than an http.Status "+
-					"constant", path, fset.Position(status.Pos()).Line, name.Name, sel.Sel.Name)
+				findings = append(findings, fmt.Sprintf("%s:%d: %s is called with %s rather than an "+
+					"http.Status constant", rel, line, name.Name, sel.Sel.Name))
 			}
 			return true
 		})
+		return nil
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("walking %s: %w", root, err)
+	}
+	return findings, calls, nil
+}
+
+// statusConstantsFixture is a handler package whose writes of both writers each name a constant,
+// plus the two files the walk skips, which would fail it if read.
+func statusConstantsFixture(t *testing.T, root string) {
+	t.Helper()
+	writeDocFixture(t, root, "handlers/apihandlers/handler_ok.go", "package apihandlers\n\n"+
+		"func HandleOK(w http.ResponseWriter, r *http.Request) {\n"+
+		"\twriteJSONError(w, \"Invalid request body\", \"INVALID_REQUEST_BODY\", http.StatusBadRequest)\n"+
+		"\twriteLocalizedError(w, r, i18n.NewLocalizedError(\"k\", nil), \"CONCURRENT_UPDATE\", http.StatusConflict)\n"+
+		"}\n")
+	writeDocFixture(t, root, "handlers/apihandlers/api_common.go", "package apihandlers\n\n"+
+		"func writeLocalizedError(w http.ResponseWriter, r *http.Request, e error, code string, status int) {\n"+
+		"\twriteJSONError(w, e.Error(), code, status)\n"+
+		"}\n")
+	writeDocFixture(t, root, "handlers/apihandlers/handler_ok_test.go", "package apihandlers\n\n"+
+		"func helper(status int) { writeJSONError(nil, \"m\", \"C\", status) }\n")
+}
+
+func TestStatusesAsConstants_AComputedStatusFails(t *testing.T) {
+	root := t.TempDir()
+	statusConstantsFixture(t, root)
+	writeDocFixture(t, root, "handlers/apihandlers/handler_bad.go", "package apihandlers\n\n"+
+		"func HandleBad(w http.ResponseWriter, r *http.Request, status int) {\n"+
+		"\twriteJSONError(w, \"m\", \"C\", status)\n"+
+		"\twriteLocalizedError(w, r, nil, \"C\", status)\n"+
+		"\twriteLocalizedError(w, r, nil, \"C\", statuses.Conflict)\n"+
+		"\twriteJSONError(w, \"m\", \"C\", http.StatusTeapotish)\n"+
+		"}\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertStatusesAsConstants(r, filepath.Join(root, "handlers"), 1)
 	})
 
-	// A scan that inspected nothing passes while guarding nothing. This is the floor that
-	// says the walk still reaches the handlers.
-	if calls < 100 {
-		t.Errorf("found only %d error writer calls; the walk is no longer reaching the "+
-			"API handlers", calls)
+	if report.Stopped {
+		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
+	}
+	want := []string{
+		"handlers/apihandlers/handler_bad.go:4: writeJSONError is called with a computed status; the openapi.yaml lint reads statuses lexically and cannot see it",
+		"handlers/apihandlers/handler_bad.go:5: writeLocalizedError is called with a computed status; the openapi.yaml lint reads statuses lexically and cannot see it",
+		"handlers/apihandlers/handler_bad.go:6: writeLocalizedError is called with Conflict rather than an http.Status constant",
+		"handlers/apihandlers/handler_bad.go:7: writeJSONError is called with StatusTeapotish rather than an http.Status constant",
+	}
+	got := append([]string(nil), report.Errors...)
+	sort.Strings(got)
+	if !slices.Equal(got, want) {
+		t.Errorf("failures\n%q\nwant\n%q", got, want)
+	}
+}
+
+func TestStatusesAsConstants_ConstantStatusesPass(t *testing.T) {
+	root := t.TempDir()
+	statusConstantsFixture(t, root)
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertStatusesAsConstants(r, filepath.Join(root, "handlers"), 2)
+	})
+
+	if report.Failed() {
+		t.Errorf("writes naming http.Status constants failed: %+v", report)
+	}
+}
+
+func TestStatusesAsConstants_AWalkThatReachedNoWriterStops(t *testing.T) {
+	root := t.TempDir()
+	writeDocFixture(t, root, "handlers/apihandlers/handler_none.go", "package apihandlers\n\n"+
+		"func HandleNone() {}\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertStatusesAsConstants(r, filepath.Join(root, "handlers"), 1)
+	})
+
+	if !report.Stopped || !strings.Contains(report.Fatal, "found only 0 error writer calls") {
+		t.Errorf("a walk that reached no writer did not stop the check: %+v", report)
 	}
 }
 

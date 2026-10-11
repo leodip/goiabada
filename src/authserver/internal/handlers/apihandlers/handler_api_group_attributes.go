@@ -143,8 +143,10 @@ func HandleGroupAttributeCreatePost(
 			return
 		}
 
+		// The group's id rides in the body, so this is no malformed target: it is translated like
+		// the other fields' refusals (#559 decision 1).
 		if createReq.GroupId <= 0 {
-			writeJSONError(w, "Group ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupAttributeGroupIdRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
