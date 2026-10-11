@@ -1420,8 +1420,8 @@ func TestWizard_AsksWhetherToTurnTheRateLimiterOn(t *testing.T) {
 
 // Under the Cluster traffic policy the question says why it is off by default: the per-IP limits,
 // with two of their budgets, would count every user arriving through one node together (#396
-// decision 9). It says what each answer costs there, and that the limits per user apply either way
-// (#542).
+// decision 9). It says what turning it on adds there, never that off leaves guessing a password
+// unbounded, since the limits per user (#542) and per email (#503) apply either way.
 func TestWizard_TheRateLimiterQuestionSaysWhyItIsOffUnderCluster(t *testing.T) {
 	w, in, out, _ := testWizard(t, &CLIFlags{}, withAnswers(t, deploymentKubernetes, nil))
 	if err := w.setup(); err != nil {
@@ -1435,13 +1435,49 @@ func TestWizard_TheRateLimiterQuestionSaysWhyItIsOffUnderCluster(t *testing.T) {
 		"20 forgot-password requests per 5 minutes",
 		"always limits, per user, wrong one-time codes",
 		"email verification codes and verification mails",
-		"nothing limits guessing a user's password",
-		"block its password sign-ins for 15 minutes",
+		"10 wrong passwords block an email's password sign-ins for 15 minutes for every client through a node",
 		rateLimitsDocs,
 	} {
 		if !strings.Contains(said, want) {
 			t.Errorf("the question does not say %q:\n%s", want, out)
 		}
+	}
+	if strings.Contains(strings.ToLower(said), "nothing limits") {
+		t.Errorf("the question says something goes unlimited with the rate limiter off:\n%s", out)
+	}
+}
+
+// Every deployment that asks says, before the question, which limits apply whatever the answer:
+// those per user and those per email, wrong passwords among them, which no edge layer can count
+// since only the auth server learns whether a password was wrong; and what the rate limiter adds,
+// the limits per client address and the tighter limit on wrong passwords per email from one network
+// (#503).
+func TestWizard_TheRateLimiterQuestionSaysWhatAppliesEitherWay(t *testing.T) {
+	cases := map[string][]scriptedStep{
+		"production":               withAnswers(t, deploymentProduction, nil),
+		"native":                   withAnswers(t, deploymentNative, nil),
+		"kubernetes under Cluster": withAnswers(t, deploymentKubernetes, nil),
+		"kubernetes under Local":   withKubernetesAnswer(t, trafficPolicyPrompt, "2"),
+	}
+	for name, steps := range cases {
+		t.Run(name, func(t *testing.T) {
+			w, in, out, _ := testWizard(t, &CLIFlags{}, steps)
+			if err := w.setup(); err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			in.assertConsumed()
+			said := strings.Join(strings.Fields(out.String()), " ")
+			for _, want := range []string{
+				"always limits, per user, wrong one-time codes",
+				"and, per email, wrong passwords (100 an hour), password-reset mails and registration notices",
+				"Its rate limiter adds limits per client address",
+				"wrong passwords per email from one network (10 per 15 minutes)",
+			} {
+				if !strings.Contains(said, want) {
+					t.Errorf("the question does not say %q:\n%s", want, out)
+				}
+			}
+		})
 	}
 }
 

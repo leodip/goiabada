@@ -61,7 +61,8 @@ const (
 	trafficPolicyLocal   trafficPolicy = "Local"
 )
 
-// rateLimitsDocsURL is where the limits the rate limiter turns on are listed.
+// rateLimitsDocsURL is where the auth server's limits are listed, those the rate limiter turns on
+// and those that apply either way.
 const rateLimitsDocsURL = "https://goiabada.dev/reference/environment-variables/#rate-limits"
 
 // rateLimiterDefault is the answer the rate limiter question offers: on, but for a manifest behind
@@ -103,24 +104,26 @@ func aesKeyComment() []string {
 }
 
 // rateLimiterComment is the comment above the rate limiter's switch in every output that writes it:
-// what it turns on, where the limits are listed, and the startup warning it brings with this
-// output's proxy trust, which the auth server logs only with the limiter on.
+// what it turns on, what applies either way (#542, #503), where the limits are listed, and the
+// startup warning it brings with this output's proxy trust, which the auth server logs only with the
+// limiter on.
 func (c *Config) rateLimiterComment() []string {
 	lines := []string{
 		"The auth server's rate limiter: per-IP limits on sign-in, password reset,",
-		"self-registration and client registration, and a limit on wrong passwords per email.",
-		"The server's own default is off. Its limits per user, on wrong one-time codes, Account-page",
-		"password checks, email verification codes and verification mails, apply either way. The",
-		"limits are listed at",
+		"self-registration and client registration, and a limit on wrong passwords per email from",
+		"one network. The server's own default is off. Its limits per user (wrong one-time codes,",
+		"Account-page password checks, email verification codes and verification mails) and per",
+		"email (wrong passwords, password-reset mails and registration notices) apply either way.",
+		"The limits are listed at",
 		rateLimitsDocsURL,
 	}
 	switch {
 	case c.Deployment.servedByEnvoyGateway && c.GatewayTrafficPolicy == trafficPolicyCluster:
 		lines = append(lines,
 			"Under the gateway's Cluster traffic policy the servers see a node's address, so the",
-			"per-IP limits count every client arriving through one node together. Off, nothing limits",
-			"guessing a password; on, anyone who knows an email can block its password sign-ins for",
-			"15 minutes, since every client through a node counts as one network.",
+			"per-IP limits count every client arriving through one node together. With it on, 10",
+			"wrong passwords block an email's password sign-ins for 15 minutes for every client",
+			"through a node, since they all count as one network.",
 			"With it on, the auth server logs a warning at every start that it trusts one proxy hop",
 			"with no list; behind Envoy alone, that is expected.")
 	case c.Deployment.servedByEnvoyGateway:
