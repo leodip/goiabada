@@ -137,6 +137,28 @@ const (
 	ErrCodePermissionBuiltInRenamed     = "handler.permission.built_in_renamed"  // Args: {"identifier": string}
 	ErrCodePermissionIdentifierInUse    = "handler.permission.identifier_in_use" // Args: {"identifier": string}
 
+	// Groups, their members and attributes, and a user's attributes. A group's and a user's attribute
+	// key is the console's own handler.attribute.key_required above, and the value bound is one
+	// sentence for both, whose codes differ (VALIDATION_ERROR and VALUE_TOO_LONG).
+	ErrCodeGroupIdentifierRequired  = "handler.group.identifier_required"
+	ErrCodeGroupDescriptionTooLong  = "handler.group.description_too_long" // Args: {"max": int}
+	ErrCodeGroupIdentifierInUse     = "handler.group.identifier_in_use"
+	ErrCodeGroupMemberAlreadyMember = "handler.group_member.already_member"
+	ErrCodeGroupMemberNotMember     = "handler.group_member.not_member"
+	ErrCodeAttributeValueTooLong    = "handler.attribute.value_too_long" // Args: {"max": int}
+
+	// Users, a user's groups, and the email verification code an administrator generates. The
+	// account's own send says the code's sentence too.
+	ErrCodeUserEmailRequired               = "handler.user.email_required"
+	ErrCodeUserEmailTooLong                = "handler.user.email_too_long" // Args: {"max": int}
+	ErrCodeUserSetPasswordTypeInvalid      = "handler.user.set_password_type_invalid"
+	ErrCodeUserPasswordRequired            = "handler.user.password_required"
+	ErrCodeUserNewPasswordRequired         = "handler.user.new_password_required"
+	ErrCodeUserOTPEnableNotSupported       = "handler.user.otp_enable_not_supported"
+	ErrCodeUserOTPNotEnabled               = "handler.user.otp_not_enabled"
+	ErrCodeUserGroupsTooMany               = "handler.user_groups.too_many"
+	ErrCodeEmailVerificationAccountChanged = "handler.email_verification.account_changed"
+
 	// RP-initiated logout via /auth/logout carries no error codes. It used to
 	// carry ten, all of which rendered an error page to the End-User instead of
 	// logging them out. A hint the OP cannot confirm is now answered with the

@@ -139,7 +139,7 @@ func HandleGroupAttributeCreatePost(
 
 		// Validate required fields
 		if createReq.Key == "" {
-			writeJSONError(w, "Attribute key is required", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -158,7 +158,7 @@ func HandleGroupAttributeCreatePost(
 		// Validate value length
 		const maxLengthAttrValue = 250
 		if inputvalidation.TextLength(createReq.Value) > maxLengthAttrValue {
-			writeJSONError(w, "The attribute value cannot exceed a maximum length of "+strconv.Itoa(maxLengthAttrValue)+" characters", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeValueTooLong, map[string]any{"max": maxLengthAttrValue}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -260,7 +260,7 @@ func HandleGroupAttributeUpdatePut(
 
 		// Validate required fields
 		if updateReq.Key == "" {
-			writeJSONError(w, "Attribute key is required", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -274,7 +274,7 @@ func HandleGroupAttributeUpdatePut(
 		// Validate value length
 		const maxLengthAttrValue = 250
 		if inputvalidation.TextLength(updateReq.Value) > maxLengthAttrValue {
-			writeJSONError(w, "The attribute value cannot exceed a maximum length of "+strconv.Itoa(maxLengthAttrValue)+" characters", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeValueTooLong, map[string]any{"max": maxLengthAttrValue}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 

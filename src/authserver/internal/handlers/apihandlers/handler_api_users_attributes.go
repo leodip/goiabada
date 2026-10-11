@@ -139,7 +139,7 @@ func HandleUserAttributeCreatePost(
 
 		// Validate required fields
 		if req.Key == "" {
-			writeJSONError(w, "Attribute key is required", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -164,7 +164,7 @@ func HandleUserAttributeCreatePost(
 		// Validate attribute value length
 		const maxLengthAttrValue = 250
 		if inputvalidation.TextLength(req.Value) > maxLengthAttrValue {
-			writeJSONError(w, "The attribute value cannot exceed a maximum length of 250 characters", "VALUE_TOO_LONG", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeValueTooLong, map[string]any{"max": maxLengthAttrValue}), "VALUE_TOO_LONG", http.StatusBadRequest)
 			return
 		}
 
@@ -259,7 +259,7 @@ func HandleUserAttributeUpdatePut(
 
 		// Validate required fields
 		if req.Key == "" {
-			writeJSONError(w, "Attribute key is required", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -273,7 +273,7 @@ func HandleUserAttributeUpdatePut(
 		// Validate attribute value length
 		const maxLengthAttrValue = 250
 		if inputvalidation.TextLength(req.Value) > maxLengthAttrValue {
-			writeJSONError(w, "The attribute value cannot exceed a maximum length of 250 characters", "VALUE_TOO_LONG", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeValueTooLong, map[string]any{"max": maxLengthAttrValue}), "VALUE_TOO_LONG", http.StatusBadRequest)
 			return
 		}
 

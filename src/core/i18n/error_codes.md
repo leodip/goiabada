@@ -125,10 +125,13 @@ when a caller sends the same request without the console's check.
 
 The admin and account API writes each of these with the `error_code` and the
 status it always had (`VALIDATION_ERROR`, `CONCURRENT_UPDATE`,
-`EMAIL_ALREADY_EXISTS`, `LAST_ADMINISTRATOR`, `FILE_TOO_LARGE`, `NO_FILE`), so
-the key is not on the wire: only `error_description` comes from here, in the
-request's language. The resource permissions save's description bound reuses
-`handler.admin_resource_permissions.description_too_long` above.
+`EMAIL_ALREADY_EXISTS`, `LAST_ADMINISTRATOR`, `FILE_TOO_LARGE`, `NO_FILE`,
+`VALUE_TOO_LONG`, `EMAIL_TOO_LONG`, `OTP_NOT_ENABLED`), so the key is not on
+the wire: only `error_description` comes from here, in the request's language.
+The resource permissions save's description bound reuses
+`handler.admin_resource_permissions.description_too_long` above, a group's and
+a user's attribute key reuses `handler.attribute.key_required`, and the user's
+phone country refusal reuses `validator.phone.country_invalid`.
 
 | Code | Args | English message |
 |---|---|---|
@@ -149,6 +152,21 @@ request's language. The resource permissions save's description bound reuses
 | `handler.permission.built_in_deleted` | `identifier` (string) | Built-in permission '{{.identifier}}' cannot be deleted. |
 | `handler.permission.built_in_renamed` | `identifier` (string) | Built-in permission '{{.identifier}}' cannot be renamed. |
 | `handler.permission.identifier_in_use` | `identifier` (string) | Permission identifier {{.identifier}} is already in use. |
+| `handler.group.identifier_required` | (none) | Group identifier is required |
+| `handler.group.description_too_long` | `max` (int) | The description cannot exceed a maximum length of {{.max}} characters |
+| `handler.group.identifier_in_use` | (none) | The group identifier is already in use |
+| `handler.group_member.already_member` | (none) | User is already a member of this group |
+| `handler.group_member.not_member` | (none) | User is not a member of this group |
+| `handler.attribute.value_too_long` | `max` (int) | The attribute value cannot exceed a maximum length of {{.max}} characters |
+| `handler.user.email_required` | (none) | Email is required |
+| `handler.user.email_too_long` | `max` (int) | The email address cannot exceed a maximum length of {{.max}} characters |
+| `handler.user.set_password_type_invalid` | (none) | setPasswordType must be "now" or "email" |
+| `handler.user.password_required` | (none) | Password is required |
+| `handler.user.new_password_required` | (none) | New password is required |
+| `handler.user.otp_enable_not_supported` | (none) | Enabling OTP is not supported through this endpoint |
+| `handler.user.otp_not_enabled` | (none) | User does not have OTP enabled |
+| `handler.user_groups.too_many` | (none) | Too many group ids |
+| `handler.email_verification.account_changed` | (none) | The account was changed by another request while the code was being sent. Nothing was sent: try again. |
 
 ## Password validator
 

@@ -85,14 +85,14 @@ func HandleGroupCreatePost(
 
 		// Validate group identifier
 		if strings.TrimSpace(createReq.GroupIdentifier) == "" {
-			writeJSONError(w, "Group identifier is required", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupIdentifierRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Validate description length
 		const maxLengthDescription = 100
 		if inputvalidation.TextLength(createReq.Description) > maxLengthDescription {
-			writeJSONError(w, "The description cannot exceed a maximum length of "+strconv.Itoa(maxLengthDescription)+" characters", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupDescriptionTooLong, map[string]any{"max": maxLengthDescription}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -115,7 +115,7 @@ func HandleGroupCreatePost(
 			return
 		}
 		if existingGroup != nil {
-			writeJSONError(w, "The group identifier is already in use", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupIdentifierInUse, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -230,14 +230,14 @@ func HandleGroupUpdatePut(
 
 		// Validate group identifier
 		if strings.TrimSpace(updateReq.GroupIdentifier) == "" {
-			writeJSONError(w, "Group identifier is required", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupIdentifierRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Validate description length
 		const maxLengthDescription = 100
 		if inputvalidation.TextLength(updateReq.Description) > maxLengthDescription {
-			writeJSONError(w, "The description cannot exceed a maximum length of "+strconv.Itoa(maxLengthDescription)+" characters", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupDescriptionTooLong, map[string]any{"max": maxLengthDescription}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -260,7 +260,7 @@ func HandleGroupUpdatePut(
 			return
 		}
 		if existingGroup != nil && existingGroup.Id != group.Id {
-			writeJSONError(w, "The group identifier is already in use", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupIdentifierInUse, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 

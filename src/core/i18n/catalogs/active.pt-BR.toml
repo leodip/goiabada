@@ -1525,6 +1525,23 @@
 "handler.permission.built_in_renamed" = "A permissão nativa '{{.identifier}}' não pode ser renomeada."
 "handler.permission.identifier_in_use" = "O identificador de permissão {{.identifier}} já está em uso."
 
+"handler.group.identifier_required" = "O identificador do grupo é obrigatório"
+"handler.group.description_too_long" = "A descrição não pode ter mais que {{.max}} caracteres"
+"handler.group.identifier_in_use" = "O identificador do grupo já está em uso"
+"handler.group_member.already_member" = "O usuário já é membro deste grupo"
+"handler.group_member.not_member" = "O usuário não é membro deste grupo"
+"handler.attribute.value_too_long" = "O valor do atributo não pode ter mais que {{.max}} caracteres"
+
+"handler.user.email_required" = "O e-mail é obrigatório"
+"handler.user.email_too_long" = "O endereço de e-mail não pode ter mais que {{.max}} caracteres"
+"handler.user.set_password_type_invalid" = "setPasswordType deve ser \"now\" ou \"email\""
+"handler.user.password_required" = "A senha é obrigatória"
+"handler.user.new_password_required" = "A nova senha é obrigatória"
+"handler.user.otp_enable_not_supported" = "Não é possível habilitar o OTP por este endpoint"
+"handler.user.otp_not_enabled" = "O usuário não tem o OTP habilitado"
+"handler.user_groups.too_many" = "Há IDs de grupo demais na requisição"
+"handler.email_verification.account_changed" = "A conta foi alterada por outra requisição enquanto o código era enviado. Nada foi enviado: tente novamente."
+
 "validator.password.too_short" = "O comprimento mínimo para a senha é {{.min}} caracteres"
 "validator.password.too_long" = "A senha pode ter no máximo {{.max}} bytes. Caracteres acentuados e de outros alfabetos contam como dois ou mais bytes cada."
 "validator.password.lowercase_required" = "Conforme nossa política, é obrigatório um caractere minúsculo na senha."

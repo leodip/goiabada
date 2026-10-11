@@ -1613,6 +1613,23 @@
 "handler.permission.built_in_renamed" = "Built-in permission '{{.identifier}}' cannot be renamed."
 "handler.permission.identifier_in_use" = "Permission identifier {{.identifier}} is already in use."
 
+"handler.group.identifier_required" = "Group identifier is required"
+"handler.group.description_too_long" = "The description cannot exceed a maximum length of {{.max}} characters"
+"handler.group.identifier_in_use" = "The group identifier is already in use"
+"handler.group_member.already_member" = "User is already a member of this group"
+"handler.group_member.not_member" = "User is not a member of this group"
+"handler.attribute.value_too_long" = "The attribute value cannot exceed a maximum length of {{.max}} characters"
+
+"handler.user.email_required" = "Email is required"
+"handler.user.email_too_long" = "The email address cannot exceed a maximum length of {{.max}} characters"
+"handler.user.set_password_type_invalid" = "setPasswordType must be \"now\" or \"email\""
+"handler.user.password_required" = "Password is required"
+"handler.user.new_password_required" = "New password is required"
+"handler.user.otp_enable_not_supported" = "Enabling OTP is not supported through this endpoint"
+"handler.user.otp_not_enabled" = "User does not have OTP enabled"
+"handler.user_groups.too_many" = "Too many group ids"
+"handler.email_verification.account_changed" = "The account was changed by another request while the code was being sent. Nothing was sent: try again."
+
 # --- Password validator (LocalizedError-backed) ------------------------------
 
 "validator.password.too_short" = "The minimum length for the password is {{.min}} characters"

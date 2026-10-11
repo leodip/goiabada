@@ -125,7 +125,7 @@ func HandleUserPasswordPut(
 
 		// Validate required fields
 		if req.NewPassword == "" {
-			writeJSONError(w, "New password is required", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserNewPasswordRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -241,7 +241,7 @@ func HandleUserOTPPut(
 
 		// Check if trying to enable OTP (not supported)
 		if req.Enabled {
-			writeJSONError(w, "Enabling OTP is not supported through this endpoint", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserOTPEnableNotSupported, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -258,7 +258,7 @@ func HandleUserOTPPut(
 
 		// Only proceed if user currently has OTP enabled and we're disabling it
 		if !user.OTPEnabled {
-			writeJSONError(w, "User does not have OTP enabled", "OTP_NOT_ENABLED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserOTPNotEnabled, nil), "OTP_NOT_ENABLED", http.StatusBadRequest)
 			return
 		}
 
@@ -337,7 +337,7 @@ func HandleUserCreatePost(
 
 		// Validate required fields
 		if req.Email == "" {
-			writeJSONError(w, "Email is required", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserEmailRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -352,8 +352,9 @@ func HandleUserCreatePost(
 		}
 
 		// Email length validation
-		if inputvalidation.TextLength(req.Email) > 60 {
-			writeJSONError(w, "The email address cannot exceed a maximum length of 60 characters", "EMAIL_TOO_LONG", http.StatusBadRequest)
+		const maxLengthEmail = 60
+		if inputvalidation.TextLength(req.Email) > maxLengthEmail {
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserEmailTooLong, map[string]any{"max": maxLengthEmail}), "EMAIL_TOO_LONG", http.StatusBadRequest)
 			return
 		}
 
@@ -401,8 +402,7 @@ func HandleUserCreatePost(
 			req.SetPasswordType != api.SetPasswordTypeNow &&
 			req.SetPasswordType != api.SetPasswordTypeEmail {
 
-			writeJSONError(w, "setPasswordType must be \"now\" or \"email\"",
-				"VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserSetPasswordTypeInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -417,7 +417,7 @@ func HandleUserCreatePost(
 		var passwordHash string
 		if !sendSetupEmail {
 			if req.Password == "" {
-				writeJSONError(w, "Password is required", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserPasswordRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 
