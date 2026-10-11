@@ -13,8 +13,10 @@
         {{if .linkHasExpired}}
             <div class="w-full mt-4 form-control">
                 <p>{{ T $.ctx "account.activation_result.expired_body" }}</p>
+                {{if .registrationAvailable}}
                 <p class="mt-2">{{ T $.ctx "account.activation_result.expired_link_prefix" }}<a class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer"
                     href="/account/register">{{ T $.ctx "common.link.click_here" }}</a>{{ T $.ctx "account.activation_result.expired_link_suffix" }}</p>
+                {{end}}
             </div>
         {{end}}
 

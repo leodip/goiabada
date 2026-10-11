@@ -34,16 +34,18 @@ The sign-in page now shows a **Register** link. To turn self-registration off ag
 
 While **User self registration enabled** is off, the sign-in page shows no **Register** link and the registration pages lead to a not-found page. Turning it on lets anyone who reaches the sign-in page register. With **User self registration requires email verification** on, they prove their address first, as [With email verification](#with-email-verification) describes. With it off, they don't, as [Without email verification](#without-email-verification) describes.
 
+Email verification needs email. While it's on and email isn't set up, nobody can register: the sign-in page shows no **Register** link and the registration form leads to a not-found page, just as the forgot-password page does without email. Set up email, or turn email verification off, to open registration.
+
 ## Without email verification
 
 The registration form asks for an email address and a password, twice. The password must meet the **Password policy** on **Admin**, **General**. When the form is sent, the account is created at once, with its address not verified, and the page says "Your account has been created." When email is set up, the user also gets a "Welcome!" email.
 
 An address that already has an account is refused with "Apologies, but this email address is already registered."
 
-That's also what happens when email verification is on but email isn't set up: the setting needs SMTP to do anything.
+This form appears only while email verification is off. It works with or without email set up.
 
 <Aside type="caution">
-Without email verification, anyone can find out whether an address has an account, by trying to register it. The answer can't be hidden, because the account the form creates is usable at once: signing in with the chosen password would fail for an address that was already taken. Turn on email verification if the list of addresses with an account shouldn't be discoverable.
+Without email verification, anyone can find out whether an address has an account, by trying to register it. The answer can't be hidden, because the account the form creates is usable at once: signing in with the chosen password would fail for an address that was already taken. Leave email verification on, and set up email, if the list of addresses with an account shouldn't be discoverable.
 </Aside>
 
 ## With email verification
@@ -56,9 +58,9 @@ The registration form asks for the email address alone, and every well-formed ad
 
 Following the link creates nothing by itself. Only sending the form does, so a mail scanner or link previewer that opens the link can't complete a registration, and someone who registers an address that isn't theirs never gets to choose its password.
 
-If the address gains an account before the form is sent, because an administrator created one, the registration is refused and discarded. While self-registration is off, the registration page and every link already sent lead to a not-found page.
+If the address gains an account before the form is sent, because an administrator created one, the registration is refused and discarded. While self-registration is off, the registration page and every link already sent lead to a not-found page. Turning email off doesn't stop a link already sent: following it needs no email, so it still creates the account.
 
-An expired or used link shows "Unable to activate the account. The verification code appears to be expired." The person registers again to get a new one.
+An expired or used link shows "Unable to activate the account. The verification code appears to be expired." The person registers again to get a new one. While registration is unavailable because email isn't set up, the page leaves out its link to the registration form.
 
 ## What a new account has
 

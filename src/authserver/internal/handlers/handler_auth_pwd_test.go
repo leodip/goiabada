@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -244,14 +243,25 @@ func TestHandleAuthPwdGet(t *testing.T) {
 	})
 }
 
-// TestHandleAuthPwd_OffersRegisterOnlyWhileSelfRegistrationIsOn: the password form's Register link
-// goes to /account/register, which answers the not-found page while self-registration is off, and
-// the setting's tooltip promises the link shows only while it is on. The form, and its re-render
-// after a refused submission, carry the setting for the template to decide by; the integration
-// tier's TestAuthorize_ThePasswordPageOffersRegisterOnlyWhileSelfRegistrationIsOn reads the
-// rendered page.
-func TestHandleAuthPwd_OffersRegisterOnlyWhileSelfRegistrationIsOn(t *testing.T) {
-	for _, enabled := range []bool{true, false} {
+// TestHandleAuthPwd_OffersRegisterOnlyWhileRegistrationIsAvailable: the password form's Register
+// link goes to /account/register, which answers the not-found page unless registration is
+// available: self-registration on, and either verification off or email on (#526 decision 2). The
+// form, and its re-render after a refused submission, carry that for the template to decide by;
+// the integration tier's TestAuthorize_ThePasswordPageOffersRegisterOnlyWhileRegistrationIsAvailable
+// reads the rendered page.
+func TestHandleAuthPwd_OffersRegisterOnlyWhileRegistrationIsAvailable(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		settings *record.Settings
+		want     bool
+	}{
+		{"self-registration off", &record.Settings{SelfRegistrationEnabled: false}, false},
+		{"verification off and email off", &record.Settings{SelfRegistrationEnabled: true}, true},
+		{"verification on and email off", &record.Settings{SelfRegistrationEnabled: true,
+			SelfRegistrationRequiresEmailVerification: true}, false},
+		{"verification on and email on", &record.Settings{SelfRegistrationEnabled: true,
+			SelfRegistrationRequiresEmailVerification: true, SMTPEnabled: true}, true},
+	} {
 		authContext := func() *ceremony.AuthContext {
 			return &ceremony.AuthContext{
 				AuthState:  ceremony.AuthStateLevel1Password,
@@ -259,9 +269,9 @@ func TestHandleAuthPwd_OffersRegisterOnlyWhileSelfRegistrationIsOn(t *testing.T)
 				ClientId:   "my-app",
 			}
 		}
-		settings := &record.Settings{SelfRegistrationEnabled: enabled}
+		settings := tc.settings
 
-		t.Run(fmt.Sprintf("the form, self-registration %v", enabled), func(t *testing.T) {
+		t.Run("the form, "+tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			database := datamocks.NewDatabase(t)
@@ -286,10 +296,10 @@ func TestHandleAuthPwd_OffersRegisterOnlyWhileSelfRegistrationIsOn(t *testing.T)
 			handler.ServeHTTP(rr, req)
 
 			require.NotNil(t, rendered)
-			assert.Equal(t, enabled, rendered["selfRegistrationEnabled"])
+			assert.Equal(t, tc.want, rendered["registrationAvailable"])
 		})
 
-		t.Run(fmt.Sprintf("the re-render after a refusal, self-registration %v", enabled), func(t *testing.T) {
+		t.Run("the re-render after a refusal, "+tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			database := datamocks.NewDatabase(t)
@@ -320,7 +330,7 @@ func TestHandleAuthPwd_OffersRegisterOnlyWhileSelfRegistrationIsOn(t *testing.T)
 
 			require.NotNil(t, rendered)
 			assert.Equal(t, "Email is required.", rendered["error"], "the refusal this case drives")
-			assert.Equal(t, enabled, rendered["selfRegistrationEnabled"],
+			assert.Equal(t, tc.want, rendered["registrationAvailable"],
 				"a mistyped address must not bring back a link the form left out")
 		})
 	}

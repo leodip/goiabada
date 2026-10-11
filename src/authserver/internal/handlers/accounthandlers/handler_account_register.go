@@ -39,6 +39,28 @@ func refuseSelfRegistrationDisabled(pageRenderer PageRenderer, w http.ResponseWr
 	pageRenderer.NotFound(w, r)
 }
 
+// refuseUnavailableRegistration answers the registration page, or its submission, while
+// registration is unavailable (record.Settings.IsSelfRegistrationAvailable), and says whether it
+// did. Self-registration off is refused as an activation link is. Verification required with email
+// off is refused with the same not-found page and a record of its own, and no audit entry, as
+// forgot-password's refusal without email writes none: the form used to fall back to creating an
+// unverified account and to answering "already registered" for a taken address, the opposite of
+// what the setting asks for (#526 decision 2).
+func refuseUnavailableRegistration(pageRenderer PageRenderer, settings *record.Settings,
+	w http.ResponseWriter, r *http.Request) bool {
+
+	if settings.IsSelfRegistrationAvailable() {
+		return false
+	}
+	if !settings.SelfRegistrationEnabled {
+		refuseSelfRegistrationDisabled(pageRenderer, w, r)
+		return true
+	}
+	slog.WarnContext(r.Context(), "self-registration request refused because email is not set up")
+	pageRenderer.NotFound(w, r)
+	return true
+}
+
 // registrationCeremonyId is the sign-in the visitor came to this page from, when the password page's
 // "Register" link said so: the id that link carried, if it has the shape of one. The page puts it back
 // into its own "Sign in" link, so a visitor who registers nothing and goes back lands on the same
@@ -59,11 +81,15 @@ func registrationCeremonyId(r *http.Request) string {
 }
 
 // registrationRequiresEmailVerification is the mode in which an account comes from the emailed
-// link: SMTP on and "requires email verification" on. In it the register form asks for the
-// address alone, and the password is chosen on the form the link leads to (#207 decision 1). In
-// every other mode the form creates a usable account at once, and asks for the password.
+// link: "requires email verification" on, which refuseUnavailableRegistration lets through only
+// with SMTP on. In it the register form asks for the address alone, and the password is chosen on
+// the form the link leads to (#207 decision 1). Without it the form creates a usable account at
+// once, and asks for the password.
+//
+// It reads the setting alone, not SMTP as well, so that a request reaching here with email off
+// would fail to send its link rather than create an unverified account (#526 decision 2).
 func registrationRequiresEmailVerification(settings *record.Settings) bool {
-	return settings.SMTPEnabled && settings.SelfRegistrationRequiresEmailVerification
+	return settings.SelfRegistrationRequiresEmailVerification
 }
 
 func HandleRegisterGet(
@@ -77,8 +103,7 @@ func HandleRegisterGet(
 			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
-		if !settings.SelfRegistrationEnabled {
-			refuseSelfRegistrationDisabled(pageRenderer, w, r)
+		if refuseUnavailableRegistration(pageRenderer, settings, w, r) {
 			return
 		}
 
@@ -211,8 +236,7 @@ func HandleRegisterPost(
 			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
-		if !settings.SelfRegistrationEnabled {
-			refuseSelfRegistrationDisabled(pageRenderer, w, r)
+		if refuseUnavailableRegistration(pageRenderer, settings, w, r) {
 			return
 		}
 

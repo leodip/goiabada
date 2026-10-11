@@ -79,9 +79,9 @@ func HandleAuthPwdGet(
 			// without the user seeing any screen at all (#79).
 			"ceremonyId":  authContext.CeremonyId,
 			"smtpEnabled": settings.SMTPEnabled,
-			// The Register link goes to a page that answers not-found while self-registration is
-			// off, so the form offers it only while it is on, as the setting's tooltip says.
-			"selfRegistrationEnabled": settings.SelfRegistrationEnabled,
+			// The Register link goes to a page that answers not-found unless registration is
+			// available, so the form offers it only then (#526 decision 2).
+			"registrationAvailable":   settings.IsSelfRegistrationAvailable(),
 			"layoutShowClientSection": displayInfo.ShowSection,
 			"layoutClientName":        displayInfo.ClientName,
 			"layoutHasClientLogo":     displayInfo.HasLogo,
@@ -168,7 +168,7 @@ func HandleAuthPwdPost(
 				// would end the ceremony: the retry would name no ceremony and be refused.
 				"ceremonyId":              authContext.CeremonyId,
 				"smtpEnabled":             settings.SMTPEnabled,
-				"selfRegistrationEnabled": settings.SelfRegistrationEnabled,
+				"registrationAvailable":   settings.IsSelfRegistrationAvailable(),
 				"email":                   email,
 				"layoutShowClientSection": displayInfo.ShowSection,
 				"layoutClientName":        displayInfo.ClientName,

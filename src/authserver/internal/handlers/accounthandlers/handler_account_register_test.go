@@ -45,9 +45,10 @@ func assertSelfRegistrationDisabledLogged(t *testing.T, logs *logtest.SlogCaptur
 }
 
 // TestHandleRegisterGet_TheFormAsksForThePasswordOnlyWithoutVerification pins what the page is
-// bound with: with verification required (SMTP on and the setting on) the form takes the address
-// alone and the password is chosen from the emailed link; in every other mode it is unchanged
-// (#207 decision 1).
+// bound with: with verification required the form takes the address alone and the password is
+// chosen from the emailed link; without it the form asks for the password (#207 decision 1).
+// Verification required with SMTP off is no mode at all: the page is refused (#526 decision 2),
+// which TestHandleRegister_RefusedWhileItRequiresVerificationAndEmailIsOff pins.
 func TestHandleRegisterGet_TheFormAsksForThePasswordOnlyWithoutVerification(t *testing.T) {
 	for _, tc := range []struct {
 		name                     string
@@ -57,7 +58,6 @@ func TestHandleRegisterGet_TheFormAsksForThePasswordOnlyWithoutVerification(t *t
 	}{
 		{"SMTP on and verification required", true, true, true},
 		{"SMTP on and verification not required", true, false, false},
-		{"SMTP off and verification required", false, true, false},
 		{"SMTP off and verification not required", false, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -171,6 +171,121 @@ func TestHandleRegisterGet(t *testing.T) {
 		assertSelfRegistrationDisabledLogged(t, logs)
 		pageRenderer.AssertExpectations(t)
 	})
+}
+
+// assertRegistrationWithoutEmailLogged holds a refusal while registration requires verification and
+// email is off to its one record, distinct from the record for self-registration being off, as
+// forgot-password's refusal without email has its own (#526 decision 2).
+func assertRegistrationWithoutEmailLogged(t *testing.T, logs *logtest.SlogCapture) {
+	t.Helper()
+
+	records := logs.Records()
+	require.Len(t, records, 1, "a refusal writes exactly one record: %s", logs.Text())
+	assert.Equal(t, slog.LevelWarn, records[0].Level)
+	assert.Equal(t, "self-registration request refused because email is not set up", records[0].Message)
+}
+
+// TestHandleRegister_RefusedWhileItRequiresVerificationAndEmailIsOff: with verification required
+// and email off no activation link can reach anyone, so the page and its submission answer the
+// not-found page, with one Warn record and no audit entry, as forgot-password answers without
+// email. They used to fall back to creating an unverified account and answering "already
+// registered" for a taken address, the opposite of what the setting asks for (#526 decision 2).
+// The two modes beside it are served as before: verification off, with or without email, and
+// verification on with email on.
+func TestHandleRegister_RefusedWhileItRequiresVerificationAndEmailIsOff(t *testing.T) {
+	refused := &record.Settings{SelfRegistrationEnabled: true, SelfRegistrationRequiresEmailVerification: true}
+
+	newPost := func(pageRenderer *handlersmocks.PageRenderer, database *datamocks.Database,
+		auditLogger *handlersmocks.AuditLogger) http.Handler {
+		return HandleRegisterPost(pageRenderer, database, accounthandlersmocks.NewUserCreator(t),
+			accounthandlersmocks.NewEmailValidator(t), accounthandlersmocks.NewPasswordValidator(t),
+			accounthandlersmocks.NewEmailSender(t), auditLogger, &heldJobs{}, testDataCipher, testBaseURL,
+			testAdminConsoleBaseURL)
+	}
+	postRequest := func(settings *record.Settings, email string) *http.Request {
+		form := url.Values{"email": {email}, "password": {"password123"}, "passwordConfirmation": {"password123"}}
+		req := httptest.NewRequest("POST", "/account/register", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		return req.WithContext(reqctx.WithSettings(req.Context(), settings))
+	}
+
+	t.Run("the page is refused", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		req := httptest.NewRequest("GET", "/account/register", nil)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), refused))
+		rr := httptest.NewRecorder()
+		pageRenderer.On("NotFound", rr, req).Return().Once()
+		logs := logtest.CaptureSlog(t)
+
+		HandleRegisterGet(pageRenderer).ServeHTTP(rr, req)
+
+		pageRenderer.AssertExpectations(t)
+		assertRegistrationWithoutEmailLogged(t, logs)
+	})
+
+	t.Run("the submission is refused and touches nothing", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		// No expectations: an audit entry, or any lookup, fails the test.
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		req := postRequest(refused, "taken@example.com")
+		rr := httptest.NewRecorder()
+		pageRenderer.On("NotFound", rr, req).Return().Once()
+		logs := logtest.CaptureSlog(t)
+
+		newPost(pageRenderer, database, auditLogger).ServeHTTP(rr, req)
+
+		pageRenderer.AssertExpectations(t)
+		assertRegistrationWithoutEmailLogged(t, logs)
+	})
+
+	for _, tc := range []struct {
+		name                     string
+		settings                 *record.Settings
+		wantRequiresVerification bool
+	}{
+		{"verification off and email off", &record.Settings{SelfRegistrationEnabled: true}, false},
+		{"verification on and email on", &record.Settings{SelfRegistrationEnabled: true,
+			SelfRegistrationRequiresEmailVerification: true, SMTPEnabled: true}, true},
+	} {
+		t.Run("the page is served, "+tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			req := httptest.NewRequest("GET", "/account/register", nil)
+			req = req.WithContext(reqctx.WithSettings(req.Context(), tc.settings))
+
+			var rendered map[string]interface{}
+			pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).
+				Run(func(args mock.Arguments) { rendered = args.Get(4).(map[string]interface{}) }).
+				Return(nil).Once()
+
+			HandleRegisterGet(pageRenderer).ServeHTTP(httptest.NewRecorder(), req)
+
+			require.NotNil(t, rendered)
+			assert.Equal(t, tc.wantRequiresVerification, rendered["requiresEmailVerification"])
+		})
+
+		// An empty address is the cheapest submission that shows the form got past the refusal:
+		// it is redrawn. What each mode then does with a real address is pinned by
+		// TestHandleRegisterPost's "Direct registration without email verification" and the
+		// TestHandleRegisterPost_WithVerification tests.
+		t.Run("the submission is served, "+tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			auditLogger.On("Log", mock.Anything, audit.EventRequestedRegistration, mock.Anything).Return().Maybe()
+
+			var rendered map[string]interface{}
+			pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).
+				Run(func(args mock.Arguments) { rendered = args.Get(4).(map[string]interface{}) }).
+				Return(nil).Once()
+
+			newPost(pageRenderer, datamocks.NewDatabase(t), auditLogger).ServeHTTP(httptest.NewRecorder(),
+				postRequest(tc.settings, ""))
+
+			require.NotNil(t, rendered)
+			assert.Equal(t, "Email is required.", rendered["error"])
+			assert.Equal(t, tc.wantRequiresVerification, rendered["requiresEmailVerification"])
+		})
+	}
 }
 
 func TestHandleRegisterPost(t *testing.T) {
