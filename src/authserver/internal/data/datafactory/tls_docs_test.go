@@ -25,7 +25,10 @@ import (
 // what each engine answers a certificate it refuses, so a page cannot quote a message nobody sees
 // or keep advice the auth server no longer follows (#502).
 
-const databasePage = "site/src/content/docs/deploy/database.mdx"
+const (
+	databasePage           = "site/src/content/docs/deploy/database.mdx"
+	databaseTLSConnectPage = "site/src/content/docs/troubleshooting/database-tls-connection-fails.mdx"
+)
 
 // databasePageSection is the section of the Database page that heading opens, up to the next.
 func databasePageSection(t *testing.T, heading string) string {
@@ -75,7 +78,7 @@ func TestDatabasePage_WhereTheDatabaseSitsIsTheTwoSettings(t *testing.T) {
 // being each engine's own TLS configuration against a certificate made here. It quotes the three
 // engines' refusals of a server offering no TLS too, and names the mode in the start's record.
 func TestDatabaseConnectPage_NamesTheTLSRefusals(t *testing.T) {
-	page := troubleshootingPage(t, databaseConnectPage)
+	page := troubleshootingPage(t, databaseTLSConnectPage)
 
 	// The page's example: the database's certificate names db-1.internal.example, the auth server
 	// dials db.example.com, and 10.0.0.5 is its address.
