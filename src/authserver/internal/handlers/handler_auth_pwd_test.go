@@ -1152,8 +1152,9 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	t.Run("a correct password spends nothing", func(t *testing.T) {
 		handler, _, authContext := newHandler(t, knownAccount())
 		// Well past the budget. A tier that counted every request would refuse the 11th,
-		// which is an account locked out of its own login by using it.
-		for i := 0; i < tightBudget*2; i++ {
+		// which is an account locked out of its own login by using it, and pwd_ip the 31st
+		// (#564).
+		for i := 0; i < tightBudget*4; i++ {
 			authContext.AuthState = ceremony.AuthStateLevel1Password
 			assert.Equal(t, http.StatusFound, post(handler, password),
 				"sign-in %d should succeed", i+1)

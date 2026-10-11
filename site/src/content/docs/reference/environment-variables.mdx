@@ -159,7 +159,7 @@ The auth server limits these endpoints. The limits counted by a user or an email
 |---|---|---|---|---|
 | `POST /auth/pwd` (password sign-in)<br/>Limiter: `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and email, shared with the password grant | switch on |
 | `POST /auth/pwd`<br/>Limiter: `pwd_account` | 100 per 60 minutes | failed sign-ins | email, shared with the password grant | always |
-| `POST /auth/pwd`<br/>Limiter: `pwd_ip` | 30 per minute | every request | IP address | switch on |
+| `POST /auth/pwd`<br/>Limiter: `pwd_ip` | 30 per minute | failed sign-ins | IP address | switch on |
 | `POST /auth/otp` (authenticator code)<br/>Limiter: `otp` | 5 per 15 minutes | failed codes | user | always |
 | `POST /api/v1/account/email/verification`<br/>Limiter: `email_verification` | 5 per 15 minutes | failed codes | the token's user | always |
 | `POST /api/v1/account/email/verification/send`<br/>Limiter: `email_verification_send` | 5 per 60 minutes | every request | the token's user | always |
@@ -173,15 +173,15 @@ The auth server limits these endpoints. The limits counted by a user or an email
 | `POST /connect/register` (dynamic client registration)<br/>Limiter: `dcr` | 10 per minute | every request | IP address | switch on |
 | `POST /auth/token` with `grant_type=password`<br/>Limiter: `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and username, shared with `POST /auth/pwd` | switch on |
 | `POST /auth/token` with `grant_type=password`<br/>Limiter: `pwd_account` | 100 per 60 minutes | failed sign-ins | username, shared with `POST /auth/pwd` | always |
-| `POST /auth/token` with `grant_type=password`<br/>Limiter: `ropc_ip` | 30 per minute | every request | IP address | switch on |
+| `POST /auth/token` with `grant_type=password`<br/>Limiter: `ropc_ip` | 30 per minute | failed sign-ins | IP address | switch on |
 
 A few rules make these work:
 
-- **A limit on failures isn't spent by a success.** Signing in normally never uses it up.
+- **A limit on failures isn't spent by a success.** Signing in normally never uses it up, so many people signing in from one address, such as an office or a mobile network, never use up `pwd_ip` or `ropc_ip`. A failed sign-in is a wrong password or an email or username that names no account, and through the password grant also a disabled user or one with two-factor authentication.
 - **Shared means one budget.** A wrong password counts once against the same budget whether it arrives at the sign-in form or at the password grant.
 - **Emails and usernames are compared in lowercase**, and IPv6 addresses are grouped by their `/64`, so a client can't step through its own network to reset a limit.
-- **Limits on failures hold across replicas** on PostgreSQL, MySQL and SQL Server, where they're counted in the database, so a rollout doesn't refill them either. If the database doesn't answer the check within 5 seconds, the request gets a server error rather than going through. On SQLite, which runs one replica, they're counted in the process.
-- **Limits on every request are per process**, on every database. With three replicas, each one allows the full budget, and a restart resets it. For a limit that holds across your whole deployment, set one at your gateway, proxy or CDN, which also stops a flood before it reaches Goiabada.
+- **Limits on failures against an account or a user hold across replicas** on PostgreSQL, MySQL and SQL Server, where they're counted in the database, so a rollout doesn't refill them either. If the database doesn't answer the check within 5 seconds, the request gets a server error rather than going through. On SQLite, which runs one replica, they're counted in the process.
+- **The other limits are per process**, on every database: `pwd_ip` and `ropc_ip`, which count failures by IP address alone, and every limit on every request. With three replicas, each one allows the full budget, and a restart resets it. Keeping them out of the database means a flood is refused before it reaches it. For a limit that holds across your whole deployment, set one at your gateway, proxy or CDN, which also stops a flood before it reaches Goiabada.
 - **A limit counted by IP address is only as good as the address.** Behind a proxy, set up [client IP addresses](#client-ip-addresses) first.
 - **Anyone who knows an email can block its password sign-in.** 100 wrong passwords in an hour block that account's password sign-in, at the form and through the password grant, for up to an hour, even with the right password, and about 100 more an hour keep it blocked. A password reset doesn't clear the count, and anyone already signed in stays signed in. That's the price of a bound on guessing that holds whatever address the server sees. If it happens, block the attacker at your proxy or CDN, which sees their address.
 

@@ -192,8 +192,8 @@ func spellingsOf(local, domain string) []string {
 // failed is what the handler found when it checked the credential, and it is the whole
 // point of the helper: a failures-only tier is spent by calling RecordCredentialFailure
 // from inside the handler, exactly as HandleAuthPwdPost does on a wrong password. A case
-// that drives requests without it is measuring the per-IP tier, whatever it says it is
-// measuring (#219).
+// that drives requests without it spends no tier at all, pwd_ip included, whatever it says it
+// is measuring (#219, #564).
 func runPwd(m *RateLimiter, email, ip string, failed bool) (int, bool, *httptest.ResponseRecorder) {
 	form := url.Values{"email": {email}}
 	req := limiterRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
@@ -211,89 +211,259 @@ func runPwd(m *RateLimiter, email, ip string, failed bool) (int, bool, *httptest
 	return rr.Code, reached, rr
 }
 
-// TestLimitPwd_PerIP verifies the password limiter's per-IP budget, which stops one
-// host hammering many accounts and is the tier that still counts every request. The
-// per-account tiers are in TestLimitPwd_AccountFailureBudget, since only a failure
-// spends those (#219).
-//
-// The budget is asserted exactly, on both sides, because it is published policy in the
-// reference documentation. That is the convention TestLimitResetPwd_PerIP established.
-//
-// The handler stub writes 418 rather than 200 on purpose: a middleware that writes
-// nothing produces exactly 200 with an empty body, so 418 is what tells "the handler
-// ran" apart from "nothing was written", and from 429.
+// TestLimitPwd_PerIP verifies the sign-in form's per-address tier, which stops one host
+// spraying passwords across many accounts. It counts only failed password checks, so an
+// office, a school or a carrier-grade NAT signing many people in from one address spends
+// nothing, and a host sending wrong passwords is still refused at 30 a minute (#564 decision
+// 2). The per-account tiers are in TestLimitPwd_AccountFailureBudget.
 //
 // The request carries the address in a form body rather than a query string, which is
 // what the real route sends. A query target cannot express the whitespace spellings at
 // all: httptest.NewRequest parses its target as a request line and panics on one.
 func TestLimitPwd_PerIP(t *testing.T) {
-	const ipBudget = 30
+	assertAddressTierCountsFailures(t, pwdAddressRoute)
+}
 
-	run := func(m *RateLimiter, email, ip string) (int, bool) {
-		code, reached, _ := runPwd(m, email, ip, false)
-		return code, reached
+// addressTierRoute is a route a per-address password tier guards, pwd_ip on the sign-in form and
+// ropc_ip on the password grant, as assertAddressTierCountsFailures drives it.
+type addressTierRoute struct {
+	limiter string
+	// contentType is the shape a refusal on the route takes.
+	contentType string
+	// serve sends one password check naming account from ip through the route's limiter, into
+	// handler.
+	serve func(m *RateLimiter, account, ip string, handler http.Handler) *httptest.ResponseRecorder
+}
+
+var pwdAddressRoute = addressTierRoute{
+	limiter:     "pwd_ip",
+	contentType: "text/html; charset=UTF-8",
+	serve: func(m *RateLimiter, account, ip string, handler http.Handler) *httptest.ResponseRecorder {
+		form := url.Values{"email": {account}}
+		req := limiterRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = ip
+		rr := httptest.NewRecorder()
+		m.LimitPwd(handler).ServeHTTP(rr, req)
+		return rr
+	},
+}
+
+var ropcAddressRoute = addressTierRoute{
+	limiter:     "ropc_ip",
+	contentType: "application/json",
+	serve: func(m *RateLimiter, account, ip string, handler http.Handler) *httptest.ResponseRecorder {
+		form := url.Values{"grant_type": {"password"}, "username": {account}, "client_id": {"app"}}
+		req := limiterRequest(http.MethodPost, "/auth/token", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = ip
+		rr := httptest.NewRecorder()
+		m.LimitROPC(handler).ServeHTTP(rr, req)
+		return rr
+	},
+}
+
+// runAddress drives one password check through route and reports the status, whether the
+// handler ran, and the response. failed is what the handler found when it checked the password,
+// recorded as the real handlers record a wrong one.
+func runAddress(m *RateLimiter, route addressTierRoute, account, ip string, failed bool) (int, bool, *httptest.ResponseRecorder) {
+	reached := false
+	rr := route.serve(m, account, ip, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		if failed {
+			m.RecordCredentialFailure(r)
+		}
+		w.WriteHeader(http.StatusTeapot)
+	}))
+	return rr.Code, reached, rr
+}
+
+// assertAddressTierCountsFailures holds a per-address password tier to its budget of 30 failed
+// password checks per minute per client block, which successes do not spend (#564 decision 2).
+//
+// Every case names a distinct account per failure where it means the address tier, so neither
+// account tier, which counts 10 failures per account from one block, can be what refuses. The
+// budget is asserted exactly, on both sides, because it is published policy in the reference
+// documentation, and Retry-After tells the address tier's minute from the account tiers' 15
+// minutes and hour. The handler writes 418 rather than 200: a middleware that writes nothing
+// produces exactly 200 with an empty body, so 418 is what tells "the handler ran" apart from
+// "nothing was written", and from 429.
+func assertAddressTierCountsFailures(t *testing.T, route addressTierRoute) {
+	t.Helper()
+	const ipBudget = 30
+	const ip = "198.51.100.7:5000"
+
+	failures := func(t *testing.T, m *RateLimiter, n int, prefix, ip string) {
+		t.Helper()
+		for i := 0; i < n; i++ {
+			account := fmt.Sprintf("%s%d@example.com", prefix, i)
+			if code, reached, _ := runAddress(m, route, account, ip, true); code != http.StatusTeapot || !reached {
+				t.Fatalf("failure %d from %s: got code %d, handler reached %v; want %d and true",
+					i+1, ip, code, reached, http.StatusTeapot)
+			}
+		}
+	}
+	refused := func(t *testing.T, m *RateLimiter, what, account, ip string, failed bool) *httptest.ResponseRecorder {
+		t.Helper()
+		code, reached, rr := runAddress(m, route, account, ip, failed)
+		if code != http.StatusTooManyRequests || reached {
+			t.Fatalf("%s: got code %d, handler reached %v; want %d and false",
+				what, code, reached, http.StatusTooManyRequests)
+		}
+		if got := rr.Header().Get("Retry-After"); got != "60" {
+			t.Fatalf("%s: Retry-After = %q, want 60, so the refusal is %s's and not an account tier's",
+				what, got, route.limiter)
+		}
+		return rr
 	}
 
-	t.Run("the per-IP budget is exactly 30, from varied emails", func(t *testing.T) {
+	t.Run("many people signing in from one address spend nothing", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
-		for i := 0; i < ipBudget; i++ {
-			// Distinct emails so no account bucket trips.
-			email := fmt.Sprintf("user%d@example.com", i)
-			if code, reached := run(m, email, "198.51.100.7:5000"); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
+		for i := 0; i < 100; i++ {
+			account := fmt.Sprintf("user%d@example.com", i)
+			if code, reached, _ := runAddress(m, route, account, ip, false); code != http.StatusTeapot || !reached {
+				t.Fatalf("sign-in %d from one address: got code %d, handler reached %v; want %d and true",
 					i+1, code, reached, http.StatusTeapot)
 			}
 		}
-		if code, reached := run(m, "last@example.com", "198.51.100.7:5000"); code != http.StatusTooManyRequests || reached {
-			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
-				ipBudget+1, code, reached, http.StatusTooManyRequests)
+		// The whole budget is still there.
+		failures(t, m, ipBudget, "guess", ip)
+		refused(t, m, "the failure past the budget", "last@example.com", ip, true)
+	})
+
+	t.Run("the budget is exactly 30 failures, refused before the next check", func(t *testing.T) {
+		m, auditLog := newAuditedTestMiddleware(nil, true)
+		failures(t, m, ipBudget, "guess", ip)
+		// The tier decides before the password is checked, so the next request is refused
+		// whether its password would have been right or not.
+		rr := refused(t, m, "the request after 30 failures", "owner@example.com", ip, false)
+		if got := rr.Header().Get("Content-Type"); !strings.HasPrefix(got, route.contentType) {
+			t.Errorf("Content-Type = %q, want %s, the route's own shape", got, route.contentType)
+		}
+		assertNoRateLimitHeaders(t, rr, route.limiter+" rejection")
+
+		auditLog.mu.Lock()
+		events := append([]auditEvent(nil), auditLog.events...)
+		auditLog.mu.Unlock()
+		want := map[string]interface{}{"limiter": route.limiter, "ip": "198.51.100.7"}
+		if len(events) != 1 || events[0].name != audit.EventRateLimitExceeded || !reflect.DeepEqual(events[0].details, want) {
+			t.Errorf("audited %+v, want one %s event with details %v", events, audit.EventRateLimitExceeded, want)
 		}
 	})
 
-	t.Run("200 addresses inside one /64 share the per-IP bucket", func(t *testing.T) {
+	t.Run("successes between failures hand their slots back", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		// Interleaved, 29 failures and 29 successes: a slot a success leaked instead of
+		// handing back would shrink the budget, and the exact count below is what sees it.
+		for i := 0; i < 2*(ipBudget-1); i++ {
+			failed := i%2 == 0
+			account := fmt.Sprintf("user%d@example.com", i)
+			if code, reached, _ := runAddress(m, route, account, ip, failed); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d (failed=%v): got code %d, handler reached %v; want %d and true",
+					i+1, failed, code, reached, http.StatusTeapot)
+			}
+		}
+		failures(t, m, 1, "thirtieth", ip)
+		refused(t, m, "the 31st failure", "last@example.com", ip, true)
+	})
+
+	t.Run("addresses inside one /64 share the budget, a second /64 does not", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
 		// A fresh IPv6 address per request, all inside 2001:db8:1:2::/64, which is what a
-		// single SLAAC host owns. Refused by clientIPRateLimitKey masking to the /64:
-		// without it all 200 reach the handler (measured, #219).
+		// single SLAAC host owns. Refused by clientIPRateLimitKey masking to the /64: without
+		// it every one reaches the handler (#219).
 		addr := func(i int) string { return fmt.Sprintf("[2001:db8:1:2::%x]:5000", i+1) }
 		for i := 0; i < ipBudget; i++ {
-			email := fmt.Sprintf("user%d@example.com", i)
-			if code, reached := run(m, email, addr(i)); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d from %s: got code %d, handler reached %v; want %d and true",
+			account := fmt.Sprintf("user%d@example.com", i)
+			if code, reached, _ := runAddress(m, route, account, addr(i), true); code != http.StatusTeapot || !reached {
+				t.Fatalf("failure %d from %s: got code %d, handler reached %v; want %d and true",
 					i+1, addr(i), code, reached, http.StatusTeapot)
 			}
 		}
-		for i := ipBudget; i < 200; i++ {
-			email := fmt.Sprintf("user%d@example.com", i)
-			if code, reached := run(m, email, addr(i)); code != http.StatusTooManyRequests || reached {
-				t.Fatalf("request %d from %s: got code %d, handler reached %v; want %d and false",
-					i+1, addr(i), code, reached, http.StatusTooManyRequests)
-			}
-		}
-	})
-
-	t.Run("a second /64 has its own bucket", func(t *testing.T) {
-		m := newTestMiddleware(nil, true)
-		for i := 0; i < ipBudget+1; i++ {
-			run(m, fmt.Sprintf("user%d@example.com", i), fmt.Sprintf("[2001:db8:1:2::%x]:5000", i+1))
-		}
-		// A neighbouring /64 is a different client. This is what makes the mask
-		// observable rather than the limiter: a key that collapsed every IPv6 address
-		// into one bucket would block this too.
-		if code, reached := run(m, "elsewhere@example.com", "[2001:db8:1:3::1]:5000"); code != http.StatusTeapot || !reached {
+		refused(t, m, "a failure from a fresh address in the same /64", "last@example.com", addr(ipBudget), true)
+		// A neighbouring /64 is a different client. Without this the case above would also
+		// pass for a key that collapsed every IPv6 address into one bucket.
+		if code, reached, _ := runAddress(m, route, "elsewhere@example.com", "[2001:db8:1:3::1]:5000", true); code != http.StatusTeapot || !reached {
 			t.Errorf("second /64: got code %d, handler reached %v; want %d and true",
 				code, reached, http.StatusTeapot)
 		}
 	})
 
-	t.Run("the limiter switched off never applies the per-IP tier", func(t *testing.T) {
-		m := newTestMiddleware(nil, false)
-		for i := 0; i < 60; i++ {
-			if code, reached := run(m, "x@example.com", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d: the per-IP tier should never block with the limiter off, got code %d, handler reached %v",
-					i+1, code, reached)
+	// The address slot is taken before the account tiers are asked. A refusal by one of them
+	// must hand it back, since a slot in flight never decays: stranded, each refusal would
+	// shrink the address's budget until the process restarted.
+	t.Run("an account tier's refusal hands the address slot back", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		const tightBudget = 10
+		for i := 0; i < tightBudget; i++ {
+			if code, reached, _ := runAddress(m, route, "victim@example.com", ip, true); code != http.StatusTeapot || !reached {
+				t.Fatalf("failure %d at one account: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
 			}
 		}
+		for i := 0; i < 2*ipBudget; i++ {
+			code, reached, rr := runAddress(m, route, "victim@example.com", ip, true)
+			if code != http.StatusTooManyRequests || reached || rr.Header().Get("Retry-After") != "900" {
+				t.Fatalf("attempt %d past the account's tight budget: got code %d, handler reached %v, Retry-After %q; "+
+					"want %d, false and 900", i+1, code, reached, rr.Header().Get("Retry-After"), http.StatusTooManyRequests)
+			}
+		}
+		failures(t, m, ipBudget-tightBudget, "other", ip)
+		refused(t, m, "the 31st failure", "last@example.com", ip, true)
+	})
+
+	// The reservation, and the only case that can see it: the address tier is decided before
+	// the password is checked and charged after, so checks running at once are bounded by what
+	// is in flight. Then every one of them succeeds, and the whole budget is still there.
+	t.Run("checks in flight at once from one address are bounded, and successes spend nothing", func(t *testing.T) {
+		const callers = ipBudget + 10
+		m := newTestMiddleware(nil, true)
+
+		release := make(chan struct{})
+		var entered, refusedCount atomic.Int64
+		var start, done sync.WaitGroup
+		start.Add(1)
+		for i := 0; i < callers; i++ {
+			done.Add(1)
+			go func() {
+				defer done.Done()
+				start.Wait()
+				rr := route.serve(m, fmt.Sprintf("burst%d@example.com", i), ip,
+					http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						entered.Add(1)
+						// Stands in for the bcrypt the handler is about to run, which is what
+						// makes the window wide enough to matter in production.
+						<-release
+						w.WriteHeader(http.StatusTeapot)
+					}))
+				if rr.Code == http.StatusTooManyRequests {
+					refusedCount.Add(1)
+				}
+			}()
+		}
+		start.Done()
+
+		deadline := time.Now().Add(10 * time.Second)
+		for entered.Load()+refusedCount.Load() < callers {
+			if time.Now().After(deadline) {
+				close(release)
+				t.Fatalf("only %d of %d callers reached a verdict", entered.Load()+refusedCount.Load(), callers)
+			}
+			time.Sleep(time.Millisecond)
+		}
+		close(release)
+		done.Wait()
+
+		if entered.Load() != ipBudget {
+			t.Errorf("%d of %d checks in flight at once were admitted, want exactly %d", entered.Load(), callers, ipBudget)
+		}
+		failures(t, m, ipBudget, "guess", ip)
+		refused(t, m, "the 31st failure", "last@example.com", ip, true)
+	})
+
+	t.Run("the limiter switched off never applies the per-address tier", func(t *testing.T) {
+		m := newTestMiddleware(nil, false)
+		failures(t, m, 4*ipBudget, "user", "203.0.113.1:5000")
 	})
 }
 
@@ -312,8 +482,8 @@ func TestLimitPwd_PerIP(t *testing.T) {
 //   - The backstop exists. Without it an attacker with a /48 owns 65,536 buckets and the
 //     account-wide ceiling RFC 6749 Section 4.3.2 makes a MUST is gone.
 //
-// Every case stays under the per-IP tier's 30 per minute, which is checked first: a case
-// that crosses it would be measuring pwd_ip while claiming to measure the account gate.
+// Every case stays under the per-IP tier's 30 failures per minute, which is checked first: a
+// case that crosses it would be measuring pwd_ip while claiming to measure the account gate.
 func TestLimitPwd_AccountFailureBudget(t *testing.T) {
 	const tightBudget = 10
 	const backstop = 100
@@ -1719,8 +1889,8 @@ func TestLimitAccountPassword_PerSubject(t *testing.T) {
 // reached before the per-IP 30.
 //
 // Every request has to record a failure: since stage 3 the account tiers count nothing
-// else, so a loop of plain requests would drive the per-IP tier instead and the cases below
-// would silently be about a different limiter.
+// else, and since #564 neither does the per-IP tier, so a loop of plain requests would trip
+// nothing and the cases below would silently be about no limiter.
 func tripBrowser(t *testing.T, m *RateLimiter) *httptest.ResponseRecorder {
 	t.Helper()
 	var last *httptest.ResponseRecorder
@@ -2618,8 +2788,8 @@ func TestLimitDCR_PerIP(t *testing.T) {
 //
 // failed is what the token handler found when it checked the credential: HandleTokenPost
 // calls RecordCredentialFailure only where ValidateTokenRequest answered invalid_grant for a
-// password grant. A case that drives requests without it is measuring ropc_ip, whatever it
-// says it is measuring (#219).
+// password grant. A case that drives requests without it spends no tier at all, ropc_ip
+// included, whatever it says it is measuring (#219, #564).
 func runROPC(m *RateLimiter, grantType, username, clientId, ip string,
 	failed bool) (int, bool, *httptest.ResponseRecorder) {
 
@@ -2643,58 +2813,16 @@ func runROPC(m *RateLimiter, grantType, username, clientId, ip string,
 	return rr.Code, reached, rr
 }
 
-// TestLimitROPC_PerIP verifies the password grant's per-IP tier, which stops one host
-// spraying passwords across many accounts and is the tier that counts every request. It
-// mirrors pwd_ip exactly, at the same 30 per minute per /64.
+// TestLimitROPC_PerIP verifies the password grant's per-address tier, which stops one host
+// spraying passwords across many accounts. It counts only failed password checks, exactly as
+// pwd_ip does for the sign-in form, at the same 30 per minute per /64 (#564 decision 2).
 //
-// The account tiers are in TestLimitROPC_AccountFailureBudget, since only a failed
-// credential spends those. RFC 6749 section 4.3.2 makes protecting this endpoint against
-// brute force a MUST, and before this the endpoint carried a single composite bucket that
-// bounded neither account nor host (#107, #195, #219).
+// The account tiers are in TestLimitROPC_AccountFailureBudget. RFC 6749 section 4.3.2 makes
+// protecting this endpoint against brute force a MUST, and before this the endpoint carried a
+// single composite bucket that bounded neither account nor host (#107, #195, #219). Brute force
+// is a stream of failures, and every one of them still counts here.
 func TestLimitROPC_PerIP(t *testing.T) {
-	const ipBudget = 30
-
-	run := func(m *RateLimiter, username, ip string) (int, bool) {
-		code, reached, _ := runROPC(m, "password", username, "app", ip, false)
-		return code, reached
-	}
-
-	t.Run("the per-IP budget is exactly 30, from varied usernames", func(t *testing.T) {
-		m := newTestMiddleware(nil, true)
-		for i := 0; i < ipBudget; i++ {
-			// Distinct accounts so no account bucket trips.
-			username := fmt.Sprintf("user%d@example.com", i)
-			if code, reached := run(m, username, "198.51.100.7:5000"); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
-					i+1, code, reached, http.StatusTeapot)
-			}
-		}
-		if code, reached := run(m, "last@example.com", "198.51.100.7:5000"); code != http.StatusTooManyRequests || reached {
-			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
-				ipBudget+1, code, reached, http.StatusTooManyRequests)
-		}
-	})
-
-	t.Run("addresses inside one /64 share the bucket, a second /64 does not", func(t *testing.T) {
-		m := newTestMiddleware(nil, true)
-		addr := func(i int) string { return fmt.Sprintf("[2001:db8:1:2::%x]:5000", i+1) }
-		for i := 0; i < ipBudget; i++ {
-			if code, reached := run(m, fmt.Sprintf("user%d@example.com", i), addr(i)); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d from %s: got code %d, handler reached %v; want %d and true",
-					i+1, addr(i), code, reached, http.StatusTeapot)
-			}
-		}
-		if code, reached := run(m, "last@example.com", addr(ipBudget)); code != http.StatusTooManyRequests || reached {
-			t.Fatalf("request %d from a fresh address in the same /64: got code %d, handler reached %v; want %d and false",
-				ipBudget+1, code, reached, http.StatusTooManyRequests)
-		}
-		// A neighbouring /64 is a different client. Without this the case above would
-		// also pass for a key that collapsed every IPv6 address into one bucket.
-		if code, reached := run(m, "elsewhere@example.com", "[2001:db8:1:3::1]:5000"); code != http.StatusTeapot || !reached {
-			t.Errorf("second /64: got code %d, handler reached %v; want %d and true",
-				code, reached, http.StatusTeapot)
-		}
-	})
+	assertAddressTierCountsFailures(t, ropcAddressRoute)
 
 	t.Run("only the password grant is limited", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
@@ -2707,25 +2835,12 @@ func TestLimitROPC_PerIP(t *testing.T) {
 		// applies too (#437).
 		for _, grant := range []string{"refresh_token", "authorization_code", "client_credentials",
 			"implicit", "PASSWORD", ""} {
-			for i := 0; i < ipBudget*2; i++ {
+			for i := 0; i < 60; i++ {
 				code, reached, _ := runROPC(m, grant, "victim@example.com", "app", "203.0.113.7:5000", true)
 				if code != http.StatusTeapot || !reached {
 					t.Fatalf("%s request %d: got code %d, handler reached %v; want %d and true",
 						grant, i+1, code, reached, http.StatusTeapot)
 				}
-			}
-		}
-	})
-
-	t.Run("the limiter switched off never applies the per-IP tier", func(t *testing.T) {
-		m := newTestMiddleware(nil, false)
-		for i := 0; i < ipBudget*4; i++ {
-			// Distinct accounts so the account-wide tier, which still applies, cannot trip.
-			username := fmt.Sprintf("user%d@example.com", i)
-			if code, reached, _ := runROPC(m, "password", username, "app",
-				"203.0.113.7:5000", true); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d: the per-IP tier should never block with the limiter off, got code %d, handler reached %v",
-					i+1, code, reached)
 			}
 		}
 	})
@@ -2844,7 +2959,7 @@ func TestLimitROPC_AFormThatDoesNotParseIsAnsweredNotForwarded(t *testing.T) {
 // while a second /64 still does, because that is decision 17's tight tier doing its job
 // rather than the ceiling failing.
 //
-// Every case stays under ropc_ip's 30 per minute, which is checked first: a case that
+// Every case stays under ropc_ip's 30 failures per minute, which is checked first: a case that
 // crossed it would be measuring the per-IP tier while claiming to measure the account gate.
 func TestLimitROPC_AccountFailureBudget(t *testing.T) {
 	const tightBudget = 10
@@ -2940,7 +3055,7 @@ func TestLimitROPC_AccountFailureBudget(t *testing.T) {
 		// A machine-driven integration authenticating one account over and over. Under the
 		// 5 per minute this replaces it was refused on the sixth request of every minute,
 		// which is what made the old budget unusable and this one safe.
-		for i := 0; i < 25; i++ { // under ropc_ip's 30, which counts every request
+		for i := 0; i < 100; i++ { // past ropc_ip's 30 too, which counts failures only
 			if code, reached, _ := runROPC(m, "password", "service@example.com", "app", attacker, false); code != http.StatusTeapot || !reached {
 				t.Fatalf("grant %d: got code %d, handler reached %v; want %d and true",
 					i+1, code, reached, http.StatusTeapot)

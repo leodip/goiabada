@@ -310,9 +310,10 @@ func TestRateLimitsDocs_NoTiersStops(t *testing.T) {
 }
 
 // TestRateLimiterSourceTiers_ReadsTheConstructorAndTheLimitMethods holds the reader to a source of
-// every shape the constructor writes a tier in: a request tier, a failures-only tier, the two
-// failures-only tiers an account limiter pairs, a window written bare, in minutes and in hours,
-// and a Limit method reaching its tiers directly and through a helper's argument.
+// every shape the constructor writes a tier in: a request tier, a failures-only tier, one counted in
+// the process whatever the database (#564 decision 3), the two failures-only tiers an account
+// limiter pairs, a window written bare, in minutes and in hours, and a Limit method reaching its
+// tiers directly and through a helper's argument.
 func TestRateLimiterSourceTiers_ReadsTheConstructorAndTheLimitMethods(t *testing.T) {
 	src := `package middleware
 
@@ -321,11 +322,13 @@ import "time"
 func NewRateLimiter(store any) *RateLimiter {
 	request := func(name string, counted countedBy, keyField string, limit int, window time.Duration) *requestTier { return nil }
 	failure := func(name string, counted countedBy, limit int, window time.Duration) *failureTier { return nil }
+	failureInProcess := func(name string, counted countedBy, keyField string, limit int, window time.Duration) *failureTier { return nil }
 	m := &RateLimiter{
 		store: store,
 		pwdAccount: newAccountTiers(failure("pwd_account_net", countedByIPAndAccount, 10, 15*time.Minute),
 			failure("pwd_account", countedByAccount, 100, 60*time.Minute)),
-		pwdIp: request("pwd_ip", countedByIP, "ip", 30, time.Minute),
+		pwdIp: failureInProcess("pwd_ip", countedByIP, "ip", 30, time.Minute),
+		forgotPwdIp: request("forgot_pwd_ip", countedByIP, "ip", 20, 5*time.Minute),
 		otp:   failure("otp", countedBySigningInUser, 5, 15*time.Minute),
 		dcr:   request("dcr", countedByIP, "ip", 10, 2*time.Hour),
 	}
@@ -338,6 +341,8 @@ func (m *RateLimiter) LimitPwd(next any) any {
 	_ = m.store
 	return next
 }
+
+func (m *RateLimiter) LimitForgotPwd(next any) any { _ = m.forgotPwdIp; return next }
 
 func (rl *RateLimiter) LimitOtp(next any) any { return rl.limitFailures(next, rl.otp) }
 
@@ -353,7 +358,8 @@ func (m *RateLimiter) LimitDCR(next any) any { return m.limitFailures(next, m.dc
 	wantTiers := []rateLimitTier{
 		{name: "pwd_account_net", limit: 10, window: 15 * time.Minute, failuresOnly: true, countedBy: "countedByIPAndAccount"},
 		{name: "pwd_account", limit: 100, window: time.Hour, failuresOnly: true, countedBy: "countedByAccount"},
-		{name: "pwd_ip", limit: 30, window: time.Minute, countedBy: "countedByIP"},
+		{name: "pwd_ip", limit: 30, window: time.Minute, failuresOnly: true, countedBy: "countedByIP"},
+		{name: "forgot_pwd_ip", limit: 20, window: 5 * time.Minute, countedBy: "countedByIP"},
 		{name: "otp", limit: 5, window: 15 * time.Minute, failuresOnly: true, countedBy: "countedBySigningInUser"},
 		{name: "dcr", limit: 10, window: 2 * time.Hour, countedBy: "countedByIP"},
 	}
@@ -361,9 +367,10 @@ func (m *RateLimiter) LimitDCR(next any) any { return m.limitFailures(next, m.dc
 		t.Errorf("tiers\n%+v\nwant\n%+v", read.tiers, wantTiers)
 	}
 	wantMethods := map[string][]string{
-		"LimitPwd": {"pwd_ip", "pwd_account_net", "pwd_account"},
-		"LimitOtp": {"otp"},
-		"LimitDCR": {"dcr"},
+		"LimitPwd":       {"pwd_ip", "pwd_account_net", "pwd_account"},
+		"LimitForgotPwd": {"forgot_pwd_ip"},
+		"LimitOtp":       {"otp"},
+		"LimitDCR":       {"dcr"},
 	}
 	if !reflect.DeepEqual(read.methods, wantMethods) {
 		t.Errorf("methods\n%v\nwant\n%v", read.methods, wantMethods)
@@ -416,6 +423,15 @@ func NewRateLimiter() *RateLimiter {
 }
 `,
 			want: "request is called with 4 arguments, want 5",
+		},
+		{
+			name: "a tier counted in the process built with no key field",
+			src: `package middleware
+func NewRateLimiter() *RateLimiter {
+	return &RateLimiter{pwdIp: failureInProcess("pwd_ip", countedByIP, 30, time.Minute)}
+}
+`,
+			want: "failureInProcess is called with 4 arguments, want 5",
 		},
 		{
 			name: "a Limit method reaching no tier",
@@ -521,8 +537,8 @@ type rateLimiterTiers struct {
 }
 
 // rateLimiterSourceTiers reads the tiers out of NewRateLimiter's RateLimiter literal, each built by
-// request(name, countedBy, keyField, limit, window) or failure(name, countedBy, limit, window),
-// directly or as an argument of another call such as newAccountTiers, and the tiers each exported
+// request(name, countedBy, keyField, limit, window), failure(name, countedBy, limit, window) or
+// failureInProcess(name, countedBy, keyField, limit, window), directly or as an argument of another call such as newAccountTiers, and the tiers each exported
 // Limit method on *RateLimiter reaches through its receiver's fields. It refuses a tier whose name,
 // limit or window is not written as a literal or whose key kind is not a constant's name, a Limit
 // method reaching no tier, and a source declaring none.
@@ -623,14 +639,15 @@ func isRateLimiterMethod(fn *ast.FuncDecl) bool {
 	return ok && ident.Name == "RateLimiter"
 }
 
-// tiersBuiltBy is the tiers expr builds: one for a call of request or failure, those of its
-// arguments for any other call, and none for anything else.
+// tiersBuiltBy is the tiers expr builds: one for a call of request, failure or failureInProcess,
+// those of its arguments for any other call, and none for anything else.
 func tiersBuiltBy(expr ast.Expr) ([]rateLimitTier, error) {
 	call, ok := expr.(*ast.CallExpr)
 	if !ok {
 		return nil, nil
 	}
-	if ident, ok := call.Fun.(*ast.Ident); ok && (ident.Name == "request" || ident.Name == "failure") {
+	if ident, ok := call.Fun.(*ast.Ident); ok && (ident.Name == "request" || ident.Name == "failure" ||
+		ident.Name == "failureInProcess") {
 		tier, err := tierBuiltBy(ident.Name, call.Args)
 		if err != nil {
 			return nil, err
@@ -648,8 +665,10 @@ func tiersBuiltBy(expr ast.Expr) ([]rateLimitTier, error) {
 	return tiers, nil
 }
 
-// tierBuiltBy reads request(name, countedBy, keyField, limit, window) or
-// failure(name, countedBy, limit, window).
+// tierBuiltBy reads request(name, countedBy, keyField, limit, window),
+// failure(name, countedBy, limit, window) or failureInProcess(name, countedBy, keyField, limit,
+// window). Where a failures-only tier counts, in the database or in the process, is not the table's
+// to say, so the two failures-only builders read alike.
 func tierBuiltBy(builder string, args []ast.Expr) (rateLimitTier, error) {
 	limitAt, want := 3, 5
 	if builder == "failure" {
@@ -678,7 +697,7 @@ func tierBuiltBy(builder string, args []ast.Expr) (rateLimitTier, error) {
 	if !ok {
 		return rateLimitTier{}, fmt.Errorf("cannot read the window of the tier %s: %s", name, types.ExprString(args[limitAt+1]))
 	}
-	return rateLimitTier{name: name, limit: limit, window: window, failuresOnly: builder == "failure",
+	return rateLimitTier{name: name, limit: limit, window: window, failuresOnly: builder != "request",
 		countedBy: counted.Name}, nil
 }
 

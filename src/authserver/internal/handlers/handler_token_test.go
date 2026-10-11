@@ -1819,7 +1819,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		handler, auditLogger := newHandler(t, nil)
 		// Well past the budget. A tier that counted every request would refuse the 11th,
 		// which is a machine-driven integration throttled for authenticating successfully.
-		for i := 0; i < 25; i++ { // under ropc_ip's 30, which counts every request
+		for i := 0; i < 40; i++ { // past ropc_ip's 30 too, which counts failures only
 			assert.Equal(t, http.StatusOK, post(handler), "grant %d should succeed", i+1)
 		}
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventROPCAuthFailed, mock.Anything)

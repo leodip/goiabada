@@ -21,11 +21,11 @@ The auth server logs a `rate limit reached` warning naming the limiter, and writ
 
 Most of the time it's the limiter doing its job: someone typed a wrong password too often, or a script is trying addresses. Each limit counts by something, an IP address, an email or a user, and refuses the next request once that one has used its budget. The [rate limits table](/reference/environment-variables/#rate-limits) lists every limit, what it counts and what it counts by.
 
-When **every user** sees "Too many attempts" at once, with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on, the auth server is almost certainly behind a proxy it doesn't trust. It then sees the proxy's address on every request, so all your users share one IP address's budget, and a handful of sign-ins uses it up for everyone.
+When **every user** sees "Too many attempts" at once, with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on, the auth server is almost certainly behind a proxy it doesn't trust. It then sees the proxy's address on every request, so all your users share one IP address's budget, and a handful of wrong passwords uses it up for everyone.
 
 ## Fix it
 
-If one user or one address is refused, wait. The `Retry-After` header gives the limit's window in seconds, and the budget comes back gradually over the window after it. Restarting the auth server resets only the limits it keeps in the process, as described below, so on PostgreSQL, MySQL and SQL Server it doesn't reset the limits on wrong passwords.
+If one user or one address is refused, wait. The `Retry-After` header gives the limit's window in seconds, and the budget comes back gradually over the window after it. Restarting the auth server resets only the limits it keeps in the process, as described below, so on PostgreSQL, MySQL and SQL Server it doesn't reset the limits on wrong passwords for one account.
 
 If one account can't sign in with its password and its owner didn't cause it, someone is guessing that password: block their address at your proxy or CDN. The `rate_limit_exceeded` audit event names the account by `email_digest`.
 
@@ -55,9 +55,9 @@ Trust forwarded headers only when the proxy is the **only** way to reach the aut
 
 ## How the limits count
 
-A limit that counts failures, such as wrong passwords, isn't spent by a success, so signing in normally never uses it up. A limit that counts every request is spent by every request, successful or not.
+A limit that counts failures, such as wrong passwords, isn't spent by a success, so signing in normally never uses it up. That includes `pwd_ip` and `ropc_ip`, the limits on wrong passwords from one IP address: many people signing in from one office or mobile network don't use them up. A limit that counts every request is spent by every request, successful or not.
 
-Limits on failures are kept in the database on PostgreSQL, MySQL and SQL Server, so they hold across replicas and a restart doesn't refill them. Limits on every request are kept in each process: each replica allows the full budget, and a restart resets it. On SQLite, which runs one replica, both are kept in the process.
+Limits on failures against an account or a user are kept in the database on PostgreSQL, MySQL and SQL Server, so they hold across replicas and a restart doesn't refill them. The others, `pwd_ip`, `ropc_ip` and the limits on every request, are kept in each process: each replica allows the full budget, and a restart resets it. On SQLite, which runs one replica, all of them are kept in the process.
 
 Wrong passwords meet up to two limits. `pwd_account` counts by email alone, as a ceiling across every network, and always applies. 100 wrong passwords in an hour, from anywhere, use it up, and then the account can't sign in with its password for the rest of the hour, whoever is typing and even with the right password. A password reset doesn't clear it, and anyone already signed in stays signed in. That's the price of having a ceiling per account at all, and the remedy for someone doing it on purpose is blocking them at your proxy or CDN. With `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on, `pwd_account_net` counts by IP address and email together, 10 every 15 minutes, so someone guessing from one network runs out of their own budget long before the account's, and the account's owner signs in normally from anywhere else.
 

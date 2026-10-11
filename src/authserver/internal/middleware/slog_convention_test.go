@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -96,6 +97,8 @@ func TestSlogConvention_RateLimitTripIsWarnAndJoinsTheRequest(t *testing.T) {
 
 	m := newTestMiddleware(nil, true)
 
+	// Each request a wrong password for an account of its own, since pwd_ip counts only failed
+	// checks and the account tiers then never trip first.
 	run := func(email string) *httptest.ResponseRecorder {
 		form := url.Values{"email": {email}}
 		req := limiterRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
@@ -105,7 +108,8 @@ func TestSlogConvention_RateLimitTripIsWarnAndJoinsTheRequest(t *testing.T) {
 		// Through chi's RequestID, as the real chain mounts it, so the id the trip record
 		// carries is one this test did not put there.
 		chimiddleware.RequestID(m.LimitPwd(http.HandlerFunc(
-			func(w http.ResponseWriter, _ *http.Request) {
+			func(w http.ResponseWriter, r *http.Request) {
+				m.RecordCredentialFailure(r)
 				w.WriteHeader(http.StatusTeapot)
 			}))).ServeHTTP(rr, req)
 		return rr
@@ -113,7 +117,7 @@ func TestSlogConvention_RateLimitTripIsWarnAndJoinsTheRequest(t *testing.T) {
 
 	// Spend the budget before capturing, so the capture holds the trip and nothing else.
 	for i := 0; i < ipBudget; i++ {
-		require.Equal(t, http.StatusTeapot, run("user@example.com").Code)
+		require.Equal(t, http.StatusTeapot, run(fmt.Sprintf("user%d@example.com", i)).Code)
 	}
 
 	logged := logtest.CaptureSlog(t)
