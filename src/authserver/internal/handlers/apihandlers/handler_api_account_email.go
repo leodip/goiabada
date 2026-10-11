@@ -59,7 +59,7 @@ func HandleAccountEmailPut(
 		// A blank one is refused before the account is read and charges nothing: no password was
 		// compared, so charging it would let a caller spend the budget without guessing (#219).
 		if strings.TrimSpace(req.CurrentPassword) == "" {
-			writeJSONError(w, "Current password is required.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountCurrentPasswordRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -81,7 +81,7 @@ func HandleAccountEmailPut(
 		if !passwordhash.Verify(user.PasswordHash, req.CurrentPassword) {
 			credentialFailures.RecordCredentialFailure(r)
 
-			writeJSONError(w, "Authentication failed. Check your current password and try again.", "AUTHENTICATION_FAILED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountCurrentPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		}
 
@@ -111,7 +111,7 @@ func HandleAccountEmailPut(
 			return
 		}
 		if !changed {
-			writeJSONError(w, "The account was changed by another request after it was loaded. Nothing was saved: reload it and make the change again.", "CONCURRENT_UPDATE", http.StatusConflict)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountChangedSinceLoaded, nil), "CONCURRENT_UPDATE", http.StatusConflict)
 			return
 		}
 		// What the write matched, so what the notice below is decided on is what the row held
