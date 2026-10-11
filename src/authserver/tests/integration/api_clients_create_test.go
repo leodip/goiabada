@@ -41,6 +41,10 @@ func TestAPIClientCreate_Success(t *testing.T) {
 	assert.Equal(t, reqBody.AuthorizationCodeEnabled, client["authorizationCodeEnabled"])
 	assert.Equal(t, reqBody.ClientCredentialsEnabled, client["clientCredentialsEnabled"])
 	assert.Equal(t, "Test client", client["description"]) // sanitized trimming
+	// Both "Include OpenID Connect claims" choices follow the global setting, as one of the three
+	// values the Tokens tab offers; the ID token choice was answered "" (#562).
+	assert.Equal(t, "default", client["includeOpenIDConnectClaimsInAccessToken"])
+	assert.Equal(t, "default", client["includeOpenIDConnectClaimsInIdToken"])
 }
 
 func TestAPIClientCreate_Validation(t *testing.T) {

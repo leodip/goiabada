@@ -136,6 +136,7 @@ func HandleDynamicClientRegistrationPost(
 			ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
 			DefaultAcrLevel:                         record.AcrLevel2Optional,
 			IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken:     record.ThreeStateSettingDefault.String(),
 			// Token expiration settings use global defaults from settings
 			TokenExpirationInSeconds:                settings.TokenExpirationInSeconds,
 			RefreshTokenOfflineIdleTimeoutInSeconds: settings.RefreshTokenOfflineIdleTimeoutInSeconds,

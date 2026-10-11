@@ -1836,6 +1836,14 @@ var publishedRequestEnums = map[string]string{
 		"TestHandleUserCreatePost_SetPasswordTypeMatrix. Was the one known gap on this list " +
 		"until #350: the handler compared against the two values and refused nothing else, so a " +
 		"third value created an account with no password and no setup email",
+	"UpdateClientTokensRequest.includeOpenIDConnectClaimsInAccessToken": "enforced: " +
+		"handler_api_clients.go parses the trimmed value through record.ThreeStateSettingFromString " +
+		"and refuses anything outside [on, off, default] with 400 before writing. Covered by " +
+		"TestAPIClientTokensPut_ValidationErrors' invalid_three_state_access case. Published in #562",
+	"UpdateClientTokensRequest.includeOpenIDConnectClaimsInIdToken": "enforced: " +
+		"handler_api_clients.go parses the trimmed value through record.ThreeStateSettingFromString " +
+		"and refuses anything outside [on, off, default] with 400 before writing. Covered by " +
+		"TestAPIClientTokensPut_ValidationErrors' invalid_three_state_id case. Published in #562",
 }
 
 // A closed enum on a request property is a promise that the server refuses everything outside it,

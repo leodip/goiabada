@@ -1,0 +1,3 @@
+-- Migration 000063 down: intentional no-op. The up migration set every value of the two
+-- three-state claim columns other than on, off and default to default, and a default written there
+-- can't be told from one an administrator saved since, so none is put back.
