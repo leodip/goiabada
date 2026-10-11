@@ -1,0 +1,38 @@
+---
+title: PostgreSQL TLS variables stop startup
+description: Fix a PostgreSQL startup refusal caused by PGSSL environment variables.
+---
+
+import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you start the auth server when PostgreSQL's `PGSSL` environment variables cause a configuration refusal.
+
+## What you see
+
+With `GOIABADA_DB_TYPE=postgres`, the auth server won't start while one of these variables is set and not empty: `PGSSLMODE`, `PGSSLROOTCERT`, `PGSSLCERT`, `PGSSLKEY`, `PGSSLPASSWORD`, `PGSSLSNI` or `PGSSLNEGOTIATION`. It prints one `malformed configuration:` line naming each variable, never its value, and exits with status 2. For example:
+
+- `malformed configuration: PGSSLMODE is set, which the auth server no longer reads: unset it and set GOIABADA_DB_TLS_MODE (--db-tls-mode) instead`
+- `malformed configuration: PGSSLROOTCERT is set, which the auth server no longer reads: unset it and set GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) instead`
+
+## Fix the configuration
+
+<Steps>
+
+1. Unset each variable the line names, wherever the auth server's environment comes from: the Compose file, `goiabada.env`, or the auth server's ConfigMap.
+
+2. Set `GOIABADA_DB_TLS_MODE` to the protection your database needs. [Where the database sits](/deploy/database/#where-the-database-sits) explains the five modes. Only `verify-full` checks the database's certificate and host name.
+
+3. For `verify-ca` or `verify-full`, set `GOIABADA_DB_TLS_CA_FILE` if the certificate's signing authority isn't in the system's roots.
+
+4. Restart the auth server.
+
+</Steps>
+
+The auth server presents no client certificate, so `PGSSLCERT`, `PGSSLKEY` and `PGSSLPASSWORD` have nothing to replace them.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Database" description="Choose a TLS mode and trusted authorities." href="/deploy/database/#where-the-database-sits" />
+  <LinkCard title="Database TLS connection fails" description="Fix a TLS or certificate refusal." href="/troubleshooting/database-tls-connection-fails/" />
+</CardGrid>

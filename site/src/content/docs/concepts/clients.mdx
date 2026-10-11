@@ -130,9 +130,9 @@ They also see it when a client asks for `authserver:manage-account`, until they'
 
 Clients you create start with consent off. Clients that register themselves start with it on, since nobody has reviewed them yet.
 
-Whether a sign-in shows the consent screen depends on the setting, the request, and what the user approved before:
+Whether a sign-in shows the consent screen depends on the setting, the request, and what the user approved before. In the approval column, **Yes** means stored consent covers every requested scope when **Consent required** is on. When it's off, **Yes** means it covers `authserver:manage-account` if the client asks for that scope:
 
-| **Consent required** | `offline_access` asked for | `prompt=consent` | `authserver:manage-account` asked for | The user approved every scope before | Consent screen |
+| **Consent required** | `offline_access` asked for | `prompt=consent` | `authserver:manage-account` asked for | Stored consent covers what's required | Consent screen |
 |---|---|---|---|---|---|
 | Off | No | No | No | Either | Skipped |
 | Off | No | No | Yes | No | Shown |
@@ -142,7 +142,7 @@ Whether a sign-in shows the consent screen depends on the setting, the request, 
 | Either | Yes | Either | Either | Either | Shown |
 | Either | Either | Yes | Either | Either | Shown |
 
-`authserver:manage-account` counts here only when a client other than the admin console's asks for it. With **Consent required** off, what the user must have approved before is `authserver:manage-account` alone: the client's other scopes follow the setting.
+`authserver:manage-account` counts here only when a client other than the admin console's asks for it. With **Consent required** off, a prior approval for that scope skips the screen even if the user hasn't approved the client's other requested scopes.
 
 The scopes are the ones left once the auth server has dropped those the user doesn't hold, as [Tokens](/concepts/tokens/#which-scopes-a-token-gets) describes. On the screen the user can untick scopes, and the tokens carry only those they approved. Their answer is kept, so the next sign-in skips the screen while it covers every scope, and a user can withdraw it under **Account**, **Manage consents**. A user who unticks `authserver:manage-account` is asked for it again at the client's next sign-in that asks for it.
 

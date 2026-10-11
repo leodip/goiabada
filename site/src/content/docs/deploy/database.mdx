@@ -49,7 +49,7 @@ Unless you use `verify-full`, keep the database on the auth server's host, or on
 
 If you leave `GOIABADA_DB_TLS_MODE` unset, the auth server connects as `prefer`. Every start then writes this warning until you set a mode: `the database tls mode is unset, so the auth server does not check whose database it reached`. Set `prefer` yourself to keep the same behavior without the warning. To see which mode a start used, read `tls_mode` on its `using database` record.
 
-If the database's certificate doesn't verify, or the database offers no TLS, the start stops with `unable to create the database connection`. [The database refuses TLS](/troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection/#the-database-refuses-tls) lists each error and its fix.
+If the database's certificate doesn't verify, or the database offers no TLS, the start stops with `unable to create the database connection`. [Database TLS connection fails](/troubleshooting/database-tls-connection-fails/) lists each error and its fix.
 
 ### The CA file
 
@@ -62,7 +62,7 @@ The auth server won't start if the file can't be read, holds no certificate, or 
 
 ### PostgreSQL's own variables
 
-On PostgreSQL, these two settings are the whole of the connection's TLS. The auth server doesn't read PostgreSQL's own `PGSSL*` variables, such as `PGSSLMODE` and `PGSSLROOTCERT`, and won't start while one is set: see [PostgreSQL's TLS variables](/troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection/#postgresqls-tls-variables).
+On PostgreSQL, these two settings are the whole of the connection's TLS. The auth server doesn't read PostgreSQL's own `PGSSL*` variables, such as `PGSSLMODE` and `PGSSLROOTCERT`, and won't start while one is set: see [PostgreSQL TLS variables stop startup](/troubleshooting/postgresql-tls-variables/).
 
 ## PostgreSQL
 

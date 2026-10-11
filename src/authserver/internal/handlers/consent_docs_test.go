@@ -36,7 +36,7 @@ const (
 	consentColumnOffline  = "`offline_access` asked for"
 	consentColumnPrompt   = "`prompt=consent`"
 	consentColumnAccount  = "`authserver:manage-account` asked for"
-	consentColumnApproved = "The user approved every scope before"
+	consentColumnApproved = "Stored consent covers what's required"
 	consentColumnScreen   = "Consent screen"
 )
 
@@ -80,8 +80,10 @@ func consentWorlds() []consentWorld {
 }
 
 // consentScreenShown is whether a sign-in in world sees the consent screen: decideAfterBinding's
-// answer for a user holding every scope asked for, given a stored consent covering every scope or
-// none, and, when that is the consent step, consentScreenOwed's for the same consent.
+// answer for a user holding every scope asked for, given stored consent covering the scopes this
+// world requires or none, and, when that is the consent step, consentScreenOwed's for the same
+// consent. With Consent required off, manage-account alone is enough even when another requested
+// scope was never approved; this partial-consent case keeps the table's approval column honest.
 func consentScreenShown(t *testing.T, world consentWorld) bool {
 	t.Helper()
 	scope := "openid profile"
@@ -95,6 +97,14 @@ func consentScreenShown(t *testing.T, world consentWorld) bool {
 	if world.adminConsole {
 		clientIdentifier = builtin.AdminConsoleClientIdentifier
 	}
+	var storedConsent *record.UserConsent
+	if world.approvedBefore {
+		consentedScope := scope
+		if world.manageAccount && !world.consentRequired && !world.adminConsole {
+			consentedScope = consentManageAccountScope
+		}
+		storedConsent = &record.UserConsent{Scope: consentedScope}
+	}
 	facts := afterBindingFacts{
 		promptConsent:    world.promptConsent,
 		consentRequired:  world.consentRequired,
@@ -104,9 +114,7 @@ func consentScreenShown(t *testing.T, world consentWorld) bool {
 	answer, need := decideAfterBinding(facts)
 	if need == afterBindingFactConsent {
 		facts.consentLoaded = true
-		if world.approvedBefore {
-			facts.consent = &record.UserConsent{Scope: scope}
-		}
+		facts.consent = storedConsent
 		answer, need = decideAfterBinding(facts)
 	}
 	if need != afterBindingFactNone {
@@ -121,7 +129,7 @@ func consentScreenShown(t *testing.T, world consentWorld) bool {
 	}
 	var scopes []ScopeInfo
 	for _, s := range strings.Split(scope, " ") {
-		scopes = append(scopes, ScopeInfo{Scope: s, AlreadyConsented: world.approvedBefore})
+		scopes = append(scopes, ScopeInfo{Scope: s, AlreadyConsented: storedConsent != nil && storedConsent.HasScope(s)})
 	}
 	return consentScreenOwed(scopes, scope, world.promptConsent)
 }
@@ -164,7 +172,7 @@ func TestConceptDocs_AConsentTableDisagreeingWithTheCodeFails(t *testing.T) {
 	}
 	want := []string{
 		"site/clients.mdx: ## Consent required row 1 says the screen is skipped, the code shows it for Consent required Off, offline_access Yes, prompt=consent No, manage-account No by another client, approved before No",
-		`site/clients.mdx: ## Consent required row 2 says "Maybe" under "The user approved every scope before", which is not Yes, No or Either`,
+		`site/clients.mdx: ## Consent required row 2 says "Maybe" under "Stored consent covers what's required", which is not Yes, No or Either`,
 		"site/clients.mdx: ## Consent required has no row for Consent required Off, offline_access No, prompt=consent No, manage-account Yes by another client, approved before No",
 		"site/clients.mdx: ## Consent required has no row for Consent required On, offline_access No, prompt=consent No, manage-account No by another client, approved before No",
 	}
@@ -201,7 +209,7 @@ func TestConceptDocs_AConsentTableAgreeingWithTheCodePasses(t *testing.T) {
 func TestConceptDocs_AConsentTableWithoutItsColumnsStops(t *testing.T) {
 	root := t.TempDir()
 	writeConceptFixture(t, root, "site/clients.mdx", "## Consent required\n\n"+
-		"| **Consent required** | `offline_access` asked for | `prompt=consent` | The user approved every scope before | Consent screen |\n"+
+		"| **Consent required** | `offline_access` asked for | `prompt=consent` | Stored consent covers what's required | Consent screen |\n"+
 		"|---|---|---|---|---|\n| On | No | No | No | Shown |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
@@ -229,7 +237,7 @@ func TestConceptDocs_AMissingConsentSectionStops(t *testing.T) {
 	}
 }
 
-const consentFixtureHeader = "| **Consent required** | `offline_access` asked for | `prompt=consent` | `authserver:manage-account` asked for | The user approved every scope before | Consent screen |\n" +
+const consentFixtureHeader = "| **Consent required** | `offline_access` asked for | `prompt=consent` | `authserver:manage-account` asked for | Stored consent covers what's required | Consent screen |\n" +
 	"|---|---|---|---|---|---|\n"
 
 // assertConsentTable is the reporting half of the consent table's check: one failure per row whose

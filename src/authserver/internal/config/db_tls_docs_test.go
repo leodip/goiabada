@@ -16,15 +16,15 @@ import (
 )
 
 const (
-	databaseConnectTroubleshootingPage = "site/src/content/docs/troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection.mdx"
-	productionChecklistPage            = "site/src/content/docs/deploy/production-checklist.mdx"
-	securityReferencePage              = "site/src/content/docs/reference/security.mdx"
+	postgresTLSVariablesPage = "site/src/content/docs/troubleshooting/postgresql-tls-variables.mdx"
+	productionChecklistPage  = "site/src/content/docs/deploy/production-checklist.mdx"
+	securityReferencePage    = "site/src/content/docs/reference/security.mdx"
 )
 
 // libpqVariableSection is where an operator who set one of libpq's TLS variables is sent: the
 // troubleshooting page a refused start leads to. Moving the old values over is an upgrade step,
 // which the release notes carry rather than the docs, which describe the latest release only.
-var libpqVariableSection = docSection{databaseConnectTroubleshootingPage, "## PostgreSQL's TLS variables"}
+var libpqVariableSection = docSection{postgresTLSVariablesPage, "## What you see"}
 
 // TestDocs_NameEveryRefusedLibpqVariable: the section names the seven variables a PostgreSQL start
 // refuses, and quotes, as the load writes it, the refusal of the two the old advice set.

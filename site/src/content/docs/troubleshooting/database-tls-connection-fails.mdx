@@ -1,0 +1,64 @@
+---
+title: Database TLS connection fails
+description: Fix a database connection refused because TLS or the database's certificate doesn't meet the auth server's settings.
+---
+
+import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you fix a database connection that stops the auth server because TLS or certificate verification fails.
+
+## What you see
+
+The auth server stops with `unable to create the database connection`. Its `error` names a TLS refusal or starts with `x509:`. Read `tls_mode` on the `using database` record to see which mode the start used; the `error` ends with it too, such as `(tls mode verify-full)`.
+
+`GOIABADA_DB_TLS_MODE` decides what the auth server asks of the database. In `require`, `verify-ca` and `verify-full`, it never falls back to plain text; the last two also check the certificate. [Where the database sits](/deploy/database/#where-the-database-sits) compares the modes.
+
+## Fix the refusal
+
+| The `error` says | Why | Fix it |
+|---|---|---|
+| `x509: certificate signed by unknown authority` | The auth server doesn't trust the authority that signed the certificate. | Set `GOIABADA_DB_TLS_CA_FILE` to a PEM file holding that authority, and any intermediate one. It replaces the system's authorities. |
+| `x509: certificate is valid for db-1.internal.example, not db.example.com` | `verify-full`, and the certificate doesn't name `GOIABADA_DB_HOST`, here `db.example.com`. | Set `GOIABADA_DB_HOST` to a name the certificate carries. If you can't, such as behind a connection pooler, use `verify-ca`. |
+| `x509: cannot validate certificate for 10.0.0.5 because it doesn't contain any IP SANs` | `verify-full`, and `GOIABADA_DB_HOST` is an IP address, here `10.0.0.5`, that the certificate doesn't carry. | Set `GOIABADA_DB_HOST` to a host name the certificate carries, or use `verify-ca`. |
+| `x509: certificate has expired or is not yet valid` | A certificate in the chain has expired or doesn't start yet, or the auth server's clock is wrong. | See [Check the certificate dates](#check-the-certificate-dates). |
+| `server refused TLS connection` (PostgreSQL), `TLS requested but server does not support TLS` (MySQL) or `server does not support encryption` (SQL Server) | The database serves no TLS. | Turn TLS on at the database. If nobody else can reach its network, you can set `GOIABADA_DB_TLS_MODE=prefer` instead. |
+
+On MySQL and SQL Server in `verify-ca`, an `x509:` error comes after `unable to verify the database server's certificate chain`.
+
+The auth server reads the CA file only at start, so restart it after you change the file. On Kubernetes, the file is in [the `goiabada-db-ca` ConfigMap](/deploy/kubernetes/security/#check-the-databases-certificate).
+
+A CA file the auth server can't use stops it before it connects, with a `malformed configuration:` line naming `GOIABADA_DB_TLS_CA_FILE`. That happens when the file can't be read, holds no certificate, or is set with `disable`, `prefer` or `require`, which read none.
+
+## Check the certificate dates
+
+After `x509: certificate has expired or is not yet valid`, the `error` gives the auth server's time and the certificate's date: `current time ... is after ...` for a certificate that has expired, `is before ...` for one that doesn't start yet.
+
+<Steps>
+
+1. Read the dates of the certificates the database serves. On PostgreSQL and MySQL, read them from the database itself, with your host and port:
+
+   ```bash
+   openssl s_client -connect db.example.com:5432 -starttls postgres -showcerts </dev/null 2>/dev/null \
+     | sed -n '/BEGIN CERT/,/END CERT/p' > served.pem
+   openssl storeutl -noout -text -certs served.pem | grep -E 'Subject:|Not (Before|After)'
+   ```
+
+   On MySQL, use `-starttls mysql`. On SQL Server, or a managed database, read them in the database's or your provider's tools: SQL Server on Windows can keep its certificate in the Windows certificate store.
+
+2. If you set `GOIABADA_DB_TLS_CA_FILE`, read the dates of every authority in it: `openssl storeutl -noout -text -certs` and the file, as above. Don't use `openssl x509` for this: it reads only a file's first certificate.
+
+3. Replace whatever has expired or doesn't start yet:
+
+   - **A certificate the database serves:** renew it at the database, or have your provider renew it, and have the database serve the new one.
+   - **An authority in `GOIABADA_DB_TLS_CA_FILE`:** put the current one in the file, then restart the auth server.
+
+4. If every date is valid, check the auth server host's clock. On Kubernetes, check the node's clock.
+
+</Steps>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Database" description="Choose a TLS mode and trusted authorities." href="/deploy/database/#where-the-database-sits" />
+  <LinkCard title="CrashLoopBackOff" description="Other reasons the auth server stops at startup." href="/troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection/" />
+</CardGrid>

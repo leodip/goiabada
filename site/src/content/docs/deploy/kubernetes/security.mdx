@@ -142,11 +142,11 @@ With a CA file, the manifest carries its certificates. They're not secret:
 - **A read-only volume** mounts that ConfigMap at `/etc/goiabada/db-ca` in the auth server's pods.
 - **`GOIABADA_DB_TLS_CA_FILE`** in `goiabada-authserver-config` names the mounted file, `/etc/goiabada/db-ca/ca.pem`. The auth server then trusts those authorities in place of the system's.
 
-If a pod can't verify the database's certificate, it stops at start and crash-loops: see [The database refuses TLS](/troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection/#the-database-refuses-tls).
+If a pod can't verify the database's certificate, it stops at start and crash-loops: see [Database TLS connection fails](/troubleshooting/database-tls-connection-fails/).
 
 ### Change the authorities
 
-The auth server reads the file only when it starts, so change it like this:
+The auth server reads the file only when it starts, so change it like this. The commands use the wizard's default namespace, `goiabada`; replace it with the namespace you chose:
 
 <Steps>
 

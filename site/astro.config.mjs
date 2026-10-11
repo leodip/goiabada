@@ -207,6 +207,8 @@ export default defineConfig({
 						{ label: 'A user cannot reset their password', slug: 'troubleshooting/a-user-cannot-reset-their-password' },
 						{ label: 'Certificates are not issued', slug: 'troubleshooting/certificates-are-not-issued' },
 						{ label: 'CrashLoopBackOff or unable to create the database connection', slug: 'troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection' },
+						{ label: 'Database TLS connection fails', slug: 'troubleshooting/database-tls-connection-fails' },
+						{ label: 'PostgreSQL TLS variables stop startup', slug: 'troubleshooting/postgresql-tls-variables' },
 						{ label: 'attempt to write a readonly database', slug: 'troubleshooting/attempt-to-write-a-readonly-database' },
 						{ label: 'Waiting for the migration lock, or marked dirty', slug: 'troubleshooting/waiting-for-the-migration-lock-or-marked-dirty' },
 						{ label: 'Metrics are not scraped', slug: 'troubleshooting/metrics-are-not-scraped' },

@@ -99,7 +99,7 @@ Until a user has approved it, your app can't get the scope without them:
 - a `prompt=none` request asking for it is answered `consent_required`;
 - a refresh renewing it is refused with `invalid_grant`, and the refresh token isn't spent, so a refresh whose `scope` leaves `authserver:manage-account` out still works.
 
-Both happen to a refresh token or a session your app got before the user approved it, however it got them. Send the user through an ordinary sign-in: they approve once, and the refreshes and silent requests after it work.
+A session or a live refresh token from an earlier authorization-code sign-in can encounter these checks until the user approves the scope. Send the user through an ordinary sign-in: they approve once, and the refreshes and silent requests after it work. Refresh tokens from the [password grant](/legacy-flows/ropc/) don't need this consent.
 
 ## Change a user's account from your app
 
