@@ -3031,9 +3031,9 @@ paths:
         Get the list of countries with their calling codes. An entry's `uniqueId` is what
         `phoneCountryUniqueId` takes when a user's phone number is set.
 
-        Unlike the other reads, it accepts only `authserver:admin-read` or `authserver:manage`: a
-        token with a domain scope alone, such as `authserver:manage-users`, is refused with 403
-        INSUFFICIENT_SCOPE.
+        It belongs to no domain, so every administrative scope reads it: `authserver:admin-read`,
+        `authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings` or
+        `authserver:manage`.
       operationId: getPhoneCountries
       responses:
         '200':
@@ -6274,7 +6274,10 @@ components:
       properties:
         phoneCountryUniqueId:
           type: string
-          description: An entry's uniqueId from GET /api/v1/admin/phone-countries, e.g. USA_0
+          description: |
+            The phone country, as `<alpha3>_<index>`: the country's ISO 3166-1 alpha-3 code and
+            the position of the calling code among that country's codes, from 0, such as `PRT_0`
+            for Portugal and +351. Required when phoneNumber is not empty.
         phoneNumber:
           type: string
           description: Empty string to clear

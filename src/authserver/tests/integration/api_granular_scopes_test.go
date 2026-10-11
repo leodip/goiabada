@@ -10,6 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -489,19 +490,21 @@ func TestGranularScopes_InvalidTokenCannotAccess(t *testing.T) {
 }
 
 // TestGranularScopes_PhoneCountriesAccessibleByAnyAdminScope verifies that
-// reference data (phone-countries) is accessible by any admin scope
+// reference data (phone-countries) is accessible by every administrative scope, and that each
+// one is answered the same list: a manage-users integration may set a user's phone, so it must
+// be able to read the ids it sends (#563).
 func TestGranularScopes_PhoneCountriesAccessibleByAnyAdminScope(t *testing.T) {
 	baseURL := appConfig.AuthServer.BaseURL
 
 	testCases := []struct {
-		name               string
-		permissionId       string
-		expectedStatusCode int
+		name         string
+		permissionId string
 	}{
-		{"admin-read", builtin.AdminReadPermissionIdentifier, http.StatusOK},
-		{"manage-users", builtin.ManageUsersPermissionIdentifier, http.StatusForbidden}, // Only scopesRead allows this
-		{"manage-clients", builtin.ManageClientsPermissionIdentifier, http.StatusForbidden},
-		{"manage-settings", builtin.ManageSettingsPermissionIdentifier, http.StatusForbidden},
+		{"admin-read", builtin.AdminReadPermissionIdentifier},
+		{"manage-users", builtin.ManageUsersPermissionIdentifier},
+		{"manage-clients", builtin.ManageClientsPermissionIdentifier},
+		{"manage-settings", builtin.ManageSettingsPermissionIdentifier},
+		{"manage", builtin.ManagePermissionIdentifier},
 	}
 
 	for _, tc := range testCases {
@@ -514,22 +517,21 @@ func TestGranularScopes_PhoneCountriesAccessibleByAnyAdminScope(t *testing.T) {
 			resp := makeAPIRequest(t, "GET", baseURL+"/api/v1/admin/phone-countries", accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
-			assert.Equal(t, tc.expectedStatusCode, resp.StatusCode, "%s should have status %d for phone-countries", tc.name, tc.expectedStatusCode)
+			require.Equal(t, http.StatusOK, resp.StatusCode, "%s should read phone-countries", tc.name)
+
+			var response api.GetPhoneCountriesResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&response))
+			var portugal *api.PhoneCountryResponse
+			for i := range response.PhoneCountries {
+				if response.PhoneCountries[i].UniqueId == "PRT_0" {
+					portugal = &response.PhoneCountries[i]
+				}
+			}
+			require.NotNil(t, portugal, "PRT_0 present for %s", tc.name)
+			assert.Equal(t, "+351", portugal.CallingCode)
+			assert.Equal(t, "PT", portugal.Alpha2)
 		})
 	}
-
-	// Manage scope should always work
-	t.Run("manage", func(t *testing.T) {
-		accessToken, client := createAdminClientWithToken(t)
-		defer func() {
-			_ = database.DeleteClient(context.Background(), nil, client.Id)
-		}()
-
-		resp := makeAPIRequest(t, "GET", baseURL+"/api/v1/admin/phone-countries", accessToken, nil)
-		defer func() { _ = resp.Body.Close() }()
-
-		assert.Equal(t, http.StatusOK, resp.StatusCode, "manage should access phone-countries")
-	})
 }
 
 // TestGranularScopes_GroupsRequireUsersScope verifies that group endpoints

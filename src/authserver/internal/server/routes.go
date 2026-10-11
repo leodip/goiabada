@@ -182,11 +182,6 @@ func (s *Server) initRoutes(branches appBranches) {
 		}
 
 		// Scope sets for granular authorization
-		// Read-only: admin-read OR manage
-		scopesRead := []string{
-			scope(builtin.AdminReadPermissionIdentifier),
-			scope(builtin.ManagePermissionIdentifier),
-		}
 		// Users domain: manage-users OR manage
 		scopesUsers := []string{
 			scope(builtin.ManageUsersPermissionIdentifier),
@@ -217,6 +212,14 @@ func (s *Server) initRoutes(branches appBranches) {
 		// Settings read: admin-read OR manage-settings OR manage
 		scopesSettingsRead := []string{
 			scope(builtin.AdminReadPermissionIdentifier),
+			scope(builtin.ManageSettingsPermissionIdentifier),
+			scope(builtin.ManagePermissionIdentifier),
+		}
+		// Any administrative scope: admin-read, any of the three domains, or manage
+		scopesAnyAdmin := []string{
+			scope(builtin.AdminReadPermissionIdentifier),
+			scope(builtin.ManageUsersPermissionIdentifier),
+			scope(builtin.ManageClientsPermissionIdentifier),
 			scope(builtin.ManageSettingsPermissionIdentifier),
 			scope(builtin.ManagePermissionIdentifier),
 		}
@@ -353,8 +356,9 @@ func (s *Server) initRoutes(branches appBranches) {
 		// that endpoint and tells a caller nothing the endpoint itself does not (#351).
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/audit-logs/event-types", apihandlers.HandleAuditEventTypesGet())
 
-		// Reference data routes (read-only, accessible by any admin scope)
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesRead)).Get("/phone-countries", apihandlers.HandlePhoneCountriesGet())
+		// Reference data routes (read-only, accessible by any admin scope). Static, so it reveals
+		// nothing about any user, and a manage-users caller needs its ids to set a phone (#563).
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesAnyAdmin)).Get("/phone-countries", apihandlers.HandlePhoneCountriesGet())
 	})
 
 	// Account API routes (self-service)
