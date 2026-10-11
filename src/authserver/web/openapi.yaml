@@ -154,7 +154,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
+                anyOf:
                   - $ref: '#/components/schemas/SearchUsersResponse'
                   - $ref: '#/components/schemas/SearchUsersWithGroupAnnotationResponse'
                   - $ref: '#/components/schemas/SearchUsersWithPermissionAnnotationResponse'
@@ -2456,6 +2456,11 @@ paths:
           description: The OAuth2 client identifier
           schema:
             type: string
+        - name: If-None-Match
+          in: header
+          description: Return 304 when this matches the logo's current ETag. Weak tags and * are accepted.
+          schema:
+            type: string
       responses:
         '200':
           description: Logo image
@@ -2475,6 +2480,15 @@ paths:
                 format: binary
         '304':
           description: Not modified (ETag match)
+          headers:
+            ETag:
+              description: Current content hash
+              schema:
+                type: string
+            Cache-Control:
+              description: "public, max-age=300, must-revalidate"
+              schema:
+                type: string
         '404':
           description: Client or logo not found
         '500':
@@ -3992,12 +4006,22 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     Unauthorized:
       description: Missing or invalid bearer token
+      headers:
+        WWW-Authenticate:
+          description: Bearer challenge on token refusals. An operation may also return a handler-level 401 without this header.
+          schema:
+            type: string
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     BadRequest:
       description: Invalid request body or parameters
+      headers:
+        WWW-Authenticate:
+          description: Bearer challenge when token transport is malformed; ordinary validation errors omit it.
+          schema:
+            type: string
       content:
         application/json:
           schema:
@@ -4062,6 +4086,11 @@ components:
         Every operation this document secures declares a 403. The public
         client logo endpoint, which carries `security: []` and authorises
         nothing, is the one that does not.
+      headers:
+        WWW-Authenticate:
+          description: Bearer challenge on scope and administrative-policy refusals; other forbidden responses omit it.
+          schema:
+            type: string
       content:
         application/json:
           schema:
@@ -4324,6 +4353,8 @@ components:
       properties:
         users:
           type: array
+          nullable: true
+          description: Null when this page has no users.
           items:
             $ref: '#/components/schemas/UserResponse'
         total:
@@ -4651,6 +4682,8 @@ components:
       properties:
         attributes:
           type: array
+          nullable: true
+          description: Null when the user has no attributes.
           items:
             $ref: '#/components/schemas/UserAttributeResponse'
       required:
@@ -4901,6 +4934,8 @@ components:
       properties:
         consents:
           type: array
+          nullable: true
+          description: Null when the user has no consents.
           items:
             $ref: '#/components/schemas/UserConsentResponse'
       required:
@@ -4970,7 +5005,7 @@ components:
           type: string
         description:
           type: string
-          maxLength: 100
+          description: At most 100 UTF-16 code units.
         includeInIdToken:
           type: boolean
         includeInAccessToken:
@@ -4991,7 +5026,7 @@ components:
           type: string
         description:
           type: string
-          maxLength: 100
+          description: At most 100 UTF-16 code units.
         includeInIdToken:
           type: boolean
         includeInAccessToken:
@@ -5040,6 +5075,8 @@ components:
       properties:
         members:
           type: array
+          nullable: true
+          description: Null when the group has no members on this page.
           items:
             $ref: '#/components/schemas/UserResponse'
         total:
@@ -5247,6 +5284,8 @@ components:
       properties:
         resources:
           type: array
+          nullable: true
+          description: Null when no resources are stored.
           items:
             $ref: '#/components/schemas/ResourceResponse'
       required:
@@ -5269,7 +5308,7 @@ components:
           type: string
         description:
           type: string
-          maxLength: 100
+          description: At most 100 UTF-16 code units.
 
     CreateResourceResponse:
       type: object
@@ -5286,7 +5325,7 @@ components:
           type: string
         description:
           type: string
-          maxLength: 100
+          description: At most 100 UTF-16 code units.
 
     UpdateResourceResponse:
       type: object
@@ -5341,6 +5380,8 @@ components:
           $ref: '#/components/schemas/UserResponse'
         permissions:
           type: array
+          nullable: true
+          description: Null when the user has no permissions.
           items:
             $ref: '#/components/schemas/PermissionResponse'
       required:
@@ -5365,6 +5406,8 @@ components:
       properties:
         users:
           type: array
+          nullable: true
+          description: Null when no users hold the permission on this page.
           items:
             $ref: '#/components/schemas/UserResponse'
         total:
@@ -5515,10 +5558,14 @@ components:
           type: string
         redirectURIs:
           type: array
+          nullable: true
+          description: Null when this collection was not loaded for the response.
           items:
             $ref: '#/components/schemas/RedirectURI'
         webOrigins:
           type: array
+          nullable: true
+          description: Null when this collection was not loaded or the client has no web origins.
           items:
             $ref: '#/components/schemas/WebOrigin'
       required:
@@ -5689,7 +5736,6 @@ components:
             anything is written.
           items:
             type: string
-            maxLength: 2048
         expectedRedirectURIs:
           type: array
           description: The redirect URIs as last read; [] if there were none.
@@ -5759,6 +5805,8 @@ components:
           $ref: '#/components/schemas/ClientResponse'
         permissions:
           type: array
+          nullable: true
+          description: Null when the client has no permissions.
           items:
             $ref: '#/components/schemas/PermissionResponse'
       required:
@@ -5919,7 +5967,6 @@ components:
           type: string
         smtpPassword:
           type: string
-          maxLength: 256
           description: |
             A new SMTP password, at most 256 bytes. The stored password is never returned, only
             `hasSmtpPassword`, so an absent or empty value keeps the stored password; a non-empty
