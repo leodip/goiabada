@@ -163,11 +163,7 @@ func run() int {
 	}
 	slog.Info("data encryption key validated")
 
-	slog.Info("using configuration",
-		"auth_server_base_url", cfg.AuthServer.BaseURL,
-		"auth_server_internal_base_url", cfg.AuthServer.InternalBaseURL,
-		"admin_console_base_url", cfg.AdminConsole.BaseURL,
-		"debug_api_requests", cfg.AuthServer.DebugAPIRequests)
+	logConfiguration(cfg)
 
 	dir, err := os.Getwd()
 	if err != nil {
@@ -391,6 +387,20 @@ var (
 		"GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY",
 	}
 )
+
+// logConfiguration writes the configuration record every start carries. It names the rate limiter
+// switch, which governs only the limits counted by an IP address: those counted by a user or an
+// email apply either way, so off is the default #219 chose rather than a fault, and the record is
+// Info whatever it says. Nothing else is said at startup about it beyond the two proxy-trust
+// warnings, which fire only with the switch on (#503).
+func logConfiguration(cfg *config.Config) {
+	slog.Info("using configuration",
+		"auth_server_base_url", cfg.AuthServer.BaseURL,
+		"auth_server_internal_base_url", cfg.AuthServer.InternalBaseURL,
+		"admin_console_base_url", cfg.AdminConsole.BaseURL,
+		"debug_api_requests", cfg.AuthServer.DebugAPIRequests,
+		"rate_limiter_enabled", cfg.AuthServer.RateLimiterEnabled)
+}
 
 // logSessionKeysRefused reports the session keys the auth server stops on, by what is wrong with
 // them, since the remedy differs. Every refusal went to the bootstrap record, which told an operator
