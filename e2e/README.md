@@ -56,7 +56,19 @@ sign-in lands on the auth server's password page, and the test app hosts.
 `e2e/.state/`, so it runs against the environment this machine last prepared. `e2e/test.sh` runs it;
 after a failure, `(cd e2e/playwright && npx playwright show-report)` opens the report with traces.
 
-Tests sit under `playwright/tests/`, one folder per area (`admin-console/` so far).
+Tests sit under `playwright/tests/`, one folder per area (`admin-console/sign-in`,
+`admin-console/clients/` so far). They run four at a time against an environment that stays up between
+runs, so every test keeps to these rules, which is what lets the suite run again and again without a
+reset:
+
+- **It creates what it needs under a unique name** (`e2e-<kind>-<random>`, `lib/unique.ts`) through a
+  fixture that removes it afterwards, pass or fail (`clients` in `lib/fixtures.ts`). The setup step
+  (`tests/admin.setup.ts`) sweeps anything left with that prefix by a run that crashed.
+- **It changes nothing global**: no settings, and the system client is only read.
+- **It never depends on what another test did**, or on counts or order.
+- **Each worker signs the administrator in for itself, with a user agent of its own** (`lib/devices.ts`).
+  Goiabada treats a sign-in from the same user agent and address as the same device and ends that
+  user's earlier session there, so workers sharing one would sign each other out.
 
 ## The VPS
 

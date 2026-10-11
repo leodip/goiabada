@@ -1,6 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
+import { userAgentFor } from "../../lib/devices";
 import { env } from "../../lib/environment";
+
+// These tests are about signing in, so each starts with no session, not the suite's saved one, and
+// signs in as a device of its own, so it ends no other test's session.
+test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ userAgent: async ({}, use, testInfo) => use(userAgentFor(`sign-in-${testInfo.testId}`)) });
 
 // A protected admin console page sends a visitor with no session to the auth server's password page.
 async function startSignIn(page: Page) {
