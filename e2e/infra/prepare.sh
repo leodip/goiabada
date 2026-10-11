@@ -10,6 +10,7 @@
 set -euo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+require_vps
 
 tag="${1:-}"
 [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]] || die "usage: $0 <release tag>, such as v1.7.0"

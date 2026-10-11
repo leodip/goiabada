@@ -17,14 +17,23 @@ nginx on the VPS terminates TLS with a Let's Encrypt certificate, and the DNS re
 
 ## Run it
 
-From your machine, with an SSH key the VPS accepts:
+From the repository root, on a machine with an SSH key the VPS accepts:
 
 ```bash
-cp e2e/.env.example e2e/.env      # then set E2E_VPS_HOST
-e2e/infra/prepare.sh v1.7.0       # build the environment from scratch, then verify it
-e2e/infra/verify.sh               # check it again at any time
-e2e/infra/teardown.sh [--all]     # remove it
+cp e2e/.env.example e2e/.env    # once: set E2E_VPS_HOST
+
+e2e/run.sh [tag]                # everything from scratch: reset, then the whole suite
+e2e/reset.sh [tag]              # wipe the environment and build it again from a release
+e2e/test.sh [playwright args]   # run the suite against the current environment
+e2e/wipe.sh [--all] [-y]        # remove the environment (asks first)
 ```
+
+With no tag, `run.sh` and `reset.sh` take the latest GitHub release. `test.sh` installs the suite's
+packages and Chromium the first time, and passes its arguments to Playwright: `--headed`, `--ui`, or
+a folder such as `tests/admin-console`. Each script answers `--help`.
+
+They wrap the scripts in `infra/`, which can also be run on their own: `prepare.sh <tag>`,
+`verify.sh [tag]` (check the environment again at any time) and `teardown.sh [--all]`.
 
 `prepare.sh`:
 
@@ -44,14 +53,8 @@ sign-in lands on the auth server's password page, and the test app hosts.
 ## Browser tests
 
 `playwright/` holds the Playwright suite. It reads the URLs and the admin password `prepare.sh` left in
-`e2e/.state/`, so prepare the environment first.
-
-```bash
-cd e2e/playwright
-npm ci && npx playwright install chromium   # once
-npx playwright test                         # headless; add --headed or --ui to watch
-npx playwright show-report                  # the HTML report, with traces of failures
-```
+`e2e/.state/`, so it runs against the environment this machine last prepared. `e2e/test.sh` runs it;
+after a failure, `(cd e2e/playwright && npx playwright show-report)` opens the report with traces.
 
 Tests sit under `playwright/tests/`, one folder per area (`admin-console/` so far).
 

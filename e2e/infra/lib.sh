@@ -15,7 +15,7 @@ if [[ -f "$E2E_DIR/.env" ]]; then
   done < "$E2E_DIR/.env"
 fi
 
-: "${E2E_VPS_HOST:?set E2E_VPS_HOST, the VPS address, in e2e/.env or the environment}"
+E2E_VPS_HOST="${E2E_VPS_HOST:-}"
 E2E_VPS_USER="${E2E_VPS_USER:-root}"
 E2E_AUTH_HOST="${E2E_AUTH_HOST:-e2e-auth.goiabada.dev}"
 E2E_ADMIN_HOST="${E2E_ADMIN_HOST:-e2e-admin.goiabada.dev}"
@@ -54,3 +54,14 @@ else BOLD=; RED=; GREEN=; YELLOW=; RESET=; fi
 step() { printf '\n%s==> %s%s\n' "$BOLD" "$*" "$RESET"; }
 warn() { printf '%sWARN%s %s\n' "$YELLOW" "$RESET" "$*" >&2; }
 die()  { printf '%sERROR%s %s\n' "$RED" "$RESET" "$*" >&2; exit 1; }
+
+# The newest published release's tag, from GitHub's API.
+latest_release_tag() {
+  curl -fsS --max-time 15 https://api.github.com/repos/leodip/goiabada/releases/latest |
+    python3 -c 'import json, sys; print(json.load(sys.stdin)["tag_name"])'
+}
+
+# The scripts that reach the VPS call this first; the test run does not need it.
+require_vps() {
+  [[ -n "$E2E_VPS_HOST" ]] || die "set E2E_VPS_HOST, the VPS address, in e2e/.env or the environment (see e2e/.env.example)"
+}

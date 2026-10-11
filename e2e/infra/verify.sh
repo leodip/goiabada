@@ -9,6 +9,7 @@
 set -uo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+require_vps
 
 tag="${1:-}"
 if [[ -z "$tag" && -f "$STATE_DIR/environment.env" ]]; then
