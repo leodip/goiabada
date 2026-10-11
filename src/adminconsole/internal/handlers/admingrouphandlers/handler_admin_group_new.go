@@ -17,7 +17,11 @@ func HandleNewGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		bind := map[string]interface{}{}
+		// A new group opens with both include switches on.
+		bind := map[string]interface{}{
+			"includeInAccessToken": true,
+			"includeInIdToken":     true,
+		}
 
 		err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_new.html", bind)
 		if err != nil {
@@ -40,11 +44,14 @@ func HandleNewPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
+		// A refused group is drawn with every input as submitted, both switches included.
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"error":           message,
-				"groupIdentifier": r.FormValue("groupIdentifier"),
-				"description":     r.FormValue("description"),
+				"error":                message,
+				"groupIdentifier":      r.FormValue("groupIdentifier"),
+				"description":          r.FormValue("description"),
+				"includeInAccessToken": r.FormValue("includeInAccessToken") == "on",
+				"includeInIdToken":     r.FormValue("includeInIdToken") == "on",
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_new.html", bind)

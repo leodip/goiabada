@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -45,8 +44,11 @@ func ParseProfileForm(r *http.Request) (*api.UpdateUserProfileRequest, error) {
 }
 
 // EchoProfileForm puts the submitted values onto the user the page is rendered again with when
-// the API refuses them, so nothing the user typed is lost. A gender or date of birth that does
-// not parse keeps the stored value, since that is what was refused.
+// the API refuses them, so nothing the user typed is lost. A gender that does not parse keeps the
+// stored value, since that is what was refused. The date of birth is not put here: a date the
+// user holds cannot carry text that is no date, so each page binds the submitted text beside the
+// user as submittedDateOfBirth, a pointer so an empty submission still counts as submitted, and
+// the form prefers it over the stored date (#562 decision 3).
 func EchoProfileForm(user *api.UserResponse, request *api.UpdateUserProfileRequest) {
 	user.Username = request.Username
 	user.GivenName = request.GivenName
@@ -64,13 +66,5 @@ func EchoProfileForm(user *api.UserResponse, request *api.UpdateUserProfileReque
 		}
 	} else {
 		user.Gender = ""
-	}
-
-	if len(request.DateOfBirth) > 0 {
-		if parsed, err := time.Parse("2006-01-02", request.DateOfBirth); err == nil {
-			user.BirthDate = &parsed
-		}
-	} else {
-		user.BirthDate = nil
 	}
 }

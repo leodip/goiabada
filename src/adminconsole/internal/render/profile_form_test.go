@@ -83,7 +83,8 @@ func TestParseProfileForm_RefusesAZoneValueThatIsNotTwoHalves(t *testing.T) {
 }
 
 // When the API refuses a profile, the page is rendered again with what the user typed rather than
-// what is stored, so nothing they entered is lost.
+// what is stored, so nothing they entered is lost. The date of birth is left as stored: each page
+// binds the submitted text beside the user, and the form prefers it (#562 decision 3).
 func TestEchoProfileForm_ShowsTheSubmittedValues(t *testing.T) {
 	stored := time.Date(1980, 1, 2, 0, 0, 0, 0, time.UTC)
 	user := &api.UserResponse{
@@ -116,7 +117,6 @@ func TestEchoProfileForm_ShowsTheSubmittedValues(t *testing.T) {
 		Locale:              "pt-BR",
 	})
 
-	wantBirthDate := time.Date(1990, 5, 17, 0, 0, 0, 0, time.UTC)
 	assert.Equal(t, &api.UserResponse{
 		Id:                  4,
 		Email:               "jane@example.com",
@@ -127,33 +127,28 @@ func TestEchoProfileForm_ShowsTheSubmittedValues(t *testing.T) {
 		Nickname:            "JD",
 		Website:             "not a url",
 		Gender:              "female",
-		BirthDate:           &wantBirthDate,
+		BirthDate:           &stored,
 		ZoneInfoCountryName: "United States",
 		ZoneInfo:            "America/New_York",
 		Locale:              "pt-BR",
 	}, user)
 }
 
-// An emptied gender or date of birth is shown empty, as submitted.
-func TestEchoProfileForm_EmptiedGenderAndBirthDateAreShownEmpty(t *testing.T) {
-	stored := time.Date(1980, 1, 2, 0, 0, 0, 0, time.UTC)
-	user := &api.UserResponse{Gender: "male", BirthDate: &stored}
+// An emptied gender is shown empty, as submitted.
+func TestEchoProfileForm_AnEmptiedGenderIsShownEmpty(t *testing.T) {
+	user := &api.UserResponse{Gender: "male"}
 
 	EchoProfileForm(user, &api.UpdateUserProfileRequest{})
 
 	assert.Empty(t, user.Gender)
-	assert.Nil(t, user.BirthDate)
 }
 
-// A gender or date that does not parse is what the API refused; the page keeps showing the stored
-// value for it rather than inventing one.
-func TestEchoProfileForm_UnparseableGenderAndBirthDateKeepTheStoredValue(t *testing.T) {
-	stored := time.Date(1980, 1, 2, 0, 0, 0, 0, time.UTC)
-	user := &api.UserResponse{Gender: "male", BirthDate: &stored}
+// A gender that does not parse is what the API refused; the page keeps showing the stored value for
+// it rather than inventing one.
+func TestEchoProfileForm_AnUnparseableGenderKeepsTheStoredValue(t *testing.T) {
+	user := &api.UserResponse{Gender: "male"}
 
-	EchoProfileForm(user, &api.UpdateUserProfileRequest{Gender: "x", DateOfBirth: "17/05/1990"})
+	EchoProfileForm(user, &api.UpdateUserProfileRequest{Gender: "x"})
 
 	assert.Equal(t, "male", user.Gender)
-	require.NotNil(t, user.BirthDate)
-	assert.Equal(t, stored, *user.BirthDate)
 }

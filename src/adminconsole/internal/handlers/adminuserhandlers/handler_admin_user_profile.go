@@ -146,12 +146,13 @@ func HandleProfilePost(
 				render.EchoProfileForm(formUser, request)
 
 				bind := map[string]interface{}{
-					"user":      formUser,
-					"timezones": timezones,
-					"locales":   locales,
-					"page":      r.URL.Query().Get("page"),
-					"query":     r.URL.Query().Get("query"),
-					"error":     errorMessage,
+					"user":                 formUser,
+					"submittedDateOfBirth": &request.DateOfBirth,
+					"timezones":            timezones,
+					"locales":              locales,
+					"page":                 r.URL.Query().Get("page"),
+					"query":                r.URL.Query().Get("query"),
+					"error":                errorMessage,
 				}
 
 				err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_profile.html", bind)
