@@ -14,8 +14,10 @@ import {
   saveResourcePermissions,
   signInAsAdmin,
   submitNewClient,
+  submitNewGroup,
   submitNewResource,
   type NewClient,
+  type NewGroup,
 } from "./admin-console";
 import { env } from "./environment";
 import { userAgentFor } from "./devices";
@@ -40,11 +42,14 @@ export interface TestResource {
 export interface TestGroup {
   id: number;
   identifier: string;
+  markDeleted(): void;
 }
 
 export interface TestUser {
   id: number;
   email: string;
+  password: string;
+  markDeleted(): void;
 }
 
 interface Fixtures {
@@ -57,7 +62,8 @@ interface Fixtures {
     create(options?: { description?: string; permissions?: string[] }): Promise<TestResource>;
   };
   groups: {
-    create(): Promise<TestGroup>;
+    // Creates a group under a fresh identifier; both include switches on unless said otherwise.
+    create(options?: Omit<NewGroup, "identifier">): Promise<TestGroup>;
   };
   users: {
     // Creates a user with a password set, so no email is sent.
@@ -143,28 +149,27 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   },
 
   groups: async ({ context }, use) => {
-    const created: number[] = [];
+    const created: { id: number; deleted: boolean }[] = [];
     const page = await context.newPage();
 
     await use({
-      async create() {
+      async create(options = {}) {
         const identifier = uniqueIdentifier("g");
-        await page.goto(`${env.adminUrl}/admin/groups/new`);
-        await page.locator("#groupIdentifier").fill(identifier);
-        await page.locator("#btnCreate").click();
+        await submitNewGroup(page, { ...options, identifier });
         await expect(page).toHaveURL(`${env.adminUrl}/admin/groups`);
         const id = await idFromListLink(page, `${env.adminUrl}/admin/groups`, identifier, "Manage");
-        created.push(id);
-        return { id, identifier };
+        const entry = { id, deleted: false };
+        created.push(entry);
+        return { id, identifier, markDeleted: () => (entry.deleted = true) };
       },
     });
 
-    for (const id of created) await deleteGroup(page, id);
+    for (const group of created.filter((g) => !g.deleted)) await deleteGroup(page, group.id);
     await page.close();
   },
 
   users: async ({ context }, use) => {
-    const created: number[] = [];
+    const created: { id: number; deleted: boolean }[] = [];
     const page = await context.newPage();
 
     await use({
@@ -177,16 +182,18 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         // The choice between setting the password now and emailing a link is offered only with SMTP on.
         const setNow = page.locator("#setPasswordTypeNow");
         if ((await setNow.count()) > 0) await setNow.check();
-        await page.locator("#password").fill(randomBytes(18).toString("base64url"));
+        const password = randomBytes(18).toString("base64url");
+        await page.locator("#password").fill(password);
         await page.locator("#btnCreate").click();
         await expect(page).toHaveURL(/\/admin\/users\/\d+\/details/);
         const id = Number(page.url().match(/\/admin\/users\/(\d+)\/details/)![1]);
-        created.push(id);
-        return { id, email };
+        const entry = { id, deleted: false };
+        created.push(entry);
+        return { id, email, password, markDeleted: () => (entry.deleted = true) };
       },
     });
 
-    for (const id of created) await deleteUser(page, id);
+    for (const user of created.filter((u) => !u.deleted)) await deleteUser(page, user.id);
     await page.close();
   },
 });

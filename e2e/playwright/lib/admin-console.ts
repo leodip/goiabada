@@ -133,6 +133,63 @@ export async function submitNewResource(page: Page, identifier: string, descript
   await page.locator("#btnCreate").click();
 }
 
+export type GroupTab = "settings" | "attributes" | "members" | "permissions" | "delete";
+
+export function groupUrl(id: number, tab: GroupTab): string {
+  return `${env.adminUrl}/admin/groups/${id}/${tab}`;
+}
+
+export interface NewGroup {
+  identifier: string;
+  description?: string;
+  includeInAccessToken?: boolean;
+  includeInIdToken?: boolean;
+}
+
+// Fills and submits the new group form, leaving the page wherever the console answers. Both include
+// switches start on, as the form opens.
+export async function submitNewGroup(page: Page, group: NewGroup) {
+  await page.goto(`${env.adminUrl}/admin/groups/new`);
+  await page.locator("#groupIdentifier").fill(group.identifier);
+  await page.locator('input[name="description"]').fill(group.description ?? "");
+  await page.locator('input[name="includeInAccessToken"]').setChecked(group.includeInAccessToken ?? true);
+  await page.locator('input[name="includeInIdToken"]').setChecked(group.includeInIdToken ?? true);
+  await page.locator("#btnCreate").click();
+}
+
+export interface GroupAttribute {
+  key: string;
+  value: string;
+  includeInAccessToken?: boolean;
+  includeInIdToken?: boolean;
+}
+
+// Fills and submits an attribute form (add or edit) already open, leaving the page wherever the
+// console answers.
+export async function submitGroupAttributeForm(page: Page, attribute: GroupAttribute) {
+  await page.locator("#attributeKey").fill(attribute.key);
+  await page.locator('input[name="attributeValue"]').fill(attribute.value);
+  await page.locator('input[name="includeInAccessToken"]').setChecked(attribute.includeInAccessToken ?? true);
+  await page.locator('input[name="includeInIdToken"]').setChecked(attribute.includeInIdToken ?? true);
+  await page.locator("#btnSave").click();
+}
+
+export async function addGroupAttribute(page: Page, groupId: number, attribute: GroupAttribute) {
+  await page.goto(`${env.adminUrl}/admin/groups/${groupId}/attributes/add`);
+  await submitGroupAttributeForm(page, attribute);
+  await expect(page).toHaveURL(groupUrl(groupId, "attributes"));
+}
+
+// Adds a user to a group the way the Members tab does: search, Add to group, confirm.
+export async function addGroupMember(page: Page, groupId: number, email: string) {
+  await page.goto(`${env.adminUrl}/admin/groups/${groupId}/members/add`);
+  await page.locator("#search").pressSequentially(email.split("@")[0]);
+  const row = rowWithCell(page, email);
+  await row.getByRole("button", { name: "Add to group" }).click();
+  await page.locator("dialog[open]").getByRole("button", { name: "Yes" }).click();
+  await expect(row.getByText("In group")).toBeVisible();
+}
+
 // The Permissions tab's table row for a permission identifier.
 export function resourcePermissionRow(page: Page, identifier: string) {
   return page.locator("#permissionsTable tbody tr").filter({ has: page.getByRole("cell", { name: identifier, exact: true }) });
@@ -174,6 +231,22 @@ export async function grantClientPermission(page: Page, id: number, resource: st
   await addPermissionRow(page, resource, permission);
   await page.locator("#btnSave").click();
   await expect(page.getByText("Client permissions saved successfully")).toBeVisible();
+}
+
+// The same on a group's Permissions tab, which shares the client tab's controls.
+export async function grantGroupPermission(page: Page, id: number, resource: string, permission: string) {
+  await page.goto(groupUrl(id, "permissions"));
+  await addPermissionRow(page, resource, permission);
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Group permissions saved successfully")).toBeVisible();
+}
+
+// Sets the client's resource owner password credentials grant to on, whatever the global setting.
+export async function enablePasswordGrant(page: Page, id: number) {
+  await page.goto(clientUrl(id, "oauth2-flows"));
+  await page.locator('input[name="ropcEnabled"][value="on"]').check();
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Client OAuth2 flows saved successfully")).toBeVisible();
 }
 
 // Adds resource:permission to the Permissions tab's table, without saving. Choosing a resource

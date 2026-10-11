@@ -57,7 +57,7 @@ sign-in lands on the auth server's password page, and the test app hosts.
 after a failure, `(cd e2e/playwright && npx playwright show-report)` opens the report with traces.
 
 Tests sit under `playwright/tests/`, one folder per area (`admin-console/sign-in`,
-`admin-console/clients/`, `admin-console/resources/` so far). They run four at a time against an environment that stays up between
+`admin-console/clients/`, `admin-console/resources/`, `admin-console/groups/` so far). They run four at a time against an environment that stays up between
 runs, so every test keeps to these rules, which is what lets the suite run again and again without a
 reset:
 

@@ -25,6 +25,34 @@ export async function clientCredentialsToken(
   return { status: response.status(), body: await response.json() };
 }
 
+// The resource owner password credentials grant, authenticating the client with client_secret_basic:
+// the shortest way for a test to get a user's tokens without driving a browser sign-in.
+export async function passwordToken(
+  request: APIRequestContext,
+  clientId: string,
+  clientSecret: string,
+  username: string,
+  password: string,
+  scope: string,
+): Promise<TokenAnswer> {
+  const basic = Buffer.from(`${encodeURIComponent(clientId)}:${encodeURIComponent(clientSecret)}`).toString("base64");
+  const response = await request.post(`${env.authUrl}/auth/token`, {
+    form: { grant_type: "password", username, password, scope },
+    headers: { Authorization: `Basic ${basic}` },
+    failOnStatusCode: false,
+  });
+  return { status: response.status(), body: await response.json() };
+}
+
+// The userinfo endpoint, called with an access token as a bearer.
+export async function userinfo(request: APIRequestContext, accessToken: string): Promise<TokenAnswer> {
+  const response = await request.get(`${env.authUrl}/userinfo`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    failOnStatusCode: false,
+  });
+  return { status: response.status(), body: await response.json() };
+}
+
 // The claims of a JWT, unverified: the tests read what the server put in, they don't trust it.
 export function jwtClaims(token: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
