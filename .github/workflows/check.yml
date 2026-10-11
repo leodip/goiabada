@@ -33,6 +33,11 @@ on:
         description: Run the jobs that are otherwise push-only (release.yml passes true)
         type: boolean
         default: false
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_TOKEN:
+        required: false
 
 concurrency:
   group: check-${{ github.ref }}
