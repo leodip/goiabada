@@ -230,6 +230,34 @@ func TestComposeFile_ProbesTheDatabaseOverTCP(t *testing.T) {
 	}
 }
 
+// Every generated database healthcheck gives a fresh volume two minutes before a failure counts. It
+// asks over TCP, so it fails for as long as the image initialises, and twenty failures one second
+// apart turned a first start that took over 20 seconds unhealthy, failing docker compose up -d as a
+// socket healthcheck did (#551).
+func TestComposeFile_GivesTheDatabaseTimeToInitialise(t *testing.T) {
+	checked := 0
+	for _, testCase := range composeCases(t) {
+		config := testCase.config()
+		if !config.Engine.hasServer {
+			continue
+		}
+		t.Run(testCase.name, func(t *testing.T) {
+			doc := only[map[string]any](t, toAny(yamlDocuments(t, descriptionOf(config))), "the Compose file's documents")
+			healthcheck := at[map[string]any](t, doc, "services", config.Engine.composeService, "healthcheck")
+			if got := at[string](t, healthcheck, "start_period"); got != "120s" {
+				t.Errorf("the database's healthcheck has start_period %q, want 120s", got)
+			}
+			if _, ok := healthcheck["start_interval"]; ok {
+				t.Errorf("the database's healthcheck sets start_interval, which Docker Engine before 25 refuses")
+			}
+		})
+		checked++
+	}
+	if checked == 0 {
+		t.Fatal("no Compose golden case runs a database server, so this checked nothing")
+	}
+}
+
 // containsRun is whether run appears in fields as consecutive elements.
 func containsRun(fields, run []string) bool {
 	for i := 0; i+len(run) <= len(fields); i++ {

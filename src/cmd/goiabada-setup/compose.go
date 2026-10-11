@@ -20,6 +20,13 @@ const composeStopGracePeriod = "60s"
 // decision 5).
 const composeAuthServerStartPeriod = "300s"
 
+// composeDBStartPeriod is how long the database's healthcheck failures do not count while the image
+// initialises a fresh volume. The healthcheck asks over TCP, which nothing answers until the real
+// server listens, so without it twenty failures one second apart turned a first start that took
+// over 20 seconds unhealthy, and docker compose up -d failed as #551's did. A fresh MySQL volume
+// took 9 to 10 seconds on a development machine, PostgreSQL's 3 to 5 (#551).
+const composeDBStartPeriod = "120s"
+
 // composeDBTLSMode is the TLS mode every Compose file writes: the auth server's own default, written
 // so the auth server does not warn at every start, since the database is a service on the file's own
 // network and nothing the operator could set would change what reaches it (#502 decision 7).
@@ -73,6 +80,9 @@ func generateDBService(config *Config) string {
 	fmt.Fprintf(&sb, "      interval: %s\n", e.healthInterval)
 	fmt.Fprintf(&sb, "      timeout: %s\n", e.healthTimeout)
 	sb.WriteString("      retries: 20\n")
+	sb.WriteString("      # Up to 2 minutes for a fresh volume's first initialisation; failures in that window do\n")
+	sb.WriteString("      # not count, and the first success ends it.\n")
+	fmt.Fprintf(&sb, "      start_period: %s\n", composeDBStartPeriod)
 	sb.WriteString("    networks:\n")
 	sb.WriteString("      - goiabada-network\n\n")
 
