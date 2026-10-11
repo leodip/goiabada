@@ -74,6 +74,20 @@ func OpenDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, logSQL b
 	// later: three records saying the same thing, none of them structured (#320).
 	slog.InfoContext(ctx, "opening the database", "type", string(dialect))
 
+	// A start relying on the default mode says what it does not check, once, and how to make it
+	// check. A mode set on purpose, disable included, is the operator's choice and starts quietly,
+	// so the warning stays loud where it matters rather than repeating at every start of a
+	// deployment that has decided. SQLite has no connection to protect (#502).
+	if dialect != data.SQLite && dbConfig.TLSMode == "" {
+		slog.WarnContext(ctx, "the database tls mode is unset, so the auth server does not check whose database it reached",
+			"setting", "GOIABADA_DB_TLS_MODE",
+			"tls_mode", string(dbConfig.EffectiveTLSMode()),
+			"host", dbConfig.Host,
+			"remedy", "set GOIABADA_DB_TLS_MODE to verify-full to check the database's certificate, "+
+				"with GOIABADA_DB_TLS_CA_FILE naming its authority when that authority is private; "+
+				"set it to prefer to keep this behavior without the warning")
+	}
+
 	// Each arm takes the constructor's two results into a local pair and returns nil on the error
 	// path rather than returning the call directly: all four constructors answer a typed nil
 	// pointer beside their error, and returning that straight out would put a non-nil
@@ -150,6 +164,8 @@ func mysqlConfig(c *config.DatabaseConfig) *mysqldb.DatabaseConfig {
 		Name:     c.Name,
 		Create:   c.Create,
 		Pool:     serverPool(c),
+		TLSMode:  c.EffectiveTLSMode(),
+		TLSRoots: c.TLSRoots,
 	}
 }
 
@@ -175,6 +191,8 @@ func postgresConfig(c *config.DatabaseConfig) *postgresdb.DatabaseConfig {
 		Name:     c.Name,
 		Create:   c.Create,
 		Pool:     serverPool(c),
+		TLSMode:  c.EffectiveTLSMode(),
+		TLSRoots: c.TLSRoots,
 	}
 }
 
@@ -189,6 +207,8 @@ func mssqlConfig(c *config.DatabaseConfig) *mssqldb.DatabaseConfig {
 		Name:     c.Name,
 		Create:   c.Create,
 		Pool:     serverPool(c),
+		TLSMode:  c.EffectiveTLSMode(),
+		TLSRoots: c.TLSRoots,
 	}
 }
 

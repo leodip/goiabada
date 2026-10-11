@@ -2,6 +2,7 @@ package datafactory
 
 import (
 	"context"
+	"crypto/x509"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -42,8 +43,16 @@ func sourceConfig() *config.DatabaseConfig {
 		MaxIdleConns:    intPtr(17),
 		ConnMaxLifetime: 43 * time.Minute,
 		ConnMaxIdleTime: 7 * time.Minute,
+
+		TLSMode:   "verify-ca",
+		TLSCAFile: "source-ca-file",
+		TLSRoots:  sourceRoots,
 	}
 }
+
+// sourceRoots is the authorities sourceConfig's CA file held, compared by identity: a mapper hands
+// the engines the pool the load read rather than a copy of it.
+var sourceRoots = x509.NewCertPool()
 
 // sourcePool is the pool sourceConfig describes, written out rather than read off it, so a mapper
 // that read the wrong field cannot agree with the expectation by construction.
@@ -95,8 +104,8 @@ func assertMapping(t *testing.T, engine string, mapped any, cases []fieldCase) {
 		engine, declared, len(cases))
 }
 
-// TestMysqlConfig_CopiesEveryField is seam 2 for MySQL: all seven fields, Create and the pool
-// included. The loaded Type and DSN are not among them, because the engine reads neither, and the
+// TestMysqlConfig_CopiesEveryField is seam 2 for MySQL: all nine fields, Create, the pool and the
+// TLS mode and roots included (#502). The loaded Type and DSN are not among them, because the engine reads neither, and the
 // field count assertMapping pins is what says they stay out (#438 decision 3). SQLite has no
 // mapper: its constructor takes the DSN alone, and its pool is its own (#394).
 func TestMysqlConfig_CopiesEveryField(t *testing.T) {
@@ -111,6 +120,8 @@ func TestMysqlConfig_CopiesEveryField(t *testing.T) {
 		{"Name", got.Name, c.Name},
 		{"Create", got.Create, c.Create},
 		{"Pool", poolOf(got.Pool), sourcePool},
+		{"TLSMode", got.TLSMode, data.TLSVerifyCA},
+		{"TLSRoots", got.TLSRoots == sourceRoots, true},
 	})
 }
 
@@ -127,6 +138,8 @@ func TestPostgresConfig_CopiesEveryField(t *testing.T) {
 		{"Name", got.Name, c.Name},
 		{"Create", got.Create, c.Create},
 		{"Pool", poolOf(got.Pool), sourcePool},
+		{"TLSMode", got.TLSMode, data.TLSVerifyCA},
+		{"TLSRoots", got.TLSRoots == sourceRoots, true},
 	})
 }
 
@@ -143,6 +156,8 @@ func TestMssqlConfig_CopiesEveryField(t *testing.T) {
 		{"Name", got.Name, c.Name},
 		{"Create", got.Create, c.Create},
 		{"Pool", poolOf(got.Pool), sourcePool},
+		{"TLSMode", got.TLSMode, data.TLSVerifyCA},
+		{"TLSRoots", got.TLSRoots == sourceRoots, true},
 	})
 }
 

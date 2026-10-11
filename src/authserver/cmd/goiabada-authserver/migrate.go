@@ -45,8 +45,8 @@ const migrateUsage = `usage:
 
 Connection details come from the GOIABADA_DB_* environment variables or the --db-* flags
 (--db-type, --db-username, --db-password, --db-host, --db-port, --db-name, --db-dsn, --db-create,
-and the pool's --db-max-open-conns, --db-max-idle-conns, --db-conn-max-lifetime and
---db-conn-max-idle-time), given before or after migrate. A flag after migrate overrides the same flag before it. Every other
+the pool's --db-max-open-conns, --db-max-idle-conns, --db-conn-max-lifetime and
+--db-conn-max-idle-time, and the connection's --db-tls-mode and --db-tls-ca-file), given before or after migrate. A flag after migrate overrides the same flag before it. Every other
 flag goes before migrate.`
 
 // Exit codes. They are kept apart so a deployment script can tell a mistake in the invocation from
