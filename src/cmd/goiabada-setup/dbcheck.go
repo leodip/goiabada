@@ -21,6 +21,9 @@ type dbTarget struct {
 	Username string
 	Password string
 	Name     string
+	// TLSMode is GOIABADA_DB_TLS_MODE as the auth server will read it, empty for unset, which is
+	// prefer.
+	TLSMode string
 }
 
 // The connection strings below are copies of the auth server's, in
@@ -32,19 +35,29 @@ type dbTarget struct {
 // engine's dsn_test.go read it, so changing one side's builder alone fails that side.
 
 // postgresDSN is postgresdb.DSN: url.URL escapes what RFC 3986 section 3.2.1 admits no unescaped
-// `@`, `/`, `?`, `#` or `%` for in the userinfo, and hostport.Join brackets an IPv6 literal.
+// `@`, `/`, `?`, `#` or `%` for in the userinfo, hostport.Join brackets an IPv6 literal, and the
+// query carries the TLS mode, prefer while it is unset.
 func postgresDSN(t dbTarget) string { return postgresURL(t, t.Name) }
 
 // postgresMaintenanceDSN is postgresdb.MaintenanceDSN: the postgres database every cluster
 // carries, where the server looks for the application database and creates it.
 func postgresMaintenanceDSN(t dbTarget) string { return postgresURL(t, "postgres") }
 
+// postgresTLSQuery is postgresdb's tlsQuery: every key the connection's TLS is decided by after
+// sslmode, written so that no PGSSL* variable, service file or file under ~/.postgresql decides it.
+const postgresTLSQuery = "&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
+
 func postgresURL(t dbTarget, database string) string {
+	mode := t.TLSMode
+	if mode == "" {
+		mode = "prefer"
+	}
 	u := url.URL{
-		Scheme: "postgres",
-		User:   url.UserPassword(t.Username, t.Password),
-		Host:   hostport.Join(t.Host, t.Port),
-		Path:   "/" + database,
+		Scheme:   "postgres",
+		User:     url.UserPassword(t.Username, t.Password),
+		Host:     hostport.Join(t.Host, t.Port),
+		Path:     "/" + database,
+		RawQuery: "sslmode=" + url.QueryEscape(mode) + postgresTLSQuery,
 	}
 	return u.String()
 }

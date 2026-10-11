@@ -356,6 +356,11 @@ func loadMatrixRefusing(t *testing.T, env map[string]string, args []string) (*fl
 	for _, name := range nonLiveEnvVars {
 		unsetEnv(t, name)
 	}
+	// libpq's TLS variables stop a PostgreSQL start, so a developer's own cannot decide a case
+	// either (#502).
+	for name := range libpqTLSRefusals {
+		unsetEnv(t, name)
+	}
 	for key, value := range env {
 		t.Setenv(key, value)
 	}

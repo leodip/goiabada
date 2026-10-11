@@ -387,10 +387,10 @@ func (f optionalIntFlag) Set(s string) error {
 }
 
 // CheckDatabaseFlags refuses what the pool flags given on fs leave out of range, a malformed TLS
-// mode given on fs and a CA file the connection cannot use, in the one malformed-configuration line
-// Load answers with, and reads the CA file into c.TLSRoots. The `migrate` subcommand calls it after
-// its own parse of the --db-* flags, so a flag given after `migrate` is held to the rules one given
-// before it is (#394 decision 5, #502).
+// mode given on fs, a CA file the connection cannot use and, on PostgreSQL, libpq's TLS variables,
+// in the one malformed-configuration line Load answers with, and reads the CA file into c.TLSRoots.
+// The `migrate` subcommand calls it after its own parse of the --db-* flags, so a flag given after
+// `migrate` is held to the rules one given before it is (#394 decision 5, #502).
 func CheckDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig) error {
 	var malformed malformedValues
 	checkDatabaseFlags(fs, c, &malformed)
@@ -430,6 +430,40 @@ func checkDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig, malformed *malforme
 		malformed.add("--db-tls-mode", v, tlsModeWant())
 	}
 	readDatabaseTLSRoots(c, malformed)
+	refuseLibpqTLSVariables(c, malformed)
+}
+
+// libpqTLSVariables are libpq's TLS variables, each with what to do instead, in the words of the
+// refusal. The PostgreSQL connection's TLS is GOIABADA_DB_TLS_MODE and GOIABADA_DB_TLS_CA_FILE and
+// nothing else, so none of these is read any more (#502 decision 5).
+var libpqTLSVariables = []struct{ name, instead string }{
+	{"PGSSLMODE", "unset it and set GOIABADA_DB_TLS_MODE (--db-tls-mode) instead"},
+	{"PGSSLROOTCERT", "unset it and set GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) instead"},
+	{"PGSSLCERT", libpqNoClientCertificate},
+	{"PGSSLKEY", libpqNoClientCertificate},
+	{"PGSSLPASSWORD", libpqNoClientCertificate},
+	{"PGSSLSNI", "unset it; " + libpqTLSSettings},
+	{"PGSSLNEGOTIATION", "unset it; " + libpqTLSSettings},
+}
+
+const (
+	libpqTLSSettings         = "GOIABADA_DB_TLS_MODE (--db-tls-mode) and GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) decide the connection's TLS"
+	libpqNoClientCertificate = "unset it; the auth server presents no client certificate, and " + libpqTLSSettings
+)
+
+// refuseLibpqTLSVariables stops a PostgreSQL start that has any of libpq's TLS variables set and
+// non-empty, as pgx itself reads them, naming each and never its value, which for PGSSLPASSWORD is a
+// secret. The connection no longer reads them, so an operator who set PGSSLMODE=verify-full, as
+// Database once advised, is stopped rather than dropped to prefer in silence (#502 decision 5).
+func refuseLibpqTLSVariables(c *DatabaseConfig, malformed *malformedValues) {
+	if dialect, err := data.ParseDialect(c.Type); err != nil || dialect != data.Postgres {
+		return
+	}
+	for _, v := range libpqTLSVariables {
+		if os.Getenv(v.name) != "" {
+			malformed.addLine(v.name + " is set, which the auth server no longer reads: " + v.instead)
+		}
+	}
 }
 
 // tlsModeWant is what a malformed mode is refused as not being.

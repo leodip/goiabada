@@ -51,6 +51,19 @@ func TestMain_RefusesTheConnectionsTLSSettingsBeforeOpeningAnything(t *testing.T
 			want: `malformed configuration: GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) is "` + missing +
 				`" while GOIABADA_DB_TLS_MODE (--db-tls-mode) is require, which checks no certificate: only verify-ca and verify-full read a CA file` + "\n",
 		},
+		{
+			name: "one of libpq's TLS variables on postgres, under migrate up",
+			env:  []string{"PGSSLMODE=verify-full"},
+			args: []string{"migrate", "up"},
+			want: "malformed configuration: PGSSLMODE is set, which the auth server no longer reads: " +
+				"unset it and set GOIABADA_DB_TLS_MODE (--db-tls-mode) instead\n",
+		},
+		{
+			name: "one of libpq's TLS variables on postgres, at the server",
+			env:  []string{"PGSSLROOTCERT=" + missing},
+			want: "malformed configuration: PGSSLROOTCERT is set, which the auth server no longer reads: " +
+				"unset it and set GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) instead\n",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

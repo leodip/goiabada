@@ -30,10 +30,12 @@ type connectionStringCase struct {
 	Database       string `json:"database"`
 	DSN            string `json:"dsn"`
 	MaintenanceDSN string `json:"maintenanceDSN"`
+	// TLSMode is GOIABADA_DB_TLS_MODE, empty for a case that leaves it unset, which is prefer.
+	TLSMode string `json:"tlsMode"`
 }
 
 func (c connectionStringCase) target() dbTarget {
-	return dbTarget{Host: c.Host, Port: c.Port, Username: c.Username, Password: c.Password, Name: c.Database}
+	return dbTarget{Host: c.Host, Port: c.Port, Username: c.Username, Password: c.Password, Name: c.Database, TLSMode: c.TLSMode}
 }
 
 func readConnectionStringCases(t *testing.T) []connectionStringCase {
@@ -102,6 +104,7 @@ func TestConnectionStrings_TheDriverReadsTheCaseBack(t *testing.T) {
 						t.Fatalf("%s %q: %v", conn.which, conn.dsn, err)
 					}
 					user, password, gotHost, port, database = parsed.User, parsed.Password, parsed.Host, int(parsed.Port), parsed.Database
+					checkPostgresTLS(t, conn.which, c, parsed)
 				case "mysql":
 					parsed, err := mysqldriver.ParseDSN(conn.dsn)
 					if err != nil {
@@ -132,6 +135,44 @@ func TestConnectionStrings_TheDriverReadsTheCaseBack(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// checkPostgresTLS holds what pgx reads out of a case's string to the case's mode, as #502
+// decision 2 defines it: whether the connection is encrypted, whether the certificate and the host
+// are checked, and whether plain text follows a failed TLS attempt.
+func checkPostgresTLS(t *testing.T, which string, c connectionStringCase, parsed *pgx.ConnConfig) {
+	t.Helper()
+	mode := c.TLSMode
+	if mode == "" {
+		mode = "prefer"
+	}
+	tlsConfig := parsed.TLSConfig
+	plainTextAfter := len(parsed.Fallbacks) > 0 && parsed.Fallbacks[len(parsed.Fallbacks)-1].TLSConfig == nil
+	var got string
+	switch {
+	case tlsConfig == nil && len(parsed.Fallbacks) == 0:
+		got = "disable"
+	case tlsConfig == nil:
+		got = "plain text first"
+	case tlsConfig.InsecureSkipVerify && tlsConfig.VerifyPeerCertificate == nil && plainTextAfter:
+		got = "prefer"
+	case len(parsed.Fallbacks) > 0:
+		got = "TLS with a fallback"
+	case tlsConfig.InsecureSkipVerify && tlsConfig.VerifyPeerCertificate == nil:
+		got = "require"
+	case tlsConfig.InsecureSkipVerify:
+		got = "verify-ca"
+	case tlsConfig.ServerName == strings.Trim(c.Host, "[]"):
+		got = "verify-full"
+	default:
+		got = "a certificate check naming no host"
+	}
+	if got != mode {
+		t.Errorf("%s reads back as %s, want %s", which, got, mode)
+	}
+	if tlsConfig != nil && (tlsConfig.RootCAs != nil || len(tlsConfig.Certificates) > 0) {
+		t.Errorf("%s carries roots or a client certificate the string cannot have named", which)
 	}
 }
 

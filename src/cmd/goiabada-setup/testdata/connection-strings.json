@@ -8,8 +8,8 @@
       "username": "goiabada",
       "password": "plain-Passw0rd",
       "database": "goiabada",
-      "dsn": "postgres://goiabada:plain-Passw0rd@db.example.com:5432/goiabada",
-      "maintenanceDSN": "postgres://goiabada:plain-Passw0rd@db.example.com:5432/postgres"
+      "dsn": "postgres://goiabada:plain-Passw0rd@db.example.com:5432/goiabada?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:plain-Passw0rd@db.example.com:5432/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
     },
     {
       "name": "every special character in the password",
@@ -19,8 +19,8 @@
       "username": "goiabada",
       "password": "p@ss/w?rd#%41: 'q\"&=+;\\x",
       "database": "goiabada",
-      "dsn": "postgres://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:5432/goiabada",
-      "maintenanceDSN": "postgres://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:5432/postgres"
+      "dsn": "postgres://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:5432/goiabada?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:5432/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
     },
     {
       "name": "at in the username",
@@ -30,8 +30,8 @@
       "username": "us@r",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "postgres://us%40r:pw@db.example.com:5432/goiabada",
-      "maintenanceDSN": "postgres://us%40r:pw@db.example.com:5432/postgres"
+      "dsn": "postgres://us%40r:pw@db.example.com:5432/goiabada?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://us%40r:pw@db.example.com:5432/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
     },
     {
       "name": "database name at the validator's limit",
@@ -41,8 +41,8 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres"
+      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
     },
     {
       "name": "a port other than the default",
@@ -52,8 +52,8 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "postgres://goiabada:pw@10.0.0.5:15000/goiabada",
-      "maintenanceDSN": "postgres://goiabada:pw@10.0.0.5:15000/postgres"
+      "dsn": "postgres://goiabada:pw@10.0.0.5:15000/goiabada?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@10.0.0.5:15000/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
     },
     {
       "name": "bare IPv6 host",
@@ -63,8 +63,8 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "postgres://goiabada:pw@[::1]:5432/goiabada",
-      "maintenanceDSN": "postgres://goiabada:pw@[::1]:5432/postgres"
+      "dsn": "postgres://goiabada:pw@[::1]:5432/goiabada?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@[::1]:5432/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
     },
     {
       "name": "bracketed IPv6 host",
@@ -74,8 +74,68 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "postgres://goiabada:pw@[::1]:5432/goiabada",
-      "maintenanceDSN": "postgres://goiabada:pw@[::1]:5432/postgres"
+      "dsn": "postgres://goiabada:pw@[::1]:5432/goiabada?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@[::1]:5432/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
+    },
+    {
+      "name": "tls mode disable",
+      "engine": "postgres",
+      "host": "db.example.com",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "disable",
+      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada?sslmode=disable&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres?sslmode=disable&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
+    },
+    {
+      "name": "tls mode prefer",
+      "engine": "postgres",
+      "host": "db.example.com",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "prefer",
+      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
+    },
+    {
+      "name": "tls mode require",
+      "engine": "postgres",
+      "host": "db.example.com",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "require",
+      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada?sslmode=require&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres?sslmode=require&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
+    },
+    {
+      "name": "tls mode verify-ca",
+      "engine": "postgres",
+      "host": "db.example.com",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "verify-ca",
+      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada?sslmode=verify-ca&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres?sslmode=verify-ca&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
+    },
+    {
+      "name": "tls mode verify-full",
+      "engine": "postgres",
+      "host": "db.example.com",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "verify-full",
+      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada?sslmode=verify-full&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres?sslmode=verify-full&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
     },
     {
       "name": "plain",
