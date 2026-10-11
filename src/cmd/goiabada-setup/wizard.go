@@ -528,9 +528,11 @@ func (w *wizard) askRateLimiter() error {
 		return nil
 	}
 	w.out.println("The auth server always limits, per user, wrong one-time codes, password checks on the")
-	w.out.println("Account pages, email verification codes and verification mails. Its rate limiter adds")
-	w.out.println("limits per client address on sign-ins, password resets, self-registrations and client")
-	w.out.println("registrations, and on wrong passwords per email.")
+	w.out.println("Account pages, email verification codes and verification mails, and, per email, wrong")
+	w.out.println("passwords (100 an hour), password-reset mails and registration notices. Its rate limiter")
+	w.out.println("adds limits per client address on sign-ins, password resets, self-registrations and")
+	w.out.println("client registrations, and on wrong passwords per email from one network (10 per 15")
+	w.out.println("minutes).")
 	if w.config.Deployment.servedByEnvoyGateway {
 		if defaultOn {
 			w.out.println("Under the Local traffic policy Goiabada sees each client's address, so the per-IP")
@@ -542,9 +544,8 @@ func (w *wizard) askRateLimiter() error {
 			w.out.println("limits count every user the load balancer sends through one node together (30 password")
 			w.out.println("posts a minute and 20 forgot-password requests per 5 minutes per node, for example),")
 			w.out.println("which throttles sign-ins on a busy site. That is why it is off by default here.")
-			w.out.println("Off, nothing limits guessing a user's password. On, every client through a node counts")
-			w.out.println("as one network, so anyone who knows an email can block its password sign-ins for 15")
-			w.out.println("minutes with 10 wrong passwords.")
+			w.out.println("On, every client through a node counts as one network, so 10 wrong passwords block an")
+			w.out.println("email's password sign-ins for 15 minutes for every client through a node.")
 		}
 	}
 	w.out.printf("The limits are listed at %s\n", rateLimitsDocsURL)
