@@ -92,6 +92,14 @@ func TestValidateTokenRequest_RefreshToken_ManageAccountConsent(t *testing.T) {
 			permissionScope: "authserver:manage-account",
 		},
 		{
+			// A replay of a rotated token. Refused here, it would never reach the containment that
+			// revokes its live successor, which would then refresh on narrowed to leave
+			// manage-account out. Containment refuses it instead.
+			name:            "a revoked token is handed on to replay containment, no consent is read",
+			grant:           storedGrant{scope: "openid authserver:manage-account", revoked: true},
+			permissionScope: "authserver:manage-account",
+		},
+		{
 			// The user typed the password into the client, which skips consent today (decision 3).
 			name:            "a password grant's token is not asked",
 			grant:           storedGrant{ropc: true, scope: "openid authserver:manage-account"},

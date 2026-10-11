@@ -71,7 +71,7 @@ An application that asks the auth server for tokens: your app, an API calling an
 
 ### Consent
 
-A user's approval for a client to receive what it asked for. The auth server asks for it when the client has "Consent required" turned on, when the client asks for `offline_access`, or when the request says `prompt=consent`. Users can revoke a consent under "Manage consents" in their account.
+A user's approval for a client to receive what it asked for. The auth server asks for it when the client has "Consent required" turned on, when the client asks for `offline_access`, or when the request says `prompt=consent`. It also asks when a client other than the admin console's asks for `authserver:manage-account` and the user hasn't approved that scope for it yet. See [Consent required](/concepts/clients/#consent-required) for the full rule. Users can revoke a consent under "Manage consents" in their account.
 
 ### Dynamic client registration (DCR)
 

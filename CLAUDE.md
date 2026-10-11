@@ -171,7 +171,7 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 | `authentication_completed` | `HandleAuthLevel1CompletedGet` | no step-up needed |
 | | `HandleAuthLevel2Get` | `level2_optional` and no OTP enrolled, which is the skip that bypasses `/auth/otp` entirely |
 | | `HandleAuthOtpPost` | OTP verified or enrolled |
-| `requires_consent` | `HandleAuthCompletedGet` | `prompt=consent`, or `client.ConsentRequired`, or `offline_access` in scope |
+| `requires_consent` | `HandleAuthCompletedGet` | `prompt=consent`, or `client.ConsentRequired`, or `offline_access` in scope, or `authserver:manage-account` still in scope, the client not the admin console's, and no stored consent covering it (`userconsent.AlwaysOwed`, #509) |
 | `ready_to_issue_code` | `handlePromptNone` | every silent check passed, skipping every hop between |
 | | `HandleAuthCompletedGet` | no consent needed |
 | | `HandleConsentGet` | scope already fully consented, no `offline_access`, no `prompt=consent` |

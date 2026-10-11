@@ -216,3 +216,71 @@ func TestToken_ManageAccount_APasswordGrantRefreshTokenIsNotAsked(t *testing.T) 
 	require.Equal(t, http.StatusOK, status, "the password grant's token refreshes: %v", body)
 	assert.Equal(t, "openid authserver:manage-account", body["scope"])
 }
+
+// A replay of a rotated manage-account token is contained whatever the consent now says: the
+// family is recorded as revoked and the live successor with it, so the successor refreshes no
+// further even narrowed to leave manage-account out. The consent re-check must not answer the
+// replay first, which left the successor live (#509 review R1-1). The client is public, the shape
+// rotation exists to protect (RFC 9700 sections 2.2.2 and 4.14.2), and the covering consent is the
+// control.
+func TestToken_ManageAccount_AReplayIsContainedWhateverTheConsent(t *testing.T) {
+	for _, change := range []string{"consent still covers it", "consent withdrawn", "consent leaves manage-account out"} {
+		t.Run(change, func(t *testing.T) {
+			f := newManageAccountConsentFixture(t, false)
+			f.client.IsPublic = true
+			f.client.ClientSecretEncrypted = nil
+			require.NoError(t, database.UpdateClient(context.Background(), nil, f.client))
+			f.signIn(t)
+
+			const scope = "openid profile authserver:manage-account"
+			consentURL, page := f.toConsentScreen(t, f.link("code", scope, ""))
+			defer func() { _ = page.Body.Close() }()
+			require.Equal(t, []string{"openid", "profile", "authserver:manage-account"}, scopesOnScreen(t, page))
+			resp := postConsent(t, f.browser, consentURL, page, []int{0, 1, 2})
+			defer func() { _ = resp.Body.Close() }()
+			location := assertRedirect(t, resp, "/auth/issue")
+			resp = loadPage(t, f.browser, location)
+			defer func() { _ = resp.Body.Close() }()
+			code, _ := getCodeAndStateFromUrl(t, resp)
+			tokens := postToTokenEndpoint(t, f.browser, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+				"grant_type":    {"authorization_code"},
+				"client_id":     {f.client.ClientIdentifier},
+				"code":          {code},
+				"redirect_uri":  {manageAccountRedirectURI},
+				"code_verifier": {testCodeVerifier},
+			})
+			parent, ok := tokens["refresh_token"].(string)
+			require.True(t, ok, "the public client's code grants a refresh token")
+			child := rotateRefreshToken(t, f.browser, f.client.ClientIdentifier, "", parent)
+			first := refreshTokenRowByJti(t, parent).FirstRefreshTokenJti
+			require.False(t, refreshTokenRowByJti(t, child).Revoked)
+
+			consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, f.user.Id, f.client.Id)
+			require.NoError(t, err)
+			require.NotNil(t, consent)
+			switch change {
+			case "consent withdrawn":
+				require.NoError(t, database.DeleteUserConsent(context.Background(), nil, consent.Id))
+			case "consent leaves manage-account out":
+				consent.Scope = "openid profile"
+				require.NoError(t, database.UpdateUserConsent(context.Background(), nil, consent))
+			}
+
+			status, body := replayRefreshToken(t, f.browser, f.client.ClientIdentifier, "", parent)
+			assertRefusedAsInvalidGrant(t, status, body, "the retired parent")
+			recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, first)
+			require.NoError(t, err)
+			assert.True(t, recorded, "the replay records the family as revoked")
+			assert.True(t, refreshTokenRowByJti(t, child).Revoked, "the replay revokes the live successor")
+
+			status, body = refreshWithScope(t, f.browser, f.client.ClientIdentifier, "", child, "openid profile")
+			// The messages name the error alone: on failure the body holds live tokens.
+			assert.Equal(t, http.StatusBadRequest, status, "the contained successor refreshes no further: %v", body["error"])
+			assert.Equal(t, "invalid_grant", body["error"])
+			_, hasAccessToken := body["access_token"]
+			_, hasRefreshToken := body["refresh_token"]
+			assert.False(t, hasAccessToken, "the contained successor gets no access token")
+			assert.False(t, hasRefreshToken, "the contained successor gets no refresh token")
+		})
+	}
+}
