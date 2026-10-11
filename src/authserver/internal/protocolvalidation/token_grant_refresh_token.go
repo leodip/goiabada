@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/userconsent"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -426,8 +427,18 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	// For auth code flow tokens, check consent if required. Both the lookup arguments and the consent
 	// scope list are loop-invariant, so fetch and split the consent once here instead of on every
 	// scope iteration.
+	//
+	// consentEveryScope is the client's own rule: every scope is re-checked when the client requires
+	// consent or the token is offline. owed is what is re-checked whatever the client says,
+	// authserver:manage-account to any client but the admin console's, judged on the scope this
+	// refresh would issue, so a refresh narrowed to leave it out reads no consent (#509 decision 3).
+	// A token issued before the upgrade gets no exception: nothing in it tells one obtained with no
+	// consent from one obtained with it. The refusals are a client requiring consent's, and come
+	// before the token is spent.
 	var scopesFromConsent []string
-	consentCheckRequired := !isROPCToken && (client.ConsentRequired || refreshTokenType == issuance.TokenTypeOffline.String())
+	consentEveryScope := client.ConsentRequired || refreshTokenType == issuance.TokenTypeOffline.String()
+	owed := userconsent.AlwaysOwed(client.ClientIdentifier, scopes)
+	consentCheckRequired := !isROPCToken && (consentEveryScope || len(owed) > 0)
 	if consentCheckRequired {
 		consent, err := val.database.GetConsentByUserIdAndClientId(ctx, nil, tokenUserId, tokenClientId)
 		if err != nil {
@@ -472,7 +483,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		}
 
 		// check if user still consents to this scope
-		if consentCheckRequired {
+		if consentCheckRequired && (consentEveryScope || slices.Contains(owed, inputScopeStr)) {
 			consentScopeExists := false
 			for _, scopeFromConsent := range scopesFromConsent {
 				if scopeFromConsent == inputScopeStr {
