@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -25,6 +26,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/metrics"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -924,4 +926,72 @@ func TestInitRoutes_TheDefaultConfigurationLimitsWhatAnEmailCounts(t *testing.T)
 				"password grant %d", i+1)
 		}
 	})
+}
+
+// While registration is unavailable, both registration routes are a 404 ahead of the limiter, as
+// forgot-password is without email: past both of LimitRegister's budgets, one address and one client
+// block, every request is still answered 404 with its one Warn record and no audit entry, never 429,
+// and once registration opens the same address and block find their budgets unspent (#526 decision 2).
+// Behind the limiter, as the check first sat in the handlers, the sixth request for one address was a
+// 429 with a rate_limit_exceeded entry, and five refusals spent the budget registration opened with.
+func TestInitRoutes_UnavailableRegistrationSpendsNoBudget(t *testing.T) {
+	budgets := []struct {
+		name  string
+		check func(t *testing.T, server *Server)
+	}{
+		{"the address's budget is unspent", func(t *testing.T, server *Server) {
+			assertRefused(t, exhaust(t, server, registerEmailBudget, func(int) *http.Request {
+				return browserForm(http.MethodPost, "/account/register", "email=one@example.com")
+			}), registerWindow, shapeBrowser)
+		}},
+		{"the client block's budget is unspent", func(t *testing.T, server *Server) {
+			assertRefused(t, exhaust(t, server, registerBudget, registrationOf), registerWindow, shapeBrowser)
+		}},
+	}
+
+	for _, tc := range []struct {
+		name    string
+		message string
+		edit    func(*record.Settings)
+	}{
+		{"self-registration off", "self-registration request refused because self-registration is disabled",
+			func(s *record.Settings) { s.SelfRegistrationEnabled = false }},
+		{"verification required with email off", "self-registration request refused because email is not set up",
+			func(s *record.Settings) {
+				s.SelfRegistrationRequiresEmailVerification = true
+				s.SMTPEnabled = false
+			}},
+	} {
+		for _, budget := range budgets {
+			t.Run(tc.name+", "+budget.name, func(t *testing.T) {
+				server := newRoutesTestServer(t)
+				unavailable := func(r *http.Request) *http.Request {
+					settings := routesTestSettings()
+					// An audit entry would be a record of its own, so the one-record check refuses it.
+					settings.AuditLogsInConsoleEnabled = true
+					tc.edit(settings)
+					return r.WithContext(reqctx.WithSettings(r.Context(), settings))
+				}
+				assertRefusedAsNotFound := func(r *http.Request, what string) {
+					t.Helper()
+					logs := logtest.CaptureSlog(t)
+					assert.Equal(t, http.StatusNotFound, serve(server, unavailable(r)).Code, what)
+					records := logs.Records()
+					if assert.Len(t, records, 1, "%s: one record and no audit entry: %s", what, logs.Text()) {
+						assert.Equal(t, slog.LevelWarn, records[0].Level, what)
+						assert.Equal(t, tc.message, records[0].Message, what)
+					}
+				}
+
+				// One address throughout, so by the end both tiers have seen more than their budget.
+				for i := 0; i < registerBudget+3; i++ {
+					assertRefusedAsNotFound(browserForm(http.MethodPost, "/account/register", "email=one@example.com"),
+						fmt.Sprintf("submission %d", i+1))
+				}
+				assertRefusedAsNotFound(browserRequest(http.MethodGet, "/account/register"), "the page")
+
+				budget.check(t, server)
+			})
+		}
+	}
 }
