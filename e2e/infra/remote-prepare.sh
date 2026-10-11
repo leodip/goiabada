@@ -104,16 +104,23 @@ log "pulling images"
 docker compose pull --quiet >pull.log 2>&1 || { cat pull.log >&2; fail "docker compose pull failed"; }
 
 log "starting"
-# On a fresh volume the first up -d can fail: PostgreSQL's healthcheck passes against the image's
-# init server, and the auth server's first connection is refused (#551). The auth server restarts on
-# its own; a second up -d starts the admin console.
-for attempt in 1 2 3; do
+# v1.7.0's wizard wrote PostgreSQL's healthcheck over the socket, which passes against the image's
+# init server on a fresh volume, so the auth server's first connection is refused and the first up -d
+# fails (#551); the auth server restarts on its own and a second up -d starts the admin console. Later
+# wizards probe over TCP, and a failed first up -d from their files is that bug back, so only a file
+# still carrying v1.7.0's healthcheck is retried. The string is frozen in that release.
+attempts=1
+if grep -qF '"pg_isready -U postgres"' docker-compose.yml; then
+  attempts=3
+  log "docker-compose.yml probes PostgreSQL over the socket, as v1.7.0 wrote it (#551): a failed up -d is retried"
+fi
+for ((attempt = 1; ; attempt++)); do
   if docker compose up -d >up.log 2>&1; then
     break
   fi
-  if ((attempt == 3)); then
+  if ((attempt == attempts)); then
     cat up.log >&2
-    fail "docker compose up -d failed three times"
+    fail "docker compose up -d failed (attempt $attempt of $attempts)"
   fi
   log "WARN docker compose up -d failed (attempt $attempt), retrying in 10s: $(tail -1 up.log)"
   sleep 10
