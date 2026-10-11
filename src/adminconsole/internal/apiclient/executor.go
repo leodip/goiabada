@@ -30,8 +30,7 @@ const generalAPITimeout = 10 * time.Second
 // kind rather than four.
 //
 // ceiling: what it holds, measured on generously populated list elements, is roughly 3,100 groups,
-// 5,100 resources, 2,500 permissions on one resource, 1,300 users and the 250-row phone country
-// table nine times over. Paged endpoints are clamped server side at 200 rows a page, so the
+// 5,100 resources, 2,500 permissions on one resource and 1,300 users. Paged endpoints are clamped server side at 200 rows a page, so the
 // largest paged response is about 163 KiB and only the unpaginated lists scale with the install.
 // Revisit when an install's unpaginated lists approach those counts: exceeding this is a hard
 // failure and reaches the administrator as a 500 on an admin page, and the same event is the one

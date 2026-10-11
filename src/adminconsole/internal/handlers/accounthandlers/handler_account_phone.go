@@ -9,14 +9,15 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/phonecountries"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-// accountPhoneAPI is what the account phone page needs: the profile, the country list, and the
-// phone write.
+// accountPhoneAPI is what the account phone page needs: the profile and the phone write. The
+// country list is core's, as the address page's is: the admin API's copy of it refuses a token
+// carrying authserver:manage-account alone, which is every user who is not an administrator (#563).
 type accountPhoneAPI interface {
 	GetAccountProfile(ctx context.Context, accessToken string) (*api.UserResponse, error)
-	GetPhoneCountries(ctx context.Context, accessToken string) ([]api.PhoneCountryResponse, error)
 	UpdateAccountPhone(ctx context.Context, accessToken string, request *api.UpdateAccountPhoneRequest) (*api.UserResponse, error)
 }
 
@@ -25,6 +26,8 @@ func HandlePhoneGet(
 	httpSession sessionstore.Store,
 	apiClient accountPhoneAPI,
 ) http.HandlerFunc {
+	phoneCountries := phonecountries.All()
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
@@ -34,13 +37,6 @@ func HandlePhoneGet(
 		}
 
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
-		if err != nil {
-			render.HandleAPIError(httpHelper, w, r, err)
-			return
-		}
-
-		// Fetch phone countries via existing admin API
-		phoneCountries, err := apiClient.GetPhoneCountries(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -80,18 +76,13 @@ func HandlePhonePost(
 	apiClient accountPhoneAPI,
 	baseURL string,
 ) http.HandlerFunc {
+	phoneCountries := phonecountries.All()
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get access token and current data for re-rendering errors
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
 			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
-			return
-		}
-
-		// Load phone countries for error rendering
-		phoneCountries, err := apiClient.GetPhoneCountries(r.Context(), jwtInfo.TokenResponse.AccessToken)
-		if err != nil {
-			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -115,7 +106,7 @@ func HandlePhonePost(
 		}
 
 		// Call API
-		_, err = apiClient.UpdateAccountPhone(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
+		_, err := apiClient.UpdateAccountPhone(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

@@ -140,7 +140,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `GetGroupResponse` | both-apps | — |
 | `core/api` | `GetGroupsResponse` | both-apps | — |
 | `core/api` | `GetPermissionsByResourceResponse` | both-apps | — |
-| `core/api` | `GetPhoneCountriesResponse` | both-apps | — |
+| `core/api` | `GetPhoneCountriesResponse` | contract | The response of `GET /api/v1/admin/phone-countries`, a published admin API route that stays when the admin console stops calling it, because its pages build the list from `core/phonecountries` (#563 decisions 1 and 2). The auth server writes it and no admin console file reads it. |
 | `core/api` | `GetResourceResponse` | both-apps | — |
 | `core/api` | `GetResourcesResponse` | both-apps | — |
 | `core/api` | `GetSettingsKeysResponse` | both-apps | — |
@@ -157,7 +157,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `GroupResponse` | both-apps | — |
 | `core/api` | `GroupWithPermissionResponse` | both-apps | — |
 | `core/api` | `PermissionResponse` | both-apps | — |
-| `core/api` | `PhoneCountryResponse` | both-apps | — |
+| `core/api` | `PhoneCountryResponse` | contract | The element of `GET /api/v1/admin/phone-countries`, a published admin API route that stays when the admin console stops calling it, because its pages build the list from `core/phonecountries` (#563 decisions 1 and 2). The auth server writes it and no admin console file reads it. |
 | `core/api` | `ProfilePictureInfoResponse` | both-apps | — |
 | `core/api` | `ProfilePictureUploadResponse` | both-apps | — |
 | `core/api` | `PublicSettingsResponse` | both-apps | — |
@@ -466,9 +466,9 @@ command itself and fails on a tree it changed.
 | `core/oauth` | `NewErrorDetailWithHTTPStatus` | both-apps | — |
 | `core/oauth` | `SplitSpaceDelimited` | kernel | — |
 | `core/oauth` | `TokenResponse` | both-apps | — |
-| `core/phonecountries` | `All` | contract | The phone country list both applications offer a user: the auth server validates and stores its ids, and the admin console's two phone pages are to build their list from it instead of asking the admin API, which refuses a token carrying `authserver:manage-account` alone (#563 decision 1). Until they do, only the auth server names it. |
+| `core/phonecountries` | `All` | both-apps | — |
 | `core/phonecountries` | `ByUniqueID` | contract | The lookup half of the phone country list, by the id the user row stores (`users.phone_number_country_uniqueid`). Moving it would put one list, whose ids are stored data, in two places (#563 decision 1). |
-| `core/phonecountries` | `PhoneCountry` | contract | The phone country list's element type, whose `UniqueId` is the id the admin console sends in a phone save and the auth server stores. Until the console's phone pages name it, only the auth server does (#563 decision 1). |
+| `core/phonecountries` | `PhoneCountry` | own-package | — |
 | `core/securerandom` | `String` | both-apps | — |
 | `core/securerandom` | `StringFromAlphabet` | own-package | — |
 | `core/sessionstore` | `Backend` | kernel | — |

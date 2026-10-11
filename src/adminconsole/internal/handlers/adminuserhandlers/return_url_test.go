@@ -118,10 +118,6 @@ func (returnURLStubApiClient) CreateUserAdmin(_ context.Context, _ string,
 	return &api.UserResponse{Id: 7}, nil
 }
 
-func (returnURLStubApiClient) GetPhoneCountries(_ context.Context, _ string) ([]api.PhoneCountryResponse, error) {
-	return []api.PhoneCountryResponse{}, nil
-}
-
 func (returnURLStubApiClient) UpdateUserPhone(_ context.Context, _ string, userId int64,
 	_ *api.UpdateUserPhoneRequest) (*api.UserResponse, error) {
 	return &api.UserResponse{Id: userId}, nil

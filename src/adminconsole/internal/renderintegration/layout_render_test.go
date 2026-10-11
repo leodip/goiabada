@@ -13,6 +13,7 @@ import (
 	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/phonecountries"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
@@ -61,7 +62,7 @@ func TestRender_JSBootstrapNoKeyLeak(t *testing.T) {
 	bind := map[string]interface{}{
 		"selectedPhoneCountryUniqueId": "",
 		"phoneNumber":                  "",
-		"phoneCountries":               []api.PhoneCountryResponse{},
+		"phoneCountries":               []phonecountries.PhoneCountry{},
 		"savedSuccessfully":            false,
 	}
 	out := renderMenuPage(t, "/account_phone.html", bind)
