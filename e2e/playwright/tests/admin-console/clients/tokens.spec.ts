@@ -37,8 +37,6 @@ test("the token expiration set here is the lifetime the token endpoint gives", a
 
   await page.goto(clientUrl(client.id, "tokens"));
   await page.locator("#tokenExpirationInSeconds").fill("123");
-  // Chosen explicitly: a new client has none selected (see the test above).
-  await page.locator('input[name="includeOpenIDConnectClaimsInIdToken"][value="default"]').check();
   await saveAndExpectSaved(page, saved);
 
   const secret = await readClientSecret(page, client.id);
@@ -55,7 +53,6 @@ for (const { value, message } of [
     const client = await clients.create();
     await page.goto(clientUrl(client.id, "tokens"));
     await page.locator("#tokenExpirationInSeconds").fill(value);
-    await page.locator('input[name="includeOpenIDConnectClaimsInIdToken"][value="default"]').check();
     await page.locator("#btnSave").click();
     await expect(page.getByText(message)).toBeVisible();
     await page.goto(clientUrl(client.id, "tokens"));

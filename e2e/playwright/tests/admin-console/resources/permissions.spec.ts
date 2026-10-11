@@ -42,7 +42,7 @@ test("unsaved changes are lost on leaving the page", async ({ page, resources })
 test("a permission is edited, and Cancel edit leaves it as it was", async ({ page, resources }) => {
   const resource = await resources.create({ permissions: ["read"] });
   await page.goto(resourceUrl(resource.id, "permissions"));
-  const editButton = () => resourcePermissionRow(page, "read").getByRole("cell").nth(2).getByRole("button");
+  const editButton = () => page.getByRole("button", { name: "Edit permission read", exact: true });
 
   await editButton().click();
   await expect(page.locator("#permissionIdentifier")).toHaveValue("read");
@@ -68,7 +68,7 @@ test("a permission is edited, and Cancel edit leaves it as it was", async ({ pag
 test("a permission is removed", async ({ page, resources }) => {
   const resource = await resources.create({ permissions: ["read", "write"] });
   await page.goto(resourceUrl(resource.id, "permissions"));
-  await resourcePermissionRow(page, "read").getByRole("cell").nth(3).getByRole("button").click();
+  await page.getByRole("button", { name: "Remove permission read", exact: true }).click();
   await expect(resourcePermissionRow(page, "read")).toHaveCount(0);
   await saveResourcePermissions(page);
 
