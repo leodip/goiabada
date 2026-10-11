@@ -435,12 +435,14 @@ func assertUserSessionEqual(t *testing.T, expected, actual *record.UserSession) 
 	if actual.DeviceOS != expected.DeviceOS {
 		t.Errorf("Expected DeviceOS %s, got %s", expected.DeviceOS, actual.DeviceOS)
 	}
-	// The raw header, compared exactly: StartNewUserSession decides two logins came from the
-	// same device by comparing this string and the IP, so a value the storage round trip alters
-	// changes which sessions supersede which (#281).
+	// The raw header, compared exactly: it is what a person reads on their list of sessions as the
+	// browser sent it (#281).
 	if actual.UserAgent != expected.UserAgent {
 		t.Errorf("Expected UserAgent %s, got %s", expected.UserAgent, actual.UserAgent)
 	}
+	// The device identifier's digest, compared exactly: StartNewUserSession decides two sign-ins
+	// came from the same browser by comparing it, so a value the round trip alters changes which
+	// sessions supersede which (#564).
 	if actual.DeviceId != expected.DeviceId {
 		t.Errorf("Expected DeviceId %s, got %s", expected.DeviceId, actual.DeviceId)
 	}

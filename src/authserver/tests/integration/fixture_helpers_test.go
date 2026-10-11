@@ -487,11 +487,6 @@ type authCodeOptions struct {
 	// clients alone (#245, D2).
 	user         *record.User
 	userPassword string
-	// userAgent runs the ceremony as a different DEVICE. Two ceremonies for one user from the
-	// default client replace each other's session, because the server treats the same user on
-	// the same device as one session, so a fixture wanting two live sessions has to say which
-	// is which. This is the same trick secondSessionFor uses.
-	userAgent string
 }
 
 func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...authCodeOptions) (*http.Client, *record.Code) {
@@ -573,10 +568,9 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
+	// A cookie jar of its own, so each ceremony is a browser of its own: two for one user keep
+	// two sessions (#564).
 	httpClient := createHttpClient(t)
-	if opt.userAgent != "" {
-		httpClient = createHttpClientWithUserAgent(t, opt.userAgent)
-	}
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {

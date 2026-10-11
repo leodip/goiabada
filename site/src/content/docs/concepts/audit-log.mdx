@@ -186,13 +186,13 @@ Every `deleted_user_session` entry has a `reason`, so you can filter on why sess
 | `reason` | Why the session was deleted |
 |---|---|
 | `replaced_by_sign_in` | The user signed in again, and the new session replaced the one the browser had. |
-| `same_device` | The user signed in again, and the new session replaced another of their sessions from the same device. |
+| `same_device` | The user signed in again, and the new session replaced another of their sessions from the same browser, recognized by its [device cookie](/concepts/sessions/#how-the-auth-server-recognizes-a-browser). |
 | `replaced_by_other_user` | Another user signed in on the browser that held it. |
 | `signed_out` | The user signed out. |
 | `ended_by_user` | The user ended it from their account. |
 | `ended_by_administrator` | An administrator ended it. |
 
-A session that's both the one the browser had and one from the same device is deleted once, and its entry says `replaced_by_sign_in`.
+A session that's both the one the browser had and one from the same browser's device cookie is deleted once, and its entry says `replaced_by_sign_in`.
 
 ## The Admin API
 

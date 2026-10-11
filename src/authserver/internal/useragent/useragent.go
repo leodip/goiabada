@@ -1,9 +1,9 @@
 // Package useragent derives the three display labels a session row carries, and bounds a raw
 // User-Agent header to the width of the columns that store it.
 //
-// The labels are display only. StartNewUserSession keys its "same device" sweep on the raw
-// header and the IP address, never on a label, so a label that is wrong costs a person one
-// confusing row on a list of their own sessions and nothing else (#281). That is what makes
+// The labels are display only. StartNewUserSession keys its "same device" sweep on the device
+// cookie, never on a label nor on the header (#281, #564), so a label that is wrong costs a
+// person one confusing row on a list of their own sessions and nothing else. That is what makes
 // the ordered token list below acceptable: it is allowed to be wrong, and it must not grow
 // into a database of browser strings, which is the treadmill that replacing a third-party
 // parser with a hand-written one exists to leave.
@@ -321,11 +321,9 @@ func bound(s string, limit int) string {
 }
 
 // BoundRaw is a raw User-Agent header bounded to the 512 bytes that user_sessions.user_agent
-// and codes.user_agent are declared with. The header is the key of the "same device" sweep
-// together with the IP address, so it is stored rather than parsed: a parser's guess at a
-// browser name changes shape whenever the parser is replaced, and the sweep then stops
-// recognising a device it recognised yesterday (#281). Both writers of those columns call this,
-// so neither chooses the width.
+// and codes.user_agent are declared with. The header is stored as sent, for display beside the
+// labels a parse of it gives; nothing compares it (#281, #564). Both writers of those columns
+// call this, so neither chooses the width.
 func BoundRaw(s string) string {
 	return bound(s, userAgentMaxLen)
 }

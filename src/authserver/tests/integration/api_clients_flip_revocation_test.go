@@ -188,13 +188,13 @@ func TestAPIClientAuthenticationPut_FlipToPublic_LeavesTheUsersOtherClientAlone(
 		authCodeOptions{user: user, userPassword: password})
 	defer func() { _ = database.DeleteClient(context.Background(), nil, flippedCode.ClientId) }()
 
-	// A DIFFERENT DEVICE for the second grant, which is a fixture requirement rather than
-	// decoration: two ceremonies for one user from the same device replace each other's session,
-	// so without this the first grant would be dead before the flip ever ran and the refusal
-	// below would prove nothing.
+	// Each createAuthCode runs in a browser of its own, so the second grant is another device's.
+	// That is a fixture requirement rather than decoration: two ceremonies for one user from the
+	// same browser replace each other's session, so the first grant would be dead before the flip
+	// ever ran and the refusal below would prove nothing.
 	otherSecret := fake.LetterN(32)
 	otherClient, otherCode := createAuthCode(t, otherSecret, "openid profile email",
-		authCodeOptions{user: user, userPassword: password, userAgent: "goiabada-d2-second-device"})
+		authCodeOptions{user: user, userPassword: password})
 	defer func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientId) }()
 
 	// Both grants belong to the same person, which is the whole point of the fixture.

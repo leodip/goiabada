@@ -439,9 +439,9 @@ func TestCrossUser_IdTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsAcr(t
 	b := createCrossUserBrowser(t, record.AcrLevel1, record.AcrLevel2Optional)
 
 	// B's ID token has to come from somewhere, so B signs in once on a browser of their own. That
-	// session is swept away when B's ceremony below mints its own, since StartNewUserSession deletes
-	// the new user's other sessions on the same device and address, which is why the shared block
-	// can still insist B holds exactly one session at the end.
+	// browser is another device, whose session B's ceremony below keeps (#564), so it is deleted
+	// once the token is in hand, which is what lets the shared block insist B holds exactly one
+	// session at the end. The hint names B, not a session, so it is still B's after.
 	level1 := "&acr_values=" + url.QueryEscape(record.AcrLevel1.String())
 	otherBrowser := createHttpClient(t)
 	hintCodeVal := signInWithPassword(t, otherBrowser, crossUserAuthorizeUrl(b, level1),
@@ -449,6 +449,10 @@ func TestCrossUser_IdTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsAcr(t
 	hintTokenData := redeemCrossUserCode(t, b, otherBrowser, hintCodeVal)
 	idTokenUserB, ok := hintTokenData["id_token"].(string)
 	require.True(t, ok, "expected an id_token for the hint, got %v", hintTokenData)
+	hintSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, b.userB.Id)
+	require.NoError(t, err)
+	require.Len(t, hintSessions, 1, "B signed in once, on the other browser")
+	require.NoError(t, database.DeleteUserSession(context.Background(), nil, hintSessions[0].Id))
 
 	codeVal := signInWithPassword(t, b.jar,
 		crossUserAuthorizeUrl(b, level1+"&id_token_hint="+url.QueryEscape(idTokenUserB)),

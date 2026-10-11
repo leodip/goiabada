@@ -12,8 +12,8 @@ import (
 )
 
 // Labels owns the whole derivation, so this file owns the whole table. The three labels are
-// display only -- StartNewUserSession keys its "same device" sweep on the raw header and the
-// IP address (#281) -- but they are what a person reads when deciding which of their sessions
+// display only -- StartNewUserSession keys its "same device" sweep on the device cookie (#281,
+// #564) -- but they are what a person reads when deciding which of their sessions
 // to end, so every row of both paths is pinned here rather than at a consumer.
 //
 // The rows are the ones #281 worked out while settling the derivation, before any of it was
