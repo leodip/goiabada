@@ -115,10 +115,11 @@ func HandleProfilePost(
 				render.EchoProfileForm(user, request)
 
 				bind := map[string]interface{}{
-					"user":      user,
-					"timezones": timezones,
-					"locales":   locales,
-					"error":     errorMessage,
+					"user":                 user,
+					"submittedDateOfBirth": &request.DateOfBirth,
+					"timezones":            timezones,
+					"locales":              locales,
+					"error":                errorMessage,
 				}
 
 				if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_profile.html", bind); renderErr != nil {

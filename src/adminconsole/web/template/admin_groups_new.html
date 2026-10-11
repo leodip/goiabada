@@ -61,7 +61,7 @@
                     <span class="label-text">
                         {{ T $.ctx "adminconsole.admin_groups.new.include_access_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_groups.new.include_access_em" }}</span>{{ T $.ctx "adminconsole.admin_groups.new.include_access_suffix" }}
                     </span>
-                    <input type="checkbox" name="includeInAccessToken" class="ml-2 toggle" checked />
+                    <input type="checkbox" name="includeInAccessToken" class="ml-2 toggle" {{if .includeInAccessToken}}checked{{end}} />
                 </label>
             </div>
 
@@ -70,7 +70,7 @@
                     <span class="label-text">
                         {{ T $.ctx "adminconsole.admin_groups.new.include_id_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_groups.new.include_id_em" }}</span>{{ T $.ctx "adminconsole.admin_groups.new.include_id_suffix" }}
                     </span>
-                    <input type="checkbox" name="includeInIdToken" class="ml-2 toggle" checked />
+                    <input type="checkbox" name="includeInIdToken" class="ml-2 toggle" {{if .includeInIdToken}}checked{{end}} />
                 </label>
             </div>
 

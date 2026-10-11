@@ -112,7 +112,7 @@ func TestHandleProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testi
 	assert.Equal(t, []int64{7}, apiClient.reads, "the page is redrawn over the user the URL names")
 
 	bind := handlertest.Bind(t, httpHelper)
-	birthDate := time.Date(1990, time.May, 17, 0, 0, 0, 0, time.UTC)
+	storedBirthDate := time.Date(1970, time.January, 2, 0, 0, 0, 0, time.UTC)
 	assert.Equal(t, &api.UserResponse{
 		Id:                  7,
 		Email:               "stored@example.com",
@@ -123,11 +123,14 @@ func TestHandleProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testi
 		Nickname:            "JD",
 		Website:             "https://jane.example",
 		Gender:              "other",
-		BirthDate:           &birthDate,
+		BirthDate:           &storedBirthDate,
 		ZoneInfoCountryName: "Brazil",
 		ZoneInfo:            "America/Sao_Paulo",
 		Locale:              "pt-BR",
 	}, bind["user"], "the page redraws what is stored instead of what the administrator typed")
+	submittedDateOfBirth := "1990-05-17"
+	assert.Equal(t, &submittedDateOfBirth, bind["submittedDateOfBirth"],
+		"the date of birth as typed, beside the user, which keeps the stored date (#562 decision 3)")
 	assert.Equal(t, "The website is not valid.", bind["error"])
 	assert.Equal(t, "3", bind["page"])
 	assert.Equal(t, "jane", bind["query"])
