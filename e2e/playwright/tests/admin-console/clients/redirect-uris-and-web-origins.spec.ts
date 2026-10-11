@@ -18,7 +18,7 @@ test("redirect URIs are added, saved, and one is removed again", async ({ page, 
   await expect(table).toContainText("https://app.example.com/callback");
   await expect(table).toContainText("https://app.example.com/signed-out");
 
-  await table.getByRole("row").filter({ hasText: "/signed-out" }).getByRole("button").click();
+  await table.getByRole("button", { name: "Remove redirect URI https://app.example.com/signed-out", exact: true }).click();
   await page.locator("#btnSave").click();
   await expect(page.getByText("Client redirect uris saved successfully")).toBeVisible();
   await page.reload();
@@ -64,7 +64,7 @@ test("a web origin is added, saved, and removed again", async ({ page, clients }
   // Origins are server-wide: it shows among the ones every client is permitted.
   await expect(page.locator("#effectiveWebOriginsTable")).toContainText(origin);
 
-  await table.getByRole("row").filter({ hasText: origin }).getByRole("button").click();
+  await table.getByRole("button", { name: `Remove web origin ${origin}`, exact: true }).click();
   await page.locator("#btnSave").click();
   await expect(page.getByText("Web origins saved successfully")).toBeVisible();
   await page.reload();

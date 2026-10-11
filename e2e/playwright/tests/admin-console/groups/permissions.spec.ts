@@ -25,7 +25,7 @@ test("a permission is granted, shows on the resource's side, and is removed", as
   await expect(row.getByRole("cell").nth(2)).toHaveText("Yes");
 
   await page.goto(groupUrl(group.id, "permissions"));
-  await table.getByRole("row").filter({ hasText: `${resource.identifier}:read` }).getByRole("button").click();
+  await table.getByRole("button", { name: `Remove permission ${resource.identifier}:read`, exact: true }).click();
   await page.locator("#btnSave").click();
   await expect(page.getByText("Group permissions saved successfully")).toBeVisible();
   await page.reload();

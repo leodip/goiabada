@@ -36,7 +36,7 @@ test("a permission granted to the user reaches their tokens, and is removed agai
   await expect(rowWithCell(page, user.email)).toHaveCount(1);
 
   await page.goto(userUrl(user.id, "permissions"));
-  await table.getByRole("row").filter({ hasText: `${resource.identifier}:read` }).getByRole("button").click();
+  await table.getByRole("button", { name: `Remove permission ${resource.identifier}:read`, exact: true }).click();
   await page.locator("#btnSave").click();
   await expect(page.getByText(permissionsSaved)).toBeVisible();
   const answer = await passwordToken(request, client.identifier, secret, user.email, user.password, scope);
@@ -88,7 +88,7 @@ test("group membership is granted and removed from the user's side", async ({ pa
   await expect(rowWithCell(page, user.email)).toHaveCount(1);
 
   await page.goto(userUrl(user.id, "groups"));
-  await table.getByRole("row").filter({ hasText: group.identifier }).getByRole("button").click();
+  await table.getByRole("button", { name: `Remove group ${group.identifier}`, exact: true }).click();
   await page.locator("#btnSave").click();
   await expect(page.getByText("Groups saved successfully")).toBeVisible();
   await page.reload();

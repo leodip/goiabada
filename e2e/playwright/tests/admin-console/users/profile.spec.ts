@@ -82,8 +82,8 @@ for (const { field, value, message } of [
     await page.locator(`input[name="${field}"]`).fill(value);
     await page.locator("#btnSave").click();
     await expect(page.getByText(message)).toBeVisible();
-    // The form echoes what was typed, except a date of birth it cannot parse, which it leaves as stored.
-    if (value !== "17/05/1990") await expect(page.locator(`input[name="${field}"]`)).toHaveValue(value);
+    // The form echoes what was typed, a date of birth it cannot parse included.
+    await expect(page.locator(`input[name="${field}"]`)).toHaveValue(value);
     await page.goto(userUrl(user.id, "profile"));
     await expect(page.locator(`input[name="${field}"]`)).not.toHaveValue(value);
   });

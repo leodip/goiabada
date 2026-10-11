@@ -70,8 +70,8 @@ test("renaming a client asks first, and the new identifier is what the list show
   await expect(clientRow(page, client.identifier)).toHaveCount(0);
 });
 
-// Two confirmations in a row: the rename's, then the administrative scopes'. Both share one <dialog>,
-// and the second is opened from the first's Yes, before that Yes closes the dialog.
+// Two confirmations in a row share one <dialog>: the second is asked from the first's Yes, which closes
+// the dialog before it runs, so the second stays open until it is answered.
 test("renaming and allowing administrative scopes in one save asks both, then saves both", async ({ page, clients }) => {
   const client = await clients.create();
   const renamed = `${client.identifier}-r`;
@@ -86,6 +86,24 @@ test("renaming and allowing administrative scopes in one save asks both, then sa
   await dialog.getByRole("button", { name: "Yes" }).click();
   await expect(page.getByText(saved)).toBeVisible();
   await expect(page.locator('input[name="clientIdentifier"]')).toHaveValue(renamed);
+  await expect(page.locator("#administrativeScopesAllowed")).toBeChecked();
+});
+
+test("disabling and allowing administrative scopes in one save asks both, then saves both", async ({ page, clients }) => {
+  const client = await clients.create();
+  await page.goto(clientUrl(client.id, "settings"));
+  await page.locator('input[name="enabled"]').uncheck();
+  await page.locator("#administrativeScopesAllowed").check();
+  await page.locator("#btnSave").click();
+  const dialog = page.locator("dialog[open]");
+  await expect(dialog).toContainText("You've disabled the client");
+  await dialog.getByRole("button", { name: "Yes" }).click();
+  await expect(dialog).toContainText("You are allowing this client to request the administrative scopes");
+  await dialog.getByRole("button", { name: "Yes" }).click();
+  await expect(page.getByText(saved)).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator('input[name="enabled"]')).not.toBeChecked();
   await expect(page.locator("#administrativeScopesAllowed")).toBeChecked();
 });
 
@@ -111,4 +129,24 @@ test("the system client warns that it is system-level", async ({ page }) => {
   await expect(dialog).toContainText("system-level client");
   await dialog.getByRole("button", { name: "No" }).click();
   await expect(page.getByText(saved)).toHaveCount(0);
+});
+
+// The system client's disable asks first, then the system-level question follows it. Yes to the first
+// and No to the second saves nothing: the suite never changes the system client.
+test("disabling the system client asks the system-level question too, and No saves nothing", async ({ page }) => {
+  await page.goto(`${env.adminUrl}/admin/clients`);
+  await clientRow(page, "admin-console-client").getByRole("link", { name: "Manage" }).click();
+  await page.locator('input[name="enabled"]').uncheck();
+  await page.locator("#btnSave").click();
+  const dialog = page.locator("dialog[open]");
+  await expect(dialog).toContainText("You've disabled the client");
+  await dialog.getByRole("button", { name: "Yes" }).click();
+  await expect(dialog).toContainText("system-level client");
+  await dialog.getByRole("button", { name: "No" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText(saved)).toHaveCount(0);
+
+  // A fresh navigation, not a reload, which could restore the unchecked switch from the page.
+  await page.goto(page.url());
+  await expect(page.locator('input[name="enabled"]')).toBeChecked();
 });

@@ -34,7 +34,7 @@ test("a granted permission is saved, gets a token with that scope, and once remo
   const claims = jwtClaims(String(granted.body.access_token));
   expect(String(claims.scope).split(" ")).toContain(permission);
 
-  await table.getByRole("row").filter({ hasText: permission }).getByRole("button").click();
+  await table.getByRole("button", { name: `Remove permission ${permission}`, exact: true }).click();
   await page.locator("#btnSave").click();
   await expect(page.getByText("Client permissions saved successfully")).toBeVisible();
   await page.reload();
