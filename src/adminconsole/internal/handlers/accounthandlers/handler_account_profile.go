@@ -116,7 +116,7 @@ func HandleProfilePost(
 
 				bind := map[string]interface{}{
 					"user":                 user,
-					"submittedDateOfBirth": &request.DateOfBirth,
+					"submittedDateOfBirth": render.SubmittedDateOfBirth(r),
 					"timezones":            timezones,
 					"locales":              locales,
 					"error":                errorMessage,
