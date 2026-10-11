@@ -57,7 +57,7 @@ sign-in lands on the auth server's password page, and the test app hosts.
 after a failure, `(cd e2e/playwright && npx playwright show-report)` opens the report with traces.
 
 Tests sit under `playwright/tests/`, one folder per area (`admin-console/sign-in`,
-`admin-console/clients/`, `admin-console/resources/`, `admin-console/groups/`, `admin-console/users/` so far). They run four at a time against an environment that stays up between
+`admin-console/clients/`, `resources/`, `groups/`, `users/`, `account/` and `settings/`). They run four at a time against an environment that stays up between
 runs, so every test keeps to these rules, which is what lets the suite run again and again without a
 reset:
 
@@ -66,12 +66,19 @@ reset:
   `lib/fixtures.ts`). The setup step (`tests/admin.setup.ts`) sweeps anything left with that prefix by
   a run that crashed.
 - **It changes nothing global**: no settings, and the system client and the system resource
-  (`authserver`) are only read; a test reaching their save answers No to the confirmation. The one
-  exception is the tests that try changes Goiabada's guards must refuse, such as renaming `authserver`
-  past its read-only field. They are named `*.system.ts` and run in the `system` project, which
-  `playwright.config.ts` makes run after every other test, alone. If a guard ever let a change through,
-  the test puts it back before failing.
+  (`authserver`) are only read; a test reaching their save answers No to the confirmation. The
+  exceptions are the tests whose subject is global, the settings pages, the signing keys, and the
+  guards around the system resource. They are named `*.system.ts` and run in the `system` project,
+  which `playwright.config.ts` runs after every other test, on one worker. Each puts back what it
+  changes (`lib/settings.ts`), and the setup step restores the seeded settings before a run if one
+  failed to.
 - **It never depends on what another test did**, or on counts or order.
+- **Users other than the administrator sign in through the browser** where the subject needs it
+  (`lib/console-user.ts`, `lib/browser-sign-in.ts`), always from an empty browser state: inside a test,
+  `browser.newContext()` starts from the test's options, which carry the administrator's session.
+- **The rate limits stay on.** The password form and the password grant each allow 30 requests a
+  minute per address, and the suite can pass that; the helpers wait and retry, and mark the test in
+  the report, rather than the environment turning the limits off.
 - **Each worker signs the administrator in for itself, with a user agent of its own** (`lib/devices.ts`).
   Goiabada treats a sign-in from the same user agent and address as the same device and ends that
   user's earlier session there, so workers sharing one would sign each other out.

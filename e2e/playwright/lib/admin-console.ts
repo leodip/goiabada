@@ -1,5 +1,6 @@
 // Helpers for driving the admin console as the signed-in administrator.
 import { expect, type Page } from "@playwright/test";
+import { submitPassword } from "./browser-sign-in";
 import { env } from "./environment";
 
 export type ClientTab =
@@ -74,9 +75,7 @@ export async function clientIdFromList(page: Page, identifier: string): Promise<
 // Signs the administrator in from the admin console, in a page with no session.
 export async function signInAsAdmin(page: Page) {
   await page.goto(`${env.adminUrl}/admin/clients`);
-  await page.locator('input[name="email"]').fill(env.adminEmail);
-  await page.locator('input[name="password"]').fill(env.adminPassword);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await submitPassword(page, env.adminEmail, env.adminPassword);
   await expect(page).toHaveURL(`${env.adminUrl}/admin/clients`);
 }
 
@@ -316,7 +315,8 @@ export async function addPermissionRow(page: Page, resource: string, permission:
   await resources.selectOption(resourceValue);
   await loaded;
   const permissions = page.locator("#permissionsSelect");
-  const option = permissions.locator("option").filter({ hasText: new RegExp(`\\b${permission}\\b`) });
+  // The label is the identifier, then the description in parentheses when there is one.
+  const option = permissions.locator("option").filter({ hasText: new RegExp(`^${permission}( \\(|$)`) });
   await expect(option).toHaveCount(1);
   await permissions.selectOption((await option.getAttribute("value"))!);
   await page.getByRole("button", { name: "Grant permission" }).click();

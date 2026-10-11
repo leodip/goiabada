@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
+import { submitPassword } from "../../lib/browser-sign-in";
 import { userAgentFor } from "../../lib/devices";
 import { env } from "../../lib/environment";
 
@@ -12,12 +13,6 @@ test.use({ userAgent: async ({}, use, testInfo) => use(userAgentFor(`sign-in-${t
 async function startSignIn(page: Page) {
   await page.goto(`${env.adminUrl}/admin/clients`);
   await expect(page).toHaveURL(new RegExp(`^${env.authUrl}/auth/pwd\\?`));
-}
-
-async function submitPassword(page: Page, email: string, password: string) {
-  await page.locator('input[name="email"]').fill(email);
-  await page.locator('input[name="password"]').fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
 }
 
 async function expectSignedIn(page: Page) {

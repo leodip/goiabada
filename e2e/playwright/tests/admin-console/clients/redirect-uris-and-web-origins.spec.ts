@@ -76,6 +76,6 @@ test("a web origin that is not an origin is refused", async ({ page, clients }) 
   await page.goto(clientUrl(client.id, "web-origins"));
   await page.locator("#webOrigin").fill("not an origin");
   await page.getByRole("button", { name: "Add" }).click();
-  await expectErrorDialog(page, /not a valid/i);
+  await expectErrorDialog(page, "The web origin is not a valid URL.");
   await expect(page.locator("#webOriginsTable")).toContainText("(none yet)");
 });

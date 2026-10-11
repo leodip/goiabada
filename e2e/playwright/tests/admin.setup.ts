@@ -10,6 +10,7 @@ import {
   signInAsAdmin,
 } from "../lib/admin-console";
 import { env } from "../lib/environment";
+import { restoreSeededSettings } from "../lib/settings";
 import { testPrefix } from "../lib/unique";
 
 setup.use({ userAgent: userAgentFor("setup") });
@@ -22,8 +23,14 @@ async function leftoversOn(page: Page, listUrl: string): Promise<string[]> {
     .filter((text) => text.startsWith(testPrefix));
 }
 
-setup("sweep what earlier runs left", async ({ page }) => {
+setup("sweep what earlier runs left", async ({ page }, testInfo) => {
   await signInAsAdmin(page);
+  // The settings tests put back what they change; one that failed while doing so is put right here.
+  const drifted = await restoreSeededSettings(page);
+  if (drifted.length > 0) {
+    testInfo.annotations.push({ type: "settings restored", description: drifted.join("; ") });
+    console.warn(`settings were not as seeded, restored: ${drifted.join("; ")}`);
+  }
   // Every test removes what it creates, so anything named with the test prefix at the start of a run
   // is what a run that crashed left. Assumes one run at a time against the environment.
   const clients = `${env.adminUrl}/admin/clients`;

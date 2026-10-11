@@ -63,7 +63,7 @@ test("creating a client is refused when the identifier is taken", async ({ page,
   const existing = await clients.create();
   await submitNewClient(page, { identifier: existing.identifier });
   await expect(page).toHaveURL(`${env.adminUrl}/admin/clients/new`);
-  await expect(page.locator("main p.text-error, main .text-error p").first()).toBeVisible();
+  await expect(page.getByText("The client identifier is already in use.")).toBeVisible();
   // Still exactly one client by that name.
   await page.goto(`${env.adminUrl}/admin/clients`);
   await expect(clientRow(page, existing.identifier)).toHaveCount(1);
