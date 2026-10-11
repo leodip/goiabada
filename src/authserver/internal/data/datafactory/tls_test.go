@@ -16,8 +16,7 @@ import (
 )
 
 // The start's side of the connection's TLS settings: the warning a start relying on the default
-// writes, the mode in the using database record, and an engine refusing a mode it does not map
-// (#502). Every server engine is pointed at a port nothing listens on, as in TestOpenDatabase_Dispatch,
+// writes, the mode in the using database record, and every engine dialling in every mode (#502). Every server engine is pointed at a port nothing listens on, as in TestOpenDatabase_Dispatch,
 // so each is observed without a live server.
 
 // tlsWarning is the record a start writes when it relies on the default mode.
@@ -117,15 +116,16 @@ func TestOpenDatabase_PreferConnectsAsBefore(t *testing.T) {
 	}
 }
 
-// TestOpenDatabase_MappedEnginesDialInEveryMode: PostgreSQL and SQL Server map all five modes, so
+// TestOpenDatabase_EveryEngineDialsInEveryMode: the three server engines map all five modes, so
 // each reaches the server, the maintenance connection a creating start opens first included, and
 // none is refused before it is dialled.
-func TestOpenDatabase_MappedEnginesDialInEveryMode(t *testing.T) {
+func TestOpenDatabase_EveryEngineDialsInEveryMode(t *testing.T) {
 	maintenanceFailure := map[string]string{
+		"mysql":    "unable to create database:",
 		"postgres": "unable to check whether the database exists:",
 		"mssql":    "unable to connect to master database:",
 	}
-	for _, engine := range []string{"postgres", "mssql"} {
+	for _, engine := range serverEngines {
 		for _, mode := range data.TLSModes() {
 			for _, create := range []bool{false, true} {
 				t.Run(engine+" "+string(mode)+" create "+strconv.FormatBool(create), func(t *testing.T) {
@@ -143,30 +143,6 @@ func TestOpenDatabase_MappedEnginesDialInEveryMode(t *testing.T) {
 					assert.Contains(t, err.Error(), "connection refused", "the failure is the server's absence")
 				})
 			}
-		}
-	}
-}
-
-// TestOpenDatabase_AnEngineRefusesAModeItDoesNotMap: a mode an engine cannot honour yet stops the
-// start before anything is dialled, naming the mode and the engine, so no setting is silently
-// ignored.
-func TestOpenDatabase_AnEngineRefusesAModeItDoesNotMap(t *testing.T) {
-	for _, engine := range []string{"mysql"} {
-		for _, mode := range []data.TLSMode{data.TLSDisable, data.TLSRequire, data.TLSVerifyCA, data.TLSVerifyFull} {
-			t.Run(engine+" "+string(mode), func(t *testing.T) {
-				capture := logtest.CaptureSlog(t)
-				cfg := unreachable(engine, true)
-				cfg.TLSMode = string(mode)
-
-				database, err := OpenDatabase(context.Background(), cfg, false)
-
-				require.Error(t, err)
-				var noDatabase Migratable
-				assert.Equal(t, noDatabase, database)
-				assert.Equal(t, "GOIABADA_DB_TLS_MODE "+string(mode)+" is not supported on "+engine+" in this build: set it to prefer",
-					err.Error())
-				assert.Empty(t, recordsNamed(capture, "database connection pool"), "nothing was opened")
-			})
 		}
 	}
 }

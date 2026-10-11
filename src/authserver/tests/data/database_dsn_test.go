@@ -20,9 +20,9 @@ const awkwardPassword = "p%#?/@:ss1A"
 
 // TestNewDatabase_AwkwardPasswordAndDatabaseNameConnect is seam 5 of #424: the engine's own
 // constructor, as a login whose password needs escaping, creates a database whose name carries a
-// space and connects to it. Create is true, so the password travels through MaintenanceDSN to
-// create the database and through DSN to open it, and both have to be read by the server exactly
-// as written. Before #424 a Sprintf'd PostgreSQL URL failed to parse this password, and a
+// space and connects to it. Create is true, so the password travels through the maintenance
+// connection to create the database and through the application one to open it, and both have to
+// be read by the server exactly as written. Before #424 a Sprintf'd PostgreSQL URL failed to parse this password, and a
 // hand-built MySQL or PostgreSQL string failed on a database name with `/?#`.
 //
 // The login may create a database and nothing else it does not need, so that what it connects to
@@ -43,7 +43,7 @@ func TestNewDatabase_AwkwardPasswordAndDatabaseNameConnect(t *testing.T) {
 
 	switch dbType() {
 	case data.MySQL:
-		admin, err := sql.Open("mysql", mySQLServerDSN(cfg.Username, cfg.Password, cfg))
+		admin, err := sql.Open("mysql", mySQLServerDSN(t, cfg.Username, cfg.Password, cfg))
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = admin.Close() })
 
@@ -114,4 +114,42 @@ func TestNewDatabase_AwkwardPasswordAndDatabaseNameConnect(t *testing.T) {
 	require.Equal(t, username, gotUser, "the connection must be the fixture login, authenticated by the awkward password")
 	require.NoError(t, sqlDB.QueryRowContext(ctx, currentDatabaseQuery).Scan(&gotDatabase))
 	require.Equal(t, name, gotDatabase, "the connection must be to the database whose name carries a space")
+}
+
+// TestMySQLNew_AUsernameContainingAColonConnects: a MySQL login whose name carries a `:`, holding
+// privileges on its one database and nothing else, creates that database through the constructor
+// and connects to it as itself. The driver's connection-string grammar splits the user from the
+// password at the first `:` and has no escape for one, so while MySQL was opened from a string
+// such a login reached the server as someone else; it is opened from the driver's configuration
+// now, which carries the username as written (#502 decision 11).
+func TestMySQLNew_AUsernameContainingAColonConnects(t *testing.T) {
+	if dbType() != data.MySQL {
+		t.Skip("the `:` ceiling was the MySQL driver's connection-string grammar")
+	}
+
+	cfg := &appConfig.Database
+	name := isolatedDBName() + "_colon"
+	username := restrictedLoginName() + ":c"
+	ctx := context.Background()
+
+	admin, err := sql.Open("mysql", mySQLServerDSN(t, cfg.Username, cfg.Password, cfg))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = admin.Close() })
+
+	mustExec(t, admin, fmt.Sprintf("CREATE USER '%s'@'%%' IDENTIFIED BY '%s'", username, awkwardPassword))
+	t.Cleanup(func() { _, _ = admin.Exec(fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%'", username)) })
+	mustExec(t, admin, fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%'", name, username))
+
+	db, err := mysqldb.New(ctx, &mysqldb.DatabaseConfig{
+		Username: username, Password: awkwardPassword,
+		Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
+	}, false)
+	require.NoError(t, err, "mysqldb.New as a login whose name carries a colon")
+	t.Cleanup(func() { _ = db.DB.Close(); dropMySQL(t, cfg, name) })
+
+	var gotUser, gotDatabase string
+	require.NoError(t, db.DB.QueryRowContext(ctx, "SELECT SUBSTRING_INDEX(CURRENT_USER(), '@', 1)").Scan(&gotUser))
+	require.Equal(t, username, gotUser, "the connection must be the login whose name carries the colon")
+	require.NoError(t, db.DB.QueryRowContext(ctx, "SELECT DATABASE()").Scan(&gotDatabase))
+	require.Equal(t, name, gotDatabase)
 }

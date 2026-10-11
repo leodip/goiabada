@@ -409,11 +409,16 @@ func restrictedLoginName() string {
 
 // mySQLServerDSN is a connection to the server with no database selected, which is both what
 // the fixture administers through and what mysqldb.New's maintenance connection uses:
-// mysqldb.MaintenanceDSN, as the credential given rather than the configured one.
-func mySQLServerDSN(username, password string, cfg *config.DatabaseConfig) string {
-	return mysqldb.MaintenanceDSN(&mysqldb.DatabaseConfig{
+// mysqldb.MaintenanceConnConfig, as the credential given rather than the configured one, written
+// as the string the driver's own sql.Open reads. The tier's own login carries no `:`, which a
+// string cannot (#502).
+func mySQLServerDSN(t *testing.T, username, password string, cfg *config.DatabaseConfig) string {
+	t.Helper()
+	c, err := mysqldb.MaintenanceConnConfig(&mysqldb.DatabaseConfig{
 		Username: username, Password: password, Host: cfg.Host, Port: cfg.Port,
 	})
+	require.NoError(t, err)
+	return c.FormatDSN()
 }
 
 // postgresMaintenanceDSN is a connection to the postgres database, which is both what the
@@ -440,7 +445,7 @@ func newRestrictedLoginDB(t *testing.T) *restrictedLoginDB {
 
 	switch dbType() {
 	case data.MySQL:
-		admin, err := sql.Open("mysql", mySQLServerDSN(cfg.Username, cfg.Password, cfg))
+		admin, err := sql.Open("mysql", mySQLServerDSN(t, cfg.Username, cfg.Password, cfg))
 		require.NoError(t, err, "open mysql as the tier's own login")
 		r.admin = admin
 

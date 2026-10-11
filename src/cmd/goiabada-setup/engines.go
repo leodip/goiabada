@@ -52,15 +52,14 @@ type engine struct {
 	healthInterval string
 	healthTimeout  string
 
-	// driver, dsn and maintenanceDSN are how the auth server reaches the database, copied in
-	// dbcheck.go, and so how the connection check does. existenceQuery counts the databases named
-	// its one parameter, over the maintenance connection; emptinessQuery counts the Goiabada
+	// connection and maintenanceConnection are how the auth server reaches the database, copied
+	// in dbcheck.go, and so how the connection check does. existenceQuery counts the databases
+	// named its one parameter, over the maintenance connection; emptinessQuery counts the Goiabada
 	// tables already in the application database.
-	driver         string
-	dsn            func(t dbTarget) string
-	maintenanceDSN func(t dbTarget) string
-	existenceQuery string
-	emptinessQuery string
+	connection            func(t dbTarget) (dbConnection, error)
+	maintenanceConnection func(t dbTarget) (dbConnection, error)
+	existenceQuery        string
+	emptinessQuery        string
 }
 
 // engines is the database menu, in its order. SQLite is last, so the three engines Kubernetes
@@ -88,9 +87,8 @@ var engines = []*engine{
 		healthcheck:             `mysqladmin ping -uroot -p"${MYSQL_ROOT_PASSWORD}" --protocol tcp`,
 		healthInterval:          "1s",
 		healthTimeout:           "2s",
-		driver:                  "mysql",
-		dsn:                     mysqlDSN,
-		maintenanceDSN:          mysqlMaintenanceDSN,
+		connection:              mysqlConnection,
+		maintenanceConnection:   mysqlMaintenanceConnection,
 		existenceQuery:          "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
 		emptinessQuery:          "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'users'",
 	},
@@ -118,9 +116,8 @@ var engines = []*engine{
 		healthcheck:             "pg_isready -U postgres",
 		healthInterval:          "1s",
 		healthTimeout:           "2s",
-		driver:                  "pgx",
-		dsn:                     postgresDSN,
-		maintenanceDSN:          postgresMaintenanceDSN,
+		connection:              postgresConnection,
+		maintenanceConnection:   postgresMaintenanceConnection,
 		existenceQuery:          "SELECT COUNT(*) FROM pg_database WHERE datname = $1",
 		emptinessQuery:          "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'",
 	},
@@ -143,9 +140,8 @@ var engines = []*engine{
 		healthcheck:             `/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "${MSSQL_SA_PASSWORD}" -C -Q 'SELECT 1' || exit 1`,
 		healthInterval:          "10s",
 		healthTimeout:           "5s",
-		driver:                  "sqlserver",
-		dsn:                     mssqlDSN,
-		maintenanceDSN:          mssqlMaintenanceDSN,
+		connection:              mssqlConnection,
+		maintenanceConnection:   mssqlMaintenanceConnection,
 		existenceQuery:          "SELECT COUNT(*) FROM sys.databases WHERE name = @p1",
 		emptinessQuery:          "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'users'",
 	},
