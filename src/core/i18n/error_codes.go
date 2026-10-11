@@ -140,12 +140,13 @@ const (
 	// Groups, their members and attributes, and a user's attributes. A group's and a user's attribute
 	// key is the console's own handler.attribute.key_required above, and the value bound is one
 	// sentence for both, whose codes differ (VALIDATION_ERROR and VALUE_TOO_LONG).
-	ErrCodeGroupIdentifierRequired  = "handler.group.identifier_required"
-	ErrCodeGroupDescriptionTooLong  = "handler.group.description_too_long" // Args: {"max": int}
-	ErrCodeGroupIdentifierInUse     = "handler.group.identifier_in_use"
-	ErrCodeGroupMemberAlreadyMember = "handler.group_member.already_member"
-	ErrCodeGroupMemberNotMember     = "handler.group_member.not_member"
-	ErrCodeAttributeValueTooLong    = "handler.attribute.value_too_long" // Args: {"max": int}
+	ErrCodeGroupIdentifierRequired       = "handler.group.identifier_required"
+	ErrCodeGroupDescriptionTooLong       = "handler.group.description_too_long" // Args: {"max": int}
+	ErrCodeGroupIdentifierInUse          = "handler.group.identifier_in_use"
+	ErrCodeGroupMemberAlreadyMember      = "handler.group_member.already_member"
+	ErrCodeGroupMemberNotMember          = "handler.group_member.not_member"
+	ErrCodeGroupAttributeGroupIdRequired = "handler.group_attribute.group_id_required"
+	ErrCodeAttributeValueTooLong         = "handler.attribute.value_too_long" // Args: {"max": int}
 
 	// Users, a user's groups, and the email verification code an administrator generates. The
 	// account's own send says the code's sentence too.

@@ -1530,6 +1530,7 @@
 "handler.group.identifier_in_use" = "O identificador do grupo já está em uso"
 "handler.group_member.already_member" = "O usuário já é membro deste grupo"
 "handler.group_member.not_member" = "O usuário não é membro deste grupo"
+"handler.group_attribute.group_id_required" = "O ID do grupo é obrigatório"
 "handler.attribute.value_too_long" = "O valor do atributo não pode ter mais que {{.max}} caracteres"
 
 "handler.user.email_required" = "O e-mail é obrigatório"

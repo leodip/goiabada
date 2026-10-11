@@ -22,9 +22,9 @@ import (
 // file is what keeps that true. The admin console shows the API's sentence for a 400 or a 409 and
 // its own page for every other status, so those two statuses are the whole surface a person reads.
 // Every 400 or 409 written here in English must be one of the sentences in machineOnlyRefusals, each
-// of which names the class of #559 decision 1 it belongs to: a body that does not parse, an id that
-// is missing or malformed, a list save's missing expected* list, and the annotate* query
-// parameters. Those address an integrator debugging a request, for whom English is the documented
+// of which names the class of #559 decision 1 it belongs to: a body that does not parse, an id in
+// the path or query that is missing or malformed, a list save's missing expected* list, and the
+// annotate* query parameters. Those address an integrator debugging a request, for whom English is the documented
 // default. Every other refusal goes through writeLocalizedError or writeValidationError with a
 // catalog key, and arrives in pt-BR when the console's page is in pt-BR (#559 decisions 1 and 4).
 //
@@ -46,6 +46,10 @@ import (
 //   - A writer stored in a value, rather than called, is refused by writerValues in
 //     api_error_code_lint_test.go over the same directory, so it cannot carry a sentence past this
 //     scan either.
+//   - A sentence is matched by its spelling, wherever it is written. An id read from a decoded body
+//     is a field like any other, not a malformed target, so its refusal goes through
+//     writeLocalizedError even when a path id's English refusal says the same words, as the group
+//     attribute's groupId does with handler.group_attribute.group_id_required.
 //   - The bearer middleware's 400 is outside the scope: it answers RFC 6750's invalid_request before
 //     any handler runs, on a token no console request can send twice.
 
@@ -55,7 +59,7 @@ type machineOnlyClass string
 
 const (
 	classUnparseableBody  machineOnlyClass = "a body that does not parse"
-	classMissingOrBadID   machineOnlyClass = "an id that is missing or malformed"
+	classMissingOrBadID   machineOnlyClass = "an id in the path or query that is missing or malformed"
 	classMissingExpected  machineOnlyClass = "a list save's missing expected* list"
 	classAnnotateArgument machineOnlyClass = "an annotate* query parameter"
 )
@@ -80,6 +84,9 @@ var machineOnlyRefusals = map[string]machineOnlyClass{
 	"Group attribute ID is required": classMissingOrBadID,
 	"Permission ID is required":      classMissingOrBadID,
 	"Resource ID is required":        classMissingOrBadID,
+	// The browser-session endpoint's, whose id rides in the body. That endpoint is not the admin or
+	// account API: its one caller is the console's session backend, whose refusals no person reads
+	// (#559 decision 3).
 	"Session id is required":         classMissingOrBadID,
 	"Session identifier is required": classMissingOrBadID,
 	"User ID is required":            classMissingOrBadID,
@@ -233,8 +240,8 @@ func assertAPIRefusals(r guard.Reporter, root string, dirs []string, floor int, 
 	sort.Strings(unclassed)
 	if len(unclassed) > 0 {
 		r.Errorf("%d machine-only entr(ies) name no class of #559 decision 1:\n\t%s\n\n"+
-			"An English refusal is kept only for a body that does not parse, an id that is missing "+
-			"or malformed, a missing expected* list, or an annotate* parameter.",
+			"An English refusal is kept only for a body that does not parse, an id in the path or "+
+			"query that is missing or malformed, a missing expected* list, or an annotate* parameter.",
 			len(unclassed), strings.Join(unclassed, "\n\t"))
 	}
 

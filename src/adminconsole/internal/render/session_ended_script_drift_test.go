@@ -27,7 +27,8 @@ import (
 //   - the recount of request sites under web/ still finds exactly the three this change handled,
 //     sendAjaxRequest in utils.js and uploadImage and handleDelete in image-upload.js, so a fourth
 //     raw fetch() fails until it is handled too;
-//   - each of the three, within its own function, calls isSessionEnded and goToSessionEnded.
+//   - each of the three, within its own function, calls isSessionEnded and goToSessionEnded, and
+//     sends its URL through withPageLanguage, which names the page's catalog as ui_locales (#559).
 //
 // It does not prove that any of them navigates. That is read, not run.
 func TestSessionEndedScripts_EveryFetchSiteFollowsTheCode(t *testing.T) {
@@ -89,6 +90,10 @@ func TestSessionEndedScripts_EveryFetchSiteFollowsTheCode(t *testing.T) {
 			}
 			assert.Containsf(t, body, "isSessionEnded(", "%s, request site %d of %d, does not check for the session-ended code", name, i+1, count)
 			assert.Containsf(t, body, "goToSessionEnded", "%s, request site %d of %d, does not go to the session-ended route", name, i+1, count)
+			// The page's language rides on every request it sends, or a refusal in its dialog is
+			// in whatever language the browser or the profile names instead (#559 decisions 3 and 7).
+			assert.Truef(t, strings.HasPrefix(body, "fetch(withPageLanguage("),
+				"%s, request site %d of %d, does not send its URL through withPageLanguage", name, i+1, count)
 		}
 	}
 }

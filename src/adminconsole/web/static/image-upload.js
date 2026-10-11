@@ -272,7 +272,7 @@
         // Get CSRF token
         const csrfToken = document.querySelector('input[name="gorilla.csrf.Token"]');
 
-        fetch(cfg.uploadUrl, {
+        fetch(withPageLanguage(cfg.uploadUrl), {
             method: 'POST',
             body: formData,
             headers: csrfToken ? {
@@ -345,7 +345,7 @@
         // Get CSRF token
         const csrfToken = document.querySelector('input[name="gorilla.csrf.Token"]');
 
-        fetch(cfg.deleteUrl, {
+        fetch(withPageLanguage(cfg.deleteUrl), {
             method: 'DELETE',
             headers: csrfToken ? {
                 'X-CSRF-Token': csrfToken.value

@@ -53,6 +53,25 @@ function goToSessionEnded() {
   window.location.assign(SESSION_ENDED_PATH);
 }
 
+// withPageLanguage names the catalog this page rendered from, which the layout publishes as
+// data-catalog-lang, as ui_locales on a request the page sends. The console resolves each request's
+// language afresh, and ui_locales is the explicit intent neither the browser's Accept-Language nor
+// the profile's locale overrides, so a refusal shown in this page's dialog, the API's or the
+// console's own, is in the page's language (#559 decisions 3 and 7). Every fetch site here and in
+// image-upload.js sends its URL through it, and a drift test in internal/render holds them to it.
+function withPageLanguage(url) {
+  const lang = document.documentElement.dataset.catalogLang;
+  if (!lang) {
+    return url;
+  }
+  const target = new URL(url, window.location.href);
+  target.searchParams.set("ui_locales", lang);
+  if (target.origin !== window.location.origin) {
+    return target.href;
+  }
+  return target.pathname + target.search + target.hash;
+}
+
 // The dialog's markup boundary. showModalDialog parses a message as HTML only when dialogMarkup or
 // dialogMarkupFormat built it, and shows any other message as text, so a value reaching it by any
 // route is never parsed (#120). What marks a message as built, the registry and the function that
@@ -219,7 +238,7 @@ function sendAjaxRequest(props) {
       headers["X-CSRF-Token"] = document.getElementsByName("gorilla.csrf.Token")[0].value;
     }
 
-    fetch(props.url, {
+    fetch(withPageLanguage(props.url), {
       method: props.method,
       headers: headers,
       body: props.bodyData,

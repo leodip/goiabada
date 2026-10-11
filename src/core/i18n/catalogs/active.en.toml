@@ -1618,6 +1618,7 @@
 "handler.group.identifier_in_use" = "The group identifier is already in use"
 "handler.group_member.already_member" = "User is already a member of this group"
 "handler.group_member.not_member" = "User is not a member of this group"
+"handler.group_attribute.group_id_required" = "Group ID is required"
 "handler.attribute.value_too_long" = "The attribute value cannot exceed a maximum length of {{.max}} characters"
 
 "handler.user.email_required" = "Email is required"
