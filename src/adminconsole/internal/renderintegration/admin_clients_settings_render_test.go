@@ -2,6 +2,7 @@ package renderintegration
 
 import (
 	"context"
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -305,4 +306,36 @@ func TestRender_AdminClientSettings_WithoutManageTheSwitchIsDisabled(t *testing.
 	asManager := renderClientSettings(t, client, nil)
 	assert.NotContains(t, allowanceSwitchRe.FindString(asManager), "disabled")
 	assert.NotContains(t, asManager, manageOnly)
+}
+
+// The Consent required tooltip keeps what the switch does and says when users are asked whatever it
+// says: a client requesting offline_access or sending prompt=consent, and a client other than the
+// admin console's requesting authserver:manage-account (#509 decision 5). An operator puzzled by an
+// unexpected consent screen looks there first.
+func TestRender_AdminClientSettings_TheConsentTooltipSaysWhenUsersAreAskedRegardless(t *testing.T) {
+	out := renderClientSettings(t, adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "portal"}, nil)
+
+	consentAt := strings.Index(out, `name="consentRequired"`)
+	require.NotEqual(t, -1, consentAt)
+	tips := regexp.MustCompile(`data-tip="([^"]*)"`).FindAllStringSubmatchIndex(out[:consentAt], -1)
+	require.NotEmpty(t, tips, "a tooltip precedes the switch")
+	last := tips[len(tips)-1]
+	tip := html.UnescapeString(out[last[2]:last[3]])
+
+	assert.Equal(t, "Se o consentimento for obrigatório, após a autenticação, o usuário verá a opção de conceder ou "+
+		"negar acesso a escopos específicos do cliente. Independentemente desta opção, os usuários sempre são "+
+		"consultados quando um cliente solicita offline_access ou envia prompt=consent, e quando um cliente que "+
+		"não seja o do console de administração solicita authserver:manage-account.", tip)
+}
+
+// The same sentence in English, which the render above cannot reach, since every page in this
+// package renders in pt-BR.
+func TestConsentRequiredTooltip_English(t *testing.T) {
+	ctx := i18n.WithLocale(context.Background(), true, "en")
+
+	assert.Equal(t, "If consent is required, following the authentication process, the user will be presented with "+
+		"the option to grant or deny access to specific scopes for the client. Whatever this says, users are always "+
+		"asked when a client requests offline_access or sends prompt=consent, and when a client other than the admin "+
+		"console's requests authserver:manage-account.",
+		i18n.T(ctx, "adminconsole.admin_clients.settings.field.consent_required_tooltip"))
 }

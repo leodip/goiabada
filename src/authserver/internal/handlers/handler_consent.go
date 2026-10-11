@@ -15,9 +15,14 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/userconsent"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 )
+
+// manageAccountScope is authserver:manage-account as a request spells it: the scope the Account
+// API takes.
+const manageAccountScope = builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 
 type ScopeInfo struct {
 	Scope            string
@@ -34,13 +39,23 @@ func buildScopeInfoArray(ctx context.Context, scope string, consent *record.User
 
 	scopes := strings.Split(scope, " ")
 	for _, scope := range scopes {
-		if oidc.IsClaimScope(scope) || oidc.IsOfflineAccessScope(scope) {
+		switch {
+		case oidc.IsClaimScope(scope) || oidc.IsOfflineAccessScope(scope):
 			scopeInfoArr = append(scopeInfoArr, ScopeInfo{
 				Scope:            scope,
 				Description:      i18n.T(ctx, oidc.ScopeDescriptionKey(scope)),
 				AlreadyConsented: consent != nil && consent.HasScope(scope),
 			})
-		} else {
+		case scope == manageAccountScope:
+			// The one resource permission described in plain words: a client whose sign-in reaches
+			// this row is asking to edit the user's account through the Account API, and the generic
+			// template below would not say so (#509 decision 4).
+			scopeInfoArr = append(scopeInfoArr, ScopeInfo{
+				Scope:            scope,
+				Description:      i18n.T(ctx, "consent.scope.authserver_manage_account.description"),
+				AlreadyConsented: consent != nil && consent.HasScope(scope),
+			})
+		default:
 			// resource-permission
 			parts := strings.Split(scope, ":")
 			scopeInfoArr = append(scopeInfoArr, ScopeInfo{

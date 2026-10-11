@@ -93,6 +93,7 @@
 "consent.scope.attributes.description" = "Access to the attributes assigned to you by an admin, stored as key-value pairs"
 "consent.scope.offline_access.description" = "Access to an offline refresh token, allowing the client to obtain a new access token without requiring your immediate interaction"
 "consent.scope.permission_template" = "Permission {{.permission}} on resource {{.resource}}"
+"consent.scope.authserver_manage_account.description" = "Manage your account for you: change your profile, phone, address and picture, see and sign out your sessions, and withdraw consents you have given. Changing your email, password or two-factor authentication still needs your password."
 
 # --- Logout confirmation (auth/logout) --------------------------------------
 
@@ -664,7 +665,7 @@
 "adminconsole.admin_clients.settings.acr_level2_mandatory" = "ACR level 3 - password + mandatory OTP"
 "adminconsole.admin_clients.settings.field.enabled" = "Enabled"
 "adminconsole.admin_clients.settings.field.consent_required" = "Consent required"
-"adminconsole.admin_clients.settings.field.consent_required_tooltip" = "If consent is required, following the authentication process, the user will be presented with the option to grant or deny access to specific scopes for the client."
+"adminconsole.admin_clients.settings.field.consent_required_tooltip" = "If consent is required, following the authentication process, the user will be presented with the option to grant or deny access to specific scopes for the client. Whatever this says, users are always asked when a client requests offline_access or sends prompt=consent, and when a client other than the admin console's requests authserver:manage-account."
 "adminconsole.admin_clients.settings.field.administrative_scopes_allowed" = "May request administrative scopes"
 "adminconsole.admin_clients.settings.field.administrative_scopes_allowed_tooltip" = "When enabled, the client may request the administrative scopes (authserver:manage, authserver:admin-read, authserver:manage-users, authserver:manage-clients, authserver:manage-settings and authserver:browser-sessions) on behalf of a signed-in user. A client that is not allowed is refused them. An allowed client is an administrator client, which only authserver:manage can change."
 "adminconsole.admin_clients.settings.administrative_scopes_always_allowed" = "The admin console's client may always request the administrative scopes."
