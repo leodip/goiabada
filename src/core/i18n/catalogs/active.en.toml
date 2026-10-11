@@ -446,16 +446,12 @@
 "adminconsole.account.phone.field.country" = "Phone country"
 "adminconsole.account.phone.country_blank" = "(blank)"
 "adminconsole.account.phone.field.number" = "Phone number"
+"adminconsole.account.phone.field.number_hint" = "Enter the number as it's dialled from another country, after the country code."
 "adminconsole.account.phone.update_button" = "Update phone"
 "adminconsole.account.phone.saved_successfully" = "Phone number updated successfully"
 
 # --- Account phone verification ---------------------------------------------
 
-"adminconsole.account.phone_verify.page_title" = "Account - Phone verification"
-"adminconsole.account.phone_verify.section_title" = "Validate SMS code"
-"adminconsole.account.phone_verify.instructions" = "Kindly check your mobile phone for an SMS message containing a code, and confirm the code provided below."
-"adminconsole.account.phone_verify.field.code" = "Code"
-"adminconsole.account.phone_verify.verify_button" = "Verify phone"
 
 # --- Account change password ------------------------------------------------
 
@@ -929,6 +925,7 @@
 "adminconsole.admin_users.phone.field.country" = "Phone country"
 "adminconsole.admin_users.phone.country_blank" = "(blank)"
 "adminconsole.admin_users.phone.field.number" = "Phone number"
+"adminconsole.admin_users.phone.field.number_hint" = "Enter the number as it's dialled from another country, after the country code."
 "adminconsole.admin_users.phone.field.verified" = "Phone verified"
 
 "adminconsole.admin_users.address.page_title_prefix" = "User - Address - "

@@ -424,16 +424,12 @@
 "adminconsole.account.phone.field.country" = "País do telefone"
 "adminconsole.account.phone.country_blank" = "(em branco)"
 "adminconsole.account.phone.field.number" = "Número de telefone"
+"adminconsole.account.phone.field.number_hint" = "Digite o número como é discado de outro país, depois do código do país."
 "adminconsole.account.phone.update_button" = "Atualizar telefone"
 "adminconsole.account.phone.saved_successfully" = "Número de telefone atualizado com sucesso"
 
 # --- Verificação de telefone da conta ---------------------------------------
 
-"adminconsole.account.phone_verify.page_title" = "Conta - Verificação de telefone"
-"adminconsole.account.phone_verify.section_title" = "Validar código SMS"
-"adminconsole.account.phone_verify.instructions" = "Verifique seu celular pela mensagem SMS contendo um código e confirme-o abaixo."
-"adminconsole.account.phone_verify.field.code" = "Código"
-"adminconsole.account.phone_verify.verify_button" = "Verificar telefone"
 
 # --- Alteração de senha da conta --------------------------------------------
 
@@ -878,6 +874,7 @@
 "adminconsole.admin_users.phone.field.country" = "País do telefone"
 "adminconsole.admin_users.phone.country_blank" = "(em branco)"
 "adminconsole.admin_users.phone.field.number" = "Número de telefone"
+"adminconsole.admin_users.phone.field.number_hint" = "Digite o número como é discado de outro país, depois do código do país."
 "adminconsole.admin_users.phone.field.verified" = "Telefone verificado"
 
 "adminconsole.admin_users.address.page_title_prefix" = "Usuário - Endereço - "

@@ -36,6 +36,67 @@ func TestRender_AccountPhone(t *testing.T) {
 	assert.Contains(t, out, "🇮🇹 - Itália") // RefPhoneCountry: CLDR-localized name
 }
 
+// numberFieldHintRe captures what a phone page renders between its number input and the next
+// form control, which is where the hint under the number field belongs.
+var numberFieldHintRe = regexp.MustCompile(`(?s)<input[^>]*\sname="phoneNumber"[^>]*>(.*?)<(?:input|button|select)\b`)
+
+// Both phone pages tell the user, under the number field, to type the number as it is dialled from
+// another country, after the country code: phone_number is the calling code followed by what was
+// typed, so a habitual trunk 0 (the UK's 07700 900123) would become a claim no one can dial (#563
+// decision 6).
+func TestRender_PhonePagesHintHowToTypeTheNumber(t *testing.T) {
+	hints := map[string]string{
+		"en":    "Enter the number as it's dialled from another country, after the country code.",
+		"pt-BR": "Digite o número como é discado de outro país, depois do código do país.",
+	}
+	for _, page := range []string{"/account_phone.html", "/admin_users_phone.html"} {
+		for locale, hint := range hints {
+			t.Run(page+" "+locale, func(t *testing.T) {
+				out := renderMenuPageIn(t, page, map[string]interface{}{
+					"user":                         &api.UserResponse{Id: 7, Email: "someone@example.com"},
+					"selectedPhoneCountryUniqueId": "PRT_0",
+					"phoneNumber":                  "912 345 678",
+					"phoneNumberVerified":          false,
+					"phoneCountries":               phonecountries.All(),
+					"page":                         "1",
+					"query":                        "",
+					"savedSuccessfully":            false,
+				}, locale, true)
+
+				m := numberFieldHintRe.FindStringSubmatch(out)
+				require.NotNil(t, m, "no form control follows the number field")
+				assert.Contains(t, html.UnescapeString(m[1]), hint, "the hint is not under the number field")
+			})
+		}
+	}
+}
+
+// The account menu marks Phone as the page the user is on at /account/phone, and at no other path.
+func TestRender_AccountMenuMarksThePhonePage(t *testing.T) {
+	phoneItemRe := regexp.MustCompile(`(?s)<li class="([^"]*)">\s*<a href="/account/phone">(.*?)</a>`)
+	bind := map[string]interface{}{
+		"selectedPhoneCountryUniqueId": "",
+		"phoneNumber":                  "",
+		"phoneCountries":               phonecountries.All(),
+		"savedSuccessfully":            false,
+	}
+
+	for _, tc := range []struct {
+		path   string
+		marked bool
+	}{
+		{"/account/phone", true},
+		{"/account/address", false},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			m := phoneItemRe.FindStringSubmatch(renderMenuPageAt(t, tc.path, "/account_phone.html", bind))
+			require.NotNil(t, m, "the account menu has no Phone item")
+			assert.Equal(t, tc.marked, strings.Contains(m[1], "bg-base-300"), "the item's background")
+			assert.Equal(t, tc.marked, strings.Contains(m[2], "bg-primary"), "the item's bar")
+		})
+	}
+}
+
 func TestRender_AccountAddress(t *testing.T) {
 	bind := map[string]interface{}{
 		"user": &api.UserResponse{},
