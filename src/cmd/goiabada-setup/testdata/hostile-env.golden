@@ -28,6 +28,12 @@ GOIABADA_DB_NAME="goiabada"
 GOIABADA_DB_USERNAME="us\"er\\na\$me #x: '"
 GOIABADA_DB_PASSWORD="db: \"pw\" #1 \$(id) \`x\` \\n 
 {a: [b]} 0123"
+# How the auth server protects its connection to the database: disable, prefer, require,
+# verify-ca or verify-full.
+# verify-ca: require, and the certificate must chain to an authority you trust; its host name is not checked.
+# The certificate is checked against the authorities in GOIABADA_DB_TLS_CA_FILE alone.
+GOIABADA_DB_TLS_MODE="verify-ca"
+GOIABADA_DB_TLS_CA_FILE="/etc/ssl/\"db\" \$HOME \`id\` #x: ca's.pem"
 
 # =============================================================================
 # Auth server settings

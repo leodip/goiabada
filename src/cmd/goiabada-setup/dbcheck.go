@@ -10,10 +10,12 @@ import (
 	"time"
 
 	mysqldriver "github.com/go-sql-driver/mysql"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hostport"
-	_ "github.com/microsoft/go-mssqldb"
+	mssql "github.com/microsoft/go-mssqldb"
+	"github.com/microsoft/go-mssqldb/msdsn"
 )
 
 // dbTarget is the database the operator described, in the auth server's DatabaseConfig terms.
@@ -67,14 +69,29 @@ func postgresURL(t dbTarget, database string) string {
 	return u.String()
 }
 
-// postgresConnection is postgresDSN through pgx's database/sql driver.
+// postgresConnection is postgresdb.ConnConfig: postgresDSN through pgx, with the CA file's
+// authorities, which no URL can carry.
 func postgresConnection(t dbTarget) (dbConnection, error) {
-	return dbConnection{driver: "pgx", dsn: postgresDSN(t)}, nil
+	return postgresConnectionFor(t, postgresDSN(t))
 }
 
-// postgresMaintenanceConnection is postgresMaintenanceDSN through pgx's database/sql driver.
+// postgresMaintenanceConnection is postgresdb.MaintenanceConnConfig.
 func postgresMaintenanceConnection(t dbTarget) (dbConnection, error) {
-	return dbConnection{driver: "pgx", dsn: postgresMaintenanceDSN(t)}, nil
+	return postgresConnectionFor(t, postgresMaintenanceDSN(t))
+}
+
+// postgresConnectionFor is postgresdb's connConfig: dsn as pgx reads it, and for a mode that checks
+// the certificate the CA file's authorities, nil leaving the system's roots. pgx's verify-ca check
+// reads the roots off this same configuration.
+func postgresConnectionFor(t dbTarget, dsn string) (dbConnection, error) {
+	c, err := pgx.ParseConfig(dsn)
+	if err != nil {
+		return dbConnection{}, errs.Wrap(err, "unable to parse the connection URL")
+	}
+	if checksCertificate(t.TLSMode) && c.TLSConfig != nil {
+		c.TLSConfig.RootCAs = t.TLSRoots
+	}
+	return dbConnection{driver: "pgx", dsn: dsn, postgres: c}, nil
 }
 
 // mysqlConnection is the connection mysqldb.ConnConfig configures: the driver's configuration
@@ -176,14 +193,33 @@ func mssqlURL(t dbTarget, database string) string {
 	return u.String()
 }
 
-// mssqlConnection is mssqlDSN through go-mssqldb's database/sql driver.
+// mssqlConnection is mssqldb.ConnConfig: mssqlDSN through go-mssqldb, with the CA file's
+// authorities, and verify-ca's check of the chain alone, which no string can carry.
 func mssqlConnection(t dbTarget) (dbConnection, error) {
-	return dbConnection{driver: "sqlserver", dsn: mssqlDSN(t)}, nil
+	return mssqlConnectionFor(t, mssqlDSN(t))
 }
 
-// mssqlMaintenanceConnection is mssqlMaintenanceDSN through go-mssqldb's database/sql driver.
+// mssqlMaintenanceConnection is mssqldb.MaintenanceConnConfig.
 func mssqlMaintenanceConnection(t dbTarget) (dbConnection, error) {
-	return dbConnection{driver: "sqlserver", dsn: mssqlMaintenanceDSN(t)}, nil
+	return mssqlConnectionFor(t, mssqlMaintenanceDSN(t))
+}
+
+// mssqlConnectionFor is mssqldb's connConfig: dsn as go-mssqldb reads it, and for a mode that checks
+// the certificate the CA file's authorities, nil leaving the system's roots. verify-full keeps the
+// driver's own check of the host name; verify-ca turns it off and checks the chain alone.
+func mssqlConnectionFor(t dbTarget, dsn string) (dbConnection, error) {
+	c, err := msdsn.Parse(dsn)
+	if err != nil {
+		return dbConnection{}, errs.Wrap(err, "unable to parse the connection URL")
+	}
+	if checksCertificate(t.TLSMode) && c.TLSConfig != nil {
+		c.TLSConfig.RootCAs = t.TLSRoots
+		if t.TLSMode == "verify-ca" {
+			c.TLSConfig.InsecureSkipVerify = true
+			c.TLSConfig.VerifyConnection = verifyChainOnly(t.TLSRoots)
+		}
+	}
+	return dbConnection{driver: "sqlserver", dsn: dsn, mssql: &c}, nil
 }
 
 // checkTimeout bounds each connection's ping and query, the bound the DSNs used to carry as a
@@ -199,13 +235,16 @@ type dbConn interface {
 	Close() error
 }
 
-// dbConnection is one connection the check opens, as the auth server opens it: a driver and its
-// connection string, or, for MySQL, the driver's configuration, which carries what no MySQL
-// connection string can, a TLS configuration of its own and a username containing `:` (#502).
+// dbConnection is one connection the check opens, as the auth server opens it: from the driver's
+// configuration, which carries what no connection string can, the CA file's authorities and, for
+// MySQL, a TLS configuration of its own and a username containing `:` (#502). PostgreSQL's and SQL
+// Server's are read from dsn, kept beside them.
 type dbConnection struct {
-	driver string
-	dsn    string
-	mysql  *mysqldriver.Config
+	driver   string
+	dsn      string
+	mysql    *mysqldriver.Config
+	postgres *pgx.ConnConfig
+	mssql    *msdsn.Config
 }
 
 // dbOpener opens a connection as sql.Open does: it only parses, and the ping is what dials.
@@ -220,30 +259,38 @@ func (c sqlConn) count(ctx context.Context, query string, args ...any) (int, err
 }
 
 func openSQL(c dbConnection) (dbConn, error) {
-	if c.mysql != nil {
+	switch {
+	case c.mysql != nil:
 		connector, err := mysqldriver.NewConnector(c.mysql)
 		if err != nil {
 			return nil, err
 		}
 		return sqlConn{sql.OpenDB(connector)}, nil
+	case c.postgres != nil:
+		return sqlConn{stdlib.OpenDB(*c.postgres)}, nil
+	case c.mssql != nil:
+		return sqlConn{sql.OpenDB(mssql.NewConnectorConfig(*c.mssql))}, nil
 	}
-	db, err := sql.Open(c.driver, c.dsn)
-	if err != nil {
-		return nil, err
-	}
-	return sqlConn{db}, nil
+	return nil, errs.Errorf("no configuration to open the %s connection from", c.driver)
 }
 
 // testDatabaseConnection checks the database the operator described and reports whether the
 // wizard may go on: true when the auth server can start against it, false when it cannot or the
 // check could not tell.
-func testDatabaseConnection(out *console, e *engine, host, port, name, user, password string) bool {
-	portNumber, err := strconv.Atoi(port)
+func testDatabaseConnection(out *console, c *Config) bool {
+	return checkConfiguredDatabase(out, openSQL, c)
+}
+
+// checkConfiguredDatabase is checkDatabase on the database c describes, dialled with its TLS mode
+// and its CA file's authorities, as the auth server will dial it (#502 decision 7).
+func checkConfiguredDatabase(out *console, open dbOpener, c *Config) bool {
+	port, err := strconv.Atoi(c.DBPort)
 	if err != nil {
-		out.fail("Invalid port %q", port)
+		out.fail("Invalid port %q", c.DBPort)
 		return false
 	}
-	return checkDatabase(out, openSQL, e, dbTarget{Host: host, Port: portNumber, Username: user, Password: password, Name: name})
+	return checkDatabase(out, open, c.Engine, dbTarget{Host: c.DBHost, Port: port, Username: c.DBUsername,
+		Password: c.DBPassword, Name: c.DBName, TLSMode: c.DBTLSMode, TLSRoots: tlsRoots(c.DBTLSCA)})
 }
 
 // checkDatabase follows the auth server's startup order under the files the wizard writes, which

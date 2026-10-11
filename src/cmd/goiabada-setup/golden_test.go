@@ -116,6 +116,27 @@ var answerCases = []goldenCase{
 		c.NetworkPolicy = true
 		c.MetricsNamespace = "monitoring"
 	}},
+	// A verifying TLS mode with a CA file: native binaries name the file's absolute path, and
+	// Kubernetes carries its PEM in a ConfigMap mounted into the auth server's pod (#502 decisions 7
+	// and 8). verify-ca with no CA file checks against the system's roots and names no file.
+	{name: "native-verify-full-postgres", deployment: deploymentNative, engine: "postgres", answers: func(c *Config) {
+		c.DBTLSMode, c.DBTLSCAFile, c.DBTLSCA = "verify-full", "/etc/ssl/goiabada/db-ca.pem", goldenCA()
+	}},
+	{name: "kubernetes-verify-full-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.DBTLSMode, c.DBTLSCAFile, c.DBTLSCA = "verify-full", "/home/operator/db-ca.pem", goldenCA()
+	}},
+	{name: "kubernetes-verify-ca-mysql", deployment: deploymentKubernetes, engine: "mysql", answers: func(c *Config) {
+		c.DBTLSMode = "verify-ca"
+	}},
+}
+
+// goldenCA is the test authority's certificate, which the CA file's goldens carry.
+func goldenCA() string {
+	content, err := os.ReadFile(testCAFile)
+	if err != nil {
+		panic(err)
+	}
+	return string(content)
 }
 
 // hostileCases are one configuration per format, Compose, Kubernetes and the env file, whose
@@ -153,6 +174,11 @@ func hostileConfig(config *Config) {
 	}
 	if config.DBUsername != "" {
 		config.DBUsername = "us\"er\\na$me #x: '"
+	}
+	// The CA file's path is the operator's, written by native binaries alone.
+	if config.Deployment.kind == deploymentNative && config.Engine.hasServer {
+		config.DBTLSMode = "verify-ca"
+		config.DBTLSCAFile = "/etc/ssl/\"db\" $HOME `id` #x: ca's.pem"
 	}
 }
 
@@ -214,6 +240,12 @@ func goldenConfig(kind deploymentType, engineName string) *Config {
 	}
 	config.PodMonitorLabels = nil
 	config.MetricsNamespace = ""
+	// The two types reaching the operator's database ask its TLS mode, prefer by default, and a CA
+	// file only for verify-ca and verify-full; Compose writes prefer and asks nothing (#502).
+	config.DBTLSMode, config.DBTLSCAFile, config.DBTLSCA = "", "", ""
+	if config.Engine.hasServer {
+		config.DBTLSMode = "prefer"
+	}
 	return config
 }
 

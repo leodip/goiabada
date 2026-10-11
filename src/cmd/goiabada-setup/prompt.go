@@ -174,8 +174,13 @@ func (a asker) ask(read func(prompt string) (string, error), prompt, defaultValu
 
 // choice asks until the answer is one of validChoices, offering the first as the default.
 func (a asker) choice(prompt string, validChoices []string) (string, error) {
+	return a.choiceOffering(prompt, validChoices, validChoices[0])
+}
+
+// choiceOffering asks until the answer is one of validChoices, offering defaultChoice.
+func (a asker) choiceOffering(prompt string, validChoices []string, defaultChoice string) (string, error) {
 	for {
-		input, err := a.text(prompt, validChoices[0])
+		input, err := a.text(prompt, defaultChoice)
 		if err != nil {
 			return "", err
 		}

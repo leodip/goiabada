@@ -815,6 +815,7 @@ func TestKubernetesManifest_GivesEachProcessAConfigMapOfItsOwn(t *testing.T) {
 			"GOIABADA_DB_HOST",
 			"GOIABADA_DB_NAME",
 			"GOIABADA_DB_PORT",
+			"GOIABADA_DB_TLS_MODE",
 			"GOIABADA_DB_TYPE",
 			"GOIABADA_DB_USERNAME",
 		},

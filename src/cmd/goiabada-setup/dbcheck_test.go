@@ -577,7 +577,9 @@ func TestCheckDatabase_FollowsTheServersStartupOrder(t *testing.T) {
 // dialling port 0.
 func TestTestDatabaseConnection_RefusesAPortThatIsNotANumber(t *testing.T) {
 	var buf bytes.Buffer
-	if testDatabaseConnection(&console{w: &buf}, testEngine("postgres"), "db.example.com", "54x", "goiabada", "goiabada", "pw") {
+	config := goldenConfig(deploymentNative, "postgres")
+	config.DBPort = "54x"
+	if testDatabaseConnection(&console{w: &buf}, config) {
 		t.Fatal("the check passed with port 54x")
 	}
 	if !strings.Contains(buf.String(), `Invalid port "54x"`) {

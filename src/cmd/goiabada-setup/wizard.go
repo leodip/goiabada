@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/leodip/goiabada/core/adminpassword"
@@ -26,8 +27,9 @@ type wizard struct {
 	// and the auth server host's parent otherwise, and none for a host without one.
 	defaultAdminEmail string
 	paths             outputPaths
-	// testConnection dials the database the operator described and reports what it found.
-	testConnection func(out *console, e *engine, host, port, name, user, password string) bool
+	// testConnection dials the database the Config describes, with its TLS mode and CA file, and
+	// reports what it found.
+	testConnection func(out *console, c *Config) bool
 }
 
 func newWizard(flags *CLIFlags, in prompter, out *console) *wizard {
@@ -703,7 +705,10 @@ func (w *wizard) askDatabaseConnection() error {
 		if err := w.databaseConnectionFromFlags(); err != nil {
 			return err
 		}
-		if !w.flags.SkipDBTest && !w.testConnection(w.out, c.Engine, c.DBHost, c.DBPort, c.DBName, c.DBUsername, c.DBPassword) {
+		if err := w.databaseTLSFromFlags(); err != nil {
+			return err
+		}
+		if !w.flags.SkipDBTest && !w.testConnection(w.out, c) {
 			w.out.warning("Database connection test failed. Configuration will still be generated.")
 		}
 		return nil
@@ -744,7 +749,7 @@ func (w *wizard) askDatabaseConnection() error {
 		if err != nil {
 			return err
 		}
-		if !test || w.testConnection(w.out, c.Engine, c.DBHost, c.DBPort, c.DBName, c.DBUsername, c.DBPassword) {
+		if !test || w.testConnection(w.out, c) {
 			return nil
 		}
 
@@ -787,7 +792,98 @@ func (w *wizard) databaseConnectionFromPrompts(defaultHost string) error {
 	if c.DBUsername, err = w.nonEmpty("Database username", c.Engine.defaultUser); err != nil {
 		return err
 	}
-	return w.databasePasswordFromPrompt()
+	if err = w.databasePasswordFromPrompt(); err != nil {
+		return err
+	}
+	return w.databaseTLSFromPrompts()
+}
+
+// databaseTLSFromPrompts asks how the auth server protects its connection to the database, from a
+// menu of the five modes offering the one answered before, prefer the first time, as the auth
+// server does unset; then, for verify-ca and verify-full alone, the CA file, blank for the system's
+// roots, asked again while the auth server would refuse it (#502 decision 7).
+func (w *wizard) databaseTLSFromPrompts() error {
+	c := w.config
+	w.out.println()
+	w.out.println("How should the auth server protect its connection to the database?")
+	choices := make([]string, 0, len(tlsModes))
+	offered := ""
+	for i, m := range tlsModes {
+		number := strconv.Itoa(i + 1)
+		choices = append(choices, number)
+		if m.name == c.DBTLSMode || (offered == "" && m.name == defaultTLSMode) {
+			offered = number
+		}
+		w.out.printf("  %s. %s: %s\n", number, m.name, m.description)
+	}
+	w.out.println("Only verify-full makes sure the auth server reached your database and nothing in between.")
+	w.out.println()
+	choice, err := w.choiceOffering(fmt.Sprintf("Select TLS mode [1-%d]", len(choices)), choices, offered)
+	if err != nil {
+		return err
+	}
+	index, _ := strconv.Atoi(choice)
+	c.DBTLSMode, c.DBTLSCAFile, c.DBTLSCA = tlsModes[index-1].name, "", ""
+	if !checksCertificate(c.DBTLSMode) {
+		w.warnUncheckedTLS()
+		return nil
+	}
+	_, err = w.validated("CA file the database's certificate chains to (PEM), blank for the system's roots", "", "CA file",
+		func(path string) error {
+			if path == "" {
+				return nil
+			}
+			absolute, certificates, refused := readCAFile(path)
+			c.DBTLSCAFile, c.DBTLSCA = absolute, certificates
+			return refused
+		})
+	return err
+}
+
+// databaseTLSFromFlags is databaseTLSFromPrompts answered by --db-tls-mode, prefer when left out,
+// and --db-tls-ca-file, refused as the auth server refuses GOIABADA_DB_TLS_CA_FILE: beside a mode
+// that checks no certificate, unreadable, or holding no PEM certificate (#502 decisions 4 and 7).
+func (w *wizard) databaseTLSFromFlags() error {
+	c := w.config
+	mode := w.flags.DBTLSMode
+	if mode == "" {
+		mode = defaultTLSMode
+	}
+	if !knownTLSMode(mode) {
+		return errs.Errorf("invalid --db-tls-mode %q: use %s", mode, orList(tlsModeNames()))
+	}
+	c.DBTLSMode = mode
+	w.out.info("Database TLS mode: %s", mode)
+	if !checksCertificate(mode) {
+		if w.flags.DBTLSCAFile != "" {
+			described := mode
+			if w.flags.DBTLSMode == "" {
+				described = "left out, so " + mode
+			}
+			return errs.Errorf("--db-tls-ca-file is set while --db-tls-mode is %s, which checks no certificate: only verify-ca and verify-full read a CA file", described)
+		}
+		w.warnUncheckedTLS()
+		return nil
+	}
+	if w.flags.DBTLSCAFile == "" {
+		w.out.info("Database CA: the system's roots")
+		return nil
+	}
+	absolute, certificates, err := readCAFile(w.flags.DBTLSCAFile)
+	if err != nil {
+		return errs.Wrap(err, "invalid --db-tls-ca-file")
+	}
+	c.DBTLSCAFile, c.DBTLSCA = absolute, certificates
+	w.out.info("Database CA file: %s", absolute)
+	return nil
+}
+
+// warnUncheckedTLS is #502 decision 3's warning at the moment a mode that checks no certificate is
+// chosen, for a database the operator runs, which the auth server may reach across any network.
+func (w *wizard) warnUncheckedTLS() {
+	w.out.warning("GOIABADA_DB_TLS_MODE is %s, which checks no certificate: the auth server cannot tell", w.config.DBTLSMode)
+	w.out.println("   whether it reached your database or something in between, which could then read and")
+	w.out.println("   change everything Goiabada stores. verify-full checks it.")
 }
 
 func (w *wizard) databaseConnectionFromFlags() error {
@@ -826,11 +922,23 @@ func (w *wizard) databaseConnectionFromFlags() error {
 }
 
 // askDatabasePassword is a database the generated compose file runs, which needs only a password.
+// Its TLS mode is not asked: the Compose file writes prefer, what the auth server does unset, and
+// the warning says why that is safe there (#502 decision 7).
 func (w *wizard) askDatabasePassword() error {
+	var err error
 	if w.interactive {
-		return w.databasePasswordFromPrompt()
+		err = w.databasePasswordFromPrompt()
+	} else {
+		err = w.databasePasswordFromFlags()
 	}
-	return w.databasePasswordFromFlags()
+	if err != nil {
+		return err
+	}
+	w.config.DBTLSMode = composeDBTLSMode
+	w.out.warning("GOIABADA_DB_TLS_MODE is %s, which checks no certificate. The database runs on", composeDBTLSMode)
+	w.out.println("   this Compose file's own network, so the connection never leaves this host. If you move")
+	w.out.println("   the database off it, set GOIABADA_DB_TLS_MODE to verify-full.")
+	return nil
 }
 
 // databasePasswordFromPrompt reads the database password hidden, offering a generated one, which is

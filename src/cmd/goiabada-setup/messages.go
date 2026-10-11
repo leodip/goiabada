@@ -63,6 +63,16 @@ func printSummary(out *console, config *Config) {
 	if config.DBPassword != "" {
 		out.printf("  DB Password:      %s\n", passwordOrigin(config.DBPasswordGenerated))
 	}
+	if config.DBTLSMode != "" {
+		out.printf("  DB TLS mode:      %s\n", config.DBTLSMode)
+	}
+	if checksCertificate(config.DBTLSMode) {
+		if config.DBTLSCAFile != "" {
+			out.printf("  DB CA file:       %s\n", config.DBTLSCAFile)
+		} else {
+			out.println("  DB CA file:       none, the system's roots")
+		}
+	}
 	out.println()
 	out.printf("%s%s==========================================================%s\n", out.bold, out.cyan, out.reset)
 }
