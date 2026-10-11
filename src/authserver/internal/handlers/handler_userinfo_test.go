@@ -173,33 +173,35 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		userAttr := record.UserAttribute{Key: "userAttr", Value: "userValue", IncludeInIdToken: true}
 
 		user := &record.User{
-			Id:                  1,
-			Subject:             sub,
-			Enabled:             true,
-			Username:            "testuser",
-			Email:               "test@example.com",
-			EmailVerified:       true,
-			GivenName:           "Test",
-			MiddleName:          "Middle",
-			FamilyName:          "User",
-			Nickname:            "Testy",
-			Website:             "https://example.com",
-			Gender:              "male",
-			BirthDate:           sql.NullTime{Time: birthDate, Valid: true},
-			ZoneInfo:            "Europe/London",
-			ZoneInfoCountryName: "United Kingdom",
-			Locale:              "en-GB",
-			PhoneNumber:         "+1234567890",
-			PhoneNumberVerified: true,
-			AddressLine1:        "123 Test St",
-			AddressLine2:        "Apt 4",
-			AddressLocality:     "Test City",
-			AddressRegion:       "Test Region",
-			AddressPostalCode:   "12345",
-			AddressCountry:      "Test Country",
-			UpdatedAt:           sql.NullTime{Time: time.Now(), Valid: true},
-			Groups:              []record.Group{group1, group2},
-			Attributes:          []record.UserAttribute{userAttr},
+			Id:                            1,
+			Subject:                       sub,
+			Enabled:                       true,
+			Username:                      "testuser",
+			Email:                         "test@example.com",
+			EmailVerified:                 true,
+			GivenName:                     "Test",
+			MiddleName:                    "Middle",
+			FamilyName:                    "User",
+			Nickname:                      "Testy",
+			Website:                       "https://example.com",
+			Gender:                        "male",
+			BirthDate:                     sql.NullTime{Time: birthDate, Valid: true},
+			ZoneInfo:                      "Europe/London",
+			ZoneInfoCountryName:           "United Kingdom",
+			Locale:                        "en-GB",
+			PhoneNumberCountryUniqueId:    "PRT_0",
+			PhoneNumberCountryCallingCode: "+351",
+			PhoneNumber:                   "912 345 678",
+			PhoneNumberVerified:           true,
+			AddressLine1:                  "123 Test St",
+			AddressLine2:                  "Apt 4",
+			AddressLocality:               "Test City",
+			AddressRegion:                 "Test Region",
+			AddressPostalCode:             "12345",
+			AddressCountry:                "Test Country",
+			UpdatedAt:                     sql.NullTime{Time: time.Now(), Valid: true},
+			Groups:                        []record.Group{group1, group2},
+			Attributes:                    []record.UserAttribute{userAttr},
 		}
 
 		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
@@ -222,7 +224,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 			assert.Equal(t, "1990-01-01", claims["birthdate"])
 			assert.Equal(t, user.ZoneInfo, claims["zoneinfo"])
 			assert.Equal(t, user.Locale, claims["locale"])
-			assert.Equal(t, user.PhoneNumber, claims["phone_number"])
+			assert.Equal(t, "+351912345678", claims["phone_number"])
 			assert.Equal(t, user.PhoneNumberVerified, claims["phone_number_verified"])
 			assert.Equal(t, user.FullName(), claims["name"])
 

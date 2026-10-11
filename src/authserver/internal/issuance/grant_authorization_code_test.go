@@ -59,29 +59,31 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 7200,
 	}
 	user := &record.User{
-		Id:                  1,
-		UpdatedAt:           sql.NullTime{Time: time.Now().Add(-1 * time.Minute), Valid: true},
-		Subject:             sub,
-		Email:               "test@example.com",
-		EmailVerified:       true,
-		Username:            "testuser",
-		GivenName:           "Test",
-		MiddleName:          "Middle",
-		FamilyName:          "User",
-		Nickname:            "Testy",
-		Website:             "https://test.com",
-		Gender:              "male",
-		BirthDate:           sql.NullTime{Time: time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
-		ZoneInfo:            "Europe/London",
-		Locale:              "en-GB",
-		PhoneNumber:         "+1234567890",
-		PhoneNumberVerified: true,
-		AddressLine1:        "123 Test St",
-		AddressLine2:        "apartment 1",
-		AddressLocality:     "Test City",
-		AddressRegion:       "Test Region",
-		AddressPostalCode:   "12345",
-		AddressCountry:      "Test Country",
+		Id:                            1,
+		UpdatedAt:                     sql.NullTime{Time: time.Now().Add(-1 * time.Minute), Valid: true},
+		Subject:                       sub,
+		Email:                         "test@example.com",
+		EmailVerified:                 true,
+		Username:                      "testuser",
+		GivenName:                     "Test",
+		MiddleName:                    "Middle",
+		FamilyName:                    "User",
+		Nickname:                      "Testy",
+		Website:                       "https://test.com",
+		Gender:                        "male",
+		BirthDate:                     sql.NullTime{Time: time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
+		ZoneInfo:                      "Europe/London",
+		Locale:                        "en-GB",
+		PhoneNumberCountryUniqueId:    "PRT_0",
+		PhoneNumberCountryCallingCode: "+351",
+		PhoneNumber:                   "912-345-678",
+		PhoneNumberVerified:           true,
+		AddressLine1:                  "123 Test St",
+		AddressLine2:                  "apartment 1",
+		AddressLocality:               "Test City",
+		AddressRegion:                 "Test Region",
+		AddressPostalCode:             "12345",
+		AddressCountry:                "Test Country",
 		Groups: []record.Group{
 			{GroupIdentifier: "group1", IncludeInIdToken: true, IncludeInAccessToken: true},
 			{GroupIdentifier: "group2", IncludeInIdToken: true, IncludeInAccessToken: false},
@@ -162,7 +164,7 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 	assert.NotEmpty(t, idClaims["updated_at"])
 	assert.Equal(t, user.Email, idClaims["email"])
 	assert.Equal(t, user.EmailVerified, idClaims["email_verified"])
-	assert.Equal(t, user.PhoneNumber, idClaims["phone_number"])
+	assert.Equal(t, "+351912345678", idClaims["phone_number"])
 	assert.Equal(t, user.PhoneNumberVerified, idClaims["phone_number_verified"])
 	address, ok := idClaims["address"].(map[string]interface{})
 	assert.True(t, ok)
@@ -224,7 +226,7 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 	assert.NotEmpty(t, accessClaims["updated_at"])
 	assert.Equal(t, user.Email, accessClaims["email"])
 	assert.Equal(t, user.EmailVerified, accessClaims["email_verified"])
-	assert.Equal(t, user.PhoneNumber, accessClaims["phone_number"])
+	assert.Equal(t, "+351912345678", accessClaims["phone_number"])
 	assert.Equal(t, user.PhoneNumberVerified, accessClaims["phone_number_verified"])
 	address, ok = accessClaims["address"].(map[string]interface{})
 	assert.True(t, ok)

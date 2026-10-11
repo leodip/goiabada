@@ -378,29 +378,31 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 		IncludeOpenIDConnectClaimsInIdToken: "on",
 	}
 	user := &record.User{
-		Id:                  1,
-		Subject:             sub,
-		Email:               "test@example.com",
-		EmailVerified:       true,
-		Username:            "testuser",
-		GivenName:           "Test",
-		MiddleName:          "Middle",
-		FamilyName:          "User",
-		Nickname:            "Testy",
-		Website:             "https://test.com",
-		Gender:              "male",
-		BirthDate:           sql.NullTime{Time: time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
-		ZoneInfo:            "Europe/London",
-		Locale:              "en-GB",
-		PhoneNumber:         "+1234567890",
-		PhoneNumberVerified: true,
-		AddressLine1:        "123 Test St",
-		AddressLine2:        "Apt 4",
-		AddressLocality:     "Testville",
-		AddressRegion:       "Testshire",
-		AddressPostalCode:   "TE1 2ST",
-		AddressCountry:      "Testland",
-		UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
+		Id:                            1,
+		Subject:                       sub,
+		Email:                         "test@example.com",
+		EmailVerified:                 true,
+		Username:                      "testuser",
+		GivenName:                     "Test",
+		MiddleName:                    "Middle",
+		FamilyName:                    "User",
+		Nickname:                      "Testy",
+		Website:                       "https://test.com",
+		Gender:                        "male",
+		BirthDate:                     sql.NullTime{Time: time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
+		ZoneInfo:                      "Europe/London",
+		Locale:                        "en-GB",
+		PhoneNumberCountryUniqueId:    "PRT_0",
+		PhoneNumberCountryCallingCode: "+351",
+		PhoneNumber:                   "912 345 678",
+		PhoneNumberVerified:           true,
+		AddressLine1:                  "123 Test St",
+		AddressLine2:                  "Apt 4",
+		AddressLocality:               "Testville",
+		AddressRegion:                 "Testshire",
+		AddressPostalCode:             "TE1 2ST",
+		AddressCountry:                "Testland",
+		UpdatedAt:                     sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
 		Groups: []record.Group{
 			{GroupIdentifier: "group1", IncludeInIdToken: true},
 			{GroupIdentifier: "group2", IncludeInIdToken: false},
@@ -452,7 +454,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	assert.Equal(t, user.Locale, claims["locale"])
 	assert.Equal(t, user.Email, claims["email"])
 	assert.Equal(t, user.EmailVerified, claims["email_verified"])
-	assert.Equal(t, user.PhoneNumber, claims["phone_number"])
+	assert.Equal(t, "+351912345678", claims["phone_number"])
 	assert.Equal(t, user.PhoneNumberVerified, claims["phone_number_verified"])
 
 	address := claims["address"].(map[string]interface{})
