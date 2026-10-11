@@ -1981,3 +1981,77 @@ func TestHandleConsentPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 }
+
+// The consent screen's row for authserver:manage-account says in plain words what the scope lets a
+// client do, in the request's locale, because after #509 decision 1 that row is what a user reads
+// before handing an application their account. The row keeps the scope's name, which the
+// template's checkbox carries, and every other resource permission, the other authserver ones
+// included, keeps the generic template (decision 4).
+func TestHandleConsentGet_DescribesManageAccountInPlainWords(t *testing.T) {
+	testCases := []struct {
+		locale        string
+		manageAccount string
+		manageUsers   string
+		customRead    string
+	}{
+		{
+			locale: "en",
+			manageAccount: "Manage your account for you: change your profile, phone, address and picture, " +
+				"see and sign out your sessions, and withdraw consents you have given. Changing your email, " +
+				"password or two-factor authentication still needs your password.",
+			manageUsers: "Permission manage-users on resource authserver",
+			customRead:  "Permission read on resource custom",
+		},
+		{
+			locale: "pt-BR",
+			manageAccount: "Gerenciar sua conta por você: alterar seu perfil, telefone, endereço e foto, ver e " +
+				"encerrar suas sessões e revogar consentimentos que você deu. Alterar seu e-mail, senha ou " +
+				"autenticação de dois fatores ainda exige sua senha.",
+			manageUsers: "Permissão manage-users no recurso authserver",
+			customRead:  "Permissão read no recurso custom",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.locale, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+
+			req := httptest.NewRequest(http.MethodGet, "/auth/consent?ceremony="+testCeremonyId, nil)
+			req = req.WithContext(i18n.WithLocale(req.Context(), true, tc.locale))
+			rr := httptest.NewRecorder()
+
+			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
+				CeremonyId: testCeremonyId,
+				AuthState:  ceremony.AuthStateRequiresConsent,
+				UserId:     1,
+				ClientId:   "portal",
+				Scope:      "openid authserver:manage-account authserver:manage-users custom:read",
+			}, nil)
+			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "portal").
+				Return(&record.Client{Id: 3, ClientIdentifier: "portal"}, nil)
+			database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(3)).Return(nil, nil)
+
+			var rendered map[string]interface{}
+			pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/consent.html",
+				mock.MatchedBy(func(data map[string]interface{}) bool {
+					rendered = data
+					return true
+				})).Return(nil)
+
+			handler.ServeHTTP(rr, req)
+
+			require.NotNil(t, rendered, "the consent screen is rendered")
+			scopes, ok := rendered["scopes"].([]ScopeInfo)
+			require.True(t, ok)
+			require.Len(t, scopes, 4)
+			assert.Equal(t, ScopeInfo{Scope: "authserver:manage-account", Description: tc.manageAccount}, scopes[1])
+			assert.Equal(t, ScopeInfo{Scope: "authserver:manage-users", Description: tc.manageUsers}, scopes[2])
+			assert.Equal(t, ScopeInfo{Scope: "custom:read", Description: tc.customRead}, scopes[3])
+		})
+	}
+}

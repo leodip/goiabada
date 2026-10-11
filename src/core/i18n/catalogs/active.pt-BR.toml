@@ -91,6 +91,7 @@
 "consent.scope.attributes.description" = "Acesso aos atributos atribuídos a você por um administrador, armazenados como pares de chave-valor"
 "consent.scope.offline_access.description" = "Acesso a um token de atualização offline, permitindo que o cliente obtenha um novo token de acesso sem exigir sua interação imediata"
 "consent.scope.permission_template" = "Permissão {{.permission}} no recurso {{.resource}}"
+"consent.scope.authserver_manage_account.description" = "Gerenciar sua conta por você: alterar seu perfil, telefone, endereço e foto, ver e encerrar suas sessões e revogar consentimentos que você deu. Alterar seu e-mail, senha ou autenticação de dois fatores ainda exige sua senha."
 
 # --- Confirmação de logout (auth/logout) -------------------------------------
 
@@ -627,7 +628,7 @@
 "adminconsole.admin_clients.settings.acr_level2_mandatory" = "ACR nível 3 - senha + OTP obrigatório"
 "adminconsole.admin_clients.settings.field.enabled" = "Habilitado"
 "adminconsole.admin_clients.settings.field.consent_required" = "Consentimento obrigatório"
-"adminconsole.admin_clients.settings.field.consent_required_tooltip" = "Se o consentimento for obrigatório, após a autenticação, o usuário verá a opção de conceder ou negar acesso a escopos específicos do cliente."
+"adminconsole.admin_clients.settings.field.consent_required_tooltip" = "Se o consentimento for obrigatório, após a autenticação, o usuário verá a opção de conceder ou negar acesso a escopos específicos do cliente. Independentemente desta opção, os usuários sempre são consultados quando um cliente solicita offline_access ou envia prompt=consent, e quando um cliente que não seja o do console de administração solicita authserver:manage-account."
 "adminconsole.admin_clients.settings.field.administrative_scopes_allowed" = "Pode solicitar escopos administrativos"
 "adminconsole.admin_clients.settings.field.administrative_scopes_allowed_tooltip" = "Quando habilitado, o cliente pode solicitar os escopos administrativos (authserver:manage, authserver:admin-read, authserver:manage-users, authserver:manage-clients, authserver:manage-settings e authserver:browser-sessions) em nome de um usuário autenticado. Um cliente sem essa autorização tem esses escopos recusados. Um cliente autorizado é um cliente administrador, que apenas authserver:manage pode alterar."
 "adminconsole.admin_clients.settings.administrative_scopes_always_allowed" = "O cliente do console de administração sempre pode solicitar os escopos administrativos."
