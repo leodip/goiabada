@@ -208,7 +208,9 @@ func runCredential(m *RateLimiter, route credentialRoute, req *http.Request, fai
 // TestSharedCredentialTiers_CountInTheStoreUnderTheirDigestedKeys is #394 decision 1's line between
 // the tiers: the five credential tiers, and only they, count in the store a server engine hands the
 // limiter, each under decision 3's digest of its own name and key. The per-IP and mail tiers stay in
-// this process, so a flood costs the database nothing.
+// this process, so a flood costs the database nothing; that includes pwd_ip and ropc_ip, which count
+// wrong passwords like the credential tiers but by the client's address alone, and so a password
+// route asks the store for its two account buckets and nothing else (#564 decision 3).
 func TestSharedCredentialTiers_CountInTheStoreUnderTheirDigestedKeys(t *testing.T) {
 	for _, route := range credentialRoutes() {
 		t.Run(route.name, func(t *testing.T) {

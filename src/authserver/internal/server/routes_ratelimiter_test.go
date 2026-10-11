@@ -98,7 +98,13 @@ const (
 	otpBudget                   = 5 // failures per 15 minutes per user id
 	otpWindow                   = 900
 
-	routesTestClientId   = "test-client"
+	routesTestClientId = "test-client"
+	// A public client the password grant is enabled for, so a password grant naming it reaches
+	// the password check, and a wrong password spends the failures-only tiers there.
+	routesTestROPCClientId = "ropc-client"
+	// The two per-address password tiers: failures per minute per /64 (#564 decision 2).
+	pwdIpBudget          = 30
+	pwdIpWindow          = 60
 	routesTestCeremonyId = "9f1c2c2f-2a0f-4a3b-8b6d-1f0a5c9e7d21"
 	// A well-formed base32 TOTP secret, so the code the OTP case submits is refused for
 	// being wrong rather than for the secret being unreadable.
@@ -167,6 +173,10 @@ func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Serv
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestClientId).
 		Return(&record.Client{Id: 1, ClientIdentifier: routesTestClientId}, nil).Maybe()
 	database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(false, nil).Maybe()
+	ropcEnabled := true
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestROPCClientId).
+		Return(&record.Client{Id: 2, ClientIdentifier: routesTestROPCClientId, Enabled: true, IsPublic: true,
+			ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled}, nil).Maybe()
 
 	// The limiter on, which initRoutes reads when it builds the limiter.
 	cfg := &config.Config{}
@@ -429,9 +439,6 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 		shape   rejectShape
 		request func(attempt int) *http.Request
 	}{
-		{"POST /auth/pwd", 30, 60, shapeBrowser, func(int) *http.Request {
-			return browserRequest(http.MethodPost, "/auth/pwd")
-		}},
 		{"POST /forgot-password", forgotPwdIpBudget, forgotPwdWindow, shapeBrowser, func(attempt int) *http.Request {
 			// A distinct address per request, so the per-email tier of 5 cannot trip and
 			// the refusal below is attributable to the per-IP tier this case names. The
@@ -456,18 +463,26 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 			r.Header.Set("Content-Type", "application/json")
 			return withRoutesTestSettings(r)
 		}},
-		{"POST /auth/token", 30, 60, shapeOAuth, func(int) *http.Request {
-			// grant_type=password, or LimitROPC hands the request straight to the handler:
-			// the other grants carry no resource-owner password for it to bound.
-			return browserForm(http.MethodPost, "/auth/token",
-				"grant_type=password&username=victim@example.com&password="+routesTestWrongPassword)
-		}},
 	} {
 		t.Run(tc.name+" is limited", func(t *testing.T) {
 			server := newRoutesTestServer(t)
 			assertRefused(t, exhaust(t, server, tc.budget, tc.request), tc.window, tc.shape)
 		})
 	}
+
+	// The two per-address password tiers count wrong passwords only (#564 decision 2), so each
+	// is spent through a real password check that fails: a sign-in form inside a ceremony, and a
+	// password grant from a public client the grant is enabled for. A distinct account per
+	// guess, so the tight account tier of 10 cannot be what refuses.
+	t.Run("POST /auth/pwd is limited", func(t *testing.T) {
+		server := newRoutesTestServer(t)
+		assertRefused(t, exhaust(t, server, pwdIpBudget, pwdGuess(t, server)), pwdIpWindow, shapeBrowser)
+	})
+
+	t.Run("POST /auth/token is limited", func(t *testing.T) {
+		server := newRoutesTestServer(t)
+		assertRefused(t, exhaust(t, server, pwdIpBudget, ropcGuess), pwdIpWindow, shapeOAuth)
+	})
 
 	// The last registration, and the only one whose tier is keyed on something the request
 	// cannot carry by itself: LimitOtp reads the user id out of the auth context and counts
@@ -658,17 +673,33 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 	})
 
 	t.Run("the password form and the ROPC grant hold separate IP budgets", func(t *testing.T) {
-		// Both are 30 requests per minute on the client block. The reject class already
+		// Both are 30 failures per minute on the client block. The reject class already
 		// separates them, browser against OAuth, and this says the counters are separate
 		// too, which is what decision 7's split of the old composite key rests on.
 		server := newRoutesTestServer(t)
-		assertRefused(t, exhaust(t, server, 30, func(int) *http.Request {
-			return browserRequest(http.MethodPost, "/auth/pwd")
-		}), 60, shapeBrowser)
+		assertRefused(t, exhaust(t, server, pwdIpBudget, pwdGuess(t, server)), pwdIpWindow, shapeBrowser)
 
-		assert.True(t, reachesHandler(server, browserForm(http.MethodPost, "/auth/token",
-			"grant_type=password&username=victim@example.com&password="+routesTestWrongPassword)),
+		assert.True(t, reachesHandler(server, ropcGuess(pwdIpBudget)),
 			"the ROPC grant keeps its own budget when the password form's is spent")
+	})
+
+	// What the per-address tiers count since #564: a request whose password is not found wrong
+	// spends nothing. Requests that check no password stand for it here, an empty sign-in form
+	// and a password grant naming a client the grant is not enabled for, which this test server
+	// can answer without a real account; the middleware's own tests drive successful checks.
+	t.Run("password checks that do not fail spend no per-address budget", func(t *testing.T) {
+		server := newRoutesTestServer(t)
+		cookie := pwdCeremonyCookie(t, server)
+		for i := 0; i < 2*pwdIpBudget; i++ {
+			empty := browserForm(http.MethodPost, "/auth/pwd", "ceremonyId="+routesTestCeremonyId)
+			empty.AddCookie(cookie)
+			require.True(t, reachesHandler(server, empty), "empty sign-in form %d", i+1)
+			require.True(t, reachesHandler(server, browserForm(http.MethodPost, "/auth/token",
+				"grant_type=password&client_id="+routesTestClientId+"&username=user"+strconv.Itoa(i)+
+					"%40example.com&password="+routesTestWrongPassword)), "unauthenticated password grant %d", i+1)
+		}
+		assertRefused(t, exhaust(t, server, pwdIpBudget, pwdGuess(t, server)), pwdIpWindow, shapeBrowser)
+		assertRefused(t, exhaust(t, server, pwdIpBudget, ropcGuess), pwdIpWindow, shapeOAuth)
 	})
 }
 
@@ -802,6 +833,28 @@ func newDefaultRoutesTestServer(t *testing.T) *Server {
 	})
 }
 
+// pwdGuess is a wrong password at the sign-in form, inside a ceremony at the password step, for a
+// distinct account per attempt. The database mock knows no account, so each takes the handler's
+// unknown-address branch, which charges the failure as a wrong password does.
+func pwdGuess(t *testing.T, s *Server) func(attempt int) *http.Request {
+	t.Helper()
+	cookie := pwdCeremonyCookie(t, s)
+	return func(attempt int) *http.Request {
+		r := browserForm(http.MethodPost, "/auth/pwd", "ceremonyId="+routesTestCeremonyId+
+			"&email=user"+strconv.Itoa(attempt)+"%40example.com&password="+routesTestWrongPassword)
+		r.AddCookie(cookie)
+		return r
+	}
+}
+
+// ropcGuess is a wrong password through the password grant, from the public client the grant is
+// enabled for, for a distinct account per attempt: answered invalid_grant, which charges the
+// failure.
+func ropcGuess(attempt int) *http.Request {
+	return browserForm(http.MethodPost, "/auth/token", "grant_type=password&client_id="+routesTestROPCClientId+
+		"&username=user"+strconv.Itoa(attempt)+"%40example.com&password="+routesTestWrongPassword)
+}
+
 // pwdCeremonyCookie mints the session cookie a browser at the password form carries: an auth context
 // at the level 1 password state, through the server's own session store as otpCeremonyCookie does.
 func pwdCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
@@ -920,10 +973,10 @@ func TestInitRoutes_TheDefaultConfigurationLimitsWhatAnEmailCounts(t *testing.T)
 			require.True(t, reachesHandler(server, browserRequest(http.MethodGet, "/account/activate")), "activation %d", i+1)
 			require.True(t, reachesHandler(server, browserRequest(http.MethodGet, "/reset-password")), "reset %d", i+1)
 		}
-		for i := 0; i < 60; i++ {
-			require.True(t, reachesHandler(server, browserForm(http.MethodPost, "/auth/token",
-				"grant_type=password&username=user"+strconv.Itoa(i)+"%40example.com&password="+routesTestWrongPassword)),
-				"password grant %d", i+1)
+		guess := pwdGuess(t, server)
+		for i := 0; i < 2*pwdIpBudget; i++ {
+			require.True(t, reachesHandler(server, guess(i)), "wrong password %d at the sign-in form", i+1)
+			require.True(t, reachesHandler(server, ropcGuess(i)), "wrong password %d through the password grant", i+1)
 		}
 	})
 }

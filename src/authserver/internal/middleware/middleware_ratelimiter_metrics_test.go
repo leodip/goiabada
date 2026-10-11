@@ -72,7 +72,7 @@ func TestRateLimiter_EveryLimiterReadsZeroBeforeItsFirstRefusal(t *testing.T) {
 	assert.Equal(t, everyLimiterAtZeroBut(t, reg, nil), before)
 
 	for i := 0; i < 31; i++ {
-		runPwd(m, fmt.Sprintf("user%d@example.com", i), "198.51.100.7:5000", false)
+		runPwd(m, fmt.Sprintf("user%d@example.com", i), "198.51.100.7:5000", true)
 	}
 
 	assert.Equal(t, everyLimiterAtZeroBut(t, reg, map[string]string{"pwd_ip": "1"}), refusalCounts(t, reg),
@@ -84,8 +84,23 @@ func TestRateLimiter_CountsEveryRefusalUnderItsLimiter(t *testing.T) {
 	// requests are two.
 	t.Run("a tier every request spends", func(t *testing.T) {
 		m, _, reg := newMeteredTestMiddleware(nil, true)
+		for i := 0; i < 12; i++ {
+			req := limiterRequest(http.MethodPost, "/connect/register", nil)
+			req.RemoteAddr = "198.51.100.7:5000"
+			m.LimitDCR(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusTeapot)
+			})).ServeHTTP(httptest.NewRecorder(), req)
+		}
+
+		assert.Equal(t, everyLimiterAtZeroBut(t, reg, map[string]string{"dcr": "2"}), refusalCounts(t, reg))
+	})
+
+	// The per-address password tier counts failures from its own reservation too: 30 wrong
+	// passwords from one address, each for an account of its own, then two more refused.
+	t.Run("a per-address tier only failures spend", func(t *testing.T) {
+		m, _, reg := newMeteredTestMiddleware(nil, true)
 		for i := 0; i < 32; i++ {
-			runPwd(m, fmt.Sprintf("user%d@example.com", i), "198.51.100.7:5000", false)
+			runPwd(m, fmt.Sprintf("user%d@example.com", i), "198.51.100.7:5000", true)
 		}
 
 		assert.Equal(t, everyLimiterAtZeroBut(t, reg, map[string]string{"pwd_ip": "2"}), refusalCounts(t, reg))

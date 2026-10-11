@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/ratelimit"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/metrics"
@@ -210,18 +211,25 @@ type failureTier struct {
 	limiter *ratelimit.FailureLimiter
 }
 
-// newFailureTier takes no keyField, unlike newTier, because a failures-only tier is by
-// construction keyed on an identifier that names a person: only a credential check can
-// spend one, and the credential names the account. That is exactly the case tier.keyField
-// must be empty for, so the empty value is passed here rather than at each call site,
-// which makes the invariant structural instead of something every caller has to remember
-// (#219). The gate is taken from the limiter for newTier's reason.
+// newFailureTier builds a failures-only tier, its gate taken from the limiter for newTier's
+// reason. NewRateLimiter builds every one through one of two builders, and each fixes what this
+// takes:
 //
-// The tier counts in store under its own name when there is one, which is every server engine,
-// and in this process when store is nil, which is SQLite (#394 decision 2). The shared limiter's
-// gate follows its epoch-aligned windows, and stays per process: at most one audit event per key,
-// per window, per replica.
-func newFailureTier(name string, counted countedBy, limit int, window time.Duration, store credentialCounter) *failureTier {
+//   - failure, for a tier counted by an account or a user, passes no keyField and the database
+//     store. Such a tier is keyed on an identifier that names a person, which is exactly the case
+//     tier.keyField must be empty for, so the empty value is passed once there rather than at each
+//     call site (#219). It counts in store under its own name when there is one, which is every
+//     server engine, and in this process when store is nil, which is SQLite (#394 decision 2). The
+//     shared limiter's gate follows its epoch-aligned windows, and stays per process: at most one
+//     audit event per key, per window, per replica.
+//   - failureInProcess, for the two password tiers counted by an IP address alone, passes the key
+//     field the address is logged under and no store, so they count in this process on every
+//     engine, as they did when they counted every request: a flood past the limit is refused
+//     before it reaches the database, and holding a limit across replicas stays the account
+//     tiers' job (#564 decision 3).
+func newFailureTier(name string, counted countedBy, keyField string, limit int, window time.Duration,
+	store credentialCounter) *failureTier {
+
 	limiter := ratelimit.NewFailureLimiter(limit, window)
 	if store != nil {
 		limiter = ratelimit.NewSharedFailureLimiter(store, name, limit, window)
@@ -230,6 +238,7 @@ func newFailureTier(name string, counted countedBy, limit int, window time.Durat
 		tier: tier{
 			name:      name,
 			countedBy: counted,
+			keyField:  keyField,
 			auditGate: limiter.Gate(),
 			window:    window,
 		},
@@ -295,10 +304,58 @@ func (m *RateLimiter) reserveAccount(r *http.Request, a *accountTiers, account s
 	}
 }
 
+// reservePassword claims every slot a password check holds, or none: the per-address tier's
+// first, keyed addressKey, when the switch is on, then a's through reserveAccount, with account
+// the identifier the route names the account by. It answers as reserveAccount does,
+// the refusing tier among the three. An account tier's refusal, or a count it could not read,
+// hands the address slot back uncharged, for ratelimit.AccountLimiter's reason: a slot in flight
+// never decays, so a stranded one would shrink the address's budget until the process restarted.
+//
+// The address tier counts failures only, like the account tiers, so a shared address signing
+// people in spends nothing, and the one verdict the handler records charges or drops all of them
+// together (#564 decision 2).
+func (m *RateLimiter) reservePassword(r *http.Request, address *failureTier, addressKey string,
+	a *accountTiers, account string) (heldReservation, *tier, string, error) {
+
+	var held heldReservations
+	if m.applies(&address.tier) {
+		reservation, err := address.limiter.Reserve(r.Context(), addressKey)
+		if err != nil {
+			return nil, nil, "", err
+		}
+		if reservation == nil {
+			return nil, &address.tier, addressKey, nil
+		}
+		held = append(held, reservation)
+	}
+
+	accountHeld, t, key, err := m.reserveAccount(r, a, account)
+	if err != nil || t != nil {
+		if releaseErr := held.Release(r.Context(), false); releaseErr != nil {
+			err = errs.Join(err, releaseErr)
+		}
+		return nil, t, key, err
+	}
+	return append(held, accountHeld), nil, "", nil
+}
+
 // heldReservation is a credential check's slot on either limiter shape: one failures-only
 // tier's, or the account limiter's two.
 type heldReservation interface {
 	Release(ctx context.Context, failed bool) error
+}
+
+// heldReservations is the slots one password check holds on several tiers, released together
+// from its one verdict. Every one is released whatever the others answer, and the errors are
+// joined.
+type heldReservations []heldReservation
+
+func (h heldReservations) Release(ctx context.Context, failed bool) error {
+	var releaseErrs []error
+	for _, reservation := range h {
+		releaseErrs = append(releaseErrs, reservation.Release(ctx, failed))
+	}
+	return errs.Join(releaseErrs...)
 }
 
 // releaseCredentialReservation charges or drops what a credential check reserved, once the
@@ -342,7 +399,7 @@ type RateLimiter struct {
 	// pwdAccount is shared with the ROPC grant: both are a password guessed against one
 	// account, so one budget covers them.
 	pwdAccount *accountTiers
-	pwdIp      *requestTier
+	pwdIp      *failureTier
 	otp        *failureTier
 	// emailVerification bounds guessing at the account's own email verification code.
 	emailVerification *failureTier
@@ -358,7 +415,7 @@ type RateLimiter struct {
 	forgotPwd       *requestTier
 	forgotPwdIp     *requestTier
 	dcr             *requestTier
-	ropcIp          *requestTier // RFC 6749 §4.3.2 MUST protect against brute force
+	ropcIp          *failureTier // RFC 6749 §4.3.2 MUST protect against brute force
 
 	// refusals counts every refusal by the tier that refused it, on the metrics listener (#400
 	// decision 5). Every refusal, where the audit event is one per key per window: a rate is what an
@@ -369,8 +426,9 @@ type RateLimiter struct {
 func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jsonWriter jsonErrorWriter,
 	auditLogger auditEventLogger, enabled bool, credentialCounts credentialCounter, reg *metrics.Registry) *RateLimiter {
 
-	// Every tier is built through one of these two, which is what makes the limiter label's set
-	// every tier's name: a tier built any other way would be counted as other.
+	// Every tier is built through one of these three, which is what makes the limiter label's set
+	// every tier's name: a tier built any other way would be counted as other. newFailureTier says
+	// what failure and failureInProcess each fix.
 	var tierNames []string
 	request := func(name string, counted countedBy, keyField string, limit int, window time.Duration) *requestTier {
 		tierNames = append(tierNames, name)
@@ -378,7 +436,11 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 	}
 	failure := func(name string, counted countedBy, limit int, window time.Duration) *failureTier {
 		tierNames = append(tierNames, name)
-		return newFailureTier(name, counted, limit, window, credentialCounts)
+		return newFailureTier(name, counted, "", limit, window, credentialCounts)
+	}
+	failureInProcess := func(name string, counted countedBy, keyField string, limit int, window time.Duration) *failureTier {
+		tierNames = append(tierNames, name)
+		return newFailureTier(name, counted, keyField, limit, window, nil)
 	}
 
 	m := &RateLimiter{
@@ -404,8 +466,13 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 			failure("pwd_account_net", countedByIPAndAccount, 10, 15*time.Minute),
 			failure("pwd_account", countedByAccount, 100, 60*time.Minute),
 		),
-		// per-IP: stops one host hammering many accounts
-		pwdIp: request("pwd_ip", countedByIP, "ip", 30, 1*time.Minute),
+		// per-IP password failures: stops one host spraying wrong passwords across many
+		// accounts. Failures only, so an office, a school or a carrier-grade NAT signing many
+		// people in from one address spends nothing, where counting every request refused the
+		// 31st person in a minute and everyone behind them; a check that names no account it
+		// can find counts, as on the account tiers. Counted in the process on every engine
+		// (#564 decisions 2 and 3).
+		pwdIp: failureInProcess("pwd_ip", countedByIP, "ip", 30, 1*time.Minute),
 		// per-user OTP failures. 5 per 15 minutes is 480 guesses a day against the 14,400
 		// the 10 a minute it replaces allowed, which takes the chance of a hit over a
 		// month from 72.6% to 4.2% against an attacker who already holds the password.
@@ -472,13 +539,15 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		forgotPwdIp: request("forgot_pwd_ip", countedByIP, "ip", 20, 5*time.Minute),
 		// RFC 7591 §3 DoS protection
 		dcr: request("dcr", countedByIP, "ip", 10, 1*time.Minute),
-		// per-IP: stops one host spraying passwords across many accounts through the
-		// password grant, exactly as pwdIp does for the browser form, and at the same
-		// budget. Its account half is pwdAccount above, shared rather than mirrored: the
-		// composite ropc_<clientId>_<username>_<ip> key this replaces gave every client
-		// and every source address a fresh budget against one account, so the per-account
-		// ceiling RFC 6749 §4.3.2 makes a MUST did not exist at all (#107, #219).
-		ropcIp: request("ropc_ip", countedByIP, "ip", 30, 1*time.Minute),
+		// per-IP password failures: stops one host spraying passwords across many accounts
+		// through the password grant, exactly as pwdIp does for the browser form, at the same
+		// budget and counting failures only too, so a machine-driven integration
+		// authenticating from one address spends nothing (#564 decision 2). Its account half
+		// is pwdAccount above, shared rather than mirrored: the composite
+		// ropc_<clientId>_<username>_<ip> key this replaces gave every client and every
+		// source address a fresh budget against one account, so the per-account ceiling RFC
+		// 6749 §4.3.2 makes a MUST did not exist at all (#107, #219).
+		ropcIp: failureInProcess("ropc_ip", countedByIP, "ip", 30, 1*time.Minute),
 	}
 	m.refusals = reg.Counter("goiabada_rate_limit_refusals_total",
 		"Requests the rate limiter refused, by the limiter that refused them.",
@@ -643,24 +712,24 @@ func (m *RateLimiter) reject(w http.ResponseWriter, r *http.Request, class rejec
 }
 
 // LimitPwd rate limits the sign-in form's password check: per client block with the switch on, and
-// per account always, in the tiers reserveAccount reserves.
+// per account always, in the tiers reservePassword reserves.
 func (m *RateLimiter) LimitPwd(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Per-IP ceiling first: stops a single host from hammering many distinct
-		// accounts. The key is drawn whether or not the tier applies, because a refusal by the
-		// account tiers records the client's address beside the address typed.
+		// Per-IP ceiling first, which stops a single host spraying wrong passwords across many
+		// distinct accounts, then the per-account limit, which bounds guessing against a single
+		// account in the two tiers ratelimit.AccountLimiter documents, or the account-wide one
+		// alone with the switch off. Only a wrong password spends any of them, so people signing
+		// in normally are never refused by them however often they do, from however few
+		// addresses. The key is drawn whether or not the per-IP tier applies, because a refusal
+		// by the account tiers records the client's address beside the address typed.
 		ipKey, ipAudited, _ := m.bucket(r, &m.pwdIp.tier, "")
-		if m.applies(&m.pwdIp.tier) && m.tripped(w, r, m.pwdIp, ipKey, rejectBrowser, ipAudited) {
-			return
-		}
-
-		// Per-account limit: bounds password guessing against a single account, in the
-		// two tiers ratelimit.AccountLimiter documents, or the account-wide one alone with the
-		// switch off. Only a wrong password spends it, so a user signing in normally is never
-		// refused by it however often they do.
-		held, t, key, err := m.reserveAccount(r, m.pwdAccount, r.FormValue("email"))
+		held, t, key, err := m.reservePassword(r, m.pwdIp, ipKey, m.pwdAccount, r.FormValue("email"))
 		if err != nil {
 			m.fault(w, r, rejectBrowser, err)
+			return
+		}
+		if t == &m.pwdIp.tier {
+			m.refuse(w, r, t, key, rejectBrowser, ipAudited)
 			return
 		}
 		if t != nil {
@@ -1080,20 +1149,21 @@ func (m *RateLimiter) LimitROPC(next http.Handler) http.Handler {
 			return
 		}
 
-		// Per-IP ceiling first: stops a single host spraying passwords across many distinct
-		// accounts. The key is drawn either way, for LimitPwd's reason.
+		// Per-IP ceiling first, which stops a single host spraying passwords across many
+		// distinct accounts, then the per-account limit, in the two tiers
+		// ratelimit.AccountLimiter documents. Only a wrong credential spends any of them, so a
+		// machine-driven integration authenticating one account over and over is never refused
+		// by them. client_id is deliberately absent from the keys: a ceiling an attacker escapes
+		// by registering a second client is not a ceiling. The per-IP key is drawn either way,
+		// for LimitPwd's reason.
 		ipKey, ipAudited, _ := m.bucket(r, &m.ropcIp.tier, "")
-		if m.applies(&m.ropcIp.tier) && m.tripped(w, r, m.ropcIp, ipKey, rejectOAuth, ipAudited) {
-			return
-		}
-
-		// Per-account limit, in the two tiers ratelimit.AccountLimiter documents. Only a wrong
-		// credential spends it, so a machine-driven integration authenticating one account
-		// over and over is never refused by it. client_id is deliberately absent from the
-		// key: a ceiling an attacker escapes by registering a second client is not a ceiling.
-		held, t, key, err := m.reserveAccount(r, m.pwdAccount, r.PostFormValue("username"))
+		held, t, key, err := m.reservePassword(r, m.ropcIp, ipKey, m.pwdAccount, r.PostFormValue("username"))
 		if err != nil {
 			m.fault(w, r, rejectOAuth, err)
+			return
+		}
+		if t == &m.ropcIp.tier {
+			m.refuse(w, r, t, key, rejectOAuth, ipAudited)
 			return
 		}
 		if t != nil {
