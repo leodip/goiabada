@@ -1,6 +1,6 @@
 ---
 title: Security
-description: The pod security Goiabada's Kubernetes manifest sets, the NetworkPolicies that decide who reaches its pods, and how to encrypt the hop to the auth server.
+description: The pod security Goiabada's Kubernetes manifest sets, the NetworkPolicies that decide who reaches its pods, how to encrypt the hop to the auth server, and where the database's certificate authority lives.
 ---
 
 import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
@@ -129,6 +129,27 @@ When the pod network isn't one you trust, such as a cluster shared with workload
 - **A [`BackendTLSPolicy`](https://gateway-api.sigs.k8s.io/api-types/backendtlspolicy/)** for the gateway's hop, once the auth server serves HTTPS as above: it has the gateway connect to a Service port over TLS and check the certificate against your authority. Point the auth server's HTTPRoute at port 9443, and name every host name the gateway uses in the certificate.
 
 If the admin console then can't reach the auth server, see [Unable to load the configuration from the auth server](/troubleshooting/unable-to-load-the-configuration-from-the-auth-server/).
+
+## Check the database's certificate
+
+The wizard asks how the auth server protects its connection to the database, and writes the answer into the `goiabada-authserver-config` ConfigMap as `GOIABADA_DB_TLS_MODE`. [Where the database sits](/deploy/database/#where-the-database-sits) says what each mode does. With `verify-ca` or `verify-full`, it then asks for a CA file: the authorities your database's certificate chains to. Answer nothing to check the certificate against the system's authorities, and the manifest gains nothing more.
+
+With a CA file, the manifest carries its certificates, which are no secret:
+
+- **A ConfigMap, `goiabada-db-ca`,** holding them as PEM under the key `ca.pem`. A private key in the file you named is left out.
+- **A read-only volume** in the auth server's pods, mounting that ConfigMap at `/etc/goiabada/db-ca`.
+- **`GOIABADA_DB_TLS_CA_FILE`** in `goiabada-authserver-config`, naming the mounted file, `/etc/goiabada/db-ca/ca.pem`. The auth server then trusts those authorities alone, in place of the system's.
+
+The auth server reads the file once, when it starts. To change the authorities, edit the `goiabada-db-ca` ConfigMap, or run the wizard again and apply only the new `goiabada-k8s.yaml`, then restart the auth server:
+
+```bash
+kubectl edit configmap goiabada-db-ca -n goiabada
+kubectl rollout restart -n goiabada deployment/goiabada-authserver
+```
+
+The file can hold several certificates. When the database is about to move to a certificate from another authority, put both authorities in it and restart before the database switches, then remove the old one once it has.
+
+A pod that can't verify the database's certificate stops at start and crash-loops: see [The database refuses TLS](/troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection/#the-database-refuses-tls).
 
 ## Next steps
 
