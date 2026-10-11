@@ -286,11 +286,11 @@ func TestLimitPwd_PerIP(t *testing.T) {
 		}
 	})
 
-	t.Run("disabled limiter never blocks", func(t *testing.T) {
+	t.Run("the limiter switched off never applies the per-IP tier", func(t *testing.T) {
 		m := newTestMiddleware(nil, false)
 		for i := 0; i < 60; i++ {
 			if code, reached := run(m, "x@example.com", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
+				t.Fatalf("request %d: the per-IP tier should never block with the limiter off, got code %d, handler reached %v",
 					i+1, code, reached)
 			}
 		}
@@ -516,13 +516,56 @@ func TestLimitPwd_AccountFailureBudget(t *testing.T) {
 		assertNoRateLimitHeaders(t, rr, "failures-only rejection")
 	})
 
-	t.Run("disabled limiter never blocks, and a recorded failure is a no-op", func(t *testing.T) {
-		m := newTestMiddleware(nil, false)
-		for i := 0; i < tightBudget*4; i++ {
-			if code, reached, _ := runPwd(m, "victim@example.com", attacker, true); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
-					i+1, code, reached)
+	// The switch off, which is the default: the account-wide tier is counted by an email anyone
+	// can type and applies whatever the switch says, while the per-network tier reads the client's
+	// address and goes off with the per-IP tiers (#503 decisions 1 and 2). One address sends all of
+	// it, so pwd_ip's 30 a minute or pwd_account_net's 10 would refuse long before the 101st.
+	t.Run("the limiter switched off still limits the account-wide tier, and only it", func(t *testing.T) {
+		m, auditLog := newAuditedTestMiddleware(nil, false)
+		// Successes first: the reservation the switch-off path holds is the account-wide tier's
+		// alone, and a success has to hand it back as the pair's does.
+		for i := 0; i < 20; i++ {
+			if code, reached, _ := runPwd(m, "victim@example.com", attacker, false); code != http.StatusTeapot || !reached {
+				t.Fatalf("success %d with the limiter off: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
 			}
+		}
+		for i := 0; i < backstop; i++ {
+			if code, reached, _ := runPwd(m, "victim@example.com", attacker, true); code != http.StatusTeapot || !reached {
+				t.Fatalf("failure %d with the limiter off: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		code, reached, rr := runPwd(m, "Victim@Example.com ", attacker, true)
+		if code != http.StatusTooManyRequests || reached {
+			t.Fatalf("failure %d with the limiter off: got code %d, handler reached %v; want %d and false",
+				backstop+1, code, reached, http.StatusTooManyRequests)
+		}
+		if got := rr.Header().Get("Retry-After"); got != "3600" {
+			t.Errorf("Retry-After = %q, want 3600, the account-wide tier's hour", got)
+		}
+		if got := rr.Header().Get("Content-Type"); got != "text/html; charset=UTF-8" {
+			t.Errorf("Content-Type = %q, want text/html; charset=UTF-8", got)
+		}
+
+		// Audited as with the switch on: the digest of the address and the client's address beside
+		// it. SHA-256 of "victim@example.com", computed outside this code.
+		auditLog.mu.Lock()
+		events := append([]auditEvent(nil), auditLog.events...)
+		auditLog.mu.Unlock()
+		want := map[string]interface{}{
+			"limiter":      "pwd_account",
+			"email_digest": "ffbe8cff4f9f8d8b109460f975c343e942cd4c3ed191323eb83374ae2ea4de5f",
+			"ip":           "203.0.113.7",
+		}
+		if len(events) != 1 || !reflect.DeepEqual(events[0].details, want) {
+			t.Errorf("audited %v, want one event with details %v", events, want)
+		}
+
+		// A second account is untouched, so what refused was the account's own tier.
+		if code, reached, _ := runPwd(m, "other@example.com", attacker, true); code != http.StatusTeapot || !reached {
+			t.Errorf("a second address with the limiter off: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
 		}
 	})
 }
@@ -687,11 +730,38 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 		}
 	})
 
-	t.Run("disabled limiter never blocks", func(t *testing.T) {
+	// The per-address tier is counted by an email anyone can type, so it applies whatever the
+	// switch says; the per-IP tier reads the client's address and goes off with the switch (#503
+	// decision 1).
+	t.Run("the limiter switched off still limits one address", func(t *testing.T) {
+		m, auditLog := newAuditedTestMiddleware(nil, false)
+		for i := 0; i < emailBudget; i++ {
+			if code, reached := run(m, "victim@example.com", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d with the limiter off: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached := run(m, "Victim@Example.com", "203.0.113.1:5000"); code != http.StatusTooManyRequests || reached {
+			t.Fatalf("request %d with the limiter off: got code %d, handler reached %v; want %d and false",
+				emailBudget+1, code, reached, http.StatusTooManyRequests)
+		}
+		auditLog.mu.Lock()
+		events := append([]auditEvent(nil), auditLog.events...)
+		auditLog.mu.Unlock()
+		want := map[string]interface{}{"limiter": "forgot_pwd_email",
+			"email_digest": "ffbe8cff4f9f8d8b109460f975c343e942cd4c3ed191323eb83374ae2ea4de5f"}
+		if len(events) != 1 || !reflect.DeepEqual(events[0].details, want) {
+			t.Errorf("audited %v, want one event with details %v", events, want)
+		}
+	})
+
+	t.Run("the limiter switched off never applies the per-IP tier", func(t *testing.T) {
 		m := newTestMiddleware(nil, false)
-		for i := 0; i < 40; i++ {
-			if code, reached := run(m, "x@example.com", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
+		for i := 0; i < 2*ipBudget; i++ {
+			// Distinct emails so the per-address tier, which still applies, cannot trip.
+			email := fmt.Sprintf("user%d@example.com", i)
+			if code, reached := run(m, email, "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: the per-IP tier should never block with the limiter off, got code %d, handler reached %v",
 					i+1, code, reached)
 			}
 		}
@@ -970,11 +1040,13 @@ func TestLimitRegister_PerIP(t *testing.T) {
 		}
 	})
 
-	t.Run("disabled limiter never blocks", func(t *testing.T) {
+	t.Run("the limiter switched off never applies the per-IP tier", func(t *testing.T) {
 		m := newTestMiddleware(nil, false)
 		for i := 0; i < budget*2; i++ {
-			if code, reached, _ := run(m, "newuser@example.com", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
+			// Distinct addresses so the per-address tier, which still applies, cannot trip.
+			email := fmt.Sprintf("newuser%d@example.com", i)
+			if code, reached, _ := run(m, email, "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: the per-IP tier should never block with the limiter off, got code %d, handler reached %v",
 					i+1, code, reached)
 			}
 		}
@@ -1064,13 +1136,31 @@ func TestLimitRegister_PerAddress(t *testing.T) {
 		}
 	})
 
-	t.Run("disabled limiter never blocks", func(t *testing.T) {
-		m := newTestMiddleware(nil, false)
-		for i := 0; i < budget*2; i++ {
+	// The tier is counted by an email anyone can type, so it applies whatever the switch says, from
+	// one client address too, which the per-IP tier beside it no longer counts (#503 decision 1).
+	t.Run("the limiter switched off still limits one address", func(t *testing.T) {
+		m, auditLog := newAuditedTestMiddleware(nil, false)
+		for i := 0; i < budget; i++ {
 			if code, reached, _ := run(m, "holder@example.com", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
-					i+1, code, reached)
+				t.Fatalf("request %d with the limiter off: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
 			}
+		}
+		code, reached, rr := run(m, " Holder@Example.com", "203.0.113.1:5000")
+		if code != http.StatusTooManyRequests || reached {
+			t.Fatalf("request %d with the limiter off: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+		if got := rr.Header().Get("Retry-After"); got != "300" {
+			t.Errorf("Retry-After = %q, want 300, the tier's 5 minute window", got)
+		}
+		auditLog.mu.Lock()
+		events := append([]auditEvent(nil), auditLog.events...)
+		auditLog.mu.Unlock()
+		want := map[string]interface{}{"limiter": "register_email",
+			"email_digest": "1a4c5ee1a381a1003aee056aea6df0740ba8744e0493228e5d9c573d4090c9ec"}
+		if len(events) != 1 || !reflect.DeepEqual(events[0].details, want) {
+			t.Errorf("audited %v, want one event with details %v", events, want)
 		}
 	})
 }
@@ -2627,12 +2717,14 @@ func TestLimitROPC_PerIP(t *testing.T) {
 		}
 	})
 
-	t.Run("disabled limiter never blocks", func(t *testing.T) {
+	t.Run("the limiter switched off never applies the per-IP tier", func(t *testing.T) {
 		m := newTestMiddleware(nil, false)
 		for i := 0; i < ipBudget*4; i++ {
-			if code, reached, _ := runROPC(m, "password", "victim@example.com", "app",
+			// Distinct accounts so the account-wide tier, which still applies, cannot trip.
+			username := fmt.Sprintf("user%d@example.com", i)
+			if code, reached, _ := runROPC(m, "password", username, "app",
 				"203.0.113.7:5000", true); code != http.StatusTeapot || !reached {
-				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
+				t.Fatalf("request %d: the per-IP tier should never block with the limiter off, got code %d, handler reached %v",
 					i+1, code, reached)
 			}
 		}
@@ -2724,20 +2816,21 @@ func TestLimitROPC_AFormThatDoesNotParseIsAnsweredNotForwarded(t *testing.T) {
 		}
 	})
 
-	// Off, the limiter parses nothing, so the handler is the first to parse and answers the failure
-	// itself.
-	t.Run("a disabled limiter forwards it to the handler, which parses it first", func(t *testing.T) {
+	// Off, the switch still leaves the account-wide tier, which needs the grant type and the
+	// username, so the limiter parses the form first either way and answers the failure itself
+	// (#503 decision 1).
+	t.Run("the limiter switched off answers it too", func(t *testing.T) {
 		m := newTestMiddleware(nil, false)
 		req := limiterRequest(http.MethodPost, "/auth/token", strings.NewReader(passwordGrant+"&junk=%zz"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
-		var parseErr error
+		reached := false
 		m.LimitROPC(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			parseErr = r.ParseForm()
+			reached = true
 			w.WriteHeader(http.StatusTeapot)
 		})).ServeHTTP(rr, req)
-		if rr.Code != http.StatusTeapot || parseErr == nil {
-			t.Errorf("got code %d, handler's ParseForm error %v; want %d and the parse error", rr.Code, parseErr, http.StatusTeapot)
+		if reached || rr.Code != http.StatusBadRequest {
+			t.Errorf("got code %d, handler reached %v; want %d and false", rr.Code, reached, http.StatusBadRequest)
 		}
 	})
 }
@@ -2952,5 +3045,46 @@ func TestLimitROPC_AccountFailureBudget(t *testing.T) {
 			t.Errorf(`error = %q, want "invalid_request"`, body["error"])
 		}
 		assertNoRateLimitHeaders(t, rr, "ropc failures-only rejection")
+	})
+
+	// The switch off, the default. RFC 6749 section 4.3.2's MUST does not wait for the switch: the
+	// account-wide tier applies whatever it says, and only the per-network tier and ropc_ip, which
+	// read the client's address, go off with it (#503 decisions 1 and 2).
+	t.Run("the limiter switched off still limits the account-wide tier, and only it", func(t *testing.T) {
+		m, auditLog := newAuditedTestMiddleware(nil, false)
+		for i := 0; i < backstop; i++ {
+			if code, reached, _ := runROPC(m, "password", "victim@example.com", "app", attacker, true); code != http.StatusTeapot || !reached {
+				t.Fatalf("failure %d with the limiter off: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		code, reached, rr := runROPC(m, "password", "victim@example.com", "other-app", attacker, true)
+		if code != http.StatusTooManyRequests || reached {
+			t.Fatalf("failure %d with the limiter off: got code %d, handler reached %v; want %d and false",
+				backstop+1, code, reached, http.StatusTooManyRequests)
+		}
+		if got := rr.Header().Get("Retry-After"); got != "3600" {
+			t.Errorf("Retry-After = %q, want 3600, the account-wide tier's hour", got)
+		}
+		if got := rr.Header().Get("Content-Type"); got != "application/json" {
+			t.Errorf("Content-Type = %q, want application/json", got)
+		}
+		auditLog.mu.Lock()
+		events := append([]auditEvent(nil), auditLog.events...)
+		auditLog.mu.Unlock()
+		want := map[string]interface{}{
+			"limiter":      "pwd_account",
+			"email_digest": "ffbe8cff4f9f8d8b109460f975c343e942cd4c3ed191323eb83374ae2ea4de5f",
+			"ip":           "203.0.113.7",
+		}
+		if len(events) != 1 || !reflect.DeepEqual(events[0].details, want) {
+			t.Errorf("audited %v, want one event with details %v", events, want)
+		}
+
+		// The sign-in form spends the same bucket with the switch off too.
+		if code, reached, _ := runPwd(m, "victim@example.com", "198.51.100.9:5000", false); code != http.StatusTooManyRequests || reached {
+			t.Errorf("the form after a hundred grant failures, from another network: got code %d, handler reached %v; want %d and false",
+				code, reached, http.StatusTooManyRequests)
+		}
 	})
 }

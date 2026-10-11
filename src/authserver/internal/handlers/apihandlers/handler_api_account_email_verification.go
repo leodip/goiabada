@@ -32,9 +32,10 @@ type accountEmailVerificationDatabase interface {
 
 // emailVerificationCodeLifetime is how long an email verification code verifies, and also the
 // resend cooldown: an account may have a code sent once per lifetime, so it holds at most one
-// live code at a time. The cooldown is what bounds the mail an account can have sent with the
-// rate limiter off, its default, and the account chooses the address that mail goes to, so the
-// two are one value rather than two that could drift apart (#404).
+// live code at a time. The cooldown bounds the mail an account can have sent beside the rate
+// limiter's per-account tier, which applies whatever its switch says (#542), and the account chooses
+// the address that mail goes to, so the two are one value rather than two that could drift apart
+// (#404).
 const emailVerificationCodeLifetime = 5 * time.Minute
 
 // HandleAccountEmailVerificationSendPost - POST /api/v1/account/email/verification/send

@@ -189,9 +189,9 @@ func (w *Worker) poll(ctx context.Context) {
 // unauthenticated caller produces rows as fast as the per-IP tier in front lets it try, on every
 // pod at once. A
 // row is no use once its windows have passed, an hour at most, and on the twelve hour claim it
-// would go on existing for up to twelve. It runs whether or not the limiter is on: a delete on an
-// empty table costs nothing, and a limiter switched off leaves no rows behind. On SQLite the table
-// stays empty, since the tiers count in memory there.
+// would go on existing for up to twelve. It runs whatever the rate limiter switch says, since the
+// account-wide password tier counts here with the switch off too (#503), and a delete on an empty
+// table costs nothing. On SQLite the table stays empty, since the tiers count in memory there.
 //
 // Single-flight is given up on the same terms: the delete is idempotent and keyed on an indexed
 // column. Do not move this call into performTask (#394 decision 3).
