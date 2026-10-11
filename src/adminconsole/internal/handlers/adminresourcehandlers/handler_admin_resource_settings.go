@@ -70,6 +70,7 @@ func HandleSettingsGet(
 
 		bind := map[string]interface{}{
 			"resourceId":            resource.Id,
+			"storedResource":        resource,
 			"resourceIdentifier":    resource.ResourceIdentifier,
 			"description":           resource.Description,
 			"isSystemLevelResource": resource.IsSystemLevelResource,
@@ -111,7 +112,10 @@ func HandleSettingsPost(
 			return
 		}
 
-		// Get resource to determine if it's system-level
+		// The resource as stored: whether it is system-level, and what a refused save is drawn with,
+		// the page title and the original identifier the rename question compares against standing
+		// for the resource as it is, so the same rename attempted again is asked again (#562
+		// decision 6).
 		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
@@ -125,6 +129,7 @@ func HandleSettingsPost(
 		renderError := func(message string) {
 			bind := map[string]interface{}{
 				"resourceId":            id,
+				"storedResource":        resource,
 				"resourceIdentifier":    resourceIdentifier,
 				"description":           description,
 				"isSystemLevelResource": isSystemLevelResource,
