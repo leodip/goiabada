@@ -1,6 +1,7 @@
 package mysqldb
 
 import (
+	"context"
 	"crypto/tls"
 	"time"
 
@@ -59,8 +60,9 @@ func driverConfig(cfg *DatabaseConfig) (*mysqldriver.Config, error) {
 // applyTLS sets the TLS each mode asks for, in go-sql-driver/mysql's terms (#502 decision 2):
 //   - disable: tls=false, never encrypted.
 //   - prefer: tls=preferred, TLS when the server offers it and plain text when it offers none, the
-//     certificate unchecked. What the auth server did before the setting existed; until #542 it
-//     asked for no TLS at all, so a server with require_secure_transport refused every connection.
+//     certificate unchecked, decided afresh on every connection. What the auth server did before
+//     the setting existed; until #542 it asked for no TLS at all, so a server with
+//     require_secure_transport refused every connection.
 //   - require: tls=skip-verify, always encrypted, the certificate unchecked.
 //   - verify-ca and verify-full: a TLS configuration of the builder's own carrying the CA file's
 //     authorities, nil leaving the system's roots. verify-full checks the host, an IP literal
@@ -76,6 +78,12 @@ func applyTLS(c *mysqldriver.Config, cfg *DatabaseConfig) error {
 		c.TLSConfig = "false"
 	case data.TLSPrefer:
 		c.TLSConfig = "preferred"
+		// The driver falls back by clearing the TLS of the configuration the connection was handed,
+		// which with no hook is the connector's own, shared by every connection the pool opens
+		// after: one greeting offering no TLS turned TLS off until a restart, and the write raced
+		// the connections reading it. With a hook the driver hands each connection a copy, so the
+		// next one asks for TLS again, as pgx's does.
+		_ = c.Apply(mysqldriver.BeforeConnect(func(context.Context, *mysqldriver.Config) error { return nil }))
 	case data.TLSRequire:
 		c.TLSConfig = "skip-verify"
 	case data.TLSVerifyCA:
