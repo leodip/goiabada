@@ -68,11 +68,37 @@ const (
 // database behind this binary a lie, since the read would happen after the migration it was meant
 // to report on.
 func migrateCommand(args []string, base config.DatabaseConfig, stdout, stderr io.Writer) int {
+	inv, ok := readMigrateCommand(args, base, stderr)
+	if !ok {
+		return migrateExitUsage
+	}
+	return runMigrateCommand(inv, stdout, stderr)
+}
+
+// readMigrateCommand reads the arguments after `migrate` into the invocation it runs, or writes
+// the refusal to stderr and answers false, for an exit with migrateExitUsage. main calls it before
+// the start's first record, so a refusal is the only thing on stderr.
+//
+// The refusals take two shapes. One of how migrate was typed, a flag it does not take or a value
+// a flag cannot hold, is followed by the usage. The CA file and libpq's TLS variables, checked
+// here rather than at the load because a --db-* flag after `migrate` can change the engine, the
+// mode or the file, are settings: they take the one line every malformed setting takes, with no
+// usage, since retyping the command fixes nothing (#502).
+func readMigrateCommand(args []string, base config.DatabaseConfig, stderr io.Writer) (migrateInvocation, bool) {
 	inv, err := parseMigrateArgs(args, base)
 	if err != nil {
 		outf(stderr, "%v\n\n%s\n", err, migrateUsage)
-		return migrateExitUsage
+		return migrateInvocation{}, false
 	}
+	if err := config.CheckDatabaseTLS(&inv.database); err != nil {
+		outf(stderr, "%v\n", err)
+		return migrateInvocation{}, false
+	}
+	return inv, true
+}
+
+// runMigrateCommand runs the invocation readMigrateCommand read.
+func runMigrateCommand(inv migrateInvocation, stdout, stderr io.Writer) int {
 	if inv.help {
 		outf(stdout, "%s\n", migrateUsage)
 		return migrateExitOK
@@ -197,9 +223,8 @@ func parseMigrateArgs(args []string, db config.DatabaseConfig) (migrateInvocatio
 		}
 	}
 
-	// The flag package parsed each value; the pool's ranges are held here as Load holds them for
-	// the flags given before `migrate` (#394 decision 5), and the CA file is read and libpq's
-	// variables refused here only, against the merged configuration (#502).
+	// The flag package parsed each value; the pool's ranges and the TLS mode are held here as Load
+	// holds them for the flags given before `migrate` (#394 decision 5, #502).
 	if err := config.CheckDatabaseFlags(fs, &db); err != nil {
 		return migrateInvocation{}, err
 	}

@@ -392,15 +392,22 @@ func (f optionalIntFlag) Set(s string) error {
 	return nil
 }
 
-// CheckDatabaseFlags refuses what the pool flags given on fs leave out of range, a malformed TLS
-// mode given on fs, a CA file the connection cannot use and, on PostgreSQL, libpq's TLS variables,
-// in the one malformed-configuration line Load answers with, and reads the CA file into c.TLSRoots.
-// The `migrate` subcommand calls it after its own parse of the --db-* flags, so a flag given after
-// `migrate` is held to the rules one given before it is, and the CA file and libpq's variables,
-// which Load leaves to it, are checked against the configuration it runs with (#394 decision 5, #502).
+// CheckDatabaseFlags refuses what the pool flags given on fs leave out of range and a malformed TLS
+// mode given on fs, in the one malformed-configuration line Load answers with. The `migrate`
+// subcommand calls it after its own parse of the --db-* flags, so a flag given after `migrate` is
+// held to the rules one given before it is (#394 decision 5, #502).
 func CheckDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig) error {
 	var malformed malformedValues
 	checkDatabaseFlags(fs, c, &malformed)
+	return malformed.err()
+}
+
+// CheckDatabaseTLS refuses a CA file the connection cannot use and, on PostgreSQL, libpq's TLS
+// variables, in the one malformed-configuration line Load answers with, and reads the CA file into
+// c.TLSRoots. Load leaves both to the `migrate` subcommand, which calls this once its --db-* flags
+// are applied, so they are checked against the configuration it runs with (#502).
+func CheckDatabaseTLS(c *DatabaseConfig) error {
+	var malformed malformedValues
 	checkDatabaseTLS(c, &malformed)
 	return malformed.err()
 }
