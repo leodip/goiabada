@@ -17,7 +17,7 @@ test("the user changes their password: the current one must be right, and the ne
   };
 
   await submit(user.password, "a-new-password", "a-different-one");
-  await expect(own.page.getByText("The new password confirmation does not match the password.")).toBeVisible();
+  await expect(own.page.getByText("The password confirmation does not match the password.")).toBeVisible();
   await submit("not-the-password", "a-new-password", "a-new-password");
   await expect(own.page.getByText("Authentication failed. Check your current password and try again.")).toBeVisible();
   await submit(user.password, "abc", "abc");
