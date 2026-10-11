@@ -141,14 +141,14 @@
             if(isSystemLevelResource && isBuiltInPermission(perm.permissionIdentifier)) {
                 cell3.innerHTML =  "&nbsp;";
             } else {
-                cell3.replaceChildren(createEditButton(editPermission, { permissionid: perm.id }));
+                cell3.replaceChildren(createEditButton("{{ T $.ctx "adminconsole.admin_resources.permissions.edit_label" }} " + perm.permissionIdentifier, editPermission, { permissionid: perm.id }));
             }
 
             cell4.className = "p-1 text-right w-16";
             if(isSystemLevelResource && isBuiltInPermission(perm.permissionIdentifier)) {
                 cell4.innerHTML =  "&nbsp;";
             } else {
-                cell4.replaceChildren(createTrashCanButton(deletePermission, { permissionid: perm.id }));
+                cell4.replaceChildren(createTrashCanButton("{{ T $.ctx "adminconsole.admin_resources.permissions.remove_label" }} " + perm.permissionIdentifier, deletePermission, { permissionid: perm.id }));
             }
         });
       }

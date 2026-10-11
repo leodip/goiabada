@@ -44,6 +44,7 @@
                             const buttonsTd = document.getElementById("buttons" + groupIdentifier);
 
                             var button = document.createElement("button");
+                            button.type = "button";
                             button.setAttribute("class", "inline-block align-middle btn-xs btn btn-primary");
                             button.innerHTML = "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.remove_button" }}";
 
@@ -94,6 +95,7 @@
                             const buttonsTd = document.getElementById("buttons" + groupIdentifier);
 
                             var button = document.createElement("button");
+                            button.type = "button";
                             button.setAttribute("class", "inline-block align-middle btn-xs btn btn-primary");
                             button.innerHTML = "{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.grant_button" }}";
 

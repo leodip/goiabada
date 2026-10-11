@@ -96,7 +96,7 @@
                 cell1.textContent = uri;
 
                 cell2.className = "p-1 text-right";
-                cell2.replaceChildren(createTrashCanButton(deleteRedirectURI));
+                cell2.replaceChildren(createTrashCanButton("{{ T $.ctx "adminconsole.admin_clients.redirect_uris.remove_label" }} " + uri, deleteRedirectURI));
             });
         }
     }

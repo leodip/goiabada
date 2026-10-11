@@ -113,7 +113,7 @@
                 cell1.replaceChildren(groupLink);
 
                 cell2.className = "p-1 text-right";
-                cell2.replaceChildren(createTrashCanButton(deleteGroupMembership, { groupid: assignedGroup.id }));
+                cell2.replaceChildren(createTrashCanButton("{{ T $.ctx "adminconsole.admin_users.groups.remove_label" }} " + assignedGroup.groupIdentifier, deleteGroupMembership, { groupid: assignedGroup.id }));
             });
         }
     }

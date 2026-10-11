@@ -81,6 +81,7 @@
             } else {
 
                 const addToGroupButton = document.createElement("button");
+                addToGroupButton.type = "button";
                 addToGroupButton.setAttribute("class", "btn btn-xs btn-primary");
                 addToGroupButton.onclick = function(event) {
                     AddUserToGroup(event, addToGroupButton, user.Id, user.Email);
@@ -161,7 +162,7 @@
 
 {{template "manage_groups_tabs" (args "members" .groupId $.ctx) }}
 
-<form method="post">
+<form method="post" onsubmit="event.preventDefault();">
 
     <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
 
