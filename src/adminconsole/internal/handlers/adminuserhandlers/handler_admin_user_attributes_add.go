@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // userAttributesAddAPI is what the add user attribute page needs: the user it belongs to, and the
@@ -131,7 +132,7 @@ func HandleAttributesAddPost(
 		attrValue := strings.TrimSpace(r.FormValue("attributeValue"))
 
 		if len(attrKey) == 0 {
-			renderError("Attribute key is required")
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil).Localize(r.Context()))
 			return
 		}
 

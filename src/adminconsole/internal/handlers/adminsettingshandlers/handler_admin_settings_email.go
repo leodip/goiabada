@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -273,7 +274,7 @@ func HandleEmailSendTestPost(
 		}
 
 		if len(destinationEmail) == 0 {
-			renderError("Destination email is required.")
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailDestinationRequired, nil).Localize(r.Context()))
 			return
 		}
 

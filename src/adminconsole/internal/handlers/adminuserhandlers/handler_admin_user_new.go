@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -90,7 +91,7 @@ func HandleNewPost(
 		// Basic validation
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 		if len(email) == 0 {
-			renderError("The email address cannot be empty.")
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.user_new.email_required"))
 			return
 		}
 

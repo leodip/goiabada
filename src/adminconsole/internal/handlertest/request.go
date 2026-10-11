@@ -23,6 +23,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -44,6 +45,7 @@ type requestSpec struct {
 	jwtInfo     *oauthclient.JwtInfo
 	settings    *api.PublicSettingsResponse
 	hasSettings bool
+	locale      string
 }
 
 // Request builds a request carrying what the options ask for and nothing else. Its context is
@@ -77,6 +79,9 @@ func Request(method, target string, opts ...Option) *http.Request {
 	if spec.hasSettings {
 		ctx = reqctx.WithSettings(ctx, spec.settings)
 	}
+	if spec.locale != "" {
+		ctx = i18n.WithLocale(ctx, true, spec.locale)
+	}
 	return req.WithContext(ctx)
 }
 
@@ -108,6 +113,15 @@ func WithJwtInfo(jwtInfo oauthclient.JwtInfo) Option {
 func WithRouteParam(key, value string) Option {
 	return func(spec *requestSpec) {
 		spec.routeParams = append(spec.routeParams, [2]string{key, value})
+	}
+}
+
+// WithLocale resolves the request to a catalog, as the locale middleware does in production, so
+// what the handler renders through i18n is in that language. Without it the handler renders in
+// English, the catalog an unlocalized context falls back to.
+func WithLocale(tag string) Option {
+	return func(spec *requestSpec) {
+		spec.locale = tag
 	}
 }
 

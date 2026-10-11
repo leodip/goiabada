@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // userAttributesEditAPI is what the edit user attribute page needs: the user, the attribute, and
@@ -174,7 +175,7 @@ func HandleAttributesEditPost(
 		}
 
 		if len(attribute.Key) == 0 {
-			renderError("Attribute key is required")
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil).Localize(r.Context()))
 			return
 		}
 

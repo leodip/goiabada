@@ -325,6 +325,25 @@
 # notice, and the description an AJAX request is answered with.
 "adminconsole.session_ended.message" = "Your sign-in has ended. Sign in again."
 
+# The console's own refusals (#559 decision 4): what a page's form is redrawn
+# with when the console refuses it before asking the auth server, and what the
+# JSON answers of a page that acts without a reload carry to its dialog.
+"adminconsole.refusal.not_found" = "Sorry, the item you are looking for could not be found. It may have been deleted, or the address may be incorrect."
+"adminconsole.refusal.concurrent_update" = "This item was changed after the page was loaded. Reload the page and try again."
+"adminconsole.refusal.invalid_request_body" = "The request body is not valid JSON, or is missing information this endpoint requires."
+"adminconsole.refusal.account_email.confirmation_mismatch" = "The email and email confirmation entries must be identical."
+"adminconsole.refusal.client_delete.identifier_mismatch" = "Client identifier does not match the client being deleted."
+"adminconsole.refusal.client_tokens.token_expiration_invalid" = "Invalid value for token expiration in seconds."
+"adminconsole.refusal.client_tokens.offline_idle_timeout_invalid" = "Invalid value for refresh token offline - idle timeout in seconds."
+"adminconsole.refusal.client_tokens.offline_max_lifetime_invalid" = "Invalid value for refresh token offline - max lifetime in seconds."
+"adminconsole.refusal.group_delete.identifier_required" = "Group identifier is required."
+"adminconsole.refusal.group_delete.identifier_mismatch" = "Group identifier does not match the group being deleted."
+"adminconsole.refusal.resource_delete.system_level" = "System-level resources cannot be deleted."
+"adminconsole.refusal.resource_delete.identifier_required" = "Resource identifier is required."
+"adminconsole.refusal.resource_delete.identifier_mismatch" = "Resource identifier does not match the resource being deleted."
+"adminconsole.refusal.settings_audit_logs.retention_days_invalid" = "Audit log retention days must be a valid number."
+"adminconsole.refusal.user_new.email_required" = "The email address cannot be empty."
+
 "adminconsole.not_found.page_title" = "Not found"
 "adminconsole.not_found.title" = "Not found (404)"
 "adminconsole.not_found.body" = "Sorry, the page you are looking for could not be found. Please check the URL and try again."
@@ -1563,6 +1582,12 @@
 "handler.admin_resource_permissions.description_html_not_allowed" = "The description contains invalid characters, as we do not permit the use of HTML in the description."
 "handler.admin_resource_permissions.permission_identifier_required" = "Permission identifier is required."
 "handler.admin_resource_permissions.description_too_long" = "The description cannot exceed a maximum length of {{.max}} characters."
+
+# --- Refusals the admin console and the admin API share (LocalizedError-backed)
+
+"handler.client.identifier_required" = "Client identifier is required."
+"handler.attribute.key_required" = "Attribute key is required"
+"handler.settings_email.destination_required" = "Destination email is required."
 
 # --- Password validator (LocalizedError-backed) ------------------------------
 

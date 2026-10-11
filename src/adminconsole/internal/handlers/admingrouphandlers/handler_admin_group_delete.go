@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // groupDeleteAPI is what the group delete page needs: the group it confirms, and the delete.
@@ -122,12 +123,12 @@ func HandleDeletePost(
 
 		groupIdentifier := r.FormValue("groupIdentifier")
 		if len(groupIdentifier) == 0 {
-			renderError("Group identifier is required.")
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.group_delete.identifier_required"))
 			return
 		}
 
 		if group.GroupIdentifier != groupIdentifier {
-			renderError("Group identifier does not match the group being deleted.")
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.group_delete.identifier_mismatch"))
 			return
 		}
 
