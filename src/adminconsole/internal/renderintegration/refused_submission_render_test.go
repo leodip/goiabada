@@ -168,6 +168,7 @@ func TestRender_ProfilePages_ARefusedDateOfBirthIsDrawnAsTyped(t *testing.T) {
 		{name: "a date in the future", typed: "2999-05-17"},
 		{name: "text that is no date", typed: "17/05/1990"},
 		{name: "nothing", typed: ""},
+		{name: "text with spaces around it", typed: " 17/05/1990 "},
 	}
 
 	for _, page := range profilePages(apiClient) {

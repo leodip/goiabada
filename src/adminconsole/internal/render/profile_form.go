@@ -46,9 +46,8 @@ func ParseProfileForm(r *http.Request) (*api.UpdateUserProfileRequest, error) {
 // EchoProfileForm puts the submitted values onto the user the page is rendered again with when
 // the API refuses them, so nothing the user typed is lost. A gender that does not parse keeps the
 // stored value, since that is what was refused. The date of birth is not put here: a date the
-// user holds cannot carry text that is no date, so each page binds the submitted text beside the
-// user as submittedDateOfBirth, a pointer so an empty submission still counts as submitted, and
-// the form prefers it over the stored date (#562 decision 3).
+// user holds cannot carry text that is no date, so each page binds SubmittedDateOfBirth beside the
+// user as submittedDateOfBirth, and the form prefers it over the stored date (#562 decision 3).
 func EchoProfileForm(user *api.UserResponse, request *api.UpdateUserProfileRequest) {
 	user.Username = request.Username
 	user.GivenName = request.GivenName
@@ -67,4 +66,12 @@ func EchoProfileForm(user *api.UserResponse, request *api.UpdateUserProfileReque
 	} else {
 		user.Gender = ""
 	}
+}
+
+// SubmittedDateOfBirth is the date-of-birth text exactly as the form posted it, surrounding spaces
+// included, which ParseProfileForm trims away for the API: a refused date is drawn back as typed
+// (#562 decision 3). A pointer, so an empty submission still counts as submitted.
+func SubmittedDateOfBirth(r *http.Request) *string {
+	typed := r.FormValue("dateOfBirth")
+	return &typed
 }

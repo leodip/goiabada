@@ -77,6 +77,10 @@ func TestMigration000063_ClientsThreeStateClaimsDefault(t *testing.T) {
 		{"m63_other_" + random, "yes", "true",
 			"default", "default",
 			"any other value becomes default"},
+		{"m63_ignorable_" + random, "o\u00adn", "of\u00adf",
+			"default", "default",
+			"a value with a soft hyphen in it, which a linguistic collation compares equal to on " +
+				"or off, is not one of the three, and issuance read it as default"},
 	}
 
 	ids := make([]int64, len(cases))

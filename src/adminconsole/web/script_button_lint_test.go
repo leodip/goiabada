@@ -397,26 +397,42 @@ func labelFault(arg []guard.ScriptToken, has catalogHas) string {
 }
 
 // TestScriptButtons_PlainAndNamed holds every page and script this server serves to the rule: every
-// script-built button is type "button", and every icon-button call passes a label.
+// script-built button is type "button", and every icon-button call passes a label. Five buttons are
+// built in script (the icon builder's and four row buttons) and eight icon buttons are asked for
+// (seven list pages, one with both an edit and a remove button).
 func TestScriptButtons_PlainAndNamed(t *testing.T) {
+	assertScriptButtons(t, realCatalogHas, buttonCalls{created: 5, labelled: 8},
+		templateFS, withoutVendored{staticFS})
+}
+
+// assertScriptButtons is the reporting half. A walk that reached no file in one of the trees, or
+// fewer button calls than least counts, is fatal: a call renamed out of this check's reach would
+// otherwise pass it vacuously.
+func assertScriptButtons(r guard.Reporter, has catalogHas, least buttonCalls, trees ...fs.FS) {
+	r.Helper()
+
 	var faults []buttonFault
 	var total buttonCalls
-	for _, tree := range []fs.FS{templateFS, withoutVendored{staticFS}} {
-		f, n, err := findButtonFaults(tree, realCatalogHas)
-		require.NoError(t, err)
-		require.NotZero(t, n.files, "reached no .html or .js file in one of the trees")
+	for _, tree := range trees {
+		f, n, err := findButtonFaults(tree, has)
+		if err != nil {
+			r.Fatalf("walking for pages and scripts: %v", err)
+		}
+		if n.files == 0 {
+			r.Fatalf("reached no .html or .js file in one of the trees; this rule is checking nothing")
+		}
 		faults = append(faults, f...)
 		total.created += n.created
 		total.labelled += n.labelled
 	}
 	for _, f := range faults {
-		t.Errorf("%s:%d: %s", f.path, f.line, f.why)
+		r.Errorf("%s:%d: %s", f.path, f.line, f.why)
 	}
-	// Five buttons are built in script (the icon builder's and four row buttons) and eight icon
-	// buttons are asked for (seven list pages, one with both an edit and a remove button). A count
-	// below that means a call was renamed out of this check's reach.
-	assert.GreaterOrEqual(t, total.created, 5, "createElement(\"button\") calls reached")
-	assert.GreaterOrEqual(t, total.labelled, 8, "icon-button calls reached")
+	if total.created < least.created || total.labelled < least.labelled {
+		r.Fatalf("reached %d createElement(\"button\") calls and %d icon-button calls, fewer than "+
+			"the %d and %d served; a call was renamed out of this rule's reach", total.created,
+			total.labelled, least.created, least.labelled)
+	}
 }
 
 // buttonPage is one page whose script is src.
@@ -489,8 +505,8 @@ b.type = "button";`, []string{"b is built in script and never made type \"button
 	}
 }
 
-// TestScriptButtons_AWalkThatReachesNothingCountsNothing pins what the real test's counts guard: a
-// tree with no page reaches no file, and a page with no button counts none.
+// TestScriptButtons_AWalkThatReachesNothingCountsNothing pins the counts the reporting half reads:
+// a tree with no page reaches no file, and a page with no button counts none.
 func TestScriptButtons_AWalkThatReachesNothingCountsNothing(t *testing.T) {
 	_, n, err := findButtonFaults(fstest.MapFS{}, fixtureCatalog)
 	require.NoError(t, err)
@@ -501,6 +517,68 @@ func TestScriptButtons_AWalkThatReachesNothingCountsNothing(t *testing.T) {
 	assert.Equal(t, 1, n.files)
 	assert.Zero(t, n.created)
 	assert.Zero(t, n.labelled)
+}
+
+// buttonsOK is a page that keeps the rule, with one script-built button and one icon-button call.
+const buttonsOK = `const b = document.createElement("button");
+b.type = "button";
+cell.replaceChildren(createTrashCanButton("{{ T $.ctx "adminconsole.page.remove_label" }} " + uri, f));`
+
+// TestScriptButtons_FailsOnAFault drives the reporting half: a refused button reaches Errorf naming
+// its file and line, and the walk goes on.
+func TestScriptButtons_FailsOnAFault(t *testing.T) {
+	fsys := fstest.MapFS{
+		"template/ok.html":  buttonPage(buttonsOK)["template/page.html"],
+		"template/bad.html": buttonPage(`const addButton = document.createElement("button");`)["template/page.html"],
+	}
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertScriptButtons(r, fixtureCatalog, buttonCalls{created: 1, labelled: 1}, fsys)
+	})
+
+	assert.False(t, report.Stopped, report.Text())
+	require.Len(t, report.Errors, 1, report.Text())
+	assert.Contains(t, report.Errors[0], `template/bad.html:2: addButton is built in script and never made type "button"`)
+}
+
+// TestScriptButtons_PassesOnACleanTree is the other direction.
+func TestScriptButtons_PassesOnACleanTree(t *testing.T) {
+	report := guard.Run(func(r guard.Reporter) {
+		assertScriptButtons(r, fixtureCatalog, buttonCalls{created: 1, labelled: 1}, buttonPage(buttonsOK))
+	})
+
+	assert.False(t, report.Failed(), report.Text())
+}
+
+// unreadableFS is a tree whose walk fails.
+type unreadableFS struct{}
+
+func (unreadableFS) Open(name string) (fs.File, error) {
+	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrPermission}
+}
+
+// TestScriptButtons_AWalkThatReachesNothingIsFatal pins the walk's own failures, where every rule
+// would pass vacuously: a tree that cannot be read, a tree with no page or script, and trees whose
+// pages build fewer buttons, or ask for fewer icon buttons, than the least the caller names.
+func TestScriptButtons_AWalkThatReachesNothingIsFatal(t *testing.T) {
+	ok := buttonPage(buttonsOK)
+	least := buttonCalls{created: 1, labelled: 1}
+
+	for name, tc := range map[string]struct {
+		trees []fs.FS
+		least buttonCalls
+	}{
+		"an unreadable tree":        {[]fs.FS{ok, unreadableFS{}}, least},
+		"an empty tree":             {[]fs.FS{ok, fstest.MapFS{}}, least},
+		"fewer buttons than served": {[]fs.FS{ok}, buttonCalls{created: 2, labelled: 1}},
+		"fewer icon buttons":        {[]fs.FS{ok}, buttonCalls{created: 1, labelled: 2}},
+		"no button call at all":     {[]fs.FS{buttonPage(`const a = 1;`)}, least},
+	} {
+		t.Run(name, func(t *testing.T) {
+			report := guard.Run(func(r guard.Reporter) { assertScriptButtons(r, fixtureCatalog, tc.least, tc.trees...) })
+			assert.True(t, report.Stopped, report.Text())
+		})
+	}
 }
 
 // searchPages are the two pages whose search box sits in a form beside the rows it lists.
