@@ -9,6 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // The last-administrator guard. An administrator remains while at least one enabled user holds
@@ -53,16 +54,14 @@ type userRemovalDatabase interface {
 // enabled user holding manage. The transaction is rolled back, and writeLastAdministrator answers it.
 var errLastAdministrator = errors.New("the change would leave no enabled user holding authserver:manage")
 
-// lastAdministratorDescription is the refusal's sentence, which the admin console shows as it is.
-const lastAdministratorDescription = "This change would leave no enabled user holding authserver:manage. Grant it to another user first."
-
 // writeLastAdministrator answers errLastAdministrator: 409, because RFC 9110 section 15.5.10 names a
 // conflict "with the current state of the target resource" that "the user might be able to resolve
 // ... and resubmit", and granting manage to another user first resolves it. Not audited: the caller
 // holds manage and is authorized, and it is the state that forbids the change, as with the other
-// 409s on this surface (#402 decision 12).
-func writeLastAdministrator(w http.ResponseWriter) {
-	writeJSONError(w, lastAdministratorDescription, "LAST_ADMINISTRATOR", http.StatusConflict)
+// 409s on this surface (#402 decision 12). The sentence is in the request's language, which the
+// admin console shows as it is (#559).
+func writeLastAdministrator(w http.ResponseWriter, r *http.Request) {
+	writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLastAdministrator, nil), "LAST_ADMINISTRATOR", http.StatusConflict)
 }
 
 // administratorRemoval is one guarded write's hold on the administrators, from the lock to the

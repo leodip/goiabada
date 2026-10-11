@@ -33,9 +33,9 @@ import (
 // handler *mentions*, not the ones it can be driven to return, so an unreachable branch is
 // still documented (the conservative direction: a caller told about a failure that cannot
 // happen loses nothing) and a status produced by a value computed at run time would be
-// missed. No handler in this module does the latter today: writeJSONError is always called
-// with an http.Status constant, which TestAPIHandlers_WriteStatusesAsConstants below is
-// what keeps true. The helpers that carry a status implicitly rather than as an argument
+// missed. No handler in this module does the latter today: writeJSONError and
+// writeLocalizedError are always called with an http.Status constant, which
+// TestAPIHandlers_WriteStatusesAsConstants below is what keeps true. The helpers that carry a status implicitly rather than as an argument
 // are read by name in statusesWrittenIn: writeValidationError at 400,
 // writeInternalServerError at 500, writeJSON at 500 for a buffered encode that fails, and
 // readSessionRequest at 400 for a body it cannot decode.
@@ -257,15 +257,21 @@ func TestOpenAPI_DescribesEveryAPIRoute(t *testing.T) {
 }
 
 // TestAPIHandlers_WriteStatusesAsConstants is what lets the three tests above be lexical.
-// Every writeJSONError call passes an http.Status constant, so reading the constants out of
-// a handler reads its whole failure surface. A status computed at run time would be
-// invisible to the scan and the spec could drift under it unnoticed, which is a hole worth
-// closing at the one call site that could open it.
+// Every writeJSONError and writeLocalizedError call passes an http.Status constant, so reading
+// the constants out of a handler reads its whole failure surface. A status computed at run
+// time would be invisible to the scan and the spec could drift under it unnoticed, which is a
+// hole worth closing at the call sites that could open it.
 func TestAPIHandlers_WriteStatusesAsConstants(t *testing.T) {
+	// The writers that take a status, by name, with their argument count and the status's index.
+	// writeLocalizedError is writeJSONError with the description translated (#559 decision 2).
+	writers := map[string]struct{ args, status int }{
+		"writeJSONError":      {args: 4, status: 3},
+		"writeLocalizedError": {args: 5, status: 4},
+	}
 	calls := 0
 	forEachHandlerSource(t, func(t *testing.T, path string, fset *token.FileSet, file *ast.File) {
 		if filepath.Base(path) == "api_common.go" {
-			return // the helper's own signature takes the int; its callers are the subject
+			return // the helpers' own signatures take the int; their callers are the subject
 		}
 		ast.Inspect(file, func(n ast.Node) bool {
 			call, ok := n.(*ast.CallExpr)
@@ -273,21 +279,26 @@ func TestAPIHandlers_WriteStatusesAsConstants(t *testing.T) {
 				return true
 			}
 			name, ok := call.Fun.(*ast.Ident)
-			if !ok || name.Name != "writeJSONError" || len(call.Args) != 4 {
+			if !ok {
+				return true
+			}
+			writer, ok := writers[name.Name]
+			if !ok || len(call.Args) != writer.args {
 				return true
 			}
 			calls++
-			sel, ok := call.Args[3].(*ast.SelectorExpr)
+			status := call.Args[writer.status]
+			sel, ok := status.(*ast.SelectorExpr)
 			if !ok {
-				t.Errorf("%s:%d: writeJSONError is called with a computed status; the "+
+				t.Errorf("%s:%d: %s is called with a computed status; the "+
 					"openapi.yaml lint reads statuses lexically and cannot see it",
-					path, fset.Position(call.Args[3].Pos()).Line)
+					path, fset.Position(status.Pos()).Line, name.Name)
 				return true
 			}
 			pkg, ok := sel.X.(*ast.Ident)
 			if !ok || pkg.Name != "http" || httpStatusConstants[sel.Sel.Name] == 0 {
-				t.Errorf("%s:%d: writeJSONError is called with %s rather than an http.Status "+
-					"constant", path, fset.Position(call.Args[3].Pos()).Line, sel.Sel.Name)
+				t.Errorf("%s:%d: %s is called with %s rather than an http.Status "+
+					"constant", path, fset.Position(status.Pos()).Line, name.Name, sel.Sel.Name)
 			}
 			return true
 		})
@@ -296,7 +307,7 @@ func TestAPIHandlers_WriteStatusesAsConstants(t *testing.T) {
 	// A scan that inspected nothing passes while guarding nothing. This is the floor that
 	// says the walk still reaches the handlers.
 	if calls < 100 {
-		t.Errorf("found only %d writeJSONError calls; the walk is no longer reaching the "+
+		t.Errorf("found only %d error writer calls; the walk is no longer reaching the "+
 			"API handlers", calls)
 	}
 }

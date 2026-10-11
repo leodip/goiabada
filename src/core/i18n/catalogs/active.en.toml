@@ -1591,6 +1591,30 @@
 "handler.attribute.key_required" = "Attribute key is required"
 "handler.settings_email.destination_required" = "Destination email is required."
 
+# --- Admin and account API refusals a person reaches through the console -----
+# The API answers each with its own error_code and status; only the description
+# is translated (#559).
+
+"handler.list_save.changed_since_loaded" = "The list was changed by another save after it was loaded. Nothing was saved: reload it and make the change again."
+"handler.list_save.changed_concurrently" = "The list was changed by another save at the same moment. Nothing was saved: reload it and make the change again."
+"handler.email.already_exists" = "This email address is already registered"
+"handler.administrators.last_administrator" = "This change would leave no enabled user holding authserver:manage. Grant it to another user first."
+"handler.image_upload.too_large" = "File too large or invalid form data"
+"handler.image_upload.no_file" = "No picture file provided"
+
+"handler.resource.identifier_required" = "Resource identifier is required"
+"handler.resource.description_too_long" = "The description cannot exceed a maximum length of {{.max}} characters"
+"handler.resource.identifier_in_use" = "The resource identifier is already in use"
+"handler.resource.system_level_identifier_fixed" = "The identifier of a system-level resource cannot be changed."
+"handler.resource.system_level_delete_not_allowed" = "Trying to delete a system level resource"
+
+"handler.permission.duplicate_ids" = "Duplicate permission IDs in request are not allowed"
+"handler.permission.identifier_required" = "Permission identifier is required"
+"handler.permission.duplicated" = "Permission {{.identifier}} is duplicated."
+"handler.permission.built_in_deleted" = "Built-in permission '{{.identifier}}' cannot be deleted."
+"handler.permission.built_in_renamed" = "Built-in permission '{{.identifier}}' cannot be renamed."
+"handler.permission.identifier_in_use" = "Permission identifier {{.identifier}} is already in use."
+
 # --- Password validator (LocalizedError-backed) ------------------------------
 
 "validator.password.too_short" = "The minimum length for the password is {{.min}} characters"

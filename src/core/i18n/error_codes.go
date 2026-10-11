@@ -108,6 +108,35 @@ const (
 	ErrCodeAttributeKeyRequired             = "handler.attribute.key_required"
 	ErrCodeSettingsEmailDestinationRequired = "handler.settings_email.destination_required"
 
+	// Refusals of the admin and account API that a person reaches through the admin console. The
+	// API writes each with the error_code and the status it always had, and only the description
+	// comes from here, in the request's language (#559 decisions 1 and 2).
+	//
+	// Shared by several areas: the two conflicts of a list save, the email taken by a concurrent
+	// write, the last administrator, and the image upload's two refusals.
+	ErrCodeListSaveChangedSinceLoaded  = "handler.list_save.changed_since_loaded"
+	ErrCodeListSaveChangedConcurrently = "handler.list_save.changed_concurrently"
+	ErrCodeEmailAlreadyExists          = "handler.email.already_exists"
+	ErrCodeLastAdministrator           = "handler.administrators.last_administrator"
+	ErrCodeImageUploadTooLarge         = "handler.image_upload.too_large"
+	ErrCodeImageUploadNoFile           = "handler.image_upload.no_file"
+
+	// Resources.
+	ErrCodeResourceIdentifierRequired          = "handler.resource.identifier_required"
+	ErrCodeResourceDescriptionTooLong          = "handler.resource.description_too_long" // Args: {"max": int}
+	ErrCodeResourceIdentifierInUse             = "handler.resource.identifier_in_use"
+	ErrCodeResourceSystemLevelIdentifierFixed  = "handler.resource.system_level_identifier_fixed"
+	ErrCodeResourceSystemLevelDeleteNotAllowed = "handler.resource.system_level_delete_not_allowed"
+
+	// A resource's permissions. The description bound is the console's own
+	// handler.admin_resource_permissions.description_too_long, which says the same sentence.
+	ErrCodePermissionDuplicateIds       = "handler.permission.duplicate_ids"
+	ErrCodePermissionIdentifierRequired = "handler.permission.identifier_required"
+	ErrCodePermissionDuplicated         = "handler.permission.duplicated"        // Args: {"identifier": string}
+	ErrCodePermissionBuiltInDeleted     = "handler.permission.built_in_deleted"  // Args: {"identifier": string}
+	ErrCodePermissionBuiltInRenamed     = "handler.permission.built_in_renamed"  // Args: {"identifier": string}
+	ErrCodePermissionIdentifierInUse    = "handler.permission.identifier_in_use" // Args: {"identifier": string}
+
 	// RP-initiated logout via /auth/logout carries no error codes. It used to
 	// carry ten, all of which rendered an error page to the End-User instead of
 	// logging them out. A hint the OP cannot confirm is now answered with the

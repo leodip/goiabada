@@ -1507,6 +1507,26 @@
 "handler.attribute.key_required" = "A chave do atributo é obrigatória"
 "handler.settings_email.destination_required" = "O e-mail de destino é obrigatório."
 
+"handler.list_save.changed_since_loaded" = "A lista foi alterada por outro salvamento depois de ser carregada. Nada foi salvo: recarregue a lista e faça a alteração novamente."
+"handler.list_save.changed_concurrently" = "A lista foi alterada por outro salvamento no mesmo instante. Nada foi salvo: recarregue a lista e faça a alteração novamente."
+"handler.email.already_exists" = "Este endereço de e-mail já está cadastrado"
+"handler.administrators.last_administrator" = "Esta alteração não deixaria nenhum usuário habilitado com authserver:manage. Conceda essa permissão a outro usuário primeiro."
+"handler.image_upload.too_large" = "Arquivo grande demais ou dados de formulário inválidos"
+"handler.image_upload.no_file" = "Nenhum arquivo de foto foi enviado"
+
+"handler.resource.identifier_required" = "O identificador do recurso é obrigatório"
+"handler.resource.description_too_long" = "A descrição não pode ter mais que {{.max}} caracteres"
+"handler.resource.identifier_in_use" = "O identificador do recurso já está em uso"
+"handler.resource.system_level_identifier_fixed" = "O identificador de um recurso em nível de sistema não pode ser alterado."
+"handler.resource.system_level_delete_not_allowed" = "Tentativa de excluir um recurso em nível de sistema"
+
+"handler.permission.duplicate_ids" = "IDs de permissão duplicados não são permitidos na requisição"
+"handler.permission.identifier_required" = "O identificador da permissão é obrigatório"
+"handler.permission.duplicated" = "A permissão {{.identifier}} está duplicada."
+"handler.permission.built_in_deleted" = "A permissão nativa '{{.identifier}}' não pode ser excluída."
+"handler.permission.built_in_renamed" = "A permissão nativa '{{.identifier}}' não pode ser renomeada."
+"handler.permission.identifier_in_use" = "O identificador de permissão {{.identifier}} já está em uso."
+
 "validator.password.too_short" = "O comprimento mínimo para a senha é {{.min}} caracteres"
 "validator.password.too_long" = "A senha pode ter no máximo {{.max}} bytes. Caracteres acentuados e de outros alfabetos contam como dois ou mais bytes cada."
 "validator.password.lowercase_required" = "Conforme nossa política, é obrigatório um caractere minúsculo na senha."
