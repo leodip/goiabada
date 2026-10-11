@@ -38,6 +38,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -220,19 +221,32 @@ func addClaimIfNotEmpty(claims jwt.MapClaims, claimName string, claimValue strin
 // removed; any other carries no country anyone can tell, so it is not sent at all, rather than
 // sent as a national number no client could dial (#563 decision 5). The empty string it returns
 // then is what keeps the claim out.
+//
+// Either way the assembled value is sent only when it is E.164, which allows at most 15 digits,
+// the calling code's included. A save bounds the number typed and not the code before it, so it
+// accepts a Portuguese "9123 4567 89123", which with "+351" makes 16; and a pre-v0.7 row may hold
+// anything after its "+". Neither is truncated or reshaped into something the user never entered:
+// it is not sent, as a number of no known country is not.
 func phoneNumberClaim(user *record.User) string {
 	number := strings.NewReplacer(" ", "", "-", "").Replace(user.PhoneNumber)
 	if number == "" {
 		return ""
 	}
+	candidate := ""
 	if callingCode := strings.TrimSpace(user.PhoneNumberCountryCallingCode); callingCode != "" {
-		return callingCode + number
+		candidate = callingCode + number
+	} else if strings.HasPrefix(number, "+") {
+		candidate = number
 	}
-	if strings.HasPrefix(number, "+") {
-		return number
+	if !e164Shape.MatchString(candidate) {
+		return ""
 	}
-	return ""
+	return candidate
 }
+
+// e164Shape is an international number as E.164 writes it: a "+", then a calling code, which
+// never starts with 0, and the rest of the number, 15 digits at most in all.
+var e164Shape = regexp.MustCompile(`^\+[1-9][0-9]{1,14}$`)
 
 // hasAddress reports whether any of the six address columns holds more than whitespace. It was
 // record.User.HasAddress until #387: it exists to gate the address claim and has no other caller.

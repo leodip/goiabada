@@ -658,7 +658,10 @@ func TestAddOpenIDConnectClaims_AddressScopeWithoutAnAddress(t *testing.T) {
 // typed after it, digits with spaces or hyphens, so those are the first rows. A save before v0.7
 // stored the whole number with its "+" and left the calling code empty, and is sent with its
 // separators removed. A number with neither carries no country anyone can tell, so it sends no
-// phone_number, while phone_number_verified is still sent with the scope, as it always is.
+// phone_number, while phone_number_verified is still sent with the scope, as it always is. Nor
+// does one that is not E.164 once assembled: more than the 15 digits ITU-T E.164 allows,
+// which a save accepts, since it bounds the number typed and not the code before it, or a pre-v0.7
+// row holding anything but a "+", a code not starting with 0, and digits.
 //
 // The expected values are literals: a test that rebuilt them from the fixture the way the mapper
 // does would pass with the mapper reverted to the stored number alone.
@@ -677,6 +680,13 @@ func TestAddOpenIDConnectClaims_PhoneNumberIsE164(t *testing.T) {
 		{name: "a pre-v0.7 number carrying its code, no calling code", callingCode: "", number: "+351 912345678", verified: true, want: "+351912345678"},
 		{name: "a pre-v0.7 number with hyphens, no calling code", callingCode: "", number: "+351-912-345-678", verified: false, want: "+351912345678"},
 		{name: "a national number with no calling code", callingCode: "", number: "912 345 678", verified: true, want: ""},
+		{name: "calling code and number at fifteen digits", callingCode: "+351", number: "912 345 678 912", verified: true, want: "+351912345678912"},
+		{name: "calling code and number at sixteen digits", callingCode: "+351", number: "912 345 678 9123", verified: true, want: ""},
+		{name: "a pre-v0.7 number at fifteen digits", callingCode: "", number: "+351 912345678912", verified: true, want: "+351912345678912"},
+		{name: "a pre-v0.7 number at sixteen digits", callingCode: "", number: "+351 9123456789123", verified: true, want: ""},
+		{name: "a pre-v0.7 number with parentheses", callingCode: "", number: "+351 (912) 345 678", verified: false, want: ""},
+		{name: "a pre-v0.7 number whose code starts with zero", callingCode: "", number: "+0351 912345678", verified: false, want: ""},
+		{name: "a pre-v0.7 plus sign and nothing else", callingCode: "", number: "+", verified: false, want: ""},
 		{name: "a calling code and no number", callingCode: "+351", number: "", verified: false, want: ""},
 		{name: "a calling code and a number of spaces", callingCode: "+351", number: "   ", verified: false, want: ""},
 		{name: "neither", callingCode: "", number: "", verified: false, want: ""},
