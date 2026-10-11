@@ -48,27 +48,29 @@ func TestAddOpenIDConnectClaims(t *testing.T) {
 		{
 			name: "Full scope",
 			user: &record.User{
-				Email:               "test@example.com",
-				EmailVerified:       true,
-				Username:            "testuser",
-				GivenName:           "Test",
-				MiddleName:          "Middle",
-				FamilyName:          "User",
-				Nickname:            "Testy",
-				Website:             "https://test.com",
-				Gender:              "male",
-				BirthDate:           sql.NullTime{Time: time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
-				ZoneInfo:            "Europe/London",
-				Locale:              "en-GB",
-				PhoneNumber:         "+1234567890",
-				PhoneNumberVerified: true,
-				AddressLine1:        "123 Test St",
-				AddressLine2:        "Apt 4",
-				AddressLocality:     "Testville",
-				AddressRegion:       "Testshire",
-				AddressPostalCode:   "TE1 2ST",
-				AddressCountry:      "Testland",
-				UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
+				Email:                         "test@example.com",
+				EmailVerified:                 true,
+				Username:                      "testuser",
+				GivenName:                     "Test",
+				MiddleName:                    "Middle",
+				FamilyName:                    "User",
+				Nickname:                      "Testy",
+				Website:                       "https://test.com",
+				Gender:                        "male",
+				BirthDate:                     sql.NullTime{Time: time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
+				ZoneInfo:                      "Europe/London",
+				Locale:                        "en-GB",
+				PhoneNumberCountryUniqueId:    "PRT_0",
+				PhoneNumberCountryCallingCode: "+351",
+				PhoneNumber:                   "912 345 678",
+				PhoneNumberVerified:           true,
+				AddressLine1:                  "123 Test St",
+				AddressLine2:                  "Apt 4",
+				AddressLocality:               "Testville",
+				AddressRegion:                 "Testshire",
+				AddressPostalCode:             "TE1 2ST",
+				AddressCountry:                "Testland",
+				UpdatedAt:                     sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
 			},
 			scopes: []string{"openid", "profile", "email", "address", "phone"},
 			expected: jwt.MapClaims{
@@ -86,7 +88,7 @@ func TestAddOpenIDConnectClaims(t *testing.T) {
 				"locale":                "en-GB",
 				"email":                 "test@example.com",
 				"email_verified":        true,
-				"phone_number":          "+1234567890",
+				"phone_number":          "+351912345678",
 				"phone_number_verified": true,
 				"updated_at":            now.Add(-1 * time.Hour).Unix(),
 			},
@@ -147,13 +149,15 @@ func TestAddOpenIDConnectClaims(t *testing.T) {
 		{
 			name: "Phone scope only",
 			user: &record.User{
-				PhoneNumber:         "+9876543210",
-				PhoneNumberVerified: false,
-				UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
+				PhoneNumberCountryUniqueId:    "USA_0",
+				PhoneNumberCountryCallingCode: "+1",
+				PhoneNumber:                   "555-123-4567",
+				PhoneNumberVerified:           false,
+				UpdatedAt:                     sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
 			},
 			scopes: []string{"openid", "phone"},
 			expected: jwt.MapClaims{
-				"phone_number":          "+9876543210",
+				"phone_number":          "+15551234567",
 				"phone_number_verified": false,
 			},
 		},
@@ -647,6 +651,80 @@ func TestAddOpenIDConnectClaims_AddressScopeWithoutAnAddress(t *testing.T) {
 		AddOpenIDConnectClaims(context.Background(), nil, claims, &record.User{Id: 4}, []string{"openid", "address"})
 
 	assert.NotContains(t, claims, "address")
+}
+
+// phone_number is strict E.164, the stored calling code followed by the stored number's digits
+// (#563 decisions 4 and 5). A save stores the calling code in its own column and the number as
+// typed after it, digits with spaces or hyphens, so those are the first rows. A save before v0.7
+// stored the whole number with its "+" and left the calling code empty, and is sent with its
+// separators removed. A number with neither carries no country anyone can tell, so it sends no
+// phone_number, while phone_number_verified is still sent with the scope, as it always is.
+//
+// The expected values are literals: a test that rebuilt them from the fixture the way the mapper
+// does would pass with the mapper reverted to the stored number alone.
+func TestAddOpenIDConnectClaims_PhoneNumberIsE164(t *testing.T) {
+	tests := []struct {
+		name        string
+		callingCode string
+		number      string
+		verified    bool
+		want        string
+	}{
+		{name: "calling code and a number with spaces", callingCode: "+351", number: "912 345 678", verified: true, want: "+351912345678"},
+		{name: "calling code and a number with hyphens", callingCode: "+351", number: "912-345-678", verified: true, want: "+351912345678"},
+		{name: "calling code and a number with both", callingCode: "+44", number: "7700 900-123", verified: false, want: "+447700900123"},
+		{name: "calling code and a number of digits alone", callingCode: "+1", number: "5551234567", verified: false, want: "+15551234567"},
+		{name: "a pre-v0.7 number carrying its code, no calling code", callingCode: "", number: "+351 912345678", verified: true, want: "+351912345678"},
+		{name: "a pre-v0.7 number with hyphens, no calling code", callingCode: "", number: "+351-912-345-678", verified: false, want: "+351912345678"},
+		{name: "a national number with no calling code", callingCode: "", number: "912 345 678", verified: true, want: ""},
+		{name: "a calling code and no number", callingCode: "+351", number: "", verified: false, want: ""},
+		{name: "a calling code and a number of spaces", callingCode: "+351", number: "   ", verified: false, want: ""},
+		{name: "neither", callingCode: "", number: "", verified: false, want: ""},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			user := &record.User{
+				Id:                            3,
+				PhoneNumberCountryCallingCode: test.callingCode,
+				PhoneNumber:                   test.number,
+				PhoneNumberVerified:           test.verified,
+			}
+
+			for _, inclusion := range []Inclusion{InclusionIdToken, InclusionAccessToken} {
+				claims := jwt.MapClaims{}
+				Mapper{Database: datamocks.NewDatabase(t), BaseURL: "https://auth.example.com", Inclusion: inclusion}.
+					AddOpenIDConnectClaims(context.Background(), nil, claims, user, []string{"openid", "phone"})
+
+				if test.want == "" {
+					assert.NotContains(t, claims, "phone_number", "no number a client could dial")
+				} else {
+					assert.Equal(t, test.want, claims["phone_number"])
+				}
+				assert.Equal(t, test.verified, claims["phone_number_verified"],
+					"phone_number_verified is sent with the phone scope whether or not phone_number is")
+			}
+		})
+	}
+}
+
+// Scopes and UserInfo give phone_number's format and say the number is sent as the user entered
+// it after the calling code, so a client relies on the format and an administrator knows why a
+// typed trunk 0 shows up in it (#563 decisions 4 and 6).
+func TestAddOpenIDConnectClaims_TheDocsGiveThePhoneNumberFormat(t *testing.T) {
+	for _, page := range []string{
+		"site/src/content/docs/concepts/scopes.mdx",
+		"site/src/content/docs/reference/endpoints/userinfo.mdx",
+	} {
+		body, err := os.ReadFile(filepath.Join(filepath.Dir(guard.SourceRoot(t)), page))
+		require.NoError(t, err)
+		assert.Containsf(t, string(body), "`phone_number` is in E.164",
+			"%s gives the phone_number format", page)
+		assert.Containsf(t, string(body), "`+351912345678`",
+			"%s shows a phone_number", page)
+		assert.Containsf(t, string(body), "as the user entered it after the calling code",
+			"%s says the number is sent as entered", page)
+	}
 }
 
 // The profile claim is the auth server's base URL and /account/profile, a path the auth server

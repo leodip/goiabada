@@ -146,7 +146,7 @@ func (m Mapper) AddOpenIDConnectClaims(ctx context.Context, tx *sql.Tx, claims j
 	}
 
 	if slices.Contains(scopes, "phone") {
-		addClaimIfNotEmpty(claims, "phone_number", user.PhoneNumber)
+		addClaimIfNotEmpty(claims, "phone_number", phoneNumberClaim(user))
 		claims["phone_number_verified"] = user.PhoneNumberVerified
 	}
 }
@@ -204,6 +204,30 @@ func addClaimIfNotEmpty(claims jwt.MapClaims, claimName string, claimValue strin
 	if len(strings.TrimSpace(claimValue)) > 0 {
 		claims[claimName] = claimValue
 	}
+}
+
+// phoneNumberClaim builds the phone_number claim in strict E.164: the stored calling code followed
+// by the stored number with its spaces and hyphens removed, so Portugal and "912 345 678" is
+// "+351912345678" (#563 decision 4). OIDC Core 1.0 section 5.1 recommends E.164 for the claim and
+// requires it when phone_number_verified is true.
+//
+// A number stored with no calling code is a save from before v0.7, which kept the whole number,
+// "+" and code included, in the one column. One that starts with "+" is sent with its separators
+// removed; any other carries no country anyone can tell, so it is not sent at all, rather than
+// sent as a national number no client could dial (#563 decision 5). The empty string it returns
+// then is what keeps the claim out.
+func phoneNumberClaim(user *record.User) string {
+	number := strings.NewReplacer(" ", "", "-", "").Replace(user.PhoneNumber)
+	if number == "" {
+		return ""
+	}
+	if callingCode := strings.TrimSpace(user.PhoneNumberCountryCallingCode); callingCode != "" {
+		return callingCode + number
+	}
+	if strings.HasPrefix(number, "+") {
+		return number
+	}
+	return ""
 }
 
 // hasAddress reports whether any of the six address columns holds more than whitespace. It was
