@@ -6,6 +6,19 @@ SQL Server and Mailpit on a private network, and four ports published to the hos
 reach the databases and the Mailpit UI: 13306, 15432, 11433 and 8025. Nothing below changes that
 stack.
 
+## TLS from a test authority
+
+The three databases serve TLS with a certificate from a test authority, so the data tier can show a
+connection whose certificate is checked succeeding (#502). `db-tls`, a service that runs once and
+exits, writes the authority and a certificate naming `mysql-server`, `postgres-server` and
+`mssql-server` into the `db-tls` volume with `generate-db-tls.sh`, before any database starts; each
+database and the devcontainer mount that volume at `/db-tls`, and `run-tests.sh` hands the data
+tier `/db-tls/ca.crt`. The script keeps a set that still verifies, so starting the stack again
+changes nothing, and `down -v` takes the authority with the volume. CI's database jobs generate
+theirs with the same script after checkout and restart their database container to serve it,
+through `.github/actions/serve-db-tls`. A stack created before this needs `docker compose up` once
+to recreate its databases with it.
+
 ## A second stack beside it
 
 `docker-compose.worktree.yml` is an override for **automated** stacks: independent copies of the

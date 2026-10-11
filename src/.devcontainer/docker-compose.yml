@@ -9,6 +9,8 @@ services:
         USER_GID: ${USER_GID:-1000}
     volumes:
       - ../..:/workspaces/goiabada
+      # The test authority's certificate, which run-tests.sh hands the data tier (#502).
+      - db-tls:/db-tls:ro
     # gh reaches the container through the environment, not through a mounted file.
     #
     # There used to be a `~/.config/gh/hosts.yml:/root/.config/gh/hosts.yml` bind here. It
@@ -29,6 +31,24 @@ services:
     command: sleep infinity
     networks: 
       - goiabada-network
+    depends_on:
+      db-tls:
+        condition: service_completed_successfully
+
+  # The test authority the three databases serve TLS from (#502), generated before any of them
+  # starts into the db-tls volume, which each server and the devcontainer mount at /db-tls; the
+  # data tier checks every server's certificate against /db-tls/ca.crt. generate-db-tls.sh keeps
+  # a set that still verifies, so starting the stack again changes nothing. The postgres image
+  # only because it carries bash and openssl and the stack pulls it anyway. The script alone is
+  # mounted, not the checkout: Docker Desktop hands a second container binding the same host path
+  # a shared copy of that bind, which would then be what the devcontainer reports mounting.
+  db-tls:
+    image: postgres:18
+    entrypoint: ["bash", "/generate-db-tls.sh", "/db-tls"]
+    volumes:
+      - ./generate-db-tls.sh:/generate-db-tls.sh:ro
+      - db-tls:/db-tls
+    network_mode: none
 
   mysql-server:
     # The image the generated deployments run, which the setup wizard's
@@ -36,9 +56,13 @@ services:
     # major upgrade is one change to both, and a dump and restore of the
     # mysql-data volume, not a tag edit.
     image: mysql:26
-    command: --port=13306
+    command: --port=13306 --ssl-ca=/db-tls/ca.crt --ssl-cert=/db-tls/server.crt --ssl-key=/db-tls/server.key
     volumes:
       - mysql-data:/var/lib/mysql
+      - db-tls:/db-tls:ro
+    depends_on:
+      db-tls:
+        condition: service_completed_successfully
     ports:
       - 13306:13306  # Devcontainer uses 13306 to avoid conflict with sample docker-compose files
     environment:
@@ -48,9 +72,14 @@ services:
 
   postgres-server:
     image: postgres:18
-    command: -p 15432
+    # postgres.key, not server.key: PostgreSQL loads a key only when its own user owns it, mode 0600.
+    command: -p 15432 -c ssl=on -c ssl_cert_file=/db-tls/server.crt -c ssl_key_file=/db-tls/postgres.key
     volumes:
       - postgres-data:/var/lib/postgresql
+      - db-tls:/db-tls:ro
+    depends_on:
+      db-tls:
+        condition: service_completed_successfully
     ports:
       - 15432:15432  # Devcontainer uses 15432 to avoid conflict with sample docker-compose files
     environment:
@@ -65,10 +94,18 @@ services:
       MSSQL_SA_PASSWORD: YourStr0ngPassw0rd!  # Must be at least 8 characters including uppercase, lowercase, digits
       MSSQL_PID: Developer
       MSSQL_TCP_PORT: 11433
+      # mssql-conf's network.tlscert and network.tlskey. The server refuses to start when either
+      # file is missing, which db-tls rules out by running first.
+      MSSQL_TLS_CERTIFICATE_FILE: /db-tls/server.crt
+      MSSQL_TLS_KEY_FILE: /db-tls/server.key
     ports:
       - 11433:11433  # Devcontainer uses 11433 to avoid conflict with sample docker-compose files
     volumes:
       - mssql-data:/var/opt/mssql
+      - db-tls:/db-tls:ro
+    depends_on:
+      db-tls:
+        condition: service_completed_successfully
     networks:
       - goiabada-network
     deploy:
@@ -87,6 +124,7 @@ volumes:
   mysql-data:
   postgres-data:
   mssql-data:
+  db-tls:
 
 networks:
   goiabada-network:
