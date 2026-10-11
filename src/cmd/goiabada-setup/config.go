@@ -77,7 +77,7 @@ func (c *Config) dbTLSComment() []string {
 	lines := []string{
 		"How the auth server protects its connection to the database: disable, prefer, require,",
 		"verify-ca or verify-full.",
-		c.DBTLSMode + ": " + tlsModeDescription(c.DBTLSMode) + ".",
+		c.DBTLSMode + ": " + tlsModeDescription(c.DBTLSMode, c.Engine.name) + ".",
 	}
 	switch {
 	case !checksCertificate(c.DBTLSMode):

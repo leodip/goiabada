@@ -135,6 +135,14 @@ func TestDatabaseConnectPage_NamesTheTLSRefusals(t *testing.T) {
 	require.Contains(t, using[0].Attrs, "tls_mode", "the start's record carries the mode in effect")
 	assert.Contains(t, page, "`using database`", "the page names the record to read the mode from")
 	assert.Contains(t, page, "`tls_mode`", "and its attribute")
+
+	cfg := unreachable("postgres", false)
+	cfg.TLSMode = string(data.TLSVerifyFull)
+	_, err := OpenDatabase(context.Background(), cfg, false)
+	require.Error(t, err)
+	_, ending, found := strings.Cut(err.Error(), "connection refused ")
+	require.True(t, found, "%v", err)
+	assert.Contains(t, page, "`"+ending+"`", "the page quotes how the error names the mode")
 }
 
 // x509Refusal is the certificate refusal inside a handshake's error: crypto/x509's own words, up to

@@ -161,7 +161,12 @@ func generateAuthServerService(config *Config) string {
 		writeComposeVariable(&sb, "GOIABADA_DB_PORT", config.Engine.defaultPort)
 		writeComposeVariable(&sb, "GOIABADA_DB_NAME", "goiabada")
 		sb.WriteString("      # The database is a service on this file's own network, so the connection never leaves\n")
-		sb.WriteString("      # this host: prefer encrypts it when the database offers TLS and checks no certificate.\n")
+		if config.Engine.name == "mssql" {
+			sb.WriteString("      # this host: prefer encrypts the login, and the rest only when the database forces\n")
+			sb.WriteString("      # encryption, and checks no certificate.\n")
+		} else {
+			sb.WriteString("      # this host: prefer encrypts it when the database offers TLS and checks no certificate.\n")
+		}
 		sb.WriteString("      # Set verify-full, with GOIABADA_DB_TLS_CA_FILE, for a database reached across a network.\n")
 		writeComposeVariable(&sb, "GOIABADA_DB_TLS_MODE", composeDBTLSMode)
 	} else {

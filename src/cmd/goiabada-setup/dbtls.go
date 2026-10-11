@@ -56,11 +56,23 @@ func checksCertificate(mode string) bool {
 	return mode == "verify-ca" || mode == "verify-full"
 }
 
-// tlsModeDescription is the line the mode is described by.
-func tlsModeDescription(name string) string {
+// mssqlPreferDescription is prefer on SQL Server, where it encrypts the login and leaves the rest of
+// the session to the database, rather than following the database's offer of TLS (#502 decision 2).
+const mssqlPreferDescription = "the login encrypted, and the rest only when the database forces encryption; no certificate is checked"
+
+// describedFor is the line the mode is described by to an operator of the engine named.
+func (m tlsMode) describedFor(engineName string) string {
+	if m.name == "prefer" && engineName == "mssql" {
+		return mssqlPreferDescription
+	}
+	return m.description
+}
+
+// tlsModeDescription is the line the mode is described by to an operator of the engine named.
+func tlsModeDescription(name, engineName string) string {
 	for _, m := range tlsModes {
 		if m.name == name {
-			return m.description
+			return m.describedFor(engineName)
 		}
 	}
 	return ""

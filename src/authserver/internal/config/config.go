@@ -310,8 +310,14 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 
 	// The pool flags parse as the flag package reads an integer or a duration; their ranges, and
 	// the one rule between two of them, are held here, in the same line as the variables' (#394).
-	// So are the TLS mode's flag and the CA file, which is read here, once (#502).
+	// So is the TLS mode's flag, and the CA file is read here, once, with libpq's variables
+	// refused beside it (#502). Under `migrate` those two wait for its own parse, which reads the
+	// file of the configuration it runs with: a --db-* flag after `migrate` can change the engine,
+	// the mode or the file they are checked against.
 	checkDatabaseFlags(fs, &c.Database, &malformed)
+	if len(c.Args) == 0 || c.Args[0] != "migrate" {
+		checkDatabaseTLS(&c.Database, &malformed)
+	}
 
 	// Re-derive slice-valued config after flag parsing so a command-line flag
 	// (comma-separated) overrides the environment value.
@@ -390,10 +396,12 @@ func (f optionalIntFlag) Set(s string) error {
 // mode given on fs, a CA file the connection cannot use and, on PostgreSQL, libpq's TLS variables,
 // in the one malformed-configuration line Load answers with, and reads the CA file into c.TLSRoots.
 // The `migrate` subcommand calls it after its own parse of the --db-* flags, so a flag given after
-// `migrate` is held to the rules one given before it is (#394 decision 5, #502).
+// `migrate` is held to the rules one given before it is, and the CA file and libpq's variables,
+// which Load leaves to it, are checked against the configuration it runs with (#394 decision 5, #502).
 func CheckDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig) error {
 	var malformed malformedValues
 	checkDatabaseFlags(fs, c, &malformed)
+	checkDatabaseTLS(c, &malformed)
 	return malformed.err()
 }
 
@@ -429,6 +437,12 @@ func checkDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig, malformed *malforme
 	if v, ok := given["db-tls-mode"]; ok && v != "" && !data.TLSMode(v).Known() {
 		malformed.add("--db-tls-mode", v, tlsModeWant())
 	}
+}
+
+// checkDatabaseTLS reads the CA file into c.TLSRoots, refusing one the connection cannot use, and
+// refuses libpq's TLS variables on PostgreSQL. Both depend on the engine, the mode and the file
+// together, so they are checked once, against the configuration the command runs with (#502).
+func checkDatabaseTLS(c *DatabaseConfig, malformed *malformedValues) {
 	readDatabaseTLSRoots(c, malformed)
 	refuseLibpqTLSVariables(c, malformed)
 }

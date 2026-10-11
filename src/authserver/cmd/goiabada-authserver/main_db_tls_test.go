@@ -1,18 +1,29 @@
 package main
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // TestMain_RefusesTheConnectionsTLSSettingsBeforeOpeningAnything: a malformed mode and a CA file
-// the start cannot use stop main at the load with one line on stderr and exit 2, the channel and
-// code of every malformed setting, under the server and under `migrate` alike, and a flag given
-// after `migrate` is held to the same rules (#502).
+// the start cannot use stop main before anything is opened, with exit 2, the code of every
+// malformed setting, under the server and under `migrate` alike, and a flag given after `migrate`
+// is held to the same rules (#502). The server stops at the load, with one line on stderr; under
+// `migrate` the CA file and libpq's variables are checked by its own parse, against the flags given
+// after it, which answers as it does every refusal, after the start's records and with its usage.
 //
 // The engine is PostgreSQL on a port nothing listens on, so a child that got past the load exits
 // 1 at the connection instead: the code and the exact line are what fail.
@@ -72,6 +83,10 @@ func TestMain_RefusesTheConnectionsTLSSettingsBeforeOpeningAnything(t *testing.T
 			code, stderr := runMainProcessWith(t, decoy, append(append([]string{}, postgres...), tc.env...), tc.args...)
 
 			require.Equal(t, migrateExitUsage, code, "stderr: %s", stderr)
+			if len(tc.args) > 0 && tc.args[0] == "migrate" {
+				assert.Contains(t, stderr, "\n"+tc.want)
+				return
+			}
 			assert.Equal(t, tc.want, stderr)
 		})
 	}
@@ -86,4 +101,90 @@ func TestMain_RefusesTheConnectionsTLSSettingsBeforeOpeningAnything(t *testing.T
 		assert.Contains(t, stderr,
 			"\n"+`malformed configuration: --db-tls-mode is "strict", not one of disable, prefer, require, verify-ca, verify-full`+"\n")
 	})
+}
+
+// TestMain_MigrateHoldsTheConnectionsTLSRulesToItsOwnFlags: the CA file and libpq's variables are
+// checked against the configuration `migrate` runs with, the --db-* flags given after it applied,
+// so a flag there that settles what the environment left wrong is not refused for it (#502). Each
+// case reaches the database: PostgreSQL's dial fails on a port nothing listens on, and SQLite's
+// decoy answers `migrate version`.
+func TestMain_MigrateHoldsTheConnectionsTLSRulesToItsOwnFlags(t *testing.T) {
+	ca := writeTestAuthority(t)
+	missing := filepath.Join(t.TempDir(), "absent.pem")
+	postgres := []string{
+		"GOIABADA_DB_TYPE=postgres",
+		"GOIABADA_DB_HOST=127.0.0.1",
+		"GOIABADA_DB_PORT=1",
+		"GOIABADA_DB_CREATE=false",
+	}
+
+	cases := []struct {
+		name     string
+		env      []string
+		args     []string
+		wantCode int
+	}{
+		{
+			name:     "a CA file from the environment, the verifying mode after migrate",
+			env:      []string{"GOIABADA_DB_TLS_CA_FILE=" + ca},
+			args:     []string{"migrate", "--db-tls-mode=verify-full", "version"},
+			wantCode: migrateExitError,
+		},
+		{
+			name:     "an unreadable CA file from the environment, replaced after migrate",
+			env:      []string{"GOIABADA_DB_TLS_MODE=verify-full", "GOIABADA_DB_TLS_CA_FILE=" + missing},
+			args:     []string{"migrate", "--db-tls-ca-file=" + ca, "version"},
+			wantCode: migrateExitError,
+		},
+		{
+			name:     "libpq's variable beside postgres, sqlite after migrate",
+			env:      []string{"PGSSLMODE=verify-full"},
+			args:     []string{"migrate", "--db-type=sqlite", "version"},
+			wantCode: migrateExitOK,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			decoy := filepath.Join(t.TempDir(), "d.db")
+
+			code, stderr := runMainProcessWith(t, decoy, append(append([]string{}, postgres...), tc.env...), tc.args...)
+
+			require.Equal(t, tc.wantCode, code, "stderr: %s", stderr)
+			assert.NotContains(t, stderr, "malformed configuration")
+		})
+	}
+
+	t.Run("the merged configuration is still held to the rules", func(t *testing.T) {
+		decoy := filepath.Join(t.TempDir(), "d.db")
+
+		code, stderr := runMainProcessWith(t, decoy, append(append([]string{}, postgres...),
+			"GOIABADA_DB_TLS_MODE=verify-full", "GOIABADA_DB_TLS_CA_FILE="+ca),
+			"migrate", "--db-tls-mode=require", "version")
+
+		require.Equal(t, migrateExitUsage, code, "stderr: %s", stderr)
+		assert.Contains(t, stderr, "\n"+`malformed configuration: GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) is "`+ca+
+			`" while GOIABADA_DB_TLS_MODE (--db-tls-mode) is require, which checks no certificate: only verify-ca and verify-full read a CA file`+"\n")
+	})
+}
+
+// writeTestAuthority writes a self-signed authority's certificate to a PEM file of the test's and
+// answers its path.
+func writeTestAuthority(t *testing.T) string {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	template := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "main test authority"},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	require.NoError(t, err)
+	path := filepath.Join(t.TempDir(), "ca.pem")
+	require.NoError(t, os.WriteFile(path, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600))
+	return path
 }

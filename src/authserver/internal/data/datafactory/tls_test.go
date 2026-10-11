@@ -111,6 +111,8 @@ func TestOpenDatabase_PreferConnectsAsBefore(t *testing.T) {
 				require.Error(t, err)
 				assert.True(t, strings.HasPrefix(err.Error(), "unable to connect to database:"),
 					"prefer dials the server: %v", err)
+				assert.True(t, strings.HasSuffix(err.Error(), " (tls mode prefer)"),
+					"the refusal names the mode in effect, set or not: %v", err)
 			})
 		}
 	}
@@ -141,9 +143,30 @@ func TestOpenDatabase_EveryEngineDialsInEveryMode(t *testing.T) {
 					}
 					assert.True(t, strings.HasPrefix(err.Error(), want), "%s dials the server: %v", mode, err)
 					assert.Contains(t, err.Error(), "connection refused", "the failure is the server's absence")
+					assert.True(t, strings.HasSuffix(err.Error(), " (tls mode "+string(mode)+")"),
+						"the refusal names the mode in effect: %v", err)
 				})
 			}
 		}
+	}
+}
+
+// TestOpenDatabase_NamingTheModeKeepsTheCause: the mode is appended to the engine's error, not put
+// in its place, so a start a signal stopped still reads as cancelled, and the error still opens
+// with the engine's own words.
+func TestOpenDatabase_NamingTheModeKeepsTheCause(t *testing.T) {
+	for _, engine := range serverEngines {
+		t.Run(engine, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			cfg := unreachable(engine, false)
+			cfg.TLSMode = string(data.TLSVerifyFull)
+
+			_, err := OpenDatabase(ctx, cfg, false)
+
+			require.ErrorIs(t, err, context.Canceled)
+			assert.True(t, strings.HasSuffix(err.Error(), " (tls mode verify-full)"), "%v", err)
+		})
 	}
 }
 
