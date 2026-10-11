@@ -21,10 +21,9 @@ Give each integration the smallest scope that does its job. A service that creat
 | `authserver:manage-settings` | Settings, resources and their permissions, signing keys, and the audit log | Settings except email and audit logging, resources and their permissions, signing keys |
 | `authserver:manage` | Everything | Everything, administrators included |
 
-Every operation that reads accepts `authserver:admin-read`, the scope of its domain, or `authserver:manage`. Every operation that writes accepts the scope of its domain or `authserver:manage`. Two reads are different:
+Every operation that reads accepts `authserver:admin-read`, the scope of its domain, or `authserver:manage`. Every operation that writes accepts the scope of its domain or `authserver:manage`. The phone countries (`GET /api/v1/admin/phone-countries`) belong to no domain, so every administrative scope reads them.
 
-- **A client's secret** (`GET /api/v1/admin/clients/{id}/secret`) is a credential, so `authserver:admin-read` doesn't reach it. It takes `authserver:manage-clients` or `authserver:manage`.
-- **The phone countries** (`GET /api/v1/admin/phone-countries`) belong to no domain, so they take `authserver:admin-read` or `authserver:manage` only.
+One read is different: **a client's secret** (`GET /api/v1/admin/clients/{id}/secret`) is a credential, so `authserver:admin-read` doesn't reach it. It takes `authserver:manage-clients` or `authserver:manage`.
 
 A token with none of the scopes an operation accepts is answered `403` with the error code `INSUFFICIENT_SCOPE`.
 
