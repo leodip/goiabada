@@ -4224,13 +4224,16 @@ components:
           type: string
           description: |
             Stable identifier for the failure. UPPER_SNAKE for legacy codes
-            (e.g. VALIDATION_ERROR), dotted lowercase for catalog-keyed
-            localized codes (e.g. validator.email.required).
+            (e.g. VALIDATION_ERROR), dotted lowercase for codes named after the
+            sentence's catalog key (e.g. validator.email.required). Never
+            translated, whatever the request's language.
         error_description:
           type: string
           description: |
-            A sentence for people to read: in the request's language when error_code is a
-            catalog key, in English otherwise. Route on error_code, not on this text.
+            A sentence for people to read: in the request's language, from the ui_locales
+            query parameter or else the Accept-Language header, when the server has the
+            sentence in that language, and in English otherwise. Route on error_code, not on
+            this text.
       required:
         - error_description
 
