@@ -67,7 +67,7 @@ The answer is `200 OK` with the claims as a JSON object. `sub`, the user's [subj
 | `groups` | `groups`, the identifiers of the user's groups set to be included in the ID token |
 | `attributes` | `attributes`, the user's attributes and their groups' set to be included in the ID token, as keys and values |
 
-A claim with no value is left out, as [Scopes](/concepts/scopes/#openid-connect-scopes-and-their-claims) explains. `profile` is the admin console's base URL followed by `/account/profile`, the page where the user manages their own profile. `picture` is the user's [profile picture](/reference/endpoints/logo-and-picture/), on the auth server's base URL. `updated_at` is the last time the user's details changed, in seconds since 1970. `phone_number` is in E.164, such as `+351912345678`, with the number as the user entered it after the calling code: see [Scopes](/concepts/scopes/#openid-connect-scopes-and-their-claims).
+A claim with no value is left out, as [Scopes](/concepts/scopes/#openid-connect-scopes-and-their-claims) explains. `profile` is the admin console's base URL followed by `/account/profile`, the page where the user manages their own profile. `picture` is the user's [profile picture](/reference/endpoints/logo-and-picture/), on the auth server's base URL. `updated_at` is the last time the user's details changed, in seconds since 1970. `phone_number` is in E.164, such as `+351912345678`, with the number as the user entered it after the calling code, and left out when it is not E.164: see [Scopes](/concepts/scopes/#openid-connect-scopes-and-their-claims).
 
 The claims are read when you call, so they're current even when the token is older than the user's last change. The answer is plain JSON, never a signed JWT.
 
