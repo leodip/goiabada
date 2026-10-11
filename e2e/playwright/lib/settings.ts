@@ -63,10 +63,12 @@ export async function withSettingsRestored(page: Page, path: string, body: () =>
   }
 }
 
-// The settings the instance was seeded with (src/authserver/internal/bootstrap/seed.go), page by page,
-// for the fields the tests change. The app name and the issuer are left alone: the tests restore what
-// they change of those, and the issuer is the deployment's own.
-const seeded: Record<string, FormValues> = {
+// The settings every run starts from, page by page, for the fields the tests change: those the
+// instance was seeded with (src/authserver/internal/bootstrap/seed.go), and email sent through the
+// environment's Mailpit (e2e/infra/remote-prepare.sh), which the auth server reaches as mailpit:1025.
+// The app name and the issuer are left alone: the tests restore what they change of those, and the
+// issuer is the deployment's own.
+const baseline: Record<string, FormValues> = {
   "/admin/settings/general": {
     passwordPolicy: "low",
     selfRegistrationEnabled: false,
@@ -86,13 +88,23 @@ const seeded: Record<string, FormValues> = {
     includeOpenIDConnectClaimsInIdToken: true,
   },
   "/admin/settings/audit-logs": { auditLogsInConsoleEnabled: true, auditLogsInDatabaseEnabled: true, auditLogRetentionDays: "180" },
+  "/admin/settings/email": {
+    smtpEnabled: true,
+    hostOrIP: "mailpit",
+    port: "1025",
+    smtpEncryption: "none",
+    username: "",
+    fromName: "Goiabada e2e",
+    fromEmail: "noreply@goiabada.dev",
+  },
 };
 
-// Puts every page's seeded values back where they differ, and returns what it had to change: a run
-// whose restore failed half way would otherwise leave the next run testing against other settings.
-export async function restoreSeededSettings(page: Page): Promise<string[]> {
+// Puts every page's baseline values back where they differ, and returns what it had to change: a run
+// whose restore failed half way would otherwise leave the next run testing against other settings. A
+// freshly built environment has no SMTP set up, so the first run sets it up here.
+export async function restoreBaselineSettings(page: Page): Promise<string[]> {
   const drifted: string[] = [];
-  for (const [path, values] of Object.entries(seeded)) {
+  for (const [path, values] of Object.entries(baseline)) {
     const now = await readSettingsForm(page, path);
     const changed = Object.fromEntries(Object.entries(values).filter(([name, value]) => now[name] !== value));
     if (Object.keys(changed).length === 0) continue;

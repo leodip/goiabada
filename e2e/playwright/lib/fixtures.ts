@@ -67,8 +67,9 @@ interface Fixtures {
     create(options?: Omit<NewGroup, "identifier">): Promise<TestGroup>;
   };
   users: {
-    // Creates a user with a password set, so no email is sent.
-    create(): Promise<TestUser>;
+    // Creates a user with a password set now, so no link is mailed; with the email verified when
+    // asked, which mail such as a password reset is only ever sent to.
+    create(options?: { emailVerified?: boolean }): Promise<TestUser>;
   };
 }
 
@@ -174,10 +175,10 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     const page = await context.newPage();
 
     await use({
-      async create() {
+      async create({ emailVerified = false } = {}) {
         const email = `${uniqueIdentifier("u")}@example.com`;
         const password = randomBytes(18).toString("base64url");
-        await submitNewUser(page, { email, givenName: "Playwright", familyName: "Tester", password });
+        await submitNewUser(page, { email, givenName: "Playwright", familyName: "Tester", password, emailVerified });
         await expect(page).toHaveURL(/\/admin\/users\/\d+\/details/);
         const id = Number(page.url().match(/\/admin\/users\/(\d+)\/details/)![1]);
         const entry = { id, deleted: false };

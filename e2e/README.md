@@ -88,8 +88,18 @@ reset:
 It is shared with other services, so the scripts touch only what is theirs: the Compose project in
 `/root/goiabada-e2e`, `/etc/nginx/conf.d/goiabada-e2e.conf`, `/var/www/goiabada-e2e`, and the
 certificate `e2e.goiabada.dev`. It needs Docker with the Compose plugin, nginx with certbot's
-`options-ssl-nginx.conf`, and certbot with a registered account, and ports 9090 and 9091 free on
+`options-ssl-nginx.conf`, and certbot with a registered account, and ports 9090, 9091 and 18025 free on
 127.0.0.1.
+
+## Mail
+
+The Compose project runs Mailpit beside the two servers (`mailpit.yml`, which the project's `.env`
+adds to the wizard's files through `COMPOSE_FILE`, so the wizard's own files stay as it wrote them).
+The auth server sends to it as `mailpit:1025`, which the setup step configures under Settings - Email
+as part of the baseline every run starts from. Its web UI and API listen on the VPS's loopback, port
+18025, and nowhere else: `e2e/test.sh` opens an SSH tunnel to it for the run and passes its address to
+the tests in `E2E_MAILPIT_URL` (`lib/mailpit.ts`). To look at the mail yourself:
+`ssh -L 8025:127.0.0.1:18025 root@<vps>` and open http://localhost:8025.
 
 ## Test app
 

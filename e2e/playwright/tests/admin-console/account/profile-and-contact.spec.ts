@@ -48,9 +48,9 @@ test("the user changes their email with their password, which must be right and 
   await submit(newEmail, newEmail, user.password);
   await expect(own.page.getByText("Email updated successfully")).toBeVisible();
 
-  // Verifying an address takes a mailed code, so without SMTP the page is not offered.
-  await expect(own.page.locator('a[href="/account/email-verification"]')).toHaveCount(0);
-  expect((await own.page.goto(`${env.adminUrl}/account/email-verification`))?.status()).toBe(404);
+  // A new address starts unverified; verifying it with the mailed code is in email.spec.ts.
+  await own.page.goto(`${env.adminUrl}/account/email-verification`);
+  await expect(own.page.getByText("isn't verified")).toBeVisible();
   await own.context.close();
 
   await page.goto(userUrl(user.id, "email"));

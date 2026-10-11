@@ -27,6 +27,10 @@ E2E_RATE_LIMITER="${E2E_RATE_LIMITER:-true}"
 # On the VPS: the Compose project's directory (and so its name), and the certificate's name.
 E2E_REMOTE_DIR="${E2E_REMOTE_DIR:-/root/goiabada-e2e}"
 E2E_CERT_NAME="${E2E_CERT_NAME:-e2e.goiabada.dev}"
+# Mailpit catches the mail the auth server sends. Its web UI and API listen on the VPS's loopback only;
+# e2e/test.sh reaches them through an SSH tunnel.
+E2E_MAILPIT_IMAGE="${E2E_MAILPIT_IMAGE:-axllent/mailpit:v1.31.5}"
+E2E_MAILPIT_PORT="${E2E_MAILPIT_PORT:-18025}"
 
 E2E_ALL_HOSTS=("$E2E_AUTH_HOST" "$E2E_ADMIN_HOST" "$E2E_WEBTEST1_HOST" "$E2E_WEBTEST2_HOST")
 

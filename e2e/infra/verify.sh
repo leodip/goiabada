@@ -96,6 +96,11 @@ print(len(keys), "keys")
 '
 }
 
+mailpit_answers() {
+  ssh_vps "curl -fsS --max-time 10 http://127.0.0.1:$E2E_MAILPIT_PORT/api/v1/info" |
+    python3 -c 'import json, sys; print("Mailpit", json.load(sys.stdin)["Version"])'
+}
+
 admin_page() {
   local body
   body="$(curl -fsS --max-time 15 "https://$E2E_ADMIN_HOST/")" || return 1
@@ -142,6 +147,7 @@ check "auth server discovery" auth_discovery
 check "auth server JWKS" auth_jwks
 check "admin console home page" admin_page
 check "admin console sign-in reaches the auth server" admin_sign_in_reaches_auth
+check "Mailpit on the VPS" mailpit_answers
 check "test app host $E2E_WEBTEST1_HOST" webtest_page "$E2E_WEBTEST1_HOST"
 check "test app host $E2E_WEBTEST2_HOST" webtest_page "$E2E_WEBTEST2_HOST"
 

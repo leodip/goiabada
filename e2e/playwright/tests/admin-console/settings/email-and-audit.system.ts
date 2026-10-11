@@ -1,5 +1,7 @@
-// Settings - Email - SMTP and Audit logs. There is no SMTP server in the e2e environment, so what is
-// tested of email is what the console refuses. Runs alone, and every test puts the settings back.
+// Settings - Email - SMTP and Audit logs. The baseline sends through the environment's Mailpit
+// (lib/settings.ts); what is mailed is tested in email.spec.ts. Runs alone, and every test puts the
+// settings back.
+import { signInToConsole } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { fillSettingsForm, saveSettings, withSettingsRestored } from "../../../lib/settings";
@@ -20,15 +22,29 @@ test("SMTP settings are refused when incomplete, out of range, or unreachable", 
       await page.locator("#btnSave").click();
       await expect(page.getByText(message).first()).toBeVisible();
     }
+    // Nothing refused was saved: still Mailpit.
     await page.goto(`${env.adminUrl}${email}`);
-    await expect(page.locator('input[name="smtpEnabled"]')).not.toBeChecked();
+    await expect(page.locator('input[name="hostOrIP"]')).toHaveValue("mailpit");
   });
 });
 
-test("with SMTP off, the send test email page says so", async ({ page }) => {
-  await page.goto(`${env.adminUrl}${email}/send-test-email`);
-  await expect(page.getByText("SMTP is currently")).toBeVisible();
-  await expect(page.getByText("disabled", { exact: true })).toBeVisible();
+test("with SMTP off, the features that mail are withdrawn", async ({ page, browser, users }) => {
+  const user = await users.create();
+  await withSettingsRestored(page, email, async () => {
+    await fillSettingsForm(page, { smtpEnabled: false });
+    await saveSettings(page);
+
+    await page.goto(`${env.adminUrl}${email}/send-test-email`);
+    await expect(page.getByText("SMTP is currently")).toBeVisible();
+    // The new user form sets the password, with no emailed link to choose.
+    await page.goto(`${env.adminUrl}/admin/users/new`);
+    await expect(page.locator("#setPasswordTypeEmail")).toHaveCount(0);
+    // A user's email verification page is not offered.
+    const own = await signInToConsole(browser, user, `smtp-off-${user.id}`);
+    await expect(own.page.locator('a[href="/account/email-verification"]')).toHaveCount(0);
+    expect((await own.page.goto(`${env.adminUrl}/account/email-verification`))?.status()).toBe(404);
+    await own.context.close();
+  });
 });
 
 test("audit log retention is saved, and refused when out of range", async ({ page }) => {

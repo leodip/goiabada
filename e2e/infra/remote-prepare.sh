@@ -76,6 +76,27 @@ for server in authserver adminconsole; do
     fail "docker-compose.yml does not name leodip/goiabada:$server-$version"
 done
 
+# Mailpit, beside the wizard's two files rather than in them: the override holds the secrets and is the
+# wizard's. COMPOSE_FILE in .env makes every docker compose command run in this directory take all
+# three, the scripts' and a person's alike. The auth server reaches it as mailpit:1025; its API listens
+# on the VPS's loopback, for the tests' SSH tunnel.
+log "adding Mailpit ($E2E_MAILPIT_IMAGE), its API on 127.0.0.1:$E2E_MAILPIT_PORT"
+cat >mailpit.yml <<EOF
+services:
+  mailpit:
+    image: $E2E_MAILPIT_IMAGE
+    restart: unless-stopped
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+      MP_MAX_MESSAGES: "5000"
+    ports:
+      - "127.0.0.1:$E2E_MAILPIT_PORT:8025"
+    networks:
+      - goiabada-network
+EOF
+printf 'COMPOSE_FILE=docker-compose.yml:docker-compose.override.yml:mailpit.yml\n' >.env
+
 # --- 3. Start it ------------------------------------------------------------------------------------
 
 log "pulling images"
@@ -99,7 +120,7 @@ done
 
 wait_for() { # name url
   for _ in $(seq 1 60); do
-    if curl -fsS -o /dev/null --max-time 5 "$2"; then
+    if curl -fsS -o /dev/null --max-time 5 "$2" 2>/dev/null; then
       log "$1 answers on $2"
       return 0
     fi
@@ -111,6 +132,7 @@ wait_for() { # name url
 }
 wait_for "the auth server" http://127.0.0.1:9090/health
 wait_for "the admin console" http://127.0.0.1:9091/
+wait_for "Mailpit" "http://127.0.0.1:$E2E_MAILPIT_PORT/api/v1/info"
 
 docker compose ps --format '{{.Service}}: {{.Image}} ({{.Status}})' | sed 's/^/    [vps]   /'
 

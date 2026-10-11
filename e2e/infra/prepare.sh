@@ -48,7 +48,7 @@ scp_vps "$E2E_DIR/infra/remote-prepare.sh" "$E2E_DIR/infra/nginx.conf.template" 
   "$STATE_DIR/admin-password" "$E2E_VPS_USER@$E2E_VPS_HOST:$stage/"
 settings="E2E_TAG=$(printf %q "$tag")"
 for name in E2E_AUTH_HOST E2E_ADMIN_HOST E2E_WEBTEST1_HOST E2E_WEBTEST2_HOST E2E_ADMIN_EMAIL \
-  E2E_DB E2E_RATE_LIMITER E2E_REMOTE_DIR E2E_CERT_NAME; do
+  E2E_DB E2E_RATE_LIMITER E2E_REMOTE_DIR E2E_CERT_NAME E2E_MAILPIT_IMAGE E2E_MAILPIT_PORT; do
   settings+=" $name=$(printf %q "${!name}")"
 done
 ssh_vps "env $settings bash $stage/remote-prepare.sh $stage; status=\$?; rm -rf $stage; exit \$status" ||

@@ -35,6 +35,22 @@ fi
 curl -fsS -o /dev/null --max-time 10 "$auth_url/health" ||
   die "$auth_url does not answer: check it with e2e/infra/verify.sh, or rebuild with e2e/reset.sh"
 
+# Mailpit's API listens on the VPS's loopback only; the tests read the mail through this tunnel, on a
+# free local port, closed when the run ends.
+require_vps
+tunnel_port="$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+ssh "${SSH_OPTS[@]}" -o ExitOnForwardFailure=yes -N -L "127.0.0.1:$tunnel_port:127.0.0.1:$E2E_MAILPIT_PORT" \
+  "$E2E_VPS_USER@$E2E_VPS_HOST" &
+tunnel_pid=$!
+trap 'kill "$tunnel_pid" 2>/dev/null' EXIT
+for _ in $(seq 1 20); do
+  curl -fsS -o /dev/null --max-time 2 "http://127.0.0.1:$tunnel_port/api/v1/info" && break
+  sleep 0.5
+done
+curl -fsS -o /dev/null --max-time 2 "http://127.0.0.1:$tunnel_port/api/v1/info" ||
+  die "Mailpit does not answer through the SSH tunnel: rebuild with e2e/reset.sh"
+export E2E_MAILPIT_URL="http://127.0.0.1:$tunnel_port"
+
 step "Running the suite against $tag (prepared $prepared)"
 started=$SECONDS
 npx playwright test "$@"

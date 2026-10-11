@@ -5,6 +5,7 @@ import { clientUrl, deleteUser, idFromListLink, submitNewUser } from "../../../l
 import { authorizeAndLand, redirectParams } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
+import { linksIn, waitForMail } from "../../../lib/mailpit";
 import { passwordToken } from "../../../lib/oauth";
 import { fillSettingsForm, saveSettings, withSettingsRestored } from "../../../lib/settings";
 import { browserSignInClient } from "../../../lib/test-clients";
@@ -96,10 +97,49 @@ test("self-registration opens the register page; without email verification it c
 });
 
 test("self-registration that requires email verification warns while email is not set up", async ({ page }) => {
+  await withSettingsRestored(page, "/admin/settings/email", async () => {
+    await fillSettingsForm(page, { smtpEnabled: false });
+    await saveSettings(page);
+    await withSettingsRestored(page, general, async () => {
+      await fillSettingsForm(page, { selfRegistrationEnabled: true, selfRegistrationRequiresEmailVerification: true });
+      await saveSettings(page);
+      await expect(page.getByText("Email isn't set up, so registration is unavailable.")).toBeVisible();
+      // And the register page is not offered.
+      expect((await page.request.get(`${env.authUrl}/account/register`, { maxRedirects: 0 })).status()).toBe(404);
+    });
+  });
+});
+
+test("self-registration with email verification: the mailed link activates the account", async ({ page, browser, request }) => {
   await withSettingsRestored(page, general, async () => {
     await fillSettingsForm(page, { selfRegistrationEnabled: true, selfRegistrationRequiresEmailVerification: true });
     await saveSettings(page);
-    await expect(page.getByText("Email isn't set up, so registration is unavailable.")).toBeVisible();
+
+    const email = `${uniqueIdentifier("u")}@example.com`;
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const register = await context.newPage();
+    // The sign-in page now offers it.
+    await register.goto(`${env.adminUrl}/account/profile`);
+    await register.getByRole("link", { name: /register/i }).click();
+    await register.locator('input[name="email"]').fill(email);
+    await register.getByRole("button", { name: "Register" }).click();
+    await expect(register.getByText("Check your email")).toBeVisible();
+
+    const mail = await waitForMail(request, email);
+    const link = linksIn(mail).find((l) => l.startsWith(env.authUrl))!;
+    await register.goto(link);
+    await register.locator('input[name="password"]').fill("a-registered-password");
+    await register.locator('input[name="passwordConfirmation"]').fill("a-registered-password");
+    await register.getByRole("button", { name: "Create account" }).click();
+    await expect(register.getByText("Congratulations! Your account has been activated.")).toBeVisible();
+    await context.close();
+
+    const users = `${env.adminUrl}/admin/users?query=${email.split("@")[0]}`;
+    const id = await idFromListLink(page, users, email, "Manage");
+    await page.goto(`${env.adminUrl}/admin/users/${id}/email`);
+    // Activated through the mailed link: the address is verified.
+    await expect(page.locator('input[name="emailVerified"]')).toBeChecked();
+    await deleteUser(page, id);
   });
 });
 
