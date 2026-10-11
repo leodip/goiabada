@@ -410,6 +410,19 @@ func LocaleTag(ctx context.Context) string {
 	return "en"
 }
 
+// CatalogTag returns the language tag of the catalog T renders from on ctx: "pt-BR" or "en" with
+// the embedded catalogs, or an override-only catalog's tag. Returns "en" when no localizer is
+// attached, which is the catalog T then renders from.
+//
+// It differs from LocaleTag, which answers the first preference asked for whether or not any
+// catalog matches it: "fr-CA,fr;q=0.9,pt-BR;q=0.8" renders in pt-BR, and LocaleTag answers fr-CA.
+// The admin console sends this tag as Accept-Language on every admin API call, so the auth server
+// answers a refusal in the language the console's page is rendered in; the value is always one of
+// the loaded catalogs' tags, never text the browser sent (#559 decision 3).
+func CatalogTag(ctx context.Context) string {
+	return localizer(ctx).tag.String()
+}
+
 // localizer returns the translator attached to ctx by the locale middleware
 // (or by the per-handler refinement helpers), or the current bundle's English
 // translator if none is attached (test contexts, background jobs that never went

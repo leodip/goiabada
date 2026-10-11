@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -83,12 +84,13 @@ type wireCase struct {
 }
 
 type charRecordedRequest struct {
-	verb          string
-	path          string
-	query         string
-	body          string
-	authorization string
-	contentType   string
+	verb           string
+	path           string
+	query          string
+	body           string
+	authorization  string
+	contentType    string
+	acceptLanguage string
 }
 
 // charServer answers every request with status and body, recording what arrived.
@@ -102,6 +104,7 @@ func charServer(t *testing.T, status int, body string) (*AuthServerClient, *char
 		got.query = r.URL.RawQuery
 		got.authorization = r.Header.Get("Authorization")
 		got.contentType = r.Header.Get("Content-Type")
+		got.acceptLanguage = r.Header.Get("Accept-Language")
 		read, _ := io.ReadAll(r.Body)
 		got.body = string(read)
 
@@ -145,6 +148,7 @@ func TestAuthServerClient_EveryMethodPutsTheSameRequestOnTheWire(t *testing.T) {
 			assert.Equal(t, tc.path, got.path, "the path, parameters substituted")
 			assert.Equal(t, tc.query, got.query, "the query string")
 			assert.Equal(t, "Bearer "+charAccessToken, got.authorization, "the bearer token")
+			assert.Equal(t, "en", got.acceptLanguage, "a context that resolved no language names English")
 
 			switch {
 			case tc.contentTypePrefix != "":
@@ -168,6 +172,31 @@ func TestAuthServerClient_EveryMethodPutsTheSameRequestOnTheWire(t *testing.T) {
 			if tc.want != nil {
 				assert.Equal(t, tc.want, value, "the value decoded out of the answer")
 			}
+		})
+	}
+}
+
+// #559 decision 3: every call names the language the console's page renders in, so the API answers
+// a refusal in that language when it has the sentence translated. The value is the catalog the
+// request resolved to, not the browser's first preference: this header's first preference, fr-CA,
+// has no catalog and the console renders the page in pt-BR, which is what the API must be told.
+func TestAuthServerClient_EveryMethodNamesTheCatalogLanguageTheRequestResolvedTo(t *testing.T) {
+	browser := httptest.NewRequest(http.MethodGet, "/admin/users", nil)
+	browser.Header.Set("Accept-Language", "fr-CA,fr;q=0.9,pt-BR;q=0.8")
+	ctx := i18n.ResolveRequestLocale(context.Background(), browser)
+
+	for _, tc := range wireCharacterization() {
+		t.Run(tc.name, func(t *testing.T) {
+			status := tc.successStatus
+			if tc.anySuccess2xx {
+				status = http.StatusOK
+			}
+			client, got := charServer(t, status, tc.reply)
+
+			_, err := tc.call(ctx, client)
+			require.NoError(t, err)
+
+			assert.Equal(t, "pt-BR", got.acceptLanguage, "the Accept-Language header")
 		})
 	}
 }
