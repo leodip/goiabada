@@ -279,9 +279,13 @@ func TestAuthorize_AdministrativeScope_AnAllowedClientGetsTheCode(t *testing.T) 
 }
 
 // The admin console's own client signs in exactly as it did: its usual scopes, the response mode it
-// uses, no consent screen, and a code carrying authserver:manage (#499 decisions 1 and 5).
+// uses, no consent screen, and a code carrying authserver:manage (#499 decisions 1 and 5). The user
+// holds manage-account too, as every user does from creation, and the code carries it with no
+// consent stored: the admin console's client is the one client the manage-account consent is not
+// owed to (#509 decision 2).
 func TestAuthorize_AdministrativeScope_TheAdminConsoleClientSignsInWithNoConsentScreen(t *testing.T) {
 	user, password := newSignInAdministrator(t)
+	assignPermissionToUser(t, user.Id, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
 	browser := createHttpClient(t)
 	callback := appConfig.AdminConsole.BaseURL + "/auth/callback"
 
@@ -339,5 +343,9 @@ func TestAuthorize_AdministrativeScope_TheAdminConsoleClientSignsInWithNoConsent
 	code := loadCodeFromDatabase(t, codeVal)
 	assert.Equal(t, builtin.AdminConsoleClientIdentifier, code.Client.ClientIdentifier)
 	assert.Contains(t, strings.Fields(code.Scope), "authserver:manage")
+	assert.Contains(t, strings.Fields(code.Scope), "authserver:manage-account")
 	assert.Equal(t, user.Id, code.User.Id)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, code.Client.Id)
+	require.NoError(t, err)
+	assert.Nil(t, consent, "no consent was asked for or stored")
 }

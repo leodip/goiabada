@@ -22,6 +22,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
+	"github.com/leodip/goiabada/authserver/internal/userconsent"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -863,10 +864,11 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 	idleTimeout, maxLifetime := settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds
 	requestedMaxAge := authContext.RequestedMaxAge()
 	facts := silentAuthenticationFacts{
-		maxAgeRequested: requestedMaxAge != nil,
-		hintSubject:     authContext.IdTokenHintSub,
-		target:          authContext.GetTargetAcrLevel(client.DefaultAcrLevel),
-		consentRequired: client.ConsentRequired,
+		maxAgeRequested:  requestedMaxAge != nil,
+		hintSubject:      authContext.IdTokenHintSub,
+		target:           authContext.GetTargetAcrLevel(client.DefaultAcrLevel),
+		consentRequired:  client.ConsentRequired,
+		clientIdentifier: client.ClientIdentifier,
 	}
 
 	// The loads, each made once and only when decideSilentAuthentication asks for it, so a refusal
@@ -1004,6 +1006,8 @@ type silentAuthenticationFacts struct {
 	target          record.AcrLevel
 	// consentRequired is the client's ConsentRequired.
 	consentRequired bool
+	// clientIdentifier is the client's ClientIdentifier.
+	clientIdentifier string
 
 	// sessionLoaded is set once the session has been looked up; session is nil when there is none,
 	// and otherwise carries its User.
@@ -1044,7 +1048,8 @@ type silentAuthenticationAnswer struct {
 //     the order it gives them;
 //  8. the user holds at least one requested scope;
 //  9. when the client requires consent or offline_access is asked for, a consent covers every
-//     scope.
+//     scope, and otherwise it covers authserver:manage-account when the scope holds it and the
+//     client is not the admin console's (userconsent.AlwaysOwed, #509 decision 3).
 func decideSilentAuthentication(f silentAuthenticationFacts) (silentAuthenticationAnswer, silentFact) {
 	refuse := func(code, description string) (silentAuthenticationAnswer, silentFact) {
 		return silentAuthenticationAnswer{errorCode: code, errorDescription: description}, silentFactNone
@@ -1096,17 +1101,22 @@ func decideSilentAuthentication(f silentAuthenticationFacts) (silentAuthenticati
 		return refuse("access_denied", "The user is not authorized to access any of the requested scopes")
 	}
 
+	// The scopes a stored consent must cover: every one when the client requires consent or
+	// offline_access is asked for, and otherwise those owed a consent whatever the client says
+	// (#509 decision 3).
+	mustCover := userconsent.AlwaysOwed(f.clientIdentifier, *f.effectiveScope)
 	if f.consentRequired || oidc.HasOfflineAccessScope(*f.effectiveScope) {
+		mustCover = oidc.SplitScope(*f.effectiveScope)
+	}
+	if len(mustCover) > 0 {
 		if !f.consentLoaded {
 			return silentAuthenticationAnswer{}, silentFactConsent
 		}
 		if f.consent == nil {
 			return refuse(oidc.ErrorConsentRequired, "User consent is required")
 		}
-		for _, scope := range oidc.SplitScope(*f.effectiveScope) {
-			if !f.consent.HasScope(scope) {
-				return refuse(oidc.ErrorConsentRequired, "Additional consent is required")
-			}
+		if !userconsent.Covers(f.consent, mustCover) {
+			return refuse(oidc.ErrorConsentRequired, "Additional consent is required")
 		}
 	}
 

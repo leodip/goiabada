@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -664,6 +665,17 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// The user has consented to the requested scope when it names manage-account, which no client
+	// but the admin console's obtains without that consent: the tests minting an Account API token
+	// through this fixture are about what the token does, not about how consent is obtained (#509).
+	if slices.Contains(strings.Split(scope, " "), "authserver:manage-account") {
+		err = database.CreateUserConsent(context.Background(), nil, &record.UserConsent{
+			UserId: user.Id, ClientId: client.Id, Scope: scope,
+			GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
+		})
+		require.NoError(t, err)
 	}
 
 	scopes := strings.Split(scope, " ")

@@ -216,9 +216,11 @@ func TestDecideBeforeBinding(t *testing.T) {
 
 // afterBindingWorld is what HandleAuthCompletedGet would load after binding, answered from the row.
 type afterBindingWorld struct {
-	promptConsent   bool
-	consentRequired bool
-	effectiveScope  string
+	promptConsent    bool
+	consentRequired  bool
+	clientIdentifier string
+	effectiveScope   string
+	consentScope     *string // nil for no consent row
 }
 
 // driveAfterBinding runs decideAfterBinding as HandleAuthCompletedGet does, loading each fact it
@@ -227,8 +229,9 @@ func driveAfterBinding(t *testing.T, world afterBindingWorld) (afterBindingAnswe
 	t.Helper()
 
 	facts := afterBindingFacts{
-		promptConsent:   world.promptConsent,
-		consentRequired: world.consentRequired,
+		promptConsent:    world.promptConsent,
+		consentRequired:  world.consentRequired,
+		clientIdentifier: world.clientIdentifier,
 	}
 	var asked []afterBindingFact
 	for {
@@ -244,6 +247,11 @@ func driveAfterBinding(t *testing.T, world afterBindingWorld) (afterBindingAnswe
 		case afterBindingFactEffectiveScope:
 			scope := world.effectiveScope
 			facts.effectiveScope = &scope
+		case afterBindingFactConsent:
+			facts.consentLoaded = true
+			if world.consentScope != nil {
+				facts.consent = &record.UserConsent{UserId: 7, Scope: *world.consentScope}
+			}
 		default:
 			require.FailNow(t, "an unknown fact", "%v", need)
 		}
@@ -252,7 +260,11 @@ func driveAfterBinding(t *testing.T, world afterBindingWorld) (afterBindingAnswe
 
 // Where a ceremony bound to a session goes, and whether the scope is filtered on the way.
 func TestDecideAfterBinding(t *testing.T) {
-	const scope = afterBindingFactEffectiveScope
+	const (
+		scope   = afterBindingFactEffectiveScope
+		consent = afterBindingFactConsent
+	)
+	scopes := func(s string) *string { return &s }
 
 	testCases := []struct {
 		name       string
@@ -294,6 +306,63 @@ func TestDecideAfterBinding(t *testing.T) {
 			name:       "no consent needed goes to issuance",
 			world:      afterBindingWorld{effectiveScope: "openid profile"},
 			wantAnswer: afterBindingIssue,
+			wantReads:  []afterBindingFact{scope},
+		},
+		// authserver:manage-account is owed the consent screen whatever the client's Consent
+		// required says, unless the user's stored consent to the client covers it, and the admin
+		// console's client skips it (#509 decisions 1 and 2).
+		{
+			name: "manage-account from a consent-off client with no stored consent goes to the consent screen",
+			world: afterBindingWorld{clientIdentifier: "crafted-link-client",
+				effectiveScope: "openid authserver:manage-account"},
+			wantAnswer: afterBindingConsent,
+			wantReads:  []afterBindingFact{scope, consent},
+		},
+		{
+			name: "manage-account with a stored consent leaving it out goes to the consent screen",
+			world: afterBindingWorld{clientIdentifier: "crafted-link-client",
+				effectiveScope: "openid authserver:manage-account", consentScope: scopes("openid profile")},
+			wantAnswer: afterBindingConsent,
+			wantReads:  []afterBindingFact{scope, consent},
+		},
+		{
+			// A consent-off client is asked about manage-account and nothing else, so a stored
+			// consent covering it is enough even when it leaves profile out.
+			name: "manage-account covered by the stored consent goes to issuance",
+			world: afterBindingWorld{clientIdentifier: "crafted-link-client",
+				effectiveScope: "openid profile authserver:manage-account",
+				consentScope:   scopes("openid authserver:manage-account")},
+			wantAnswer: afterBindingIssue,
+			wantReads:  []afterBindingFact{scope, consent},
+		},
+		{
+			name: "the admin console's client goes to issuance with manage-account and reads no consent",
+			world: afterBindingWorld{clientIdentifier: "admin-console-client",
+				effectiveScope: "authserver:manage authserver:manage-account email openid profile"},
+			wantAnswer: afterBindingIssue,
+			wantReads:  []afterBindingFact{scope},
+		},
+		{
+			// The user's permissions narrowed the scope, and what is about to be granted is what
+			// the rule reads.
+			name:       "manage-account filtered out of the effective scope is owed nothing",
+			world:      afterBindingWorld{clientIdentifier: "crafted-link-client", effectiveScope: "openid"},
+			wantAnswer: afterBindingIssue,
+			wantReads:  []afterBindingFact{scope},
+		},
+		{
+			// A client requiring consent goes to the consent step as before, which reads the
+			// stored consent itself.
+			name: "manage-account from a client requiring consent goes to the consent screen without a read here",
+			world: afterBindingWorld{clientIdentifier: "crafted-link-client", consentRequired: true,
+				effectiveScope: "openid authserver:manage-account"},
+			wantAnswer: afterBindingConsent,
+			wantReads:  []afterBindingFact{scope},
+		},
+		{
+			name:       "no scope is refused before manage-account is asked about",
+			world:      afterBindingWorld{clientIdentifier: "crafted-link-client", effectiveScope: ""},
+			wantAnswer: afterBindingNoScope,
 			wantReads:  []afterBindingFact{scope},
 		},
 	}

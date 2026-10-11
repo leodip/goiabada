@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
+	"github.com/leodip/goiabada/authserver/internal/userconsent"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -206,12 +207,14 @@ func HandleAuthCompletedGet(
 		}
 
 		facts := afterBindingFacts{
-			promptConsent:   authContext.HasPromptValue("consent"),
-			consentRequired: client.ConsentRequired,
+			promptConsent:    authContext.HasPromptValue("consent"),
+			consentRequired:  client.ConsentRequired,
+			clientIdentifier: client.ClientIdentifier,
 		}
 		answer, need := decideAfterBinding(facts)
 		for need != afterBindingFactNone {
-			if need == afterBindingFactEffectiveScope {
+			switch need {
+			case afterBindingFactEffectiveScope:
 				// The effective scope is the requested one with every scope the user is not
 				// authorized for filtered out, and it replaces the ceremony's scope.
 				effectiveScope, filterErr := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(r.Context(), authContext.Scope, user)
@@ -222,6 +225,14 @@ func HandleAuthCompletedGet(
 				authContext.SetScope(effectiveScope)
 				scope := authContext.Scope
 				facts.effectiveScope = &scope
+			case afterBindingFactConsent:
+				consent, consentErr := database.GetConsentByUserIdAndClientId(r.Context(), nil, user.Id, client.Id)
+				if consentErr != nil {
+					pageRenderer.InternalServerError(w, r, consentErr)
+					return
+				}
+				facts.consentLoaded = true
+				facts.consent = consent
 			}
 			answer, need = decideAfterBinding(facts)
 		}
@@ -674,6 +685,8 @@ const (
 	// afterBindingFactEffectiveScope is the ceremony's scope narrowed to what the user holds, as
 	// AuthContext.SetScope stores it.
 	afterBindingFactEffectiveScope
+	// afterBindingFactConsent is the user's stored consent to the client, or none.
+	afterBindingFactConsent
 )
 
 // afterBindingAnswer is where a ceremony bound to a session goes next.
@@ -697,7 +710,12 @@ type afterBindingFacts struct {
 	promptConsent bool
 	// consentRequired is the client's ConsentRequired.
 	consentRequired bool
-	effectiveScope  *string
+	// clientIdentifier is the client's ClientIdentifier.
+	clientIdentifier string
+	effectiveScope   *string
+	// consentLoaded is set once the consent has been looked up; consent is nil when there is none.
+	consentLoaded bool
+	consent       *record.UserConsent
 }
 
 // decideAfterBinding decides where a ceremony goes once it is bound to a session, or names the
@@ -705,7 +723,10 @@ type afterBindingFacts struct {
 // a disabled one before anything was bound, so the permission check is made only for a user who
 // may be issued something. prompt=consent forces the consent screen regardless of an existing
 // consent or the client's setting; otherwise it is shown when the client requires it or
-// offline_access is asked for.
+// offline_access is asked for, and the consent step then skips it for a scope already consented.
+// Short of those, a scope owed a consent whatever the client says (userconsent.AlwaysOwed) goes to
+// the consent screen unless the user's stored consent covers it, which is the one case the stored
+// consent is read here (#509 decision 1).
 func decideAfterBinding(f afterBindingFacts) (afterBindingAnswer, afterBindingFact) {
 	if f.effectiveScope == nil {
 		return afterBindingUndecided, afterBindingFactEffectiveScope
@@ -715,6 +736,14 @@ func decideAfterBinding(f afterBindingFacts) (afterBindingAnswer, afterBindingFa
 	}
 	if f.promptConsent || f.consentRequired || oidc.HasOfflineAccessScope(*f.effectiveScope) {
 		return afterBindingConsent, afterBindingFactNone
+	}
+	if owed := userconsent.AlwaysOwed(f.clientIdentifier, *f.effectiveScope); len(owed) > 0 {
+		if !f.consentLoaded {
+			return afterBindingUndecided, afterBindingFactConsent
+		}
+		if !userconsent.Covers(f.consent, owed) {
+			return afterBindingConsent, afterBindingFactNone
+		}
 	}
 	return afterBindingIssue, afterBindingFactNone
 }
