@@ -79,10 +79,17 @@ func HandleOtpPost(
 			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
-		// Load user to determine current OTP state
-		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
-		if err != nil {
-			render.HandleAPIError(httpHelper, w, r, err)
+		// The posted form says what it does, enable or disable, and the auth server is asked for
+		// that and nothing else. The page used to read the user's stored state and ask for its
+		// inverse, whichever form had been posted, so an enrolment form left open in one tab and
+		// posted after enrolling in another switched the second factor off with nothing but the
+		// password. The auth server refuses an enable for a user who has OTP and a disable for one
+		// who has not, and either refusal reloads the page, which then draws the account as it is
+		// now; a post naming neither form changes nothing and reloads it the same way (#562
+		// decision 8).
+		otpAction := r.PostFormValue("otpAction")
+		if otpAction != "enable" && otpAction != "disable" {
+			http.Redirect(w, r, baseURL+"/account/otp", http.StatusFound)
 			return
 		}
 
@@ -121,9 +128,18 @@ func HandleOtpPost(
 		// branch of account_otp.html draws the <img> and the <pre> unconditionally, so a blank
 		// code or a wrong password would have rerendered an empty QR code and an empty seed, and
 		// the user could not have finished enrolling.
+		//
+		// The enrolment endpoint refuses a user who has OTP, and an enrolment form posted by one is
+		// a stale form refused on its own terms, a blank code or a wrong password, before the auth
+		// server looked at the state: the page reloads, as it does for the enable itself.
 		renderEnrollmentError := func(message string) {
 			enrollment, err := apiClient.GetAccountOTPEnrollment(r.Context(), jwtInfo.TokenResponse.AccessToken)
 			if err != nil {
+				var apiErr *apiclient.APIError
+				if errors.As(err, &apiErr) && apiErr.Code == "OTP_ALREADY_ENABLED" {
+					http.Redirect(w, r, baseURL+"/account/otp", http.StatusFound)
+					return
+				}
 				render.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
@@ -141,8 +157,7 @@ func HandleOtpPost(
 			}
 		}
 
-		if user.OTPEnabled {
-			// disabling
+		if otpAction == "disable" {
 			req := &api.UpdateAccountOTPRequest{
 				Enabled:  false,
 				Password: password,
@@ -153,15 +168,21 @@ func HandleOtpPost(
 					return
 				}
 				var apiErr *apiclient.APIError
-				if errors.As(err, &apiErr) && isHandledAccountOTPError(apiErr.Code) {
-					renderDisableError(apiErr.Message)
-					return
+				if errors.As(err, &apiErr) {
+					// OTP already off, from another tab or another client: a stale disable form.
+					if apiErr.Code == "OTP_NOT_ENABLED" {
+						http.Redirect(w, r, baseURL+"/account/otp", http.StatusFound)
+						return
+					}
+					if isHandledAccountOTPError(apiErr.Code) {
+						renderDisableError(apiErr.Message)
+						return
+					}
 				}
 				render.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 		} else {
-			// enabling
 			otpCode := r.PostFormValue("otp")
 
 			if len(otpCode) == 0 {

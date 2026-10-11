@@ -60,7 +60,7 @@ func TestAccountPages_RefuseInThePagesLanguage(t *testing.T) {
 				return HandleOtpPost(h, newStubApiClient(false), consoleBaseURL)
 			},
 			target:     accountOTPPath,
-			form:       url.Values{"password": {"P4ss!word"}, "otp": {""}},
+			form:       url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {""}},
 			english:    "OTP code is required.",
 			portuguese: "O código OTP é obrigatório.",
 		},

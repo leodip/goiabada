@@ -54,14 +54,21 @@ func (s *stubApiClient) GetAccountProfile(_ context.Context, accessToken string)
 	return s.profile, nil
 }
 
+// GetAccountOTPEnrollment refuses a user who has OTP, as GET /api/v1/account/otp/enrollment does.
 func (s *stubApiClient) GetAccountOTPEnrollment(_ context.Context, accessToken string) (*api.AccountOTPEnrollmentResponse, error) {
 	s.enrollmentGET++
 	if s.enrollmentErr != nil {
 		return nil, s.enrollmentErr
 	}
+	if s.profile.OTPEnabled {
+		return nil, otpAlreadyEnabled()
+	}
 	return s.enrollment, nil
 }
 
+// UpdateAccountOTP answers a request for the state the user is already in as PUT
+// /api/v1/account/otp does, with the 400 that names it, so a case about a stale form can assert
+// what the console asked for and what it did with the refusal.
 func (s *stubApiClient) UpdateAccountOTP(_ context.Context, accessToken string,
 	request *api.UpdateAccountOTPRequest) (*api.UserResponse, error) {
 
@@ -69,7 +76,19 @@ func (s *stubApiClient) UpdateAccountOTP(_ context.Context, accessToken string,
 	if s.updateErr != nil {
 		return nil, s.updateErr
 	}
+	if request.Enabled && s.profile.OTPEnabled {
+		return nil, otpAlreadyEnabled()
+	}
+	if !request.Enabled && !s.profile.OTPEnabled {
+		return nil, &apiclient.APIError{Code: "OTP_NOT_ENABLED", Message: "User does not have OTP enabled",
+			StatusCode: http.StatusBadRequest}
+	}
 	return s.profile, nil
+}
+
+func otpAlreadyEnabled() error {
+	return &apiclient.APIError{Code: "OTP_ALREADY_ENABLED", Message: "OTP is already enabled",
+		StatusCode: http.StatusBadRequest}
 }
 
 func newStubApiClient(otpEnabled bool) *stubApiClient {
@@ -113,26 +132,26 @@ func TestHandleOtpPost_EveryEnrollmentRerenderCarriesTheQRAndTheSeed(t *testing.
 	}{
 		{
 			name: "a blank code, refused by the console itself",
-			form: url.Values{"password": {"P4ss!word"}, "otp": {""}},
+			form: url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {""}},
 		},
 		{
 			name:      "a wrong password, refused by the API",
-			form:      url.Values{"password": {"wrong"}, "otp": {"123456"}},
+			form:      url.Values{"otpAction": {"enable"}, "password": {"wrong"}, "otp": {"123456"}},
 			updateErr: apiError("AUTHENTICATION_FAILED"),
 		},
 		{
 			name:      "a wrong OTP code",
-			form:      url.Values{"password": {"P4ss!word"}, "otp": {"123456"}},
+			form:      url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"}},
 			updateErr: apiError("INVALID_OTP_CODE"),
 		},
 		{
 			name:      "no pending enrolment, or one that expired",
-			form:      url.Values{"password": {"P4ss!word"}, "otp": {"123456"}},
+			form:      url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"}},
 			updateErr: apiError("OTP_ENROLLMENT_NOT_PENDING"),
 		},
 		{
 			name:      "a secretKey refusal, which this client cannot provoke but must still explain",
-			form:      url.Values{"password": {"P4ss!word"}, "otp": {"123456"}},
+			form:      url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"}},
 			updateErr: apiError("SECRET_KEY_NOT_ACCEPTED"),
 		},
 	}
@@ -178,7 +197,7 @@ func TestHandleOtpPost_AlreadyEnabledReloadsRatherThanRedrawing(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
-		otpPostRequest(url.Values{"password": {"P4ss!word"}, "otp": {"123456"}}))
+		otpPostRequest(url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"}}))
 
 	assert.Equal(t, http.StatusFound, rr.Code)
 	assert.Contains(t, rr.Header().Get("Location"), "/account/otp")
@@ -199,7 +218,7 @@ func TestHandleOtpPost_DisableErrorFetchesNoEnrollment(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
-		otpPostRequest(url.Values{"password": {"wrong"}}))
+		otpPostRequest(url.Values{"otpAction": {"disable"}, "password": {"wrong"}}))
 
 	bind := handlertest.Bind(t, httpHelper)
 	assert.Equal(t, true, bind["otpEnabled"])
@@ -216,7 +235,7 @@ func TestHandleOtpPost_EnableSendsOnlyThePasswordAndTheCode(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
-		otpPostRequest(url.Values{"password": {"P4ss!word"}, "otp": {"123456"}}))
+		otpPostRequest(url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"}}))
 
 	assert.Equal(t, http.StatusFound, rr.Code)
 	require.NotNil(t, client.updateReq)
@@ -241,8 +260,8 @@ func TestHandleOtpPost_AConcurrentUpdateIsShownOnTheForm(t *testing.T) {
 		otpEnabled bool
 		form       url.Values
 	}{
-		{name: "disabling", otpEnabled: true, form: url.Values{"password": {"P4ss!word"}}},
-		{name: "enabling", otpEnabled: false, form: url.Values{"password": {"P4ss!word"}, "otp": {"123456"}}},
+		{name: "disabling", otpEnabled: true, form: url.Values{"otpAction": {"disable"}, "password": {"P4ss!word"}}},
+		{name: "enabling", otpEnabled: false, form: url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"}}},
 	}
 
 	for _, tc := range testCases {
@@ -264,6 +283,128 @@ func TestHandleOtpPost_AConcurrentUpdateIsShownOnTheForm(t *testing.T) {
 	}
 }
 
+// Each form says what it does, and the console asks the auth server for that and nothing else. The
+// page used to ignore which form was posted and ask for the inverse of the user's stored state, so
+// an enrolment form left open in one tab and posted after enrolling in another switched the second
+// factor off with nothing but the password (#562 decision 8). A form that no longer matches the
+// account changes nothing: the auth server refuses it, and the page reloads to show the account as
+// it is now.
+func TestHandleOtpPost_AStaleFormNeverSwitchesTheOtherWay(t *testing.T) {
+	testCases := []struct {
+		name        string
+		otpEnabled  bool
+		form        url.Values
+		wantEnabled bool
+	}{
+		{
+			name:        "an enrolment form posted by a user who has since enrolled",
+			otpEnabled:  true,
+			form:        url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"}},
+			wantEnabled: true,
+		},
+		{
+			name:        "a disable form posted by a user who has since disabled",
+			otpEnabled:  false,
+			form:        url.Values{"otpAction": {"disable"}, "password": {"P4ss!word"}},
+			wantEnabled: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			client := newStubApiClient(tc.otpEnabled)
+
+			rr := httptest.NewRecorder()
+			HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
+
+			require.NotNil(t, client.updateReq, "the console asks the auth server, which decides")
+			assert.Equal(t, tc.wantEnabled, client.updateReq.Enabled,
+				"the console asks for what the posted form says, never the inverse of the stored state")
+
+			assert.Equal(t, http.StatusFound, rr.Code, "the refusal reloads the page")
+			assert.Equal(t, consoleBaseURL+accountOTPPath, rr.Header().Get("Location"))
+			assert.Zero(t, client.enrollmentGET)
+			httpHelper.AssertNotCalled(t, "RenderTemplate",
+				mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// A stale enrolment form the console refuses itself, for a blank code, or the auth server refuses
+// for the password before it looks at the state, is redrawn by fetching the enrolment, which the
+// auth server refuses for a user who has OTP. That is the same mismatch, and it reloads the page
+// rather than showing the error page.
+func TestHandleOtpPost_AStaleEnrolmentFormRefusedOnItsOwnTermsReloads(t *testing.T) {
+	testCases := []struct {
+		name      string
+		form      url.Values
+		updateErr error
+	}{
+		{
+			name: "a blank code",
+			form: url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {""}},
+		},
+		{
+			name:      "a wrong password",
+			form:      url.Values{"otpAction": {"enable"}, "password": {"wrong"}, "otp": {"123456"}},
+			updateErr: apiError("AUTHENTICATION_FAILED"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			client := newStubApiClient(true)
+			client.updateErr = tc.updateErr
+
+			rr := httptest.NewRecorder()
+			HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
+
+			if client.updateReq != nil {
+				assert.True(t, client.updateReq.Enabled, "an enrolment form never asks to disable")
+			}
+			assert.Equal(t, http.StatusFound, rr.Code)
+			assert.Equal(t, consoleBaseURL+accountOTPPath, rr.Header().Get("Location"))
+			httpHelper.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
+			httpHelper.AssertNotCalled(t, "RenderTemplate",
+				mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// A post that names neither form, or names something else, asks the auth server for nothing and
+// reloads the page.
+func TestHandleOtpPost_APostNamingNeitherFormChangesNothing(t *testing.T) {
+	testCases := []struct {
+		name       string
+		otpEnabled bool
+		form       url.Values
+	}{
+		{name: "no otpAction, OTP on", otpEnabled: true, form: url.Values{"password": {"P4ss!word"}}},
+		{name: "no otpAction, OTP off", otpEnabled: false,
+			form: url.Values{"password": {"P4ss!word"}, "otp": {"123456"}}},
+		{name: "an otpAction naming neither", otpEnabled: true,
+			form: url.Values{"otpAction": {"toggle"}, "password": {"P4ss!word"}}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			client := newStubApiClient(tc.otpEnabled)
+
+			rr := httptest.NewRecorder()
+			HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
+
+			assert.Nil(t, client.updateReq, "nothing is asked of the auth server")
+			assert.Equal(t, http.StatusFound, rr.Code)
+			assert.Equal(t, consoleBaseURL+accountOTPPath, rr.Header().Get("Location"))
+			httpHelper.AssertNotCalled(t, "RenderTemplate",
+				mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
 // The auth server allows five wrong passwords per user per 15 minutes on the two-factor
 // authentication change and answers the sixth 429 TOO_MANY_REQUESTS, whatever the rate limiter
 // switch says. This page sent every code it did not name to the generic handler, so five mistyped
@@ -279,8 +420,9 @@ func TestHandleOtpPost_ARateLimitIsShownOnTheForm(t *testing.T) {
 		otpEnabled bool
 		form       url.Values
 	}{
-		{name: "disabling", otpEnabled: true, form: url.Values{"password": {"wrong"}}},
-		{name: "enabling", otpEnabled: false, form: url.Values{"password": {"wrong"}, "otp": {"123456"}}},
+		{name: "disabling", otpEnabled: true, form: url.Values{"otpAction": {"disable"}, "password": {"wrong"}}},
+		{name: "enabling", otpEnabled: false,
+			form: url.Values{"otpAction": {"enable"}, "password": {"wrong"}, "otp": {"123456"}}},
 	}
 	languages := []struct{ name, tag, want string }{
 		{"with no language", "",
