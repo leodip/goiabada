@@ -270,9 +270,9 @@ function sendAjaxRequest(props) {
                 return;
               }
               // The title says whose mistake it was. A 5xx is the server's, so it is
-              // "Server error"; a 400, 404 or 409 is a rejected value, a stale record or
-              // a conflict, and the sentence below already explains it, so the title is
-              // the plain "Error" (#279).
+              // "Server error"; a 400, 404, 409 or 429 is a rejected value, a stale record,
+              // a conflict or too many attempts, and the sentence below already explains
+              // it, so the title is the plain "Error" (#279, #562).
               const title = response.status >= 500
                 ? t("js.error.server_error_title")
                 : t("js.error.error_title");

@@ -35,9 +35,9 @@ import (
 // the difference. That is what makes it a lint rather than a sweep (#279 decisions 11 and 13).
 //
 // The rule is one sentence: a guard on an error that came from apiClient must reach one of the
-// three classifiers. It may route on a code first -- handler_admin_settings_email.go redraws its
-// form for SMTP_NOT_ENABLED, handler_account_otp.go for its seven enrolment codes -- because those
-// are codes a caller acts on, and the classifier is still what answers everything else.
+// three classifiers. It may route on a code first -- handler_account_email_verification.go redraws
+// its form for an expired code, handler_account_otp.go for its seven enrolment codes -- because
+// those are codes a caller acts on, and the classifier is still what answers everything else.
 //
 // Two boundaries, stated rather than discovered later. The guard has to be the if statement that
 // immediately follows the call or carries it in its own init, which is every guard in this tree and

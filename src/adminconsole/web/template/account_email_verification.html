@@ -90,8 +90,9 @@
         </div>
     {{end}}
 
-    {{ if and .smtpEnabled (not .emailVerified) (.email) }}
+    {{ $codeForm := and .smtpEnabled (not .emailVerified) (.email) }}
 
+    {{ if $codeForm }}
         <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
             <div class="w-full form-control">
                 <label class="label">
@@ -101,7 +102,11 @@
                     class="w-full input input-bordered " autocomplete="off" autofocus />
             </div>
         </div>
+    {{end}}
 
+    {{/* A refusal is drawn whatever email's state: email switched off since the page was drawn is
+         refused with a sentence of its own, and the page had nothing else to show (#562). */}}
+    {{ if or $codeForm .error }}
         <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
             <div class="mt-6">
                 {{if .error}}
@@ -109,13 +114,15 @@
                         <p>{{.error}}</p>
                     </div>
                 {{end}}
-                {{if .savedSuccessfully}}
-                    <div class="mb-4 text-right text-success">
-                        <p>&#10004; {{ T $.ctx "adminconsole.account.email_verification.success" }}</p>
-                    </div>
+                {{ if $codeForm }}
+                    {{if .savedSuccessfully}}
+                        <div class="mb-4 text-right text-success">
+                            <p>&#10004; {{ T $.ctx "adminconsole.account.email_verification.success" }}</p>
+                        </div>
+                    {{end}}
+                    <button class="link link-primary" onclick="sendVerificationEmail(event);">{{ T $.ctx "adminconsole.account.email_verification.send_button" }}</button>
+                    <button class="float-right btn btn-primary">{{ T $.ctx "adminconsole.account.email_verification.verify_button" }}</button>
                 {{end}}
-                <button class="link link-primary" onclick="sendVerificationEmail(event);">{{ T $.ctx "adminconsole.account.email_verification.send_button" }}</button>
-                <button class="float-right btn btn-primary">{{ T $.ctx "adminconsole.account.email_verification.verify_button" }}</button>
             </div>
         </div>
     {{end}}
