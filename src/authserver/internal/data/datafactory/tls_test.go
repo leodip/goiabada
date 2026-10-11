@@ -117,26 +117,32 @@ func TestOpenDatabase_PreferConnectsAsBefore(t *testing.T) {
 	}
 }
 
-// TestOpenDatabase_PostgresDialsInEveryMode: PostgreSQL maps all five modes, so each reaches the
-// server, the maintenance connection a creating start opens first included, and none is refused
-// before it is dialled.
-func TestOpenDatabase_PostgresDialsInEveryMode(t *testing.T) {
-	for _, mode := range data.TLSModes() {
-		for _, create := range []bool{false, true} {
-			t.Run(string(mode)+" create "+strconv.FormatBool(create), func(t *testing.T) {
-				cfg := unreachable("postgres", create)
-				cfg.TLSMode = string(mode)
+// TestOpenDatabase_MappedEnginesDialInEveryMode: PostgreSQL and SQL Server map all five modes, so
+// each reaches the server, the maintenance connection a creating start opens first included, and
+// none is refused before it is dialled.
+func TestOpenDatabase_MappedEnginesDialInEveryMode(t *testing.T) {
+	maintenanceFailure := map[string]string{
+		"postgres": "unable to check whether the database exists:",
+		"mssql":    "unable to connect to master database:",
+	}
+	for _, engine := range []string{"postgres", "mssql"} {
+		for _, mode := range data.TLSModes() {
+			for _, create := range []bool{false, true} {
+				t.Run(engine+" "+string(mode)+" create "+strconv.FormatBool(create), func(t *testing.T) {
+					cfg := unreachable(engine, create)
+					cfg.TLSMode = string(mode)
 
-				_, err := OpenDatabase(context.Background(), cfg, false)
+					_, err := OpenDatabase(context.Background(), cfg, false)
 
-				require.Error(t, err)
-				want := "unable to connect to database:"
-				if create {
-					want = "unable to check whether the database exists:"
-				}
-				assert.True(t, strings.HasPrefix(err.Error(), want), "%s dials the server: %v", mode, err)
-				assert.Contains(t, err.Error(), "connection refused", "the failure is the server's absence")
-			})
+					require.Error(t, err)
+					want := "unable to connect to database:"
+					if create {
+						want = maintenanceFailure[engine]
+					}
+					assert.True(t, strings.HasPrefix(err.Error(), want), "%s dials the server: %v", mode, err)
+					assert.Contains(t, err.Error(), "connection refused", "the failure is the server's absence")
+				})
+			}
 		}
 	}
 }
@@ -145,7 +151,7 @@ func TestOpenDatabase_PostgresDialsInEveryMode(t *testing.T) {
 // start before anything is dialled, naming the mode and the engine, so no setting is silently
 // ignored.
 func TestOpenDatabase_AnEngineRefusesAModeItDoesNotMap(t *testing.T) {
-	for _, engine := range []string{"mysql", "mssql"} {
+	for _, engine := range []string{"mysql"} {
 		for _, mode := range []data.TLSMode{data.TLSDisable, data.TLSRequire, data.TLSVerifyCA, data.TLSVerifyFull} {
 			t.Run(engine+" "+string(mode), func(t *testing.T) {
 				capture := logtest.CaptureSlog(t)
