@@ -31,8 +31,9 @@ reference graph; three are asserted by a human and each of those needs a note.
 behaviour. `sessionstore.SessionIdBytes` is the width the store mints an identifier at, inside a
 store both processes depend on; asserting a word for it would record a judgement where the tree
 already has an answer. `reachable` is here for the same reason one step further out:
-`countries.Country` is `All`'s element type, and outside its package only the auth server's
-phone-country builder names it, so a `contract` row on it would be true and misleading.
+`api.RedirectURIResponse` is the element type of `ClientResponse.RedirectURIs`, and outside its
+package only the auth server's mapping names it, so a `contract` row on it would be true and
+misleading.
 
 **Circular evidence is not evidence.** `kernel` and `both-apps` are read off references from outside
 the declaring package and are the only seeds; `own-package` and `reachable` then require a source
@@ -248,9 +249,9 @@ command itself and fails on a tree it changed.
 | `core/builtin` | `ManagePermissionIdentifier` | both-apps | — |
 | `core/builtin` | `ManageSettingsPermissionIdentifier` | own-package | — |
 | `core/builtin` | `ManageUsersPermissionIdentifier` | own-package | — |
-| `core/countries` | `All` | both-apps | — |
+| `core/countries` | `All` | kernel | — |
 | `core/countries` | `ByAlpha2` | contract | The lookup half of the country table whose other half the admin console uses. Moving it would put one ISO 3166 dataset in two places. |
-| `core/countries` | `Country` | own-package | — |
+| `core/countries` | `Country` | kernel | — |
 | `core/errs` | `Errorf` | kernel | — |
 | `core/errs` | `Join` | both-apps | — |
 | `core/errs` | `New` | kernel | — |
@@ -465,6 +466,9 @@ command itself and fails on a tree it changed.
 | `core/oauth` | `NewErrorDetailWithHTTPStatus` | both-apps | — |
 | `core/oauth` | `SplitSpaceDelimited` | kernel | — |
 | `core/oauth` | `TokenResponse` | both-apps | — |
+| `core/phonecountries` | `All` | contract | The phone country list both applications offer a user: the auth server validates and stores its ids, and the admin console's two phone pages are to build their list from it instead of asking the admin API, which refuses a token carrying `authserver:manage-account` alone (#563 decision 1). Until they do, only the auth server names it. |
+| `core/phonecountries` | `ByUniqueID` | contract | The lookup half of the phone country list, by the id the user row stores (`users.phone_number_country_uniqueid`). Moving it would put one list, whose ids are stored data, in two places (#563 decision 1). |
+| `core/phonecountries` | `PhoneCountry` | contract | The phone country list's element type, whose `UniqueId` is the id the admin console sends in a phone save and the auth server stores. Until the console's phone pages name it, only the auth server does (#563 decision 1). |
 | `core/securerandom` | `String` | both-apps | — |
 | `core/securerandom` | `StringFromAlphabet` | own-package | — |
 | `core/sessionstore` | `Backend` | kernel | — |

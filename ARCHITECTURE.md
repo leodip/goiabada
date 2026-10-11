@@ -113,6 +113,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/logging` | kernel | — |
 | `core/metrics` | kernel | — |
 | `core/oauth` | kernel | — |
+| `core/phonecountries` | kernel | — |
 | `core/securerandom` | kernel | — |
 | `core/sessionstore` | kernel | — |
 | `core/timezones` | kernel | — |
@@ -143,6 +144,11 @@ Notes on rows that are not self-evident:
   labels take only declared values, the Prometheus text exposition and the request middleware. It is
   written here rather than taken from `prometheus/client_golang`, which would add eight modules and
   link `expvar` into both binaries, and which takes any string as a label value (#400).
+- `core/phonecountries` is kernel because both applications offer a user the same phone country
+  list: the auth server validates and stores its ids on the user row, and the admin console's two
+  phone pages build their list from it rather than ask the admin API, which refuses a token carrying
+  `authserver:manage-account` alone. It was `authserver/internal/phonecountries` from #344, when no
+  console code read it, until #563 brought it back.
 - `core/adminpassword` is kernel because the auth server's first start and the setup wizard apply
   its one rule, and it is a package of its own rather than a file in `core/inputvalidation` because
   the wizard links whatever its home imports: there, the identifier validator's `core/i18n` import

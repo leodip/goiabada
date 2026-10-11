@@ -4,9 +4,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/leodip/goiabada/authserver/internal/phonecountries"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/inputvalidation"
+	"github.com/leodip/goiabada/core/phonecountries"
 )
 
 // phoneNumberShape is digits in groups separated by at most one space or hyphen.
