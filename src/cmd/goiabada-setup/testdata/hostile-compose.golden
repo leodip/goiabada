@@ -17,6 +17,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
+      # Up to 2 minutes for a fresh volume's first initialisation; failures in that window do
+      # not count, and the first success ends it.
+      start_period: 120s
     networks:
       - goiabada-network
 
