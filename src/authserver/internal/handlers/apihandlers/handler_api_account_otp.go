@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // otpEnrollmentLifetime is how long an enrollment the server has issued stays usable: the window
@@ -83,14 +84,13 @@ func writeLostOTPChange(w http.ResponseWriter, r *http.Request, database userByI
 	}
 	if current != nil && current.OTPEnabled == wantEnabled {
 		if wantEnabled {
-			writeJSONError(w, "OTP is already enabled", "OTP_ALREADY_ENABLED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPAlreadyEnabled, nil), "OTP_ALREADY_ENABLED", http.StatusBadRequest)
 		} else {
-			writeJSONError(w, "User does not have OTP enabled", "OTP_NOT_ENABLED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserOTPNotEnabled, nil), "OTP_NOT_ENABLED", http.StatusBadRequest)
 		}
 		return
 	}
-	writeJSONError(w, "The account was changed by another request after it was loaded. Nothing was saved: reload it and make the change again.",
-		"CONCURRENT_UPDATE", http.StatusConflict)
+	writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountChangedSinceLoaded, nil), "CONCURRENT_UPDATE", http.StatusConflict)
 }
 
 // userByIdReader is the one read writeLostOTPChange makes.
@@ -138,7 +138,7 @@ func HandleAccountOTPEnrollmentGet(
 
 		// If already enabled, cannot enroll
 		if user.OTPEnabled {
-			writeJSONError(w, "OTP is already enabled", "OTP_ALREADY_ENABLED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPAlreadyEnabled, nil), "OTP_ALREADY_ENABLED", http.StatusBadRequest)
 			return
 		}
 
@@ -207,7 +207,7 @@ func HandleAccountOTPEnrollmentGet(
 					return
 				}
 				if user.OTPEnabled {
-					writeJSONError(w, "OTP is already enabled", "OTP_ALREADY_ENABLED", http.StatusBadRequest)
+					writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPAlreadyEnabled, nil), "OTP_ALREADY_ENABLED", http.StatusBadRequest)
 					return
 				}
 
@@ -289,9 +289,7 @@ func HandleAccountOTPPut(
 		// about the shape of the request rather than about who sent it, and an integrator
 		// upgrading needs to see the reason rather than a password failure.
 		if _, sent := rawFields["secretKey"]; sent {
-			writeJSONError(w,
-				"This endpoint no longer accepts a secretKey. Start an enrollment with GET /api/v1/account/otp/enrollment and submit only the code from your authenticator app.",
-				"SECRET_KEY_NOT_ACCEPTED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPSecretKeyNotAccepted, nil), "SECRET_KEY_NOT_ACCEPTED", http.StatusBadRequest)
 			return
 		}
 
@@ -314,7 +312,7 @@ func HandleAccountOTPPut(
 
 		// Verify password for both enable and disable operations
 		if strings.TrimSpace(req.Password) == "" {
-			writeJSONError(w, "Authentication failed. Check your password and try again.", "AUTHENTICATION_FAILED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		}
 		if !passwordhash.Verify(user.PasswordHash, req.Password) {
@@ -331,7 +329,7 @@ func HandleAccountOTPPut(
 			// no code at all (#113, #219).
 			credentialFailures.RecordCredentialFailure(r)
 
-			writeJSONError(w, "Authentication failed. Check your password and try again.", "AUTHENTICATION_FAILED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		}
 
@@ -339,22 +337,22 @@ func HandleAccountOTPPut(
 		if req.Enabled {
 			// Enable OTP
 			if user.OTPEnabled {
-				writeJSONError(w, "OTP is already enabled", "OTP_ALREADY_ENABLED", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPAlreadyEnabled, nil), "OTP_ALREADY_ENABLED", http.StatusBadRequest)
 				return
 			}
 			if strings.TrimSpace(req.OtpCode) == "" {
-				writeJSONError(w, "OTP code is required to enable.", "OTP_CODE_REQUIRED", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPCodeRequired, nil), "OTP_CODE_REQUIRED", http.StatusBadRequest)
 				return
 			}
 
 			// OTP code must be 6 digits
 			if len(req.OtpCode) != 6 {
-				writeJSONError(w, "Invalid OTP code.", "INVALID_OTP_CODE", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPCodeInvalid, nil), "INVALID_OTP_CODE", http.StatusBadRequest)
 				return
 			}
 			for i := 0; i < 6; i++ {
 				if req.OtpCode[i] < '0' || req.OtpCode[i] > '9' {
-					writeJSONError(w, "Invalid OTP code.", "INVALID_OTP_CODE", http.StatusBadRequest)
+					writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPCodeInvalid, nil), "INVALID_OTP_CODE", http.StatusBadRequest)
 					return
 				}
 			}
@@ -377,9 +375,7 @@ func HandleAccountOTPPut(
 				return
 			}
 			if keyURL == "" {
-				writeJSONError(w,
-					"No OTP enrollment is pending, or the one you started has expired. Request a new one with GET /api/v1/account/otp/enrollment and try again.",
-					"OTP_ENROLLMENT_NOT_PENDING", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPEnrollmentNotPending, nil), "OTP_ENROLLMENT_NOT_PENDING", http.StatusBadRequest)
 				return
 			}
 
@@ -391,7 +387,7 @@ func HandleAccountOTPPut(
 
 			// A replayed code must be indistinguishable from a wrong one to the caller, so
 			// both branches below write this same body (#111).
-			incorrectOtpCode := "Incorrect OTP Code. OTP codes are time-sensitive and change every 30 seconds. Make sure you're using the most recent code generated by your authenticator app."
+			incorrectOtpCode := i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil)
 
 			// VerifySupplied rather than VerifyStored, because this code is checked against
 			// the seed the server issued and recorded and not against an enrolled
@@ -416,10 +412,10 @@ func HandleAccountOTPPut(
 					"step":           verified.Step,
 					"logged_in_user": subject,
 				})
-				writeJSONError(w, incorrectOtpCode, "INVALID_OTP_CODE", http.StatusBadRequest)
+				writeLocalizedError(w, r, incorrectOtpCode, "INVALID_OTP_CODE", http.StatusBadRequest)
 				return
 			case otpcredential.OutcomeWrong:
-				writeJSONError(w, incorrectOtpCode, "INVALID_OTP_CODE", http.StatusBadRequest)
+				writeLocalizedError(w, r, incorrectOtpCode, "INVALID_OTP_CODE", http.StatusBadRequest)
 				return
 			}
 
@@ -447,7 +443,7 @@ func HandleAccountOTPPut(
 		} else {
 			// Disable OTP
 			if !user.OTPEnabled {
-				writeJSONError(w, "User does not have OTP enabled", "OTP_NOT_ENABLED", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserOTPNotEnabled, nil), "OTP_NOT_ENABLED", http.StatusBadRequest)
 				return
 			}
 

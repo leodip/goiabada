@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // accountPasswordDatabase is what the account password endpoint needs: the caller's user row and
@@ -50,11 +51,11 @@ func HandleAccountPasswordPut(
 
 		// Validate required fields
 		if strings.TrimSpace(req.CurrentPassword) == "" {
-			writeJSONError(w, "Current password is required.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountCurrentPasswordRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if strings.TrimSpace(req.NewPassword) == "" {
-			writeJSONError(w, "New password is required.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountNewPasswordRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -78,7 +79,7 @@ func HandleAccountPasswordPut(
 			// spend a budget without ever attempting the credential (#219).
 			credentialFailures.RecordCredentialFailure(r)
 
-			writeJSONError(w, "Authentication failed. Check your current password and try again.", "AUTHENTICATION_FAILED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountCurrentPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		}
 

@@ -1665,6 +1665,23 @@
 "handler.client_tokens.include_claims_in_access_token_invalid" = "Invalid value for includeOpenIDConnectClaimsInAccessToken."
 "handler.client_tokens.include_claims_in_id_token_invalid" = "Invalid value for includeOpenIDConnectClaimsInIdToken."
 
+"handler.account.current_password_required" = "Current password is required."
+"handler.account.new_password_required" = "New password is required."
+"handler.account.current_password_incorrect" = "Authentication failed. Check your current password and try again."
+"handler.account.password_incorrect" = "Authentication failed. Check your password and try again."
+"handler.account.changed_since_loaded" = "The account was changed by another request after it was loaded. Nothing was saved: reload it and make the change again."
+"handler.smtp.not_enabled" = "SMTP is not enabled"
+"handler.email_verification.code_invalid_or_expired" = "Invalid or expired verification code"
+"handler.account_otp.already_enabled" = "OTP is already enabled"
+"handler.account_otp.secret_key_not_accepted" = "This endpoint no longer accepts a secretKey. Start an enrollment with GET /api/v1/account/otp/enrollment and submit only the code from your authenticator app."
+"handler.account_otp.code_required" = "OTP code is required to enable."
+"handler.account_otp.code_invalid" = "Invalid OTP code."
+"handler.account_otp.enrollment_not_pending" = "No OTP enrollment is pending, or the one you started has expired. Request a new one with GET /api/v1/account/otp/enrollment and try again."
+"handler.account_logout.post_logout_redirect_uri_required" = "postLogoutRedirectUri is required"
+"handler.account_logout.client_identifier_invalid" = "Invalid client identifier"
+"handler.account_logout.client_unresolved" = "Unable to resolve client from postLogoutRedirectUri; supply clientIdentifier."
+"handler.account_logout.post_logout_redirect_uri_not_registered" = "postLogoutRedirectUri is not registered for the client"
+
 # --- Password validator (LocalizedError-backed) ------------------------------
 
 "validator.password.too_short" = "The minimum length for the password is {{.min}} characters"

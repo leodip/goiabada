@@ -126,14 +126,21 @@ when a caller sends the same request without the console's check.
 The admin and account API writes each of these with the `error_code` and the
 status it always had (`VALIDATION_ERROR`, `CONCURRENT_UPDATE`,
 `EMAIL_ALREADY_EXISTS`, `LAST_ADMINISTRATOR`, `FILE_TOO_LARGE`, `NO_FILE`,
-`VALUE_TOO_LONG`, `EMAIL_TOO_LONG`, `OTP_NOT_ENABLED`), so the key is not on
-the wire: only `error_description` comes from here, in the request's language.
+`VALUE_TOO_LONG`, `EMAIL_TOO_LONG`, `OTP_NOT_ENABLED`, `AUTHENTICATION_FAILED`,
+`SMTP_NOT_ENABLED`, `INVALID_OR_EXPIRED_VERIFICATION_CODE`, `OTP_ALREADY_ENABLED`,
+`SECRET_KEY_NOT_ACCEPTED`, `OTP_CODE_REQUIRED`, `INVALID_OTP_CODE`,
+`OTP_ENROLLMENT_NOT_PENDING`), so the key is not on the wire: only
+`error_description` comes from here, in the request's language.
 The resource permissions save's description bound reuses
 `handler.admin_resource_permissions.description_too_long` above, a group's and
 a user's attribute key reuses `handler.attribute.key_required`, the user's
 phone country refusal reuses `validator.phone.country_invalid`, and a client's
 identifier and description refusals reuse `handler.client.identifier_required`
-and `handler.admin_resource_permissions.description_too_long`.
+and `handler.admin_resource_permissions.description_too_long`. The account API's
+disable of an authenticator it does not have reuses `handler.user.otp_not_enabled`,
+its wrong code on enabling one `handler.otp.incorrect_code`, its email
+verification send's conflict `handler.email_verification.account_changed`, and
+its phone country refusal `validator.phone.country_invalid`.
 
 | Code | Args | English message |
 |---|---|---|
@@ -201,6 +208,22 @@ and `handler.admin_resource_permissions.description_too_long`.
 | `handler.client_tokens.offline_idle_timeout_above_max_lifetime` | (none) | Refresh token offline - idle timeout cannot be greater than max lifetime. |
 | `handler.client_tokens.include_claims_in_access_token_invalid` | (none) | Invalid value for includeOpenIDConnectClaimsInAccessToken. |
 | `handler.client_tokens.include_claims_in_id_token_invalid` | (none) | Invalid value for includeOpenIDConnectClaimsInIdToken. |
+| `handler.account.current_password_required` | (none) | Current password is required. |
+| `handler.account.new_password_required` | (none) | New password is required. |
+| `handler.account.current_password_incorrect` | (none) | Authentication failed. Check your current password and try again. |
+| `handler.account.password_incorrect` | (none) | Authentication failed. Check your password and try again. |
+| `handler.account.changed_since_loaded` | (none) | The account was changed by another request after it was loaded. Nothing was saved: reload it and make the change again. |
+| `handler.smtp.not_enabled` | (none) | SMTP is not enabled |
+| `handler.email_verification.code_invalid_or_expired` | (none) | Invalid or expired verification code |
+| `handler.account_otp.already_enabled` | (none) | OTP is already enabled |
+| `handler.account_otp.secret_key_not_accepted` | (none) | This endpoint no longer accepts a secretKey. Start an enrollment with GET /api/v1/account/otp/enrollment and submit only the code from your authenticator app. |
+| `handler.account_otp.code_required` | (none) | OTP code is required to enable. |
+| `handler.account_otp.code_invalid` | (none) | Invalid OTP code. |
+| `handler.account_otp.enrollment_not_pending` | (none) | No OTP enrollment is pending, or the one you started has expired. Request a new one with GET /api/v1/account/otp/enrollment and try again. |
+| `handler.account_logout.post_logout_redirect_uri_required` | (none) | postLogoutRedirectUri is required |
+| `handler.account_logout.client_identifier_invalid` | (none) | Invalid client identifier |
+| `handler.account_logout.client_unresolved` | (none) | Unable to resolve client from postLogoutRedirectUri; supply clientIdentifier. |
+| `handler.account_logout.post_logout_redirect_uri_not_registered` | (none) | postLogoutRedirectUri is not registered for the client |
 
 ## Password validator
 

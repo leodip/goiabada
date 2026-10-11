@@ -199,6 +199,30 @@ const (
 	ErrCodeClientTokensIncludeClaimsInAccessTokenInvalid  = "handler.client_tokens.include_claims_in_access_token_invalid"
 	ErrCodeClientTokensIncludeClaimsInIdTokenInvalid      = "handler.client_tokens.include_claims_in_id_token_invalid"
 
+	// The account: email, email verification, password, two-factor authentication and the logout
+	// request. Disabling an authenticator the account does not have is handler.user.otp_not_enabled
+	// above, a wrong code on enabling one is handler.otp.incorrect_code, and the email verification
+	// send's conflict is handler.email_verification.account_changed. SMTP being off is one sentence
+	// for every endpoint that needs it.
+	ErrCodeAccountCurrentPasswordRequired  = "handler.account.current_password_required"
+	ErrCodeAccountNewPasswordRequired      = "handler.account.new_password_required"
+	ErrCodeAccountCurrentPasswordIncorrect = "handler.account.current_password_incorrect"
+	ErrCodeAccountPasswordIncorrect        = "handler.account.password_incorrect"
+	ErrCodeAccountChangedSinceLoaded       = "handler.account.changed_since_loaded"
+	ErrCodeSMTPNotEnabled                  = "handler.smtp.not_enabled"
+	ErrCodeEmailVerificationCodeInvalid    = "handler.email_verification.code_invalid_or_expired"
+
+	ErrCodeAccountOTPAlreadyEnabled       = "handler.account_otp.already_enabled"
+	ErrCodeAccountOTPSecretKeyNotAccepted = "handler.account_otp.secret_key_not_accepted"
+	ErrCodeAccountOTPCodeRequired         = "handler.account_otp.code_required"
+	ErrCodeAccountOTPCodeInvalid          = "handler.account_otp.code_invalid"
+	ErrCodeAccountOTPEnrollmentNotPending = "handler.account_otp.enrollment_not_pending"
+
+	ErrCodeAccountLogoutRedirectURIRequired      = "handler.account_logout.post_logout_redirect_uri_required"
+	ErrCodeAccountLogoutClientIdentifierInvalid  = "handler.account_logout.client_identifier_invalid"
+	ErrCodeAccountLogoutClientUnresolved         = "handler.account_logout.client_unresolved"
+	ErrCodeAccountLogoutRedirectURINotRegistered = "handler.account_logout.post_logout_redirect_uri_not_registered"
+
 	// RP-initiated logout via /auth/logout carries no error codes. It used to
 	// carry ten, all of which rendered an error page to the End-User instead of
 	// logging them out. A hint the OP cannot confirm is now answered with the

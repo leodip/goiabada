@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging"
 )
 
@@ -56,7 +57,7 @@ func HandleAccountLogoutRequestPost(
 
 		postLogout := req.PostLogoutRedirectUri
 		if postLogout == "" {
-			writeJSONError(w, "postLogoutRedirectUri is required", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutRedirectURIRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -80,7 +81,7 @@ func HandleAccountLogoutRequestPost(
 				return
 			}
 			if client == nil {
-				writeJSONError(w, "Invalid client identifier", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutClientIdentifierInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 		} else {
@@ -108,7 +109,7 @@ func HandleAccountLogoutRequestPost(
 				}
 			}
 			if len(matches) != 1 {
-				writeJSONError(w, "Unable to resolve client from postLogoutRedirectUri; supply clientIdentifier.", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutClientUnresolved, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			client = matches[0]
@@ -127,7 +128,7 @@ func HandleAccountLogoutRequestPost(
 			}
 		}
 		if !found {
-			writeJSONError(w, "postLogoutRedirectUri is not registered for the client", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutRedirectURINotRegistered, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
