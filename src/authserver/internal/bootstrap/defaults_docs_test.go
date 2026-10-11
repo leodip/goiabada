@@ -1,13 +1,12 @@
 package bootstrap
 
-// The default lifetimes the concept pages state, held to the settings row a first start seeds
-// (#522).
+// The defaults the concept pages state, held to the settings row a first start seeds (#522, #526).
 //
-// Tokens, Refresh tokens and Sessions each open with how long the thing lasts, in a table of the
-// settings that decide it, named as the admin console names them, with the value a new install
-// starts with. An operator sizing a deployment reads those values there, so each table is held to
-// the row the seed writes, in both directions: a value the seed does not write fails, and so does a
-// setting the page owes and leaves out.
+// Tokens, Refresh tokens and Sessions each state how long the thing lasts, and Self-registration
+// who can register, in a table of the settings that decide it, named as the admin console names
+// them, with the value a new install starts with. An operator sizing or opening a deployment reads
+// those values there, so each table is held to the row the seed writes, in both directions: a value
+// the seed does not write fails, and so does a setting the page owes and leaves out.
 
 import (
 	"context"
@@ -45,6 +44,10 @@ var defaultsSections = []defaultsSection{
 		"User session - idle timeout in seconds",
 		"User session - max lifetime in seconds",
 	}},
+	{"site/src/content/docs/concepts/self-registration.mdx", "## Who can register", []string{
+		"User self registration enabled",
+		"User self registration requires email verification",
+	}},
 }
 
 // seededDefaults is the value a seeded settings row holds for each admin console label: a number
@@ -52,18 +55,20 @@ var defaultsSections = []defaultsSection{
 func seededDefaults(settings *record.Settings) map[string]string {
 	onOff := map[bool]string{false: "Off", true: "On"}
 	return map[string]string{
-		"Token expiration in seconds":                       strconv.Itoa(settings.TokenExpirationInSeconds),
-		"Include OpenID Connect claims in the access token": onOff[settings.IncludeOpenIDConnectClaimsInAccessToken],
-		"Include OpenID Connect claims in the ID token":     onOff[settings.IncludeOpenIDConnectClaimsInIdToken],
-		"Offline refresh token - idle timeout in seconds":   strconv.Itoa(settings.RefreshTokenOfflineIdleTimeoutInSeconds),
-		"Offline refresh token - max lifetime in seconds":   strconv.Itoa(settings.RefreshTokenOfflineMaxLifetimeInSeconds),
-		"User session - idle timeout in seconds":            strconv.Itoa(settings.UserSessionIdleTimeoutInSeconds),
-		"User session - max lifetime in seconds":            strconv.Itoa(settings.UserSessionMaxLifetimeInSeconds),
+		"Token expiration in seconds":                        strconv.Itoa(settings.TokenExpirationInSeconds),
+		"Include OpenID Connect claims in the access token":  onOff[settings.IncludeOpenIDConnectClaimsInAccessToken],
+		"Include OpenID Connect claims in the ID token":      onOff[settings.IncludeOpenIDConnectClaimsInIdToken],
+		"Offline refresh token - idle timeout in seconds":    strconv.Itoa(settings.RefreshTokenOfflineIdleTimeoutInSeconds),
+		"Offline refresh token - max lifetime in seconds":    strconv.Itoa(settings.RefreshTokenOfflineMaxLifetimeInSeconds),
+		"User session - idle timeout in seconds":             strconv.Itoa(settings.UserSessionIdleTimeoutInSeconds),
+		"User session - max lifetime in seconds":             strconv.Itoa(settings.UserSessionMaxLifetimeInSeconds),
+		"User self registration enabled":                     onOff[settings.SelfRegistrationEnabled],
+		"User self registration requires email verification": onOff[settings.SelfRegistrationRequiresEmailVerification],
 	}
 }
 
-// The tables of default settings on Tokens, Refresh tokens and Sessions are the values a new
-// install starts with. Each row's default is what the seed writes, and each page names every
+// The tables of default settings on Tokens, Refresh tokens, Sessions and Self-registration are the
+// values a new install starts with. Each row's default is what the seed writes, and each page names every
 // setting it owes.
 func TestConceptDocs_TheDefaultsAreWhatTheSeedWrites(t *testing.T) {
 	db := newSeedDB(t)

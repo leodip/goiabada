@@ -319,12 +319,14 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 	// Last, and at the id IsEmpty reads, so the database reads as seeded exactly when the
 	// transaction holding this row commits (#424 decision 14).
 	return r.db.CreateInitialSettings(ctx, tx, &record.Settings{
-		AppName:                 values.appName,
-		Issuer:                  r.cfg.AuthServerBaseURL,
-		UITheme:                 "",
-		SelfRegistrationEnabled: true,
-		SelfRegistrationRequiresEmailVerification: false,
-		PasswordPolicy: record.PasswordPolicyLow,
+		AppName: values.appName,
+		Issuer:  r.cfg.AuthServerBaseURL,
+		UITheme: "",
+		// Nobody registers until an administrator opens it, and then through the verified flow
+		// unless they turn verification off on purpose (#526).
+		SelfRegistrationEnabled:                   false,
+		SelfRegistrationRequiresEmailVerification: true,
+		PasswordPolicy:                            record.PasswordPolicyLow,
 		// The data key is supplied from the environment (issue #83); the legacy
 		// aes_encryption_key column is left empty on fresh installs. It is NOT NULL,
 		// so store an empty (non-nil) blob rather than nil.
