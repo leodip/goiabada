@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // accountOTPAPI is what the account OTP page needs: the enrolment offer, the profile, and the
@@ -160,7 +161,7 @@ func HandleOtpPost(
 			otpCode := r.PostFormValue("otp")
 
 			if len(otpCode) == 0 {
-				renderEnrollmentError("OTP code is required.")
+				renderEnrollmentError(i18n.NewLocalizedError(i18n.ErrCodeOtpCodeRequired, nil).Localize(r.Context()))
 				return
 			}
 

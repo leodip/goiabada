@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -119,7 +120,7 @@ func HandleAuditLogsPost(
 		if v := settingsInfo.AuditLogRetentionDays; len(v) > 0 {
 			p, err := strconv.Atoi(v)
 			if err != nil {
-				renderError("Audit log retention days must be a valid number.")
+				renderError(i18n.T(r.Context(), "adminconsole.refusal.settings_audit_logs.retention_days_invalid"))
 				return
 			}
 			retentionInt = p

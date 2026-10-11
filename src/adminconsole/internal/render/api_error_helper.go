@@ -174,9 +174,13 @@ func HandleAPIErrorJSON(httpHelper ErrorWriter, w http.ResponseWriter, r *http.R
 //
 // It is silent because JSONError does not log an *ErrorDetail, which is the property that makes it
 // the counterpart of NotFound rather than a differently spelled 500.
+//
+// Its sentence comes from the catalog in the page's language, as JSONConflict's and
+// JSONBadRequestBody's do: the console's dialog shows them beside the API's refusals, which arrive
+// in that language too, and the console answers nobody but its own pages (#559 decision 7).
 func JSONNotFound(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request) {
 	httpHelper.JSONError(w, r, oauth.NewErrorDetailWithHTTPStatus("not_found",
-		"Sorry, the item you are looking for could not be found. It may have been deleted, or the address may be incorrect.",
+		i18n.T(r.Context(), "adminconsole.refusal.not_found"),
 		http.StatusNotFound))
 }
 
@@ -188,7 +192,7 @@ func JSONNotFound(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request
 // here, by reloading. Neither side is at fault, so nothing is logged (#440 decision 6).
 func JSONConflict(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request) {
 	httpHelper.JSONError(w, r, oauth.NewErrorDetailWithHTTPStatus("concurrent_update",
-		"This item was changed after the page was loaded. Reload the page and try again.",
+		i18n.T(r.Context(), "adminconsole.refusal.concurrent_update"),
 		http.StatusConflict))
 }
 
@@ -204,6 +208,6 @@ func JSONConflict(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request
 // of them (#279 decision 12).
 func JSONBadRequestBody(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request) {
 	httpHelper.JSONError(w, r, oauth.NewErrorDetailWithHTTPStatus("invalid_request_body",
-		"The request body is not valid JSON, or is missing information this endpoint requires.",
+		i18n.T(r.Context(), "adminconsole.refusal.invalid_request_body"),
 		http.StatusBadRequest))
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 func HandleNewGet(
@@ -68,7 +69,7 @@ func HandleNewPost(
 		displayName := r.FormValue("displayName")
 
 		if strings.TrimSpace(clientIdentifier) == "" {
-			renderError("Client identifier is required.")
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierRequired, nil).Localize(r.Context()))
 			return
 		}
 

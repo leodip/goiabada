@@ -498,3 +498,67 @@ func TestIsSessionEnded(t *testing.T) {
 		})
 	}
 }
+
+// The console's three JSON refusals reach its modal dialog in the language the page is rendered in,
+// beside the API refusals the same dialog shows: English with no language on the request, word for
+// word what they said before, and Portuguese under pt-BR. Their codes and statuses do not change
+// (#559 decision 7).
+func TestJSONRefusals_AreInThePagesLanguage(t *testing.T) {
+	testCases := []struct {
+		name       string
+		write      func(ErrorWriter, http.ResponseWriter, *http.Request)
+		code       string
+		status     int
+		english    string
+		portuguese string
+	}{
+		{
+			name:       "JSONNotFound",
+			write:      JSONNotFound,
+			code:       "not_found",
+			status:     http.StatusNotFound,
+			english:    "Sorry, the item you are looking for could not be found. It may have been deleted, or the address may be incorrect.",
+			portuguese: "Desculpe, não foi possível encontrar o item solicitado. Ele pode ter sido excluído, ou o endereço pode estar incorreto.",
+		},
+		{
+			name:       "JSONConflict",
+			write:      JSONConflict,
+			code:       "concurrent_update",
+			status:     http.StatusConflict,
+			english:    "This item was changed after the page was loaded. Reload the page and try again.",
+			portuguese: "Este item foi alterado depois que a página foi carregada. Recarregue a página e tente novamente.",
+		},
+		{
+			name:       "JSONBadRequestBody",
+			write:      JSONBadRequestBody,
+			code:       "invalid_request_body",
+			status:     http.StatusBadRequest,
+			english:    "The request body is not valid JSON, or is missing information this endpoint requires.",
+			portuguese: "O corpo da requisição não é um JSON válido, ou não contém informações que este endpoint exige.",
+		},
+	}
+
+	for _, testCase := range testCases {
+		for _, language := range []struct{ name, tag, want string }{
+			{"with no language", "", testCase.english},
+			{"in pt-BR", "pt-BR", testCase.portuguese},
+		} {
+			t.Run(testCase.name+" "+language.name, func(t *testing.T) {
+				httpHelper := handlersmocks.NewHttpHelper(t)
+				captured := captureJSONError(httpHelper)
+
+				req := httptest.NewRequest(http.MethodPost, "/admin/users/42/attributes/7/remove", nil)
+				if language.tag != "" {
+					req = req.WithContext(i18n.WithLocale(req.Context(), true, language.tag))
+				}
+				testCase.write(httpHelper, httptest.NewRecorder(), req)
+
+				var detail *oauth.ErrorDetail
+				require.True(t, errors.As(*captured, &detail), "expected an *oauth.ErrorDetail, got %T", *captured)
+				assert.Equal(t, testCase.status, detail.HTTPStatus())
+				assert.Equal(t, testCase.code, detail.Code())
+				assert.Equal(t, language.want, detail.Description())
+			})
+		}
+	}
+}

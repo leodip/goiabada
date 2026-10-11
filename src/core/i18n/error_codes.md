@@ -110,6 +110,17 @@ resource-permissions page.
 | `handler.admin_resource_permissions.permission_identifier_required` | (none) | Permission identifier is required. |
 | `handler.admin_resource_permissions.description_too_long` | `max` (int) | The description cannot exceed a maximum length of {{.max}} characters. |
 
+## Refusals the admin console and the admin API share
+
+Written by the admin console before it calls the admin API, and by the API
+when a caller sends the same request without the console's check.
+
+| Code | Args | English message |
+|---|---|---|
+| `handler.client.identifier_required` | (none) | Client identifier is required. |
+| `handler.attribute.key_required` | (none) | Attribute key is required |
+| `handler.settings_email.destination_required` | (none) | Destination email is required. |
+
 ## Password validator
 
 | Code | Args | English message |

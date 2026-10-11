@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // resourceDeleteAPI is what the resource delete page needs: the resource, the permissions it
@@ -124,18 +125,18 @@ func HandleDeletePost(
 
 		// System-level resource protection: block deletion
 		if resource.IsSystemLevelResource {
-			renderError("System-level resources cannot be deleted.")
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.resource_delete.system_level"))
 			return
 		}
 
 		resourceIdentifier := r.FormValue("resourceIdentifier")
 		if len(resourceIdentifier) == 0 {
-			renderError("Resource identifier is required.")
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.resource_delete.identifier_required"))
 			return
 		}
 
 		if resource.ResourceIdentifier != resourceIdentifier {
-			renderError("Resource identifier does not match the resource being deleted.")
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.resource_delete.identifier_mismatch"))
 			return
 		}
 

@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -83,7 +84,7 @@ func HandleChangePasswordPost(
 
 		// UI-level confirmation check only; rest is validated by the API
 		if newPassword != newPasswordConfirmation {
-			renderError("The new password confirmation does not match the password.")
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationMismatch, nil).Localize(r.Context()))
 			return
 		}
 

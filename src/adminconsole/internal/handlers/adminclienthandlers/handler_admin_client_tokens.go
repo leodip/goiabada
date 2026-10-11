@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -170,21 +171,21 @@ func HandleTokensPost(
 		tokenExpirationInSeconds, err := strconv.Atoi(settingsInfo.TokenExpirationInSeconds)
 		if err != nil {
 			settingsInfo.TokenExpirationInSeconds = strconv.Itoa(client.TokenExpirationInSeconds)
-			renderError("Invalid value for token expiration in seconds.")
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.token_expiration_invalid"))
 			return
 		}
 
 		refreshTokenOfflineIdleTimeoutInSeconds, err := strconv.Atoi(settingsInfo.RefreshTokenOfflineIdleTimeoutInSeconds)
 		if err != nil {
 			settingsInfo.RefreshTokenOfflineIdleTimeoutInSeconds = strconv.Itoa(client.RefreshTokenOfflineIdleTimeoutInSeconds)
-			renderError("Invalid value for refresh token offline - idle timeout in seconds.")
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.offline_idle_timeout_invalid"))
 			return
 		}
 
 		refreshTokenOfflineMaxLifetimeInSeconds, err := strconv.Atoi(settingsInfo.RefreshTokenOfflineMaxLifetimeInSeconds)
 		if err != nil {
 			settingsInfo.RefreshTokenOfflineMaxLifetimeInSeconds = strconv.Itoa(client.RefreshTokenOfflineMaxLifetimeInSeconds)
-			renderError("Invalid value for refresh token offline - max lifetime in seconds.")
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.offline_max_lifetime_invalid"))
 			return
 		}
 

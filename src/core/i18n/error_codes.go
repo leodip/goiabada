@@ -101,6 +101,13 @@ const (
 	ErrCodeAdminResourcePermissionsIdentifierRequired        = "handler.admin_resource_permissions.permission_identifier_required"
 	ErrCodeAdminResourcePermissionsDescriptionTooLong        = "handler.admin_resource_permissions.description_too_long" // Args: {"max": int}
 
+	// Refusals the admin console and the admin API both write, the console before it calls the
+	// API and the API when a caller sends the same request without the console's check. One key
+	// for each, so the two say the same sentence in every language (#559).
+	ErrCodeClientIdentifierRequired         = "handler.client.identifier_required"
+	ErrCodeAttributeKeyRequired             = "handler.attribute.key_required"
+	ErrCodeSettingsEmailDestinationRequired = "handler.settings_email.destination_required"
+
 	// RP-initiated logout via /auth/logout carries no error codes. It used to
 	// carry ten, all of which rendered an error page to the End-User instead of
 	// logging them out. A hint the OP cannot confirm is now answered with the

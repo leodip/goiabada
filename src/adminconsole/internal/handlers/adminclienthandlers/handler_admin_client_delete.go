@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // clientDeleteAPI is what the client delete page needs: the permissions it warns about, and the
@@ -149,12 +150,12 @@ func HandleDeletePost(
 
 		clientIdentifier := r.FormValue("clientIdentifier")
 		if len(clientIdentifier) == 0 {
-			renderError("Client identifier is required.")
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierRequired, nil).Localize(r.Context()))
 			return
 		}
 
 		if client.ClientIdentifier != clientIdentifier {
-			renderError("Client identifier does not match the client being deleted.")
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_delete.identifier_mismatch"))
 			return
 		}
 

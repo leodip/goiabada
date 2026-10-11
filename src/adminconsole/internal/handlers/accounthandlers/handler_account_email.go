@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -113,7 +114,7 @@ func HandleEmailPost(
 				"email":             email,
 				"emailVerified":     user.EmailVerified,
 				"emailConfirmation": emailConfirmation,
-				"error":             "The email and email confirmation entries must be identical.",
+				"error":             i18n.T(r.Context(), "adminconsole.refusal.account_email.confirmation_mismatch"),
 			}
 			if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind); renderErr != nil {
 				httpHelper.InternalServerError(w, r, renderErr)

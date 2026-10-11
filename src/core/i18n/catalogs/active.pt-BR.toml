@@ -303,6 +303,22 @@
 
 "adminconsole.session_ended.message" = "Seu acesso terminou. Entre novamente."
 
+"adminconsole.refusal.not_found" = "Desculpe, não foi possível encontrar o item solicitado. Ele pode ter sido excluído, ou o endereço pode estar incorreto."
+"adminconsole.refusal.concurrent_update" = "Este item foi alterado depois que a página foi carregada. Recarregue a página e tente novamente."
+"adminconsole.refusal.invalid_request_body" = "O corpo da requisição não é um JSON válido, ou não contém informações que este endpoint exige."
+"adminconsole.refusal.account_email.confirmation_mismatch" = "Os campos de e-mail e de confirmação de e-mail devem ser idênticos."
+"adminconsole.refusal.client_delete.identifier_mismatch" = "O identificador do cliente não corresponde ao cliente que está sendo excluído."
+"adminconsole.refusal.client_tokens.token_expiration_invalid" = "Valor inválido para a expiração do token em segundos."
+"adminconsole.refusal.client_tokens.offline_idle_timeout_invalid" = "Valor inválido para o refresh token offline - timeout por inatividade em segundos."
+"adminconsole.refusal.client_tokens.offline_max_lifetime_invalid" = "Valor inválido para o refresh token offline - tempo máximo de vida em segundos."
+"adminconsole.refusal.group_delete.identifier_required" = "O identificador do grupo é obrigatório."
+"adminconsole.refusal.group_delete.identifier_mismatch" = "O identificador do grupo não corresponde ao grupo que está sendo excluído."
+"adminconsole.refusal.resource_delete.system_level" = "Recursos em nível de sistema não podem ser excluídos."
+"adminconsole.refusal.resource_delete.identifier_required" = "O identificador do recurso é obrigatório."
+"adminconsole.refusal.resource_delete.identifier_mismatch" = "O identificador do recurso não corresponde ao recurso que está sendo excluído."
+"adminconsole.refusal.settings_audit_logs.retention_days_invalid" = "Os dias de retenção de logs de auditoria devem ser um número válido."
+"adminconsole.refusal.user_new.email_required" = "O endereço de e-mail não pode ficar vazio."
+
 "adminconsole.not_found.page_title" = "Não encontrado"
 "adminconsole.not_found.title" = "Não encontrado (404)"
 "adminconsole.not_found.body" = "Desculpe, não foi possível encontrar a página solicitada. Verifique a URL e tente novamente."
@@ -1486,6 +1502,10 @@
 "handler.admin_resource_permissions.description_html_not_allowed" = "A descrição contém caracteres inválidos: não permitimos uso de HTML na descrição."
 "handler.admin_resource_permissions.permission_identifier_required" = "O identificador da permissão é obrigatório."
 "handler.admin_resource_permissions.description_too_long" = "A descrição não pode ter mais que {{.max}} caracteres."
+
+"handler.client.identifier_required" = "O identificador do cliente é obrigatório."
+"handler.attribute.key_required" = "A chave do atributo é obrigatória"
+"handler.settings_email.destination_required" = "O e-mail de destino é obrigatório."
 
 "validator.password.too_short" = "O comprimento mínimo para a senha é {{.min}} caracteres"
 "validator.password.too_long" = "A senha pode ter no máximo {{.max}} bytes. Caracteres acentuados e de outros alfabetos contam como dois ou mais bytes cada."
