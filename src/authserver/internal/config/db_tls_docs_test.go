@@ -21,15 +21,12 @@ const (
 	securityReferencePage              = "site/src/content/docs/reference/security.mdx"
 )
 
-// libpqVariableSections are the sections an operator who set one of libpq's TLS variables is sent
-// to: the troubleshooting page a refused start leads to, and the upgrade page, where an operator
-// who followed the old advice learns before upgrading that the start will stop.
-var libpqVariableSections = []docSection{
-	{databaseConnectTroubleshootingPage, ""},
-	{upgradePage, "## If you set PGSSLMODE"},
-}
+// libpqVariableSection is where an operator who set one of libpq's TLS variables is sent: the
+// troubleshooting page a refused start leads to. Moving the old values over is an upgrade step,
+// which the release notes carry rather than the docs, which describe the latest release only.
+var libpqVariableSection = docSection{databaseConnectTroubleshootingPage, "## PostgreSQL's TLS variables"}
 
-// TestDocs_NameEveryRefusedLibpqVariable: each section names the seven variables a PostgreSQL start
+// TestDocs_NameEveryRefusedLibpqVariable: the section names the seven variables a PostgreSQL start
 // refuses, and quotes, as the load writes it, the refusal of the two the old advice set.
 func TestDocs_NameEveryRefusedLibpqVariable(t *testing.T) {
 	root := filepath.Dir(guard.SourceRoot(t))
@@ -41,15 +38,13 @@ func TestDocs_NameEveryRefusedLibpqVariable(t *testing.T) {
 	}
 	require.Len(t, refusals, 7, "libpq's seven TLS variables")
 
-	for _, section := range libpqVariableSections {
-		text, err := docSectionText(root, section)
-		require.NoError(t, err)
-		require.NotEmpty(t, text, "%s exists", section)
-		for name, refusal := range refusals {
-			assert.Contains(t, text, "`"+name+"`", "%s names %s", section, name)
-			if name == "PGSSLMODE" || name == "PGSSLROOTCERT" {
-				assert.Contains(t, text, "`"+refusal+"`", "%s quotes the refusal of %s", section, name)
-			}
+	text, err := docSectionText(root, libpqVariableSection)
+	require.NoError(t, err)
+	require.NotEmpty(t, text, "%s exists", libpqVariableSection)
+	for name, refusal := range refusals {
+		assert.Contains(t, text, "`"+name+"`", "%s names %s", libpqVariableSection, name)
+		if name == "PGSSLMODE" || name == "PGSSLROOTCERT" {
+			assert.Contains(t, text, "`"+refusal+"`", "%s quotes the refusal of %s", libpqVariableSection, name)
 		}
 	}
 }
