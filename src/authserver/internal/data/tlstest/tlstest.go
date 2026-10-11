@@ -86,6 +86,20 @@ func (a Authority) IssueWithCommonName(t *testing.T, commonName, host string) tl
 	return a.issueNamed(t, commonName, host, x509.ExtKeyUsageServerAuth)
 }
 
+// IssueExpired signs a server certificate naming host, as Issue does, whose validity ended an hour
+// ago.
+func (a Authority) IssueExpired(t *testing.T, host string) tls.Certificate {
+	t.Helper()
+	return a.issueValid(t, host, host, x509.ExtKeyUsageServerAuth, time.Now().Add(-2*time.Hour), time.Now().Add(-time.Hour))
+}
+
+// IssueNotYetValid signs a server certificate naming host, as Issue does, whose validity starts in
+// an hour.
+func (a Authority) IssueNotYetValid(t *testing.T, host string) tls.Certificate {
+	t.Helper()
+	return a.issueValid(t, host, host, x509.ExtKeyUsageServerAuth, time.Now().Add(time.Hour), time.Now().Add(2*time.Hour))
+}
+
 // IssueClient signs a client certificate naming user.
 func (a Authority) IssueClient(t *testing.T, user string) tls.Certificate {
 	t.Helper()
@@ -97,15 +111,21 @@ func (a Authority) issue(t *testing.T, name string, usage x509.ExtKeyUsage) tls.
 	return a.issueNamed(t, name, name, usage)
 }
 
+// issueNamed signs a certificate valid from an hour ago to an hour from now.
 func (a Authority) issueNamed(t *testing.T, commonName, name string, usage x509.ExtKeyUsage) tls.Certificate {
+	t.Helper()
+	return a.issueValid(t, commonName, name, usage, time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
+}
+
+func (a Authority) issueValid(t *testing.T, commonName, name string, usage x509.ExtKeyUsage, notBefore, notAfter time.Time) tls.Certificate {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	template := &x509.Certificate{
 		SerialNumber: serial(t),
 		Subject:      pkix.Name{CommonName: commonName},
-		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(time.Hour),
+		NotBefore:    notBefore,
+		NotAfter:     notAfter,
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{usage},
 	}

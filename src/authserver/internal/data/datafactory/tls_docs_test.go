@@ -71,8 +71,9 @@ func TestDatabasePage_WhereTheDatabaseSitsIsTheTwoSettings(t *testing.T) {
 }
 
 // TestDatabaseConnectPage_NamesTheTLSRefusals: the troubleshooting page quotes what each engine
-// answers in a verifying mode when the certificate is another authority's, and in verify-full when
-// it names another host or the host dialled is an IP address it does not carry, the handshakes
+// answers in a verifying mode when the certificate is another authority's, has expired or is not
+// yet valid, and in verify-full when it names another host or the host dialled is an IP address it
+// does not carry, the handshakes
 // being each engine's own TLS configuration against a certificate made here. It quotes the three
 // engines' refusals of a server offering no TLS too, and names the mode in the start's record.
 func TestDatabaseConnectPage_NamesTheTLSRefusals(t *testing.T) {
@@ -100,6 +101,10 @@ func TestDatabaseConnectPage_NamesTheTLSRefusals(t *testing.T) {
 				{"verify-full, another authority", data.TLSVerifyFull, dialled, theirs.Issue(t, dialled)},
 				{"verify-full, another host", data.TLSVerifyFull, dialled, ours.Issue(t, certified)},
 				{"verify-full, an IP address the certificate does not carry", data.TLSVerifyFull, address, ours.Issue(t, certified)},
+				{"verify-ca, an expired certificate", data.TLSVerifyCA, dialled, ours.IssueExpired(t, dialled)},
+				{"verify-full, an expired certificate", data.TLSVerifyFull, dialled, ours.IssueExpired(t, dialled)},
+				{"verify-ca, a certificate not yet valid", data.TLSVerifyCA, dialled, ours.IssueNotYetValid(t, dialled)},
+				{"verify-full, a certificate not yet valid", data.TLSVerifyFull, dialled, ours.IssueNotYetValid(t, dialled)},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
 					cfg := &config.DatabaseConfig{Type: engine, Host: tc.host, Port: 1, Name: "goiabada",
@@ -146,8 +151,10 @@ func TestDatabaseConnectPage_NamesTheTLSRefusals(t *testing.T) {
 }
 
 // x509Refusal is the certificate refusal inside a handshake's error: crypto/x509's own words, up to
-// any hint it appends in parentheses.
-var x509Refusal = regexp.MustCompile(`x509: [^(]*[^ (]`)
+// any hint it appends in parentheses, or the detail it appends after a colon and a space, such as
+// an expired certificate's times. A colon with no space after it is part of the words, as in an
+// IPv6 address.
+var x509Refusal = regexp.MustCompile(`x509: (?:[^(:]|:[^ ])*[^ (:]`)
 
 // engineTLSConfig is the TLS configuration the engine cfg names will hand its driver, as the start
 // builds it from the configuration.
@@ -183,4 +190,9 @@ func TestX509Refusal_ReadsTheCertificatesWordsAlone(t *testing.T) {
 	assert.Equal(t, "x509: certificate signed by unknown authority", x509Refusal.FindString(err.Error()))
 	assert.Equal(t, "x509: certificate is valid for a.example, not b.example",
 		x509Refusal.FindString("TLS Handshake failed: tls: failed to verify certificate: x509: certificate is valid for a.example, not b.example"))
+	assert.Equal(t, "x509: certificate has expired or is not yet valid",
+		x509Refusal.FindString("tls: failed to verify certificate: x509: certificate has expired or is not yet valid: "+
+			"current time 2026-10-11T05:00:00Z is after 2026-10-11T04:00:00Z"))
+	assert.Equal(t, "x509: certificate is valid for ::1, not db.example.com",
+		x509Refusal.FindString("tls: failed to verify certificate: x509: certificate is valid for ::1, not db.example.com"))
 }
