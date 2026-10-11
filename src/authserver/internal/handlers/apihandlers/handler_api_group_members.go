@@ -292,7 +292,7 @@ func HandleGroupMemberDelete(
 			return administrators.leavesAnAdministrator(r.Context())
 		})
 		if errors.Is(err, errLastAdministrator) {
-			writeLastAdministrator(w)
+			writeLastAdministrator(w, r)
 			return
 		}
 		if err != nil {

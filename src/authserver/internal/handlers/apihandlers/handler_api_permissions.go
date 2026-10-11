@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -127,7 +126,7 @@ func HandleResourcePermissionsPut(
 			// Reject duplicate IDs (prevents bypass of built-in permission protection)
 			if req.Permissions[i].Id > 0 {
 				if seenIds[req.Permissions[i].Id] {
-					writeJSONError(w, "Duplicate permission IDs in request are not allowed", "VALIDATION_ERROR", http.StatusBadRequest)
+					writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodePermissionDuplicateIds, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 					return
 				}
 				seenIds[req.Permissions[i].Id] = true
@@ -149,7 +148,7 @@ func HandleResourcePermissionsPut(
 			// the sanitizer dropped everything from the "<" onwards and IdentifierValidator.Validate then
 			// saw a name the caller never asked for. It is now refused instead (#275).
 			if len(rawIdentifier) == 0 {
-				writeJSONError(w, "Permission identifier is required", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodePermissionIdentifierRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 
@@ -160,12 +159,12 @@ func HandleResourcePermissionsPut(
 
 			const maxLengthDescription = 100
 			if inputvalidation.TextLength(rawDescription) > maxLengthDescription {
-				writeJSONError(w, fmt.Sprintf("The description cannot exceed a maximum length of %d characters.", maxLengthDescription), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionTooLong, map[string]any{"max": maxLengthDescription}), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 
 			if seenIdentifiers[rawIdentifier] {
-				writeJSONError(w, fmt.Sprintf("Permission %s is duplicated.", rawIdentifier), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodePermissionDuplicated, map[string]any{"identifier": rawIdentifier}), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			seenIdentifiers[rawIdentifier] = true
@@ -213,13 +212,13 @@ func HandleResourcePermissionsPut(
 				}
 
 				if requestEntry == nil {
-					writeJSONError(w, fmt.Sprintf("Built-in permission '%s' cannot be deleted.", builtInIdentifier), "VALIDATION_ERROR", http.StatusBadRequest)
+					writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodePermissionBuiltInDeleted, map[string]any{"identifier": builtInIdentifier}), "VALIDATION_ERROR", http.StatusBadRequest)
 					return
 				}
 
 				// The identifier must not be changed
 				if requestEntry.PermissionIdentifier != builtInIdentifier {
-					writeJSONError(w, fmt.Sprintf("Built-in permission '%s' cannot be renamed.", builtInIdentifier), "VALIDATION_ERROR", http.StatusBadRequest)
+					writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodePermissionBuiltInRenamed, map[string]any{"identifier": builtInIdentifier}), "VALIDATION_ERROR", http.StatusBadRequest)
 					return
 				}
 
@@ -242,7 +241,7 @@ func HandleResourcePermissionsPut(
 				}
 			}
 			if other, exists := existingByIdentifier[p.PermissionIdentifier]; exists && other.Id != p.Id {
-				writeJSONError(w, fmt.Sprintf("Permission identifier %s is already in use.", p.PermissionIdentifier), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodePermissionIdentifierInUse, map[string]any{"identifier": p.PermissionIdentifier}), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 		}

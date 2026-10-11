@@ -134,6 +134,10 @@ var apiErrorCodeArg = map[string]int{
 	// (w, r, err, message, code): the 500 that keeps an operation code a caller acts on. Its own
 	// body forwards that code to writeJSONError, so it is a forwarder below as well.
 	"writeInternalServerErrorWithCode": 4,
+	// (w, r, message, code, status): a refusal whose description is translated and whose code is
+	// the caller's, written as a literal at each call site like writeJSONError's. Its own body
+	// forwards that code, so it is a forwarder below as well (#559 decision 2).
+	"writeLocalizedError": 3,
 }
 
 // apiErrorCodeForwarders are the functions whose code argument is their caller's, so a non-literal
@@ -142,6 +146,7 @@ var apiErrorCodeArg = map[string]int{
 var apiErrorCodeForwarders = map[string]bool{
 	"writeJSONError":                   true,
 	"writeValidationError":             true,
+	"writeLocalizedError":              true,
 	"writeInternalServerErrorWithCode": true,
 	"WriteError":                       true,
 	"WriteInternalServerError":         true,
@@ -527,6 +532,29 @@ func HandleX() { _ = json.NewEncoder(w).Encode(api.ErrorResponse{ErrorCode: "TOO
 			src: `package p
 func HandleX() { WriteError(w, "m", internalServerErrorCode, 500) }`,
 			codes: []string{"INTERNAL_SERVER_ERROR"},
+		},
+		{
+			// The localizing writer translates the description and keeps the code its caller
+			// names, so the code is written at the call site as a literal like any other (#559
+			// decision 2).
+			name: "writeLocalizedError's fourth argument is a code",
+			src: `package p
+func HandleX() { writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest) }`,
+			codes: []string{"VALIDATION_ERROR"},
+		},
+		{
+			name: "a computed code through writeLocalizedError outside a forwarder is a problem",
+			src: `package p
+func HandleX() { writeLocalizedError(w, r, message, code, http.StatusConflict) }`,
+			problems: 1,
+		},
+		{
+			name: "writeLocalizedError forwarding its caller's code is the design",
+			src: `package p
+func writeLocalizedError(w http.ResponseWriter, r *http.Request, message *i18n.LocalizedError, code string, statusCode int) {
+	writeJSONError(w, message.Localize(r.Context()), code, statusCode)
+}`,
+			problems: 0,
 		},
 		{
 			name: "a computed code outside a forwarder is a problem",

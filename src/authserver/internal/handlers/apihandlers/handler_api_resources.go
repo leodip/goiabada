@@ -68,14 +68,14 @@ func HandleResourceCreatePost(
 
 		// Validate resource identifier is present
 		if strings.TrimSpace(createReq.ResourceIdentifier) == "" {
-			writeJSONError(w, "Resource identifier is required", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Validate description length
 		const maxLengthDescription = 100
 		if inputvalidation.TextLength(createReq.Description) > maxLengthDescription {
-			writeJSONError(w, "The description cannot exceed a maximum length of "+strconv.Itoa(maxLengthDescription)+" characters", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceDescriptionTooLong, map[string]any{"max": maxLengthDescription}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -97,7 +97,7 @@ func HandleResourceCreatePost(
 			return
 		}
 		if existing != nil {
-			writeJSONError(w, "The resource identifier is already in use", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierInUse, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -197,14 +197,14 @@ func HandleResourceUpdatePut(
 
 		// Validate identifier present
 		if strings.TrimSpace(updateReq.ResourceIdentifier) == "" {
-			writeJSONError(w, "Resource identifier is required", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Validate description length
 		const maxLengthDescription = 100
 		if inputvalidation.TextLength(updateReq.Description) > maxLengthDescription {
-			writeJSONError(w, "The description cannot exceed a maximum length of "+strconv.Itoa(maxLengthDescription)+" characters", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceDescriptionTooLong, map[string]any{"max": maxLengthDescription}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -226,7 +226,7 @@ func HandleResourceUpdatePut(
 			return
 		}
 		if existing != nil && existing.Id != resource.Id {
-			writeJSONError(w, "The resource identifier is already in use", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierInUse, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -235,7 +235,7 @@ func HandleResourceUpdatePut(
 
 		// System-level resource protection: block identifier changes
 		if resource.IsSystemLevelResource() && trimmedResourceIdentifier != resource.ResourceIdentifier {
-			writeJSONError(w, "The identifier of a system-level resource cannot be changed.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceSystemLevelIdentifierFixed, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -291,7 +291,7 @@ func HandleResourceDelete(
 		}
 
 		if resource.IsSystemLevelResource() {
-			writeJSONError(w, "Trying to delete a system level resource", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceSystemLevelDeleteNotAllowed, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 

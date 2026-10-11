@@ -27,6 +27,7 @@ import (
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/guard"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // The pages, relative to the repository root.
@@ -185,11 +186,13 @@ func TestAdministrativeDocs_TheConsoleLockoutRecoveryRequestsManage(t *testing.T
 }
 
 // The admin console shows the auth server's last-administrator refusal as it is sent, so the sentence
-// the Administrators page tells an operator to expect is the refusal's own description. It moved
-// there from Users and groups, which now links to it (#522).
+// the Administrators page tells an operator to expect is the refusal's own description, in English,
+// the language the page is written in (#559). It moved there from Users and groups, which now links
+// to it (#522).
 func TestAdministrativeDocs_TheLastAdministratorSectionQuotesTheRefusal(t *testing.T) {
 	assertSectionQuotes(t, filepath.Dir(guard.SourceRoot(t)),
-		docSection{apiAdministratorsPage, "## The last administrator"}, lastAdministratorDescription)
+		docSection{apiAdministratorsPage, "## The last administrator"},
+		i18n.NewLocalizedError(i18n.ErrCodeLastAdministrator, nil).EnglishFallback())
 }
 
 func TestAdministrativeDocs_ASectionNotQuotingTheSentenceFails(t *testing.T) {

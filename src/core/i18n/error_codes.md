@@ -121,6 +121,35 @@ when a caller sends the same request without the console's check.
 | `handler.attribute.key_required` | (none) | Attribute key is required |
 | `handler.settings_email.destination_required` | (none) | Destination email is required. |
 
+## Admin and account API refusals a person reaches through the console
+
+The admin and account API writes each of these with the `error_code` and the
+status it always had (`VALIDATION_ERROR`, `CONCURRENT_UPDATE`,
+`EMAIL_ALREADY_EXISTS`, `LAST_ADMINISTRATOR`, `FILE_TOO_LARGE`, `NO_FILE`), so
+the key is not on the wire: only `error_description` comes from here, in the
+request's language. The resource permissions save's description bound reuses
+`handler.admin_resource_permissions.description_too_long` above.
+
+| Code | Args | English message |
+|---|---|---|
+| `handler.list_save.changed_since_loaded` | (none) | The list was changed by another save after it was loaded. Nothing was saved: reload it and make the change again. |
+| `handler.list_save.changed_concurrently` | (none) | The list was changed by another save at the same moment. Nothing was saved: reload it and make the change again. |
+| `handler.email.already_exists` | (none) | This email address is already registered |
+| `handler.administrators.last_administrator` | (none) | This change would leave no enabled user holding authserver:manage. Grant it to another user first. |
+| `handler.image_upload.too_large` | (none) | File too large or invalid form data |
+| `handler.image_upload.no_file` | (none) | No picture file provided |
+| `handler.resource.identifier_required` | (none) | Resource identifier is required |
+| `handler.resource.description_too_long` | `max` (int) | The description cannot exceed a maximum length of {{.max}} characters |
+| `handler.resource.identifier_in_use` | (none) | The resource identifier is already in use |
+| `handler.resource.system_level_identifier_fixed` | (none) | The identifier of a system-level resource cannot be changed. |
+| `handler.resource.system_level_delete_not_allowed` | (none) | Trying to delete a system level resource |
+| `handler.permission.duplicate_ids` | (none) | Duplicate permission IDs in request are not allowed |
+| `handler.permission.identifier_required` | (none) | Permission identifier is required |
+| `handler.permission.duplicated` | `identifier` (string) | Permission {{.identifier}} is duplicated. |
+| `handler.permission.built_in_deleted` | `identifier` (string) | Built-in permission '{{.identifier}}' cannot be deleted. |
+| `handler.permission.built_in_renamed` | `identifier` (string) | Built-in permission '{{.identifier}}' cannot be renamed. |
+| `handler.permission.identifier_in_use` | `identifier` (string) | Permission identifier {{.identifier}} is already in use. |
+
 ## Password validator
 
 | Code | Args | English message |

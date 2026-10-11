@@ -18,11 +18,30 @@ import (
 // on the HTTP status code, not on the body, so this helper is the only
 // thing every callsite needs.
 //
-// i18n surface: C — admin/account API. Callers pass already-localized
-// text (when relevant) or a stable English message for non-localized
-// codes. writeValidationError is the localizing wrapper.
+// i18n surface: C — admin/account API. Callers pass a stable English
+// message for a refusal only a malformed request can produce. A refusal a
+// person can reach goes through one of the two localizing wrappers:
+// writeValidationError for a validator's error, writeLocalizedError for a
+// sentence whose code the caller names.
 func writeJSONError(w http.ResponseWriter, message, code string, statusCode int) {
 	apiresponse.WriteError(w, message, code, statusCode)
+}
+
+// writeLocalizedError emits the admin/account API error envelope for a refusal a person reaches
+// through the admin console: error_description is message rendered in the request's language, from
+// ui_locales or Accept-Language, and in English when the request names neither or its language has
+// no entry for the sentence; error_code and the status are the ones the caller names, whatever the
+// language. The console sends the language its page is rendered in, so the refusal it shows is in
+// that language too (#559 decision 3).
+//
+// It is writeValidationError's sibling for a refusal whose code is not its catalog key: the
+// VALIDATION_ERROR sentences and the 409s keep the code a caller may route on and translate only
+// the sentence a person reads (#559 decision 2). The code is written as a literal at each call
+// site, which is what holds it to the survivor table in api_error_code_lint_test.go.
+//
+// i18n surface: C — admin/account API.
+func writeLocalizedError(w http.ResponseWriter, r *http.Request, message *i18n.LocalizedError, code string, statusCode int) {
+	writeJSONError(w, message.Localize(r.Context()), code, statusCode)
 }
 
 // writeJSON is the one JSON writer on this surface: it buffers the encode before the header, so a
@@ -69,7 +88,7 @@ func writeInternalServerErrorWithCode(w http.ResponseWriter, r *http.Request, er
 // #425 (#414 item 1).
 func writeEmailTakenOrInternalServerError(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, data.ErrUniqueViolation) {
-		writeJSONError(w, "This email address is already registered", "EMAIL_ALREADY_EXISTS", http.StatusConflict)
+		writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeEmailAlreadyExists, nil), "EMAIL_ALREADY_EXISTS", http.StatusConflict)
 		return
 	}
 	writeInternalServerError(w, r, err)
@@ -92,11 +111,11 @@ var errListChanged = errors.New("the stored list differs from the list the calle
 // Every other failure is the one 500, with the caller's attributes (#428).
 func writeListSaveFailure(w http.ResponseWriter, r *http.Request, err error, attrs ...any) {
 	if errors.Is(err, errListChanged) {
-		writeJSONError(w, "The list was changed by another save after it was loaded. Nothing was saved: reload it and make the change again.", "CONCURRENT_UPDATE", http.StatusConflict)
+		writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeListSaveChangedSinceLoaded, nil), "CONCURRENT_UPDATE", http.StatusConflict)
 		return
 	}
 	if errors.Is(err, data.ErrUniqueViolation) {
-		writeJSONError(w, "The list was changed by another save at the same moment. Nothing was saved: reload it and make the change again.", "CONCURRENT_UPDATE", http.StatusConflict)
+		writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeListSaveChangedConcurrently, nil), "CONCURRENT_UPDATE", http.StatusConflict)
 		return
 	}
 	writeInternalServerError(w, r, err, attrs...)

@@ -364,7 +364,7 @@ func HandleUserCreatePost(
 			return
 		}
 		if existingUser != nil {
-			writeJSONError(w, "This email address is already registered", "EMAIL_ALREADY_EXISTS", http.StatusConflict)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeEmailAlreadyExists, nil), "EMAIL_ALREADY_EXISTS", http.StatusConflict)
 			return
 		}
 
@@ -673,7 +673,7 @@ func HandleUserEnabledPut(
 		} else {
 			result, transitioned, err = disableWithRevocation()
 			if errors.Is(err, errLastAdministrator) {
-				writeLastAdministrator(w)
+				writeLastAdministrator(w, r)
 				return
 			}
 			if err != nil {
@@ -772,7 +772,7 @@ func HandleUserDelete(
 			return administrators.leavesAnAdministrator(r.Context())
 		})
 		if errors.Is(err, errLastAdministrator) {
-			writeLastAdministrator(w)
+			writeLastAdministrator(w, r)
 			return
 		}
 		if err != nil {
