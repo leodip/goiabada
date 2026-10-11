@@ -9,7 +9,7 @@ const adminPages = ["/admin/clients", "/admin/users", "/admin/settings/general",
 
 test("a user without authserver:manage reaches their account, and is refused every admin page", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page } = await signInToConsole(browser, user, `access-${user.id}`);
+  const { context, page } = await signInToConsole(browser, user);
   await expect(page).toHaveURL(`${env.adminUrl}/account/profile`);
   await expect(page.locator('input[name="givenName"]')).toHaveValue("Playwright");
   // The admin link in the menu is not offered.
@@ -34,7 +34,7 @@ test("a user granted authserver:manage reaches the admin pages", async ({ page, 
   await page.locator("#btnSave").click();
   await expect(page.getByText("Permissions saved successfully")).toBeVisible();
 
-  const session = await signInToConsole(browser, user, `access-admin-${user.id}`, "/admin/clients");
+  const session = await signInToConsole(browser, user, "/admin/clients");
   await expect(session.page).toHaveURL(`${env.adminUrl}/admin/clients`);
   await expect(session.page.getByRole("cell", { name: "admin-console-client", exact: true })).toBeVisible();
   await session.context.close();
@@ -42,7 +42,7 @@ test("a user granted authserver:manage reaches the admin pages", async ({ page, 
 
 test("signing out ends the session: the next page asks for the password again", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page } = await signInToConsole(browser, user, `signout-${user.id}`);
+  const { context, page } = await signInToConsole(browser, user);
   await page.goto(`${env.adminUrl}/auth/logout`);
   // The auth server ends the session and returns; whatever page it lands on, the console is signed out.
   await page.waitForLoadState("networkidle");

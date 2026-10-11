@@ -1,5 +1,5 @@
 // Calls to the auth server's token endpoint, as a client application makes them.
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, type APIRequestContext } from "@playwright/test";
 import { env } from "./environment";
 
 export interface TokenAnswer {
@@ -27,12 +27,6 @@ export async function clientCredentialsToken(
 
 // The resource owner password credentials grant, authenticating the client with client_secret_basic:
 // the shortest way for a test to get a user's tokens without driving a browser sign-in.
-//
-// The grant is limited to 30 requests a minute per client address (the ropc_ip tier), successes
-// included, and the suite running four workers from one address can pass that. A 429 here is the
-// limiter doing its job, not the test's subject, so the call waits and tries again, every few
-// seconds as the sliding window frees room, extending the test's timeout by what it waits and
-// noting it in the report.
 export async function passwordToken(
   request: APIRequestContext,
   clientId: string,
@@ -42,19 +36,11 @@ export async function passwordToken(
   scope: string,
 ): Promise<TokenAnswer> {
   const basic = Buffer.from(`${encodeURIComponent(clientId)}:${encodeURIComponent(clientSecret)}`).toString("base64");
-  const post = () =>
-    request.post(`${env.authUrl}/auth/token`, {
-      form: { grant_type: "password", username, password, scope },
-      headers: { Authorization: `Basic ${basic}` },
-      failOnStatusCode: false,
-    });
-  let response = await post();
-  for (let waited = 0; response.status() === 429 && waited < 90_000; waited += 3_000) {
-    if (waited === 0) test.info().annotations.push({ type: "rate-limited", description: "password grant answered 429; waited" });
-    test.info().setTimeout(test.info().timeout + 3_000);
-    await new Promise((resolve) => setTimeout(resolve, 3_000));
-    response = await post();
-  }
+  const response = await request.post(`${env.authUrl}/auth/token`, {
+    form: { grant_type: "password", username, password, scope },
+    headers: { Authorization: `Basic ${basic}` },
+    failOnStatusCode: false,
+  });
   return { status: response.status(), body: await response.json() };
 }
 

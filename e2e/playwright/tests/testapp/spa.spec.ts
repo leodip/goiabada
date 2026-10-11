@@ -9,7 +9,7 @@ import { expectResult, resultBody, testapp, userBrowser } from "../../lib/testap
 test("the SPA signs a user in, refreshes, calls /userinfo and the API, and signs out, all from the browser", async ({ page, browser, users }) => {
   const user = await users.create();
   await grantUserPermission(page, user.id, testapp.api.resource, "read");
-  const { context, page: spa } = await userBrowser(browser, `testapp-spa-${user.id}`);
+  const { context, page: spa } = await userBrowser(browser);
 
   await spa.goto(testapp.spa.url);
   await spa.getByRole("button", { name: "Sign in" }).click();

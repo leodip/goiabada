@@ -3,7 +3,6 @@
 // pages in a browser as its user would, and read what it shows.
 import { expect, type Browser, type Page } from "@playwright/test";
 import { submitPassword } from "./browser-sign-in";
-import { userAgentFor } from "./devices";
 import { env } from "./environment";
 
 export const testapp = {
@@ -20,8 +19,8 @@ export type WebApp = typeof testapp.web;
 
 // A browser of the user's own, with nothing in it: inside a test, browser.newContext() starts from the
 // test's options, which carry the administrator's signed-in state. The caller closes it.
-export async function userBrowser(browser: Browser, device: string) {
-  const context = await browser.newContext({ userAgent: userAgentFor(device), storageState: { cookies: [], origins: [] } });
+export async function userBrowser(browser: Browser) {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   return { context, page: await context.newPage() };
 }
 

@@ -6,7 +6,7 @@ import { expectResult, resultBody, signInToWebApp, testapp, userBrowser } from "
 
 test("signing out with the ID token returns to the app with its state, and the next sign-in asks for the password", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-signout-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user);
   await expectResult(app, "Signed in");
 
@@ -24,7 +24,7 @@ test("signing out with the ID token returns to the app with its state, and the n
 
 test("signing out with no ID token asks first, then ends the session", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-signout-nohint-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user);
   await expectResult(app, "Signed in");
 
@@ -42,7 +42,7 @@ test("signing out with no ID token asks first, then ends the session", async ({ 
 
 test("forgetting only the app's session leaves the auth server's: signing in again asks for nothing", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-forget-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user);
   await expectResult(app, "Signed in");
 
@@ -59,7 +59,7 @@ test("forgetting only the app's session leaves the auth server's: signing in aga
 // client_id it is registered on. Without one the sign-out still happens.
 test("signing out with no ID token and no client_id signs out, but leaves the user on the auth server's page", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-signout-noclient-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user);
   await expectResult(app, "Signed in");
 

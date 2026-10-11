@@ -15,6 +15,11 @@ The deployment is the docs' [Reverse proxy](https://goiabada.dev/deploy/reverse-
 user would follow it: the release's own setup wizard writes the Compose files (production, PostgreSQL),
 nginx on the VPS terminates TLS with a Let's Encrypt certificate, and the DNS records are DNS only.
 
+The suite and its scripts follow the code on `main`, not the releases before it, so they need a
+release after v1.7.0: they no longer work around how v1.7.0 signed people in from one address (#564)
+or started its first PostgreSQL (#551). Against v1.7.0 the suite fails, and the environment may fail
+to start.
+
 ## Run it
 
 From the repository root, on a machine with an SSH key the VPS accepts:
@@ -44,7 +49,7 @@ They wrap the scripts in `infra/`, which can also be run on their own: `prepare.
    the stack, waits for both servers, and writes `/etc/nginx/conf.d/goiabada-e2e.conf` from
    `nginx.conf.template`. The certificate is requested only when it is missing or does not cover the
    four hosts.
-4. Writes `e2e/.state/environment.env` (URLs, tag, admin email).
+4. Writes `e2e/.state/environment.env` (URLs, tag, admin email, whether the rate limiter is on).
 5. Sets up the test app with `testapp.sh` (see [Test app](#test-app)).
 6. Runs `verify.sh`.
 
@@ -73,21 +78,21 @@ reset:
   a run that crashed.
 - **It changes nothing global**: no settings, and the system client and the system resource
   (`authserver`) are only read; a test reaching their save answers No to the confirmation. The
-  exceptions are the tests whose subject is global, the settings pages, the signing keys, and the
-  guards around the system resource. They are named `*.system.ts` and run in the `system` project,
-  which `playwright.config.ts` runs after every other test, on one worker. Each puts back what it
-  changes (`lib/settings.ts`), and the setup step restores the seeded settings before a run if one
-  failed to.
+  exceptions are the tests whose subject is global, the settings pages, the signing keys, the
+  guards around the system resource, and the limit on wrong passwords from one address, which every
+  test signs in from. They are named `*.system.ts` and run in the `system` project, which
+  `playwright.config.ts` runs after every other test, on one worker. Each puts back what it changes
+  (`lib/settings.ts`), the address test waiting until the address may sign in again, and the setup
+  step restores the seeded settings before a run if one failed to.
 - **It never depends on what another test did**, or on counts or order.
 - **Users other than the administrator sign in through the browser** where the subject needs it
   (`lib/console-user.ts`, `lib/browser-sign-in.ts`), always from an empty browser state: inside a test,
   `browser.newContext()` starts from the test's options, which carry the administrator's session.
-- **The rate limits stay on.** The password form and the password grant each allow 30 requests a
-  minute per address, and the suite can pass that; the helpers wait and retry, and mark the test in
-  the report, rather than the environment turning the limits off.
-- **Each worker signs the administrator in for itself, with a user agent of its own** (`lib/devices.ts`).
-  Goiabada treats a sign-in from the same user agent and address as the same device and ends that
-  user's earlier session there, so workers sharing one would sign each other out.
+- **Each worker signs the administrator in for itself**, in a browser of its own (`lib/fixtures.ts`).
+  Every browser context is a device of its own through its own cookies, so no sign-in ends another
+  worker's session. A run signs the administrator in about ten times, under the seeded cap of 20
+  sessions per user, and the sessions the cap ends are the least recently used, those earlier runs
+  left.
 
 ## The VPS
 

@@ -41,16 +41,16 @@ test("the client's own password grant switch wins over the global one, both ways
 test("the client's own implicit switch turns the implicit flow on for it alone", async ({ page, browser, clients, users }) => {
   const user = await users.create();
   const { client } = await browserSignInClient(page, clients);
-  const implicit = (device: string) =>
-    authorizeAndLand(browser, { client_id: client.identifier, response_type: "token", scope: "openid", state: "s" }, user, device);
+  const implicit = () =>
+    authorizeAndLand(browser, { client_id: client.identifier, response_type: "token", scope: "openid", state: "s" }, user);
 
   await setFlow(page, client.id, "implicitGrantEnabled", "on");
-  const params = redirectParams(await implicit(`client-implicit-on-${user.id}`));
+  const params = redirectParams(await implicit());
   expect(params.get("access_token"), params.toString()).toBeTruthy();
   expect(params.get("state")).toBe("s");
 
   await setFlow(page, client.id, "implicitGrantEnabled", "off");
-  expect(redirectParams(await implicit(`client-implicit-off-${user.id}`)).get("error")).toBe("unauthorized_client");
+  expect(redirectParams(await implicit()).get("error")).toBe("unauthorized_client");
 });
 
 test("the client's own PKCE switch lets it leave PKCE out while the global setting requires it", async ({
@@ -64,7 +64,7 @@ test("the client's own PKCE switch lets it leave PKCE out while the global setti
   const { client, secret } = await browserSignInClient(page, clients);
   await setFlow(page, client.id, "pkceRequired", "off");
   const params = redirectParams(
-    await authorizeAndLand(browser, { client_id: client.identifier, response_type: "code", scope: "openid", state: "s" }, user, `client-pkce-${user.id}`),
+    await authorizeAndLand(browser, { client_id: client.identifier, response_type: "code", scope: "openid", state: "s" }, user),
   );
   const code = params.get("code");
   expect(code, params.toString()).toBeTruthy();
@@ -81,8 +81,8 @@ test("the client's own PKCE switch lets it leave PKCE out while the global setti
 test("the consent screen shows the client's name, description and website only where told to", async ({ page, browser, clients, users }) => {
   const user = await users.create();
   const { client } = await browserSignInClient(page, clients, { consentRequired: true });
-  const consentPage = async (device: string) => {
-    const attempt = await openSignIn(browser, { clientId: client.identifier, scope: "openid", device });
+  const consentPage = async () => {
+    const attempt = await openSignIn(browser, { clientId: client.identifier, scope: "openid" });
     await submitPassword(attempt.page, user.email, user.password);
     await expect(attempt.page).toHaveURL(/\/auth\/consent/);
     return attempt;
@@ -94,7 +94,7 @@ test("the consent screen shows the client's name, description and website only w
     await page.locator('input[name="websiteUrl"]').fill("https://reports.example.com");
     for (const name of ["showDisplayName", "showDescription", "showWebsiteUrl"]) await page.locator(`input[name="${name}"]`).check();
   });
-  let attempt = await consentPage(`consent-shown-${user.id}`);
+  let attempt = await consentPage();
   await expect(attempt.page.getByText("Acme Reports")).toBeVisible();
   await expect(attempt.page.getByText("Monthly sales reports")).toBeVisible();
   await expect(attempt.page.getByRole("link", { name: "https://reports.example.com" })).toBeVisible();
@@ -103,7 +103,7 @@ test("the consent screen shows the client's name, description and website only w
   await saveClientSettings(page, client.id, async () => {
     for (const name of ["showDisplayName", "showDescription", "showWebsiteUrl"]) await page.locator(`input[name="${name}"]`).uncheck();
   });
-  attempt = await consentPage(`consent-hidden-${user.id}`);
+  attempt = await consentPage();
   await expect(attempt.page.getByText("Acme Reports")).toHaveCount(0);
   await expect(attempt.page.getByText("Monthly sales reports")).toHaveCount(0);
   await expect(attempt.page.getByRole("link", { name: "https://reports.example.com" })).toHaveCount(0);

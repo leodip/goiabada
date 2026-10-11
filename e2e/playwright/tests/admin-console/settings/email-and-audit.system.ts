@@ -40,7 +40,7 @@ test("with SMTP off, the features that mail are withdrawn", async ({ page, brows
     await page.goto(`${env.adminUrl}/admin/users/new`);
     await expect(page.locator("#setPasswordTypeEmail")).toHaveCount(0);
     // A user's email verification page is not offered.
-    const own = await signInToConsole(browser, user, `smtp-off-${user.id}`);
+    const own = await signInToConsole(browser, user);
     await expect(own.page.locator('a[href="/account/email-verification"]')).toHaveCount(0);
     expect((await own.page.goto(`${env.adminUrl}/account/email-verification`))?.status()).toBe(404);
     await own.context.close();

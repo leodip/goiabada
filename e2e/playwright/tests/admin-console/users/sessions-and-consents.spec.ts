@@ -39,7 +39,6 @@ test("a browser sign-in is listed as a session, signs the user in again, and end
     email: user.email,
     password: user.password,
     scope: "openid email",
-    device: `sessions-${user.id}`,
   });
 
   // The code is good for tokens naming the user.
@@ -71,7 +70,6 @@ test("a session ends from the client's User sessions tab", async ({ page, browse
     email: user.email,
     password: user.password,
     scope: "openid",
-    device: `client-sessions-${user.id}`,
   });
 
   await page.goto(clientUrl(client.id, "user-sessions"));
@@ -102,7 +100,7 @@ test("consent given on the consent screen is listed, remembered, and revoked", a
   await expect(page.getByText("No consents have been granted by this user yet.")).toBeVisible();
 
   // First sign-in: the consent screen asks.
-  let attempt = await openSignIn(browser, { ...options, device: `consent-1-${user.id}` });
+  let attempt = await openSignIn(browser, options);
   await submitPassword(attempt.page, user.email, user.password);
   await expect(attempt.page).toHaveURL(/\/auth\/consent/);
   await attempt.page.getByRole("button", { name: "Give consent" }).click();
@@ -114,7 +112,7 @@ test("consent given on the consent screen is listed, remembered, and revoked", a
   await expect(row).toContainText(client.identifier);
 
   // Another browser, same scope: no consent screen, the stored consent covers it.
-  attempt = await openSignIn(browser, { ...options, device: `consent-2-${user.id}` });
+  attempt = await openSignIn(browser, options);
   await submitPassword(attempt.page, user.email, user.password);
   await attempt.page.waitForURL((url) => url.href.startsWith(testRedirectUri));
   await attempt.context.close();
@@ -128,7 +126,7 @@ test("consent given on the consent screen is listed, remembered, and revoked", a
   await expect(page.getByText("No consents have been granted by this user yet.")).toBeVisible();
 
   // Revoked: the consent screen asks again.
-  attempt = await openSignIn(browser, { ...options, device: `consent-3-${user.id}` });
+  attempt = await openSignIn(browser, options);
   await submitPassword(attempt.page, user.email, user.password);
   await expect(attempt.page).toHaveURL(/\/auth\/consent/);
   await attempt.context.close();

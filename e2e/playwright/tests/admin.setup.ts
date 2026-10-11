@@ -1,6 +1,5 @@
 // Runs before every other test: sweeps what earlier runs that stopped half way may have left behind.
 import { test as setup, type Page } from "@playwright/test";
-import { userAgentFor } from "../lib/devices";
 import {
   deleteClient,
   deleteGroup,
@@ -12,8 +11,6 @@ import {
 import { env } from "../lib/environment";
 import { restoreBaselineSettings } from "../lib/settings";
 import { testPrefix } from "../lib/unique";
-
-setup.use({ userAgent: userAgentFor("setup") });
 
 // The cells of a list page that hold a name the tests made.
 async function leftoversOn(page: Page, listUrl: string): Promise<string[]> {
