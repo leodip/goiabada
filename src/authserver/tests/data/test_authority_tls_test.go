@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"net/url"
-	"os"
 	"testing"
 	"time"
 
@@ -42,14 +41,7 @@ func TestDatabaseServer_ServesTheTestAuthority(t *testing.T) {
 		t.Skip("sqlite has no server and no transport to protect")
 	}
 
-	caFile := os.Getenv(testAuthorityCAFileVariable)
-	require.NotEmpty(t, caFile, "%s must name the test authority's certificate; run the data tier "+
-		"through run-tests.sh, on a stack whose databases serve it", testAuthorityCAFileVariable)
-	pemBytes, err := os.ReadFile(caFile)
-	require.NoError(t, err, "the test authority's certificate must be readable at %s=%s",
-		testAuthorityCAFileVariable, caFile)
-	testAuthority := x509.NewCertPool()
-	require.True(t, testAuthority.AppendCertsFromPEM(pemBytes), "%s must hold a PEM certificate", caFile)
+	testAuthority := requireTestAuthority(t)
 
 	t.Run("checked against the test authority, it connects over TLS", func(t *testing.T) {
 		db, encryptedQuery := openVerified(t, testAuthority)

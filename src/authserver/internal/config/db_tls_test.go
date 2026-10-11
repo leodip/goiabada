@@ -323,3 +323,97 @@ func TestRegisterDatabaseFlags_TheTLSHelpNamesEveryMode(t *testing.T) {
 		assert.Contains(t, f.Usage, mode)
 	}
 }
+
+// libpqTLSRefusals are the line each of libpq's TLS variables stops a PostgreSQL start with: the
+// variable, never its value, which for PGSSLPASSWORD is a secret, and what replaces it (#502
+// decision 5).
+var libpqTLSRefusals = map[string]string{
+	"PGSSLMODE":     "PGSSLMODE is set, which the auth server no longer reads: unset it and set GOIABADA_DB_TLS_MODE (--db-tls-mode) instead",
+	"PGSSLROOTCERT": "PGSSLROOTCERT is set, which the auth server no longer reads: unset it and set GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) instead",
+	"PGSSLCERT": "PGSSLCERT is set, which the auth server no longer reads: unset it; the auth server presents no client certificate, " +
+		"and GOIABADA_DB_TLS_MODE (--db-tls-mode) and GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) decide the connection's TLS",
+	"PGSSLKEY": "PGSSLKEY is set, which the auth server no longer reads: unset it; the auth server presents no client certificate, " +
+		"and GOIABADA_DB_TLS_MODE (--db-tls-mode) and GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) decide the connection's TLS",
+	"PGSSLPASSWORD": "PGSSLPASSWORD is set, which the auth server no longer reads: unset it; the auth server presents no client certificate, " +
+		"and GOIABADA_DB_TLS_MODE (--db-tls-mode) and GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) decide the connection's TLS",
+	"PGSSLSNI": "PGSSLSNI is set, which the auth server no longer reads: unset it; " +
+		"GOIABADA_DB_TLS_MODE (--db-tls-mode) and GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) decide the connection's TLS",
+	"PGSSLNEGOTIATION": "PGSSLNEGOTIATION is set, which the auth server no longer reads: unset it; " +
+		"GOIABADA_DB_TLS_MODE (--db-tls-mode) and GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) decide the connection's TLS",
+}
+
+// TestLoad_RefusesLibpqsTLSVariablesOnPostgres: on PostgreSQL, any of the seven PGSSL* variables
+// set and non-empty stops the start with one line naming it and its replacement, whatever its value,
+// because Goiabada's two settings are the whole of the connection's TLS and an operator who followed
+// the old PGSSLMODE advice must not drop to prefer in silence (#502 decision 5).
+func TestLoad_RefusesLibpqsTLSVariablesOnPostgres(t *testing.T) {
+	for name, refusal := range libpqTLSRefusals {
+		t.Run(name, func(t *testing.T) {
+			const value = "verify-full-s3cr3t"
+			_, c, err := loadMatrixRefusing(t, map[string]string{"GOIABADA_DB_TYPE": "postgres", name: value}, nil)
+
+			require.Error(t, err)
+			assert.Equal(t, "malformed configuration: "+refusal, err.Error())
+			assert.NotContains(t, err.Error(), value, "the value is never written, PGSSLPASSWORD's being a secret")
+			assert.Nil(t, c, "a refusal answers no configuration")
+		})
+	}
+
+	t.Run("every one set is named, in the order decision 5 lists them", func(t *testing.T) {
+		_, _, err := loadMatrixRefusing(t, map[string]string{
+			"GOIABADA_DB_TYPE": "postgres", "PGSSLNEGOTIATION": "direct", "PGSSLMODE": "require",
+		}, nil)
+		require.Error(t, err)
+		assert.Equal(t, "malformed configuration: "+libpqTLSRefusals["PGSSLMODE"]+"; "+libpqTLSRefusals["PGSSLNEGOTIATION"], err.Error())
+	})
+
+	t.Run("postgres chosen by the flag", func(t *testing.T) {
+		_, _, err := loadMatrixRefusing(t, map[string]string{"GOIABADA_DB_TYPE": "mysql", "PGSSLROOTCERT": "/ca.pem"},
+			[]string{"-db-type=postgres"})
+		require.Error(t, err)
+		assert.Equal(t, "malformed configuration: "+libpqTLSRefusals["PGSSLROOTCERT"], err.Error())
+	})
+}
+
+// TestLoad_LeavesLibpqsVariablesAloneOtherwise: the variables mean nothing to another engine, an
+// empty one is unset, and libpq's other variables, PGSERVICE among them, are untouched.
+func TestLoad_LeavesLibpqsVariablesAloneOtherwise(t *testing.T) {
+	for _, engine := range []string{"mysql", "mssql", "sqlite"} {
+		t.Run(engine, func(t *testing.T) {
+			env := map[string]string{"GOIABADA_DB_TYPE": engine}
+			for name := range libpqTLSRefusals {
+				env[name] = "verify-full"
+			}
+			loadMatrix(t, env, nil)
+		})
+	}
+	t.Run("postgres with each one empty", func(t *testing.T) {
+		env := map[string]string{"GOIABADA_DB_TYPE": "postgres"}
+		for name := range libpqTLSRefusals {
+			env[name] = ""
+		}
+		loadMatrix(t, env, nil)
+	})
+	t.Run("postgres with libpq's other variables", func(t *testing.T) {
+		loadMatrix(t, map[string]string{"GOIABADA_DB_TYPE": "postgres", "PGSERVICE": "goiabada", "PGHOST": "db", "PGAPPNAME": "x"}, nil)
+	})
+}
+
+// TestCheckDatabaseFlags_RefusesLibpqsTLSVariablesUnderMigrate: a type changed to postgres after
+// `migrate` is held to the refusal too, since migrate opens the same connection.
+func TestCheckDatabaseFlags_RefusesLibpqsTLSVariablesUnderMigrate(t *testing.T) {
+	for name := range libpqTLSRefusals {
+		t.Setenv(name, "")
+	}
+	t.Setenv("PGSSLMODE", "verify-full")
+
+	local := DatabaseConfig{Type: "mysql", MaxOpenConns: 20}
+	fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	RegisterDatabaseFlags(fs, &local)
+	require.NoError(t, fs.Parse([]string{"-db-type=postgres"}))
+
+	err := CheckDatabaseFlags(fs, &local)
+	require.Error(t, err)
+	assert.Equal(t, "malformed configuration: "+libpqTLSRefusals["PGSSLMODE"], err.Error())
+}
