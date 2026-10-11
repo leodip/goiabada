@@ -560,7 +560,7 @@ func TestJSONRefusals_AreInThePagesLanguage(t *testing.T) {
 				testCase.write(httpHelper, httptest.NewRecorder(), req)
 
 				var detail *oauth.ErrorDetail
-				require.True(t, errors.As(*captured, &detail), "expected an *oauth.ErrorDetail, got %T", *captured)
+				require.ErrorAs(t, *captured, &detail, "expected an *oauth.ErrorDetail, got %T", *captured)
 				assert.Equal(t, testCase.status, detail.HTTPStatus())
 				assert.Equal(t, testCase.code, detail.Code())
 				assert.Equal(t, language.want, detail.Description())
@@ -631,7 +631,7 @@ func TestHandleAPIErrorJSON_AnswersA429WithTheConsolesSentence(t *testing.T) {
 			// The status is what keeps JSONError silent and the dialog's title "Error" rather than
 			// "Server error": a detail with no status is answered 500, with a stack in the log.
 			var detail *oauth.ErrorDetail
-			require.True(t, errors.As(*captured, &detail), "expected an *oauth.ErrorDetail, got %T", *captured)
+			require.ErrorAs(t, *captured, &detail, "expected an *oauth.ErrorDetail, got %T", *captured)
 			assert.Equal(t, http.StatusTooManyRequests, detail.HTTPStatus())
 			assert.Equal(t, "too_many_requests", detail.Code())
 			assert.Equal(t, language.want, detail.Description())
