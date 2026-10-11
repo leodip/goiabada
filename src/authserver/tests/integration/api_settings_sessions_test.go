@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,6 +36,7 @@ func TestAPISettingsSessionsGet_Success(t *testing.T) {
 
 	assert.Equal(t, settings.UserSessionIdleTimeoutInSeconds, body.UserSessionIdleTimeoutInSeconds)
 	assert.Equal(t, settings.UserSessionMaxLifetimeInSeconds, body.UserSessionMaxLifetimeInSeconds)
+	assert.Equal(t, settings.MaxUserSessionsPerUser, body.MaxUserSessionsPerUser)
 }
 
 // PUT /api/v1/admin/settings/sessions - success
@@ -44,6 +47,7 @@ func TestAPISettingsSessionsPut_Success(t *testing.T) {
 	req := api.UpdateSettingsSessionsRequest{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 7200,
+		MaxUserSessionsPerUser:          sessionCapOf(7),
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/sessions"
@@ -59,12 +63,14 @@ func TestAPISettingsSessionsPut_Success(t *testing.T) {
 
 	assert.Equal(t, req.UserSessionIdleTimeoutInSeconds, body.UserSessionIdleTimeoutInSeconds)
 	assert.Equal(t, req.UserSessionMaxLifetimeInSeconds, body.UserSessionMaxLifetimeInSeconds)
+	assert.Equal(t, 7, body.MaxUserSessionsPerUser)
 
 	// Verify DB persisted
 	settings, err2 := database.GetSettingsById(context.Background(), nil, 1)
 	require.NoError(t, err2)
 	assert.Equal(t, req.UserSessionIdleTimeoutInSeconds, settings.UserSessionIdleTimeoutInSeconds)
 	assert.Equal(t, req.UserSessionMaxLifetimeInSeconds, settings.UserSessionMaxLifetimeInSeconds)
+	assert.Equal(t, 7, settings.MaxUserSessionsPerUser)
 }
 
 // PUT /api/v1/admin/settings/sessions - validation errors
@@ -77,6 +83,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsSessionsRequest{
 		UserSessionIdleTimeoutInSeconds: 0,
 		UserSessionMaxLifetimeInSeconds: 10,
+		MaxUserSessionsPerUser:          sessionCapOf(20),
 	})
 	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
@@ -88,6 +95,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsSessionsRequest{
 		UserSessionIdleTimeoutInSeconds: 10,
 		UserSessionMaxLifetimeInSeconds: 0,
+		MaxUserSessionsPerUser:          sessionCapOf(20),
 	})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
@@ -99,6 +107,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsSessionsRequest{
 		UserSessionIdleTimeoutInSeconds: 11,
 		UserSessionMaxLifetimeInSeconds: 10,
+		MaxUserSessionsPerUser:          sessionCapOf(20),
 	})
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
@@ -110,6 +119,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 	resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsSessionsRequest{
 		UserSessionIdleTimeoutInSeconds: 160000001,
 		UserSessionMaxLifetimeInSeconds: 160000001,
+		MaxUserSessionsPerUser:          sessionCapOf(20),
 	})
 	defer func() { _ = resp4.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
@@ -121,6 +131,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 	resp5 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsSessionsRequest{
 		UserSessionIdleTimeoutInSeconds: 10,
 		UserSessionMaxLifetimeInSeconds: 160000001,
+		MaxUserSessionsPerUser:          sessionCapOf(20),
 	})
 	defer func() { _ = resp5.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp5.StatusCode)
@@ -190,3 +201,100 @@ func TestAPISettingsSessions_UnauthorizedAndScope(t *testing.T) {
 }
 
 //
+
+// sessionCapOf is a cap as the request type holds it: a pointer, so an absent one is told from 0.
+func sessionCapOf(maxSessions int) *int {
+	return &maxSessions
+}
+
+// PUT /api/v1/admin/settings/sessions requires maxUserSessionsPerUser, and refuses one outside 0 to
+// 1000, saving nothing (#564 decision 6). The body is raw JSON here, so an absent field is absent.
+func TestAPISettingsSessionsPut_TheCapIsRequiredAndBounded(t *testing.T) {
+	before := restoreSettings(t)
+	accessToken, _ := createAdminClientWithToken(t)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/sessions"
+
+	for _, tc := range []struct {
+		name    string
+		body    string
+		message string
+	}{
+		{"absent", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200}`,
+			"User session - max sessions per user is required."},
+		{"null", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":null}`,
+			"User session - max sessions per user is required."},
+		{"below 0", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":-1}`,
+			"User session - max sessions per user must be between 0 and 1000."},
+		{"above 1000", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":1001}`,
+			"User session - max sessions per user must be between 0 and 1000."},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodPut, url, strings.NewReader(tc.body))
+			require.NoError(t, err)
+			req.Header.Set("Authorization", "Bearer "+accessToken)
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := createHttpClient(t).Do(req)
+			require.NoError(t, err)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			var refusal api.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&refusal))
+			assert.Equal(t, "VALIDATION_ERROR", refusal.ErrorCode)
+			assert.Equal(t, tc.message, refusal.ErrorDescription)
+
+			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			require.NoError(t, err)
+			assert.Equal(t, before.UserSessionIdleTimeoutInSeconds, after.UserSessionIdleTimeoutInSeconds, "nothing is saved")
+			assert.Equal(t, before.MaxUserSessionsPerUser, after.MaxUserSessionsPerUser, "nothing is saved")
+		})
+	}
+
+	t.Run("0, no limit, is saved as 0", func(t *testing.T) {
+		resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsSessionsRequest{
+			UserSessionIdleTimeoutInSeconds: 3600,
+			UserSessionMaxLifetimeInSeconds: 7200,
+			MaxUserSessionsPerUser:          sessionCapOf(0),
+		})
+		defer func() { _ = resp.Body.Close() }()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		after, err := database.GetSettingsById(context.Background(), nil, 1)
+		require.NoError(t, err)
+		assert.Equal(t, 0, after.MaxUserSessionsPerUser)
+	})
+}
+
+// updated_sessions_settings records who saved and the three values before and after the save, under
+// old and new (#564 decision 10).
+func TestAPISettingsSessionsPut_TheEventRecordsEachValueBeforeAndAfter(t *testing.T) {
+	changeSettings(t, func(settings *record.Settings) {
+		settings.AuditLogsInDatabaseEnabled = true
+		settings.UserSessionIdleTimeoutInSeconds = 7200
+		settings.UserSessionMaxLifetimeInSeconds = 86400
+		settings.MaxUserSessionsPerUser = 20
+	})
+	accessToken, adminClient := createAdminClientWithToken(t)
+
+	resp, requestId := sendAdmin(t, accessToken, http.MethodPut, "/api/v1/admin/settings/sessions", api.UpdateSettingsSessionsRequest{
+		UserSessionIdleTimeoutInSeconds: 3600,
+		UserSessionMaxLifetimeInSeconds: 43200,
+		MaxUserSessionsPerUser:          sessionCapOf(5),
+	})
+	body, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode, string(body))
+
+	assert.Equal(t, []map[string]any{{
+		"logged_in_user": adminClient.ClientIdentifier,
+		"old": map[string]any{
+			"user_session_idle_timeout_in_seconds": float64(7200),
+			"user_session_max_lifetime_in_seconds": float64(86400),
+			"max_user_sessions_per_user":           float64(20),
+		},
+		"new": map[string]any{
+			"user_session_idle_timeout_in_seconds": float64(3600),
+			"user_session_max_lifetime_in_seconds": float64(43200),
+			"max_user_sessions_per_user":           float64(5),
+		},
+	}}, auditRows(t, accessToken, "updated_sessions_settings", requestId))
+}

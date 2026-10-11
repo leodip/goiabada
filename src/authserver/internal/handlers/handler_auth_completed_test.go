@@ -291,7 +291,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AuthTime: newAuthTime,
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1),
-			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "", (*record.UserSession)(nil)).
+			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "", (*record.UserSession)(nil), testSessionLimits).
 			Run(func(mock.Arguments) { sequence = append(sequence, "session-created") }).
 			Return(newSession, nil, nil)
 
@@ -451,7 +451,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AuthTime: newAuthTime,
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1),
-			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "", (*record.UserSession)(nil)).Return(newSession, nil, nil)
+			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "", (*record.UserSession)(nil), testSessionLimits).Return(newSession, nil, nil)
 
 		user := &record.User{Id: 2, Enabled: true, AuthStateGeneration: 3}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(2)).Return(user, nil)
@@ -564,7 +564,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AuthTime: newAuthTime,
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1),
-			signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "203.0.113.7", ownSession).
+			signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "203.0.113.7", ownSession, testSessionLimits).
 			Return(newSession, []usersession.Removal{{Session: *ownSession, Reason: "replaced_by_sign_in"}}, nil)
 
 		user := &record.User{Id: 1, Enabled: true, AuthStateGeneration: 3}
@@ -678,7 +678,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 			startError := errors.New("unable to rotate the browser session identifier")
 			userSessionManager.On("StartNewUserSession", rr, req, int64(1),
-				signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "203.0.113.7", ownSession).
+				signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "203.0.113.7", ownSession, testSessionLimits).
 				Return(nil, tc.removed, startError)
 
 			pageRenderer.On("InternalServerError", rr, req, startError).Run(func(mock.Arguments) { answered = true }).Return().Once()
@@ -798,7 +798,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// the assertion passes however often the method ran. It was seven here, one short of
 		// the eight parameters the method had, so it asserted nothing until #252.
 		userSessionManager.AssertNotCalled(t, "StartNewUserSession", mock.Anything, mock.Anything, mock.Anything,
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		userSessionManager.AssertNotCalled(t, "BindUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 
@@ -898,7 +898,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		startError := errors.New("the replacement session could not be created")
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1),
-			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "", (*record.UserSession)(nil)).Return(nil, nil, startError)
+			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "", (*record.UserSession)(nil), testSessionLimits).Return(nil, nil, startError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == startError.Error()
@@ -1294,7 +1294,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AcrLevel: record.AcrLevel1,
 			AuthTime: sessionAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), "", (*record.UserSession)(nil)).Return(newUserSession, nil, nil)
+		userSessionManager.On("StartNewUserSession", rr, req, int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
@@ -1691,7 +1691,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				UserId: 1, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Optional,
 				AuthTime: &pwdAuthTime, PasswordAuthTime: &pwdAuthTime,
 				OTPClaim: otpcredential.OTPClaim{Claimed: true, Generation: &captured},
-			}, int64(7), &captured, "", (*record.UserSession)(nil)).Return(newUserSession, nil, nil)
+			}, int64(7), &captured, "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
@@ -2601,7 +2601,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AcrLevel: record.AcrLevel1,
 			AuthTime: sessionAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), "", (*record.UserSession)(nil)).Return(newUserSession, nil, nil)
+		userSessionManager.On("StartNewUserSession", rr, req, int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
@@ -2694,7 +2694,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			AcrLevel: record.AcrLevel1,
 			AuthTime: sessionAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), "", (*record.UserSession)(nil)).Return(newUserSession, nil, nil)
+		userSessionManager.On("StartNewUserSession", rr, req, int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
@@ -3212,7 +3212,7 @@ func TestHandleAuthCompletedGet_AnAuthenticatorRemovedAtTheWriteRestarts(t *test
 			})
 			if create {
 				userSessionManager.On("StartNewUserSession", rr, req, int64(1), claimed, int64(0), &generation, "",
-					(*record.UserSession)(nil)).Return(nil, nil, removed).Once()
+					(*record.UserSession)(nil), testSessionLimits).Return(nil, nil, removed).Once()
 			} else {
 				userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1), claimed, false, "").
 					Return(nil, removed).Once()

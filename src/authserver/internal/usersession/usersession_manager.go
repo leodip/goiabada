@@ -1,6 +1,7 @@
 package usersession
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"net/http"
@@ -106,6 +107,15 @@ type Authentication struct {
 	OTPClaim otpcredential.OTPClaim
 }
 
+// SessionLimits is what the settings bound a user's sessions to when a sign-in starts a new one. The
+// two lifetimes say which of the user's other sessions have expired, and MaxSessionsPerUser is how
+// many sessions the user may hold once the new one is created, 0 for no limit (#564 decision 5).
+type SessionLimits struct {
+	IdleTimeoutInSeconds int
+	MaxLifetimeInSeconds int
+	MaxSessionsPerUser   int
+}
+
 // Removal is a session StartNewUserSession deleted, and why. Reason is the reason the caller's
 // deleted_user_session event carries for it, one of audit's DeletedUserSessionReason values.
 type Removal struct {
@@ -157,6 +167,12 @@ type Removal struct {
 // replaces a session and revokes nothing (#133, #243). A session of another user is not this
 // function's to end: the cross-user handover terminates it with revocation first and passes nil.
 //
+// limits is the settings' bounds on the user's sessions. When the user would hold more than
+// limits.MaxSessionsPerUser once the new session exists, the same transaction deletes as many of
+// their other sessions as it takes, after the two removals above, and reports each with the reason
+// session_cap; sessionsOverCap says which. Those are deletions as the sweep's are, so their normal
+// refresh tokens stop and their offline grants survive (#564 decision 5).
+//
 // The removals come back only when their deletion committed: with the session on success, and
 // alongside the error when the browser session write after the commit fails, since the rows are
 // gone either way and each is owed its audit event. Every other failure rolled them back and
@@ -164,7 +180,7 @@ type Removal struct {
 func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	clientId int64, authentication Authentication,
 	authStateGeneration int64, otpConfigGeneration *int64,
-	ipAddress string, replacing *record.UserSession) (*record.UserSession, []Removal, error) {
+	ipAddress string, replacing *record.UserSession, limits SessionLimits) (*record.UserSession, []Removal, error) {
 
 	userId := authentication.UserId
 	if authentication.AuthTime == nil || authentication.AuthTime.IsZero() {
@@ -295,6 +311,7 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		// rather than deleted blindly, so a row already gone is not reported as one this sign-in
 		// removed, and a row that is both replacing and a sweep match is removed and reported once,
 		// as the one replaced (#564 decision 7).
+		var kept []record.UserSession
 		for _, us := range allUserSessions {
 			if us.SessionIdentifier == userSession.SessionIdentifier {
 				continue
@@ -306,12 +323,23 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 			case us.DeviceId != "" && us.DeviceId == userSession.DeviceId:
 				reason = audit.DeletedUserSessionSameDevice
 			default:
+				kept = append(kept, us)
 				continue
 			}
 			if deleteUserSessionErr := u.database.DeleteUserSession(r.Context(), tx, us.Id); deleteUserSessionErr != nil {
 				return deleteUserSessionErr
 			}
 			removedThisAttempt = append(removedThisAttempt, Removal{Session: us, Reason: reason})
+		}
+
+		// The per-user cap counts what the two rules above left, and the new session (#564 decision
+		// 5). The other sessions it ends are chosen by sessionsOverCap, never the new one, which is
+		// not among kept.
+		for _, us := range sessionsOverCap(kept, utcNow, limits) {
+			if deleteUserSessionErr := u.database.DeleteUserSession(r.Context(), tx, us.Id); deleteUserSessionErr != nil {
+				return deleteUserSessionErr
+			}
+			removedThisAttempt = append(removedThisAttempt, Removal{Session: us, Reason: audit.DeletedUserSessionSessionCap})
 		}
 		removed = removedThisAttempt
 		return nil
@@ -366,6 +394,48 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	u.writeDeviceCookie(w, device)
 
 	return userSession, removed, nil
+}
+
+// sessionsOverCap is which of others, the user's sessions besides the one a sign-in just created,
+// go so that the user holds no more than limits.MaxSessionsPerUser sessions with the new one
+// counted, and none when the cap is 0, no limit (#564 decision 5). Every stored session counts,
+// expired ones the background job has not removed yet included.
+//
+// Expired sessions go first, those whose idle timeout or max lifetime has passed at now, and then
+// the least recently accessed, the lower id breaking a tie, in that order within each group. Least
+// recently accessed alone could end a session in use and keep a dead one, since a session past its
+// max lifetime can have been used more recently than a valid one.
+//
+// No lock is taken for it: two sign-ins of one user committing at once can each count the other's
+// session as not yet there, and leave the user one over the cap until their next sign-in. The cap
+// is a housekeeping bound, and taking the user's row on every sign-in to make it exact buys nothing
+// a user would notice.
+func sessionsOverCap(others []record.UserSession, now time.Time, limits SessionLimits) []record.UserSession {
+	if limits.MaxSessionsPerUser <= 0 {
+		return nil
+	}
+	excess := len(others) + 1 - limits.MaxSessionsPerUser
+	if excess <= 0 {
+		return nil
+	}
+
+	expired := func(us *record.UserSession) bool {
+		return !us.IsValid(now, limits.IdleTimeoutInSeconds, limits.MaxLifetimeInSeconds, nil)
+	}
+	candidates := slices.Clone(others)
+	slices.SortStableFunc(candidates, func(a, b record.UserSession) int {
+		if aExpired, bExpired := expired(&a), expired(&b); aExpired != bExpired {
+			if aExpired {
+				return -1
+			}
+			return 1
+		}
+		if c := a.LastAccessed.Compare(b.LastAccessed); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Id, b.Id)
+	})
+	return candidates[:excess]
 }
 
 // abandonUserSession deletes the session row the transaction above committed, after the browser

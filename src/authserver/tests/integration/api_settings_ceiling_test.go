@@ -145,6 +145,7 @@ func TestSettingsCeiling_ManageSettingsStillChangesTheOtherSettings(t *testing.T
 	resp, requestId := sendAdmin(t, granularToken, http.MethodPut, "/api/v1/admin/settings/sessions", api.UpdateSettingsSessionsRequest{
 		UserSessionIdleTimeoutInSeconds: before.UserSessionIdleTimeoutInSeconds + 60,
 		UserSessionMaxLifetimeInSeconds: before.UserSessionMaxLifetimeInSeconds + 60,
+		MaxUserSessionsPerUser:          &before.MaxUserSessionsPerUser,
 	})
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()

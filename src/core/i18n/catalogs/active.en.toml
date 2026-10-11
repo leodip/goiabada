@@ -1409,6 +1409,8 @@
 "adminconsole.admin_settings.sessions.idle_timeout_tooltip" = "If there is no activity from the user within this timeframe, the session will be terminated."
 "adminconsole.admin_settings.sessions.field.max_lifetime" = "User session - max lifetime in seconds"
 "adminconsole.admin_settings.sessions.max_lifetime_tooltip" = "The maximum duration a user session can last, irrespective of user activity."
+"adminconsole.admin_settings.sessions.field.max_sessions_per_user" = "User session - max sessions per user"
+"adminconsole.admin_settings.sessions.max_sessions_per_user_tooltip" = "The most sessions one user can hold, from 0 to 1000. When a sign-in would go past it, the user's expired sessions end first, then the least recently used. 0 means no limit."
 
 # --- Admin settings (email, keys, audit logs) -------------------------------
 

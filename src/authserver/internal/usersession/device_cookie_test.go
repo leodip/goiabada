@@ -78,7 +78,7 @@ func startOnce(t *testing.T, m *startSessionMocks, req *http.Request) (*httptest
 	captured := m.expectPersistThroughCommit(123, nil)
 	rr := httptest.NewRecorder()
 	_, _, err := m.manager.StartNewUserSession(rr, req, 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 	require.NoError(t, err)
 	return rr, *captured
 }
@@ -208,7 +208,7 @@ func TestStartNewUserSession_AFailedStartWritesNoDeviceCookie(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		_, _, err := m.manager.StartNewUserSession(rr, newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-			authenticationOf(123, "pwd", record.AcrLevel1, nil), 0, nil, "192.168.1.50", nil)
+			authenticationOf(123, "pwd", record.AcrLevel1, nil), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 		require.Error(t, err)
 		noDeviceCookieIn(t, rr)
@@ -222,7 +222,7 @@ func TestStartNewUserSession_AFailedStartWritesNoDeviceCookie(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		_, _, err := m.manager.StartNewUserSession(rr, newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-			authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+			authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 		require.ErrorIs(t, err, dbErr)
 		noDeviceCookieIn(t, rr)

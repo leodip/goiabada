@@ -2738,7 +2738,7 @@ paths:
     get:
       tags: [Settings]
       summary: Get session settings
-      description: Get session timeout settings
+      description: Get the session idle timeout, the session maximum lifetime, and the most sessions one user can hold.
       operationId: getSettingsSessions
       responses:
         '200':
@@ -2756,7 +2756,14 @@ paths:
     put:
       tags: [Settings]
       summary: Update session settings
-      description: Update session timeout settings
+      description: |
+        Replace the session settings. All three fields are required. A request without
+        `maxUserSessionsPerUser`, or with it `null`, is refused with `400`, and so is a value outside
+        0 to 1000.
+
+        Lowering `maxUserSessionsPerUser` ends no session at once: each user's sessions over the new
+        value end at that user's next sign-in, their expired sessions first and then the least
+        recently used.
       operationId: updateSettingsSessions
       requestBody:
         required: true
@@ -6003,17 +6010,38 @@ components:
           type: integer
         userSessionMaxLifetimeInSeconds:
           type: integer
+        maxUserSessionsPerUser:
+          type: integer
+          description: >-
+            The most sessions one user can hold. When a sign-in would go past it, the user's expired
+            sessions end, and then the least recently used. 0 means no limit.
+          minimum: 0
+          maximum: 1000
       required:
         - userSessionIdleTimeoutInSeconds
         - userSessionMaxLifetimeInSeconds
+        - maxUserSessionsPerUser
 
     UpdateSettingsSessionsRequest:
       type: object
       properties:
         userSessionIdleTimeoutInSeconds:
           type: integer
+          description: At least 1, at most 160000000, and no more than `userSessionMaxLifetimeInSeconds`.
         userSessionMaxLifetimeInSeconds:
           type: integer
+          description: At least 1, at most 160000000.
+        maxUserSessionsPerUser:
+          type: integer
+          description: >-
+            The most sessions one user can hold, 0 for no limit. When a sign-in would go past it,
+            the user's expired sessions end, and then the least recently used.
+          minimum: 0
+          maximum: 1000
+      required:
+        - userSessionIdleTimeoutInSeconds
+        - userSessionMaxLifetimeInSeconds
+        - maxUserSessionsPerUser
 
     SettingsUIThemeResponse:
       type: object

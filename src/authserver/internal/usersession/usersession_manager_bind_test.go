@@ -205,7 +205,7 @@ func TestStartNewUserSession_RecordsThePasswordInstant(t *testing.T) {
 
 	result, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
 		Authentication{UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory, AuthTime: &codeAt, PasswordAuthTime: &passwordAt},
-		0, nil, "192.168.1.50", nil)
+		0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
 	assert.Same(t, *captured, result)
@@ -221,7 +221,7 @@ func TestStartNewUserSession_RefusesAMissingPasswordInstant(t *testing.T) {
 
 	_, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
 		Authentication{UserId: 123, AuthMethods: "pwd", AcrLevel: record.AcrLevel1, AuthTime: &at},
-		0, nil, "192.168.1.50", nil)
+		0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.ErrorContains(t, err, "no password instant captured")
 	m.db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
@@ -243,7 +243,7 @@ func TestStartNewUserSession_AClaimThatNoLongerStandsCreatesNothing(t *testing.T
 			UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory, AuthTime: &at, PasswordAuthTime: &at,
 			OTPClaim: otpcredential.OTPClaim{Claimed: true, Generation: &generation},
 		},
-		0, &generation, "192.168.1.50", nil)
+		0, &generation, "192.168.1.50", nil, SessionLimits{})
 
 	require.ErrorIs(t, err, otpcredential.ErrAuthenticatorRemoved)
 	require.ErrorIs(t, stub.BodyErr, otpcredential.ErrAuthenticatorRemoved)

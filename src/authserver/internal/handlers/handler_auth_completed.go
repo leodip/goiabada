@@ -172,7 +172,11 @@ func HandleAuthCompletedGet(
 				auditLogger, authContext, client, sessionIdentifier, targetAcrLevel)
 		default:
 			boundSession, err = bindNewSession(w, r, plan, userSessionManager, database, auditLogger,
-				authContext, client, userSession, targetAcrLevel)
+				authContext, client, userSession, targetAcrLevel, usersession.SessionLimits{
+					IdleTimeoutInSeconds: settings.UserSessionIdleTimeoutInSeconds,
+					MaxLifetimeInSeconds: settings.UserSessionMaxLifetimeInSeconds,
+					MaxSessionsPerUser:   settings.MaxUserSessionsPerUser,
+				})
 		}
 		if errors.Is(err, otpcredential.ErrAuthenticatorRemoved) {
 			// The question decideBeforeBinding asked, asked again under the user's row lock by the
@@ -548,7 +552,8 @@ func bindReusedSession(
 }
 
 // bindNewSession is the create arm: it ends the arrived-with session when plan says it is another
-// user's, starts a new one, and answers it.
+// user's, starts a new one, and answers it. limits is the settings' bounds on the user's sessions,
+// which the new one is started under.
 func bindNewSession(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -560,6 +565,7 @@ func bindNewSession(
 	client *record.Client,
 	userSession *record.UserSession,
 	targetAcrLevel record.AcrLevel,
+	limits usersession.SessionLimits,
 ) (*record.UserSession, error) {
 	// The browser changed hands, so the session it was carrying is ended rather than left behind.
 	// StartNewUserSession below does not do this: it sweeps sibling sessions of the NEW user, so
@@ -643,7 +649,7 @@ func bindNewSession(
 			OTPClaim:         otpClaimOf(authContext),
 		},
 		authContext.AuthStateGeneration, authContext.OtpConfigGeneration,
-		middleware.ClientIP(r), replacing)
+		middleware.ClientIP(r), replacing, limits)
 
 	// Every row the sign-in removed is gone once its transaction committed, which includes a
 	// failure that came after the commit, so each is audited before either answer, with the reason

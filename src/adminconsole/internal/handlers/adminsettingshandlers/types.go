@@ -75,11 +75,13 @@ type SettingsKey struct {
 type SettingsSessionGet struct {
 	UserSessionIdleTimeoutInSeconds int
 	UserSessionMaxLifetimeInSeconds int
+	MaxUserSessionsPerUser          int
 }
 
 type SettingsSessionPost struct {
 	UserSessionIdleTimeoutInSeconds string
 	UserSessionMaxLifetimeInSeconds string
+	MaxUserSessionsPerUser          string
 }
 
 type SettingsTokenGet struct {

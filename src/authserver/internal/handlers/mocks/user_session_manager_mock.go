@@ -308,8 +308,8 @@ func (_c *UserSessionManager_HasValidUserSession_Call) RunAndReturn(run func(use
 }
 
 // StartNewUserSession provides a mock function for the type UserSessionManager
-func (_mock *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.Request, clientId int64, authentication usersession.Authentication, authStateGeneration int64, otpConfigGeneration *int64, ipAddress string, replacing *record.UserSession) (*record.UserSession, []usersession.Removal, error) {
-	ret := _mock.Called(w, r, clientId, authentication, authStateGeneration, otpConfigGeneration, ipAddress, replacing)
+func (_mock *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.Request, clientId int64, authentication usersession.Authentication, authStateGeneration int64, otpConfigGeneration *int64, ipAddress string, replacing *record.UserSession, limits usersession.SessionLimits) (*record.UserSession, []usersession.Removal, error) {
+	ret := _mock.Called(w, r, clientId, authentication, authStateGeneration, otpConfigGeneration, ipAddress, replacing, limits)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StartNewUserSession")
@@ -318,25 +318,25 @@ func (_mock *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *h
 	var r0 *record.UserSession
 	var r1 []usersession.Removal
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, int64, usersession.Authentication, int64, *int64, string, *record.UserSession) (*record.UserSession, []usersession.Removal, error)); ok {
-		return returnFunc(w, r, clientId, authentication, authStateGeneration, otpConfigGeneration, ipAddress, replacing)
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, int64, usersession.Authentication, int64, *int64, string, *record.UserSession, usersession.SessionLimits) (*record.UserSession, []usersession.Removal, error)); ok {
+		return returnFunc(w, r, clientId, authentication, authStateGeneration, otpConfigGeneration, ipAddress, replacing, limits)
 	}
-	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, int64, usersession.Authentication, int64, *int64, string, *record.UserSession) *record.UserSession); ok {
-		r0 = returnFunc(w, r, clientId, authentication, authStateGeneration, otpConfigGeneration, ipAddress, replacing)
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, int64, usersession.Authentication, int64, *int64, string, *record.UserSession, usersession.SessionLimits) *record.UserSession); ok {
+		r0 = returnFunc(w, r, clientId, authentication, authStateGeneration, otpConfigGeneration, ipAddress, replacing, limits)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*record.UserSession)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(http.ResponseWriter, *http.Request, int64, usersession.Authentication, int64, *int64, string, *record.UserSession) []usersession.Removal); ok {
-		r1 = returnFunc(w, r, clientId, authentication, authStateGeneration, otpConfigGeneration, ipAddress, replacing)
+	if returnFunc, ok := ret.Get(1).(func(http.ResponseWriter, *http.Request, int64, usersession.Authentication, int64, *int64, string, *record.UserSession, usersession.SessionLimits) []usersession.Removal); ok {
+		r1 = returnFunc(w, r, clientId, authentication, authStateGeneration, otpConfigGeneration, ipAddress, replacing, limits)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).([]usersession.Removal)
 		}
 	}
-	if returnFunc, ok := ret.Get(2).(func(http.ResponseWriter, *http.Request, int64, usersession.Authentication, int64, *int64, string, *record.UserSession) error); ok {
-		r2 = returnFunc(w, r, clientId, authentication, authStateGeneration, otpConfigGeneration, ipAddress, replacing)
+	if returnFunc, ok := ret.Get(2).(func(http.ResponseWriter, *http.Request, int64, usersession.Authentication, int64, *int64, string, *record.UserSession, usersession.SessionLimits) error); ok {
+		r2 = returnFunc(w, r, clientId, authentication, authStateGeneration, otpConfigGeneration, ipAddress, replacing, limits)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -357,11 +357,12 @@ type UserSessionManager_StartNewUserSession_Call struct {
 //   - otpConfigGeneration *int64
 //   - ipAddress string
 //   - replacing *record.UserSession
-func (_e *UserSessionManager_Expecter) StartNewUserSession(w any, r any, clientId any, authentication any, authStateGeneration any, otpConfigGeneration any, ipAddress any, replacing any) *UserSessionManager_StartNewUserSession_Call {
-	return &UserSessionManager_StartNewUserSession_Call{Call: _e.mock.On("StartNewUserSession", w, r, clientId, authentication, authStateGeneration, otpConfigGeneration, ipAddress, replacing)}
+//   - limits usersession.SessionLimits
+func (_e *UserSessionManager_Expecter) StartNewUserSession(w any, r any, clientId any, authentication any, authStateGeneration any, otpConfigGeneration any, ipAddress any, replacing any, limits any) *UserSessionManager_StartNewUserSession_Call {
+	return &UserSessionManager_StartNewUserSession_Call{Call: _e.mock.On("StartNewUserSession", w, r, clientId, authentication, authStateGeneration, otpConfigGeneration, ipAddress, replacing, limits)}
 }
 
-func (_c *UserSessionManager_StartNewUserSession_Call) Run(run func(w http.ResponseWriter, r *http.Request, clientId int64, authentication usersession.Authentication, authStateGeneration int64, otpConfigGeneration *int64, ipAddress string, replacing *record.UserSession)) *UserSessionManager_StartNewUserSession_Call {
+func (_c *UserSessionManager_StartNewUserSession_Call) Run(run func(w http.ResponseWriter, r *http.Request, clientId int64, authentication usersession.Authentication, authStateGeneration int64, otpConfigGeneration *int64, ipAddress string, replacing *record.UserSession, limits usersession.SessionLimits)) *UserSessionManager_StartNewUserSession_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 http.ResponseWriter
 		if args[0] != nil {
@@ -395,6 +396,10 @@ func (_c *UserSessionManager_StartNewUserSession_Call) Run(run func(w http.Respo
 		if args[7] != nil {
 			arg7 = args[7].(*record.UserSession)
 		}
+		var arg8 usersession.SessionLimits
+		if args[8] != nil {
+			arg8 = args[8].(usersession.SessionLimits)
+		}
 		run(
 			arg0,
 			arg1,
@@ -404,6 +409,7 @@ func (_c *UserSessionManager_StartNewUserSession_Call) Run(run func(w http.Respo
 			arg5,
 			arg6,
 			arg7,
+			arg8,
 		)
 	})
 	return _c
@@ -414,7 +420,7 @@ func (_c *UserSessionManager_StartNewUserSession_Call) Return(userSession *recor
 	return _c
 }
 
-func (_c *UserSessionManager_StartNewUserSession_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, clientId int64, authentication usersession.Authentication, authStateGeneration int64, otpConfigGeneration *int64, ipAddress string, replacing *record.UserSession) (*record.UserSession, []usersession.Removal, error)) *UserSessionManager_StartNewUserSession_Call {
+func (_c *UserSessionManager_StartNewUserSession_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, clientId int64, authentication usersession.Authentication, authStateGeneration int64, otpConfigGeneration *int64, ipAddress string, replacing *record.UserSession, limits usersession.SessionLimits) (*record.UserSession, []usersession.Removal, error)) *UserSessionManager_StartNewUserSession_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -91,7 +91,7 @@ type UserSessionManager interface {
 	StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		clientId int64, authentication usersession.Authentication,
 		authStateGeneration int64, otpConfigGeneration *int64,
-		ipAddress string, replacing *record.UserSession) (*record.UserSession, []usersession.Removal, error)
+		ipAddress string, replacing *record.UserSession, limits usersession.SessionLimits) (*record.UserSession, []usersession.Removal, error)
 
 	// BumpUserSession updates an existing session's last accessed time and client list.
 	// It also handles ACR/AMR step-up: if the user completed a higher level of authentication

@@ -473,6 +473,10 @@ const (
 	// DeletedUserSessionSameDevice is another session of the user from the same device, which that
 	// sign-in's sweep removed.
 	DeletedUserSessionSameDevice = "same_device"
+	// DeletedUserSessionSessionCap is another session of the user that the same sign-in ended to
+	// keep the user within the per-user session cap, after the two above: an expired one first, then
+	// the least recently accessed (#564 decision 5).
+	DeletedUserSessionSessionCap = "session_cap"
 	// DeletedUserSessionReplacedByOtherUser is another user's session, ended because a different
 	// user signed in on the browser carrying it.
 	DeletedUserSessionReplacedByOtherUser = "replaced_by_other_user"

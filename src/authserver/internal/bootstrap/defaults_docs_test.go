@@ -43,6 +43,7 @@ var defaultsSections = []defaultsSection{
 	{"site/src/content/docs/concepts/sessions.mdx", "## How long a session lasts", []string{
 		"User session - idle timeout in seconds",
 		"User session - max lifetime in seconds",
+		"User session - max sessions per user",
 	}},
 	{"site/src/content/docs/concepts/self-registration.mdx", "## Who can register", []string{
 		"User self registration enabled",
@@ -62,6 +63,7 @@ func seededDefaults(settings *record.Settings) map[string]string {
 		"Offline refresh token - max lifetime in seconds":    strconv.Itoa(settings.RefreshTokenOfflineMaxLifetimeInSeconds),
 		"User session - idle timeout in seconds":             strconv.Itoa(settings.UserSessionIdleTimeoutInSeconds),
 		"User session - max lifetime in seconds":             strconv.Itoa(settings.UserSessionMaxLifetimeInSeconds),
+		"User session - max sessions per user":               strconv.Itoa(settings.MaxUserSessionsPerUser),
 		"User self registration enabled":                     onOff[settings.SelfRegistrationEnabled],
 		"User self registration requires email verification": onOff[settings.SelfRegistrationRequiresEmailVerification],
 	}

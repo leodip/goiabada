@@ -1350,6 +1350,8 @@
 "adminconsole.admin_settings.sessions.idle_timeout_tooltip" = "Se não houver atividade do usuário neste período, a sessão será encerrada."
 "adminconsole.admin_settings.sessions.field.max_lifetime" = "Sessão de usuário - tempo máximo de vida em segundos"
 "adminconsole.admin_settings.sessions.max_lifetime_tooltip" = "Duração máxima de uma sessão de usuário, independentemente da atividade do usuário."
+"adminconsole.admin_settings.sessions.field.max_sessions_per_user" = "Sessão de usuário - máximo de sessões por usuário"
+"adminconsole.admin_settings.sessions.max_sessions_per_user_tooltip" = "O número máximo de sessões que um usuário pode ter, de 0 a 1000. Quando um login ultrapassar esse limite, as sessões expiradas do usuário são encerradas primeiro, e depois as usadas há mais tempo. 0 significa sem limite."
 
 "adminconsole.admin_settings.email.page_title" = "Configurações - E-mail"
 "adminconsole.admin_settings.email.subtitle" = "Configurações - E-mail"

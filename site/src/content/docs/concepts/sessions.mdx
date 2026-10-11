@@ -42,12 +42,13 @@ To ask for a password every time, whatever the session, send [`prompt=login`](/c
 
 ## How long a session lasts
 
-A session's lifetimes are under **Admin**, **Sessions** in the admin console, and apply to every client:
+A session's lifetimes, and how many sessions one user can hold, are under **Admin**, **Sessions** in the admin console, and apply to every client:
 
 | Setting | Default |
 |---|---|
 | **User session - idle timeout in seconds** | 7200 (2 hours) |
 | **User session - max lifetime in seconds** | 86400 (24 hours) |
+| **User session - max sessions per user** | 20 (0 means no limit) |
 
 A session can be used only while all of these hold:
 
@@ -60,6 +61,19 @@ A session can be used only while all of these hold:
 Each bound includes its last second: a session idle for exactly the idle timeout still counts, and so does a sign-in exactly `max_age` seconds ago, as [OpenID Connect Core 1.0 section 3.1.2.1](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest) describes. The idle timeout can't be longer than the maximum lifetime.
 
 A session that fails one of them isn't used, and the user signs in again. It isn't ended either: a session that has merely expired revokes nothing, and its offline refresh tokens keep working. A background job removes idle and expired sessions every 12 hours.
+
+## How many sessions a user can hold
+
+Each sign-in that starts a new session adds one to the user's sessions, and one person rarely needs more than a handful: a phone, a laptop, a browser at work. **User session - max sessions per user** caps them, at 20 unless you change it, from 0 to 1000.
+
+When a sign-in starts a new session and the user would then hold more than the cap, the auth server ends as many of their other sessions as it takes, never the new one:
+
+1. **Expired sessions first:** those past their idle timeout or maximum lifetime that the background job hasn't removed yet. They count toward the cap until it does.
+2. **Then the least recently used,** the session whose last activity is the oldest.
+
+It counts what's left after the sign-in has replaced the browser's own session and its other sessions from the same browser, as [At the end of a sign-in](#at-the-end-of-a-sign-in) describes. Ending a session this way revokes nothing it handed out, though its normal refresh tokens stop working with it, and the audit log records it with the reason `session_cap`.
+
+The cap catches pile-ups, such as a script that signs in with a fresh browser every time, and accounts shared across more browsers than the cap. Set 1 for one session per user, or 0 for no limit. Lowering it ends nothing at once: a user's sessions over the new cap end at their next sign-in.
 
 ## What keeps a session alive
 
@@ -86,7 +100,7 @@ Once the user has signed in, the auth server checks them again before it records
 Then it records the sign-in in a session:
 
 - **The browser's session is valid and the user's own.** It's reused: its last activity moves forward, and its ACR level goes up when this sign-in reached a higher one. Reusing it never lowers its level. When the user entered a credential in this sign-in, its `auth_time` is updated to then. A sign-in that asked for the password again, such as one with `prompt=login`, replaces the session's level and methods with its own, as described in [A session that's already there](/concepts/acr-and-amr/#a-session-thats-already-there).
-- **Otherwise, a new session starts.** It replaces the user's own session the browser had, if it had one that's no longer valid, and the user's other sessions from the same browser, which the browser's [device cookie](#how-the-auth-server-recognizes-a-browser) tells apart. Sessions in any other browser stay, even one sending the same `User-Agent` from the same IP address, like a second browser profile or a colleague's machine behind the same router. Nothing those sessions handed out is revoked, though their normal refresh tokens stop working with them. A session the browser had for **another** user is ended, as [Ending sessions](/concepts/ending-sessions/#a-different-user-signs-in-on-the-same-browser) describes.
+- **Otherwise, a new session starts.** It replaces the user's own session the browser had, if it had one that's no longer valid, and the user's other sessions from the same browser, which the browser's [device cookie](#how-the-auth-server-recognizes-a-browser) tells apart. Sessions in any other browser stay, even one sending the same `User-Agent` from the same IP address, like a second browser profile or a colleague's machine behind the same router, unless the user would then hold more sessions than [the cap](#how-many-sessions-a-user-can-hold). Nothing those sessions handed out is revoked, though their normal refresh tokens stop working with them. A session the browser had for **another** user is ended, as [Ending sessions](/concepts/ending-sessions/#a-different-user-signs-in-on-the-same-browser) describes.
 
 A new session needs a password entered in this sign-in. A sign-in that was relying on a session that ended partway through goes back to the password step rather than starting one from nothing.
 

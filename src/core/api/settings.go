@@ -101,12 +101,17 @@ type SendTestEmailRequest struct {
 type SettingsSessionsResponse struct {
 	UserSessionIdleTimeoutInSeconds int `json:"userSessionIdleTimeoutInSeconds"`
 	UserSessionMaxLifetimeInSeconds int `json:"userSessionMaxLifetimeInSeconds"`
+	MaxUserSessionsPerUser          int `json:"maxUserSessionsPerUser"`
 }
 
 // UpdateSettingsSessionsRequest contains session-related settings fields for update
 type UpdateSettingsSessionsRequest struct {
 	UserSessionIdleTimeoutInSeconds int `json:"userSessionIdleTimeoutInSeconds"`
 	UserSessionMaxLifetimeInSeconds int `json:"userSessionMaxLifetimeInSeconds"`
+	// MaxUserSessionsPerUser is required on the wire. It is a pointer because 0 is a valid cap, no
+	// limit, so an absent or null field must be told from 0 to be refused rather than turn the cap
+	// off for a caller that does not know the field (#564 decision 6).
+	MaxUserSessionsPerUser *int `json:"maxUserSessionsPerUser"`
 }
 
 // SettingsTokensResponse represents the token settings returned by the API

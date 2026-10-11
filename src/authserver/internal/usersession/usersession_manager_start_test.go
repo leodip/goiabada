@@ -241,7 +241,7 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 	credentialAcceptedAt := someCredentialInstant()
 
 	before := time.Now().UTC()
-	result, _, err := m.manager.StartNewUserSession(recorder, req, 7, authenticationOf(123, "pwd otp", record.AcrLevel2Mandatory, credentialAcceptedAt), 0, nil, "192.168.1.50", nil)
+	result, _, err := m.manager.StartNewUserSession(recorder, req, 7, authenticationOf(123, "pwd otp", record.AcrLevel2Mandatory, credentialAcceptedAt), 0, nil, "192.168.1.50", nil, SessionLimits{})
 	after := time.Now().UTC()
 
 	require.NoError(t, err)
@@ -309,7 +309,7 @@ func TestStartNewUserSession_BoundsTheUserAgentToTheColumnWidth(t *testing.T) {
 	captured := m.expectPersistThroughCommit(123, nil)
 
 	result, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
 	assert.Same(t, *captured, result)
@@ -332,7 +332,7 @@ func TestStartNewUserSession_RecordsTheClient(t *testing.T) {
 	}).Return(nil).Once()
 	m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return(nil, nil).Once()
 
-	result, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 7, authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+	result, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 7, authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
 	assert.Len(t, result.Clients, 1)
@@ -356,7 +356,7 @@ func TestStartNewUserSession_WritesIdentifierIntoTheCookieSession(t *testing.T) 
 
 	m.expectPersistThroughCommit(123, nil)
 
-	result, _, err := m.manager.StartNewUserSession(rr, req, 7, authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+	result, _, err := m.manager.StartNewUserSession(rr, req, 7, authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
 	assert.Equal(t, result.SessionIdentifier, m.readBack(rr.Result().Cookies()).Values[sessionkeys.SessionIdentifier])
@@ -390,7 +390,7 @@ func TestStartNewUserSession_DeletesTheSessionsOfTheSameDevice(t *testing.T) {
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
 	_, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{42}, removedIds(removed), "the swept row is reported so the caller can audit it")
@@ -472,7 +472,7 @@ func TestStartNewUserSession_KeepsTheSessionsOfOtherDevices(t *testing.T) {
 			m.expectPersistThroughCommit(123, []record.UserSession{tc.session})
 
 			_, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-				authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+				authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 			require.NoError(t, err)
 			assert.Empty(t, removed)
@@ -491,7 +491,7 @@ func TestStartNewUserSession_ABrowserWithNoDeviceCookieSweepsNothing(t *testing.
 	})
 
 	_, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
 	assert.Empty(t, removed)
@@ -527,7 +527,7 @@ func TestStartNewUserSession_DoesNotDeleteTheSessionItJustCreated(t *testing.T) 
 		}).Once()
 
 	_, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	assert.NoError(t, err)
 }
@@ -549,7 +549,7 @@ func TestStartNewUserSession_StoresTheAddressItIsGiven(t *testing.T) {
 	captured := m.expectPersistThroughCommit(123, nil)
 
 	result, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "203.0.113.7", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "203.0.113.7", nil, SessionLimits{})
 
 	require.NoError(t, err)
 	assert.Equal(t, "203.0.113.7", (*captured).IpAddress)
@@ -574,7 +574,7 @@ func TestStartNewUserSession_DeletesTheSessionItReplacesWhereverItWasSeen(t *tes
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
 	_, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", &replaced)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", &replaced, SessionLimits{})
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{42}, removedIds(removed))
@@ -596,7 +596,7 @@ func TestStartNewUserSession_AReplacedSessionThatAlsoMatchesTheSweepIsRemovedOnc
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
 	_, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", &replaced)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", &replaced, SessionLimits{})
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{42}, removedIds(removed))
@@ -621,7 +621,7 @@ func TestStartNewUserSession_EachRemovalIsReportedWithItsOwnReason(t *testing.T)
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(43)).Return(nil).Once()
 
 	_, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", &replaced)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", &replaced, SessionLimits{})
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{42, 43}, removedIds(removed))
@@ -637,7 +637,7 @@ func TestStartNewUserSession_AReplacedSessionAlreadyGoneIsNotReported(t *testing
 	m.expectPersistThroughCommit(123, nil)
 
 	_, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", &replaced)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", &replaced, SessionLimits{})
 
 	require.NoError(t, err)
 	assert.Empty(t, removed)
@@ -653,7 +653,7 @@ func TestStartNewUserSession_RefusesToReplaceAnotherUsersSession(t *testing.T) {
 	foreign := record.UserSession{Id: 42, SessionIdentifier: "someone-else", UserId: 999}
 
 	result, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", &foreign)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", &foreign, SessionLimits{})
 
 	require.ErrorContains(t, err, "belongs to user 999")
 	assert.Nil(t, result)
@@ -685,7 +685,7 @@ func TestStartNewUserSession_ARerunReportsTheCommittedAttemptsRemovalsOnce(t *te
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Twice()
 
 	_, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{42}, removedIds(removed))
@@ -711,7 +711,7 @@ func TestStartNewUserSession_AnUncommittedTransactionReportsNoRemovals(t *testin
 		m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(dbErr).Once()
 
 		result, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-			authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+			authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 		require.ErrorIs(t, err, dbErr)
 		require.ErrorIs(t, stub.BodyErr, dbErr, "the body rolled back")
@@ -729,7 +729,7 @@ func TestStartNewUserSession_AnUncommittedTransactionReportsNoRemovals(t *testin
 		m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
 		result, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-			authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+			authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 		require.ErrorIs(t, err, dbErr)
 		assert.Nil(t, result)
@@ -752,7 +752,7 @@ func TestStartNewUserSession_ARotationFailureStillReportsTheCommittedRemovals(t 
 	m.db.On("DeleteUserSession", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil).Once()
 
 	result, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.ErrorIs(t, err, errCreateRefused)
 	assert.Nil(t, result)
@@ -882,7 +882,7 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 			alsoAssert := tc.setup(m)
 
 			result, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 7,
-				authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+				authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 			require.Error(t, err)
 			assert.Nil(t, result, "no session may be returned alongside an error")
@@ -922,7 +922,7 @@ func TestStartNewUserSession_RotatesTheBrowserSessionIdentifierAndKeepsTheRow(t 
 	captured := m.expectPersistThroughCommit(123, nil)
 
 	result, _, err := m.manager.StartNewUserSession(rr, req, 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
 	assert.Same(t, *captured, result)
@@ -953,7 +953,7 @@ func TestStartNewUserSession_DeletesTheRowWhenTheRotationFails(t *testing.T) {
 	m.db.On("DeleteUserSession", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil).Once()
 
 	result, _, err := m.manager.StartNewUserSession(rr, req, 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	assert.Nil(t, result)
 	require.ErrorIs(t, err, errCreateRefused, "the caller must be told why the ceremony failed, not what the cleanup did")
@@ -988,7 +988,7 @@ func TestStartNewUserSession_DeletesTheRowEvenWhenTheRequestWasCancelled(t *test
 	m.db.On("DeleteUserSession", aLiveSessionContext(), (*sql.Tx)(nil), int64(99)).Return(nil).Once()
 
 	result, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	assert.Nil(t, result)
 	require.ErrorIs(t, err, errCreateRefused, "the caller is still told why the ceremony failed")
@@ -1015,7 +1015,7 @@ func TestStartNewUserSession_AFailedCompensationKeepsTheOriginalError(t *testing
 	m.db.On("DeleteUserSession", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(deleteErr).Once()
 
 	result, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	assert.Nil(t, result)
 	require.ErrorIs(t, err, errCreateRefused, "the original failure must survive a failed cleanup")
@@ -1036,7 +1036,7 @@ func TestStartNewUserSession_WrapsSessionStoreReadError(t *testing.T) {
 	m.backend.failLoad = true
 
 	_, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.ErrorIs(t, err, errLoadRefused)
 	assert.Contains(t, err.Error(), "unable to get the session")
@@ -1081,7 +1081,7 @@ func TestStartNewUserSession_StampsAuthStateGeneration(t *testing.T) {
 	captured := m.expectPersistThroughCommit(123, nil)
 
 	_, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 7, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 7, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
@@ -1103,7 +1103,7 @@ func TestStartNewUserSession_StampsOtpConfigGeneration(t *testing.T) {
 
 	observed := int64(9)
 	_, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 7, &observed, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 7, &observed, "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
@@ -1124,7 +1124,7 @@ func TestStartNewUserSession_NilOtpConfigGenerationLandsAtZero(t *testing.T) {
 	captured := m.expectPersistThroughCommit(123, nil)
 
 	_, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 7, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 7, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
@@ -1154,7 +1154,7 @@ func TestStartNewUserSession_AuthTimeIsTheCapturedCredentialInstant(t *testing.T
 
 	before := time.Now().UTC()
 	result, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, &credentialAcceptedAt), 7, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, &credentialAcceptedAt), 7, nil, "192.168.1.50", nil, SessionLimits{})
 	after := time.Now().UTC()
 
 	require.NoError(t, err)
@@ -1186,7 +1186,7 @@ func TestStartNewUserSession_AuthTimeIsNormalisedToUTC(t *testing.T) {
 	credentialAcceptedAt := time.Now().In(zone).Add(-30 * time.Minute)
 
 	_, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, &credentialAcceptedAt), 7, nil, "192.168.1.50", nil)
+		authenticationOf(123, "pwd", record.AcrLevel1, &credentialAcceptedAt), 7, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
@@ -1221,7 +1221,7 @@ func TestStartNewUserSession_RefusesAMissingCredentialInstant(t *testing.T) {
 			loads, creates := m.backend.loads, m.backend.creates
 
 			result, _, err := m.manager.StartNewUserSession(recorder, req, 7,
-				authenticationOf(123, "pwd", record.AcrLevel1, capture), 7, nil, "192.168.1.50", nil)
+				authenticationOf(123, "pwd", record.AcrLevel1, capture), 7, nil, "192.168.1.50", nil, SessionLimits{})
 
 			require.ErrorContains(t, err, "no credential instant captured")
 			assert.Nil(t, result, "a refused call must hand back no session")
