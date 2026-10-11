@@ -81,6 +81,7 @@
                 permissionStatusCell.appendChild(hasPermissionSpan);
             } else {
                 const grantPermissionButton = document.createElement("button");
+                grantPermissionButton.type = "button";
                 grantPermissionButton.setAttribute("class", "btn btn-xs btn-primary");
                 grantPermissionButton.onclick = function(event) {
                     GrantPermission(event, grantPermissionButton, user.Id, user.Email);
@@ -158,7 +159,7 @@
 
 {{template "manage_resources_tabs" (args "users-with-permission" .resourceId $.ctx) }}
 
-<form method="post">
+<form method="post" onsubmit="event.preventDefault();">
 
     <div class="flex items-center justify-between mt-6">
         <div class="">

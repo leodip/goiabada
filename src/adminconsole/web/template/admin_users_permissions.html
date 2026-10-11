@@ -164,7 +164,7 @@
             cell1.textContent = value.Scope;
 
             cell2.className = "p-1 text-right";
-            cell2.replaceChildren(createTrashCanButton(deletePermission, { permissionid: parseInt(key, 10) }));
+            cell2.replaceChildren(createTrashCanButton("{{ T $.ctx "adminconsole.admin_users.permissions.remove_label" }} " + value.Scope, deletePermission, { permissionid: parseInt(key, 10) }));
          }
       }
    }

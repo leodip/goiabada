@@ -96,7 +96,7 @@
                 cell1.textContent = uri;
 
                 cell2.className = "p-1 text-right";
-                cell2.replaceChildren(createTrashCanButton(deleteWebOrigin));
+                cell2.replaceChildren(createTrashCanButton("{{ T $.ctx "adminconsole.admin_clients.web_origins.remove_label" }} " + uri, deleteWebOrigin));
             });
         }
     }
