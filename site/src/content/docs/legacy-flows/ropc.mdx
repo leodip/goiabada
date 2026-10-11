@@ -100,7 +100,7 @@ Setting the flow to **Disabled**, for the client or globally, stops new grants a
 
 ## Rate limits
 
-[RFC 6749 section 4.3.2](https://www.rfc-editor.org/rfc/rfc6749.html#section-4.3.2) requires the endpoint to be protected against guessing. With the rate limiter on, the password grant has a budget per IP address for every request, and a wrong password counts against the same budgets as one typed into the sign-in page. It's off by default. See [rate limits](/reference/environment-variables/#rate-limits) and [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
+[RFC 6749 section 4.3.2](https://www.rfc-editor.org/rfc/rfc6749.html#section-4.3.2) requires the endpoint to be protected against guessing. A wrong password counts against the same budgets as one typed into the sign-in page, and the one for each account, 100 wrong passwords an hour, always applies. With the rate limiter on, the password grant also has a budget per IP address for every request, and a tighter one for wrong passwords for one username from one network. See [rate limits](/reference/environment-variables/#rate-limits) and [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
 
 ## Errors
 

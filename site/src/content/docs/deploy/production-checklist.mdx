@@ -49,7 +49,7 @@ With `GOIABADA_DB_TLS_MODE` unset, Goiabada encrypts its connection to PostgreSQ
 
 ## Abuse
 
-- [ ] **The rate limiter is on,** `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=true`. Its limits counted by an IP address or an email, on password sign-in among them, are off unless you turn it on, and the setup wizard asks. See [Rate limits](/reference/environment-variables/#rate-limits).
+- [ ] **The rate limiter is on,** `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=true`. The limits counted by a user or an email, 100 wrong passwords an hour for one account among them, apply either way, and it adds the limits counted by an IP address, on password sign-in among them. The setup wizard asks. See [Rate limits](/reference/environment-variables/#rate-limits).
 
 ## Monitoring and logs
 

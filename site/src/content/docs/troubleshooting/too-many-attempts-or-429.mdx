@@ -9,7 +9,7 @@ This page helps you when Goiabada's rate limiter refuses a request, and especial
 
 ## What you see
 
-The limits on one-time codes, on the Account pages' password checks and on email verification always apply. The others, counted by an IP address or an email, apply once you set `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` to `true`. A refused request gets `429 Too Many Requests` with a `Retry-After` header, in the format the endpoint usually answers with:
+The limits counted by a user or an email always apply: wrong passwords for one account, one-time codes, the Account pages' password checks, email verification, and password-reset and registration mails to one address. The limits counted by an IP address apply once you set `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` to `true`. A refused request gets `429 Too Many Requests` with a `Retry-After` header, in the format the endpoint usually answers with:
 
 - **A sign-in, two-factor, registration, activation or password reset page** shows "Too many attempts" and "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again."
 - **The token endpoint's password grant and `POST /connect/register`** answer `{"error": "invalid_request", "error_description": "Too many requests. Please wait and try again later."}`.
@@ -21,11 +21,13 @@ The auth server logs a `rate limit reached` warning naming the limiter, and writ
 
 Most of the time it's the limiter doing its job: someone typed a wrong password too often, or a script is trying addresses. Each limit counts by something, an IP address, an email or a user, and refuses the next request once that one has used its budget. The [rate limits table](/reference/environment-variables/#rate-limits) lists every limit, what it counts and what it counts by.
 
-When **every user** sees "Too many attempts" at once, the auth server is almost certainly behind a proxy it doesn't trust. It then sees the proxy's address on every request, so all your users share one IP address's budget, and a handful of sign-ins uses it up for everyone.
+When **every user** sees "Too many attempts" at once, with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on, the auth server is almost certainly behind a proxy it doesn't trust. It then sees the proxy's address on every request, so all your users share one IP address's budget, and a handful of sign-ins uses it up for everyone.
 
 ## Fix it
 
 If one user or one address is refused, wait. The `Retry-After` header gives the limit's window in seconds, and the budget comes back gradually over the window after it. Restarting the auth server resets only the limits it keeps in the process, as described below, so on PostgreSQL, MySQL and SQL Server it doesn't reset the limits on wrong passwords.
+
+If one account can't sign in with its password and its owner didn't cause it, someone is guessing that password: block their address at your proxy or CDN. The `rate_limit_exceeded` audit event names the account by `email_digest`.
 
 If everyone is refused behind a proxy, tell the auth server to read the client's address from the proxy's headers:
 
@@ -57,7 +59,7 @@ A limit that counts failures, such as wrong passwords, isn't spent by a success,
 
 Limits on failures are kept in the database on PostgreSQL, MySQL and SQL Server, so they hold across replicas and a restart doesn't refill them. Limits on every request are kept in each process: each replica allows the full budget, and a restart resets it. On SQLite, which runs one replica, both are kept in the process.
 
-Wrong passwords meet two limits. `pwd_account_net` counts by IP address and email together, so someone guessing from one network spends only their own budget, and the account's owner signs in normally from anywhere else. `pwd_account` counts by email alone, as a ceiling across every network. Wrong passwords from enough networks use it up, and then the account can't sign in for the rest of its window, whoever is typing. That's the price of having a ceiling per account at all.
+Wrong passwords meet up to two limits. `pwd_account` counts by email alone, as a ceiling across every network, and always applies. 100 wrong passwords in an hour, from anywhere, use it up, and then the account can't sign in with its password for the rest of the hour, whoever is typing and even with the right password. A password reset doesn't clear it, and anyone already signed in stays signed in. That's the price of having a ceiling per account at all, and the remedy for someone doing it on purpose is blocking them at your proxy or CDN. With `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on, `pwd_account_net` counts by IP address and email together, 10 every 15 minutes, so someone guessing from one network runs out of their own budget long before the account's, and the account's owner signs in normally from anywhere else.
 
 ## Next steps
 

@@ -8,7 +8,7 @@ package server
 // and goiabada_rate_limit_refusals_total carry when it trips. Every tier middleware.NewRateLimiter
 // builds is held to it in both directions: a tier with no row fails, and so does a row naming a
 // limiter the auth server does not have, or giving one a limit, a window, a counting rule, a
-// Counted by cell or an endpoint other than its own. A tier counted on two routes, as the password tiers shared by the
+// Counted by cell, an Applies cell or an endpoint other than its own. A tier counted on two routes, as the password tiers shared by the
 // sign-in form and the password grant are, may take a row per route, and between them they must
 // list every route it guards.
 //
@@ -72,6 +72,24 @@ var docCountedBy = map[string]string{
 	"countedByTokenUser":     "the token's user",
 }
 
+// docApplies is what the table's Applies cell says of each key kind (#503 decisions 1 and 2): a
+// tier counted by a user or an email applies whatever GOIABADA_AUTHSERVER_RATELIMITER_ENABLED says,
+// and one that reads the client's address, an IP address alone or with an email, only with it on.
+// A kind missing here is one docCountedBy has no words for either, which its own finding reports.
+var docApplies = map[string]string{
+	"countedByIP":            docAppliesWithTheSwitch,
+	"countedByAccount":       docAppliesAlways,
+	"countedByIPAndAccount":  docAppliesWithTheSwitch,
+	"countedBySigningInUser": docAppliesAlways,
+	"countedByTokenUser":     docAppliesAlways,
+}
+
+// The two things an Applies cell can say.
+const (
+	docAppliesAlways        = "always"
+	docAppliesWithTheSwitch = "switch on"
+)
+
 // docSharedNote is what may follow a Counted by cell's kind: the routes or grant that share the
 // tier's budget, as "email, shared with the password grant".
 const docSharedNote = ", shared with "
@@ -100,27 +118,27 @@ func TestRateLimitsDocs_TheTableIsTheLimitersTiers(t *testing.T) {
 func TestRateLimitsDocs_ATableDisagreeingWithTheCodeFails(t *testing.T) {
 	root := t.TempDir()
 	writeDocFixture(t, root, "site/env.mdx", "## Rate limits\n\n"+
-		"| Endpoint | Limit | Counts | Counted by |\n"+
-		"|---|---|---|---|\n"+
-		"| `POST /auth/pwd`<br/>Limiter: `pwd_ip` | 30 per 15 minutes | every request | IP address |\n"+
-		"| `POST /auth/pwd`<br/>Limiter: `pwd_account` | 10 per 60 minutes | failed sign-ins | email |\n"+
-		"| `POST /auth/otp`<br/>Limiter: `otp` | 5 per 15 minutes | every request | user |\n"+
-		"| `POST /forgot-password`<br/>Limiter: `forgot_pwd_ip` | 20 per 5 minutes | failed requests | IP address |\n"+
-		"| `POST /forgot-password` and `POST /reset-password`<br/>Limiter: `forgot_pwd_email` | 5 per 5 minutes | every request | email |\n"+
-		"| `POST /forgot-password`<br/>Limiter: `forgot_pwd_email` | 5 per 5 minutes | every request | email, again |\n"+
-		"| `POST /connect/register`<br/>Limiter: `dcr` | ten a minute | every request | IP address |\n"+
-		"| `POST /connect/register`<br/>Limiter: `dcr_retired` | 10 per minute | every request | IP address |\n"+
-		"| the registration endpoint<br/>Limiter: `register` | 20 per 5 minutes | every request | IP address |\n"+
-		"| `POST /account/register`<br/>Limiter: register_email | 5 per 5 minutes | every request | email |\n"+
-		"| `GET /account/activate`<br/>Limiter: `activate` | 30 per 5 minutes | every request | |\n"+
+		"| Endpoint | Limit | Counts | Counted by | Applies |\n"+
+		"|---|---|---|---|---|\n"+
+		"| `POST /auth/pwd`<br/>Limiter: `pwd_ip` | 30 per 15 minutes | every request | IP address | always |\n"+
+		"| `POST /auth/pwd`<br/>Limiter: `pwd_account` | 10 per 60 minutes | failed sign-ins | email | switch on |\n"+
+		"| `POST /auth/otp`<br/>Limiter: `otp` | 5 per 15 minutes | every request | user | always |\n"+
+		"| `POST /forgot-password`<br/>Limiter: `forgot_pwd_ip` | 20 per 5 minutes | failed requests | IP address | sometimes |\n"+
+		"| `POST /forgot-password` and `POST /reset-password`<br/>Limiter: `forgot_pwd_email` | 5 per 5 minutes | every request | email | always |\n"+
+		"| `POST /forgot-password`<br/>Limiter: `forgot_pwd_email` | 5 per 5 minutes | every request | email, again | always |\n"+
+		"| `POST /connect/register`<br/>Limiter: `dcr` | ten a minute | every request | IP address | switch on |\n"+
+		"| `POST /connect/register`<br/>Limiter: `dcr_retired` | 10 per minute | every request | IP address | switch on |\n"+
+		"| the registration endpoint<br/>Limiter: `register` | 20 per 5 minutes | every request | IP address | switch on |\n"+
+		"| `POST /account/register`<br/>Limiter: register_email | 5 per 5 minutes | every request | email | always |\n"+
+		"| `GET /account/activate`<br/>Limiter: `activate` | 30 per 5 minutes | every request | | switch on |\n"+
 		"| `POST /auth/token`<br/>Limiter: `ropc_ip` | 30 per minute | every request |\n"+
-		"| `POST /auth/pwd` `pwd_ip` | 30 per minute | every request | IP address |\n"+
-		"| `POST /api/v1/account/email/verification`<br/>Limiter: `email_verification` | 5 per 15 minutes | failed codes | user |\n"+
-		"| `POST /auth/token` with `grant_type=password`<br/>Limiter: `ropc_account` | 100 per 60 minutes | failed sign-ins | email |\n"+
-		"| `POST /auth/token`<br/>Limiter: `ropc_account_net` | 10 per 15 minutes | failed sign-ins | IP address and email, shared with `POST /auth/pwd` |\n"+
-		"| `POST /account/register`<br/>Limiter: `register_address` | 5 per 5 minutes | every request | IP address |\n"+
-		"| `GET /reset-password`<br/>Limiter: `reset_pwd` | 30 per 5 minutes | every request | IP address shared with activate |\n"+
-		"| `POST /api/v1/account/email/verification/send`<br/>Limiter: `send` | 5 per 60 minutes | every request | the token's user |\n\n"+
+		"| `POST /auth/pwd` `pwd_ip` | 30 per minute | every request | IP address | switch on |\n"+
+		"| `POST /api/v1/account/email/verification`<br/>Limiter: `email_verification` | 5 per 15 minutes | failed codes | user | always |\n"+
+		"| `POST /auth/token` with `grant_type=password`<br/>Limiter: `ropc_account` | 100 per 60 minutes | failed sign-ins | email | always |\n"+
+		"| `POST /auth/token`<br/>Limiter: `ropc_account_net` | 10 per 15 minutes | failed sign-ins | IP address and email, shared with `POST /auth/pwd` | switch on |\n"+
+		"| `POST /account/register`<br/>Limiter: `register_address` | 5 per 5 minutes | every request | IP address | always |\n"+
+		"| `GET /reset-password`<br/>Limiter: `reset_pwd` | 30 per 5 minutes | every request | IP address shared with activate | switch on |\n"+
+		"| `POST /api/v1/account/email/verification/send`<br/>Limiter: `send` | 5 per 60 minutes | every request | the token's user | always |\n\n"+
 		"## Next\n\n| `POST /auth/token` | `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP and email |\n")
 
 	tiers := []rateLimitTier{
@@ -166,9 +184,12 @@ func TestRateLimitsDocs_ATableDisagreeingWithTheCodeFails(t *testing.T) {
 	where := "site/env.mdx: ## Rate limits"
 	want := []string{
 		where + ` gives pwd_ip the limit "30 per 15 minutes", want "30 per minute"`,
+		where + ` says pwd_ip applies "always", want "switch on"`,
 		where + ` gives pwd_account the limit "10 per 60 minutes", want "100 per 60 minutes"`,
+		where + ` says pwd_account applies "switch on", want "always"`,
 		where + " says otp counts every request, but it counts only failed credential checks",
 		where + " says forgot_pwd_ip counts failures, but it counts every request",
+		where + ` says forgot_pwd_ip applies "sometimes", want "switch on"`,
 		where + " gives forgot_pwd_email the endpoint `POST /reset-password`, which it does not guard",
 		where + " lists forgot_pwd_email on `POST /forgot-password` twice",
 		where + ` says forgot_pwd_email counts by "email, again", want "email"`,
@@ -177,7 +198,7 @@ func TestRateLimitsDocs_ATableDisagreeingWithTheCodeFails(t *testing.T) {
 		where + " gives register no endpoint",
 		where + ` has a row whose limiter is not one backticked limiter name: "register_email"`,
 		where + " says nothing of what activate counts by",
-		where + ` has a row of 3 cells, want endpoint and limiter, limit, counts and counted by: ["` +
+		where + ` has a row of 3 cells, want endpoint and limiter, limit, counts, counted by and applies: ["` +
 			"`POST /auth/token`<br/>Limiter: `ropc_ip`" + `" "30 per minute" "every request"]`,
 		where + ` has a row whose endpoint cell names no limiter on a line of its own: "` + "`POST /auth/pwd` `pwd_ip`" + `"`,
 		where + ` says email_verification counts by "user", want "the token's user"`,
@@ -203,18 +224,18 @@ func TestRateLimitsDocs_ATableMatchingTheCodePasses(t *testing.T) {
 	root := t.TempDir()
 	writeDocFixture(t, root, "site/env.mdx", "## Rate limits\n\n"+
 		"Text before the table.\n\n"+
-		"| Endpoint | Limit | Counts | Counted by |\n"+
-		"|---|---|---|---|\n"+
-		"| `POST /auth/pwd` (password sign-in)<br/>Limiter: `pwd_account` | 100 per 60 minutes | failed sign-ins | email, shared with the password grant |\n"+
-		"| `POST /auth/pwd`<br/>Limiter: `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and email |\n"+
-		"| `POST /auth/pwd`<br/>Limiter: `pwd_ip` | 30 per minute | every request | IP address |\n"+
-		"| `POST /auth/otp`<br/>Limiter: `otp` | 5 per 15 minutes | failed codes | user |\n"+
-		"| `PUT /api/v1/account/password` and `PUT /api/v1/account/otp`<br/>Limiter: `account_password` | 5 per 15 minutes, for the two together | failed passwords | the token's user |\n"+
-		"| `GET /reset-password` and `POST /reset-password`<br/>Limiter: `reset_pwd` | 30 per 5 minutes | every request | IP address |\n"+
-		"| `POST /auth/token` with `grant_type=password`<br/>Limiter: `pwd_account` | 100 per hour | failed sign-ins | username, shared with `POST /auth/pwd` |\n"+
-		"| `POST /auth/token`<br/>Limiter: `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and username, shared with `POST /auth/pwd` |\n"+
-		"| `POST /forgot-password`<br/>Limiter: `forgot_pwd_email` | 5 per 5 minutes | every request | email |\n"+
-		"| `POST /connect/register`<br/>Limiter: `dcr` | 10 per 60 seconds | every request | IP address |\n\n"+
+		"| Endpoint | Limit | Counts | Counted by | Applies |\n"+
+		"|---|---|---|---|---|\n"+
+		"| `POST /auth/pwd` (password sign-in)<br/>Limiter: `pwd_account` | 100 per 60 minutes | failed sign-ins | email, shared with the password grant | always |\n"+
+		"| `POST /auth/pwd`<br/>Limiter: `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and email | switch on |\n"+
+		"| `POST /auth/pwd`<br/>Limiter: `pwd_ip` | 30 per minute | every request | IP address | switch on |\n"+
+		"| `POST /auth/otp`<br/>Limiter: `otp` | 5 per 15 minutes | failed codes | user | always |\n"+
+		"| `PUT /api/v1/account/password` and `PUT /api/v1/account/otp`<br/>Limiter: `account_password` | 5 per 15 minutes, for the two together | failed passwords | the token's user | always |\n"+
+		"| `GET /reset-password` and `POST /reset-password`<br/>Limiter: `reset_pwd` | 30 per 5 minutes | every request | IP address | switch on |\n"+
+		"| `POST /auth/token` with `grant_type=password`<br/>Limiter: `pwd_account` | 100 per hour | failed sign-ins | username, shared with `POST /auth/pwd` | always |\n"+
+		"| `POST /auth/token`<br/>Limiter: `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and username, shared with `POST /auth/pwd` | switch on |\n"+
+		"| `POST /forgot-password`<br/>Limiter: `forgot_pwd_email` | 5 per 5 minutes | every request | email | always |\n"+
+		"| `POST /connect/register`<br/>Limiter: `dcr` | 10 per 60 seconds | every request | IP address | switch on |\n\n"+
 		"- A rule after the table.\n\n"+
 		"## Next\n\nText.\n")
 
@@ -246,8 +267,8 @@ func TestRateLimitsDocs_ATableMatchingTheCodePasses(t *testing.T) {
 func TestRateLimitsDocs_AMissingSectionStops(t *testing.T) {
 	root := t.TempDir()
 	writeDocFixture(t, root, "site/env.mdx", "## Limits\n\n"+
-		"| Endpoint | Limit | Counts | Counted by |\n|---|---|---|---|\n"+
-		"| `POST /connect/register`<br/>Limiter: `dcr` | 10 per minute | every request | IP address |\n")
+		"| Endpoint | Limit | Counts | Counted by | Applies |\n|---|---|---|---|---|\n"+
+		"| `POST /connect/register`<br/>Limiter: `dcr` | 10 per minute | every request | IP address | switch on |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
 		assertRateLimitTable(r, root, docSection{"site/env.mdx", "## Rate limits"},
@@ -276,8 +297,8 @@ func TestRateLimitsDocs_ASectionWithNoTableStops(t *testing.T) {
 func TestRateLimitsDocs_NoTiersStops(t *testing.T) {
 	root := t.TempDir()
 	writeDocFixture(t, root, "site/env.mdx", "## Rate limits\n\n"+
-		"| Endpoint | Limit | Counts | Counted by |\n|---|---|---|---|\n"+
-		"| `POST /connect/register`<br/>Limiter: `dcr` | 10 per minute | every request | IP address |\n")
+		"| Endpoint | Limit | Counts | Counted by | Applies |\n|---|---|---|---|---|\n"+
+		"| `POST /connect/register`<br/>Limiter: `dcr` | 10 per minute | every request | IP address | switch on |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
 		assertRateLimitTable(r, root, docSection{"site/env.mdx", "## Rate limits"}, nil)
@@ -719,11 +740,12 @@ func assertRateLimitTable(r guard.Reporter, root string, section docSection, tie
 }
 
 // rateLimitTableFindings reads the section's table, one row per limiter and endpoint with its
-// limit, what it counts and what it counts by, and returns one finding per row that is malformed,
-// names a limiter the auth server does not have, names no endpoint or one its limiter does not
+// limit, what it counts, what it counts by and whether it always applies, and returns one finding
+// per row that is malformed, names a limiter the auth server does not have, names no endpoint or one its limiter does not
 // guard, lists a limiter on an endpoint a second time, gives a limiter a limit, a window or a
 // counting rule other than its own, says nothing of what it counts by or counts it by other than the
-// key kind the tier declares, or gives a tier a kind the table has no words for; then one per tier with no
+// key kind the tier declares, gives a tier a kind the table has no words for, or says it applies
+// always when the rate limiter switch governs it or the other way round; then one per tier with no
 // row, or with no row for a route it guards. It returns an error, and no findings, for no tiers, or
 // a section not found or holding no table.
 func rateLimitTableFindings(root string, section docSection, tiers []rateLimitTier) ([]string, error) {
@@ -748,8 +770,8 @@ func rateLimitTableFindings(root string, section docSection, tiers []rateLimitTi
 	var findings []string
 	listed := make(map[string]map[string]bool)
 	for _, cells := range rows {
-		if len(cells) != 4 {
-			findings = append(findings, fmt.Sprintf("%s has a row of %d cells, want endpoint and limiter, limit, counts and counted by: %q",
+		if len(cells) != 5 {
+			findings = append(findings, fmt.Sprintf("%s has a row of %d cells, want endpoint and limiter, limit, counts, counted by and applies: %q",
 				where, len(cells), cells))
 			continue
 		}
@@ -759,7 +781,7 @@ func rateLimitTableFindings(root string, section docSection, tiers []rateLimitTi
 				where, cells[0]))
 			continue
 		}
-		limitCell, countsCell, keyCell := cells[1], cells[2], cells[3]
+		limitCell, countsCell, keyCell, appliesCell := cells[1], cells[2], cells[3], cells[4]
 		match := docLimiterCell.FindStringSubmatch(limiterCell)
 		if match == nil {
 			findings = append(findings, fmt.Sprintf("%s has a row whose limiter is not one backticked limiter name: %q",
@@ -822,6 +844,10 @@ func rateLimitTableFindings(root string, section docSection, tiers []rateLimitTi
 			findings = append(findings, where+" says nothing of what "+name+" counts by")
 		} else if finding := docCountedByFinding(keyCell, tier, routes); finding != "" {
 			findings = append(findings, where+finding)
+		}
+
+		if want, ok := docApplies[tier.countedBy]; ok && appliesCell != want {
+			findings = append(findings, fmt.Sprintf("%s says %s applies %q, want %q", where, name, appliesCell, want))
 		}
 	}
 	for _, tier := range tiers {

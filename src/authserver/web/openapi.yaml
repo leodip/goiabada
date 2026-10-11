@@ -3232,9 +3232,9 @@ paths:
 
         Inside that cooldown nothing is sent: the answer is 200 with `tooManyRequests` true and
         `waitInSeconds` holding the seconds left. Changing or verifying the address does not reset
-        the cooldown, and of requests sent at the same moment exactly one sends a code. When the
-        rate limiter is enabled, the operation is also limited to 5 requests per hour per account,
-        answered 429.
+        the cooldown, and of requests sent at the same moment exactly one sends a code. The
+        operation is also limited to 5 requests per hour per account, answered 429, whether or not
+        the rate limiter (GOIABADA_AUTHSERVER_RATELIMITER_ENABLED) is on.
       operationId: sendAccountEmailVerification
       responses:
         '200':
@@ -4068,8 +4068,9 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     TooManyRequests:
       description: |
-        Rate limit reached. Returned only when rate limiting is enabled
-        (GOIABADA_AUTHSERVER_RATELIMITER_ENABLED). error_code is
+        Rate limit reached. Every limit on the account API is counted by
+        the token's user and applies whether or not the rate limiter
+        (GOIABADA_AUTHSERVER_RATELIMITER_ENABLED) is on. error_code is
         TOO_MANY_REQUESTS and a Retry-After header carries the window length
         in seconds.
       headers:
