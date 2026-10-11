@@ -44,23 +44,37 @@ func renderWithLayoutAs(t *testing.T, layout, page string, bind map[string]inter
 	idTokenClaims jwt.MapClaims) string {
 
 	t.Helper()
+	return renderPage(t, layout, page, bind, idTokenClaims, "pt-BR", true)
+}
+
+// renderMenuPageIn is renderMenuPage in the locale named and with email on or off, which every page
+// reads from the auth server's public settings as smtpEnabled.
+func renderMenuPageIn(t *testing.T, page string, bind map[string]interface{}, locale string, smtpEnabled bool) string {
+	t.Helper()
+	return renderPage(t, "/layouts/menu_layout.html", page, bind, nil, locale, smtpEnabled)
+}
+
+func renderPage(t *testing.T, layout, page string, bind map[string]interface{},
+	idTokenClaims jwt.MapClaims, locale string, smtpEnabled bool) string {
+
+	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	settings := &api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: true}
+	settings := &api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: smtpEnabled}
 	req = req.WithContext(reqctx.WithSettings(req.Context(), settings))
 	if idTokenClaims != nil {
 		jwtInfo := oauthclient.JwtInfo{IdToken: &oauth.JwtToken{Claims: idTokenClaims}}
 		req = req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
 	}
-	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
+	req = req.WithContext(i18n.WithLocale(req.Context(), true, locale))
 
 	h := render.New(web.TemplateFS())
 	w := httptest.NewRecorder()
 	err := h.RenderTemplate(w, req, layout, page, bind)
-	require.NoErrorf(t, err, "render %s in pt-BR (template referenced data the bind lacks?)", page)
+	require.NoErrorf(t, err, "render %s in %s (template referenced data the bind lacks?)", page, locale)
 
 	out := w.Body.String()
-	// <html lang> must reflect the active locale, not "en".
-	assert.Containsf(t, out, `lang="pt-BR"`, "%s: <html lang> not localized", page)
+	// <html lang> must reflect the active locale.
+	assert.Containsf(t, out, `lang="`+locale+`"`, "%s: <html lang> not localized", page)
 	// No raw catalog key should leak into visible HTML (scripts hold the JS
 	// bootstrap keys legitimately, so strip them first).
 	visible := regexp.MustCompile(`(?s)<script.*?</script>`).ReplaceAllString(out, "")

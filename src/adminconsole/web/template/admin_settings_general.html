@@ -18,8 +18,25 @@
 
         selfRegistrationEnabled.addEventListener('change', function () {
             refreshSelfRegistrationEmailVerification();
+            updateSelfRegistrationEmailWarning();
         });
         refreshSelfRegistrationEmailVerification();
+
+        // Registration needs email while it requires verification: with both switches on and
+        // email off, the auth server refuses it, so the page says so as the switches change.
+        const smtpEnabled = {{ .smtpEnabled }};
+        const selfRegistrationEmailWarning = document.getElementById('selfRegistrationEmailWarning');
+
+        function updateSelfRegistrationEmailWarning() {
+            if (selfRegistrationEnabled.checked && selfRegistrationRequiresEmailVerification.checked && !smtpEnabled) {
+                selfRegistrationEmailWarning.classList.remove('hidden');
+            } else {
+                selfRegistrationEmailWarning.classList.add('hidden');
+            }
+        }
+
+        selfRegistrationRequiresEmailVerification.addEventListener('change', updateSelfRegistrationEmailWarning);
+        updateSelfRegistrationEmailWarning(); // Initial state
 
         // PKCE warning handling
         const pkceRequired = document.getElementById('pkceRequired');
@@ -239,6 +256,9 @@
                     <input id="selfRegistrationRequiresEmailVerification" type="checkbox" name="selfRegistrationRequiresEmailVerification"
                         class="ml-2 toggle" {{if .settings.SelfRegistrationRequiresEmailVerification}}checked{{end}} />
                 </label>
+            </div>
+            <div id="selfRegistrationEmailWarning" role="alert" class="mt-2 alert alert-warning alert-soft{{if not (and .settings.SelfRegistrationEnabled .settings.SelfRegistrationRequiresEmailVerification (not .smtpEnabled))}} hidden{{end}}">
+                <span>{{ T $.ctx "adminconsole.admin_settings.general.self_registration_email_warning" }}</span>
             </div>
 
             <div class="w-full mt-6 form-control">

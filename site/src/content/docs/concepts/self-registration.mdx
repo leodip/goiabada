@@ -23,7 +23,7 @@ Email verification is on in a new installation, so a new account's address is pr
 
 </Steps>
 
-The sign-in page now shows a **Register** link. To turn self-registration off again, turn off **User self registration enabled** on the same page. Only administrators can then create users. **User self registration requires email verification** keeps its value meanwhile, greyed out, so turning self-registration back on brings back the choice you made.
+The sign-in page now shows a **Register** link. If it doesn't, email isn't set up yet, and **Admin**, **General** shows a warning under **User self registration requires email verification** saying registration is unavailable. To turn self-registration off again, turn off **User self registration enabled** on the same page. Only administrators can then create users. **User self registration requires email verification** keeps its value meanwhile, greyed out, so turning self-registration back on brings back the choice you made.
 
 ## Who can register
 
@@ -34,7 +34,7 @@ The sign-in page now shows a **Register** link. To turn self-registration off ag
 
 While **User self registration enabled** is off, the sign-in page shows no **Register** link and the registration pages lead to a not-found page. Turning it on lets anyone who reaches the sign-in page register. With **User self registration requires email verification** on, they prove their address first, as [With email verification](#with-email-verification) describes. With it off, they don't, as [Without email verification](#without-email-verification) describes.
 
-Email verification needs email. While it's on and email isn't set up, nobody can register: the sign-in page shows no **Register** link and the registration form leads to a not-found page, just as the forgot-password page does without email. Set up email, or turn email verification off, to open registration.
+Email verification needs email. While it's on and email isn't set up, nobody can register: the sign-in page shows no **Register** link and the registration form leads to a not-found page, just as the forgot-password page does without email. Meanwhile **Admin**, **General** shows a warning saying so, under **User self registration requires email verification**. Set up email, or turn email verification off, to open registration.
 
 ## Without email verification
 
