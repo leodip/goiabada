@@ -39,26 +39,38 @@ func refuseSelfRegistrationDisabled(pageRenderer PageRenderer, w http.ResponseWr
 	pageRenderer.NotFound(w, r)
 }
 
-// refuseUnavailableRegistration answers the registration page, or its submission, while
-// registration is unavailable (record.Settings.IsSelfRegistrationAvailable), and says whether it
-// did. Self-registration off is refused as an activation link is. Verification required with email
-// off is refused with the same not-found page and a record of its own, and no audit entry, as
+// RefuseUnavailableRegistration fronts both registration routes, answering every request as a page
+// that isn't there while registration is unavailable (record.Settings.IsSelfRegistrationAvailable).
+// Self-registration off is refused as an activation link is. Verification required with email off
+// is refused with the same not-found page and a record of its own, and no audit entry, as
 // forgot-password's refusal without email writes none: the form used to fall back to creating an
 // unverified account and to answering "already registered" for a taken address, the opposite of
 // what the setting asks for (#526 decision 2).
-func refuseUnavailableRegistration(pageRenderer PageRenderer, settings *record.Settings,
-	w http.ResponseWriter, r *http.Request) bool {
-
-	if settings.IsSelfRegistrationAvailable() {
-		return false
+//
+// It is middleware, mounted ahead of the submission's rate limiter, as ForgotPasswordRequiresEmail
+// is, rather than a check in the handlers: behind the limiter, a refused submission still spent its
+// address's and its client block's budgets, was answered 429 and audited once those ran out, and
+// left the budgets spent when registration opened.
+func RefuseUnavailableRegistration(pageRenderer PageRenderer) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			settings, ok := reqctx.SettingsFrom(r.Context())
+			if !ok {
+				pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
+				return
+			}
+			if settings.IsSelfRegistrationAvailable() {
+				next.ServeHTTP(w, r)
+				return
+			}
+			if !settings.SelfRegistrationEnabled {
+				refuseSelfRegistrationDisabled(pageRenderer, w, r)
+				return
+			}
+			slog.WarnContext(r.Context(), "self-registration request refused because email is not set up")
+			pageRenderer.NotFound(w, r)
+		})
 	}
-	if !settings.SelfRegistrationEnabled {
-		refuseSelfRegistrationDisabled(pageRenderer, w, r)
-		return true
-	}
-	slog.WarnContext(r.Context(), "self-registration request refused because email is not set up")
-	pageRenderer.NotFound(w, r)
-	return true
 }
 
 // registrationCeremonyId is the sign-in the visitor came to this page from, when the password page's
@@ -81,7 +93,7 @@ func registrationCeremonyId(r *http.Request) string {
 }
 
 // registrationRequiresEmailVerification is the mode in which an account comes from the emailed
-// link: "requires email verification" on, which refuseUnavailableRegistration lets through only
+// link: "requires email verification" on, which RefuseUnavailableRegistration lets through only
 // with SMTP on. In it the register form asks for the address alone, and the password is chosen on
 // the form the link leads to (#207 decision 1). Without it the form creates a usable account at
 // once, and asks for the password.
@@ -101,9 +113,6 @@ func HandleRegisterGet(
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
 			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
-			return
-		}
-		if refuseUnavailableRegistration(pageRenderer, settings, w, r) {
 			return
 		}
 
@@ -234,9 +243,6 @@ func HandleRegisterPost(
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
 			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
-			return
-		}
-		if refuseUnavailableRegistration(pageRenderer, settings, w, r) {
 			return
 		}
 

@@ -151,7 +151,7 @@ func TestHandleRegisterGet(t *testing.T) {
 
 	t.Run("Self registration disabled", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
-		handler := HandleRegisterGet(pageRenderer)
+		handler := RefuseUnavailableRegistration(pageRenderer)(HandleRegisterGet(pageRenderer))
 
 		req, _ := http.NewRequest("GET", "/account/register", nil)
 		rr := httptest.NewRecorder()
@@ -197,10 +197,10 @@ func TestHandleRegister_RefusedWhileItRequiresVerificationAndEmailIsOff(t *testi
 
 	newPost := func(pageRenderer *handlersmocks.PageRenderer, database *datamocks.Database,
 		auditLogger *handlersmocks.AuditLogger) http.Handler {
-		return HandleRegisterPost(pageRenderer, database, accounthandlersmocks.NewUserCreator(t),
-			accounthandlersmocks.NewEmailValidator(t), accounthandlersmocks.NewPasswordValidator(t),
-			accounthandlersmocks.NewEmailSender(t), auditLogger, &heldJobs{}, testDataCipher, testBaseURL,
-			testAdminConsoleBaseURL)
+		return RefuseUnavailableRegistration(pageRenderer)(HandleRegisterPost(pageRenderer, database,
+			accounthandlersmocks.NewUserCreator(t), accounthandlersmocks.NewEmailValidator(t),
+			accounthandlersmocks.NewPasswordValidator(t), accounthandlersmocks.NewEmailSender(t), auditLogger,
+			&heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL))
 	}
 	postRequest := func(settings *record.Settings, email string) *http.Request {
 		form := url.Values{"email": {email}, "password": {"password123"}, "passwordConfirmation": {"password123"}}
@@ -217,7 +217,7 @@ func TestHandleRegister_RefusedWhileItRequiresVerificationAndEmailIsOff(t *testi
 		pageRenderer.On("NotFound", rr, req).Return().Once()
 		logs := logtest.CaptureSlog(t)
 
-		HandleRegisterGet(pageRenderer).ServeHTTP(rr, req)
+		RefuseUnavailableRegistration(pageRenderer)(HandleRegisterGet(pageRenderer)).ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
 		assertRegistrationWithoutEmailLogged(t, logs)
@@ -258,7 +258,7 @@ func TestHandleRegister_RefusedWhileItRequiresVerificationAndEmailIsOff(t *testi
 				Run(func(args mock.Arguments) { rendered = args.Get(4).(map[string]interface{}) }).
 				Return(nil).Once()
 
-			HandleRegisterGet(pageRenderer).ServeHTTP(httptest.NewRecorder(), req)
+			RefuseUnavailableRegistration(pageRenderer)(HandleRegisterGet(pageRenderer)).ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NotNil(t, rendered)
 			assert.Equal(t, tc.wantRequiresVerification, rendered["requiresEmailVerification"])
@@ -698,7 +698,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := RefuseUnavailableRegistration(pageRenderer)(HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL))
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -1059,4 +1059,59 @@ func TestHandleRegisterPost_AcceptsAnAddressOfExactlySixtyCharacters(t *testing.
 		"/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Apologies, but this email address is already registered."
 		}))
+}
+
+// RefuseUnavailableRegistration passes an available registration through untouched, refuses an
+// unavailable one without reaching what is behind it, which on the submission route is the limiter
+// (#526 decision 2), and answers a request reaching it with no settings as the handlers do.
+func TestRefuseUnavailableRegistration(t *testing.T) {
+	reached := func(n *int) http.Handler {
+		return http.HandlerFunc(func(http.ResponseWriter, *http.Request) { *n++ })
+	}
+
+	for _, tc := range []struct {
+		name      string
+		settings  *record.Settings
+		wantReach bool
+	}{
+		{"self-registration off", &record.Settings{SelfRegistrationRequiresEmailVerification: true, SMTPEnabled: true}, false},
+		{"verification on and email off", &record.Settings{SelfRegistrationEnabled: true, SelfRegistrationRequiresEmailVerification: true}, false},
+		{"verification off and email off", &record.Settings{SelfRegistrationEnabled: true}, true},
+		{"verification on and email on", &record.Settings{SelfRegistrationEnabled: true, SelfRegistrationRequiresEmailVerification: true, SMTPEnabled: true}, true},
+	} {
+		for _, method := range []string{http.MethodGet, http.MethodPost} {
+			t.Run(tc.name+", "+method, func(t *testing.T) {
+				pageRenderer := handlersmocks.NewPageRenderer(t)
+				req := httptest.NewRequest(method, "/account/register", nil)
+				req = req.WithContext(reqctx.WithSettings(req.Context(), tc.settings))
+				rr := httptest.NewRecorder()
+				if !tc.wantReach {
+					pageRenderer.On("NotFound", rr, req).Return().Once()
+				}
+				calls := 0
+
+				RefuseUnavailableRegistration(pageRenderer)(reached(&calls)).ServeHTTP(rr, req)
+
+				if tc.wantReach {
+					assert.Equal(t, 1, calls)
+				} else {
+					assert.Zero(t, calls, "nothing behind it is reached")
+				}
+				pageRenderer.AssertExpectations(t)
+			})
+		}
+	}
+
+	t.Run("no settings", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		req := httptest.NewRequest(http.MethodPost, "/account/register", nil)
+		rr := httptest.NewRecorder()
+		pageRenderer.On("InternalServerError", rr, req, reqctx.ErrNoSettings).Return().Once()
+		calls := 0
+
+		RefuseUnavailableRegistration(pageRenderer)(reached(&calls)).ServeHTTP(rr, req)
+
+		assert.Zero(t, calls)
+		pageRenderer.AssertExpectations(t)
+	})
 }

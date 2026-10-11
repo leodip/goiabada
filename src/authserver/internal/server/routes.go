@@ -153,10 +153,12 @@ func (s *Server) initRoutes(branches appBranches) {
 	token.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics))
 
 	pages.Route("/account", func(r chi.Router) {
-		r.Get("/register", accounthandlers.HandleRegisterGet(httpHelper))
-		// The POST alone is limited: the GET renders a static form, while the POST probes
-		// whether an address already has an account, sends mail to it and writes a row.
-		r.With(rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleRegisterPost(httpHelper, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL, adminConsoleBaseURL))
+		// While registration is unavailable both routes are a 404 ahead of the limiter, so a refused
+		// submission spends no budget (#526 decision 2). The POST alone is limited: the GET renders
+		// a static form, while the POST probes whether an address already has an account, sends
+		// mail to it and writes a row.
+		r.With(accounthandlers.RefuseUnavailableRegistration(httpHelper)).Get("/register", accounthandlers.HandleRegisterGet(httpHelper))
+		r.With(accounthandlers.RefuseUnavailableRegistration(httpHelper), rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleRegisterPost(httpHelper, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL, adminConsoleBaseURL))
 	})
 	// From emaillinks.AccountActivatePath, as the reset endpoints above are.
 	pages.With(rateLimiter.LimitActivate).Get(emaillinks.AccountActivatePath, accounthandlers.HandleActivateGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
