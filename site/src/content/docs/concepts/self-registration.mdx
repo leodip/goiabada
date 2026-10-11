@@ -7,11 +7,11 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 
 This page helps you decide whether people can create their own accounts, and how they prove their email address when they do.
 
-Self-registration is a user creating their own account, from the **Register** link on the sign-in page, instead of an administrator creating it. It's on in a new installation. Turn it off if only your administrators should create users: the sign-in page then shows no **Register** link.
+Self-registration is a user creating their own account, from the **Register** link on the sign-in page, instead of an administrator creating it. It's off in a new installation, so only your administrators create users until you turn it on.
 
-## Turn on email verification
+## Turn on self-registration
 
-With email verification, a new account's address is proven before the account exists: the person who registers gets a link by email, and chooses their password only after following it.
+Email verification is on in a new installation, so a new account's address is proven before the account exists: the person who registers gets a link by email, and chooses their password only after following it. That needs email, so set it up first.
 
 <Steps>
 
@@ -19,11 +19,20 @@ With email verification, a new account's address is proven before the account ex
 
 2. Open **Admin**, **General**.
 
-3. Turn on **User self registration enabled** and **User self registration requires email verification**, and click **Save**.
+3. Turn on **User self registration enabled**, leave **User self registration requires email verification** on, and click **Save**.
 
 </Steps>
 
-To turn self-registration off, turn off **User self registration enabled** on the same page. Only administrators can then create users. **User self registration requires email verification** keeps its value meanwhile, greyed out, so turning self-registration back on brings back the choice you made.
+The sign-in page now shows a **Register** link. To turn self-registration off again, turn off **User self registration enabled** on the same page. Only administrators can then create users. **User self registration requires email verification** keeps its value meanwhile, greyed out, so turning self-registration back on brings back the choice you made.
+
+## Who can register
+
+| Setting | Default |
+|---|---|
+| **User self registration enabled** | Off |
+| **User self registration requires email verification** | On |
+
+While **User self registration enabled** is off, the sign-in page shows no **Register** link and the registration pages lead to a not-found page. Turning it on lets anyone who reaches the sign-in page register. With **User self registration requires email verification** on, they prove their address first, as [With email verification](#with-email-verification) describes. With it off, they don't, as [Without email verification](#without-email-verification) describes.
 
 ## Without email verification
 
