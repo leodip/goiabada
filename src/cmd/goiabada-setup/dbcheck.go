@@ -92,22 +92,37 @@ func mysqlConfig(t dbTarget) *mysqldriver.Config {
 	return c
 }
 
-// mssqlDSN is mssqldb.DSN, with no encrypt parameter as there: the check must reach a server the way
-// the auth server will, and go-mssqldb reads that as encrypting the login, and the whole session when
-// the server forces encryption, without checking the server's certificate.
+// mssqlDSN is mssqldb.DSN: the query carries the TLS mode's parameters, none for prefer, which
+// go-mssqldb reads as encrypting the login, and the whole session when the server forces
+// encryption, without checking the server's certificate.
 func mssqlDSN(t dbTarget) string { return mssqlURL(t, t.Name) }
 
 // mssqlMaintenanceDSN is mssqldb.MaintenanceDSN: master, where the server creates the database.
 func mssqlMaintenanceDSN(t dbTarget) string { return mssqlURL(t, "master") }
 
+// mssqlTLSQuery is mssqldb's tlsQuery: what each mode adds to the query. The two verifying modes
+// are one string; the CA file and verify-ca's check of the chain alone are added to the
+// configuration the string is parsed into.
+var mssqlTLSQuery = map[string]string{
+	"disable":     "&encrypt=disable",
+	"prefer":      "",
+	"require":     "&encrypt=true&TrustServerCertificate=true",
+	"verify-ca":   "&encrypt=true",
+	"verify-full": "&encrypt=true",
+}
+
 func mssqlURL(t dbTarget, database string) string {
+	mode := t.TLSMode
+	if mode == "" {
+		mode = "prefer"
+	}
 	q := url.Values{}
 	q.Add("database", database)
 	u := url.URL{
 		Scheme:   "sqlserver",
 		User:     url.UserPassword(t.Username, t.Password),
 		Host:     hostport.Join(t.Host, t.Port),
-		RawQuery: q.Encode(),
+		RawQuery: q.Encode() + mssqlTLSQuery[mode],
 	}
 	return u.String()
 }

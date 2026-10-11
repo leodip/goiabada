@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/core/errs"
 	mssql "github.com/microsoft/go-mssqldb"
+	"github.com/microsoft/go-mssqldb/msdsn"
 )
 
 //go:embed migrations/*.sql
@@ -74,15 +75,15 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 	slog.InfoContext(ctx, "using database", "type", "mssql", "username", dbConfig.Username,
 		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name, "tls_mode", string(tlsMode))
 
-	// prefer is the one mode this engine's connection strings carry, so any other stops the start
-	// before anything is dialled rather than connecting as prefer under another name (#502).
-	if tlsMode != data.TLSPrefer {
-		return nil, errs.Errorf("GOIABADA_DB_TLS_MODE %s is not supported on mssql in this build: set it to prefer", tlsMode)
+	// The configuration's load refuses any other value, so only a configuration built directly
+	// reaches this, and it must not connect as prefer under another name (#502).
+	if !tlsMode.Known() {
+		return nil, errs.Errorf("GOIABADA_DB_TLS_MODE %q is not one of the five modes", tlsMode)
 	}
 
 	if dbConfig.Create {
 		// Connect to master database first
-		masterDB, err := sql.Open("sqlserver", MaintenanceDSN(dbConfig))
+		masterDB, err := open(MaintenanceConnConfig(dbConfig))
 		if err != nil {
 			return nil, errs.Wrap(err, "unable to open master database")
 		}
@@ -106,7 +107,7 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 	}
 
 	// Connect to the actual database
-	db, err := sql.Open("sqlserver", DSN(dbConfig))
+	db, err := open(ConnConfig(dbConfig))
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to open database")
 	}
@@ -134,6 +135,17 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 		dbConfig: dbConfig,
 	}
 	return &mssqlDb, nil
+}
+
+// open is sql.Open("sqlserver", dsn) for a configuration rather than a string, which is what
+// carries the CA file's authorities and verify-ca's check of the chain alone: the "sqlserver"
+// driver and NewConnectorConfig build the same connector from what msdsn.Parse reads. Like
+// sql.Open it dials nothing.
+func open(c msdsn.Config, err error) (*sql.DB, error) {
+	if err != nil {
+		return nil, err
+	}
+	return sql.OpenDB(mssql.NewConnectorConfig(c)), nil
 }
 
 // CreateDatabaseResource is the sp_getapplock resource createDatabaseUnderAppLock serializes on.

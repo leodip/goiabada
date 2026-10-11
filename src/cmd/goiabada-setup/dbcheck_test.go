@@ -124,9 +124,7 @@ func TestConnectionStrings_TheDriverReadsTheCaseBack(t *testing.T) {
 						t.Fatalf("%s %q: %v", conn.which, conn.dsn, err)
 					}
 					user, password, gotHost, port, database = parsed.User, parsed.Password, parsed.Host, int(parsed.Port), parsed.Database
-					if parsed.Encryption != msdsn.EncryptionOff || parsed.TLSConfig == nil || !parsed.TLSConfig.InsecureSkipVerify {
-						t.Errorf("%s encryption is %v, want the login encrypted and the certificate unchecked, as the server has it", conn.which, parsed.Encryption)
-					}
+					checkMssqlTLS(t, conn.which, c, parsed)
 				default:
 					t.Fatalf("no parser for %q", c.Engine)
 				}
@@ -165,6 +163,43 @@ func checkPostgresTLS(t *testing.T, which string, c connectionStringCase, parsed
 		got = "verify-ca"
 	case tlsConfig.ServerName == strings.Trim(c.Host, "[]"):
 		got = "verify-full"
+	default:
+		got = "a certificate check naming no host"
+	}
+	if got != mode {
+		t.Errorf("%s reads back as %s, want %s", which, got, mode)
+	}
+	if tlsConfig != nil && (tlsConfig.RootCAs != nil || len(tlsConfig.Certificates) > 0) {
+		t.Errorf("%s carries roots or a client certificate the string cannot have named", which)
+	}
+}
+
+// checkMssqlTLS holds what go-mssqldb reads out of a case's string to the case's mode, as #502
+// decision 2 defines it: whether the login or the whole session is encrypted, with no plain-text
+// fallback outside prefer, and whether the certificate and the host are checked. The two verifying
+// modes are one string: what makes verify-ca check the chain alone, and either of them trust the CA
+// file, is added to the configuration the string is parsed into, which no string can carry.
+func checkMssqlTLS(t *testing.T, which string, c connectionStringCase, parsed msdsn.Config) {
+	t.Helper()
+	mode := c.TLSMode
+	if mode == "" {
+		mode = "prefer"
+	}
+	tlsConfig := parsed.TLSConfig
+	var got string
+	switch {
+	case parsed.Encryption == msdsn.EncryptionDisabled && tlsConfig == nil:
+		got = "disable"
+	case tlsConfig == nil:
+		got = "encrypted with no TLS configuration"
+	case parsed.Encryption == msdsn.EncryptionOff && tlsConfig.InsecureSkipVerify:
+		got = "prefer"
+	case parsed.Encryption != msdsn.EncryptionRequired:
+		got = "an encryption no mode names"
+	case tlsConfig.InsecureSkipVerify:
+		got = "require"
+	case tlsConfig.ServerName == strings.Trim(c.Host, "[]") && (mode == "verify-ca" || mode == "verify-full"):
+		got = mode
 	default:
 		got = "a certificate check naming no host"
 	}

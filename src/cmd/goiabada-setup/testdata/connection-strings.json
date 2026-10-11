@@ -290,6 +290,66 @@
       "database": "goiabada",
       "dsn": "sqlserver://goiabada:pw@[::1]:1433?database=goiabada",
       "maintenanceDSN": "sqlserver://goiabada:pw@[::1]:1433?database=master"
+    },
+    {
+      "name": "tls mode disable",
+      "engine": "mssql",
+      "host": "db.example.com",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "disable",
+      "dsn": "sqlserver://goiabada:pw@db.example.com:1433?database=goiabada&encrypt=disable",
+      "maintenanceDSN": "sqlserver://goiabada:pw@db.example.com:1433?database=master&encrypt=disable"
+    },
+    {
+      "name": "tls mode prefer",
+      "engine": "mssql",
+      "host": "db.example.com",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "prefer",
+      "dsn": "sqlserver://goiabada:pw@db.example.com:1433?database=goiabada",
+      "maintenanceDSN": "sqlserver://goiabada:pw@db.example.com:1433?database=master"
+    },
+    {
+      "name": "tls mode require",
+      "engine": "mssql",
+      "host": "db.example.com",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "require",
+      "dsn": "sqlserver://goiabada:pw@db.example.com:1433?database=goiabada&encrypt=true&TrustServerCertificate=true",
+      "maintenanceDSN": "sqlserver://goiabada:pw@db.example.com:1433?database=master&encrypt=true&TrustServerCertificate=true"
+    },
+    {
+      "name": "tls mode verify-ca",
+      "engine": "mssql",
+      "host": "db.example.com",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "verify-ca",
+      "dsn": "sqlserver://goiabada:pw@db.example.com:1433?database=goiabada&encrypt=true",
+      "maintenanceDSN": "sqlserver://goiabada:pw@db.example.com:1433?database=master&encrypt=true"
+    },
+    {
+      "name": "tls mode verify-full",
+      "engine": "mssql",
+      "host": "db.example.com",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "verify-full",
+      "dsn": "sqlserver://goiabada:pw@db.example.com:1433?database=goiabada&encrypt=true",
+      "maintenanceDSN": "sqlserver://goiabada:pw@db.example.com:1433?database=master&encrypt=true"
     }
   ]
 }

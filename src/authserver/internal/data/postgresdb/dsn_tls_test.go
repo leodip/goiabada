@@ -1,22 +1,16 @@
 package postgresdb
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
-	"math/big"
-	"net"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/data/tlstest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,94 +23,6 @@ import (
 
 const tlsTestHost = "db.example.com"
 
-// authority is a certificate authority made for one test.
-type authority struct {
-	cert *x509.Certificate
-	key  *ecdsa.PrivateKey
-	pem  []byte
-}
-
-func newAuthority(t *testing.T, name string) authority {
-	t.Helper()
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(t, err)
-	template := &x509.Certificate{
-		SerialNumber:          big.NewInt(1),
-		Subject:               pkix.Name{CommonName: name},
-		NotBefore:             time.Now().Add(-time.Hour),
-		NotAfter:              time.Now().Add(time.Hour),
-		IsCA:                  true,
-		KeyUsage:              x509.KeyUsageCertSign,
-		BasicConstraintsValid: true,
-	}
-	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
-	require.NoError(t, err)
-	cert, err := x509.ParseCertificate(der)
-	require.NoError(t, err)
-	return authority{cert: cert, key: key, pem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})}
-}
-
-func (a authority) pool() *x509.CertPool {
-	p := x509.NewCertPool()
-	p.AddCert(a.cert)
-	return p
-}
-
-// issue signs a certificate naming host, for a server or, with client set, a client.
-func (a authority) issue(t *testing.T, host string, client bool) tls.Certificate {
-	t.Helper()
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(t, err)
-	usage := x509.ExtKeyUsageServerAuth
-	if client {
-		usage = x509.ExtKeyUsageClientAuth
-	}
-	template := &x509.Certificate{
-		SerialNumber: big.NewInt(time.Now().UnixNano()),
-		Subject:      pkix.Name{CommonName: host},
-		DNSNames:     []string{host},
-		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(time.Hour),
-		KeyUsage:     x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:  []x509.ExtKeyUsage{usage},
-	}
-	der, err := x509.CreateCertificate(rand.Reader, template, a.cert, &key.PublicKey, a.key)
-	require.NoError(t, err)
-	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}
-}
-
-// handshake runs a TLS handshake from client to a server presenting serverCert, and answers the
-// client's error, nil when the client accepted the server. Over loopback TCP rather than net.Pipe:
-// a client refusing the certificate writes its alert while the server is still writing its flight,
-// which an unbuffered pipe holds until the deadline.
-func handshake(t *testing.T, client *tls.Config, serverCert tls.Certificate) error {
-	t.Helper()
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	defer func() { _ = listener.Close() }()
-
-	served := make(chan struct{})
-	go func() {
-		defer close(served)
-		conn, acceptErr := listener.Accept()
-		if acceptErr != nil {
-			return
-		}
-		_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
-		server := tls.Server(conn, &tls.Config{Certificates: []tls.Certificate{serverCert}, MinVersion: tls.VersionTLS12})
-		_ = server.Handshake()
-		_ = conn.Close()
-	}()
-
-	conn, err := net.DialTimeout("tcp", listener.Addr().String(), 10*time.Second)
-	require.NoError(t, err)
-	require.NoError(t, conn.SetDeadline(time.Now().Add(10*time.Second)))
-	err = tls.Client(conn, client).Handshake()
-	_ = conn.Close()
-	<-served
-	return err
-}
-
 // tlsCertificates are the server certificates every mode is shown against.
 type tlsCertificates struct {
 	ours      *x509.CertPool  // the authority the CA file holds
@@ -127,13 +33,13 @@ type tlsCertificates struct {
 
 func newTLSCertificates(t *testing.T) tlsCertificates {
 	t.Helper()
-	ours := newAuthority(t, "ours")
-	theirs := newAuthority(t, "theirs")
+	ours := tlstest.NewAuthority(t, "ours")
+	theirs := tlstest.NewAuthority(t, "theirs")
 	return tlsCertificates{
-		ours:      ours.pool(),
-		oursForDB: ours.issue(t, tlsTestHost, false),
-		oursOther: ours.issue(t, "other.example.com", false),
-		theirs:    theirs.issue(t, tlsTestHost, false),
+		ours:      ours.Pool(),
+		oursForDB: ours.Issue(t, tlsTestHost),
+		oursOther: ours.Issue(t, "other.example.com"),
+		theirs:    theirs.Issue(t, tlsTestHost),
 	}
 }
 
@@ -200,7 +106,7 @@ func assertEveryModeMaps(t *testing.T, certs tlsCertificates) {
 					{"our authority's certificate for another host", certs.oursOther, tt.accepts.oursOther},
 					{"another authority's certificate for the host dialled", certs.theirs, tt.accepts.theirs},
 				} {
-					err := handshake(t, parsed.TLSConfig, server.cert)
+					err := tlstest.Handshake(t, parsed.TLSConfig, server.cert)
 					if server.accept {
 						assert.NoErrorf(t, err, "%s is accepted", server.name)
 					} else {
@@ -226,8 +132,8 @@ func TestConnConfig_EveryModeMaps(t *testing.T) {
 // certificate, no SNI and direct negotiation. Every mode still maps as it does with none of them.
 func TestConnConfig_TheEnvironmentNoLongerReachesTheConnection(t *testing.T) {
 	certs := newTLSCertificates(t)
-	theirs := newAuthority(t, "the environment's authority")
-	clientCert := theirs.issue(t, "goiabada", true)
+	theirs := tlstest.NewAuthority(t, "the environment's authority")
+	clientCert := theirs.IssueClient(t, "goiabada")
 	clientKeyDER, err := x509.MarshalPKCS8PrivateKey(clientCert.PrivateKey)
 	require.NoError(t, err)
 	clientCertPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: clientCert.Certificate[0]})
@@ -244,13 +150,13 @@ func TestConnConfig_TheEnvironmentNoLongerReachesTheConnection(t *testing.T) {
 	t.Run("each variable naming a file that exists", func(t *testing.T) {
 		cleanLibpqEnvironment(t)
 		home := filepath.Join(dir, "home")
-		write("home/.postgresql/root.crt", theirs.pem)
+		write("home/.postgresql/root.crt", theirs.PEM)
 		write("home/.postgresql/postgresql.crt", clientCertPEM)
 		write("home/.postgresql/postgresql.key", clientKeyPEM)
 		t.Setenv("HOME", home)
 
 		t.Setenv("PGSSLMODE", "disable")
-		t.Setenv("PGSSLROOTCERT", write("root.pem", theirs.pem))
+		t.Setenv("PGSSLROOTCERT", write("root.pem", theirs.PEM))
 		t.Setenv("PGSSLCERT", write("client.pem", clientCertPEM))
 		t.Setenv("PGSSLKEY", write("client.key", clientKeyPEM))
 		t.Setenv("PGSSLPASSWORD", "unused")
