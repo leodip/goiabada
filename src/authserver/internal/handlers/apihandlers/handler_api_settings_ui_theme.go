@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/uithemes"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // HandleSettingsUIThemeGet - GET /api/v1/admin/settings/ui-theme
@@ -65,7 +66,7 @@ func HandleSettingsUIThemePut(
 				}
 			}
 			if !valid {
-				writeJSONError(w, "Invalid theme.", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsUIThemeInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 		}

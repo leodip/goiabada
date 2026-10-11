@@ -72,6 +72,17 @@ func TestCatalog_ParityEnPtBR(t *testing.T) {
 // prompt=login, nor login_hint, whose spelling is the protocol's.
 var logInOrOut = regexp.MustCompile(`(?i)(?:^|[^=\w])log(?:ged|ging)?(?:[ -]?|\s+(?:you|them|me|us)\s+)(?:in|out)\b`)
 
+// smtpMechanisms matches the SMTP authentication mechanisms a refusal names, in the capitals RFC 4954
+// and the SASL registry spell them. LOGIN there is a protocol value, as prompt=login is, and not the
+// UI's word for signing in.
+var smtpMechanisms = regexp.MustCompile(`\b(?:PLAIN|LOGIN|CRAM-MD5)\b`)
+
+// saysLogInOrOut reports whether v says login or logout as a word, once the protocol values above
+// are taken out.
+func saysLogInOrOut(v string) bool {
+	return logInOrOut.MatchString(smtpMechanisms.ReplaceAllString(v, ""))
+}
+
 // TestCatalog_EnglishSaysSignInAndSignOut holds the English catalog to the
 // glossary's words (#519): "sign in" and "sign out" as verbs, "sign-in" as the
 // noun, never login or logout, and "signed out" for what a sign-out leaves.
@@ -79,18 +90,18 @@ var logInOrOut = regexp.MustCompile(`(?i)(?:^|[^=\w])log(?:ged|ging)?(?:[ -]?|\s
 // working.
 func TestCatalog_EnglishSaysSignInAndSignOut(t *testing.T) {
 	for k, v := range loadCatalogFlat(t, "active.en.toml") {
-		assert.Falsef(t, logInOrOut.MatchString(v), "active.en.toml: key %q says %q; the UI says sign in, sign out and sign-in", k, v)
+		assert.Falsef(t, saysLogInOrOut(v), "active.en.toml: key %q says %q; the UI says sign in, sign out and sign-in", k, v)
 	}
 }
 
 func TestCatalog_LogInOrOutMatchesOnlyTheWords(t *testing.T) {
 	for _, v := range []string{"Login", "Logout", "Are you sure you want to logout?", "shown on login and consent screens", "Log in", "log-in page",
 		"Log out now", "Logged out", "You have been logged out.", "while logging in", "the application that logged you out"} {
-		assert.Truef(t, logInOrOut.MatchString(v), "%q should match", v)
+		assert.Truef(t, saysLogInOrOut(v), "%q should match", v)
 	}
 	for _, v := range []string{"Sign in", "Sign out", "the sign-in page", "You have been signed out.", "prompt=login", "login_hint", "catalogue",
-		"logo uploads", "the audit log is", "logged into the audit log"} {
-		assert.Falsef(t, logInOrOut.MatchString(v), "%q should not match", v)
+		"logo uploads", "the audit log is", "logged into the audit log", "The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5."} {
+		assert.Falsef(t, saysLogInOrOut(v), "%q should not match", v)
 	}
 }
 

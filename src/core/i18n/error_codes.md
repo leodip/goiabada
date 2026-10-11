@@ -129,7 +129,7 @@ status it always had (`VALIDATION_ERROR`, `CONCURRENT_UPDATE`,
 `VALUE_TOO_LONG`, `EMAIL_TOO_LONG`, `OTP_NOT_ENABLED`, `AUTHENTICATION_FAILED`,
 `SMTP_NOT_ENABLED`, `INVALID_OR_EXPIRED_VERIFICATION_CODE`, `OTP_ALREADY_ENABLED`,
 `SECRET_KEY_NOT_ACCEPTED`, `OTP_CODE_REQUIRED`, `INVALID_OTP_CODE`,
-`OTP_ENROLLMENT_NOT_PENDING`), so the key is not on the wire: only
+`OTP_ENROLLMENT_NOT_PENDING`, `SEND_FAILED`, `ROTATION_IN_PROGRESS`), so the key is not on the wire: only
 `error_description` comes from here, in the request's language.
 The resource permissions save's description bound reuses
 `handler.admin_resource_permissions.description_too_long` above, a group's and
@@ -140,7 +140,12 @@ and `handler.admin_resource_permissions.description_too_long`. The account API's
 disable of an authenticator it does not have reuses `handler.user.otp_not_enabled`,
 its wrong code on enabling one `handler.otp.incorrect_code`, its email
 verification send's conflict `handler.email_verification.account_changed`, and
-its phone country refusal `validator.phone.country_invalid`.
+its phone country refusal `validator.phone.country_invalid`. The token settings'
+offline idle timeout above its max lifetime reuses
+`handler.client_tokens.offline_idle_timeout_above_max_lifetime`, and the test
+email's SMTP being off and missing destination reuse `handler.smtp.not_enabled`
+and `handler.settings_email.destination_required`. The SMTP connection and send
+failures are one key per cause, each a whole sentence.
 
 | Code | Args | English message |
 |---|---|---|
@@ -224,6 +229,56 @@ its phone country refusal `validator.phone.country_invalid`.
 | `handler.account_logout.client_identifier_invalid` | (none) | Invalid client identifier |
 | `handler.account_logout.client_unresolved` | (none) | Unable to resolve client from postLogoutRedirectUri; supply clientIdentifier. |
 | `handler.account_logout.post_logout_redirect_uri_not_registered` | (none) | postLogoutRedirectUri is not registered for the client |
+| `handler.settings_general.app_name_too_long` | `max` (int) | App name is too long. The maximum length is {{.max}} characters. |
+| `handler.settings_general.issuer_uri_invalid` | (none) | Invalid issuer. Please enter a valid URI. |
+| `handler.settings_general.issuer_identifier_invalid` | (none) | Invalid issuer. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores. |
+| `handler.settings_general.issuer_too_short` | `min` (int) | Issuer is too short. The minimum length is {{.min}} characters. |
+| `handler.settings_general.issuer_too_long` | `max` (int) | Issuer is too long. The maximum length is {{.max}} characters. |
+| `handler.settings_general.password_policy_invalid` | (none) | Invalid password policy |
+| `handler.settings_sessions.idle_timeout_not_positive` | (none) | User session - idle timeout in seconds must be greater than zero. |
+| `handler.settings_sessions.max_lifetime_not_positive` | (none) | User session - max lifetime in seconds must be greater than zero. |
+| `handler.settings_sessions.idle_timeout_too_large` | `max` (int) | User session - idle timeout in seconds cannot be greater than {{.max}}. |
+| `handler.settings_sessions.max_lifetime_too_large` | `max` (int) | User session - max lifetime in seconds cannot be greater than {{.max}}. |
+| `handler.settings_sessions.idle_timeout_above_max_lifetime` | (none) | User session - the idle timeout cannot be greater than the max lifetime. |
+| `handler.settings_tokens.token_expiration_not_positive` | (none) | Token expiration in seconds must be greater than zero. |
+| `handler.settings_tokens.token_expiration_too_large` | `max` (int) | Token expiration in seconds cannot be greater than {{.max}}. |
+| `handler.settings_tokens.offline_idle_timeout_not_positive` | (none) | Refresh token offline - idle timeout in seconds must be greater than zero. |
+| `handler.settings_tokens.offline_idle_timeout_too_large` | `max` (int) | Refresh token offline - idle timeout in seconds cannot be greater than {{.max}}. |
+| `handler.settings_tokens.offline_max_lifetime_not_positive` | (none) | Refresh token offline - max lifetime in seconds must be greater than zero. |
+| `handler.settings_tokens.offline_max_lifetime_too_large` | `max` (int) | Refresh token offline - max lifetime in seconds cannot be greater than {{.max}}. |
+| `handler.settings_email.smtp_host_required` | (none) | SMTP host is required. |
+| `handler.settings_email.smtp_port_required` | (none) | SMTP port is required. |
+| `handler.settings_email.smtp_from_email_required` | (none) | SMTP from email is required. |
+| `handler.settings_email.smtp_host_too_long` | `max` (int) | SMTP host must be less than {{.max}} characters. |
+| `handler.settings_email.smtp_port_out_of_range` | (none) | SMTP port must be between 1 and 65535. |
+| `handler.settings_email.smtp_encryption_invalid` | (none) | Invalid SMTP encryption. |
+| `handler.settings_email.smtp_username_too_long` | `max` (int) | SMTP username must be less than {{.max}} characters. |
+| `handler.settings_email.smtp_password_too_long` | `max` (int) | SMTP password must be at most {{.max}} bytes. |
+| `handler.settings_email.smtp_from_name_too_long` | `max` (int) | SMTP from name must be less than {{.max}} characters. |
+| `handler.settings_email.smtp_from_email_too_long` | `max` (int) | SMTP from email must be less than {{.max}} characters. |
+| `handler.settings_email.smtp_password_and_clear` | (none) | Send either a new SMTP password or clearSmtpPassword, not both. |
+| `handler.settings_email.smtp_host_changed` | (none) | The SMTP host has changed: enter the SMTP password again, or remove it. |
+| `handler.settings_email.connect_failed_host_not_found` | (none) | Unable to connect to the SMTP server: host name not found. |
+| `handler.settings_email.connect_failed_timed_out` | (none) | Unable to connect to the SMTP server: connection timed out. |
+| `handler.settings_email.connect_failed_refused` | (none) | Unable to connect to the SMTP server: connection refused. |
+| `handler.settings_email.connect_failed` | (none) | Unable to connect to the SMTP server. |
+| `handler.settings_email.send_failed_host_not_found` | (none) | Unable to send the test email: host name not found. |
+| `handler.settings_email.send_failed_timed_out` | (none) | Unable to send the test email: connection timed out. |
+| `handler.settings_email.send_failed_refused` | (none) | Unable to send the test email: connection refused. |
+| `handler.settings_email.send_failed` | (none) | Unable to send the test email. |
+| `handler.settings_email.starttls_not_offered` | (none) | The SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS. |
+| `handler.settings_email.password_unencrypted` | (none) | The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS. |
+| `handler.settings_email.no_authentication` | (none) | SMTP credentials are configured but the server offers no authentication. |
+| `handler.settings_email.no_supported_mechanism` | (none) | The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5. |
+| `handler.settings_email.tls_failed` | (none) | The TLS connection failed; check the encryption setting and the server's certificate. |
+| `handler.settings_email.authentication_rejected` | (none) | The SMTP server rejected the username or password. |
+| `handler.settings_email.message_refused` | (none) | The SMTP server refused the message. |
+| `handler.settings_keys.rotation_in_progress` | (none) | Another key rotation is in progress |
+| `handler.settings_keys.key_not_found` | (none) | Key not found |
+| `handler.settings_keys.only_previous_revocable` | (none) | Only a previous key can be revoked |
+| `handler.settings_ui_theme.theme_invalid` | (none) | Invalid theme. |
+| `handler.settings_audit_logs.retention_days_negative` | (none) | Audit log retention days cannot be negative. Use 0 for infinite retention. |
+| `handler.settings_audit_logs.retention_days_too_large` | (none) | Audit log retention days cannot exceed 3650 days (10 years). |
 
 ## Password validator
 

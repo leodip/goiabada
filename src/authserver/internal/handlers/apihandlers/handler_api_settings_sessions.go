@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // HandleSettingsSessionsGet - GET /api/v1/admin/settings/sessions
@@ -57,24 +57,24 @@ func HandleSettingsSessionsPut(
 
 		// Validation
 		if req.UserSessionIdleTimeoutInSeconds <= 0 {
-			writeJSONError(w, "User session - idle timeout in seconds must be greater than zero.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsIdleTimeoutNotPositive, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if req.UserSessionMaxLifetimeInSeconds <= 0 {
-			writeJSONError(w, "User session - max lifetime in seconds must be greater than zero.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsMaxLifetimeNotPositive, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		const maxValue = 160000000
 		if req.UserSessionIdleTimeoutInSeconds > maxValue {
-			writeJSONError(w, fmt.Sprintf("User session - idle timeout in seconds cannot be greater than %v.", maxValue), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsIdleTimeoutTooLarge, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if req.UserSessionMaxLifetimeInSeconds > maxValue {
-			writeJSONError(w, fmt.Sprintf("User session - max lifetime in seconds cannot be greater than %v.", maxValue), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsMaxLifetimeTooLarge, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if req.UserSessionIdleTimeoutInSeconds > req.UserSessionMaxLifetimeInSeconds {
-			writeJSONError(w, "User session - the idle timeout cannot be greater than the max lifetime.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsIdleTimeoutAboveMaxLifetime, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		// The cap is required: a PUT replaces the whole resource, and an absent or null value read
