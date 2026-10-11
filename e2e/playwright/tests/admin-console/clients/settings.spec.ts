@@ -70,6 +70,25 @@ test("renaming a client asks first, and the new identifier is what the list show
   await expect(clientRow(page, client.identifier)).toHaveCount(0);
 });
 
+// Two confirmations in a row: the rename's, then the administrative scopes'. Both share one <dialog>,
+// and the second is opened from the first's Yes, before that Yes closes the dialog.
+test("renaming and allowing administrative scopes in one save asks both, then saves both", async ({ page, clients }) => {
+  const client = await clients.create();
+  const renamed = `${client.identifier}-r`;
+  await page.goto(clientUrl(client.id, "settings"));
+  await page.locator('input[name="clientIdentifier"]').fill(renamed);
+  await page.locator("#administrativeScopesAllowed").check();
+  await page.locator("#btnSave").click();
+  const dialog = page.locator("dialog[open]");
+  await expect(dialog).toContainText("You've modified the client identifier");
+  await dialog.getByRole("button", { name: "Yes" }).click();
+  await expect(dialog).toContainText("You are allowing this client to request the administrative scopes");
+  await dialog.getByRole("button", { name: "Yes" }).click();
+  await expect(page.getByText(saved)).toBeVisible();
+  await expect(page.locator('input[name="clientIdentifier"]')).toHaveValue(renamed);
+  await expect(page.locator("#administrativeScopesAllowed")).toBeChecked();
+});
+
 test("an invalid identifier is refused on save, and nothing changes", async ({ page, clients }) => {
   const client = await clients.create();
   await page.goto(clientUrl(client.id, "settings"));

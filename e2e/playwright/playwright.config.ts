@@ -22,8 +22,12 @@ export default defineConfig({
   },
   projects: [
     // Sweeps what earlier runs left, before any test starts.
-    { name: "setup", testMatch: /.*\.setup\.ts/ },
+    { name: "setup", testMatch: /.*\.setup\.ts/, teardown: "system" },
     // Each worker signs the administrator in for itself (lib/fixtures.ts).
     { name: "chromium", use: { ...devices["Desktop Chrome"] }, dependencies: ["setup"] },
+    // Tries changes to what Goiabada itself depends on, which its guards must refuse. Were one to land,
+    // every other test would run against it, so these run once all of them have finished, pass or
+    // fail: as setup's teardown, which runs after every project depending on setup.
+    { name: "system", testMatch: /.*\.system\.ts/, use: { ...devices["Desktop Chrome"] } },
   ],
 });

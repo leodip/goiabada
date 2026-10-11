@@ -66,7 +66,11 @@ reset:
   `lib/fixtures.ts`). The setup step (`tests/admin.setup.ts`) sweeps anything left with that prefix by
   a run that crashed.
 - **It changes nothing global**: no settings, and the system client and the system resource
-  (`authserver`) are only read; a test reaching their save answers No to the confirmation.
+  (`authserver`) are only read; a test reaching their save answers No to the confirmation. The one
+  exception is the tests that try changes Goiabada's guards must refuse, such as renaming `authserver`
+  past its read-only field. They are named `*.system.ts` and run in the `system` project, which
+  `playwright.config.ts` makes run after every other test, alone. If a guard ever let a change through,
+  the test puts it back before failing.
 - **It never depends on what another test did**, or on counts or order.
 - **Each worker signs the administrator in for itself, with a user agent of its own** (`lib/devices.ts`).
   Goiabada treats a sign-in from the same user agent and address as the same device and ends that
