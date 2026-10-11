@@ -7,11 +7,13 @@ package sqlitedb
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"embed"
 	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -63,19 +65,20 @@ func New(ctx context.Context, dsn string, logSQL bool) (*Database, error) {
 	// (#320).
 	slog.InfoContext(ctx, "using database", "type", "sqlite", "dsn", dsn)
 
-	db, err := sql.Open("sqlite", dsn)
+	connector, err := sqlitedriver.NewConnector(dsn)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to open database")
 	}
+	db := sql.OpenDB(configuringConnector{Connector: connector})
 
 	Pool().ApplyTo(db)
 
-	// The ping comes before the PRAGMAs because the first statement on the pool is what opens
-	// the file, so it is what an unopenable file fails: behind the PRAGMAs, an operator read
-	// "failed to execute PRAGMA foreign_keys = ON" for a path that does not exist, and this
-	// branch was unreachable for that input. errors.As rather than a type assertion, and the
-	// driver's error kept in the chain with SQLite's own name for the code beside it, e.g.
-	// "Unable to open the database file (SQLITE_CANTOPEN)" (#438 decision 4).
+	// The ping comes before the journal mode because the ping's connection is the first the pool
+	// opens, with the connector's per-connection PRAGMAs, so it is what an unopenable file fails:
+	// behind the PRAGMAs, an operator read "failed to execute PRAGMA foreign_keys = ON" for a path
+	// that does not exist, and this branch was unreachable for that input. errors.As rather than
+	// a type assertion, and the driver's error kept in the chain with SQLite's own name for the
+	// code beside it, e.g. "Unable to open the database file (SQLITE_CANTOPEN)" (#438 decision 4).
 	if err = db.PingContext(ctx); err != nil {
 		_ = db.Close()
 		var sqliteErr *sqlitedriver.Error
@@ -116,23 +119,73 @@ func codeName(code int) string {
 	return sqlitedriver.ErrorCodeString[code&0xff]
 }
 
-// applyPragmas sets the PRAGMAs Goiabada requires on db and reads each back, refusing a value
-// that did not take. WAL is skipped for an in-memory database, which has no journal file.
-func applyPragmas(ctx context.Context, db *sql.DB, dsn string) error {
-	pragmaStatements := []string{
-		"PRAGMA foreign_keys = ON;",
-		"PRAGMA busy_timeout = 5000;",
-	}
+// connectionPragmas are the settings SQLite keeps per connection rather than in the file, so
+// configuringConnector applies them to every connection the pool opens.
+var connectionPragmas = []string{
+	"PRAGMA foreign_keys = ON;",
+	"PRAGMA busy_timeout = 5000;",
+}
 
+// configuringConnector opens each of the pool's connections with connectionPragmas applied. The
+// pool's one connection is not the only one it ever opens: a query whose context ends is
+// interrupted, SQLite clears an interrupt only when the connection's next statement starts, so the
+// driver reports the connection unusable and database/sql opens another in its place. Applied once
+// to the pool, as they were, the settings held on the first connection alone, and a request
+// cancelled mid-query left the rest of the process with foreign keys off and no busy timeout (#562).
+type configuringConnector struct {
+	driver.Connector
+}
+
+func (c configuringConnector) Connect(ctx context.Context) (driver.Conn, error) {
+	conn, err := c.Connector.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	execer, ok := conn.(driver.ExecerContext)
+	if !ok {
+		_ = conn.Close()
+		return nil, errs.New("the sqlite driver's connection cannot execute a statement")
+	}
+	for _, stmt := range connectionPragmas {
+		if _, err := execer.ExecContext(ctx, stmt, nil); err != nil {
+			_ = conn.Close()
+			return nil, errs.Wrapf(err, "failed to execute %s", stmt)
+		}
+	}
+	return conn, nil
+}
+
+// Close folds the WAL into the database file before closing the pool, so a stopped server leaves
+// the database in one file (#542). SQLite does that when its last connection closes, but a
+// checkpoint gives up while an interrupt is pending, and the connection a cancelled query
+// interrupted is closed by database/sql with the interrupt still pending: when that was the last
+// connection, as on a server stopped while its first query ran, the -wal and -shm stayed beside
+// the file with the data in them (#562). The checkpoint runs on a connection without one, which
+// the pool's close then closes last. The pool is closed whether or not the checkpoint succeeds.
+func (d *Database) Close() error {
+	ctx, cancel := context.WithTimeout(context.Background(), closeCheckpointTimeout)
+	defer cancel()
+	_, checkpointErr := d.DB.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE);")
+	closeErr := d.Database.Close()
+	if checkpointErr != nil {
+		return errs.Join(errs.Wrap(checkpointErr, "unable to checkpoint the WAL"), closeErr)
+	}
+	return closeErr
+}
+
+// closeCheckpointTimeout bounds Close's wait for the pool's connection and for the checkpoint,
+// past the busy timeout another process holding a lock would make it wait.
+const closeCheckpointTimeout = 10 * time.Second
+
+// applyPragmas sets the journal mode, which SQLite keeps in the file, and reads back every
+// setting Goiabada requires, refusing a value that did not take. WAL is skipped for an in-memory
+// database, which has no journal file.
+func applyPragmas(ctx context.Context, db *sql.DB, dsn string) error {
 	// Only set journal_mode to WAL if it's not an in-memory database
 	isMemoryDB := strings.Contains(dsn, ":memory:")
 	if !isMemoryDB {
-		pragmaStatements = append(pragmaStatements, "PRAGMA journal_mode = WAL;")
-	}
-
-	for _, stmt := range pragmaStatements {
-		if _, err := db.ExecContext(ctx, stmt); err != nil {
-			return errs.Wrapf(err, "failed to execute %s", stmt)
+		if _, err := db.ExecContext(ctx, "PRAGMA journal_mode = WAL;"); err != nil {
+			return errs.Wrap(err, "failed to execute PRAGMA journal_mode = WAL;")
 		}
 	}
 
