@@ -673,7 +673,8 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 // TestInitRoutes_TokenFormThatDoesNotParse drives POST /auth/token through the real registration,
 // the limiter and the token handler with its real validator, and requires the same 400
 // invalid_request whether the limiter is on or off, with nothing past the parse reached. The limiter
-// parses the form first when it is on, and it used to forward a failure: net/http kept the pairs
+// parses the form first, on or off since the account-wide tier applies either way (#503), and it used
+// to forward a failure: net/http kept the pairs
 // that did parse, the handler's own ParseForm answered nil over them, and the request was validated
 // as if those pairs were all it carried. A repeated parameter whose second copy was malformed passed
 // as sent once, and a password grant beside one malformed pair reached the password check past both
@@ -787,4 +788,140 @@ func TestInitRoutes_ForgotPasswordWithEmailOffSpendsNoBudget(t *testing.T) {
 	assertRefused(t, exhaust(t, server, forgotPwdEmailBudget, func(int) *http.Request {
 		return browserForm(http.MethodPost, "/forgot-password", "email=one@example.com")
 	}), forgotPwdWindow, shapeBrowser)
+}
+
+// newDefaultRoutesTestServer is newRoutesTestServer with GOIABADA_AUTHSERVER_RATELIMITER_ENABLED at
+// its zero value, which is its default and what the setup wizard writes for a Kubernetes install
+// under the Cluster traffic policy.
+func newDefaultRoutesTestServer(t *testing.T) *Server {
+	t.Helper()
+	return newRoutesTestServerWith(t, func(cfg *config.Config) {
+		cfg.AuthServer.RateLimiterEnabled = false
+	})
+}
+
+// pwdCeremonyCookie mints the session cookie a browser at the password form carries: an auth context
+// at the level 1 password state, through the server's own session store as otpCeremonyCookie does.
+func pwdCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
+	t.Helper()
+
+	r := httptest.NewRequest(http.MethodGet, "/auth/pwd", nil)
+	sess, err := s.sessionStore.Get(r, sessionkeys.AuthServerSessionName)
+	require.NoError(t, err)
+
+	authContext, err := json.Marshal(ceremony.AuthContext{
+		AuthState:  ceremony.AuthStateLevel1Password,
+		CeremonyId: routesTestCeremonyId,
+		ClientId:   routesTestClientId,
+	})
+	require.NoError(t, err)
+	sess.Values[sessionkeys.AuthContext] = string(authContext)
+
+	recorder := httptest.NewRecorder()
+	require.NoError(t, s.sessionStore.Save(r, recorder, sess))
+	cookies := recorder.Result().Cookies()
+	require.Len(t, cookies, 1)
+	return cookies[0]
+}
+
+// TestInitRoutes_TheDefaultConfigurationLimitsWhatAnEmailCounts drives the production routes with the
+// rate limiter switch at its default, off, and requires the limits counted by a user or by an email to
+// apply all the same (#503 decision 7). Off is #219's default and the wizard's Cluster default, and
+// until #503 it left nothing bounding how many passwords anyone could guess against one account, which
+// RFC 6749 section 4.3.2 makes a MUST for the password grant, nor how many reset mails or registration
+// notices one address could be sent.
+//
+// Every request comes from one client address, which is what shows the tiers the switch governs are
+// off: the hundred wrong passwords reaching the handler is past both pwd_ip's 30 a minute and
+// pwd_account_net's 10, and the hundred and first refused with an hour's Retry-After is the account-wide
+// tier and no other.
+func TestInitRoutes_TheDefaultConfigurationLimitsWhatAnEmailCounts(t *testing.T) {
+	const pwdAccountBudget = 100 // failures per 60 minutes per account, shared with the password grant
+	const pwdAccountWindow = 3600
+
+	t.Run("100 wrong passwords for one email from one address reach the handler, the 101st is refused, and so is the password grant", func(t *testing.T) {
+		server := newDefaultRoutesTestServer(t)
+		cookie := pwdCeremonyCookie(t, server)
+
+		// The account is unknown to the database mock, so each guess takes the handler's
+		// unknown-address branch, which charges the failure as a wrong password does.
+		guess := func(int) *http.Request {
+			r := browserForm(http.MethodPost, "/auth/pwd",
+				"ceremonyId="+routesTestCeremonyId+"&email=victim%40example.com&password="+routesTestWrongPassword)
+			r.AddCookie(cookie)
+			return r
+		}
+		for i := 0; i < pwdAccountBudget; i++ {
+			rr := serve(server, guess(i))
+			require.Equal(t, http.StatusOK, rr.Code, "guess %d must reach the handler, which answers the form again", i+1)
+			require.Contains(t, rr.Body.String(), routesTestCeremonyId,
+				"guess %d must be answered by the password form, not refused before it", i+1)
+		}
+		assertRefused(t, serve(server, guess(pwdAccountBudget)), pwdAccountWindow, shapeBrowser)
+
+		// The password grant spends the same account's bucket, so it is refused too, in the shape
+		// the token endpoint's caller parses.
+		assertRefused(t, serve(server, browserForm(http.MethodPost, "/auth/token",
+			"grant_type=password&username=Victim%40Example.com&password="+routesTestWrongPassword)),
+			pwdAccountWindow, shapeOAuth)
+
+		// Another account is untouched, so what refused was the account's own tier.
+		assert.True(t, reachesHandler(server, browserForm(http.MethodPost, "/auth/token",
+			"grant_type=password&username=other%40example.com&password="+routesTestWrongPassword)),
+			"another account keeps its budget")
+	})
+
+	t.Run("the 6th wrong one-time code is refused", func(t *testing.T) {
+		server := newDefaultRoutesTestServer(t)
+		cookie := otpCeremonyCookie(t, server)
+		wrongCode := routesTestWrongOTPCode(t)
+
+		assertRefused(t, exhaust(t, server, otpBudget, func(int) *http.Request {
+			r := browserForm(http.MethodPost, "/auth/otp", "ceremonyId="+routesTestCeremonyId+"&otp="+wrongCode)
+			r.AddCookie(cookie)
+			return r
+		}), otpWindow, shapeBrowser)
+	})
+
+	t.Run("the 6th forgot-password request for one address is refused", func(t *testing.T) {
+		server := newDefaultRoutesTestServer(t)
+		assertRefused(t, exhaust(t, server, forgotPwdEmailBudget, func(int) *http.Request {
+			return browserForm(http.MethodPost, "/forgot-password", "email=one@example.com")
+		}), forgotPwdWindow, shapeBrowser)
+
+		assert.True(t, reachesHandler(server, browserForm(http.MethodPost, "/forgot-password",
+			"email=another@example.com")),
+			"a second address has its own budget, and the per-IP tier is off")
+	})
+
+	t.Run("the 6th registration for one address is refused", func(t *testing.T) {
+		server := newDefaultRoutesTestServer(t)
+		assertRefused(t, exhaust(t, server, registerEmailBudget, func(int) *http.Request {
+			return browserForm(http.MethodPost, "/account/register", "email=one@example.com")
+		}), registerWindow, shapeBrowser)
+
+		assert.True(t, reachesHandler(server, browserForm(http.MethodPost, "/account/register",
+			"email=another@example.com")),
+			"a second address has its own budget, and the per-IP tier is off")
+	})
+
+	// The tiers the switch still governs, each spent well past its budget from one address with a
+	// fresh account or address each time, so only a per-IP tier could refuse.
+	t.Run("the tiers counted by an address stay off", func(t *testing.T) {
+		server := newDefaultRoutesTestServer(t)
+		for i := 0; i < 2*forgotPwdIpBudget; i++ {
+			require.True(t, reachesHandler(server, browserForm(http.MethodPost, "/forgot-password",
+				"email=user"+strconv.Itoa(i)+"@example.com")), "forgot-password request %d", i+1)
+			require.True(t, reachesHandler(server, registrationOf(i)), "registration %d", i+1)
+		}
+		for i := 0; i < 2*activateBudget; i++ {
+			require.True(t, reachesHandler(server, browserRequest(http.MethodGet, "/account/activate")), "activation %d", i+1)
+			require.True(t, reachesHandler(server, browserRequest(http.MethodGet, "/reset-password")), "reset %d", i+1)
+		}
+		for i := 0; i < 60; i++ {
+			require.True(t, reachesHandler(server, browserForm(http.MethodPost, "/auth/token",
+				"grant_type=password&username=user"+strconv.Itoa(i)+"%40example.com&password="+routesTestWrongPassword)),
+				"password grant %d", i+1)
+		}
+	})
 }

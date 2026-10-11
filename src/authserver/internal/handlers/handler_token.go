@@ -99,8 +99,8 @@ func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenReques
 	// A body that cannot be parsed is the client's malformed request, RFC 6749 section 5.2's
 	// invalid_request, and not a server fault: a url-encoding broken by the client, or a body cut
 	// at the request-body limit (#426). Answered as a 500 it wrote an Error record for every one.
-	// With the ROPC limiter on, its own ParseForm meets the failure first and answers it with this
-	// same refusal. It cannot forward the request: net/http keeps the pairs that did parse, and this
+	// On the production route the ROPC limiter's own ParseForm meets the failure first, whatever the
+	// rate limiter switch says (#503), and answers it with this same refusal. It cannot forward the request: net/http keeps the pairs that did parse, and this
 	// ParseForm would then answer nil over them (#437).
 	if err := r.ParseForm(); err != nil {
 		return nil, protocolvalidation.UnparseableRequest()

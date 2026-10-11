@@ -115,7 +115,9 @@ func TestRateLimiter_CountsEveryRefusalUnderItsLimiter(t *testing.T) {
 		assert.Equal(t, everyLimiterAtZeroBut(t, reg, nil), refusalCounts(t, reg))
 	})
 
-	t.Run("a disabled limiter refuses nothing", func(t *testing.T) {
+	// Forty failures against one account from one address: under the account-wide tier's hundred,
+	// which is all the switch off leaves of the password pair (#503).
+	t.Run("the limiter switched off refuses nothing under the account-wide budget", func(t *testing.T) {
 		m, _, reg := newMeteredTestMiddleware(nil, false)
 		for i := 0; i < 40; i++ {
 			runPwd(m, "x@example.com", "203.0.113.1:5000", true)

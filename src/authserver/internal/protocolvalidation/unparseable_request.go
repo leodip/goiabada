@@ -11,7 +11,9 @@ import (
 // malformed request, RFC 6749 section 5.2's invalid_request, and never a server fault (#426).
 //
 // Two places answer it, because whichever parses the form first is the one that sees the failure:
-// LimitROPC when the rate limiter is on, HandleTokenPost when it is off. net/http keeps the pairs
+// LimitROPC, which parses first on the production route whatever the rate limiter switch says since
+// its account-wide tier applies either way (#503), and HandleTokenPost wherever it runs without that
+// limiter in front. net/http keeps the pairs
 // that did parse and answers a second ParseForm with nil, so the second reader can never see it. Both
 // call this, so the two answers cannot drift apart (#228, #437).
 func UnparseableRequest() *oauth.ErrorDetail {
