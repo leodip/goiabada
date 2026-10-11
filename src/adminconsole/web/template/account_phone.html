@@ -43,7 +43,10 @@
             </label>
             <input type="text" id="phoneNumber" name="phoneNumber"
                 class="w-full input input-bordered" value="{{.phoneNumber}}" autocomplete="off" autofocus />
-
+            <label class="label">
+                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.phone.field.number_hint" }}</span>
+                <span></span>
+            </label>
         </div>
 
     </div>

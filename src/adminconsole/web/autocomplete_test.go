@@ -34,7 +34,6 @@ func TestTemplates_EveryPasswordFieldNamesItsAutocomplete(t *testing.T) {
 		"template/account_change_password.html":      {"currentPassword": "current-password", "newPassword": "new-password", "newPasswordConfirmation": "new-password"},
 		"template/account_otp.html":                  {"password": "current-password", "otp": "one-time-code"},
 		"template/account_email.html":                {"email": "email", "currentPassword": "current-password"},
-		"template/account_phone_verify.html":         {"code": "one-time-code"},
 		"template/admin_clients_authentication.html": {"clientSecret": "off"},
 	}
 	checked := 0

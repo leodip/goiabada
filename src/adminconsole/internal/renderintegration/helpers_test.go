@@ -58,7 +58,21 @@ func renderPage(t *testing.T, layout, page string, bind map[string]interface{},
 	idTokenClaims jwt.MapClaims, locale string, smtpEnabled bool) string {
 
 	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	return renderPageAt(t, "/", layout, page, bind, idTokenClaims, locale, smtpEnabled)
+}
+
+// renderMenuPageAt is renderMenuPage requested at the path named, which the menus read as urlPath to
+// mark the page the user is on.
+func renderMenuPageAt(t *testing.T, path, page string, bind map[string]interface{}) string {
+	t.Helper()
+	return renderPageAt(t, path, "/layouts/menu_layout.html", page, bind, nil, "pt-BR", true)
+}
+
+func renderPageAt(t *testing.T, path, layout, page string, bind map[string]interface{},
+	idTokenClaims jwt.MapClaims, locale string, smtpEnabled bool) string {
+
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, path, nil)
 	settings := &api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: smtpEnabled}
 	req = req.WithContext(reqctx.WithSettings(req.Context(), settings))
 	if idTokenClaims != nil {
