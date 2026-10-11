@@ -138,11 +138,12 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `key_id` | The key id (`kid`) of a deleted signing key. |
 | `limiter` | The name of the rate limiter that refused. |
 | `logged_in_user` | The subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow. Empty on the entries a sign-out or a sign-in writes, which no token makes. |
+| `max_user_sessions_per_user` | Under `old` and `new`: the most sessions one user can hold, 0 for no limit. |
 | `method` | The HTTP method of a refused Admin API request. |
-| `new` | The default token settings after the change, keyed as below. |
+| `new` | The default token settings, or the session settings, after the change, keyed as below. |
 | `new_generation` | The user's authentication generation after their sessions and tokens were revoked. |
 | `new_ui_theme` | The UI theme after the change. |
-| `old` | The default token settings before the change, keyed as below. |
+| `old` | The default token settings, or the session settings, before the change, keyed as below. |
 | `old_generation` | The user's authentication generation before their sessions and tokens were revoked. |
 | `old_ui_theme` | The UI theme before the change. |
 | `outcome` | What a registration or forgot-password request led to, such as `link_issued`, `code_issued` or `unknown_address`. |
@@ -178,6 +179,8 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `user_attribute_id` | The row id of a user's custom attribute. |
 | `user_id` | The user's row id. |
 | `user_session_id` | The row id of a user's session. |
+| `user_session_idle_timeout_in_seconds` | Under `old` and `new`: the session idle timeout, in seconds. |
+| `user_session_max_lifetime_in_seconds` | Under `old` and `new`: the session maximum lifetime, in seconds. |
 
 ## Why a session was deleted
 
@@ -187,6 +190,7 @@ Every `deleted_user_session` entry has a `reason`, so you can filter on why sess
 |---|---|
 | `replaced_by_sign_in` | The user signed in again, and the new session replaced the one the browser had. |
 | `same_device` | The user signed in again, and the new session replaced another of their sessions from the same browser, recognized by its [device cookie](/concepts/sessions/#how-the-auth-server-recognizes-a-browser). |
+| `session_cap` | The user signed in, and would have held more sessions than **User session - max sessions per user** allows, so this one, expired or the least recently used, was ended. See [How many sessions a user can hold](/concepts/sessions/#how-many-sessions-a-user-can-hold). |
 | `replaced_by_other_user` | Another user signed in on the browser that held it. |
 | `signed_out` | The user signed out. |
 | `ended_by_user` | The user ended it from their account. |
@@ -362,7 +366,7 @@ These come from the Account API, which users reach through the admin console's a
 |---|---|
 | `updated_general_settings` | An administrator saved the **General** settings. |
 | `updated_ui_theme_settings` | An administrator changed the **UI theme**. The entry names the old and the new theme. |
-| `updated_sessions_settings` | An administrator changed the session idle timeout or maximum lifetime. |
+| `updated_sessions_settings` | An administrator changed the session settings: the idle timeout, the maximum lifetime, or the most sessions one user can hold. The entry holds the old and the new values. |
 | `updated_tokens_settings` | An administrator changed the default token settings. The entry holds the old and the new values. |
 | `updated_smtp_settings` | An administrator changed the **Email - SMTP** settings, including turning email on or off. |
 | `sent_test_email` | An administrator sent a test email, and the mail server accepted it. |

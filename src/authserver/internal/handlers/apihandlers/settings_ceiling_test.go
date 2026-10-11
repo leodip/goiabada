@@ -251,7 +251,7 @@ func TestSettingsCeiling_ManageSettingsKeepsTheOtherSettings(t *testing.T) {
 	database.On("UpdateSettings", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*record.Settings")).Return(nil).Once()
 	records := recordLoggedEvents(auditLogger)
 
-	body := `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":86400}`
+	body := `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":86400,"maxUserSessionsPerUser":20}`
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/sessions", strings.NewReader(body))
 	r = r.WithContext(reqctx.WithSettings(r.Context(), &record.Settings{}))
 	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage-settings", "sub": grantCaller})

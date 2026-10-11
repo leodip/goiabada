@@ -101,8 +101,8 @@ func TestMigration000062_UserSessionPasswordAuthTime(t *testing.T) {
 
 	// The ORM writes every column the record carries, so it writes at head: at 000062 a column a later
 	// migration adds is not there yet, 000063's device_id among them.
-	if err := h.Migrator.Up(ctx); err != nil && !errors.Is(err, migrator.ErrNoChange) {
-		require.NoError(t, err, "migrate to head for the round trip")
+	if upErr := h.Migrator.Up(ctx); upErr != nil && !errors.Is(upErr, migrator.ErrNoChange) {
+		require.NoError(t, upErr, "migrate to head for the round trip")
 	}
 	written := seedSession()
 	read, err := h.DB.GetUserSessionById(ctx, nil, written.Id)

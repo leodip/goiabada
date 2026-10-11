@@ -214,7 +214,7 @@ func TestAuthCompleted_ALegacyRestartedContextIsDeniedAnEmptyScope(t *testing.T)
 	userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), testIdleTimeoutInSeconds,
 		testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
 	userSessionManager.On("StartNewUserSession", rr, req, int64(1),
-		signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(0), (*int64)(nil), "", (*record.UserSession)(nil)).
+		signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(0), (*int64)(nil), "", (*record.UserSession)(nil), testSessionLimits).
 		Return(&record.UserSession{Id: 1, UserId: 1, AcrLevel: record.AcrLevel1, AuthTime: pwdAuthTime}, nil, nil)
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1, Enabled: true}, nil)

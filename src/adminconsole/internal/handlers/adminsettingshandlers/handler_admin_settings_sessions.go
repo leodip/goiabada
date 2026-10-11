@@ -45,6 +45,7 @@ func HandleSessionsGet(
 		settingsInfo := SettingsSessionGet{
 			UserSessionIdleTimeoutInSeconds: apiResp.UserSessionIdleTimeoutInSeconds,
 			UserSessionMaxLifetimeInSeconds: apiResp.UserSessionMaxLifetimeInSeconds,
+			MaxUserSessionsPerUser:          apiResp.MaxUserSessionsPerUser,
 		}
 
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
@@ -94,6 +95,7 @@ func HandleSessionsPost(
 		settingsInfo := SettingsSessionPost{
 			UserSessionIdleTimeoutInSeconds: r.FormValue("userSessionIdleTimeoutInSeconds"),
 			UserSessionMaxLifetimeInSeconds: r.FormValue("userSessionMaxLifetimeInSeconds"),
+			MaxUserSessionsPerUser:          r.FormValue("maxUserSessionsPerUser"),
 		}
 
 		renderError := func(message string) {
@@ -122,9 +124,17 @@ func HandleSessionsPost(
 			}
 		}
 
+		// The cap is always sent (#564 decision 6). 0 is a cap, no limit, so invalid input cannot
+		// become 0 as above: it becomes -1, which the auth server refuses with its range message.
+		maxSessionsInt := -1
+		if p, err := strconv.Atoi(settingsInfo.MaxUserSessionsPerUser); err == nil {
+			maxSessionsInt = p
+		}
+
 		updateReq := &api.UpdateSettingsSessionsRequest{
 			UserSessionIdleTimeoutInSeconds: idleInt,
 			UserSessionMaxLifetimeInSeconds: maxInt,
+			MaxUserSessionsPerUser:          &maxSessionsInt,
 		}
 
 		_, err := apiClient.UpdateSettingsSessions(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
