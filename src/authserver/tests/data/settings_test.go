@@ -21,6 +21,7 @@ func TestCreateSettings(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds:   604800,
 		UserSessionIdleTimeoutInSeconds:           1800,
 		UserSessionMaxLifetimeInSeconds:           43200,
+		MaxUserSessionsPerUser:                    35,
 		IncludeOpenIDConnectClaimsInAccessToken:   true,
 		IncludeOpenIDConnectClaimsInIdToken:       true,
 		AESEncryptionKeyLegacy:                    []byte("testaes"),
@@ -75,6 +76,9 @@ func TestUpdateSettings(t *testing.T) {
 	settings.RefreshTokenOfflineMaxLifetimeInSeconds = 1209600
 	settings.UserSessionIdleTimeoutInSeconds = 3600
 	settings.UserSessionMaxLifetimeInSeconds = 86400
+	// 0 is no limit, a value of its own: it must be stored as 0, not replaced by the column's
+	// default of 20 (#564).
+	settings.MaxUserSessionsPerUser = 0
 	settings.IncludeOpenIDConnectClaimsInAccessToken = false
 	settings.IncludeOpenIDConnectClaimsInIdToken = false
 	// AESEncryptionKeyLegacy is migration-only (dont-update); UpdateSettings must
@@ -144,6 +148,7 @@ func createTestSettings(t *testing.T) *record.Settings {
 		RefreshTokenOfflineMaxLifetimeInSeconds:   604800,
 		UserSessionIdleTimeoutInSeconds:           1800,
 		UserSessionMaxLifetimeInSeconds:           43200,
+		MaxUserSessionsPerUser:                    35,
 		IncludeOpenIDConnectClaimsInAccessToken:   true,
 		IncludeOpenIDConnectClaimsInIdToken:       true,
 		AESEncryptionKeyLegacy:                    []byte("testaes"),
@@ -200,6 +205,9 @@ func compareSettings(t *testing.T, expected, actual *record.Settings) {
 	}
 	if actual.UserSessionMaxLifetimeInSeconds != expected.UserSessionMaxLifetimeInSeconds {
 		t.Errorf("Expected UserSessionMaxLifetimeInSeconds %d, got %d", expected.UserSessionMaxLifetimeInSeconds, actual.UserSessionMaxLifetimeInSeconds)
+	}
+	if actual.MaxUserSessionsPerUser != expected.MaxUserSessionsPerUser {
+		t.Errorf("Expected MaxUserSessionsPerUser %d, got %d", expected.MaxUserSessionsPerUser, actual.MaxUserSessionsPerUser)
 	}
 	if actual.IncludeOpenIDConnectClaimsInAccessToken != expected.IncludeOpenIDConnectClaimsInAccessToken {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInAccessToken %v, got %v", expected.IncludeOpenIDConnectClaimsInAccessToken, actual.IncludeOpenIDConnectClaimsInAccessToken)

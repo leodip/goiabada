@@ -35,6 +35,11 @@ type UserSession struct {
 	// browser name, so keying the sweep on them meant every change of parser or of label
 	// format silently changed which sessions superseded which (#281).
 	UserAgent string `db:"user_agent"`
+	// DeviceId names the browser that started the session: the SHA-256, in hex, of the value of the
+	// auth server's device cookie, never the value itself, so a database read hands out nothing a
+	// browser could present (#564). It is empty on a session stored before migration 000063, and an
+	// empty identifier names no browser.
+	DeviceId string `db:"device_id"`
 	// AuthStateGeneration records the user's generation when this session was
 	// created. Tagged dont-update so an ordinary full-row UpdateUserSession cannot
 	// regress it: it is written on insert and afterwards only by
