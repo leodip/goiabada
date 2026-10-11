@@ -90,8 +90,8 @@ func dialogAnswerFaults(src string) ([]string, bool) {
 		}
 	}
 
-	switch {
-	case answer == "":
+	switch answer {
+	case "":
 		faults = append(faults, "no inner function of showModalDialog prevents the dialog form's default; "+
 			"the form then closes the dialog after the callback, and any question the callback asked with it (#562)")
 	default:
