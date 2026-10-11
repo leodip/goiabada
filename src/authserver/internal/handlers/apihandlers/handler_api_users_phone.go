@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/phonecountries"
 )
 
@@ -110,10 +111,12 @@ func HandleUserPhonePut(
 			return
 		}
 
-		// Look up the phone country
+		// Look up the phone country. ValidatePhone has already refused a country it does not know, so
+		// this is a second line, and it says the validator's sentence under the code it always wrote
+		// (#559).
 		phoneCountry, found := phonecountries.ByUniqueID(input.PhoneCountryUniqueId)
 		if !found && len(input.PhoneCountryUniqueId) > 0 {
-			writeJSONError(w, "Phone country is invalid: "+input.PhoneCountryUniqueId, "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodePhoneCountryInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 

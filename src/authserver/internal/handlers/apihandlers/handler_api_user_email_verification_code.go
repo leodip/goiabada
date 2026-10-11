@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // userEmailVerificationCodeDatabase is what the user email verification code endpoint needs: the
@@ -79,7 +80,7 @@ func HandleUserEmailVerificationCodePost(
 			return
 		}
 		if !stored {
-			writeJSONError(w, "The account was changed by another request while the code was being sent. Nothing was sent: try again.", "CONCURRENT_UPDATE", http.StatusConflict)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeEmailVerificationAccountChanged, nil), "CONCURRENT_UPDATE", http.StatusConflict)
 			return
 		}
 

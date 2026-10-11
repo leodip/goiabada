@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // groupMembersDatabase is what the group membership endpoints need: the group, its members, and
@@ -149,7 +150,7 @@ func HandleGroupMemberAddPost(
 			return
 		}
 		if existingUserGroup != nil {
-			writeJSONError(w, "User is already a member of this group", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupMemberAlreadyMember, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -253,7 +254,7 @@ func HandleGroupMemberDelete(
 			return
 		}
 		if userGroup == nil {
-			writeJSONError(w, "User is not a member of this group", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupMemberNotMember, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 

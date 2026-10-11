@@ -133,7 +133,7 @@ func HandleUserGroupsPut(
 		// Refused on the body alone, before any query: the ids are not read one at a time, so the
 		// cost of an oversized array is paid by the validation below rather than by the caller.
 		if len(request.GroupIds) > maxGroupIdsPerRequest {
-			writeJSONError(w, "Too many group ids", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserGroupsTooMany, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
