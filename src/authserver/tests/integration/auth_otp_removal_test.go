@@ -85,8 +85,8 @@ func TestOtpCeremony_RemovingTheAuthenticatorLowersEverySession(t *testing.T) {
 	httpClient, _, _, user := signInAtLevel3(t)
 
 	// A second session of the same user, on another device, which stepped up with a code half an
-	// hour after its password. Written directly, because a second sign-in from this suite's one
-	// address and user agent would replace the first as the same device.
+	// hour after its password. Written directly, so its password and code can be an hour old, which
+	// is what tells the lowered auth_time from the code's.
 	passwordAt := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
 	other := &record.UserSession{
 		SessionIdentifier: fake.UUID(),

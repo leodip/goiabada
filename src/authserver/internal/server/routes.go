@@ -46,7 +46,8 @@ func (s *Server) initRoutes(branches appBranches) {
 	identifierValidator := inputvalidation.NewIdentifierValidator()
 
 	codeIssuer := issuance.NewCodeIssuer(s.database)
-	userSessionManager := usersession.NewManager(s.sessionStore, sessionkeys.AuthServerSessionName, s.database)
+	userSessionManager := usersession.NewManager(s.sessionStore, sessionkeys.AuthServerSessionName, s.database,
+		s.cfg.AuthServer.IsCookieSecure())
 	otpSecretGenerator := otp.NewKeyGenerator()
 	tokenIssuer := issuance.NewTokenIssuer(s.database, s.cfg.AuthServer.BaseURL, s.dataCipher, userSessionManager)
 	// The tokens the token endpoint and /auth/issue answer with, and the token requests refused,

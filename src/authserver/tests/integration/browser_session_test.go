@@ -35,21 +35,30 @@ import (
 // what made four documentation pages tell operators to enlarge their proxy buffers. The
 // size is now a function of nothing a deployment can configure, and this is the case that
 // keeps it that way.
+//
+// The browser holds one other cookie beside it since #564, the device cookie, which names the
+// browser rather than any session and is just as fixed: 64 hex characters. So a session still costs
+// one cookie, and a signed-in browser holds exactly the two.
 func TestBrowserSession_CostsExactlyOneSmallCookie(t *testing.T) {
 	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
 
-	cookies := browserCookies(t, httpClient)
-	require.Len(t, cookies, 1, "a signed-in browser must hold exactly one Goiabada cookie")
-	assert.Equal(t, browserSessionCookieName(), cookies[0].Name)
+	cookies := map[string]*http.Cookie{}
+	for _, cookie := range browserCookies(t, httpClient) {
+		cookies[cookie.Name] = cookie
+	}
+	require.Len(t, cookies, 2, "a signed-in browser must hold exactly two Goiabada cookies: its session's and its device's")
+	session, device := cookies[browserSessionCookieName()], cookies[deviceCookieName()]
+	require.NotNil(t, session, "one of them is the session cookie")
+	require.NotNil(t, device, "and the other the device cookie")
 
-	// What the browser puts in its single Cookie: header on the next request, counted the
+	// What the browser puts in its Cookie: header on the next request for each, counted the
 	// way RFC 6265 section 4.2.1 has it serialised: name, "=", value, and "; " between
-	// pairs. One cookie so there is one pair, and the measurement stays comparable with
-	// the figures in the issue.
-	wireBytes := len(cookies[0].Name) + 1 + len(cookies[0].Value) + 2
+	// pairs. The session's measurement stays comparable with the figures in the issue.
+	wireBytes := len(session.Name) + 1 + len(session.Value) + 2
 	assert.Less(t, wireBytes, 300,
 		"the identifier is a fixed 64 hex characters, so this cannot grow with anything a "+
 			"deployment configures; if it has, something other than an identifier is in the cookie")
+	assert.Len(t, device.Value, 64, "the device cookie is an identifier and nothing else")
 }
 
 // TestBrowserSession_IdentifierRotatesAtSignIn is the property that makes a server-side

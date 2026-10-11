@@ -86,11 +86,22 @@ Once the user has signed in, the auth server checks them again before it records
 Then it records the sign-in in a session:
 
 - **The browser's session is valid and the user's own.** It's reused: its last activity moves forward, and its ACR level goes up when this sign-in reached a higher one. Reusing it never lowers its level. When the user entered a credential in this sign-in, its `auth_time` is updated to then. A sign-in that asked for the password again, such as one with `prompt=login`, replaces the session's level and methods with its own, as described in [A session that's already there](/concepts/acr-and-amr/#a-session-thats-already-there).
-- **Otherwise, a new session starts.** It replaces the user's own session the browser had, if it had one that's no longer valid, and the user's other sessions from the same device, which means the same browser `User-Agent` and the same IP address. Nothing those sessions handed out is revoked, though their normal refresh tokens stop working with them. A session the browser had for **another** user is ended, as [Ending sessions](/concepts/ending-sessions/#a-different-user-signs-in-on-the-same-browser) describes.
+- **Otherwise, a new session starts.** It replaces the user's own session the browser had, if it had one that's no longer valid, and the user's other sessions from the same browser, which the browser's [device cookie](#how-the-auth-server-recognizes-a-browser) tells apart. Sessions in any other browser stay, even one sending the same `User-Agent` from the same IP address, like a second browser profile or a colleague's machine behind the same router. Nothing those sessions handed out is revoked, though their normal refresh tokens stop working with them. A session the browser had for **another** user is ended, as [Ending sessions](/concepts/ending-sessions/#a-different-user-signs-in-on-the-same-browser) describes.
 
 A new session needs a password entered in this sign-in. A sign-in that was relying on a session that ended partway through goes back to the password step rather than starting one from nothing.
 
 The cookie's identifier changes whenever a session starts and whenever its ACR level goes up, so an identifier copied before the sign-in names nothing afterwards.
+
+## How the auth server recognizes a browser
+
+To know which of a user's sessions came from the browser they're signing in on, the auth server gives each browser a cookie of its own, `__Host-authserver_device`, or `authserver_device` when the auth server's base URL is plain `http`. It's a first-party cookie the auth server needs to work, not a tracker: it holds a random identifier, 32 bytes from a secure random generator, only the auth server reads it, and it's used for one thing, ending the user's own earlier sessions from that browser when they sign in again.
+
+- **It's written when a sign-in starts a new session,** and lasts 400 days from then, the longest a browser keeps a cookie. A browser that already has one keeps its identifier. Single sign-on through an existing session doesn't touch it.
+- **Signing out doesn't clear it,** and neither does an administrator ending a session: it names the browser, not a session.
+- **A session stores the identifier's SHA-256, never the identifier.** Neither is shown in the admin console, returned by an API, logged or written to the audit log.
+- **A browser whose cookies were cleared counts as a new browser.** Its next sign-in leaves the old session alone, and that one expires on its own.
+
+The browser and IP address shown on a sessions page are there for you to read. They don't decide which sessions a sign-in replaces.
 
 ## Closing the browser
 

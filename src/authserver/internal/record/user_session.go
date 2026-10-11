@@ -28,17 +28,15 @@ type UserSession struct {
 	DeviceType       string    `db:"device_type"`
 	DeviceOS         string    `db:"device_os"`
 	// UserAgent is the request's User-Agent header as the browser sent it, repaired to
-	// valid UTF-8 and cut to 512 bytes by useragent.BoundRaw. With IpAddress it is the key
-	// StartNewUserSession sweeps on: two logins are the same device when both match.
-	//
-	// The three Device* fields above it are display only. They are a parser's guess at a
-	// browser name, so keying the sweep on them meant every change of parser or of label
-	// format silently changed which sessions superseded which (#281).
+	// valid UTF-8 and cut to 512 bytes by useragent.BoundRaw. Like IpAddress and the three
+	// Device* fields above it, it is recorded and shown and compared by nothing: two browsers
+	// sending one header from one address are two devices (#281, #564).
 	UserAgent string `db:"user_agent"`
 	// DeviceId names the browser that started the session: the SHA-256, in hex, of the value of the
 	// auth server's device cookie, never the value itself, so a database read hands out nothing a
-	// browser could present (#564). It is empty on a session stored before migration 000063, and an
-	// empty identifier names no browser.
+	// browser could present (#564). It is the key StartNewUserSession sweeps on: a sign-in that
+	// starts a session ends the user's other sessions with the same identifier. It is empty on a
+	// session stored before migration 000063, and an empty identifier names no browser.
 	DeviceId string `db:"device_id"`
 	// AuthStateGeneration records the user's generation when this session was
 	// created. Tagged dont-update so an ordinary full-row UpdateUserSession cannot

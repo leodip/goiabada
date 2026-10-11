@@ -40,27 +40,6 @@ import (
 // left that test passing, because rotation loads the parent AFTER the sweep promoted it and so
 // writes the promoted value back either way.
 
-// userAgentTransport stamps a User-Agent on every request a client makes, including the ones made
-// through helpers that build their own requests.
-type userAgentTransport struct {
-	base      http.RoundTripper
-	userAgent string
-}
-
-func (t *userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Set("User-Agent", t.userAgent)
-	return t.base.RoundTrip(req)
-}
-
-// createHttpClientWithUserAgent is createHttpClient plus a fixed User-Agent, so the server records
-// a different device for this client's sessions.
-func createHttpClientWithUserAgent(t *testing.T, userAgent string) *http.Client {
-	t.Helper()
-	client := createHttpClient(t)
-	client.Transport = &userAgentTransport{base: client.Transport, userAgent: userAgent}
-	return client
-}
-
 // offlineGrant is what an offline_access ceremony yields, plus the pieces later steps need.
 type offlineGrant struct {
 	client       *record.Client
@@ -113,20 +92,16 @@ func (g *offlineGrant) codeFromSameSession(t *testing.T, scope string, codeVerif
 // browser session, and returns a session-bound access token plus that session's sid.
 //
 // A separate cookie jar is the whole point: reusing grant.httpClient would SSO onto the existing
-// session and prove nothing about a second device. The scope deliberately omits offline_access, so
-// the resulting grant is session-bound and its access token carries a sid.
+// session and prove nothing about a second device. A fresh jar holds no device cookie, so it is
+// another browser, whose sign-in keeps the first session although both send this process's one
+// user agent from its one address (#564). The scope deliberately omits offline_access, so the
+// resulting grant is session-bound and its access token carries a sid.
 //
 // password must be the user's CURRENT password, so call this after any setUserPassword.
 func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (string, string) {
 	t.Helper()
 
-	// A DISTINCT User-Agent is required, not cosmetic. StartNewUserSession deletes other sessions
-	// of the same user that share the raw User-Agent header and the address, and two logins from
-	// one test process share both by default: the second login would silently delete the first and
-	// the test would then be asserting against a session that no longer existed. Varying the UA
-	// makes this a genuinely different device, which is what the case is about.
-	httpClient := createHttpClientWithUserAgent(t,
-		"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1")
+	httpClient := createHttpClient(t)
 	const codeVerifier = testCodeVerifier + "-second-device"
 	scope := "openid " +
 		builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
@@ -191,9 +166,8 @@ func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (strin
 // another session of the same user is ended. Varying only the session is what makes it reject a
 // table-wide sweep and a user-scoped one at once.
 //
-// A DISTINCT User-Agent is required rather than cosmetic, for the reason secondSessionFor states:
-// StartNewUserSession deletes other sessions of the same user sharing the raw User-Agent header and
-// the address, so without it the second login silently deletes the first.
+// A fresh cookie jar is another browser, for the reason secondSessionFor states, so the second
+// login keeps the first.
 //
 // The consent screen is reached unconditionally rather than conditionally, and that is a property of
 // the server rather than an assumption: both HandleAuthCompletedGet and HandleConsentGet route an
@@ -204,8 +178,7 @@ func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (strin
 func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password string) *offlineGrant {
 	t.Helper()
 
-	httpClient := createHttpClientWithUserAgent(t,
-		"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+	httpClient := createHttpClient(t)
 	const codeVerifier = testCodeVerifier + "-second-offline"
 	scope := "openid offline_access " +
 		builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier

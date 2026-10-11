@@ -55,17 +55,23 @@ type Manager struct {
 	sessionStore userSessionStore
 	sessionName  string
 	database     userSessionManagerDatabase
+	// secureCookies is whether the auth server's base URL is https, which gives the device cookie
+	// its __Host- prefix and Secure, as it gives them to the session cookie.
+	secureCookies bool
 	// now is the clock HasValidUserSession judges a session against, a field so a test can fix
 	// it, as sessionbackend's is.
 	now func() time.Time
 }
 
-func NewManager(sessionStore userSessionStore, sessionName string, database userSessionManagerDatabase) *Manager {
+// NewManager builds the manager. secureCookies is whether the auth server's base URL is https.
+func NewManager(sessionStore userSessionStore, sessionName string, database userSessionManagerDatabase,
+	secureCookies bool) *Manager {
 	return &Manager{
-		sessionStore: sessionStore,
-		sessionName:  sessionName,
-		database:     database,
-		now:          func() time.Time { return time.Now().UTC() },
+		sessionStore:  sessionStore,
+		sessionName:   sessionName,
+		database:      database,
+		secureCookies: secureCookies,
+		now:           func() time.Time { return time.Now().UTC() },
 	}
 }
 
@@ -141,7 +147,10 @@ type Removal struct {
 // claiming a code from an authenticator a removal took away meanwhile (otpcredential.OTPClaim.Recheck).
 //
 // ipAddress is the browser's address as the caller read it, and becomes the session's one
-// recorded address. replacing is the session this sign-in replaces for the same user, the one the
+// recorded address. The device is the browser's device cookie, which this function reads, records
+// on the session by its digest and writes back on success, minting one when the browser presents
+// none (#564 decision 4); the sweep deletes the user's other sessions recorded with the same one.
+// replacing is the session this sign-in replaces for the same user, the one the
 // browser's cookie named, or nil; it is deleted with the same-device sweep's rows, and every row
 // removed is returned with its reason so the caller can audit each. A replaced session's refresh tokens that are
 // bound to it stop, as they do when it expires, and its offline grants survive: a re-login
@@ -179,8 +188,16 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 
 	// One parse of the request for all three display labels. They are derived from the
 	// Sec-CH-UA* Client Hints when the browser sends them and from the User-Agent otherwise,
-	// and nothing below reads them back: the sweep keys on UserAgent and IpAddress (#281).
+	// and nothing below reads them back, nor the raw header or the address: the sweep keys on
+	// the device identifier (#281, #564 decision 4).
 	deviceName, deviceType, deviceOS := useragent.Labels(r)
+
+	// The browser's device identifier, or a new one, drawn before the transaction so a rerun
+	// sweeps on the same value. The session stores its digest, never the value.
+	device, err := u.browserDevice(r)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	userSession := &record.UserSession{
 		SessionIdentifier: uuid.New(),
@@ -196,6 +213,7 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		DeviceType:        deviceType,
 		DeviceOS:          deviceOS,
 		UserAgent:         useragent.BoundRaw(r.UserAgent()),
+		DeviceId:          deviceDigest(device),
 
 		AuthStateGeneration: authStateGeneration,
 		OtpConfigGeneration: observedOtpConfigGeneration,
@@ -258,24 +276,17 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 			return getUserSessionsErr
 		}
 
-		// Delete this user's other sessions from the same device: same raw User-Agent header,
-		// same address. Nothing here reads DeviceName, DeviceType or DeviceOS, which are a
-		// parser's guess at a browser name and now display only. Keying on them meant a coarser
-		// label collapsed two machines behind one address into one device, and a change of parser
-		// or of label format silently changed which sessions superseded which. The header is
-		// compared as sent, bounded by useragent.BoundRaw on both sides, so the comparison is between
-		// two values cut at the same point (#281).
+		// Delete this user's other sessions from the same device: the same device identifier,
+		// compared by its digest. The User-Agent header and the address are recorded and no longer
+		// compared: two windows of one browser, two profiles, and two machines behind one router on
+		// one browser version all send the same pair, so the pair ended the sessions of browsers
+		// that had nothing to do with this sign-in (#564 decision 4). The display labels were never
+		// the key either (#281).
 		//
-		// Two consequences of pre-upgrade rows carrying an empty header, both accepted rather than
-		// worked around: a login that sends a header does not match one, so a legacy row survives
-		// this login and expires on its own by idle timeout or max lifetime; and a client that
-		// sends no header matches every legacy row on its address, which is how a header-less
-		// client is treated today in any case.
-		//
-		// The address is compared whole, one address to one address. It used to be a substring
-		// test against a comma-joined history, so 10.0.0.1 was found in 10.0.0.12, and a history
-		// that outgrew the 512-byte column failed every later bump of that session. A session now
-		// holds the latest address its browser was seen from (#243).
+		// A session stored before the upgrade has an empty identifier, which matches nothing, so it
+		// expires on its own by idle timeout or max lifetime; so does the session of a browser whose
+		// cookies were cleared, since it comes back as a new device. Both fail in the safe
+		// direction, keeping a session rather than ending another browser's.
 		//
 		// replacing is the other reason a row goes: the session this browser's cookie named, which
 		// this sign-in supersedes wherever it was last seen. Without it a max_age or prompt=login
@@ -292,7 +303,7 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 			switch {
 			case replacing != nil && us.Id == replacing.Id:
 				reason = audit.DeletedUserSessionReplacedBySignIn
-			case us.UserAgent == userSession.UserAgent && us.IpAddress == ipAddress:
+			case us.DeviceId != "" && us.DeviceId == userSession.DeviceId:
 				reason = audit.DeletedUserSessionSameDevice
 			default:
 				continue
@@ -349,6 +360,10 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	if regenerateErr := u.sessionStore.Regenerate(w, r, sess); regenerateErr != nil {
 		return nil, removed, u.abandonUserSession(r.Context(), userSession, errs.Wrap(regenerateErr, "unable to rotate the browser session identifier"))
 	}
+
+	// The device cookie is written only once the session it was recorded on is the browser's, and
+	// on every such sign-in, so a browser keeps its identifier for 400 days past its last one.
+	u.writeDeviceCookie(w, device)
 
 	return userSession, removed, nil
 }

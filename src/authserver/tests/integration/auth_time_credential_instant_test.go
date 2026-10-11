@@ -377,10 +377,10 @@ func TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn(t *testing.T) {
 // sign-in on a browser whose own session is too old for it replaces that session, and the
 // replacement ends the old one wherever it was last seen from, with nothing revoked.
 //
-// The old session is moved to another address and its AuthTime two hours back, in the database,
-// because a request from this test process always arrives from the same address and header: left
-// alone, the same-device sweep would remove the old row on its own and prove nothing about the
-// replacement. Before the fix the moved row survived the sign-in, still listed and still refreshed
+// The old session is moved to another address, its device identifier cleared and its AuthTime two
+// hours back, in the database, because the sign-in comes from the same browser, holding the same
+// device cookie: left alone, the same-device sweep would remove the old row on its own and prove
+// nothing about the replacement. Before the fix the moved row survived the sign-in, still listed and still refreshed
 // by its session-bound token, with no browser able to reach it.
 //
 // What the replacement must not do is revoke: the offline grant issued through the old session
@@ -394,6 +394,7 @@ func TestReLogin_EndsTheSessionItReplaces(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, oldSession)
 	oldSession.IpAddress = "203.0.113.77"
+	oldSession.DeviceId = ""
 	oldSession.AuthTime = time.Now().UTC().Add(-2 * time.Hour)
 	require.NoError(t, database.UpdateUserSession(context.Background(), nil, oldSession))
 
