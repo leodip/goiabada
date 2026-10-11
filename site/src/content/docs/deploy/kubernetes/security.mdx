@@ -132,24 +132,41 @@ If the admin console then can't reach the auth server, see [Unable to load the c
 
 ## Check the database's certificate
 
-The wizard asks how the auth server protects its connection to the database, and writes the answer into the `goiabada-authserver-config` ConfigMap as `GOIABADA_DB_TLS_MODE`. [Where the database sits](/deploy/database/#where-the-database-sits) says what each mode does. With `verify-ca` or `verify-full`, it then asks for a CA file: the authorities your database's certificate chains to. Answer nothing to check the certificate against the system's authorities, and the manifest gains nothing more.
+The wizard asks how the auth server should protect its connection to the database, and writes your answer into the `goiabada-authserver-config` ConfigMap as `GOIABADA_DB_TLS_MODE`. [Where the database sits](/deploy/database/#where-the-database-sits) explains each mode.
 
-With a CA file, the manifest carries its certificates, which are no secret:
+For `verify-ca` and `verify-full`, the wizard also asks for a CA file: the authorities your database's certificate chains to. Leave it empty to trust the system's authorities, and the manifest gains nothing more.
 
-- **A ConfigMap, `goiabada-db-ca`,** holding them as PEM under the key `ca.pem`. A private key in the file you named is left out.
-- **A read-only volume** in the auth server's pods, mounting that ConfigMap at `/etc/goiabada/db-ca`.
-- **`GOIABADA_DB_TLS_CA_FILE`** in `goiabada-authserver-config`, naming the mounted file, `/etc/goiabada/db-ca/ca.pem`. The auth server then trusts those authorities alone, in place of the system's.
+With a CA file, the manifest carries its certificates. They're not secret:
 
-The auth server reads the file once, when it starts. To change the authorities, edit the `goiabada-db-ca` ConfigMap, or run the wizard again and apply only the new `goiabada-k8s.yaml`, then restart the auth server:
+- **A ConfigMap, `goiabada-db-ca`,** holds them as PEM under the key `ca.pem`. If the file you named also held a private key, the wizard leaves it out.
+- **A read-only volume** mounts that ConfigMap at `/etc/goiabada/db-ca` in the auth server's pods.
+- **`GOIABADA_DB_TLS_CA_FILE`** in `goiabada-authserver-config` names the mounted file, `/etc/goiabada/db-ca/ca.pem`. The auth server then trusts those authorities in place of the system's.
 
-```bash
-kubectl edit configmap goiabada-db-ca -n goiabada
-kubectl rollout restart -n goiabada deployment/goiabada-authserver
-```
+If a pod can't verify the database's certificate, it stops at start and crash-loops: see [The database refuses TLS](/troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection/#the-database-refuses-tls).
 
-The file can hold several certificates. When the database is about to move to a certificate from another authority, put both authorities in it and restart before the database switches, then remove the old one once it has.
+### Change the authorities
 
-A pod that can't verify the database's certificate stops at start and crash-loops: see [The database refuses TLS](/troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection/#the-database-refuses-tls).
+The auth server reads the file only when it starts, so change it like this:
+
+<Steps>
+
+1. Edit the `goiabada-db-ca` ConfigMap:
+
+   ```bash
+   kubectl edit configmap goiabada-db-ca -n goiabada
+   ```
+
+   Or run the wizard again, and apply only the new `goiabada-k8s.yaml`.
+
+2. Restart the auth server:
+
+   ```bash
+   kubectl rollout restart -n goiabada deployment/goiabada-authserver
+   ```
+
+</Steps>
+
+Moving the database to a certificate from another authority? Put both authorities in the file and restart before the database switches. Remove the old one once it has.
 
 ## Next steps
 

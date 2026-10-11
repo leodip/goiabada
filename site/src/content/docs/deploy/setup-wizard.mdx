@@ -61,19 +61,19 @@ The wizard asks only the questions that apply to your deployment, in this order,
 | Rate limiter | Every deployment but local testing, which leaves it off. See [why it's off under Cluster](#the-rate-limiter-under-the-cluster-traffic-policy). | On, but off on Kubernetes under the Cluster policy |
 | Metrics | Kubernetes. None, pod annotations, or a PodMonitor for the Prometheus Operator. See [Monitoring](/deploy/monitoring/). | None |
 | Admin credentials | Every deployment: the admin's email and password. | `admin@example.com` for local testing, otherwise `admin@` and the auth server's domain. A generated password. |
-| Database connection | Kubernetes and native binaries, with any database but SQLite: host, port, name, user and password; the [TLS mode](#the-database-connections-tls), and for `verify-ca` and `verify-full` the CA file; then an optional connection test, which connects as the auth server will. After a failed test, you can enter all of them again. | The database's usual port and user, the name `goiabada`, the TLS mode `prefer`, and the system's roots |
+| Database connection | Kubernetes and native binaries, with any database but SQLite: host, port, name, user, password, [TLS mode](#the-database-connections-tls) and, for `verify-ca` and `verify-full`, a CA file. Then an optional connection test, which connects as the auth server will. If it fails, you can enter them all again. | The database's usual port and user, the name `goiabada`, the TLS mode `prefer`, and the system's roots |
 | Database password | Local testing and production, with any database but SQLite. The wizard runs that database for you, and writes the TLS mode `prefer`. | A generated password |
 
 ## The database connection's TLS
 
-The wizard writes `GOIABADA_DB_TLS_MODE`, which decides how the auth server protects its connection to MySQL, PostgreSQL or SQL Server. See the [environment variables](/reference/environment-variables/) for what each mode does.
+The wizard writes `GOIABADA_DB_TLS_MODE`, which decides how the auth server protects its connection to MySQL, PostgreSQL or SQL Server. [Where the database sits](/deploy/database/#where-the-database-sits) explains each mode.
 
-- **Local testing and production** write `prefer`. The database is a service on the Compose file's own network, so the connection never leaves the host.
-- **Kubernetes and native binaries** ask for one of `disable`, `prefer`, `require`, `verify-ca` and `verify-full`. Only `verify-full` makes sure the auth server reached your database and nothing in between. For `verify-ca` and `verify-full`, the wizard then asks for the CA file: a PEM file of the authorities your database's certificate chains to, or nothing for the system's roots. It refuses a file the auth server would refuse: one it can't read, or one that holds no certificate.
-- **Native binaries** write the CA file's absolute path as `GOIABADA_DB_TLS_CA_FILE`, so the file must stay where it is.
-- **Kubernetes** writes the certificates into a `goiabada-db-ca` ConfigMap in the manifest, mounts it read-only into the auth server's pods at `/etc/goiabada/db-ca/ca.pem`, and names that path as `GOIABADA_DB_TLS_CA_FILE`. Only the certificates are copied: a private key in the same file is left out.
+- **Local testing and production** write `prefer`. The database runs on the Compose file's own network, so the connection never leaves the host.
+- **Kubernetes and native binaries** ask you to pick one of `disable`, `prefer`, `require`, `verify-ca` and `verify-full`. Only `verify-full` makes sure the auth server reached your database and nothing in between. For `verify-ca` and `verify-full`, the wizard then asks for a CA file: a PEM file of the authorities your database's certificate chains to. Leave it blank to trust the system's roots. The wizard refuses a file the auth server would refuse: one it can't read, or one that holds no certificate.
+- **Native binaries** write the CA file's absolute path as `GOIABADA_DB_TLS_CA_FILE`, so keep the file where it is.
+- **Kubernetes** copies the certificates into a `goiabada-db-ca` ConfigMap, mounts it read-only into the auth server's pods at `/etc/goiabada/db-ca/ca.pem`, and names that path as `GOIABADA_DB_TLS_CA_FILE`. A private key in the same file isn't copied.
 
-Whenever the mode it writes checks no certificate, the wizard warns you.
+The wizard warns you whenever the mode it writes checks no certificate.
 
 ## The rate limiter under the Cluster traffic policy
 

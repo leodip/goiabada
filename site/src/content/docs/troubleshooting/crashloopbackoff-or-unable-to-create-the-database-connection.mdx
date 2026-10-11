@@ -73,28 +73,66 @@ On SQLite, `unable to connect to database` means the file couldn't be opened. Wh
 
 ## The database refuses TLS
 
-`GOIABADA_DB_TLS_MODE` decides what the auth server asks of the database's TLS, as [Where the database sits](/deploy/database/#where-the-database-sits) describes. The `using database` record, written just before the connection, says which mode the start used, in `tls_mode`, and the `error` ends with it too, such as `(tls mode verify-full)`. In `require`, `verify-ca` and `verify-full`, the auth server never falls back to plain text, and in the last two it checks the database's certificate, so a start can stop with one of these in the `error`:
+`GOIABADA_DB_TLS_MODE` decides what the auth server asks of the database's TLS: see [Where the database sits](/deploy/database/#where-the-database-sits). To see which mode a start used, read `tls_mode` on its `using database` record, written just before it connects. The `error` ends with the mode too, such as `(tls mode verify-full)`.
+
+In `require`, `verify-ca` and `verify-full`, the auth server never falls back to plain text, and in the last two it checks the database's certificate. So a start can stop with one of these in its `error`:
 
 | The `error` says | Why | Fix it |
 |---|---|---|
-| `x509: certificate signed by unknown authority` | `verify-ca` or `verify-full`, and the certificate doesn't chain to an authority the auth server trusts: one in `GOIABADA_DB_TLS_CA_FILE`, or, with none, one the system trusts. On MySQL and SQL Server under `verify-ca` it follows `unable to verify the database server's certificate chain`. | Set `GOIABADA_DB_TLS_CA_FILE` to a PEM file of the authority that signed the database's certificate, and any intermediate one between them. It replaces the system's authorities, so it must hold yours. |
-| `x509: certificate is valid for db-1.internal.example, not db.example.com` | `verify-full`, and the certificate doesn't name `GOIABADA_DB_HOST`, here `db.example.com`. | Set `GOIABADA_DB_HOST` to a name the certificate carries. When the auth server can only reach the database by a name the certificate can't carry, such as a connection pooler's, use `verify-ca`. |
-| `x509: cannot validate certificate for 10.0.0.5 because it doesn't contain any IP SANs` | `verify-full`, `GOIABADA_DB_HOST` is an IP address, here `10.0.0.5`, and the certificate names host names only. | Set `GOIABADA_DB_HOST` to a host name the certificate carries, or use `verify-ca`. |
-| `x509: certificate has expired or is not yet valid` | `verify-ca` or `verify-full`, and the database's certificate, or the certificate of an authority in its chain, is outside its validity period: it expired without being renewed, it was issued to start later, or the clock of the auth server's host is wrong. The words after it give the auth server's time and the date the certificate ends or starts, as `current time ... is after ...` or `is before ...`. On MySQL and SQL Server under `verify-ca` it follows `unable to verify the database server's certificate chain`. | Read the dates of every certificate in the database's certificate file and in `GOIABADA_DB_TLS_CA_FILE` with `openssl storeutl -noout -text -certs` and the file, since `openssl x509` reads only a file's first certificate. Replace the one that has expired or doesn't start yet, and have the database serve the new one. When every date is right, set the clock of the auth server's host right; on Kubernetes, the node's. |
-| `server refused TLS connection` (PostgreSQL), `TLS requested but server does not support TLS` (MySQL) or `server does not support encryption` (SQL Server) | `require`, `verify-ca` or `verify-full`, and the database serves no TLS. | Turn TLS on at the database. Only with the database on a network nobody else reaches, set `GOIABADA_DB_TLS_MODE=prefer`. |
+| `x509: certificate signed by unknown authority` | The auth server doesn't trust the authority that signed the certificate. | Set `GOIABADA_DB_TLS_CA_FILE` to a PEM file holding that authority, and any intermediate one. It replaces the system's authorities. |
+| `x509: certificate is valid for db-1.internal.example, not db.example.com` | `verify-full`, and the certificate doesn't name `GOIABADA_DB_HOST`, here `db.example.com`. | Set `GOIABADA_DB_HOST` to a name the certificate carries. If you can't, such as behind a connection pooler, use `verify-ca`. |
+| `x509: cannot validate certificate for 10.0.0.5 because it doesn't contain any IP SANs` | `verify-full`, and `GOIABADA_DB_HOST` is an IP address, here `10.0.0.5`, that the certificate doesn't carry. | Set `GOIABADA_DB_HOST` to a host name the certificate carries, or use `verify-ca`. |
+| `x509: certificate has expired or is not yet valid` | A certificate in the chain has expired or doesn't start yet, or the auth server's clock is wrong. | See [An expired certificate](#an-expired-certificate). |
+| `server refused TLS connection` (PostgreSQL), `TLS requested but server does not support TLS` (MySQL) or `server does not support encryption` (SQL Server) | The database serves no TLS. | Turn TLS on at the database. If nobody else can reach its network, you can set `GOIABADA_DB_TLS_MODE=prefer` instead. |
 
-The auth server reads the CA file only when it starts, so restart it after changing the file. On Kubernetes, the CA file is in [the `goiabada-db-ca` ConfigMap](/deploy/kubernetes/security/#check-the-databases-certificate).
+On MySQL and SQL Server in `verify-ca`, an `x509:` error comes after `unable to verify the database server's certificate chain`.
 
-A CA file the auth server can't use stops it sooner, with a `malformed configuration:` line naming `GOIABADA_DB_TLS_CA_FILE`: a file that can't be read, that holds no certificate, or that's set beside `disable`, `prefer` or `require`, which read none.
+The auth server reads the CA file only at start, so restart it after you change the file. On Kubernetes, the file is in [the `goiabada-db-ca` ConfigMap](/deploy/kubernetes/security/#check-the-databases-certificate).
+
+A CA file the auth server can't use stops it before it connects, with a `malformed configuration:` line naming `GOIABADA_DB_TLS_CA_FILE`. That happens when the file can't be read, holds no certificate, or is set with `disable`, `prefer` or `require`, which read none.
+
+### An expired certificate
+
+After `x509: certificate has expired or is not yet valid`, the `error` gives the auth server's time and the certificate's date: `current time ... is after ...` for a certificate that has expired, `is before ...` for one that doesn't start yet.
+
+<Steps>
+
+1. Read the dates of every certificate in the database's certificate file and in `GOIABADA_DB_TLS_CA_FILE`:
+
+   ```bash
+   openssl storeutl -noout -text -certs ca.pem | grep -E 'Subject:|Not (Before|After)'
+   ```
+
+   Don't use `openssl x509` for this: it reads only a file's first certificate.
+
+2. Replace any certificate that has expired or doesn't start yet, and have the database serve the new one.
+
+3. If the certificates are valid, check the auth server host's clock. On Kubernetes, check the node's clock.
+
+</Steps>
 
 ## PostgreSQL's TLS variables
 
-With `GOIABADA_DB_TYPE=postgres`, the auth server refuses to start when any of PostgreSQL's own TLS variables is set and not empty: `PGSSLMODE`, `PGSSLROOTCERT`, `PGSSLCERT`, `PGSSLKEY`, `PGSSLPASSWORD`, `PGSSLSNI` and `PGSSLNEGOTIATION`. It no longer reads them: `GOIABADA_DB_TLS_MODE` and `GOIABADA_DB_TLS_CA_FILE` decide the connection's TLS. It prints one line on standard error for all of them, and exits with status 2. The line names each variable, never its value:
+With `GOIABADA_DB_TYPE=postgres`, the auth server won't start while any of PostgreSQL's own TLS variables is set and not empty: `PGSSLMODE`, `PGSSLROOTCERT`, `PGSSLCERT`, `PGSSLKEY`, `PGSSLPASSWORD`, `PGSSLSNI` and `PGSSLNEGOTIATION`. It doesn't read them, since `GOIABADA_DB_TLS_MODE` and `GOIABADA_DB_TLS_CA_FILE` decide the connection's TLS. It prints one line on standard error, naming each variable but never its value, and exits with status 2:
 
 - `malformed configuration: PGSSLMODE is set, which the auth server no longer reads: unset it and set GOIABADA_DB_TLS_MODE (--db-tls-mode) instead`
 - `malformed configuration: PGSSLROOTCERT is set, which the auth server no longer reads: unset it and set GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) instead`
 
-Unset each one it names, wherever the auth server's environment comes from: the Compose file, `goiabada.env`, or the auth server's ConfigMap. Write its value into the setting that replaces it, as [Upgrade Goiabada](/deploy/upgrade-goiabada/#if-you-set-pgsslmode) shows. The auth server presents no client certificate, so `PGSSLCERT`, `PGSSLKEY` and `PGSSLPASSWORD` have no replacement.
+To fix it:
+
+<Steps>
+
+1. Unset each variable the line names, wherever the auth server's environment comes from: the Compose file, `goiabada.env`, or the auth server's ConfigMap.
+
+2. Set `GOIABADA_DB_TLS_MODE` to the mode you want. The modes have PostgreSQL's `sslmode` names, so `PGSSLMODE=verify-full` becomes `GOIABADA_DB_TLS_MODE=verify-full`.
+
+3. If you set `PGSSLROOTCERT`, set `GOIABADA_DB_TLS_CA_FILE` to the same file, with `verify-ca` or `verify-full`.
+
+4. Restart the auth server.
+
+</Steps>
+
+The auth server presents no client certificate, so `PGSSLCERT`, `PGSSLKEY` and `PGSSLPASSWORD` have nothing to replace them.
 
 ## When it isn't the database
 

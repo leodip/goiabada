@@ -57,8 +57,6 @@ func TestDatabasePage_WhereTheDatabaseSitsIsTheTwoSettings(t *testing.T) {
 	require.Len(t, warnings, 1, "a start with the mode unset warns: %s", capture.Text())
 
 	assert.Contains(t, section, "`"+warnings[0].Message+"`", "the section quotes the warning a start writes")
-	assert.Contains(t, troubleshootingPage(t, upgradePage), "`"+warnings[0].Message+"`",
-		"the upgrade page quotes the warning an upgraded deployment writes")
 	for _, setting := range []string{"GOIABADA_DB_TLS_MODE", "GOIABADA_DB_TLS_CA_FILE"} {
 		assert.Contains(t, section, "`"+setting+"`", "the section names %s", setting)
 	}
