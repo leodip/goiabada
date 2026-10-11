@@ -22,4 +22,4 @@ The [quickstart](https://goiabada.dev/get-started/quickstart/) runs Goiabada loc
 
 [Documentation](https://goiabada.dev/) · [Contributing](https://goiabada.dev/about/contributing/) · [MIT license](LICENSE)
 
-[![Mentioned in Awesome Go](https://awesome.re/mentioned-badge-flat.svg)](https://github.com/avelino/awesome-go)
+[![Mentioned in Awesome Go](https://awesome.re/mentioned-badge-flat.svg)](https://awesome-go.com/)
