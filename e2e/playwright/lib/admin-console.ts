@@ -321,3 +321,11 @@ export async function addPermissionRow(page: Page, resource: string, permission:
   await permissions.selectOption((await option.getAttribute("value"))!);
   await page.getByRole("button", { name: "Grant permission" }).click();
 }
+
+// Grants a resource's permission on a user's Permissions tab and saves.
+export async function grantUserPermission(page: Page, id: number, resource: string, permission: string) {
+  await page.goto(userUrl(id, "permissions"));
+  await addPermissionRow(page, resource, permission);
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Permissions saved successfully")).toBeVisible();
+}

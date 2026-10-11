@@ -76,6 +76,22 @@ export async function codeToken(
   return { status: response.status(), body: await response.json() };
 }
 
+// Trades a refresh token for new tokens, authenticating the client with client_secret_basic.
+export async function refreshToken(
+  request: APIRequestContext,
+  clientId: string,
+  clientSecret: string,
+  token: string,
+): Promise<TokenAnswer> {
+  const basic = Buffer.from(`${encodeURIComponent(clientId)}:${encodeURIComponent(clientSecret)}`).toString("base64");
+  const response = await request.post(`${env.authUrl}/auth/token`, {
+    form: { grant_type: "refresh_token", refresh_token: token },
+    headers: { Authorization: `Basic ${basic}` },
+    failOnStatusCode: false,
+  });
+  return { status: response.status(), body: await response.json() };
+}
+
 // The userinfo endpoint, called with an access token as a bearer.
 export async function userinfo(request: APIRequestContext, accessToken: string): Promise<TokenAnswer> {
   const response = await request.get(`${env.authUrl}/userinfo`, {

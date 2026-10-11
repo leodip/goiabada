@@ -59,8 +59,11 @@ and that its API refuses a request with no token.
 `e2e/.state/`, so it runs against the environment this machine last prepared. `e2e/test.sh` runs it;
 after a failure, `(cd e2e/playwright && npx playwright show-report)` opens the report with traces.
 
-Tests sit under `playwright/tests/`, one folder per area (`admin-console/sign-in`,
-`admin-console/clients/`, `resources/`, `groups/`, `users/`, `account/` and `settings/`). They run four at a time against an environment that stays up between
+Tests sit under `playwright/tests/`, one folder per area: the admin console (`admin-console/sign-in`,
+`admin-console/clients/`, `resources/`, `groups/`, `users/`, `account/` and `settings/`), the test app
+(`testapp/`: a user signing in to its web apps, its SPA and its API, single sign-on across its two
+sites, signing out, and the authorization parameters), and the protocol itself where no page reaches
+it (`oauth/`). They run four at a time against an environment that stays up between
 runs, so every test keeps to these rules, which is what lets the suite run again and again without a
 reset:
 
@@ -119,6 +122,10 @@ the tests in `E2E_MAILPIT_URL` (`lib/mailpit.ts`). To look at the mail yourself:
    secrets reach the containers through `testapp.env` beside the Compose files, and go nowhere else.
 
 After changing the app, `e2e/infra/testapp.sh --deploy-only` builds and deploys it again with the
-same clients; with no option it sets the clients up again too. Tests must leave the `testapp-*`
-clients and `product-api` as they found them: the setup step does not sweep them, since they are not
-named with the test prefix.
+same clients; with no option it sets the clients up again too.
+
+The tests in `playwright/tests/testapp/` drive the app's pages as its user would (`lib/testapp.ts`), with
+users of their own from the `users` fixture, granted `product-api:read` where a test needs the API.
+They never change the `testapp-*` clients or `product-api`: every test signs in through them at once,
+and the setup step doesn't sweep them, since they aren't named with the test prefix. A test that needs
+a client set up differently creates its own.

@@ -49,6 +49,9 @@ export async function openSignIn(browser: Browser, options: { clientId: string; 
 // timeout by what it waits and noting it in the report.
 export async function submitPassword(page: Page, email: string, password: string) {
   const tooMany = page.getByRole("heading", { name: "Too many attempts" });
+  // The form's own address, a GET, to come back to: going back from the refusal, which answers a POST,
+  // can fail with ERR_CACHE_MISS.
+  const form = page.url();
   for (let waited = 0; ; waited += 3_000) {
     await page.locator('input[name="email"]').fill(email);
     await page.locator('input[name="password"]').fill(password);
@@ -58,7 +61,7 @@ export async function submitPassword(page: Page, email: string, password: string
     if (waited === 0) test.info().annotations.push({ type: "rate-limited", description: "sign-in form answered too many attempts; waited" });
     test.info().setTimeout(test.info().timeout + 3_000);
     await new Promise((resolve) => setTimeout(resolve, 3_000));
-    await page.goBack();
+    await page.goto(form);
   }
 }
 

@@ -1,5 +1,5 @@
 import * as client from "openid-client";
-import { appUrl } from "@/lib/config";
+import { appUrl, webClients } from "@/lib/config";
 import { describeError, webConfig } from "@/lib/oidc";
 import { setResult } from "@/lib/session";
 import { backTo, webRoute } from "@/lib/web-route";
@@ -8,7 +8,9 @@ import { backTo, webRoute } from "@/lib/web-route";
 // ID token as id_token_hint, the post-logout redirect URI and a new state to /auth/logout, from a
 // form the page submits on its own. hint=no leaves the hint out, to try the confirmation page, and
 // sends a GET instead: the auth server refuses a cross-origin POST with no hint (Sign-out answers
-// 403).
+// 403). With no hint, client_id says whose redirect URIs the post-logout redirect URI is checked
+// against; without it the user stays on the auth server's "Signed out" page (Logout, "Where the user
+// lands").
 export async function POST(request: Request, ctx: RouteContext<"/[client]/logout">) {
   const route = await webRoute(ctx.params);
   if ("notFound" in route) return route.notFound;
@@ -37,6 +39,7 @@ export async function POST(request: Request, ctx: RouteContext<"/[client]/logout
   };
   if (withHint && idToken) fields.id_token_hint = idToken;
   if (!fields.id_token_hint) {
+    fields.client_id = webClients[key].clientId;
     const url = new URL(endpoint);
     for (const [name, value] of Object.entries(fields)) url.searchParams.set(name, value);
     return Response.redirect(url, 303);
