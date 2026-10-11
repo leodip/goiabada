@@ -154,6 +154,8 @@ func HandleTokensPost(
 			IncludeOpenIDConnectClaimsInIdToken:     strings.TrimSpace(r.FormValue("includeOpenIDConnectClaimsInIdToken")),
 		}
 
+		// A refused save draws every input as submitted, a duration that is not a number and both
+		// choices included; the title comes from the stored client.
 		renderError := func(message string) {
 
 			bind := map[string]interface{}{
@@ -170,21 +172,18 @@ func HandleTokensPost(
 
 		tokenExpirationInSeconds, err := strconv.Atoi(settingsInfo.TokenExpirationInSeconds)
 		if err != nil {
-			settingsInfo.TokenExpirationInSeconds = strconv.Itoa(client.TokenExpirationInSeconds)
 			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.token_expiration_invalid"))
 			return
 		}
 
 		refreshTokenOfflineIdleTimeoutInSeconds, err := strconv.Atoi(settingsInfo.RefreshTokenOfflineIdleTimeoutInSeconds)
 		if err != nil {
-			settingsInfo.RefreshTokenOfflineIdleTimeoutInSeconds = strconv.Itoa(client.RefreshTokenOfflineIdleTimeoutInSeconds)
 			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.offline_idle_timeout_invalid"))
 			return
 		}
 
 		refreshTokenOfflineMaxLifetimeInSeconds, err := strconv.Atoi(settingsInfo.RefreshTokenOfflineMaxLifetimeInSeconds)
 		if err != nil {
-			settingsInfo.RefreshTokenOfflineMaxLifetimeInSeconds = strconv.Itoa(client.RefreshTokenOfflineMaxLifetimeInSeconds)
 			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.offline_max_lifetime_invalid"))
 			return
 		}

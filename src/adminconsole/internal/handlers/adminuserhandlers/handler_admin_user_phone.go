@@ -126,6 +126,17 @@ func HandlePhonePost(
 			return
 		}
 
+		// The user a refused save draws the page with: its title and its tabs name the stored user.
+		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		if err != nil {
+			render.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+		if user == nil {
+			httpHelper.NotFound(w, r)
+			return
+		}
+
 		// Parse form input
 		phoneCountryUniqueId := r.FormValue("phoneCountryUniqueId")
 		phoneNumber := strings.TrimSpace(r.FormValue("phoneNumber"))
@@ -141,6 +152,7 @@ func HandlePhonePost(
 		// Render error function for form validation errors
 		renderError := func(errorMessage string) {
 			bind := map[string]interface{}{
+				"user":                         user,
 				"selectedPhoneCountryUniqueId": phoneCountryUniqueId,
 				"phoneNumber":                  phoneNumber,
 				"phoneNumberVerified":          phoneNumberVerified,
