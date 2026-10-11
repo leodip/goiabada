@@ -11,8 +11,8 @@ package countries
 //
 // CallingCodes are ITU-T E.164 country calling codes as DIGITS WITHOUT the
 // leading '+' (a country may have zero, one, or several). Renderers and
-// persisters prepend '+' themselves — see phonecountries.All(), which lives in
-// the auth server now (src/authserver/internal/phonecountries).
+// persisters prepend '+' themselves — see phonecountries.All()
+// (src/core/phonecountries).
 type Country struct {
 	// Name is the CLDR (en) display name. It is a rarely-shown display
 	// fallback but is also the sort key used by callers.
