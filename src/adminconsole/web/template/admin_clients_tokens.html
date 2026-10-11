@@ -198,17 +198,17 @@
                 <div class="space-y-3 ml-1">
                     <label class="flex gap-3 cursor-pointer items-center">
                         <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio radio-sm" value="on"
-                            {{if eq .client.IncludeOpenIDConnectClaimsInAccessToken "on"}}checked{{end}} />
+                            {{if eq .settings.IncludeOpenIDConnectClaimsInAccessToken "on"}}checked{{end}} />
                         <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.tokens.access_yes" }}</span>
                     </label>
                     <label class="flex gap-3 cursor-pointer items-center">
                         <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio radio-sm"  value="off"
-                            {{if eq .client.IncludeOpenIDConnectClaimsInAccessToken "off"}}checked{{end}} />
+                            {{if eq .settings.IncludeOpenIDConnectClaimsInAccessToken "off"}}checked{{end}} />
                         <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.tokens.access_no" }}</span>
                     </label>
                     <label class="flex gap-3 cursor-pointer items-center">
                         <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio radio-sm" value="default"
-                        {{if eq .client.IncludeOpenIDConnectClaimsInAccessToken "default"}}checked{{end}} />
+                        {{if eq .settings.IncludeOpenIDConnectClaimsInAccessToken "default"}}checked{{end}} />
                         <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.tokens.access_inherit_prefix" }}<a href="/admin/settings/tokens"
                             class="link link-hover link-secondary">{{ T $.ctx "adminconsole.admin_clients.tokens.access_inherit_link" }}</a></span>
                     </label>
@@ -231,17 +231,17 @@
                 <div class="space-y-3 ml-1">
                     <label class="flex gap-3 cursor-pointer items-center">
                         <input type="radio" name="includeOpenIDConnectClaimsInIdToken" class="radio radio-sm" value="on"
-                            {{if eq .client.IncludeOpenIDConnectClaimsInIdToken "on"}}checked{{end}} />
+                            {{if eq .settings.IncludeOpenIDConnectClaimsInIdToken "on"}}checked{{end}} />
                         <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.tokens.id_on" }}</span>
                     </label>
                     <label class="flex gap-3 cursor-pointer items-center">
                         <input type="radio" name="includeOpenIDConnectClaimsInIdToken" class="radio radio-sm"  value="off"
-                            {{if eq .client.IncludeOpenIDConnectClaimsInIdToken "off"}}checked{{end}} />
+                            {{if eq .settings.IncludeOpenIDConnectClaimsInIdToken "off"}}checked{{end}} />
                         <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.tokens.id_off" }}</span>
                     </label>
                     <label class="flex gap-3 cursor-pointer items-center">
                         <input type="radio" name="includeOpenIDConnectClaimsInIdToken" class="radio radio-sm" value="default"
-                        {{if eq .client.IncludeOpenIDConnectClaimsInIdToken "default"}}checked{{end}} />
+                        {{if eq .settings.IncludeOpenIDConnectClaimsInIdToken "default"}}checked{{end}} />
                         <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.tokens.id_default_prefix" }}<a href="/admin/settings/tokens"
                             class="link link-hover link-secondary">{{ T $.ctx "adminconsole.admin_clients.tokens.id_default_link" }}</a>{{ T $.ctx "adminconsole.admin_clients.tokens.id_default_suffix" }}</span>
                     </label>
