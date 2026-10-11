@@ -64,7 +64,7 @@ The authenticator app lists the account under the auth server's **App name** and
 
 The code is a time-based one-time password ([RFC 6238](https://www.rfc-editor.org/rfc/rfc6238)): six digits, a new one every 30 seconds. The auth server also accepts the code from the 30 seconds before and after, so a phone whose clock is a little off still works.
 
-Each code works once. Sent again, it's refused, and the [audit log](/concepts/audit-log/) records `otp_code_replay_detected`. With the rate limiter on, each user gets 5 wrong codes in 15 minutes, and then waits. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
+Each code works once. Sent again, it's refused, and the [audit log](/concepts/audit-log/) records `otp_code_replay_detected`. Each user gets 5 wrong codes in 15 minutes, and then waits. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
 
 ## Users who are already signed in
 

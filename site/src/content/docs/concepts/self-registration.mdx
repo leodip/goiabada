@@ -57,7 +57,7 @@ A user who registers gets what every new user gets: the `authserver:manage-accou
 
 ## Limits and the audit log
 
-With the rate limiter on, an address can register 5 times every 5 minutes, and an IP address 20 times, and following links and sending the password form is limited per IP address. Past that, the page shows "Too many attempts": see [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
+An address can register 5 times every 5 minutes, whether or not the rate limiter is on. With it on, an IP address can register 20 times, and following links and sending the password form is limited per IP address. Past that, the page shows "Too many attempts": see [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
 
 Every registration with email verification leaves a `requested_registration` entry in the [audit log](/concepts/audit-log/), whose `outcome` says what it led to, such as `link_issued` or `notice_issued`. The address is recorded only as a digest. An account created leaves `created_user`, an activated one `activated_account`, and a refused link `failed_account_activation_code`.
 

@@ -149,31 +149,31 @@ Each server can serve Prometheus metrics on a listener of its own, which answers
 
 | Variable | What it does |
 |---|---|
-| `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`<br/>Flag: `--authserver-ratelimiter-enabled`<br/>Default: `false`<br/>Read by: auth server | Turn on the [rate limits](#rate-limits) below that are counted by an IP address or an email. Those counted by a user apply whether or not it's on. The setup wizard asks whether you want them. |
+| `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`<br/>Flag: `--authserver-ratelimiter-enabled`<br/>Default: `false`<br/>Read by: auth server | Turn on the [rate limits](#rate-limits) below that are counted by an IP address. Those counted by a user or an email apply whether or not it's on. The setup wizard asks whether you want them. |
 
 ## Rate limits
 
-The auth server limits these endpoints. The limits counted by a user, the one signing in or an access token's, always apply: only someone already past the password, or holding the user's token, can spend them, so they can't lock a stranger out. The others, counted by an IP address or by an email anyone can type, apply only with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on. A refused request gets `429 Too Many Requests`, in the format the endpoint usually answers with. The limiter is the name the `rate_limit_exceeded` [audit event](/concepts/audit-log/) and the `goiabada_rate_limit_refusals_total` [metric](/deploy/monitoring/) give it.
+The auth server limits these endpoints. The limits counted by a user or an email always apply, and `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` adds the limits counted by an IP address: the **Applies** column says `always` or `switch on`. A refused request gets `429 Too Many Requests`, in the format the endpoint usually answers with. The limiter is the name the `rate_limit_exceeded` [audit event](/concepts/audit-log/) and the `goiabada_rate_limit_refusals_total` [metric](/deploy/monitoring/) give it.
 
-| Endpoint | Limit | Counts | Counted by |
-|---|---|---|---|
-| `POST /auth/pwd` (password sign-in)<br/>Limiter: `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and email, shared with the password grant |
-| `POST /auth/pwd`<br/>Limiter: `pwd_account` | 100 per 60 minutes | failed sign-ins | email, shared with the password grant |
-| `POST /auth/pwd`<br/>Limiter: `pwd_ip` | 30 per minute | every request | IP address |
-| `POST /auth/otp` (authenticator code)<br/>Limiter: `otp` | 5 per 15 minutes | failed codes | user |
-| `POST /api/v1/account/email/verification`<br/>Limiter: `email_verification` | 5 per 15 minutes | failed codes | the token's user |
-| `POST /api/v1/account/email/verification/send`<br/>Limiter: `email_verification_send` | 5 per 60 minutes | every request | the token's user |
-| `PUT /api/v1/account/password`, `PUT /api/v1/account/otp` and `PUT /api/v1/account/email`<br/>Limiter: `account_password` | 5 per 15 minutes, for the three together | failed passwords | the token's user |
-| `POST /forgot-password`<br/>Limiter: `forgot_pwd_email` | 5 per 5 minutes | every request | email |
-| `POST /forgot-password`<br/>Limiter: `forgot_pwd_ip` | 20 per 5 minutes | every request | IP address |
-| `GET /reset-password` and `POST /reset-password`<br/>Limiter: `reset_pwd` | 30 per 5 minutes, for the two together | every request | IP address |
-| `POST /account/register` (self-registration)<br/>Limiter: `register_email` | 5 per 5 minutes | every request | email |
-| `POST /account/register`<br/>Limiter: `register` | 20 per 5 minutes | every request | IP address |
-| `GET /account/activate` and `POST /account/activate`<br/>Limiter: `activate` | 30 per 5 minutes, for the two together | every request | IP address |
-| `POST /connect/register` (dynamic client registration)<br/>Limiter: `dcr` | 10 per minute | every request | IP address |
-| `POST /auth/token` with `grant_type=password`<br/>Limiter: `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and username, shared with `POST /auth/pwd` |
-| `POST /auth/token` with `grant_type=password`<br/>Limiter: `pwd_account` | 100 per 60 minutes | failed sign-ins | username, shared with `POST /auth/pwd` |
-| `POST /auth/token` with `grant_type=password`<br/>Limiter: `ropc_ip` | 30 per minute | every request | IP address |
+| Endpoint | Limit | Counts | Counted by | Applies |
+|---|---|---|---|---|
+| `POST /auth/pwd` (password sign-in)<br/>Limiter: `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and email, shared with the password grant | switch on |
+| `POST /auth/pwd`<br/>Limiter: `pwd_account` | 100 per 60 minutes | failed sign-ins | email, shared with the password grant | always |
+| `POST /auth/pwd`<br/>Limiter: `pwd_ip` | 30 per minute | every request | IP address | switch on |
+| `POST /auth/otp` (authenticator code)<br/>Limiter: `otp` | 5 per 15 minutes | failed codes | user | always |
+| `POST /api/v1/account/email/verification`<br/>Limiter: `email_verification` | 5 per 15 minutes | failed codes | the token's user | always |
+| `POST /api/v1/account/email/verification/send`<br/>Limiter: `email_verification_send` | 5 per 60 minutes | every request | the token's user | always |
+| `PUT /api/v1/account/password`, `PUT /api/v1/account/otp` and `PUT /api/v1/account/email`<br/>Limiter: `account_password` | 5 per 15 minutes, for the three together | failed passwords | the token's user | always |
+| `POST /forgot-password`<br/>Limiter: `forgot_pwd_email` | 5 per 5 minutes | every request | email | always |
+| `POST /forgot-password`<br/>Limiter: `forgot_pwd_ip` | 20 per 5 minutes | every request | IP address | switch on |
+| `GET /reset-password` and `POST /reset-password`<br/>Limiter: `reset_pwd` | 30 per 5 minutes, for the two together | every request | IP address | switch on |
+| `POST /account/register` (self-registration)<br/>Limiter: `register_email` | 5 per 5 minutes | every request | email | always |
+| `POST /account/register`<br/>Limiter: `register` | 20 per 5 minutes | every request | IP address | switch on |
+| `GET /account/activate` and `POST /account/activate`<br/>Limiter: `activate` | 30 per 5 minutes, for the two together | every request | IP address | switch on |
+| `POST /connect/register` (dynamic client registration)<br/>Limiter: `dcr` | 10 per minute | every request | IP address | switch on |
+| `POST /auth/token` with `grant_type=password`<br/>Limiter: `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and username, shared with `POST /auth/pwd` | switch on |
+| `POST /auth/token` with `grant_type=password`<br/>Limiter: `pwd_account` | 100 per 60 minutes | failed sign-ins | username, shared with `POST /auth/pwd` | always |
+| `POST /auth/token` with `grant_type=password`<br/>Limiter: `ropc_ip` | 30 per minute | every request | IP address | switch on |
 
 A few rules make these work:
 
@@ -183,6 +183,7 @@ A few rules make these work:
 - **Limits on failures hold across replicas** on PostgreSQL, MySQL and SQL Server, where they're counted in the database, so a rollout doesn't refill them either. If the database doesn't answer the check within 5 seconds, the request gets a server error rather than going through. On SQLite, which runs one replica, they're counted in the process.
 - **Limits on every request are per process**, on every database. With three replicas, each one allows the full budget, and a restart resets it. For a limit that holds across your whole deployment, set one at your gateway, proxy or CDN, which also stops a flood before it reaches Goiabada.
 - **A limit counted by IP address is only as good as the address.** Behind a proxy, set up [client IP addresses](#client-ip-addresses) first.
+- **Anyone who knows an email can block its password sign-in.** 100 wrong passwords in an hour block that account's password sign-in, at the form and through the password grant, for up to an hour, even with the right password, and about 100 more an hour keep it blocked. A password reset doesn't clear the count, and anyone already signed in stays signed in. That's the price of a bound on guessing that holds whatever address the server sees. If it happens, block the attacker at your proxy or CDN, which sees their address.
 
 Each limit that trips writes a `rate_limit_exceeded` [audit event](/concepts/audit-log/), once per key and window on each replica.
 
