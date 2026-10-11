@@ -252,3 +252,97 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 		})
 	}
 }
+
+// prompt=none from a consent-off client asking for authserver:manage-account through the handler:
+// an ordinary client's request reads the user's consent to that client and, with none stored, is
+// answered consent_required, and the admin console's client reads no consent and goes on to issue.
+// Which answer each fact gets is decideSilentAuthentication's table; this is that the handler hands
+// it the client and loads the consent it asks for (#509 decisions 2 and 3).
+func TestHandlePromptNone_ManageAccountConsent(t *testing.T) {
+	const scope = "openid authserver:manage-account"
+
+	testCases := []struct {
+		name             string
+		clientIdentifier string
+		wantIssue        bool
+	}{
+		{name: "an ordinary client with no stored consent is answered consent_required",
+			clientIdentifier: "test-client"},
+		{name: "the admin console's client reads no consent and goes on to issue",
+			clientIdentifier: "admin-console-client", wantIssue: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			database := datamocks.NewDatabase(t)
+			authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
+			tokenParser := handlersmocks.NewTokenParser(t)
+
+			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
+				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+
+			req, err := http.NewRequest("GET", "/authorize?"+url.Values{
+				"client_id":     {tc.clientIdentifier},
+				"redirect_uri":  {"https://example.com"},
+				"response_type": {"code"},
+				"scope":         {scope},
+				"prompt":        {"none"},
+			}.Encode(), nil)
+			require.NoError(t, err)
+			ctx := reqctx.WithSettings(req.Context(), &record.Settings{Issuer: "https://test-issuer.com"})
+			ctx = reqctx.WithSessionIdentifier(ctx, "session-1")
+			req = req.WithContext(ctx)
+			rr := httptest.NewRecorder()
+
+			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
+			authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
+			authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
+			authorizeValidator.On("ValidateScopes", mock.Anything, scope).Return(nil)
+			authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+
+			// Consent required off, as every client an administrator creates starts.
+			client := &record.Client{Id: 1, ClientIdentifier: tc.clientIdentifier, DefaultAcrLevel: record.AcrLevel1}
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, tc.clientIdentifier).Return(client, nil)
+
+			userSession := &record.UserSession{
+				Id:          1,
+				UserId:      7,
+				AcrLevel:    record.AcrLevel1,
+				AuthMethods: "pwd",
+				User:        record.User{Id: 7, Enabled: true},
+			}
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").Return(userSession, nil)
+			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
+			userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
+			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, scope, &userSession.User).Return(scope, nil)
+
+			if tc.wantIssue {
+				userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.AcrLevel(""), mock.Anything).Return(userSession, nil)
+				auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
+				ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
+			} else {
+				database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(7), int64(1)).Return(nil, nil).Once()
+				stubRegisteredRedirectURI(database, "https://example.com")
+				ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+			}
+
+			handler.ServeHTTP(rr, req)
+
+			require.Equal(t, http.StatusFound, rr.Code)
+			location, err := url.Parse(rr.Header().Get("Location"))
+			require.NoError(t, err)
+			if tc.wantIssue {
+				assert.Equal(t, "/auth/issue", location.Path)
+				database.AssertNotCalled(t, "GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+				return
+			}
+			assert.Equal(t, "consent_required", location.Query().Get("error"))
+			assert.Equal(t, "User consent is required", location.Query().Get("error_description"))
+		})
+	}
+}

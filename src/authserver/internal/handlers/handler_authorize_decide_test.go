@@ -438,6 +438,7 @@ type silentWorld struct {
 	otpEnabled         bool
 	effectiveScope     string
 	consentRequired    bool
+	clientIdentifier   string
 	consentScope       *string // nil for no consent row
 }
 
@@ -447,10 +448,11 @@ func driveSilentAuthentication(t *testing.T, world silentWorld) (silentAuthentic
 	t.Helper()
 
 	facts := silentAuthenticationFacts{
-		maxAgeRequested: world.maxAgeRequested,
-		hintSubject:     world.hint,
-		target:          world.target,
-		consentRequired: world.consentRequired,
+		maxAgeRequested:  world.maxAgeRequested,
+		hintSubject:      world.hint,
+		target:           world.target,
+		consentRequired:  world.consentRequired,
+		clientIdentifier: world.clientIdentifier,
 	}
 	var asked []silentFact
 	for {
@@ -733,6 +735,69 @@ func TestDecideSilentAuthentication(t *testing.T) {
 				w.consentScope = scopes("openid res:read all")
 			}),
 			wantReads: []silentFact{session, validity, scope, consent},
+		},
+		// authserver:manage-account needs a stored consent covering it from every client but the
+		// admin console's, whatever its Consent required says, with today's sentences (#509
+		// decisions 1 to 3).
+		{
+			name: "manage-account from a consent-off client with no stored consent",
+			world: with(func(w *silentWorld) {
+				w.clientIdentifier = "crafted-link-client"
+				w.effectiveScope = "openid authserver:manage-account"
+			}),
+			wantCode:        oidc.ErrorConsentRequired,
+			wantDescription: "User consent is required",
+			wantReads:       []silentFact{session, validity, scope, consent},
+		},
+		{
+			name: "manage-account from a consent-off client with a stored consent leaving it out",
+			world: with(func(w *silentWorld) {
+				w.clientIdentifier = "crafted-link-client"
+				w.effectiveScope = "openid authserver:manage-account"
+				w.consentScope = scopes("openid profile")
+			}),
+			wantCode:        oidc.ErrorConsentRequired,
+			wantDescription: "Additional consent is required",
+			wantReads:       []silentFact{session, validity, scope, consent},
+		},
+		{
+			// A consent-off client is asked about manage-account and nothing else.
+			name: "manage-account covered by the stored consent passes, profile left out",
+			world: with(func(w *silentWorld) {
+				w.clientIdentifier = "crafted-link-client"
+				w.effectiveScope = "openid profile authserver:manage-account"
+				w.consentScope = scopes("openid authserver:manage-account")
+			}),
+			wantReads: []silentFact{session, validity, scope, consent},
+		},
+		{
+			name: "manage-account from the admin console's client passes with no consent read",
+			world: with(func(w *silentWorld) {
+				w.clientIdentifier = "admin-console-client"
+				w.effectiveScope = "authserver:manage authserver:manage-account email openid profile"
+			}),
+			wantReads: []silentFact{session, validity, scope},
+		},
+		{
+			name: "manage-account filtered out of the effective scope is owed nothing",
+			world: with(func(w *silentWorld) {
+				w.clientIdentifier = "crafted-link-client"
+				w.effectiveScope = "openid"
+			}),
+			wantReads: []silentFact{session, validity, scope},
+		},
+		{
+			// A client requiring consent still needs every scope covered, manage-account included.
+			name: "a client requiring consent with manage-account covered and profile not",
+			world: with(func(w *silentWorld) {
+				w.clientIdentifier = "crafted-link-client"
+				w.consentRequired = true
+				w.effectiveScope = "openid profile authserver:manage-account"
+				w.consentScope = scopes("openid authserver:manage-account")
+			}),
+			wantCode:        oidc.ErrorConsentRequired,
+			wantDescription: "Additional consent is required",
+			wantReads:       []silentFact{session, validity, scope, consent},
 		},
 		{
 			name: "a tab still separates two scopes of an effective scope",
