@@ -318,6 +318,7 @@ command itself and fails on a tree it changed.
 | `core/httpmw` | `RequestLogger` | both-apps | — |
 | `core/httpmw` | `SecurityHeaders` | both-apps | — |
 | `core/httpmw` | `SkipCSRF` | both-apps | — |
+| `core/i18n` | `CatalogTag` | contract | The cross-process half of a refusal's language: the admin console sends it as `Accept-Language` on every admin API call, and the auth server resolves it against the same catalogs, so its answer is in the language of the console's page (#559 decision 3). Only the admin console calls it; it stays because it reads the localizer this package keeps private, as `Raw` does, and exporting the localizer to move it would undo #385 decision 11. |
 | `core/i18n` | `ErrCodeAddressAngleBrackets` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAddressCountryInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAddressLine1TooLong` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |

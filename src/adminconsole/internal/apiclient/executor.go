@@ -12,6 +12,7 @@ import (
 
 	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // generalAPITimeout bounds every request the general AuthServerClient makes. Ten seconds,
@@ -119,6 +120,9 @@ func (c *AuthServerClient) do(ctx context.Context, accessToken string, r apiRequ
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
+	// The language the console's page renders in, so the auth server answers a refusal the page
+	// shows in that language when it has the sentence translated (#559 decision 3).
+	req.Header.Set("Accept-Language", i18n.CatalogTag(ctx))
 	if r.contentType != "" {
 		req.Header.Set("Content-Type", r.contentType)
 	}

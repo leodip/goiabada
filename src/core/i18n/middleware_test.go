@@ -408,3 +408,67 @@ func TestLocaleTag_FromContext(t *testing.T) {
 	// primaryTag splits on comma/semicolon.
 	assert.Equal(t, "en-US", LocaleTag(ctx2))
 }
+
+// TestCatalogTag_NamesTheCatalogTheRequestRendersIn: CatalogTag answers the catalog the localizer
+// renders from, which is what the admin console names to the auth server, and not the first
+// preference LocaleTag answers. The fr-CA and es-MX rows are the two the #559 probe found
+// rendering the console in pt-BR while their first preference has no catalog: forwarding that
+// preference would get the API's answer in English on a Portuguese page.
+func TestCatalogTag_NamesTheCatalogTheRequestRendersIn(t *testing.T) {
+	tests := []struct {
+		name           string
+		target         string
+		acceptLanguage string
+		want           string
+	}{
+		{"a catalog asked for by name", "/", "pt-BR", "pt-BR"},
+		{"a list led by a catalog", "/", "pt-BR,pt;q=0.9,en;q=0.8", "pt-BR"},
+		{"a first preference with no catalog", "/", "fr-CA,fr;q=0.9,pt-BR;q=0.8", "pt-BR"},
+		{"a later preference at a lower quality", "/", "es-MX, pt-BR;q=0.5", "pt-BR"},
+		{"a language matched to its regional catalog", "/", "pt-PT", "pt-BR"},
+		{"a language with no catalog", "/", "de", "en"},
+		{"a regional English", "/", "en-US,en;q=0.9", "en"},
+		{"nothing to go on", "/", "", "en"},
+		{"ui_locales over the header", "/?ui_locales=pt-BR", "de", "pt-BR"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tt.target, nil)
+			if tt.acceptLanguage != "" {
+				req.Header.Set("Accept-Language", tt.acceptLanguage)
+			}
+
+			var got string
+			Locale(nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got = CatalogTag(r.Context())
+			})).ServeHTTP(httptest.NewRecorder(), req)
+
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// A refinement through WithLocale moves the catalog with it, and a context that went through no
+// locale step at all, a background job's, renders English and says so.
+func TestCatalogTag_FollowsWithLocaleAndDefaultsToEnglish(t *testing.T) {
+	assert.Equal(t, "en", CatalogTag(context.Background()))
+	//nolint:staticcheck // SA1012: the nil tolerance is the behaviour under test, as LocaleTag's is.
+	assert.Equal(t, "en", CatalogTag(nil))
+
+	refined := WithLocale(context.Background(), false, "fr", "pt-BR")
+	assert.Equal(t, "pt-BR", CatalogTag(refined))
+	assert.Equal(t, "fr", LocaleTag(refined), "LocaleTag still answers the first preference")
+}
+
+// An override-only catalog is a catalog like the embedded ones: a request matching it names it.
+func TestCatalogTag_NamesAnOverrideOnlyCatalog(t *testing.T) {
+	saved := installed.Load()
+	t.Cleanup(func() { installed.Store(saved) })
+
+	require.NoError(t, LoadBundle(overridesDir(t, map[string]string{
+		"active.fr.toml": "\"auth.pwd.title\" = \"Connexion\"\n",
+	})))
+
+	assert.Equal(t, "fr", CatalogTag(WithLocale(context.Background(), false, "fr-CA")))
+}
