@@ -113,7 +113,10 @@ const { dialogMarkup, dialogMarkupFormat, showModalDialog } = (function () {
     return seal(html);
   }
 
+  // showModalDialog opens the dialog id with title and message. btn1callback runs when its first
+  // button is clicked (Close, No or Cancel) and btn2callback when its second is (Yes or OK).
   function showModalDialog(id, title, message, btn1callback, btn2callback) {
+    const dialog = document.getElementById(id + "_modalDialog");
     document.getElementById(id + "_modalDialogTitle").innerText = title;
     const messageElement = document.getElementById(id + "_modalDialogMessage");
     if (built.has(message)) {
@@ -122,19 +125,35 @@ const { dialogMarkup, dialogMarkupFormat, showModalDialog } = (function () {
       messageElement.textContent = message;
     }
 
+    // A button's answer. The buttons sit in a form whose method is dialog, which closes the
+    // dialog after the click's handler has run, and with it any question that handler asked:
+    // the second confirmation of a chain was closed by the click that answered the first, and
+    // its save dropped unasked. So the answer prevents the form's default, closes the dialog
+    // itself, and only then runs the callback, which therefore finds the dialog closed and the
+    // focus restored (#562). Escape closes the dialog without an answer, as before.
+    function answer(callback) {
+      return function (event) {
+        event.preventDefault();
+        dialog.close();
+        if (callback) {
+          callback(event);
+        }
+      };
+    }
+
+    // Every call sets both buttons, so a button given no callback just closes the dialog
+    // rather than running the one a previous call left on it (#562).
     const btn1 = document.getElementById(id + "_btnModal1");
-    if (btn1 && btn1callback) {
-      btn1.onclick = null;
-      btn1.onclick = btn1callback;
+    if (btn1) {
+      btn1.onclick = answer(btn1callback);
     }
 
     const btn2 = document.getElementById(id + "_btnModal2");
-    if (btn2 && btn2callback) {
-      btn2.onclick = null;
-      btn2.onclick = btn2callback;
+    if (btn2) {
+      btn2.onclick = answer(btn2callback);
     }
 
-    document.getElementById(id + "_modalDialog").showModal();
+    dialog.showModal();
   }
 
   return { dialogMarkup, dialogMarkupFormat, showModalDialog };
