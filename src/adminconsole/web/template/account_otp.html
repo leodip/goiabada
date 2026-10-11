@@ -46,7 +46,7 @@
                     <p>{{.error}}</p>
                 </div>
                 {{end}}
-                <button class="float-right btn btn-primary">{{ T $.ctx "adminconsole.account.otp.disable_button" }}</button>
+                <button type="submit" name="otpAction" value="disable" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.account.otp.disable_button" }}</button>
             </div>
 
         </div>
@@ -98,7 +98,7 @@
                     <p>{{.error}}</p>
                 </div>
                 {{end}}
-                <button class="float-right btn btn-primary">{{ T $.ctx "adminconsole.account.otp.enable_button" }}</button>
+                <button type="submit" name="otpAction" value="enable" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.account.otp.enable_button" }}</button>
             </div>
         </div>
     {{end}}

@@ -70,7 +70,7 @@ func TestAccountHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T)
 		{"HandleOtpPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleOtpPost(h, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/account/otp", handlertest.WithForm(url.Values{
-			"password": {"P4ss!word"}, "otp": {"123456"},
+			"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"},
 		}))},
 		{"HandlePhoneGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandlePhoneGet(h, nil, c)

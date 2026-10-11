@@ -203,6 +203,9 @@ func TestRender_AccountOtp_Enrollment(t *testing.T) {
 	assert.Contains(t, out, secretKey, "and the seed, for a user who cannot scan it")
 	assert.Contains(t, out, `name="otp"`)
 	assert.Contains(t, out, `name="password"`)
+	assert.Contains(t, out, `name="otpAction" value="enable"`,
+		"the form says it enables, so a stale one cannot be read as a disable (#562 decision 8)")
+	assert.NotContains(t, out, `value="disable"`)
 
 	assert.NotContains(t, out, `type="hidden"`,
 		"the enrolment form must post nothing the user did not type")
@@ -221,6 +224,9 @@ func TestRender_AccountOtp_Enabled(t *testing.T) {
 	assert.NotContains(t, out, "data:image/png;base64,")
 	assert.NotContains(t, out, `name="otp"`)
 	assert.Contains(t, out, `name="password"`)
+	assert.Contains(t, out, `name="otpAction" value="disable"`,
+		"the form says it disables, so a stale one cannot be read as an enrolment (#562 decision 8)")
+	assert.NotContains(t, out, `value="enable"`)
 }
 
 // The Device cell's tooltip, on all three session pages at once.
