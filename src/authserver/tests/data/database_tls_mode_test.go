@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
+	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
 	"github.com/stretchr/testify/require"
 )
@@ -43,12 +44,8 @@ func requireTestAuthority(t *testing.T) *x509.CertPool {
 // its IP address, verify-ca, which checks no host name, connects where verify-full is refused. Create
 // is on, so the maintenance connection a creating start opens is held to the mode as well (#502).
 func TestOpenDatabase_EachTLSModeAgainstTheTestServer(t *testing.T) {
-	switch dbType() {
-	case data.SQLite:
+	if dbType() == data.SQLite {
 		t.Skip("sqlite has no server and no transport to protect")
-	case data.Postgres, data.MSSQL:
-	default:
-		t.Skip("this engine refuses every mode but prefer until it maps them")
 	}
 
 	testAuthority := requireTestAuthority(t)
@@ -145,6 +142,8 @@ func TestOpenDatabase_EachTLSModeAgainstTheTestServer(t *testing.T) {
 func rawDB(t *testing.T, database datafactory.Migratable) *sql.DB {
 	t.Helper()
 	switch db := database.(type) {
+	case *mysqldb.Database:
+		return db.DB
 	case *postgresdb.Database:
 		return db.DB
 	case *mssqldb.Database:
@@ -158,6 +157,8 @@ func rawDB(t *testing.T, database datafactory.Migratable) *sql.DB {
 func encryptedConnectionQuery(t *testing.T) string {
 	t.Helper()
 	switch dbType() {
+	case data.MySQL:
+		return "SELECT VARIABLE_VALUE <> '' FROM performance_schema.session_status WHERE VARIABLE_NAME = 'Ssl_cipher'"
 	case data.Postgres:
 		return "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()"
 	case data.MSSQL:

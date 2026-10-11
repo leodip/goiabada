@@ -66,21 +66,21 @@ type DatabaseConfig struct {
 // ends when the caller stops waiting (#438 decision 3).
 func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database, error) {
 
-	// One record where five used to be, and no password: the DSN is assembled below from the
-	// same four values, so a startup problem is read off this line rather than off four
+	// One record where five used to be, and no password: the connection is configured below from
+	// the same four values, so a startup problem is read off this line rather than off four
 	// consecutive ones that a collector had no way to join (#320 decision 6).
 	tlsMode := dbConfig.TLSMode.OrPrefer()
 	slog.InfoContext(ctx, "using database", "type", "mysql", "username", dbConfig.Username,
 		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name, "tls_mode", string(tlsMode))
 
-	// prefer is the one mode this engine's connection strings carry, so any other stops the start
-	// before anything is dialled rather than connecting as prefer under another name (#502).
-	if tlsMode != data.TLSPrefer {
-		return nil, errs.Errorf("GOIABADA_DB_TLS_MODE %s is not supported on mysql in this build: set it to prefer", tlsMode)
+	// The configuration's load refuses any other value, so only a configuration built directly
+	// reaches this, and it must not connect as prefer under another name (#502).
+	if !tlsMode.Known() {
+		return nil, errs.Errorf("GOIABADA_DB_TLS_MODE %q is not one of the five modes", tlsMode)
 	}
 
 	if dbConfig.Create {
-		tempDB, err := sql.Open("mysql", MaintenanceDSN(dbConfig))
+		tempDB, err := open(MaintenanceConnConfig(dbConfig))
 		if err != nil {
 			return nil, errs.Wrap(err, "unable to open database")
 		}
@@ -116,7 +116,7 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 		slog.InfoContext(ctx, "database creation is disabled, so the database must already exist", "setting", "GOIABADA_DB_CREATE")
 	}
 
-	db, err := sql.Open("mysql", DSN(dbConfig))
+	db, err := open(ConnConfig(dbConfig))
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to open database")
 	}
@@ -125,7 +125,7 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 	}
 
 	if !dbConfig.Create {
-		// sql.Open only parses the DSN, so without this an absent database would come back as
+		// Opening only builds the connector, so without this an absent database would come back as
 		// a usable handle and a nil error, and the failure would surface inside the migrator
 		// as somebody else's problem. Ping forces first use here, so the caller gets MySQL's
 		// own "Error 1049 (42000): Unknown database" from the constructor. Not on the creating
@@ -145,6 +145,21 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 		dbConfig: dbConfig,
 	}
 	return &mysqlDb, nil
+}
+
+// open is sql.Open("mysql", dsn) for a configuration rather than a string, which is what carries
+// a TLS configuration of the builder's own and a username containing `:` (#502 decision 11): the
+// "mysql" driver builds the same connector from what ParseDSN reads. Like sql.Open it dials
+// nothing.
+func open(c *mysqldriver.Config, err error) (*sql.DB, error) {
+	if err != nil {
+		return nil, err
+	}
+	connector, err := mysqldriver.NewConnector(c)
+	if err != nil {
+		return nil, errs.Wrap(err, "unable to configure the connection")
+	}
+	return sql.OpenDB(connector), nil
 }
 
 // isDeadlock is MySQL's half of RunInTransaction's classifier: error 1213, ER_LOCK_DEADLOCK,
@@ -220,7 +235,7 @@ func (d *Database) NewMigrator(ctx context.Context, _ migrator.Progress) (*migra
 // backtick inside it.
 //
 // MySQL was never broken the way PostgreSQL was: an unquoted identifier is not folded here, so
-// the name in this statement and the name in the DSN's path already agreed. What quoting buys is
+// the name in this statement and the database the connection selects already agreed. What quoting buys is
 // the rest of the class. A name needing quotes for any other reason, a hyphen or a space, was a
 // syntax error, and the name reaches this statement by interpolation because an identifier
 // cannot be a bind parameter. GOIABADA_DB_NAME is operator-supplied configuration rather than

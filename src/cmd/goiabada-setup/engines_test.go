@@ -26,12 +26,12 @@ func TestEngines_EveryRowIsComplete(t *testing.T) {
 				"image": e.image, "defaultPort": e.defaultPort, "defaultUser": e.defaultUser,
 				"kubernetesHost": e.kubernetesHost, "composeService": e.composeService,
 				"healthcheck": e.healthcheck, "healthInterval": e.healthInterval, "healthTimeout": e.healthTimeout,
-				"driver": e.driver, "existenceQuery": e.existenceQuery, "emptinessQuery": e.emptinessQuery,
+				"existenceQuery": e.existenceQuery, "emptinessQuery": e.emptinessQuery,
 				"composePasswordVariable": e.composePasswordVariable,
 			}
 			serverFuncs := map[string]bool{
-				"dsn":            e.dsn != nil,
-				"maintenanceDSN": e.maintenanceDSN != nil,
+				"connection":            e.connection != nil,
+				"maintenanceConnection": e.maintenanceConnection != nil,
 			}
 
 			if !e.hasServer {
@@ -161,8 +161,8 @@ func TestEngines_NumbersAreMenuPositions(t *testing.T) {
 	}
 }
 
-// The driver each row opens is the one the auth server opens (sql.Open in each engine's
-// New*Database), and the existence query is the server's own databaseExists where it has one,
+// The driver each row opens is the one the auth server opens (in each engine's New, MySQL's
+// through the driver's connector), and the existence query is the server's own databaseExists where it has one,
 // asked over the maintenance connection the server creates the database from. The connection
 // strings are pinned by testdata/connection-strings.json instead (#430).
 func TestEngines_TheConnectionCheckIsTheServers(t *testing.T) {
@@ -192,8 +192,12 @@ func TestEngines_TheConnectionCheckIsTheServers(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.engine, func(t *testing.T) {
 			e := testEngine(testCase.engine)
-			if e.driver != testCase.driver {
-				t.Errorf("driver is %q, want %q", e.driver, testCase.driver)
+			for which, connection := range map[string]func(dbTarget) (dbConnection, error){
+				"connection": e.connection, "maintenance connection": e.maintenanceConnection,
+			} {
+				if got := build(t, which, connection, dbTarget{Host: "db", Port: 1, Name: "goiabada"}).driver; got != testCase.driver {
+					t.Errorf("%s driver is %q, want %q", which, got, testCase.driver)
+				}
 			}
 			if e.existenceQuery != testCase.existenceQuery {
 				t.Errorf("existence query is %q, want %q", e.existenceQuery, testCase.existenceQuery)
