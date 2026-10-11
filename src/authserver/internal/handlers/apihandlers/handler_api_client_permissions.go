@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // clientPermissionsDatabase is what the client permission endpoints need: the client's grants and
@@ -124,7 +125,7 @@ func HandleClientPermissionsPut(
 
 		// Enforce that client credentials flow must be enabled
 		if !client.ClientCredentialsEnabled {
-			writeJSONError(w, "Client permissions can only be configured when client credentials flow is enabled", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientPermissionsClientCredentialsDisabled, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 

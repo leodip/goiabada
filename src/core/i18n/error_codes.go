@@ -159,6 +159,46 @@ const (
 	ErrCodeUserGroupsTooMany               = "handler.user_groups.too_many"
 	ErrCodeEmailVerificationAccountChanged = "handler.email_verification.account_changed"
 
+	// Clients, their administrative scopes, permissions, redirect URIs, web origins and tokens. A
+	// client's identifier refusal is handler.client.identifier_required above, and its description
+	// bound is handler.admin_resource_permissions.description_too_long, which says the same sentence.
+	ErrCodeClientDisplayNameTooLong            = "handler.client.display_name_too_long" // Args: {"max": int}
+	ErrCodeClientIdentifierInUse               = "handler.client.identifier_in_use"
+	ErrCodeClientSystemLevelDeleteNotAllowed   = "handler.client.system_level_delete_not_allowed"
+	ErrCodeClientSystemLevelIdentifierFixed    = "handler.client.system_level_identifier_fixed"
+	ErrCodeClientSelfRegisteredIdentifierFixed = "handler.client.self_registered_identifier_fixed"
+	ErrCodeClientDefaultAcrNotApplicable       = "handler.client.default_acr_not_applicable"
+	ErrCodeClientDefaultAcrInvalid             = "handler.client.default_acr_invalid"
+	ErrCodeClientWebsiteURLTooLong             = "handler.client.website_url_too_long" // Args: {"max": int}
+	ErrCodeClientWebsiteURLInvalid             = "handler.client.website_url_invalid"
+	ErrCodeClientWebsiteURLSchemeInvalid       = "handler.client.website_url_scheme_invalid"
+	ErrCodeClientSecretInvalid                 = "handler.client.secret_invalid"
+
+	ErrCodeClientAdministrativeScopesAllowedRequired      = "handler.client_administrative_scopes.allowed_required"
+	ErrCodeClientAdministrativeScopesConsoleAlwaysAllowed = "handler.client_administrative_scopes.console_always_allowed"
+	ErrCodeClientPermissionsClientCredentialsDisabled     = "handler.client_permissions.client_credentials_disabled"
+
+	ErrCodeClientRedirectURIsNoRedirectFlow = "handler.client_redirect_uris.no_redirect_flow"
+	ErrCodeClientRedirectURIsTooMany        = "handler.client_redirect_uris.too_many" // Args: {"max": int, "count": int}
+	ErrCodeClientRedirectURIEmpty           = "handler.client_redirect_uris.empty"
+	ErrCodeClientRedirectURITooLong         = "handler.client_redirect_uris.too_long"     // Args: {"length": int, "max": int, "prefix": string}
+	ErrCodeClientRedirectURIInvalid         = "handler.client_redirect_uris.invalid"      // Args: {"uri": string}
+	ErrCodeClientRedirectURINotAbsolute     = "handler.client_redirect_uris.not_absolute" // Args: {"uri": string}
+	ErrCodeClientRedirectURIsDuplicate      = "handler.client_redirect_uris.duplicate"
+
+	ErrCodeClientWebOriginEmpty            = "handler.client_web_origins.empty"
+	ErrCodeClientWebOriginInvalid          = "handler.client_web_origins.invalid"  // Args: {"origin": string}
+	ErrCodeClientWebOriginTooLong          = "handler.client_web_origins.too_long" // Args: {"length": int, "max": int, "origin": string}
+	ErrCodeClientWebOriginsDuplicate       = "handler.client_web_origins.duplicate"
+	ErrCodeClientWebOriginsExpectedInvalid = "handler.client_web_origins.expected_invalid" // Args: {"origin": string}
+
+	ErrCodeClientTokensTokenExpirationOutOfRange          = "handler.client_tokens.token_expiration_out_of_range"     // Args: {"max": int}
+	ErrCodeClientTokensOfflineIdleTimeoutOutOfRange       = "handler.client_tokens.offline_idle_timeout_out_of_range" // Args: {"max": int}
+	ErrCodeClientTokensOfflineMaxLifetimeOutOfRange       = "handler.client_tokens.offline_max_lifetime_out_of_range" // Args: {"max": int}
+	ErrCodeClientTokensOfflineIdleTimeoutAboveMaxLifetime = "handler.client_tokens.offline_idle_timeout_above_max_lifetime"
+	ErrCodeClientTokensIncludeClaimsInAccessTokenInvalid  = "handler.client_tokens.include_claims_in_access_token_invalid"
+	ErrCodeClientTokensIncludeClaimsInIdTokenInvalid      = "handler.client_tokens.include_claims_in_id_token_invalid"
+
 	// RP-initiated logout via /auth/logout carries no error codes. It used to
 	// carry ten, all of which rendered an error page to the End-User instead of
 	// logging them out. A hint the OP cannot confirm is now answered with the

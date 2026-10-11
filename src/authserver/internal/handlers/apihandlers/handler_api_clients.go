@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -300,7 +299,7 @@ func HandleClientDelete(
 		}
 
 		if client.IsSystemLevelClient() {
-			writeJSONError(w, "Trying to delete a system level client", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientSystemLevelDeleteNotAllowed, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -343,14 +342,14 @@ func HandleClientCreatePost(
 
 		// Validate client identifier present
 		if strings.TrimSpace(req.ClientIdentifier) == "" {
-			writeJSONError(w, "Client identifier is required.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Validate description length
 		const maxLengthDescription = 100
 		if inputvalidation.TextLength(req.Description) > maxLengthDescription {
-			writeJSONError(w, "The description cannot exceed a maximum length of "+strconv.Itoa(maxLengthDescription)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionTooLong, map[string]any{"max": maxLengthDescription}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -363,7 +362,7 @@ func HandleClientCreatePost(
 		trimmedDisplayName := strings.TrimSpace(req.DisplayName)
 		const maxLengthDisplayName = 100
 		if inputvalidation.TextLength(trimmedDisplayName) > maxLengthDisplayName {
-			writeJSONError(w, "The display name cannot exceed a maximum length of "+strconv.Itoa(maxLengthDisplayName)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDisplayNameTooLong, map[string]any{"max": maxLengthDisplayName}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -385,7 +384,7 @@ func HandleClientCreatePost(
 			return
 		}
 		if existingClient != nil {
-			writeJSONError(w, "The client identifier is already in use.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierInUse, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -481,14 +480,14 @@ func HandleClientUpdatePut(
 
 		// Validate client identifier
 		if strings.TrimSpace(updateReq.ClientIdentifier) == "" {
-			writeJSONError(w, "Client identifier is required.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Validate description length
 		const maxLengthDescription = 100
 		if inputvalidation.TextLength(updateReq.Description) > maxLengthDescription {
-			writeJSONError(w, "The description cannot exceed a maximum length of "+strconv.Itoa(maxLengthDescription)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionTooLong, map[string]any{"max": maxLengthDescription}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -506,7 +505,7 @@ func HandleClientUpdatePut(
 		//
 		// System-level client protection: block identifier changes
 		if client.IsSystemLevelClient() && trimmedClientIdentifier != client.ClientIdentifier {
-			writeJSONError(w, "The identifier of a system-level client cannot be changed.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientSystemLevelIdentifierFixed, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -524,7 +523,7 @@ func HandleClientUpdatePut(
 		// escape hatch this whole change rests on, so a guard that refused the update outright
 		// would take away the remedy along with the risk.
 		if client.CreatedViaDCR && trimmedClientIdentifier != client.ClientIdentifier {
-			writeJSONError(w, "The identifier of a self-registered client cannot be changed.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientSelfRegisteredIdentifierFixed, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -559,14 +558,14 @@ func HandleClientUpdatePut(
 				return
 			}
 			if existingClient != nil && existingClient.Id != client.Id {
-				writeJSONError(w, "The client identifier is already in use.", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierInUse, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 		}
 
 		// ACR level validation depending on AuthorizationCodeEnabled
 		if !client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultAcrLevel) != "" {
-			writeJSONError(w, "Default ACR level is not applicable when authorization code flow is disabled.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDefaultAcrNotApplicable, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -575,16 +574,16 @@ func HandleClientUpdatePut(
 		if websiteURL != "" {
 			const maxLengthWebsiteURL = 256
 			if inputvalidation.TextLength(websiteURL) > maxLengthWebsiteURL {
-				writeJSONError(w, "The website URL cannot exceed a maximum length of "+strconv.Itoa(maxLengthWebsiteURL)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebsiteURLTooLong, map[string]any{"max": maxLengthWebsiteURL}), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			parsed, err := url.ParseRequestURI(websiteURL)
 			if err != nil {
-				writeJSONError(w, "Invalid website URL.", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebsiteURLInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			if parsed.Scheme != "http" && parsed.Scheme != "https" {
-				writeJSONError(w, "Website URL must use http or https scheme.", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebsiteURLSchemeInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 		}
@@ -597,7 +596,7 @@ func HandleClientUpdatePut(
 		// Validate display name length
 		const maxLengthDisplayName = 100
 		if inputvalidation.TextLength(client.DisplayName) > maxLengthDisplayName {
-			writeJSONError(w, "The display name cannot exceed a maximum length of "+strconv.Itoa(maxLengthDisplayName)+" characters.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDisplayNameTooLong, map[string]any{"max": maxLengthDisplayName}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -616,7 +615,7 @@ func HandleClientUpdatePut(
 		if client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultAcrLevel) != "" {
 			acrLevel, err := record.AcrLevelFromString(updateReq.DefaultAcrLevel)
 			if err != nil {
-				writeJSONError(w, "Invalid default ACR level", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDefaultAcrInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			client.DefaultAcrLevel = acrLevel
@@ -703,7 +702,7 @@ func HandleClientAuthenticationPut(
 		} else {
 			// Confidential: require strong secret
 			if err := validateClientSecret(req.ClientSecret); err != nil {
-				writeJSONError(w, "Invalid client secret. Please generate a new one.", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientSecretInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 
@@ -832,13 +831,13 @@ func HandleClientAdministrativeScopesPut(
 		// Absent or null is refused rather than read as false: a body that says nothing must not
 		// switch the allowance off.
 		if req.Allowed == nil {
-			writeJSONError(w, "allowed is required.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientAdministrativeScopesAllowedRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		allowed := *req.Allowed
 
 		if client.IsSystemLevelClient() && !allowed {
-			writeJSONError(w, "The admin console's client is always allowed to request the administrative scopes.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientAdministrativeScopesConsoleAlwaysAllowed, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -1029,7 +1028,7 @@ func HandleClientRedirectURIsPut(
 			return
 		}
 		if !client.AuthorizationCodeEnabled && !client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled) {
-			writeJSONError(w, "Redirect URIs are used by the authorization code with PKCE flow and by the implicit flow, and neither is enabled for this client.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIsNoRedirectFlow, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -1053,7 +1052,7 @@ func HandleClientRedirectURIsPut(
 		// bound cannot be saved until the administrator trims it in the same save, which is #122's
 		// precedent for a legacy row below (#428).
 		if len(req.RedirectURIs) > record.RedirectURIsMaxPerClient {
-			writeJSONError(w, fmt.Sprintf("A client can have at most %d redirect URIs, and this list has %d.", record.RedirectURIsMaxPerClient, len(req.RedirectURIs)), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIsTooMany, map[string]any{"max": record.RedirectURIsMaxPerClient, "count": len(req.RedirectURIs)}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -1063,17 +1062,17 @@ func HandleClientRedirectURIsPut(
 		for _, raw := range req.RedirectURIs {
 			uri := strings.TrimSpace(raw)
 			if uri == "" {
-				writeJSONError(w, "Redirect URI cannot be empty", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIEmpty, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			// Before the parse, so an overlong value is never parsed. The message names the
 			// value by its beginning rather than echoing up to the whole body back.
 			if len(uri) > record.RedirectURIMaxBytes {
-				writeJSONError(w, fmt.Sprintf("Redirect URI is too long (%d bytes, the maximum is %d): %s...", len(uri), record.RedirectURIMaxBytes, strings.ToValidUTF8(uri[:80], "")), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURITooLong, map[string]any{"length": len(uri), "max": record.RedirectURIMaxBytes, "prefix": strings.ToValidUTF8(uri[:80], "")}), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			if _, parseErr := url.ParseRequestURI(uri); parseErr != nil {
-				writeJSONError(w, fmt.Sprintf("Invalid redirect URI: %s", uri), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIInvalid, map[string]any{"uri": uri}), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			// url.ParseRequestURI above accepts "//evil.example/cb", "/relative/cb",
@@ -1094,11 +1093,11 @@ func HandleClientRedirectURIsPut(
 			// that URI from the list. The message names the offending value, and taking that
 			// remediation also deletes the row.
 			if !urlmatch.IsAbsoluteRedirectURI(uri) {
-				writeJSONError(w, fmt.Sprintf("Redirect URI must be an absolute URI (a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host): %s", uri), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURINotAbsolute, map[string]any{"uri": uri}), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			if _, exists := seen[uri]; exists {
-				writeJSONError(w, "Duplicate redirect URIs are not allowed", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIsDuplicate, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			seen[uri] = struct{}{}
@@ -1244,22 +1243,22 @@ func HandleClientWebOriginsPut(
 		for _, raw := range req.WebOrigins {
 			val := strings.TrimSpace(raw)
 			if val == "" {
-				writeJSONError(w, "Web origin cannot be empty", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebOriginEmpty, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			origin, ok := urlmatch.CanonicalOrigin(val)
 			if !ok {
-				writeJSONError(w, fmt.Sprintf("Invalid web origin: %s. A web origin is a scheme, a host and an optional port, with nothing after the host: for example https://www.example.com or https://myapp:8080. The scheme must be http or https; the host must be ASCII, must carry no user information, and must not be an IPv6 literal or an abbreviated IPv4 address; and a port, if present, must be plain decimal below 65536 with no leading zero.", val), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebOriginInvalid, map[string]any{"origin": val}), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			// The column's width, record.WebOriginMaxBytes; its comment says why the bound is
 			// here rather than in CanonicalOrigin.
 			if len(origin) > record.WebOriginMaxBytes {
-				writeJSONError(w, fmt.Sprintf("Web origin is too long (%d characters, the maximum is %d): %s", len(origin), record.WebOriginMaxBytes, origin), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebOriginTooLong, map[string]any{"length": len(origin), "max": record.WebOriginMaxBytes, "origin": origin}), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			if _, exists := seen[origin]; exists {
-				writeJSONError(w, "Duplicate web origins are not allowed", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebOriginsDuplicate, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			seen[origin] = struct{}{}
@@ -1273,7 +1272,7 @@ func HandleClientWebOriginsPut(
 		for _, raw := range req.ExpectedWebOrigins {
 			origin, ok := urlmatch.CanonicalOrigin(strings.TrimSpace(raw))
 			if !ok {
-				writeJSONError(w, fmt.Sprintf("Invalid web origin in expectedWebOrigins: %s. Send the web origins exactly as you last read them.", raw), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebOriginsExpectedInvalid, map[string]any{"origin": raw}), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			expected = append(expected, origin)
@@ -1387,19 +1386,19 @@ func HandleClientTokensPut(
 		// Validate numbers: >= 0 and <= 160000000
 		const maxValue = 160000000
 		if req.TokenExpirationInSeconds < 0 || req.TokenExpirationInSeconds > maxValue {
-			writeJSONError(w, fmt.Sprintf("Token expiration in seconds must be between 0 and %d.", maxValue), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensTokenExpirationOutOfRange, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if req.RefreshTokenOfflineIdleTimeoutInSeconds < 0 || req.RefreshTokenOfflineIdleTimeoutInSeconds > maxValue {
-			writeJSONError(w, fmt.Sprintf("Refresh token offline - idle timeout in seconds must be between 0 and %d.", maxValue), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensOfflineIdleTimeoutOutOfRange, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if req.RefreshTokenOfflineMaxLifetimeInSeconds < 0 || req.RefreshTokenOfflineMaxLifetimeInSeconds > maxValue {
-			writeJSONError(w, fmt.Sprintf("Refresh token offline - max lifetime in seconds must be between 0 and %d.", maxValue), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensOfflineMaxLifetimeOutOfRange, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if req.RefreshTokenOfflineIdleTimeoutInSeconds > req.RefreshTokenOfflineMaxLifetimeInSeconds {
-			writeJSONError(w, "Refresh token offline - idle timeout cannot be greater than max lifetime.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensOfflineIdleTimeoutAboveMaxLifetime, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -1410,12 +1409,12 @@ func HandleClientTokensPut(
 		// (#385).
 		includeClaimsInAccessToken, err := record.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInAccessToken))
 		if err != nil {
-			writeJSONError(w, "Invalid value for includeOpenIDConnectClaimsInAccessToken.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensIncludeClaimsInAccessTokenInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		includeClaimsInIdToken, err := record.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIdToken))
 		if err != nil {
-			writeJSONError(w, "Invalid value for includeOpenIDConnectClaimsInIdToken.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensIncludeClaimsInIdTokenInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
