@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -86,4 +88,36 @@ func TestLogSessionKeysRefused_ACurrentKeyWithNoBootstrapFileNamesTheVariables(t
 	logged, _ := records[0].Attrs["error"].(error)
 	require.Error(t, logged)
 	assert.Contains(t, logged.Error(), "must be 32 bytes")
+}
+
+// The configuration record says whether the rate limiter switch is on, since the limits counted
+// by an IP address are the ones it can leave off and nothing else at startup says so (#503). It
+// is Info either way: off is the default #219 chose, not a fault, and a Warn on every default
+// install would teach operators to ignore warnings.
+func TestLogConfiguration_NamesTheRateLimiterSwitch(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("switch %v", enabled), func(t *testing.T) {
+			logs := logtest.CaptureSlog(t)
+			cfg := &config.Config{}
+			cfg.AuthServer.BaseURL = "https://auth.example.com"
+			cfg.AuthServer.InternalBaseURL = "http://authserver:9090"
+			cfg.AdminConsole.BaseURL = "https://admin.example.com"
+			cfg.AuthServer.DebugAPIRequests = true
+			cfg.AuthServer.RateLimiterEnabled = enabled
+
+			logConfiguration(cfg)
+
+			records := logs.Records()
+			require.Len(t, records, 1, "the switch rides on the configuration record, with no record of its own")
+			assert.Equal(t, slog.LevelInfo, records[0].Level)
+			assert.Equal(t, "using configuration", records[0].Message)
+			assert.Equal(t, map[string]any{
+				"auth_server_base_url":          "https://auth.example.com",
+				"auth_server_internal_base_url": "http://authserver:9090",
+				"admin_console_base_url":        "https://admin.example.com",
+				"debug_api_requests":            true,
+				"rate_limiter_enabled":          enabled,
+			}, records[0].Attrs)
+		})
+	}
 }
