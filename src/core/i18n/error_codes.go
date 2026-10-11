@@ -223,6 +223,70 @@ const (
 	ErrCodeAccountLogoutClientUnresolved         = "handler.account_logout.client_unresolved"
 	ErrCodeAccountLogoutRedirectURINotRegistered = "handler.account_logout.post_logout_redirect_uri_not_registered"
 
+	// Settings: general, sessions, tokens, email, signing keys, the UI theme and audit logs. A settings
+	// refusal sentence that a client's tokens or the account already say reuses that key: the offline
+	// idle timeout above its max lifetime is handler.client_tokens.offline_idle_timeout_above_max_lifetime,
+	// SMTP being off handler.smtp.not_enabled, and the test send's missing destination
+	// handler.settings_email.destination_required. The SMTP connection and send failures are one
+	// whole sentence per cause, never an opening and a cause joined at run time.
+	ErrCodeSettingsGeneralAppNameTooLong          = "handler.settings_general.app_name_too_long" // Args: {"max": int}
+	ErrCodeSettingsGeneralIssuerURIInvalid        = "handler.settings_general.issuer_uri_invalid"
+	ErrCodeSettingsGeneralIssuerIdentifierInvalid = "handler.settings_general.issuer_identifier_invalid"
+	ErrCodeSettingsGeneralIssuerTooShort          = "handler.settings_general.issuer_too_short" // Args: {"min": int}
+	ErrCodeSettingsGeneralIssuerTooLong           = "handler.settings_general.issuer_too_long"  // Args: {"max": int}
+	ErrCodeSettingsGeneralPasswordPolicyInvalid   = "handler.settings_general.password_policy_invalid"
+
+	ErrCodeSettingsSessionsIdleTimeoutNotPositive      = "handler.settings_sessions.idle_timeout_not_positive"
+	ErrCodeSettingsSessionsMaxLifetimeNotPositive      = "handler.settings_sessions.max_lifetime_not_positive"
+	ErrCodeSettingsSessionsIdleTimeoutTooLarge         = "handler.settings_sessions.idle_timeout_too_large" // Args: {"max": int}
+	ErrCodeSettingsSessionsMaxLifetimeTooLarge         = "handler.settings_sessions.max_lifetime_too_large" // Args: {"max": int}
+	ErrCodeSettingsSessionsIdleTimeoutAboveMaxLifetime = "handler.settings_sessions.idle_timeout_above_max_lifetime"
+
+	ErrCodeSettingsTokensTokenExpirationNotPositive    = "handler.settings_tokens.token_expiration_not_positive"
+	ErrCodeSettingsTokensTokenExpirationTooLarge       = "handler.settings_tokens.token_expiration_too_large" // Args: {"max": int}
+	ErrCodeSettingsTokensOfflineIdleTimeoutNotPositive = "handler.settings_tokens.offline_idle_timeout_not_positive"
+	ErrCodeSettingsTokensOfflineIdleTimeoutTooLarge    = "handler.settings_tokens.offline_idle_timeout_too_large" // Args: {"max": int}
+	ErrCodeSettingsTokensOfflineMaxLifetimeNotPositive = "handler.settings_tokens.offline_max_lifetime_not_positive"
+	ErrCodeSettingsTokensOfflineMaxLifetimeTooLarge    = "handler.settings_tokens.offline_max_lifetime_too_large" // Args: {"max": int}
+
+	ErrCodeSettingsEmailSMTPHostRequired      = "handler.settings_email.smtp_host_required"
+	ErrCodeSettingsEmailSMTPPortRequired      = "handler.settings_email.smtp_port_required"
+	ErrCodeSettingsEmailSMTPFromEmailRequired = "handler.settings_email.smtp_from_email_required"
+	ErrCodeSettingsEmailSMTPHostTooLong       = "handler.settings_email.smtp_host_too_long" // Args: {"max": int}
+	ErrCodeSettingsEmailSMTPPortOutOfRange    = "handler.settings_email.smtp_port_out_of_range"
+	ErrCodeSettingsEmailSMTPEncryptionInvalid = "handler.settings_email.smtp_encryption_invalid"
+	ErrCodeSettingsEmailSMTPUsernameTooLong   = "handler.settings_email.smtp_username_too_long"   // Args: {"max": int}
+	ErrCodeSettingsEmailSMTPPasswordTooLong   = "handler.settings_email.smtp_password_too_long"   // Args: {"max": int}
+	ErrCodeSettingsEmailSMTPFromNameTooLong   = "handler.settings_email.smtp_from_name_too_long"  // Args: {"max": int}
+	ErrCodeSettingsEmailSMTPFromEmailTooLong  = "handler.settings_email.smtp_from_email_too_long" // Args: {"max": int}
+	ErrCodeSettingsEmailSMTPPasswordAndClear  = "handler.settings_email.smtp_password_and_clear"
+	ErrCodeSettingsEmailSMTPHostChanged       = "handler.settings_email.smtp_host_changed"
+
+	ErrCodeSettingsEmailConnectFailedHostNotFound = "handler.settings_email.connect_failed_host_not_found"
+	ErrCodeSettingsEmailConnectFailedTimedOut     = "handler.settings_email.connect_failed_timed_out"
+	ErrCodeSettingsEmailConnectFailedRefused      = "handler.settings_email.connect_failed_refused"
+	ErrCodeSettingsEmailConnectFailed             = "handler.settings_email.connect_failed"
+
+	ErrCodeSettingsEmailSendFailedHostNotFound = "handler.settings_email.send_failed_host_not_found"
+	ErrCodeSettingsEmailSendFailedTimedOut     = "handler.settings_email.send_failed_timed_out"
+	ErrCodeSettingsEmailSendFailedRefused      = "handler.settings_email.send_failed_refused"
+	ErrCodeSettingsEmailSendFailed             = "handler.settings_email.send_failed"
+	ErrCodeSettingsEmailSTARTTLSNotOffered     = "handler.settings_email.starttls_not_offered"
+	ErrCodeSettingsEmailPasswordUnencrypted    = "handler.settings_email.password_unencrypted"
+	ErrCodeSettingsEmailNoAuthentication       = "handler.settings_email.no_authentication"
+	ErrCodeSettingsEmailNoSupportedMechanism   = "handler.settings_email.no_supported_mechanism"
+	ErrCodeSettingsEmailTLSFailed              = "handler.settings_email.tls_failed"
+	ErrCodeSettingsEmailAuthenticationRejected = "handler.settings_email.authentication_rejected"
+	ErrCodeSettingsEmailMessageRefused         = "handler.settings_email.message_refused"
+
+	ErrCodeSettingsKeysRotationInProgress    = "handler.settings_keys.rotation_in_progress"
+	ErrCodeSettingsKeysKeyNotFound           = "handler.settings_keys.key_not_found"
+	ErrCodeSettingsKeysOnlyPreviousRevocable = "handler.settings_keys.only_previous_revocable"
+
+	ErrCodeSettingsUIThemeInvalid                 = "handler.settings_ui_theme.theme_invalid"
+	ErrCodeSettingsAuditLogsRetentionDaysNegative = "handler.settings_audit_logs.retention_days_negative"
+	ErrCodeSettingsAuditLogsRetentionDaysTooLarge = "handler.settings_audit_logs.retention_days_too_large"
+
 	// RP-initiated logout via /auth/logout carries no error codes. It used to
 	// carry ten, all of which rendered an error page to the End-User instead of
 	// logging them out. A hint the OP cannot confirm is now answered with the

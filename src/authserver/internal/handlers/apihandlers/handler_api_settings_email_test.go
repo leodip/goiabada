@@ -498,7 +498,7 @@ func TestConnectionFailureMessage(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.want, func(t *testing.T) {
-			assert.Equal(t, tc.want, connectionFailureMessage("Unable to connect to the SMTP server", tc.cause))
+			assert.Equal(t, tc.want, connectionFailureMessage(smtpDialFailure, tc.cause).EnglishFallback())
 		})
 	}
 }

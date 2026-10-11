@@ -52,7 +52,7 @@ const failureMessage = "failure message"
 func dialFailureMessages() []string {
 	var messages []string
 	for cause := emaildelivery.ConnectionCause(0); cause < connectionCausesReached; cause++ {
-		messages = appendNew(messages, connectionFailureMessage(smtpDialFailure, cause))
+		messages = appendNew(messages, connectionFailureMessage(smtpDialFailure, cause).EnglishFallback())
 	}
 	return messages
 }
@@ -70,7 +70,7 @@ func sendFailureMessages() []string {
 	var messages []string
 	for kind := emaildelivery.SendFailureKind(0); kind < sendFailureKindsReached; kind++ {
 		for _, cause := range causes {
-			messages = appendNew(messages, sendFailureMessage(&emaildelivery.SendError{Kind: kind, Err: cause}))
+			messages = appendNew(messages, sendFailureMessage(&emaildelivery.SendError{Kind: kind, Err: cause}).EnglishFallback())
 		}
 	}
 	return messages

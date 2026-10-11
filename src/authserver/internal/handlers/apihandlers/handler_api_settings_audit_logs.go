@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // HandleSettingsAuditLogsGet - GET /api/v1/admin/settings/audit-logs
@@ -56,12 +57,12 @@ func HandleSettingsAuditLogsPut(
 
 		// Validation
 		if req.AuditLogRetentionDays < 0 {
-			writeJSONError(w, "Audit log retention days cannot be negative. Use 0 for infinite retention.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsAuditLogsRetentionDaysNegative, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		const maxRetentionDays = 3650 // 10 years
 		if req.AuditLogRetentionDays > maxRetentionDays {
-			writeJSONError(w, "Audit log retention days cannot exceed 3650 days (10 years).", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsAuditLogsRetentionDaysTooLarge, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 

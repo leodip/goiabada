@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // HandleSettingsTokensGet - GET /api/v1/admin/settings/tokens
@@ -60,34 +60,34 @@ func HandleSettingsTokensPut(
 		// Preserve existing behavior: values must be > 0 and <= max, and idle <= max lifetime
 		const maxValue = 160000000
 		if req.TokenExpirationInSeconds <= 0 {
-			writeJSONError(w, "Token expiration in seconds must be greater than zero.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensTokenExpirationNotPositive, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if req.TokenExpirationInSeconds > maxValue {
-			writeJSONError(w, fmt.Sprintf("Token expiration in seconds cannot be greater than %v.", maxValue), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensTokenExpirationTooLarge, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		if req.RefreshTokenOfflineIdleTimeoutInSeconds <= 0 {
-			writeJSONError(w, "Refresh token offline - idle timeout in seconds must be greater than zero.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensOfflineIdleTimeoutNotPositive, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if req.RefreshTokenOfflineIdleTimeoutInSeconds > maxValue {
-			writeJSONError(w, fmt.Sprintf("Refresh token offline - idle timeout in seconds cannot be greater than %v.", maxValue), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensOfflineIdleTimeoutTooLarge, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		if req.RefreshTokenOfflineMaxLifetimeInSeconds <= 0 {
-			writeJSONError(w, "Refresh token offline - max lifetime in seconds must be greater than zero.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensOfflineMaxLifetimeNotPositive, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if req.RefreshTokenOfflineMaxLifetimeInSeconds > maxValue {
-			writeJSONError(w, fmt.Sprintf("Refresh token offline - max lifetime in seconds cannot be greater than %v.", maxValue), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensOfflineMaxLifetimeTooLarge, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		if req.RefreshTokenOfflineIdleTimeoutInSeconds > req.RefreshTokenOfflineMaxLifetimeInSeconds {
-			writeJSONError(w, "Refresh token offline - idle timeout cannot be greater than max lifetime.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensOfflineIdleTimeoutAboveMaxLifetime, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 

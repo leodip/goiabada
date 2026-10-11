@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // settingsKeysDatabase is what the signing key endpoints need: the key rows they list and delete.
@@ -119,7 +120,7 @@ func HandleSettingsKeysRotatePost(
 			// admin console announce one rotation twice, and would invite a caller to believe
 			// it holds a key it never created. Retrying is wrong for the same reason, which is
 			// what the operation's description in openapi.yaml says.
-			writeJSONError(w, "Another key rotation is in progress", "ROTATION_IN_PROGRESS",
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsKeysRotationInProgress, nil), "ROTATION_IN_PROGRESS",
 				http.StatusConflict)
 
 		case errors.Is(err, signingkeys.ErrKeySetIncomplete):
@@ -157,7 +158,7 @@ func HandleSettingsKeyDelete(
 			return
 		}
 		if kp == nil {
-			writeJSONError(w, "Key not found", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsKeysKeyNotFound, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -167,7 +168,7 @@ func HandleSettingsKeyDelete(
 			return
 		}
 		if keyState != record.KeyStatePrevious {
-			writeJSONError(w, "Only a previous key can be revoked", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsKeysOnlyPreviousRevocable, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 

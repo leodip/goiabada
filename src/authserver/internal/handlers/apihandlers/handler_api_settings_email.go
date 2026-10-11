@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -119,49 +118,54 @@ func HandleSettingsEmailPut(
 		smtpHost := hostport.Unbracket(strings.TrimSpace(req.SMTPHost))
 
 		// Validation when enabled
+		const (
+			smtpHostMaxLength    = 120
+			smtpFieldMaxLength   = 60
+			smtpPasswordMaxBytes = 256
+		)
 		if smtpHost == "" {
-			writeJSONError(w, "SMTP host is required.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPHostRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if req.SMTPPort == 0 {
-			writeJSONError(w, "SMTP port is required.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPPortRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if strings.TrimSpace(req.SMTPFromEmail) == "" {
-			writeJSONError(w, "SMTP from email is required.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPFromEmailRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		if inputvalidation.TextLength(smtpHost) > 120 {
-			writeJSONError(w, fmt.Sprintf("SMTP host must be less than %v characters.", 120), "VALIDATION_ERROR", http.StatusBadRequest)
+		if inputvalidation.TextLength(smtpHost) > smtpHostMaxLength {
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPHostTooLong, map[string]any{"max": smtpHostMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		if req.SMTPPort < 1 || req.SMTPPort > 65535 {
-			writeJSONError(w, "SMTP port must be between 1 and 65535.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPPortOutOfRange, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Encryption value
 		smtpEncryption, err := emaildelivery.SMTPEncryptionFromString(req.SMTPEncryption)
 		if err != nil {
-			writeJSONError(w, "Invalid SMTP encryption.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPEncryptionInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		if inputvalidation.TextLength(req.SMTPUsername) > 60 {
-			writeJSONError(w, fmt.Sprintf("SMTP username must be less than %v characters.", 60), "VALIDATION_ERROR", http.StatusBadRequest)
+		if inputvalidation.TextLength(req.SMTPUsername) > smtpFieldMaxLength {
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPUsernameTooLong, map[string]any{"max": smtpFieldMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		// An application bound, measured in bytes because len(string) counts bytes. No
 		// PLAIN or LOGIN provider credential is known to exceed it, and it must not shrink
 		// to the neighbours' 60: SendGrid's SMTP password is its 69-character API key.
-		if len(req.SMTPPassword) > 256 {
-			writeJSONError(w, fmt.Sprintf("SMTP password must be at most %v bytes.", 256), "VALIDATION_ERROR", http.StatusBadRequest)
+		if len(req.SMTPPassword) > smtpPasswordMaxBytes {
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPPasswordTooLong, map[string]any{"max": smtpPasswordMaxBytes}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		if inputvalidation.TextLength(req.SMTPFromName) > 60 {
-			writeJSONError(w, fmt.Sprintf("SMTP from name must be less than %v characters.", 60), "VALIDATION_ERROR", http.StatusBadRequest)
+		if inputvalidation.TextLength(req.SMTPFromName) > smtpFieldMaxLength {
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPFromNameTooLong, map[string]any{"max": smtpFieldMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -169,8 +173,8 @@ func HandleSettingsEmailPut(
 			writeValidationError(w, r, validateNoAngleBracketsErr)
 			return
 		}
-		if inputvalidation.TextLength(req.SMTPFromEmail) > 60 {
-			writeJSONError(w, fmt.Sprintf("SMTP from email must be less than %v characters.", 60), "VALIDATION_ERROR", http.StatusBadRequest)
+		if inputvalidation.TextLength(req.SMTPFromEmail) > smtpFieldMaxLength {
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPFromEmailTooLong, map[string]any{"max": smtpFieldMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -182,7 +186,7 @@ func HandleSettingsEmailPut(
 		// The password is kept, replaced or removed (#410 decision 1). The API never answers it, so
 		// an absent or empty one keeps what is stored, and only the flag removes it.
 		if req.SMTPPassword != "" && req.ClearSMTPPassword {
-			writeJSONError(w, "Send either a new SMTP password or clearSmtpPassword, not both.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPPasswordAndClear, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		// A stored password reaches only the host it was entered for: pointing it elsewhere needs
@@ -191,7 +195,7 @@ func HandleSettingsEmailPut(
 		storedHost := hostport.Unbracket(strings.TrimSpace(currentSettings.SMTPHost))
 		if len(currentSettings.SMTPPasswordEncrypted) > 0 && req.SMTPPassword == "" && !req.ClearSMTPPassword &&
 			!strings.EqualFold(smtpHost, storedHost) {
-			writeJSONError(w, "The SMTP host has changed: enter the SMTP password again, or remove it.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPHostChanged, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -209,7 +213,7 @@ func HandleSettingsEmailPut(
 		conn, err := dialer.DialContext(r.Context(), "tcp", hostport.Join(smtpHost, req.SMTPPort))
 		if err != nil {
 			slog.WarnContext(r.Context(), "unable to connect to the smtp server", "error", err)
-			writeJSONError(w, connectionFailureMessage(smtpDialFailure,
+			writeLocalizedError(w, r, connectionFailureMessage(smtpDialFailure,
 				emaildelivery.ClassifyConnectionError(err)), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -275,7 +279,7 @@ func HandleSettingsEmailSendTestPost(
 			return
 		}
 		if !settings.SMTPEnabled {
-			writeJSONError(w, "SMTP is not enabled", "SMTP_NOT_ENABLED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSMTPNotEnabled, nil), "SMTP_NOT_ENABLED", http.StatusBadRequest)
 			return
 		}
 
@@ -285,7 +289,7 @@ func HandleSettingsEmailSendTestPost(
 			return
 		}
 		if strings.TrimSpace(req.To) == "" {
-			writeJSONError(w, "Destination email is required.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailDestinationRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if err := emailValidator.ValidateEmailAddress(req.To); err != nil {
@@ -305,7 +309,7 @@ func HandleSettingsEmailSendTestPost(
 		// can point the host somewhere would read them back here (#410 decision 5).
 		if err := emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input); err != nil {
 			slog.WarnContext(r.Context(), "unable to send the test email", "error", err)
-			writeJSONError(w, sendFailureMessage(err), "SEND_FAILED", http.StatusBadRequest)
+			writeLocalizedError(w, r, sendFailureMessage(err), "SEND_FAILED", http.StatusBadRequest)
 			return
 		}
 
@@ -318,24 +322,41 @@ func HandleSettingsEmailSendTestPost(
 	}
 }
 
-// smtpDialFailure is what a failed connectivity dial on save answers, before
-// connectionFailureMessage adds its cause.
-const smtpDialFailure = "Unable to connect to the SMTP server"
+// connectionFailure is a failed connection's answer, one whole sentence per coarse cause, and none
+// when the classification names no cause. The cause is never a fragment joined to an opening at run
+// time, so each language words the whole sentence its own way (#559).
+type connectionFailure struct {
+	hostNotFound, timedOut, refused, noCause string
+}
 
-// connectionFailureMessage is message, a fixed sentence with no end stop, followed by the words the
-// cause adds, or by its end stop alone when the classification names no cause. It is the only text
-// a failed connection answers: no address, port, resolver or operating-system string (#410
-// decision 4).
-func connectionFailureMessage(message string, cause emaildelivery.ConnectionCause) string {
+// smtpDialFailure is what a failed connectivity dial on save answers.
+var smtpDialFailure = connectionFailure{
+	hostNotFound: i18n.ErrCodeSettingsEmailConnectFailedHostNotFound,
+	timedOut:     i18n.ErrCodeSettingsEmailConnectFailedTimedOut,
+	refused:      i18n.ErrCodeSettingsEmailConnectFailedRefused,
+	noCause:      i18n.ErrCodeSettingsEmailConnectFailed,
+}
+
+// testSendConnectionFailure is what a test send that could not connect answers.
+var testSendConnectionFailure = connectionFailure{
+	hostNotFound: i18n.ErrCodeSettingsEmailSendFailedHostNotFound,
+	timedOut:     i18n.ErrCodeSettingsEmailSendFailedTimedOut,
+	refused:      i18n.ErrCodeSettingsEmailSendFailedRefused,
+	noCause:      i18n.ErrCodeSettingsEmailSendFailed,
+}
+
+// connectionFailureMessage is failure's sentence for cause. It is the only text a failed connection
+// answers: no address, port, resolver or operating-system string (#410 decision 4).
+func connectionFailureMessage(failure connectionFailure, cause emaildelivery.ConnectionCause) *i18n.LocalizedError {
 	switch cause {
 	case emaildelivery.ConnectionCauseHostNotFound:
-		return message + ": host name not found."
+		return i18n.NewLocalizedError(failure.hostNotFound, nil)
 	case emaildelivery.ConnectionCauseTimedOut:
-		return message + ": connection timed out."
+		return i18n.NewLocalizedError(failure.timedOut, nil)
 	case emaildelivery.ConnectionCauseRefused:
-		return message + ": connection refused."
+		return i18n.NewLocalizedError(failure.refused, nil)
 	default:
-		return message + "."
+		return i18n.NewLocalizedError(failure.noCause, nil)
 	}
 }
 
@@ -343,25 +364,25 @@ func connectionFailureMessage(message string, cause emaildelivery.ConnectionCaus
 // labelled the failure with and, for a connection failure, by its coarse cause; nothing in it is read
 // from the error's text. The four refusals the sender composes itself keep its wording, without the
 // part that quotes the server (#410 decision 5).
-func sendFailureMessage(err error) string {
+func sendFailureMessage(err error) *i18n.LocalizedError {
 	switch emaildelivery.SendFailureKindOf(err) {
 	case emaildelivery.SendFailureConnection:
-		return connectionFailureMessage("Unable to send the test email", emaildelivery.ClassifyConnectionError(err))
+		return connectionFailureMessage(testSendConnectionFailure, emaildelivery.ClassifyConnectionError(err))
 	case emaildelivery.SendFailureSTARTTLSNotOffered:
-		return "The SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS."
+		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSTARTTLSNotOffered, nil)
 	case emaildelivery.SendFailureUnencryptedPassword:
-		return "The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS."
+		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailPasswordUnencrypted, nil)
 	case emaildelivery.SendFailureNoAuthentication:
-		return "SMTP credentials are configured but the server offers no authentication."
+		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailNoAuthentication, nil)
 	case emaildelivery.SendFailureNoSupportedMechanism:
-		return "The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5."
+		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailNoSupportedMechanism, nil)
 	case emaildelivery.SendFailureTLS:
-		return "The TLS connection failed; check the encryption setting and the server's certificate."
+		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailTLSFailed, nil)
 	case emaildelivery.SendFailureAuthenticationRejected:
-		return "The SMTP server rejected the username or password."
+		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailAuthenticationRejected, nil)
 	case emaildelivery.SendFailureMessageRefused:
-		return "The SMTP server refused the message."
+		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailMessageRefused, nil)
 	default:
-		return "Unable to send the test email."
+		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSendFailed, nil)
 	}
 }

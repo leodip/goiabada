@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -70,7 +69,7 @@ func HandleSettingsGeneralPut(
 		// Validation: AppName
 		const appNameMaxLength = 30
 		if inputvalidation.TextLength(req.AppName) > appNameMaxLength {
-			writeJSONError(w, fmt.Sprintf("App name is too long. The maximum length is %v characters.", appNameMaxLength), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralAppNameTooLong, map[string]any{"max": appNameMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -84,29 +83,29 @@ func HandleSettingsGeneralPut(
 		if strings.Contains(issuer, ":") {
 			parsedUri, err := url.ParseRequestURI(issuer)
 			if err != nil || parsedUri.Scheme == "" || parsedUri.Host == "" {
-				writeJSONError(w, "Invalid issuer. Please enter a valid URI.", "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerURIInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 		} else {
-			errorMsg := "Invalid issuer. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores."
+			invalidIdentifier := i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerIdentifierInvalid, nil)
 			match, _ := regexp.MatchString("^[a-zA-Z]([a-zA-Z0-9_-]*[a-zA-Z0-9])?$", issuer)
 			if !match {
-				writeJSONError(w, errorMsg, "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, invalidIdentifier, "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			if strings.Contains(issuer, "--") || strings.Contains(issuer, "__") {
-				writeJSONError(w, errorMsg, "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, invalidIdentifier, "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			const issuerMinLength = 3
 			if len(issuer) < issuerMinLength {
-				writeJSONError(w, fmt.Sprintf("Issuer is too short. The minimum length is %v characters.", issuerMinLength), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerTooShort, map[string]any{"min": issuerMinLength}), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 		}
 		const issuerMaxLength = 60
 		if inputvalidation.TextLength(issuer) > issuerMaxLength {
-			writeJSONError(w, fmt.Sprintf("Issuer is too long. The maximum length is %v characters.", issuerMaxLength), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerTooLong, map[string]any{"max": issuerMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -122,7 +121,7 @@ func HandleSettingsGeneralPut(
 		// Validation: Password policy
 		passwordPolicy, err := record.PasswordPolicyFromString(strings.TrimSpace(req.PasswordPolicy))
 		if err != nil {
-			writeJSONError(w, "Invalid password policy", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralPasswordPolicyInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
