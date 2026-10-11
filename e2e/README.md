@@ -1,8 +1,8 @@
 # End-to-end environment
 
 A real Goiabada deployment, built from a release tag on a VPS, for browser tests to run against.
-This is a proof of concept: today it builds the environment and checks that it is reachable. The
-clients, users and Playwright scenarios come next.
+This is a proof of concept: it builds the environment, checks that it is reachable, and runs a first
+Playwright test. Provisioning clients and users, and the scenarios, come next.
 
 | Host | What |
 |---|---|
@@ -40,6 +40,20 @@ e2e/infra/teardown.sh [--all]     # remove it
 `verify.sh` checks DNS, HTTPS and its certificate's expiry, the HTTP-to-HTTPS redirect, that the VPS
 runs the tag's images, the auth server's health, discovery and JWKS, the admin console's page, that its
 sign-in lands on the auth server's password page, and the test app hosts.
+
+## Browser tests
+
+`playwright/` holds the Playwright suite. It reads the URLs and the admin password `prepare.sh` left in
+`e2e/.state/`, so prepare the environment first.
+
+```bash
+cd e2e/playwright
+npm ci && npx playwright install chromium   # once
+npx playwright test                         # headless; add --headed or --ui to watch
+npx playwright show-report                  # the HTML report, with traces of failures
+```
+
+Tests sit under `playwright/tests/`, one folder per area (`admin-console/` so far).
 
 ## The VPS
 
