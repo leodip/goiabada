@@ -1,6 +1,6 @@
 # Implementing a slice of Goiabada
 
-- **Run everything through the commands in your prompt.** They run inside this
+- **Run Go checks through the commands in your prompt.** They run inside this
   issue's own Docker stack, in the devcontainer, with the environment it needs.
   Never run `go test` on the host: without that environment the integration tier
   times out with zero tests.
@@ -24,3 +24,10 @@
   "Standards" in AGENTS.md), read the section the agreement cites, or find it, and
   follow its MUST and SHOULD requirements. Tests assert what the standard requires,
   not only what the code happens to do.
+- **Documentation:** update affected pages under `site/src/content/docs/` in the
+  same slice as reader-facing changes. For Admin or Account API operation facts,
+  edit `src/authserver/web/openapi.yaml`, which generates their reference pages.
+  Read `site/STYLE.md` and its linked glossary before writing. The docs describe
+  the latest version in the present tense; put breaking changes and migration
+  steps in release notes. For docs or OpenAPI changes, build the site from `site/`
+  on the host as `site/README.md` describes; the devcontainer has no Node.js.

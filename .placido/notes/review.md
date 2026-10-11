@@ -19,3 +19,9 @@
   real engine besides SQLite (`data postgres`, for example).
 - **Generated files must be current:** the schema goldens, the core ownership table,
   the mocks, and the CSS. A stale one is a blocking finding, since it turns CI red.
+- **Documentation:** check that reader-facing changes have matching updates under
+  `site/src/content/docs/`, and that Admin or Account API operation facts agree
+  with `src/authserver/web/openapi.yaml`. Review changed docs against
+  `site/STYLE.md` and its linked glossary. The docs describe the latest version;
+  breaking changes and migration steps belong in release notes. For docs or
+  OpenAPI changes, build the site on the host as `site/README.md` describes.

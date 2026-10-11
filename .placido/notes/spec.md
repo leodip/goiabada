@@ -12,3 +12,9 @@
   for storage, the integration tier for whole OAuth2 and OpenID Connect flows.
 - **Gates:** give a slice that changes storage the `data-sqlite` gate, and one that
   changes a flow end to end the `integration-sqlite` gate.
+- **Documentation:** decide whether a change to reader-facing behavior, configuration,
+  an API, deployment, or the admin console needs an update under
+  `site/src/content/docs/`. Name the affected pages in the agreement and include
+  the updates in a slice. API operation descriptions live in
+  `src/authserver/web/openapi.yaml`. Use `site/STYLE.md` and its linked glossary
+  for wording; breaking changes and migration steps belong in release notes.
