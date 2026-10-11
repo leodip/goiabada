@@ -73,7 +73,7 @@ On SQLite, `unable to connect to database` means the file couldn't be opened. Wh
 
 ## The database refuses TLS
 
-`GOIABADA_DB_TLS_MODE` decides what the auth server asks of the database's TLS, as [Where the database sits](/deploy/database/#where-the-database-sits) describes. The `using database` record, written just before the connection, says which mode the start used, in `tls_mode`. In `require`, `verify-ca` and `verify-full`, the auth server never falls back to plain text, and in the last two it checks the database's certificate, so a start can stop with one of these in the `error`:
+`GOIABADA_DB_TLS_MODE` decides what the auth server asks of the database's TLS, as [Where the database sits](/deploy/database/#where-the-database-sits) describes. The `using database` record, written just before the connection, says which mode the start used, in `tls_mode`, and the `error` ends with it too, such as `(tls mode verify-full)`. In `require`, `verify-ca` and `verify-full`, the auth server never falls back to plain text, and in the last two it checks the database's certificate, so a start can stop with one of these in the `error`:
 
 | The `error` says | Why | Fix it |
 |---|---|---|

@@ -28,7 +28,7 @@ GOIABADA_DB_USERNAME="goiabada-user"
 GOIABADA_DB_PASSWORD="db-password"
 # How the auth server protects its connection to the database: disable, prefer, require,
 # verify-ca or verify-full.
-# prefer: encrypted when the database offers TLS, plain text when it offers none; no certificate is checked.
+# prefer: the login encrypted, and the rest only when the database forces encryption; no certificate is checked.
 # Only verify-full makes sure it reached your database and nothing in between.
 GOIABADA_DB_TLS_MODE="prefer"
 

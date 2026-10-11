@@ -22,4 +22,4 @@ runs:
       env:
         ENGINE: ${{ inputs.engine }}
         CONTAINER: ${{ inputs.container }}
-      run: '"$GITHUB_ACTION_PATH/serve-db-tls.sh" "$ENGINE" "$CONTAINER"'
+      run: 'bash "$GITHUB_ACTION_PATH/serve-db-tls.sh" "$ENGINE" "$CONTAINER"'

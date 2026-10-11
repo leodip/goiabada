@@ -42,7 +42,8 @@ func requireTestAuthority(t *testing.T) *x509.CertPool {
 // which encrypts the login alone when the server does not force encryption; verify-ca and verify-full
 // connect with the test authority's CA file and are refused with the system's roots; and dialled by
 // its IP address, verify-ca, which checks no host name, connects where verify-full is refused. Create
-// is on, so the maintenance connection a creating start opens is held to the mode as well (#502).
+// is on, so the maintenance connection a creating start opens is held to the mode as well, and every
+// refusal names the mode it was made in (#502).
 func TestOpenDatabase_EachTLSModeAgainstTheTestServer(t *testing.T) {
 	if dbType() == data.SQLite {
 		t.Skip("sqlite has no server and no transport to protect")
@@ -103,6 +104,9 @@ func TestOpenDatabase_EachTLSModeAgainstTheTestServer(t *testing.T) {
 			defer cancel()
 
 			database, err := datafactory.OpenDatabase(ctx, &cfg, false)
+			if err != nil {
+				require.ErrorContains(t, err, "(tls mode "+string(tt.mode)+")", "a refusal names the mode in effect")
+			}
 			switch tt.outcome {
 			case unknownAuthority:
 				require.Error(t, err, "a certificate the roots do not know is refused")

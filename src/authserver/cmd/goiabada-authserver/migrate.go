@@ -198,7 +198,8 @@ func parseMigrateArgs(args []string, db config.DatabaseConfig) (migrateInvocatio
 	}
 
 	// The flag package parsed each value; the pool's ranges are held here as Load holds them for
-	// the flags given before `migrate` (#394 decision 5).
+	// the flags given before `migrate` (#394 decision 5), and the CA file is read and libpq's
+	// variables refused here only, against the merged configuration (#502).
 	if err := config.CheckDatabaseFlags(fs, &db); err != nil {
 		return migrateInvocation{}, err
 	}

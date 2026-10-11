@@ -814,7 +814,7 @@ func (w *wizard) databaseTLSFromPrompts() error {
 		if m.name == c.DBTLSMode || (offered == "" && m.name == defaultTLSMode) {
 			offered = number
 		}
-		w.out.printf("  %s. %s: %s\n", number, m.name, m.description)
+		w.out.printf("  %s. %s: %s\n", number, m.name, m.describedFor(c.Engine.name))
 	}
 	w.out.println("Only verify-full makes sure the auth server reached your database and nothing in between.")
 	w.out.println()

@@ -7,6 +7,7 @@ package config
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/core/guard"
@@ -69,5 +70,38 @@ func TestDocs_TheDatabaseTransportNamesTheSettings(t *testing.T) {
 			assert.Contains(t, text, "`"+name+"`", "%s names %s", section, name)
 		}
 		assert.NotContains(t, text, "PGSSLMODE", "%s no longer advises libpq's variable", section)
+	}
+}
+
+// TestDocs_PreferSaysWhatSQLServerEncrypts: every page that says what prefer encrypts says that on
+// SQL Server it is the login, and the rest of the session only when the server forces encryption,
+// which is #502 decision 2's prefer and what the data tier shows a TLS-capable SQL Server doing. Said
+// as PostgreSQL's and MySQL's, encrypted whenever the server offers TLS, it reads as protection a
+// SQL Server deployment does not have.
+func TestDocs_PreferSaysWhatSQLServerEncrypts(t *testing.T) {
+	root := filepath.Dir(guard.SourceRoot(t))
+	for _, tc := range []struct {
+		section docSection
+		marker  string // what opens or names the line describing prefer
+	}{
+		{docSection{environmentVariablesPage, "## Every variable"}, "| `GOIABADA_DB_TLS_MODE`"},
+		{docSection{securityReferencePage, "## The network"}, "it's `prefer`"},
+		{docSection{productionChecklistPage, "## Database"}, "`GOIABADA_DB_TLS_MODE` unset"},
+		{docSection{"site/src/content/docs/deploy/database.mdx", "## Where the database sits"}, "| `prefer`"},
+	} {
+		text, err := docSectionText(root, tc.section)
+		require.NoError(t, err)
+		require.NotEmpty(t, text, "%s exists", tc.section)
+		var prefer string
+		for _, line := range strings.Split(text, "\n") {
+			if strings.Contains(line, tc.marker) {
+				prefer = line
+				break
+			}
+		}
+		require.NotEmpty(t, prefer, "%s says what prefer encrypts", tc.section)
+		assert.Contains(t, prefer, "SQL Server", "%s: %s", tc.section, prefer)
+		assert.Contains(t, prefer, "login", "%s: %s", tc.section, prefer)
+		assert.Contains(t, prefer, "forces encryption", "%s: %s", tc.section, prefer)
 	}
 }

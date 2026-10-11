@@ -11,6 +11,7 @@ import (
 	"errors"
 	"math/big"
 	"net"
+	"strings"
 	"testing"
 	"time"
 )
@@ -245,4 +246,43 @@ func testHandshake(t *testing.T, client *tls.Config, serverCert tls.Certificate)
 	_ = conn.Close()
 	<-served
 	return err
+}
+
+// TestPreferDescription_SaysWhatSQLServerEncrypts: what the wizard says prefer encrypts, in the
+// menu and the files it writes, holds on SQL Server too, where prefer encrypts the login, and the
+// rest of the session only when the database forces encryption (#502 decision 2). Each is written
+// for the one engine chosen, so only SQL Server's says so, and the other engines' keep saying what
+// prefer encrypts for them.
+func TestPreferDescription_SaysWhatSQLServerEncrypts(t *testing.T) {
+	for _, word := range []string{"login", "forces encryption"} {
+		if described := tlsModeDescription("prefer", "mssql"); !strings.Contains(described, word) {
+			t.Errorf("SQL Server's prefer does not say %q: %s", word, described)
+		}
+	}
+	for _, engine := range []string{"postgres", "mysql"} {
+		if described := tlsModeDescription("prefer", engine); !strings.Contains(described, "when the database offers TLS") {
+			t.Errorf("%s's prefer no longer says what it encrypts: %s", engine, described)
+		}
+	}
+
+	composeComment := func(engine string) string {
+		t.Helper()
+		service := generateAuthServerService(goldenConfig(deploymentLocal, engine))
+		start := strings.Index(service, "      # The database is a service")
+		end := strings.Index(service, "GOIABADA_DB_TLS_MODE=")
+		if start < 0 || end < start {
+			t.Fatalf("no database TLS comment in the %s Compose service:\n%s", engine, service)
+		}
+		return service[start:end]
+	}
+	for _, word := range []string{"login", "forces"} {
+		if comment := composeComment("mssql"); !strings.Contains(comment, word) {
+			t.Errorf("SQL Server's Compose comment does not say %q:\n%s", word, comment)
+		}
+	}
+	for _, engine := range []string{"postgres", "mysql"} {
+		if comment := composeComment(engine); !strings.Contains(comment, "when the database offers TLS") {
+			t.Errorf("%s's Compose comment no longer says what prefer encrypts:\n%s", engine, comment)
+		}
+	}
 }

@@ -97,7 +97,7 @@ func OpenDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, logSQL b
 		engineConfig := mysqlConfig(dbConfig)
 		database, err := mysqldb.New(ctx, engineConfig, logSQL)
 		if err != nil {
-			return nil, err
+			return nil, withTLSMode(err, engineConfig.TLSMode)
 		}
 		recordPool(ctx, *engineConfig.Pool)
 		return database, nil
@@ -119,7 +119,7 @@ func OpenDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, logSQL b
 		engineConfig := postgresConfig(dbConfig)
 		database, err := postgresdb.New(ctx, engineConfig, logSQL)
 		if err != nil {
-			return nil, err
+			return nil, withTLSMode(err, engineConfig.TLSMode)
 		}
 		recordPool(ctx, *engineConfig.Pool)
 		return database, nil
@@ -127,7 +127,7 @@ func OpenDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, logSQL b
 		engineConfig := mssqlConfig(dbConfig)
 		database, err := mssqldb.New(ctx, engineConfig, logSQL)
 		if err != nil {
-			return nil, err
+			return nil, withTLSMode(err, engineConfig.TLSMode)
 		}
 		recordPool(ctx, *engineConfig.Pool)
 		return database, nil
@@ -136,6 +136,15 @@ func OpenDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, logSQL b
 		// than falling through, so a fifth constant added there without an arm here fails loudly.
 		return nil, errs.Errorf("no engine for database dialect %q", dialect)
 	}
+}
+
+// withTLSMode names the mode a server engine was opened in at the end of its error, so a start or a
+// `migrate` the database refused, over TLS or otherwise, says which mode it was refused in, on the
+// record or the line that reports it, whatever level the log keeps (#502). Appended rather than put
+// before, the error still opens with the engine's own words, and the cause stays reachable through
+// errors.Is and errors.As, a cancellation included.
+func withTLSMode(err error, mode data.TLSMode) error {
+	return errs.Errorf("%w (tls mode %s)", err, mode)
 }
 
 // recordPool writes the one record of the pool a start opened, once the engine has opened it. It is

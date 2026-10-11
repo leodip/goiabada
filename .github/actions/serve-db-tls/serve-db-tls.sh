@@ -37,7 +37,7 @@ docker_api() {  # docker_api METHOD PATH [curl arguments...]
     curl -sS --fail-with-body --unix-socket "$socket" -X "$method" "$@" "http://localhost$path"
 }
 
-"${GITHUB_WORKSPACE:?}/src/.devcontainer/generate-db-tls.sh" "$dir"
+bash "${GITHUB_WORKSPACE:?}/src/.devcontainer/generate-db-tls.sh" "$dir"
 
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT

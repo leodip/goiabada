@@ -80,7 +80,8 @@ services:
       - "GOIABADA_DB_PORT=1433"
       - "GOIABADA_DB_NAME=goiabada"
       # The database is a service on this file's own network, so the connection never leaves
-      # this host: prefer encrypts it when the database offers TLS and checks no certificate.
+      # this host: prefer encrypts the login, and the rest only when the database forces
+      # encryption, and checks no certificate.
       # Set verify-full, with GOIABADA_DB_TLS_CA_FILE, for a database reached across a network.
       - "GOIABADA_DB_TLS_MODE=prefer"
       - "GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091"
