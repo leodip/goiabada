@@ -67,7 +67,7 @@ func codeGrantSettings() *record.Settings {
 
 func TestIssueAuthorizationCodeGrant_ClaimsBeforeMinting(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	var order []string
 	note := func(what string) { order = append(order, what) }
@@ -92,7 +92,7 @@ func TestIssueAuthorizationCodeGrant_ClaimsBeforeMinting(t *testing.T) {
 // key, no user, no refresh token row.
 func TestIssueAuthorizationCodeGrant_ALostClaimMintsNothing(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 	logs := logtest.CaptureSlog(t)
 
 	code := &record.Code{Id: 42}
@@ -117,7 +117,7 @@ func TestIssueAuthorizationCodeGrant_ALostClaimMintsNothing(t *testing.T) {
 // as ErrCodeNotClaimed, and nothing is minted.
 func TestIssueAuthorizationCodeGrant_AClaimFailureIsAFault(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	failure := errs.New("connection refused")
 	code := &record.Code{Id: 1}
@@ -135,7 +135,7 @@ func TestIssueAuthorizationCodeGrant_AClaimFailureIsAFault(t *testing.T) {
 // gives the code back, which is the price of never issuing two token sets from one code (#77).
 func TestIssueAuthorizationCodeGrant_AFailedMintAfterTheClaimIsAFault(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	failure := errs.New("connection refused")
 	code := &record.Code{Id: 1}

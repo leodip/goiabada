@@ -26,7 +26,7 @@ const implicitTestBaseURL = "http://localhost:8081"
 // implicitIssuerOn is the issuer /auth/issue signs implicit tokens with, over the handle it is
 // given.
 func implicitIssuerOn(db data.Database) *issuance.TokenIssuer {
-	return issuance.NewTokenIssuer(db, implicitTestBaseURL, dataCipher, nil)
+	return issuance.NewTokenIssuer(db, implicitTestBaseURL, "http://localhost:9091", dataCipher, nil)
 }
 
 // implicitSettings turns the profile claims on for both tokens, so the picture lookup is reached by

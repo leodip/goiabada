@@ -19,11 +19,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// idTokenMapper is the shape /userinfo and the ID token share: the ID token's include flag and a
-// base URL the assertions can name. The updated_at gate is per test, since that is one of the
-// three things the two callers disagree about.
+// idTokenMapper is the shape /userinfo and the ID token share: the ID token's include flag and two
+// base URLs the assertions can name apart, the auth server's and the admin console's.
 func idTokenMapper(db Database) Mapper {
-	return Mapper{Database: db, BaseURL: "http://localhost:8081", Inclusion: InclusionIdToken}
+	return Mapper{Database: db, BaseURL: "http://localhost:8081", AdminConsoleBaseURL: "http://localhost:9091",
+		Inclusion: InclusionIdToken}
 }
 
 // TestAddOpenIDConnectClaims is the table that came with the code from
@@ -80,7 +80,7 @@ func TestAddOpenIDConnectClaims(t *testing.T) {
 				"family_name":           "User",
 				"nickname":              "Testy",
 				"preferred_username":    "testuser",
-				"profile":               "http://localhost:8081/account/profile",
+				"profile":               "http://localhost:9091/account/profile",
 				"website":               "https://test.com",
 				"gender":                "male",
 				"birthdate":             "1990-01-01",
@@ -116,7 +116,7 @@ func TestAddOpenIDConnectClaims(t *testing.T) {
 				"given_name":         "Profile",
 				"family_name":        "User",
 				"preferred_username": "profileuser",
-				"profile":            "http://localhost:8081/account/profile",
+				"profile":            "http://localhost:9091/account/profile",
 				"updated_at":         now.Add(-1 * time.Hour).Unix(),
 			},
 		},
@@ -357,7 +357,7 @@ func TestAddOpenIDConnectClaims_PictureFailureLeavesTheRestStanding(t *testing.T
 
 	assert.NotContains(t, claims, "picture")
 	assert.Equal(t, "Ada", claims["given_name"])
-	assert.Equal(t, "http://localhost:8081/account/profile", claims["profile"])
+	assert.Equal(t, "http://localhost:9091/account/profile", claims["profile"])
 }
 
 // groupsAndAttributesUser is one user whose group, user attribute and group attribute each carry
@@ -727,20 +727,34 @@ func TestAddOpenIDConnectClaims_TheDocsGiveThePhoneNumberFormat(t *testing.T) {
 	}
 }
 
-// The profile claim is the auth server's base URL and /account/profile, a path the auth server
-// serves no page at, and Scopes says so rather than calling it the user's account page (#522).
-func TestAddOpenIDConnectClaims_TheScopesPageSaysWhereProfilePoints(t *testing.T) {
-	db := datamocks.NewDatabase(t)
-	db.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(false, nil)
-	claims := jwt.MapClaims{}
-	Mapper{Database: db, BaseURL: "https://auth.example.com"}.
-		AddOpenIDConnectClaims(context.Background(), nil, claims, &record.User{Id: 1}, []string{"openid", "profile"})
-	assert.Equal(t, "https://auth.example.com/account/profile", claims["profile"])
+// The profile claim is the URL of the user's profile page, OIDC Core 1.0 section 5.1, and that page
+// is the admin console's /account/profile: the auth server serves none there. The picture stays on
+// the auth server, whose route serves it. Pinned for the ID token's mapper, which /userinfo uses
+// too, and for the access token's, with base URLs that differ, so a profile built on the auth
+// server's cannot pass, and the Scopes and UserInfo pages say where it goes (#527, #563 decision 7).
+func TestAddOpenIDConnectClaims_ProfileIsTheAdminConsolesProfilePage(t *testing.T) {
+	for _, inclusion := range []Inclusion{InclusionIdToken, InclusionAccessToken} {
+		db := datamocks.NewDatabase(t)
+		db.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(true, nil)
+		claims := jwt.MapClaims{}
+		Mapper{Database: db, BaseURL: "https://auth.example.com", AdminConsoleBaseURL: "https://admin.example.com",
+			Inclusion: inclusion}.
+			AddOpenIDConnectClaims(context.Background(), nil, claims, &record.User{Id: 1, Subject: "sub-1"},
+				[]string{"openid", "profile"})
+		assert.Equal(t, "https://admin.example.com/account/profile", claims["profile"])
+		assert.Equal(t, "https://auth.example.com/userinfo/picture/sub-1", claims["picture"])
+	}
 
-	const page = "site/src/content/docs/concepts/scopes.mdx"
-	body, err := os.ReadFile(filepath.Join(filepath.Dir(guard.SourceRoot(t)), page))
-	require.NoError(t, err)
-	assert.Containsf(t, string(body),
-		"`profile` is the auth server's base URL followed by `/account/profile`, where the auth server has no page",
-		"%s says where the profile claim points", page)
+	for _, page := range []string{
+		"site/src/content/docs/concepts/scopes.mdx",
+		"site/src/content/docs/reference/endpoints/userinfo.mdx",
+	} {
+		body, err := os.ReadFile(filepath.Join(filepath.Dir(guard.SourceRoot(t)), page))
+		require.NoError(t, err)
+		assert.Containsf(t, string(body),
+			"`profile` is the admin console's base URL followed by `/account/profile`, the page where the user manages their own profile",
+			"%s says where the profile claim points", page)
+		assert.NotContainsf(t, string(body), "https://auth.example.com/account/profile",
+			"%s shows no profile claim on the auth server", page)
+	}
 }

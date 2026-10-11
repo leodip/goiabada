@@ -3,7 +3,6 @@ package issuance
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -20,7 +19,7 @@ import (
 
 func TestMintCodeRefreshTokens(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -131,7 +130,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, user.GivenName, idClaims["given_name"])
 	assert.Equal(t, user.FullName(), idClaims["name"])
 	assert.Equal(t, user.Username, idClaims["preferred_username"])
-	assert.Equal(t, fmt.Sprintf("%v/account/profile", "http://localhost:8081"), idClaims["profile"])
+	assert.Equal(t, "http://localhost:9091/account/profile", idClaims["profile"])
 	_, err = uuidtest.Parse(idClaims["jti"].(string))
 	require.NoError(t, err)
 	assertTimeClaimWithinRange(t, idClaims, "updated_at", -1*time.Hour, "updated_at should be 1 hour ago")
@@ -151,7 +150,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, user.GivenName, accessClaims["given_name"])
 	assert.Equal(t, user.FullName(), accessClaims["name"])
 	assert.Equal(t, user.Username, accessClaims["preferred_username"])
-	assert.Equal(t, fmt.Sprintf("%v/account/profile", "http://localhost:8081"), accessClaims["profile"])
+	assert.Equal(t, "http://localhost:9091/account/profile", accessClaims["profile"])
 	assert.Equal(t, "openid profile resource1:read", accessClaims["scope"])
 	_, err = uuidtest.Parse(accessClaims["jti"].(string))
 	require.NoError(t, err)
@@ -202,7 +201,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 
 func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -368,7 +367,7 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 // TestMintROPCRefreshTokens tests ROPC refresh token flow
 func TestMintROPCRefreshTokens(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -493,7 +492,7 @@ func TestMintROPCRefreshTokens(t *testing.T) {
 // TestMintROPCRefreshTokens_ScopeDowngrade tests requesting fewer scopes on refresh
 func TestMintROPCRefreshTokens_ScopeDowngrade(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)

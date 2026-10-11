@@ -17,7 +17,7 @@ import (
 
 func TestIssueImplicitTx_AccessTokenOnly(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -97,7 +97,7 @@ func TestIssueImplicitTx_AccessTokenOnly(t *testing.T) {
 
 func TestIssueImplicitTx_IdTokenOnly(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
@@ -188,7 +188,7 @@ func TestIssueImplicitTx_IdTokenOnly(t *testing.T) {
 
 func TestIssueImplicitTx_BothTokens(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -280,7 +280,7 @@ func TestIssueImplicitTx_NoRefreshToken(t *testing.T) {
 	// This test verifies that implicit flow NEVER issues a refresh token
 	// per RFC 6749 Section 4.2.2
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -338,7 +338,7 @@ func TestIssueImplicitTx_NoRefreshToken(t *testing.T) {
 
 func TestIssueImplicitTx_ClientOverrideExpiration(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -401,7 +401,7 @@ func TestIssueImplicitTx_ClientOverrideExpiration(t *testing.T) {
 
 func TestIssueImplicitTx_WithGroupsAndAttributes(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",

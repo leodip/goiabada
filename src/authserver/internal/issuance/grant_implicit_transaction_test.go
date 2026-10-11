@@ -48,7 +48,7 @@ func newImplicitFixture(t *testing.T) *implicitFixture {
 	mockDB := datamocks.NewDatabase(t)
 	return &implicitFixture{
 		mockDB: mockDB,
-		issuer: NewTokenIssuer(mockDB, implicitBaseURL, testDataCipher, nil),
+		issuer: NewTokenIssuer(mockDB, implicitBaseURL, "http://localhost:9091", testDataCipher, nil),
 		settings: &record.Settings{
 			Issuer:                                  "https://test-issuer.com",
 			TokenExpirationInSeconds:                600,

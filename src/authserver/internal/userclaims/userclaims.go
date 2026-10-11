@@ -8,10 +8,11 @@
 // The two things each caller chooses are inputs here, not merges. Each is observable on the wire,
 // so the mapper reads neither from anywhere else, and tests pin both (#387 decision 6):
 //
-//   - the base URL the profile and picture claims are built from, which the caller supplies:
-//     /userinfo the one its handler is constructed with, issuance the one injected into
-//     TokenIssuer, both from the loaded configuration. The mapper reads no configuration of its
-//     own. That is Mapper.BaseURL.
+//   - the two base URLs the profile and picture claims are built from, which the caller supplies:
+//     /userinfo the ones its handler is constructed with, issuance the ones injected into
+//     TokenIssuer, all from the loaded configuration. The mapper reads no configuration of its
+//     own. That is Mapper.BaseURL, the auth server's, which serves the picture, and
+//     Mapper.AdminConsoleBaseURL, the admin console's, which serves the user's profile page.
 //   - which of a group's or an attribute's two include flags decides. /userinfo reads
 //     IncludeInIdToken at all three of its filter sites; issuance reads IncludeInAccessToken in
 //     the access token and IncludeInIdToken in the ID token. That is Mapper.Inclusion.
@@ -86,13 +87,16 @@ func (i Inclusion) includesGroupAttribute(attribute record.GroupAttribute) bool 
 	return attribute.IncludeInIdToken
 }
 
-// Mapper writes OIDC claims from a stored user row. Its three fields are the port and the two
+// Mapper writes OIDC claims from a stored user row. Its fields are the port and the two
 // divergences, so a call site reads as a statement of which of the two conversions it wants.
 type Mapper struct {
 	// Database backs the picture claim and is only reached under the profile scope.
 	Database Database
-	// BaseURL is the public URL the profile and picture claims are built from.
+	// BaseURL is the auth server's public URL, which the picture claim is built from.
 	BaseURL string
+	// AdminConsoleBaseURL is the admin console's public URL, which the profile claim is built
+	// from: the user's own profile page is the console's /account/profile (#527).
+	AdminConsoleBaseURL string
 	// Inclusion filters groups and attributes. The zero value is the ID token's flag.
 	Inclusion Inclusion
 }
@@ -121,7 +125,7 @@ func (m Mapper) AddOpenIDConnectClaims(ctx context.Context, tx *sql.Tx, claims j
 		addClaimIfNotEmpty(claims, "family_name", user.FamilyName)
 		addClaimIfNotEmpty(claims, "nickname", user.Nickname)
 		addClaimIfNotEmpty(claims, "preferred_username", user.Username)
-		claims["profile"] = fmt.Sprintf("%v/account/profile", m.BaseURL)
+		claims["profile"] = fmt.Sprintf("%v/account/profile", m.AdminConsoleBaseURL)
 		addClaimIfNotEmpty(claims, "website", user.Website)
 		addClaimIfNotEmpty(claims, "gender", user.Gender)
 		if user.BirthDate.Valid {

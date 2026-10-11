@@ -16,7 +16,7 @@ import (
 // TestIssuePasswordGrant_BasicOpenIDScope tests ROPC with basic openid scope
 func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -117,7 +117,7 @@ func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 // TestIssuePasswordGrant_WithOfflineAccess tests ROPC with offline_access scope
 func TestIssuePasswordGrant_WithOfflineAccess(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -197,7 +197,7 @@ func TestIssuePasswordGrant_WithOfflineAccess(t *testing.T) {
 // TestIssuePasswordGrant_WithProfileScope tests ROPC with profile scope claims
 func TestIssuePasswordGrant_WithProfileScope(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -277,7 +277,7 @@ func TestIssuePasswordGrant_WithProfileScope(t *testing.T) {
 // TestIssuePasswordGrant_WithEmailScope tests ROPC with email scope claims
 func TestIssuePasswordGrant_WithEmailScope(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -352,7 +352,7 @@ func TestIssuePasswordGrant_WithEmailScope(t *testing.T) {
 // TestIssuePasswordGrant_WithResourcePermissions tests ROPC with resource:permission scopes
 func TestIssuePasswordGrant_WithResourcePermissions(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -435,7 +435,7 @@ func TestIssuePasswordGrant_WithResourcePermissions(t *testing.T) {
 // TestIssuePasswordGrant_WithGroups tests ROPC with groups scope
 func TestIssuePasswordGrant_WithGroups(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -519,7 +519,7 @@ func TestIssuePasswordGrant_WithGroups(t *testing.T) {
 // TestIssuePasswordGrant_WithoutOpenID tests ROPC without openid scope (no id_token)
 func TestIssuePasswordGrant_WithoutOpenID(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -591,7 +591,7 @@ func TestIssuePasswordGrant_WithoutOpenID(t *testing.T) {
 // TestIssuePasswordGrant_DatabaseError_GetSigningKey tests error handling for signing key errors
 func TestIssuePasswordGrant_DatabaseError_GetSigningKey(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -634,7 +634,7 @@ func TestIssuePasswordGrant_DatabaseError_GetSigningKey(t *testing.T) {
 // TestIssuePasswordGrant_DatabaseError_CreateRefreshToken tests error handling for refresh token creation errors
 func TestIssuePasswordGrant_DatabaseError_CreateRefreshToken(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -702,7 +702,7 @@ func TestIssuePasswordGrant_DatabaseError_CreateRefreshToken(t *testing.T) {
 // TestIssuePasswordGrant_ClientTokenExpiration tests client-specific token expiration override
 func TestIssuePasswordGrant_ClientTokenExpiration(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -772,7 +772,7 @@ func TestIssuePasswordGrant_ClientTokenExpiration(t *testing.T) {
 // TestIssuePasswordGrant_GlobalTokenExpiration tests global token expiration (no client override)
 func TestIssuePasswordGrant_GlobalTokenExpiration(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",

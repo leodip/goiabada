@@ -18,7 +18,7 @@ import (
 
 func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -155,7 +155,7 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 	assert.Equal(t, user.FamilyName, idClaims["family_name"])
 	assert.Equal(t, user.Nickname, idClaims["nickname"])
 	assert.Equal(t, user.Username, idClaims["preferred_username"])
-	assert.Equal(t, "http://localhost:8081/account/profile", idClaims["profile"])
+	assert.Equal(t, "http://localhost:9091/account/profile", idClaims["profile"])
 	assert.Equal(t, user.Website, idClaims["website"])
 	assert.Equal(t, user.Gender, idClaims["gender"])
 	assert.Equal(t, "1990-01-01", idClaims["birthdate"])
@@ -217,7 +217,7 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 	assert.Equal(t, user.FamilyName, accessClaims["family_name"])
 	assert.Equal(t, user.Nickname, accessClaims["nickname"])
 	assert.Equal(t, user.Username, accessClaims["preferred_username"])
-	assert.Equal(t, "http://localhost:8081/account/profile", accessClaims["profile"])
+	assert.Equal(t, "http://localhost:9091/account/profile", accessClaims["profile"])
 	assert.Equal(t, user.Website, accessClaims["website"])
 	assert.Equal(t, user.Gender, accessClaims["gender"])
 	assert.Equal(t, "1990-01-01", accessClaims["birthdate"])
@@ -270,7 +270,7 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 
 func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -404,7 +404,7 @@ func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 
 func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -522,7 +522,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 	assert.Equal(t, user.GivenName, idClaims["given_name"])
 	assert.Equal(t, user.FamilyName, idClaims["family_name"])
 	assert.Equal(t, user.FullName(), idClaims["name"])
-	assert.Equal(t, "http://localhost:8081/account/profile", idClaims["profile"])
+	assert.Equal(t, "http://localhost:9091/account/profile", idClaims["profile"])
 
 	assert.NotContains(t, idClaims, "groups")
 	assert.NotContains(t, idClaims, "attributes")
@@ -554,7 +554,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 	assert.Equal(t, user.GivenName, accessClaims["given_name"])
 	assert.Equal(t, user.FamilyName, accessClaims["family_name"])
 	assert.Equal(t, user.FullName(), accessClaims["name"])
-	assert.Equal(t, "http://localhost:8081/account/profile", accessClaims["profile"])
+	assert.Equal(t, "http://localhost:9091/account/profile", accessClaims["profile"])
 
 	assert.NotContains(t, accessClaims, "groups")
 	assert.NotContains(t, accessClaims, "attributes")
@@ -582,7 +582,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 
 func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -700,7 +700,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) 
 
 func TestMintAuthorizationCodeTokens_CustomScope(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",

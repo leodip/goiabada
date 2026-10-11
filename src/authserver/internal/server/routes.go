@@ -48,7 +48,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	codeIssuer := issuance.NewCodeIssuer(s.database)
 	userSessionManager := usersession.NewManager(s.sessionStore, sessionkeys.AuthServerSessionName, s.database)
 	otpSecretGenerator := otp.NewKeyGenerator()
-	tokenIssuer := issuance.NewTokenIssuer(s.database, s.cfg.AuthServer.BaseURL, s.dataCipher, userSessionManager)
+	tokenIssuer := issuance.NewTokenIssuer(s.database, s.cfg.AuthServer.BaseURL, s.cfg.AdminConsole.BaseURL, s.dataCipher, userSessionManager)
 	// The tokens the token endpoint and /auth/issue answer with, and the token requests refused,
 	// counted on the metrics listener (#400 decision 5).
 	tokenMetrics := s.tokenMetrics
@@ -110,8 +110,8 @@ func (s *Server) initRoutes(branches appBranches) {
 	// Refresh and ID tokens never get this far: the parse guard admits only an access token
 	// for authserver (#401). GET and POST are separate registrations: a guard added to only one of
 	// them leaves the other reachable.
-	protocol.With(userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL))
-	protocol.With(userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL))
+	protocol.With(userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
+	protocol.With(userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
 	pages.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	getAndHead(pages, "/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
 	getAndHead(pages, "/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))
