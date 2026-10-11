@@ -134,6 +134,32 @@ func TestHandleEmailPost_ARefusedPasswordReRendersWithoutIt(t *testing.T) {
 	requireNoPasswordInBind(t, httpHelper)
 }
 
+// Too many wrong passwords is the user's to wait out, RFC 6585 section 4, so the change is drawn
+// again with the auth server's sentence rather than the 500 page; the password, again, is not
+// (#562 decision 7).
+func TestHandleEmailPost_TooManyAttemptsReRendersWithTheSentence(t *testing.T) {
+	apiClient := &emailRecordingApiClient{refusal: &apiclient.APIError{
+		StatusCode: http.StatusTooManyRequests, Code: "TOO_MANY_REQUESTS",
+		Message: "Too many requests. Please wait and try again later."}}
+	httpHelper := handlersmocks.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_email.html").Once()
+	form := url.Values{
+		"email":             {"new@example.com"},
+		"emailConfirmation": {"new@example.com"},
+		"currentPassword":   {accountEmailFormPassword},
+	}
+	req := handlertest.Request(http.MethodPost, "/account/email",
+		handlertest.WithAccessToken(), handlertest.WithForm(form))
+
+	HandleEmailPost(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
+
+	bind := handlertest.Bind(t, httpHelper)
+	assert.Equal(t, "Too many requests. Please wait and try again later.", bind["error"])
+	assert.Equal(t, "new@example.com", bind["email"], "the address the user typed is kept")
+	requireNoPasswordInBind(t, httpHelper)
+}
+
 func TestHandleEmailPost_AConfirmationMismatchReRendersWithoutThePassword(t *testing.T) {
 	apiClient := &emailRecordingApiClient{}
 	httpHelper := handlersmocks.NewHttpHelper(t)
