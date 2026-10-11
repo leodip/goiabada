@@ -8,10 +8,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/binary"
 	"errors"
+	"io"
 	"math/big"
 	"net"
+	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -285,4 +289,145 @@ func TestPreferDescription_SaysWhatSQLServerEncrypts(t *testing.T) {
 			t.Errorf("%s's Compose comment no longer says what prefer encrypts:\n%s", engine, comment)
 		}
 	}
+}
+
+// TestOpenSQL_PreferAsksForTLSOnEveryConnection: in prefer, a connection that met a server offering
+// no TLS and went on in plain text leaves the next connection asking for TLS again, as the auth
+// server's does, for both of the check's connections. The driver's fallback clears the TLS of the
+// configuration the connection was handed, and without a copy per connection that was the
+// connector's own (#502).
+func TestOpenSQL_PreferAsksForTLSOnEveryConnection(t *testing.T) {
+	server := newGreetingServer(t)
+	target := dbTarget{Host: "127.0.0.1", Port: server.port, Username: "goiabada", Password: "pw", Name: "goiabada",
+		TLSMode: "prefer"}
+	for which, connection := range map[string]func(dbTarget) (dbConnection, error){
+		"connection": mysqlConnection, "maintenance connection": mysqlMaintenanceConnection,
+	} {
+		t.Run(which, func(t *testing.T) {
+			db, err := openSQL(build(t, which, connection, target))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = db.Close() }()
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+
+			for _, phase := range []struct {
+				offerTLS bool
+				what     string
+			}{
+				{false, "a server offering no TLS is answered in plain text"},
+				{true, "the next connection asks for TLS again"},
+			} {
+				server.offerTLS.Store(phase.offerTLS)
+				if db.PingContext(ctx) == nil {
+					t.Fatal("the server hangs up after the client's first answer, yet the ping succeeded")
+				}
+				asked := server.answers()
+				if len(asked) == 0 {
+					t.Fatal("no connection reached the server")
+				}
+				if slices.Contains(asked, !phase.offerTLS) {
+					t.Errorf("%s: asked for TLS %v", phase.what, asked)
+				}
+			}
+		})
+	}
+}
+
+// The capability flags of the MySQL protocol the greeting below offers, and the one a client's
+// first answer is read for.
+const (
+	clientMySQL      = 1 << 0
+	clientProtocol41 = 1 << 9
+	clientSSL        = 1 << 11
+	clientSecureConn = 1 << 15
+	clientPluginAuth = 1 << 19
+)
+
+// greetingServer is as much of a MySQL server as a connection's first two packets: it greets each
+// connection, offering TLS when offerTLS says so as the connection arrives, reads the client's first
+// answer, records whether it asks for TLS, and hangs up. A copy of the auth server's in mysqldb's
+// dsn_tls_test.go, which this module may not import.
+type greetingServer struct {
+	port     int
+	offerTLS atomic.Bool
+	asked    chan bool
+}
+
+func newGreetingServer(t *testing.T) *greetingServer {
+	t.Helper()
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	tcpAddr, ok := listener.Addr().(*net.TCPAddr)
+	if !ok {
+		t.Fatalf("listening on %v, not TCP", listener.Addr())
+	}
+	s := &greetingServer{port: tcpAddr.Port, asked: make(chan bool, 16)}
+	go func() {
+		for {
+			conn, acceptErr := listener.Accept()
+			if acceptErr != nil {
+				return
+			}
+			s.serve(conn)
+		}
+	}()
+	return s
+}
+
+// serve records the answer before it hangs up, so by the time a client's ping has failed every
+// connection it made is recorded.
+func (s *greetingServer) serve(conn net.Conn) {
+	defer func() { _ = conn.Close() }()
+	_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
+	if _, err := conn.Write(greeting(s.offerTLS.Load())); err != nil {
+		return
+	}
+	header := make([]byte, 4)
+	if _, err := io.ReadFull(conn, header); err != nil {
+		return
+	}
+	answer := make([]byte, int(header[0])|int(header[1])<<8|int(header[2])<<16)
+	if _, err := io.ReadFull(conn, answer); err != nil || len(answer) < 4 {
+		return
+	}
+	s.asked <- binary.LittleEndian.Uint32(answer)&clientSSL != 0
+}
+
+// answers is whether each connection made since the last call asked for TLS.
+func (s *greetingServer) answers() []bool {
+	var asked []bool
+	for {
+		select {
+		case a := <-s.asked:
+			asked = append(asked, a)
+		default:
+			return asked
+		}
+	}
+}
+
+// greeting is a protocol 10 handshake packet, the first a MySQL server sends, offering TLS or not.
+func greeting(offerTLS bool) []byte {
+	capabilities := uint32(clientMySQL | clientProtocol41 | clientSecureConn | clientPluginAuth)
+	if offerTLS {
+		capabilities |= clientSSL
+	}
+	p := []byte{10}
+	p = append(p, "8.0.36\x00"...)
+	p = binary.LittleEndian.AppendUint32(p, 1) // connection id
+	p = append(p, "12345678\x00"...)           // the scramble's first part, and a filler
+	p = binary.LittleEndian.AppendUint16(p, uint16(capabilities))
+	p = append(p, 255)                         // utf8mb4_0900_ai_ci
+	p = binary.LittleEndian.AppendUint16(p, 2) // autocommit
+	p = binary.LittleEndian.AppendUint16(p, uint16(capabilities>>16))
+	p = append(p, 21)                    // the scramble's length
+	p = append(p, make([]byte, 10)...)   // reserved
+	p = append(p, "123456789012\x00"...) // the scramble's second part
+	p = append(p, "mysql_native_password\x00"...)
+	return append([]byte{byte(len(p)), byte(len(p) >> 8), byte(len(p) >> 16), 0}, p...)
 }

@@ -120,7 +120,9 @@ func mysqlMaintenanceConnection(t dbTarget) (dbConnection, error) {
 
 // mysqlConfig is mysqldb's driverConfig, and its applyTLS: tls=false for disable, preferred for
 // prefer, skip-verify for require, and for the two verifying modes a TLS configuration carrying
-// the roots, verify-ca's checking the chain alone. Only preferred falls back to plain text.
+// the roots, verify-ca's checking the chain alone. Only preferred falls back to plain text, and its
+// hook makes the driver hand each connection a copy of the configuration, so a fallback clears the
+// TLS of that connection alone.
 func mysqlConfig(t dbTarget) (*mysqldriver.Config, error) {
 	c := mysqldriver.NewConfig()
 	c.User = t.Username
@@ -140,6 +142,7 @@ func mysqlConfig(t dbTarget) (*mysqldriver.Config, error) {
 		c.TLSConfig = "false"
 	case "prefer":
 		c.TLSConfig = "preferred"
+		_ = c.Apply(mysqldriver.BeforeConnect(func(context.Context, *mysqldriver.Config) error { return nil }))
 	case "require":
 		c.TLSConfig = "skip-verify"
 	case "verify-ca":
