@@ -8,8 +8,8 @@
       "username": "goiabada",
       "password": "plain-Passw0rd",
       "database": "goiabada",
-      "dsn": "postgres://goiabada:plain-Passw0rd@db.example.com:5432/goiabada",
-      "maintenanceDSN": "postgres://goiabada:plain-Passw0rd@db.example.com:5432/postgres"
+      "dsn": "postgres://goiabada:plain-Passw0rd@db.example.com:5432/goiabada?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:plain-Passw0rd@db.example.com:5432/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
     },
     {
       "name": "every special character in the password",
@@ -19,8 +19,8 @@
       "username": "goiabada",
       "password": "p@ss/w?rd#%41: 'q\"&=+;\\x",
       "database": "goiabada",
-      "dsn": "postgres://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:5432/goiabada",
-      "maintenanceDSN": "postgres://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:5432/postgres"
+      "dsn": "postgres://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:5432/goiabada?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:5432/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
     },
     {
       "name": "at in the username",
@@ -30,8 +30,8 @@
       "username": "us@r",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "postgres://us%40r:pw@db.example.com:5432/goiabada",
-      "maintenanceDSN": "postgres://us%40r:pw@db.example.com:5432/postgres"
+      "dsn": "postgres://us%40r:pw@db.example.com:5432/goiabada?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://us%40r:pw@db.example.com:5432/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
     },
     {
       "name": "database name at the validator's limit",
@@ -41,8 +41,8 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres"
+      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
     },
     {
       "name": "a port other than the default",
@@ -52,8 +52,8 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "postgres://goiabada:pw@10.0.0.5:15000/goiabada",
-      "maintenanceDSN": "postgres://goiabada:pw@10.0.0.5:15000/postgres"
+      "dsn": "postgres://goiabada:pw@10.0.0.5:15000/goiabada?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@10.0.0.5:15000/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
     },
     {
       "name": "bare IPv6 host",
@@ -63,8 +63,8 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "postgres://goiabada:pw@[::1]:5432/goiabada",
-      "maintenanceDSN": "postgres://goiabada:pw@[::1]:5432/postgres"
+      "dsn": "postgres://goiabada:pw@[::1]:5432/goiabada?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@[::1]:5432/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
     },
     {
       "name": "bracketed IPv6 host",
@@ -74,8 +74,68 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "postgres://goiabada:pw@[::1]:5432/goiabada",
-      "maintenanceDSN": "postgres://goiabada:pw@[::1]:5432/postgres"
+      "dsn": "postgres://goiabada:pw@[::1]:5432/goiabada?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@[::1]:5432/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
+    },
+    {
+      "name": "tls mode disable",
+      "engine": "postgres",
+      "host": "db.example.com",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "disable",
+      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada?sslmode=disable&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres?sslmode=disable&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
+    },
+    {
+      "name": "tls mode prefer",
+      "engine": "postgres",
+      "host": "db.example.com",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "prefer",
+      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres?sslmode=prefer&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
+    },
+    {
+      "name": "tls mode require",
+      "engine": "postgres",
+      "host": "db.example.com",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "require",
+      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada?sslmode=require&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres?sslmode=require&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
+    },
+    {
+      "name": "tls mode verify-ca",
+      "engine": "postgres",
+      "host": "db.example.com",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "verify-ca",
+      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada?sslmode=verify-ca&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres?sslmode=verify-ca&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
+    },
+    {
+      "name": "tls mode verify-full",
+      "engine": "postgres",
+      "host": "db.example.com",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "verify-full",
+      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada?sslmode=verify-full&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres?sslmode=verify-full&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
     },
     {
       "name": "plain",
@@ -85,8 +145,32 @@
       "username": "goiabada",
       "password": "plain-Passw0rd",
       "database": "goiabada",
-      "dsn": "goiabada:plain-Passw0rd@tcp(db.example.com:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true&tls=preferred",
-      "maintenanceDSN": "goiabada:plain-Passw0rd@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true&tls=preferred"
+      "mysql": {
+        "user": "goiabada",
+        "passwd": "plain-Passw0rd",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "goiabada",
+        "multiStatements": true,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      },
+      "mysqlMaintenance": {
+        "user": "goiabada",
+        "passwd": "plain-Passw0rd",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "",
+        "multiStatements": false,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      }
     },
     {
       "name": "every special character in the password",
@@ -96,8 +180,32 @@
       "username": "goiabada",
       "password": "p@ss/w?rd#%41: 'q\"&=+;\\x",
       "database": "goiabada",
-      "dsn": "goiabada:p@ss/w?rd#%41: 'q\"&=+;\\x@tcp(db.example.com:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true&tls=preferred",
-      "maintenanceDSN": "goiabada:p@ss/w?rd#%41: 'q\"&=+;\\x@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true&tls=preferred"
+      "mysql": {
+        "user": "goiabada",
+        "passwd": "p@ss/w?rd#%41: 'q\"&=+;\\x",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "goiabada",
+        "multiStatements": true,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      },
+      "mysqlMaintenance": {
+        "user": "goiabada",
+        "passwd": "p@ss/w?rd#%41: 'q\"&=+;\\x",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "",
+        "multiStatements": false,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      }
     },
     {
       "name": "at in the username",
@@ -107,8 +215,32 @@
       "username": "us@r",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "us@r:pw@tcp(db.example.com:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true&tls=preferred",
-      "maintenanceDSN": "us@r:pw@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true&tls=preferred"
+      "mysql": {
+        "user": "us@r",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "goiabada",
+        "multiStatements": true,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      },
+      "mysqlMaintenance": {
+        "user": "us@r",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "",
+        "multiStatements": false,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      }
     },
     {
       "name": "database name at the validator's limit",
@@ -118,8 +250,32 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-      "dsn": "goiabada:pw@tcp(db.example.com:3306)/goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx?charset=utf8mb4&multiStatements=true&parseTime=true&tls=preferred",
-      "maintenanceDSN": "goiabada:pw@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true&tls=preferred"
+      "mysql": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "multiStatements": true,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      },
+      "mysqlMaintenance": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "",
+        "multiStatements": false,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      }
     },
     {
       "name": "a port other than the default",
@@ -129,8 +285,32 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "goiabada:pw@tcp(10.0.0.5:15000)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true&tls=preferred",
-      "maintenanceDSN": "goiabada:pw@tcp(10.0.0.5:15000)/?charset=utf8mb4&parseTime=true&tls=preferred"
+      "mysql": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "10.0.0.5:15000",
+        "dbName": "goiabada",
+        "multiStatements": true,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      },
+      "mysqlMaintenance": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "10.0.0.5:15000",
+        "dbName": "",
+        "multiStatements": false,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      }
     },
     {
       "name": "bare IPv6 host",
@@ -140,8 +320,32 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "goiabada:pw@tcp([::1]:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true&tls=preferred",
-      "maintenanceDSN": "goiabada:pw@tcp([::1]:3306)/?charset=utf8mb4&parseTime=true&tls=preferred"
+      "mysql": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "[::1]:3306",
+        "dbName": "goiabada",
+        "multiStatements": true,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      },
+      "mysqlMaintenance": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "[::1]:3306",
+        "dbName": "",
+        "multiStatements": false,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      }
     },
     {
       "name": "bracketed IPv6 host",
@@ -151,8 +355,307 @@
       "username": "goiabada",
       "password": "pw",
       "database": "goiabada",
-      "dsn": "goiabada:pw@tcp([::1]:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true&tls=preferred",
-      "maintenanceDSN": "goiabada:pw@tcp([::1]:3306)/?charset=utf8mb4&parseTime=true&tls=preferred"
+      "mysql": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "[::1]:3306",
+        "dbName": "goiabada",
+        "multiStatements": true,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      },
+      "mysqlMaintenance": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "[::1]:3306",
+        "dbName": "",
+        "multiStatements": false,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      }
+    },
+    {
+      "name": "colon in the username",
+      "engine": "mysql",
+      "host": "db.example.com",
+      "port": 3306,
+      "username": "us:r",
+      "password": "p:w",
+      "database": "goiabada",
+      "mysql": {
+        "user": "us:r",
+        "passwd": "p:w",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "goiabada",
+        "multiStatements": true,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      },
+      "mysqlMaintenance": {
+        "user": "us:r",
+        "passwd": "p:w",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "",
+        "multiStatements": false,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      }
+    },
+    {
+      "name": "tls mode disable",
+      "engine": "mysql",
+      "host": "db.example.com",
+      "port": 3306,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "disable",
+      "mysql": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "goiabada",
+        "multiStatements": true,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "false",
+        "tls": null
+      },
+      "mysqlMaintenance": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "",
+        "multiStatements": false,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "false",
+        "tls": null
+      }
+    },
+    {
+      "name": "tls mode prefer",
+      "engine": "mysql",
+      "host": "db.example.com",
+      "port": 3306,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "prefer",
+      "mysql": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "goiabada",
+        "multiStatements": true,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      },
+      "mysqlMaintenance": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "",
+        "multiStatements": false,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "preferred",
+        "tls": null
+      }
+    },
+    {
+      "name": "tls mode require",
+      "engine": "mysql",
+      "host": "db.example.com",
+      "port": 3306,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "require",
+      "mysql": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "goiabada",
+        "multiStatements": true,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "skip-verify",
+        "tls": null
+      },
+      "mysqlMaintenance": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "",
+        "multiStatements": false,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "skip-verify",
+        "tls": null
+      }
+    },
+    {
+      "name": "tls mode verify-ca",
+      "engine": "mysql",
+      "host": "db.example.com",
+      "port": 3306,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "verify-ca",
+      "mysql": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "goiabada",
+        "multiStatements": true,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "",
+        "tls": {
+          "serverName": "db.example.com",
+          "insecureSkipVerify": true,
+          "verifyConnection": true
+        }
+      },
+      "mysqlMaintenance": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "",
+        "multiStatements": false,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "",
+        "tls": {
+          "serverName": "db.example.com",
+          "insecureSkipVerify": true,
+          "verifyConnection": true
+        }
+      }
+    },
+    {
+      "name": "tls mode verify-full",
+      "engine": "mysql",
+      "host": "db.example.com",
+      "port": 3306,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "verify-full",
+      "mysql": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "goiabada",
+        "multiStatements": true,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "",
+        "tls": {
+          "serverName": "db.example.com",
+          "insecureSkipVerify": false,
+          "verifyConnection": false
+        }
+      },
+      "mysqlMaintenance": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "",
+        "multiStatements": false,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "",
+        "tls": {
+          "serverName": "db.example.com",
+          "insecureSkipVerify": false,
+          "verifyConnection": false
+        }
+      }
+    },
+    {
+      "name": "tls mode verify-full on a bracketed IPv6 host",
+      "engine": "mysql",
+      "host": "[::1]",
+      "port": 3306,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "verify-full",
+      "mysql": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "[::1]:3306",
+        "dbName": "goiabada",
+        "multiStatements": true,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "",
+        "tls": {
+          "serverName": "::1",
+          "insecureSkipVerify": false,
+          "verifyConnection": false
+        }
+      },
+      "mysqlMaintenance": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "[::1]:3306",
+        "dbName": "",
+        "multiStatements": false,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "",
+        "tls": {
+          "serverName": "::1",
+          "insecureSkipVerify": false,
+          "verifyConnection": false
+        }
+      }
     },
     {
       "name": "plain",
@@ -230,6 +733,66 @@
       "database": "goiabada",
       "dsn": "sqlserver://goiabada:pw@[::1]:1433?database=goiabada",
       "maintenanceDSN": "sqlserver://goiabada:pw@[::1]:1433?database=master"
+    },
+    {
+      "name": "tls mode disable",
+      "engine": "mssql",
+      "host": "db.example.com",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "disable",
+      "dsn": "sqlserver://goiabada:pw@db.example.com:1433?database=goiabada&encrypt=disable",
+      "maintenanceDSN": "sqlserver://goiabada:pw@db.example.com:1433?database=master&encrypt=disable"
+    },
+    {
+      "name": "tls mode prefer",
+      "engine": "mssql",
+      "host": "db.example.com",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "prefer",
+      "dsn": "sqlserver://goiabada:pw@db.example.com:1433?database=goiabada",
+      "maintenanceDSN": "sqlserver://goiabada:pw@db.example.com:1433?database=master"
+    },
+    {
+      "name": "tls mode require",
+      "engine": "mssql",
+      "host": "db.example.com",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "require",
+      "dsn": "sqlserver://goiabada:pw@db.example.com:1433?database=goiabada&encrypt=true&TrustServerCertificate=true",
+      "maintenanceDSN": "sqlserver://goiabada:pw@db.example.com:1433?database=master&encrypt=true&TrustServerCertificate=true"
+    },
+    {
+      "name": "tls mode verify-ca",
+      "engine": "mssql",
+      "host": "db.example.com",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "verify-ca",
+      "dsn": "sqlserver://goiabada:pw@db.example.com:1433?database=goiabada&encrypt=true",
+      "maintenanceDSN": "sqlserver://goiabada:pw@db.example.com:1433?database=master&encrypt=true"
+    },
+    {
+      "name": "tls mode verify-full",
+      "engine": "mssql",
+      "host": "db.example.com",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "tlsMode": "verify-full",
+      "dsn": "sqlserver://goiabada:pw@db.example.com:1433?database=goiabada&encrypt=true",
+      "maintenanceDSN": "sqlserver://goiabada:pw@db.example.com:1433?database=master&encrypt=true"
     }
   ]
 }

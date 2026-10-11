@@ -6,6 +6,7 @@ package mssqldb
 
 import (
 	"context"
+	"crypto/x509"
 	"database/sql"
 	"database/sql/driver"
 	"embed"
@@ -20,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/core/errs"
 	mssql "github.com/microsoft/go-mssqldb"
+	"github.com/microsoft/go-mssqldb/msdsn"
 )
 
 //go:embed migrations/*.sql
@@ -54,6 +56,11 @@ type DatabaseConfig struct {
 	// tools and the data tier's fixtures that call this constructor directly open with: the
 	// server's comes through datafactory, which always passes one (#394).
 	Pool *data.PoolConfig
+	// TLSMode is GOIABADA_DB_TLS_MODE, the zero value reading as prefer, and TLSRoots the
+	// authorities GOIABADA_DB_TLS_CA_FILE holds, nil for the system's roots. Both cover every
+	// connection the constructor opens, the maintenance one included (#502).
+	TLSMode  data.TLSMode
+	TLSRoots *x509.CertPool
 }
 
 // New opens the SQL Server database dbConfig names, creating it first when dbConfig.Create says
@@ -64,12 +71,19 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 	// One record where five used to be, and no password: the connection string is assembled
 	// below from the same four values, so a startup problem is read off this line rather than
 	// off four consecutive ones that a collector had no way to join (#320 decision 6).
+	tlsMode := dbConfig.TLSMode.OrPrefer()
 	slog.InfoContext(ctx, "using database", "type", "mssql", "username", dbConfig.Username,
-		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name)
+		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name, "tls_mode", string(tlsMode))
+
+	// The configuration's load refuses any other value, so only a configuration built directly
+	// reaches this, and it must not connect as prefer under another name (#502).
+	if !tlsMode.Known() {
+		return nil, errs.Errorf("GOIABADA_DB_TLS_MODE %q is not one of the five modes", tlsMode)
+	}
 
 	if dbConfig.Create {
 		// Connect to master database first
-		masterDB, err := sql.Open("sqlserver", MaintenanceDSN(dbConfig))
+		masterDB, err := open(MaintenanceConnConfig(dbConfig))
 		if err != nil {
 			return nil, errs.Wrap(err, "unable to open master database")
 		}
@@ -93,7 +107,7 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 	}
 
 	// Connect to the actual database
-	db, err := sql.Open("sqlserver", DSN(dbConfig))
+	db, err := open(ConnConfig(dbConfig))
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to open database")
 	}
@@ -121,6 +135,17 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 		dbConfig: dbConfig,
 	}
 	return &mssqlDb, nil
+}
+
+// open is sql.Open("sqlserver", dsn) for a configuration rather than a string, which is what
+// carries the CA file's authorities and verify-ca's check of the chain alone: the "sqlserver"
+// driver and NewConnectorConfig build the same connector from what msdsn.Parse reads. Like
+// sql.Open it dials nothing.
+func open(c msdsn.Config, err error) (*sql.DB, error) {
+	if err != nil {
+		return nil, err
+	}
+	return sql.OpenDB(mssql.NewConnectorConfig(c)), nil
 }
 
 // CreateDatabaseResource is the sp_getapplock resource createDatabaseUnderAppLock serializes on.

@@ -51,7 +51,19 @@ type configVar struct {
 	flagValue string // ignored when flag is ""
 	flagWant  any
 
+	// with is set beside envValue in the environment and the flag cases, for a setting another
+	// one has to allow: a CA file loads only beside a mode that checks the certificate (#502).
+	with map[string]string
+
 	read func(*Config) any
+}
+
+// envWith is the environment of v's environment and flag cases: its own value, and what it needs
+// beside it.
+func (v configVar) envWith() map[string]string {
+	env := map[string]string{v.env: v.envValue}
+	maps.Copy(env, v.with)
+	return env
 }
 
 // strVar is a row whose landed value is the string as supplied.
@@ -119,7 +131,7 @@ func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, w
 }
 
 // configVariables is every live GOIABADA_* variable this process loads: 28 auth server, the 2
-// admin console values it reads, 12 database and 5 top-level, of which 39 have a flag. The one
+// admin console values it reads, 14 database and 5 top-level, of which 41 have a flag. The one
 // name Load mentions that is not live configuration is in nonLiveEnvVars.
 var configVariables = []configVar{
 	// Auth server
@@ -263,6 +275,20 @@ var configVariables = []configVar{
 	durationVar("GOIABADA_DB_CONN_MAX_IDLE_TIME", "db-conn-max-idle-time", 5*time.Minute,
 		"10m", 10*time.Minute, "0", 0,
 		func(c *Config) any { return c.Database.ConnMaxIdleTime }),
+	// The connection's protection, read as the mode the engines are given: prefer while neither
+	// the variable nor the flag sets it (#502).
+	strVar("GOIABADA_DB_TLS_MODE", "db-tls-mode", "prefer",
+		"verify-full", "disable",
+		func(c *Config) any { return string(c.Database.EffectiveTLSMode()) }),
+	// A CA file loads only beside a mode that checks the certificate, on an engine with a
+	// connection to check, so its cases set both; the two files are certificates and nothing else.
+	{
+		env: "GOIABADA_DB_TLS_CA_FILE", flag: "db-tls-ca-file", def: "",
+		envValue: "testdata/db-tls-ca-env.pem", envWant: "testdata/db-tls-ca-env.pem",
+		flagValue: "testdata/db-tls-ca-flag.pem", flagWant: "testdata/db-tls-ca-flag.pem",
+		with: map[string]string{"GOIABADA_DB_TYPE": "postgres", "GOIABADA_DB_TLS_MODE": "verify-ca"},
+		read: func(c *Config) any { return c.Database.TLSCAFile },
+	},
 
 	// Initial setup and the data-encryption keys
 	// One default for unset and empty alike, the address the seed falls back to for an empty
@@ -328,6 +354,11 @@ func loadMatrixRefusing(t *testing.T, env map[string]string, args []string) (*fl
 		unsetEnv(t, v.env)
 	}
 	for _, name := range nonLiveEnvVars {
+		unsetEnv(t, name)
+	}
+	// libpq's TLS variables stop a PostgreSQL start, so a developer's own cannot decide a case
+	// either (#502).
+	for name := range libpqTLSRefusals {
 		unsetEnv(t, name)
 	}
 	for key, value := range env {
@@ -644,7 +675,7 @@ func TestLoad_Defaults(t *testing.T) {
 func TestLoad_FromTheEnvironment(t *testing.T) {
 	for _, v := range configVariables {
 		t.Run(v.env, func(t *testing.T) {
-			_, c := loadMatrix(t, map[string]string{v.env: v.envValue}, nil)
+			_, c := loadMatrix(t, v.envWith(), nil)
 
 			if got := v.read(c); !reflect.DeepEqual(got, v.envWant) {
 				t.Errorf("%s=%q: got %#v, want %#v", v.env, v.envValue, got, v.envWant)
@@ -662,7 +693,7 @@ func TestLoad_FlagBeatsTheEnvironment(t *testing.T) {
 			// The variable is set to a value the flag does not use, so a pass cannot come
 			// from the environment having supplied the same answer.
 			args := []string{"-" + v.flag + "=" + v.flagValue}
-			_, c := loadMatrix(t, map[string]string{v.env: v.envValue}, args)
+			_, c := loadMatrix(t, v.envWith(), args)
 
 			if got := v.read(c); !reflect.DeepEqual(got, v.flagWant) {
 				t.Errorf("%s=%q with %s: got %#v, want the flag's %#v",
@@ -676,10 +707,10 @@ func TestLoad_FlagBeatsTheEnvironment(t *testing.T) {
 // Seam 2: the registered flag set of this binary
 // -----------------------------------------------------------------------------
 
-// authServerFlags is the 39 flags the auth server registers: its own 22, the 12 database flags,
+// authServerFlags is the 41 flags the auth server registers: its own 22, the 14 database flags,
 // the 3 initial-setup flags, and the two admin console values it reads. 32 were what the split
-// left (#351); the four pool flags came after it (#394), and the three metrics listener flags
-// after those (#400).
+// left (#351); the four pool flags came after it (#394), the three metrics listener flags
+// after those (#400), and the two of the connection's TLS after those (#502).
 //
 // It is written out rather than derived from configVariables, and that is the whole point. A
 // derived expectation cannot fail when a flag is dropped from the table and from config.go
@@ -724,6 +755,8 @@ var authServerFlags = []string{
 	"db-name",
 	"db-password",
 	"db-port",
+	"db-tls-ca-file",
+	"db-tls-mode",
 	"db-type",
 	"db-username",
 }
@@ -738,6 +771,8 @@ var flagsAddedAfterTheSplit = []string{
 	"db-conn-max-lifetime",
 	"db-max-idle-conns",
 	"db-max-open-conns",
+	"db-tls-ca-file",
+	"db-tls-mode",
 }
 
 // refusedFlags is the other half of the narrowing, named rather than merely absent: the 13 admin
@@ -906,6 +941,9 @@ func TestRegisterDatabaseFlags_RegistersTheDatabaseFlagsOnTheConfigGiven(t *test
 		MaxIdleConns:    intPtr(6),
 		ConnMaxLifetime: 2 * time.Hour,
 		ConnMaxIdleTime: 3 * time.Minute,
+
+		TLSMode:   "require",
+		TLSCAFile: "/c1.pem",
 	}
 	fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -917,8 +955,8 @@ func TestRegisterDatabaseFlags_RegistersTheDatabaseFlagsOnTheConfigGiven(t *test
 			want[name] = true
 		}
 	}
-	if len(want) != 12 {
-		t.Fatalf("authServerFlags names %d db- flags, want 12, so this case would check the wrong set", len(want))
+	if len(want) != 14 {
+		t.Fatalf("authServerFlags names %d db- flags, want 14, so this case would check the wrong set", len(want))
 	}
 
 	registered := map[string]string{}
@@ -948,6 +986,9 @@ func TestRegisterDatabaseFlags_RegistersTheDatabaseFlagsOnTheConfigGiven(t *test
 		"db-max-idle-conns":     "6",
 		"db-conn-max-lifetime":  "2h0m0s",
 		"db-conn-max-idle-time": "3m0s",
+
+		"db-tls-mode":    "require",
+		"db-tls-ca-file": "/c1.pem",
 	}
 	for name, def := range wantDefaults {
 		if got := registered[name]; got != def {

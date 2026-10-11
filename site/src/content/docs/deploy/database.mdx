@@ -27,13 +27,31 @@ The auth server creates every table itself, at each start, as [Upgrade Goiabada]
 
 ## Where the database sits
 
-<Aside type="caution" title="Goiabada doesn't check whose database server it reached">
-The auth server encrypts its connection to the database when the server offers TLS, without checking the server's certificate: on PostgreSQL and MySQL whenever the server supports TLS, and on SQL Server for the login, and for the whole session when the server forces encryption, as Azure SQL Database does. A server that requires TLS, such as a MySQL with `require_secure_transport`, is reached.
+The connection to PostgreSQL, MySQL or SQL Server carries the database password and everything Goiabada stores, apart from the secrets the [AES key](/deploy/secrets/#what-each-secret-protects) encrypts. Two settings of the auth server decide how it's protected, the same way on all three engines. SQLite has no connection to protect, and ignores both.
 
-Only on PostgreSQL can the auth server check the certificate: set PostgreSQL's own `PGSSLMODE=verify-full` in the auth server's environment, with `PGSSLROOTCERT` naming the file of the CA certificate that signed the database's, or `SSL_CERT_FILE` for a CA the system trusts. The auth server then refuses a server whose certificate doesn't verify, or that offers no TLS.
+`GOIABADA_DB_TLS_MODE` takes one of five modes, PostgreSQL's `sslmode` names:
+
+| Mode | Encrypted | Certificate checked |
+|---|---|---|
+| `disable` | Never, even when the server offers TLS. On SQL Server the login travels in plain text too. | No |
+| `prefer`, the default | On PostgreSQL and MySQL, when the server offers TLS, and in plain text when it offers none. On SQL Server, the login, and the whole session when the server forces encryption, as Azure SQL Database does. | No |
+| `require` | Always, the whole session. A server that offers no TLS is refused. | No |
+| `verify-ca` | Always, the whole session. | The certificate must chain to a trusted authority. The host name isn't checked. |
+| `verify-full` | Always, the whole session. | The certificate must chain to a trusted authority and name `GOIABADA_DB_HOST`. An IP address must be one of the certificate's IP addresses. |
+
+Only `verify-full` makes sure the auth server reached your database and nothing in between. Use `verify-ca` only when the auth server reaches the database by a name its certificate doesn't carry, such as an IP address or a connection pooler's host name.
+
+`GOIABADA_DB_TLS_CA_FILE` names a PEM file of the authorities `verify-ca` and `verify-full` trust, read once at start. With it, the auth server trusts those authorities alone, in place of the system's. Leave it empty when the database's certificate comes from an authority the system already trusts. A managed database whose provider signs with an authority of its own needs the provider's CA file. The auth server doesn't start when the file can't be read, holds no certificate, or is set beside `disable`, `prefer` or `require`, which check no certificate and so read no CA file. On Kubernetes, the setup wizard carries the file in [a ConfigMap](/deploy/kubernetes/security/#check-the-databases-certificate).
+
+<Aside type="caution" title="The default doesn't check whose database it reached">
+With `GOIABADA_DB_TLS_MODE` unset, the auth server connects as `prefer` and checks no certificate, as every release before these settings did. Every start then writes a warning, `the database tls mode is unset, so the auth server does not check whose database it reached`, until you set a mode. Setting `prefer` keeps the same behavior without the warning. The `using database` record says which mode a start uses, in `tls_mode`.
 </Aside>
 
-So, unless you check the certificate on PostgreSQL, keep the database where nobody else can read or change that traffic: on the same host as the auth server, or on a private network that only the auth server and your administrators reach. The connection carries the database password and everything Goiabada stores, apart from the secrets the [AES key](/deploy/secrets/#what-each-secret-protects) encrypts.
+So, unless the mode is `verify-full`, keep the database where nobody else can read or change that traffic: on the same host as the auth server, or on a private network that only the auth server and your administrators reach. The Docker Compose files the setup wizard generates write `prefer`, since their database is a service on the file's own network.
+
+On PostgreSQL, these two settings are the whole of the connection's TLS. PostgreSQL's own `PGSSL*` variables, such as `PGSSLMODE` and `PGSSLROOTCERT`, no longer decide anything, and one that's set stops the auth server: see [Upgrade Goiabada](/deploy/upgrade-goiabada/#if-you-set-pgsslmode).
+
+A start the database refuses, because its certificate doesn't verify or it offers no TLS, stops with `unable to create the database connection`: see [the refusals](/troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection/#the-database-refuses-tls).
 
 ## PostgreSQL
 

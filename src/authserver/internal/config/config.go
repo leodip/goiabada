@@ -7,7 +7,9 @@
 package config
 
 import (
+	"crypto/x509"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"log/slog"
 	"math"
@@ -17,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -125,6 +128,20 @@ type DatabaseConfig struct {
 	// ConnMaxLifetime and ConnMaxIdleTime are 0 or more, 0 meaning no limit.
 	ConnMaxLifetime time.Duration
 	ConnMaxIdleTime time.Duration
+
+	// How the connection to PostgreSQL, MySQL and SQL Server is protected; SQLite reads neither
+	// (#502). TLSMode is GOIABADA_DB_TLS_MODE as configured, empty while neither the variable nor
+	// its flag sets it, which is what the start's warning keys on; read the mode in effect through
+	// EffectiveTLSMode. TLSCAFile names the PEM file whose authorities replace the system's roots,
+	// and TLSRoots is those authorities, read once by the load; nil means the system's roots.
+	TLSMode   string
+	TLSCAFile string
+	TLSRoots  *x509.CertPool
+}
+
+// EffectiveTLSMode is the mode the engines are given: the one set or, unset, prefer.
+func (c *DatabaseConfig) EffectiveTLSMode() data.TLSMode {
+	return data.TLSMode(c.TLSMode).OrPrefer()
 }
 
 // EffectiveMaxIdleConns is the idle cap the engines are given: the one set, or the open cap.
@@ -233,6 +250,9 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			MaxIdleConns:    getEnvAsOptionalIntAtLeast("GOIABADA_DB_MAX_IDLE_CONNS", 0, &malformed),
 			ConnMaxLifetime: getEnvAsDuration("GOIABADA_DB_CONN_MAX_LIFETIME", defaultConnMaxLifetime, &malformed),
 			ConnMaxIdleTime: getEnvAsDuration("GOIABADA_DB_CONN_MAX_IDLE_TIME", defaultConnMaxIdleTime, &malformed),
+
+			TLSMode:   getEnvAsTLSMode("GOIABADA_DB_TLS_MODE", &malformed),
+			TLSCAFile: getEnv("GOIABADA_DB_TLS_CA_FILE", ""),
 		},
 		AdminEmail:               getEnv("GOIABADA_ADMIN_EMAIL", "admin@example.com"),
 		AdminPassword:            getEnv("GOIABADA_ADMIN_PASSWORD", ""),
@@ -290,7 +310,14 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 
 	// The pool flags parse as the flag package reads an integer or a duration; their ranges, and
 	// the one rule between two of them, are held here, in the same line as the variables' (#394).
+	// So is the TLS mode's flag, and the CA file is read here, once, with libpq's variables
+	// refused beside it (#502). Under `migrate` those two wait for its own parse, which reads the
+	// file of the configuration it runs with: a --db-* flag after `migrate` can change the engine,
+	// the mode or the file they are checked against.
 	checkDatabaseFlags(fs, &c.Database, &malformed)
+	if len(c.Args) == 0 || c.Args[0] != "migrate" {
+		checkDatabaseTLS(&c.Database, &malformed)
+	}
 
 	// Re-derive slice-valued config after flag parsing so a command-line flag
 	// (comma-separated) overrides the environment value.
@@ -319,7 +346,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	return c, nil
 }
 
-// RegisterDatabaseFlags registers the twelve --db-* flags on fs, each writing into c and
+// RegisterDatabaseFlags registers the fourteen --db-* flags on fs, each writing into c and
 // defaulting to the value c already holds.
 //
 // It is the one registration of those names. The server's parse registers them over the loaded
@@ -339,6 +366,8 @@ func RegisterDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig) {
 	fs.Var(optionalIntFlag{&c.MaxIdleConns}, "db-max-idle-conns", "Most idle connections kept open, from 0 to the max open connections; unset follows the max open connections (only for mysql, postgres, mssql)")
 	fs.DurationVar(&c.ConnMaxLifetime, "db-conn-max-lifetime", c.ConnMaxLifetime, "Longest a connection is reused, such as 30m; 0 is no limit (only for mysql, postgres, mssql)")
 	fs.DurationVar(&c.ConnMaxIdleTime, "db-conn-max-idle-time", c.ConnMaxIdleTime, "Longest a connection stays idle before it is closed, such as 5m; 0 is no limit (only for mysql, postgres, mssql)")
+	fs.StringVar(&c.TLSMode, "db-tls-mode", c.TLSMode, "How the database connection is protected. Options: disable, prefer, require, verify-ca, verify-full; unset is prefer, which checks no certificate (only for mysql, postgres, mssql)")
+	fs.StringVar(&c.TLSCAFile, "db-tls-ca-file", c.TLSCAFile, "PEM file of the authorities verify-ca and verify-full trust instead of the system's roots (only for mysql, postgres, mssql)")
 }
 
 // optionalIntFlag is a flag over an *int that stays nil until the flag is given, which is how the
@@ -363,13 +392,23 @@ func (f optionalIntFlag) Set(s string) error {
 	return nil
 }
 
-// CheckDatabaseFlags refuses what the pool flags given on fs leave out of range, in the one
-// malformed-configuration line Load answers with. The `migrate` subcommand calls it after its own
-// parse of the --db-* flags, so a pool flag given after `migrate` is held to the rules one given
-// before it is (#394 decision 5).
+// CheckDatabaseFlags refuses what the pool flags given on fs leave out of range and a malformed TLS
+// mode given on fs, in the one malformed-configuration line Load answers with. The `migrate`
+// subcommand calls it after its own parse of the --db-* flags, so a flag given after `migrate` is
+// held to the rules one given before it is (#394 decision 5, #502).
 func CheckDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig) error {
 	var malformed malformedValues
 	checkDatabaseFlags(fs, c, &malformed)
+	return malformed.err()
+}
+
+// CheckDatabaseTLS refuses a CA file the connection cannot use and, on PostgreSQL, libpq's TLS
+// variables, in the one malformed-configuration line Load answers with, and reads the CA file into
+// c.TLSRoots. Load leaves both to the `migrate` subcommand, which calls this once its --db-* flags
+// are applied, so they are checked against the configuration it runs with (#502).
+func CheckDatabaseTLS(c *DatabaseConfig) error {
+	var malformed malformedValues
+	checkDatabaseTLS(c, &malformed)
 	return malformed.err()
 }
 
@@ -401,6 +440,119 @@ func checkDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig, malformed *malforme
 		malformed.add("GOIABADA_DB_MAX_IDLE_CONNS (--db-max-idle-conns)", strconv.Itoa(idle),
 			"at most GOIABADA_DB_MAX_OPEN_CONNS (--db-max-open-conns), which is "+strconv.Itoa(c.MaxOpenConns))
 	}
+
+	if v, ok := given["db-tls-mode"]; ok && v != "" && !data.TLSMode(v).Known() {
+		malformed.add("--db-tls-mode", v, tlsModeWant())
+	}
+}
+
+// checkDatabaseTLS reads the CA file into c.TLSRoots, refusing one the connection cannot use, and
+// refuses libpq's TLS variables on PostgreSQL. Both depend on the engine, the mode and the file
+// together, so they are checked once, against the configuration the command runs with (#502).
+func checkDatabaseTLS(c *DatabaseConfig, malformed *malformedValues) {
+	readDatabaseTLSRoots(c, malformed)
+	refuseLibpqTLSVariables(c, malformed)
+}
+
+// libpqTLSVariables are libpq's TLS variables, each with what to do instead, in the words of the
+// refusal. The PostgreSQL connection's TLS is GOIABADA_DB_TLS_MODE and GOIABADA_DB_TLS_CA_FILE and
+// nothing else, so none of these is read any more (#502 decision 5).
+var libpqTLSVariables = []struct{ name, instead string }{
+	{"PGSSLMODE", "unset it and set GOIABADA_DB_TLS_MODE (--db-tls-mode) instead"},
+	{"PGSSLROOTCERT", "unset it and set GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) instead"},
+	{"PGSSLCERT", libpqNoClientCertificate},
+	{"PGSSLKEY", libpqNoClientCertificate},
+	{"PGSSLPASSWORD", libpqNoClientCertificate},
+	{"PGSSLSNI", "unset it; " + libpqTLSSettings},
+	{"PGSSLNEGOTIATION", "unset it; " + libpqTLSSettings},
+}
+
+const (
+	libpqTLSSettings         = "GOIABADA_DB_TLS_MODE (--db-tls-mode) and GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) decide the connection's TLS"
+	libpqNoClientCertificate = "unset it; the auth server presents no client certificate, and " + libpqTLSSettings
+)
+
+// refuseLibpqTLSVariables stops a PostgreSQL start that has any of libpq's TLS variables set and
+// non-empty, as pgx itself reads them, naming each and never its value, which for PGSSLPASSWORD is a
+// secret. The connection no longer reads them, so an operator who set PGSSLMODE=verify-full, as
+// Database once advised, is stopped rather than dropped to prefer in silence (#502 decision 5).
+func refuseLibpqTLSVariables(c *DatabaseConfig, malformed *malformedValues) {
+	if dialect, err := data.ParseDialect(c.Type); err != nil || dialect != data.Postgres {
+		return
+	}
+	for _, v := range libpqTLSVariables {
+		if os.Getenv(v.name) != "" {
+			malformed.addLine(v.name + " is set, which the auth server no longer reads: " + v.instead)
+		}
+	}
+}
+
+// tlsModeWant is what a malformed mode is refused as not being.
+func tlsModeWant() string {
+	names := make([]string, 0, len(data.TLSModes()))
+	for _, m := range data.TLSModes() {
+		names = append(names, string(m))
+	}
+	return "one of " + strings.Join(names, ", ")
+}
+
+// getEnvAsTLSMode is GOIABADA_DB_TLS_MODE as written, empty while unset: one of the five modes
+// or, recorded as malformed, anything else, spelled as it is with no case folding (#502).
+func getEnvAsTLSMode(key string, malformed *malformedValues) string {
+	value := getEnv(key, "")
+	if value != "" && !data.TLSMode(value).Known() {
+		malformed.add(key, value, tlsModeWant())
+	}
+	return value
+}
+
+// readDatabaseTLSRoots reads the CA file into c.TLSRoots, which is how the file is read once, at
+// start, and refuses one the connection cannot use: beside a mode that checks no certificate, where
+// it would read as a protection it is not, one that cannot be read, and one holding no PEM
+// certificate (#502). SQLite has no connection to check, and reads no file. Neither does a mode
+// that is itself malformed, which is refused already.
+func readDatabaseTLSRoots(c *DatabaseConfig, malformed *malformedValues) {
+	c.TLSRoots = nil
+	if c.TLSCAFile == "" {
+		return
+	}
+	if dialect, err := data.ParseDialect(c.Type); err != nil || dialect == data.SQLite {
+		return
+	}
+	mode := c.EffectiveTLSMode()
+	if !mode.Known() {
+		return
+	}
+
+	const setting = "GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) is "
+	file := strconv.Quote(c.TLSCAFile)
+	if !mode.ChecksCertificate() {
+		described := string(mode)
+		if c.TLSMode == "" {
+			described = "unset, so prefer"
+		}
+		malformed.addLine(setting + file + " while GOIABADA_DB_TLS_MODE (--db-tls-mode) is " + described +
+			", which checks no certificate: only verify-ca and verify-full read a CA file")
+		return
+	}
+
+	pemBytes, err := os.ReadFile(c.TLSCAFile)
+	if err != nil {
+		// The cause alone: the path is quoted above, and the error repeats it unquoted.
+		reason := err.Error()
+		var pathErr *os.PathError
+		if errors.As(err, &pathErr) {
+			reason = pathErr.Err.Error()
+		}
+		malformed.addLine(setting + file + ", which cannot be read: " + reason)
+		return
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(pemBytes) {
+		malformed.addLine(setting + file + ", which holds no PEM certificate")
+		return
+	}
+	c.TLSRoots = roots
 }
 
 // DataKeys decodes the data-encryption keys: the current one, which must be present,
@@ -449,6 +601,12 @@ type malformedValues []string
 
 func (m *malformedValues) add(key, value, want string) {
 	*m = append(*m, key+" is "+strconv.Quote(value)+", not "+want)
+}
+
+// addLine records a refusal that is not a value out of its form, written whole by the caller,
+// who quotes any value in it.
+func (m *malformedValues) addLine(refusal string) {
+	*m = append(*m, refusal)
 }
 
 // err is the refusal: one line, whatever the values hold, because main writes it to stderr

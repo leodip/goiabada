@@ -2,7 +2,6 @@ package mysqldb
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -14,7 +13,7 @@ import (
 // drop once: schemadump's scratch databases, the data tier's fixtures, and droptestdb, which
 // run-tests.sh runs before each tier so every local run starts from an empty database (#433).
 func DropDatabase(ctx context.Context, cfg *DatabaseConfig) error {
-	db, err := sql.Open("mysql", MaintenanceDSN(cfg))
+	db, err := open(MaintenanceConnConfig(cfg))
 	if err != nil {
 		return errs.Wrap(err, "unable to open the maintenance connection")
 	}

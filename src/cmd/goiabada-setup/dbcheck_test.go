@@ -3,10 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"net"
+	"net/url"
 	"os"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -30,10 +33,68 @@ type connectionStringCase struct {
 	Database       string `json:"database"`
 	DSN            string `json:"dsn"`
 	MaintenanceDSN string `json:"maintenanceDSN"`
+	// MySQL and MySQLMaintenance are a MySQL case's two connections, which are opened from the
+	// driver's configuration rather than a string, as the fields they are opened from (#502).
+	MySQL            *mysqlFields `json:"mysql"`
+	MySQLMaintenance *mysqlFields `json:"mysqlMaintenance"`
+	// TLSMode is GOIABADA_DB_TLS_MODE, empty for a case that leaves it unset, which is prefer.
+	TLSMode string `json:"tlsMode"`
+}
+
+// mysqlFields is a MySQL configuration as the case file pins it: the fields the connection is
+// opened from. The auth server's mysqldb tier reads the same shape.
+type mysqlFields struct {
+	User            string     `json:"user"`
+	Passwd          string     `json:"passwd"`
+	Net             string     `json:"net"`
+	Addr            string     `json:"addr"`
+	DBName          string     `json:"dbName"`
+	MultiStatements bool       `json:"multiStatements"`
+	ParseTime       bool       `json:"parseTime"`
+	Loc             string     `json:"loc"`
+	Charset         string     `json:"charset"`
+	TLSConfig       string     `json:"tlsConfig"`
+	TLS             *tlsFields `json:"tls"`
+}
+
+// tlsFields is what a TLS configuration of the builder's own decides: the host the certificate
+// must name, whether the library's check is off, and whether a check of the chain alone replaces
+// it. Roots are not pinned: the case file names no CA file.
+type tlsFields struct {
+	ServerName         string `json:"serverName"`
+	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+	VerifyConnection   bool   `json:"verifyConnection"`
+}
+
+func mysqlFieldsOf(t *testing.T, c *mysqldriver.Config) *mysqlFields {
+	t.Helper()
+	dsn := c.FormatDSN()
+	q, err := url.ParseQuery(dsn[strings.LastIndex(dsn, "?")+1:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := &mysqlFields{User: c.User, Passwd: c.Passwd, Net: c.Net, Addr: c.Addr, DBName: c.DBName,
+		MultiStatements: c.MultiStatements, ParseTime: c.ParseTime, Loc: c.Loc.String(), Charset: q.Get("charset"),
+		TLSConfig: c.TLSConfig}
+	if c.TLS != nil {
+		f.TLS = &tlsFields{ServerName: c.TLS.ServerName, InsecureSkipVerify: c.TLS.InsecureSkipVerify,
+			VerifyConnection: c.TLS.VerifyConnection != nil}
+	}
+	return f
+}
+
+// build is the connection e opens for the case, failing the test when it cannot be built.
+func build(t *testing.T, which string, connection func(dbTarget) (dbConnection, error), target dbTarget) dbConnection {
+	t.Helper()
+	c, err := connection(target)
+	if err != nil {
+		t.Fatalf("%s: %v", which, err)
+	}
+	return c
 }
 
 func (c connectionStringCase) target() dbTarget {
-	return dbTarget{Host: c.Host, Port: c.Port, Username: c.Username, Password: c.Password, Name: c.Database}
+	return dbTarget{Host: c.Host, Port: c.Port, Username: c.Username, Password: c.Password, Name: c.Database, TLSMode: c.TLSMode}
 }
 
 func readConnectionStringCases(t *testing.T) []connectionStringCase {
@@ -60,6 +121,7 @@ func readConnectionStringCases(t *testing.T) []connectionStringCase {
 // so a row added without them fails here rather than dialling a string nothing pins (#430).
 func TestConnectionStrings_MatchTheSharedCaseFile(t *testing.T) {
 	covered := map[string]int{}
+	modes := map[string]bool{}
 	for _, c := range readConnectionStringCases(t) {
 		t.Run(c.Engine+"/"+c.Name, func(t *testing.T) {
 			e, ok := resolveEngine(c.Engine)
@@ -67,13 +129,42 @@ func TestConnectionStrings_MatchTheSharedCaseFile(t *testing.T) {
 				t.Fatalf("engine %q is not a server engine's name", c.Engine)
 			}
 			covered[e.name]++
-			if got := e.dsn(c.target()); got != c.DSN {
-				t.Errorf("dsn is\n  %s\nwant\n  %s", got, c.DSN)
-			}
-			if got := e.maintenanceDSN(c.target()); got != c.MaintenanceDSN {
-				t.Errorf("maintenance dsn is\n  %s\nwant\n  %s", got, c.MaintenanceDSN)
+			modes[e.name+" "+c.TLSMode] = true
+			for _, conn := range []struct {
+				which  string
+				got    dbConnection
+				dsn    string
+				fields *mysqlFields
+			}{
+				{"connection", build(t, "connection", e.connection, c.target()), c.DSN, c.MySQL},
+				{"maintenance connection", build(t, "maintenance connection", e.maintenanceConnection, c.target()),
+					c.MaintenanceDSN, c.MySQLMaintenance},
+			} {
+				if conn.got.dsn != conn.dsn {
+					t.Errorf("%s dsn is\n  %s\nwant\n  %s", conn.which, conn.got.dsn, conn.dsn)
+				}
+				switch {
+				case c.Engine != "mysql" && (conn.got.mysql != nil || conn.fields != nil):
+					t.Errorf("%s: only MySQL is opened from the driver's configuration", conn.which)
+				case c.Engine == "mysql" && (conn.got.mysql == nil || conn.fields == nil):
+					t.Errorf("%s: MySQL is opened from the driver's configuration, pinned as its fields", conn.which)
+				case c.Engine == "mysql":
+					if got := mysqlFieldsOf(t, conn.got.mysql); !reflect.DeepEqual(got, conn.fields) {
+						t.Errorf("%s fields are\n  %+v %+v\nwant\n  %+v %+v", conn.which, *got, got.TLS, *conn.fields, conn.fields.TLS)
+					}
+				}
 			}
 		})
+	}
+	for _, e := range engines {
+		if !e.hasServer {
+			continue
+		}
+		for _, mode := range []string{"disable", "prefer", "require", "verify-ca", "verify-full"} {
+			if !modes[e.name+" "+mode] {
+				t.Errorf("%s has no case in %s in testdata/connection-strings.json", e.name, mode)
+			}
+		}
 	}
 	for _, e := range engines {
 		if e.hasServer && covered[e.name] == 0 {
@@ -102,28 +193,29 @@ func TestConnectionStrings_TheDriverReadsTheCaseBack(t *testing.T) {
 						t.Fatalf("%s %q: %v", conn.which, conn.dsn, err)
 					}
 					user, password, gotHost, port, database = parsed.User, parsed.Password, parsed.Host, int(parsed.Port), parsed.Database
+					checkPostgresTLS(t, conn.which, c, parsed)
 				case "mysql":
-					parsed, err := mysqldriver.ParseDSN(conn.dsn)
-					if err != nil {
-						t.Fatalf("%s %q: %v", conn.which, conn.dsn, err)
+					// No string to parse: the configuration the file pins, as the wizard builds it,
+					// handed to the driver, which must accept it.
+					builder := map[string]func(dbTarget) (dbConnection, error){
+						"dsn": mysqlConnection, "maintenance dsn": mysqlMaintenanceConnection}[conn.which]
+					parsed := build(t, conn.which, builder, c.target()).mysql
+					if _, err := mysqldriver.NewConnector(parsed); err != nil {
+						t.Fatalf("%s: the driver refuses the configuration: %v", conn.which, err)
 					}
 					user, password, database = parsed.User, parsed.Passwd, parsed.DBName
-					if parsed.TLSConfig != "preferred" {
-						t.Errorf("%s tls is %q, want preferred as the server has it", conn.which, parsed.TLSConfig)
-					}
 					if parsed.Addr != net.JoinHostPort(host, strconv.Itoa(c.Port)) {
 						t.Errorf("%s address is %q", conn.which, parsed.Addr)
 					}
 					gotHost, port = host, c.Port
+					checkMysqlTLS(t, conn.which, c, parsed)
 				case "mssql":
 					parsed, err := msdsn.Parse(conn.dsn)
 					if err != nil {
 						t.Fatalf("%s %q: %v", conn.which, conn.dsn, err)
 					}
 					user, password, gotHost, port, database = parsed.User, parsed.Password, parsed.Host, int(parsed.Port), parsed.Database
-					if parsed.Encryption != msdsn.EncryptionOff || parsed.TLSConfig == nil || !parsed.TLSConfig.InsecureSkipVerify {
-						t.Errorf("%s encryption is %v, want the login encrypted and the certificate unchecked, as the server has it", conn.which, parsed.Encryption)
-					}
+					checkMssqlTLS(t, conn.which, c, parsed)
 				default:
 					t.Fatalf("no parser for %q", c.Engine)
 				}
@@ -135,8 +227,143 @@ func TestConnectionStrings_TheDriverReadsTheCaseBack(t *testing.T) {
 	}
 }
 
+// checkPostgresTLS holds what pgx reads out of a case's string to the case's mode, as #502
+// decision 2 defines it: whether the connection is encrypted, whether the certificate and the host
+// are checked, and whether plain text follows a failed TLS attempt.
+func checkPostgresTLS(t *testing.T, which string, c connectionStringCase, parsed *pgx.ConnConfig) {
+	t.Helper()
+	mode := c.TLSMode
+	if mode == "" {
+		mode = "prefer"
+	}
+	tlsConfig := parsed.TLSConfig
+	plainTextAfter := len(parsed.Fallbacks) > 0 && parsed.Fallbacks[len(parsed.Fallbacks)-1].TLSConfig == nil
+	var got string
+	switch {
+	case tlsConfig == nil && len(parsed.Fallbacks) == 0:
+		got = "disable"
+	case tlsConfig == nil:
+		got = "plain text first"
+	case tlsConfig.InsecureSkipVerify && tlsConfig.VerifyPeerCertificate == nil && plainTextAfter:
+		got = "prefer"
+	case len(parsed.Fallbacks) > 0:
+		got = "TLS with a fallback"
+	case tlsConfig.InsecureSkipVerify && tlsConfig.VerifyPeerCertificate == nil:
+		got = "require"
+	case tlsConfig.InsecureSkipVerify:
+		got = "verify-ca"
+	case tlsConfig.ServerName == strings.Trim(c.Host, "[]"):
+		got = "verify-full"
+	default:
+		got = "a certificate check naming no host"
+	}
+	if got != mode {
+		t.Errorf("%s reads back as %s, want %s", which, got, mode)
+	}
+	if tlsConfig != nil && (tlsConfig.RootCAs != nil || len(tlsConfig.Certificates) > 0) {
+		t.Errorf("%s carries roots or a client certificate the string cannot have named", which)
+	}
+}
+
+// checkMssqlTLS holds what go-mssqldb reads out of a case's string to the case's mode, as #502
+// decision 2 defines it: whether the login or the whole session is encrypted, with no plain-text
+// fallback outside prefer, and whether the certificate and the host are checked. The two verifying
+// modes are one string: what makes verify-ca check the chain alone, and either of them trust the CA
+// file, is added to the configuration the string is parsed into, which no string can carry.
+func checkMssqlTLS(t *testing.T, which string, c connectionStringCase, parsed msdsn.Config) {
+	t.Helper()
+	mode := c.TLSMode
+	if mode == "" {
+		mode = "prefer"
+	}
+	tlsConfig := parsed.TLSConfig
+	var got string
+	switch {
+	case parsed.Encryption == msdsn.EncryptionDisabled && tlsConfig == nil:
+		got = "disable"
+	case tlsConfig == nil:
+		got = "encrypted with no TLS configuration"
+	case parsed.Encryption == msdsn.EncryptionOff && tlsConfig.InsecureSkipVerify:
+		got = "prefer"
+	case parsed.Encryption != msdsn.EncryptionRequired:
+		got = "an encryption no mode names"
+	case tlsConfig.InsecureSkipVerify:
+		got = "require"
+	case tlsConfig.ServerName == strings.Trim(c.Host, "[]") && (mode == "verify-ca" || mode == "verify-full"):
+		got = mode
+	default:
+		got = "a certificate check naming no host"
+	}
+	if got != mode {
+		t.Errorf("%s reads back as %s, want %s", which, got, mode)
+	}
+	if tlsConfig != nil && (tlsConfig.RootCAs != nil || len(tlsConfig.Certificates) > 0) {
+		t.Errorf("%s carries roots or a client certificate the string cannot have named", which)
+	}
+}
+
+// checkMysqlTLS holds the TLS go-sql-driver/mysql connects with under a case's configuration to
+// the case's mode, as #502 decision 2 defines it: whether the connection is encrypted, whether
+// plain text follows when the server offers no TLS, and whether the certificate and the host are
+// checked.
+func checkMysqlTLS(t *testing.T, which string, c connectionStringCase, parsed *mysqldriver.Config) {
+	t.Helper()
+	mode := c.TLSMode
+	if mode == "" {
+		mode = "prefer"
+	}
+	tlsConfig, fallback := mysqlDriverTLS(t, parsed)
+	var got string
+	switch {
+	case tlsConfig == nil:
+		got = "disable"
+	case fallback && tlsConfig.InsecureSkipVerify && tlsConfig.VerifyConnection == nil:
+		got = "prefer"
+	case fallback:
+		got = "TLS with a fallback"
+	case tlsConfig.InsecureSkipVerify && tlsConfig.VerifyConnection == nil:
+		got = "require"
+	case tlsConfig.InsecureSkipVerify:
+		got = "verify-ca"
+	case tlsConfig.ServerName == strings.Trim(c.Host, "[]"):
+		got = "verify-full"
+	default:
+		got = "a certificate check naming no host"
+	}
+	if got != mode {
+		t.Errorf("%s reads back as %s, want %s", which, got, mode)
+	}
+	if tlsConfig != nil && (tlsConfig.RootCAs != nil || len(tlsConfig.Certificates) > 0) {
+		t.Errorf("%s carries roots or a client certificate the case cannot have named", which)
+	}
+}
+
+// mysqlDriverTLS is the TLS configuration go-sql-driver/mysql connects with under c, and whether
+// it falls back to plain text when the server offers no TLS. A configuration of the builder's own
+// is used as it is; a named one is what the driver's own parser makes of the name.
+func mysqlDriverTLS(t *testing.T, c *mysqldriver.Config) (*tls.Config, bool) {
+	t.Helper()
+	if c.TLS != nil {
+		return c.TLS, c.AllowFallbackToPlaintext
+	}
+	parsed, err := mysqldriver.ParseDSN("tcp(" + c.Addr + ")/?tls=" + url.QueryEscape(c.TLSConfig))
+	if err != nil {
+		t.Fatalf("tls %q: %v", c.TLSConfig, err)
+	}
+	return parsed.TLS, parsed.AllowFallbackToPlaintext
+}
+
+// connectionKey names a connection in the fake's records: its string, or for MySQL the fields that
+// tell its two connections apart.
+func connectionKey(c dbConnection) string {
+	if c.mysql != nil {
+		return "mysql " + c.mysql.User + "@" + c.mysql.Addr + "/" + c.mysql.DBName
+	}
+	return c.dsn
+}
+
 // fakeDatabase is a database server the check dials through a dbOpener: each connection is known
-// by its DSN, the failures are set per DSN or per query, and every open, ping, query and close is
+// by its connectionKey, the failures are set per connection or per query, and every open, ping, query and close is
 // recorded.
 type fakeDatabase struct {
 	openErr  map[string]error
@@ -156,10 +383,11 @@ type fakeQuery struct {
 }
 
 func (f *fakeDatabase) opener(driver string) dbOpener {
-	return func(gotDriver, dsn string) (dbConn, error) {
-		if gotDriver != driver {
-			return nil, errors.New("opened with driver " + gotDriver + ", want " + driver)
+	return func(c dbConnection) (dbConn, error) {
+		if c.driver != driver {
+			return nil, errors.New("opened with driver " + c.driver + ", want " + driver)
 		}
+		dsn := connectionKey(c)
 		f.opened = append(f.opened, dsn)
 		if err := f.openErr[dsn]; err != nil {
 			return nil, err
@@ -214,7 +442,8 @@ func TestCheckDatabase_FollowsTheServersStartupOrder(t *testing.T) {
 		if !e.hasServer {
 			continue
 		}
-		maintenance, application := e.maintenanceDSN(target), e.dsn(target)
+		maintenance := connectionKey(build(t, "maintenance connection", e.maintenanceConnection, target))
+		application := connectionKey(build(t, "connection", e.connection, target))
 		existence := fakeQuery{dsn: maintenance, query: e.existenceQuery, args: []any{target.Name}}
 		emptiness := fakeQuery{dsn: application, query: e.emptinessQuery}
 
@@ -305,7 +534,7 @@ func TestCheckDatabase_FollowsTheServersStartupOrder(t *testing.T) {
 			t.Run(e.name+"/"+testCase.name, func(t *testing.T) {
 				var buf bytes.Buffer
 				db := testCase.db
-				got := checkDatabase(&console{w: &buf}, db.opener(e.driver), e, target)
+				got := checkDatabase(&console{w: &buf}, db.opener(build(t, "connection", e.connection, target).driver), e, target)
 				output := buf.String()
 
 				if got != testCase.want {
@@ -348,7 +577,9 @@ func TestCheckDatabase_FollowsTheServersStartupOrder(t *testing.T) {
 // dialling port 0.
 func TestTestDatabaseConnection_RefusesAPortThatIsNotANumber(t *testing.T) {
 	var buf bytes.Buffer
-	if testDatabaseConnection(&console{w: &buf}, testEngine("postgres"), "db.example.com", "54x", "goiabada", "goiabada", "pw") {
+	config := goldenConfig(deploymentNative, "postgres")
+	config.DBPort = "54x"
+	if testDatabaseConnection(&console{w: &buf}, config) {
 		t.Fatal("the check passed with port 54x")
 	}
 	if !strings.Contains(buf.String(), `Invalid port "54x"`) {

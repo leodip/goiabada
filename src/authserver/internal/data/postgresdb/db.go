@@ -6,6 +6,7 @@ package postgresdb
 
 import (
 	"context"
+	"crypto/x509"
 	"database/sql"
 	"embed"
 	"errors"
@@ -16,7 +17,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5/pgconn"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
@@ -55,6 +56,11 @@ type DatabaseConfig struct {
 	// tools and the data tier's fixtures that call this constructor directly open with: the
 	// server's comes through datafactory, which always passes one (#394).
 	Pool *data.PoolConfig
+	// TLSMode is GOIABADA_DB_TLS_MODE, the zero value reading as prefer, and TLSRoots the
+	// authorities GOIABADA_DB_TLS_CA_FILE holds, nil for the system's roots. Both cover every
+	// connection the constructor opens, the maintenance one included (#502).
+	TLSMode  data.TLSMode
+	TLSRoots *x509.CertPool
 }
 
 // New opens the PostgreSQL database dbConfig names, creating it first when dbConfig.Create says
@@ -65,8 +71,9 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 	// One record where five used to be, and no password: the URL is assembled below from the
 	// same four values, so a startup problem is read off this line rather than off four
 	// consecutive ones that a collector had no way to join (#320 decision 6).
+	tlsMode := dbConfig.TLSMode.OrPrefer()
 	slog.InfoContext(ctx, "using database", "type", "postgres", "username", dbConfig.Username,
-		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name)
+		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name, "tls_mode", string(tlsMode))
 
 	if dbConfig.Create {
 		// Create database if not exists.
@@ -77,7 +84,7 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 		// the 42P04 isDuplicateDatabase tolerates below: the loser returns
 		// "unable to create database" and the process exits. Two replicas starting together
 		// against a fresh server is an ordinary topology, not a hypothetical one (#293).
-		defaultDB, err := sql.Open("pgx", MaintenanceDSN(dbConfig))
+		defaultDB, err := openMaintenance(dbConfig)
 		if err != nil {
 			return nil, errs.Wrap(err, "unable to connect to default database")
 		}
@@ -99,10 +106,11 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 	// fails or gives up at the caller's deadline returns before there is a pool to leave open:
 	// opened first, each of those two returns abandoned it, a goroutine and a handle nobody
 	// could close (#438).
-	db, err := sql.Open("pgx", DSN(dbConfig))
+	connConfig, err := ConnConfig(dbConfig)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to open database")
 	}
+	db := stdlib.OpenDB(*connConfig)
 	if dbConfig.Pool != nil {
 		dbConfig.Pool.ApplyTo(db)
 	}
@@ -131,6 +139,16 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 		dbConfig: dbConfig,
 	}
 	return &postgresDb, nil
+}
+
+// openMaintenance opens a pool on the postgres maintenance database, over the same TLS as the
+// application database's: GOIABADA_DB_TLS_MODE and the CA file cover every connection (#502).
+func openMaintenance(dbConfig *DatabaseConfig) (*sql.DB, error) {
+	connConfig, err := MaintenanceConnConfig(dbConfig)
+	if err != nil {
+		return nil, err
+	}
+	return stdlib.OpenDB(*connConfig), nil
 }
 
 // advisoryLockNamespace keeps this lock's keys away from any other advisory lock a session on

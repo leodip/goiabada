@@ -16,9 +16,10 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// connectionCall is one call of the wizard's connection check.
+// connectionCall is one call of the wizard's connection check: the database, and the TLS mode and
+// CA file it is dialled with.
 type connectionCall struct {
-	engine, host, port, name, user, password string //nolint:unused // compared whole with ==, which the linter does not count as a read
+	engine, host, port, name, user, password, tlsMode, caFile string //nolint:unused // compared whole with ==, which the linter does not count as a read
 }
 
 // testWizard is a wizard over a scripted prompter writing into a fresh directory, whose connection
@@ -34,8 +35,8 @@ func testWizard(t *testing.T, flags *CLIFlags, steps []scriptedStep, results ...
 	// A password file named - reads this rather than the test binary's own standard input.
 	w.stdin = strings.NewReader("")
 	calls := &[]connectionCall{}
-	w.testConnection = func(_ *console, e *engine, host, port, name, user, password string) bool {
-		*calls = append(*calls, connectionCall{e.name, host, port, name, user, password})
+	w.testConnection = func(_ *console, c *Config) bool {
+		*calls = append(*calls, connectionCall{c.Engine.name, c.DBHost, c.DBPort, c.DBName, c.DBUsername, c.DBPassword, c.DBTLSMode, c.DBTLSCAFile})
 		if len(results) == 0 {
 			return true
 		}
@@ -136,6 +137,7 @@ func interactiveScript(d *deployment, e *engine) []scriptedStep {
 			scriptedStep{prompt: "Database name [goiabada]: ", answer: ""},
 			scriptedStep{prompt: "Database username [" + e.defaultUser + "]: ", answer: ""},
 			scriptedStep{prompt: "Database password [generated]: ", hidden: true, answer: "db-secret"},
+			scriptedStep{prompt: tlsModePrompt, answer: ""},
 			scriptedStep{prompt: "Test database connection? [Y/n]: ", answer: ""},
 		)
 	case e.hasServer:
@@ -204,8 +206,8 @@ func TestWizard_EveryDeploymentTypeRunsToItsFile(t *testing.T) {
 			var wantCalls []connectionCall
 			switch {
 			case e.hasServer && d.externalDatabase:
-				want := connectionCall{e.name, "db.internal", e.defaultPort, "goiabada", e.defaultUser, "db-secret"}
-				got := connectionCall{e.name, c.DBHost, c.DBPort, c.DBName, c.DBUsername, c.DBPassword}
+				want := connectionCall{e.name, "db.internal", e.defaultPort, "goiabada", e.defaultUser, "db-secret", "prefer", ""}
+				got := connectionCall{e.name, c.DBHost, c.DBPort, c.DBName, c.DBUsername, c.DBPassword, c.DBTLSMode, c.DBTLSCAFile}
 				if got != want {
 					t.Errorf("database is %+v, want %+v", got, want)
 				}
@@ -305,8 +307,8 @@ func TestWizard_AReadFaultAtTheConfirmationWritesNothing(t *testing.T) {
 func TestWizard_TheConnectionFailureMenu(t *testing.T) {
 	d, e := deployments[deploymentNative], testEngine("postgres")
 	full := interactiveScript(d, e)
-	// full ends with the six database reads and the confirmation.
-	before, database, confirmation := full[:len(full)-7], full[len(full)-7:len(full)-1], full[len(full)-1]
+	// full ends with the seven database reads and the confirmation.
+	before, database, confirmation := full[:len(full)-8], full[len(full)-8:len(full)-1], full[len(full)-1]
 	menu := func(answer string) scriptedStep {
 		return scriptedStep{prompt: "Select option [1-3] [1]: ", answer: answer}
 	}
@@ -381,7 +383,7 @@ func TestWizard_NonInteractiveRunsFromTheFlags(t *testing.T) {
 		{
 			flags:    CLIFlags{DeploymentType: "production", DBType: "mysql", AuthServerURL: "https://auth.example.org", DBPassword: "db-secret"},
 			numbers:  []int{7, 8},
-			database: connectionCall{engine: "mysql", port: "3306", password: "db-secret"},
+			database: connectionCall{engine: "mysql", port: "3306", password: "db-secret", tlsMode: "prefer"},
 		},
 		{
 			flags: CLIFlags{
@@ -389,13 +391,13 @@ func TestWizard_NonInteractiveRunsFromTheFlags(t *testing.T) {
 				Namespace: "identity", DBHost: "pg.internal", DBPort: "6543", DBName: "gb", DBUsername: "gbuser", DBPassword: "db-secret",
 			},
 			numbers:  []int{11, 12},
-			database: connectionCall{"postgres", "pg.internal", "6543", "gb", "gbuser", "db-secret"},
+			database: connectionCall{"postgres", "pg.internal", "6543", "gb", "gbuser", "db-secret", "prefer", ""},
 			checked:  true,
 		},
 		{
 			flags:    CLIFlags{DeploymentType: "4", DBType: "mssql", AuthServerURL: "https://auth.example.org", DBHost: "sql.internal", DBPassword: "db-secret", SkipDBTest: true},
 			numbers:  []int{8, 9},
-			database: connectionCall{"mssql", "sql.internal", "1433", "goiabada", "sa", "db-secret"},
+			database: connectionCall{"mssql", "sql.internal", "1433", "goiabada", "sa", "db-secret", "prefer", ""},
 		},
 	}
 	for _, tc := range cases {
@@ -413,7 +415,7 @@ func TestWizard_NonInteractiveRunsFromTheFlags(t *testing.T) {
 				t.Errorf("headings %q, want only the two generating steps", titles)
 			}
 			c := w.config
-			got := connectionCall{c.Engine.name, c.DBHost, c.DBPort, c.DBName, c.DBUsername, c.DBPassword}
+			got := connectionCall{c.Engine.name, c.DBHost, c.DBPort, c.DBName, c.DBUsername, c.DBPassword, c.DBTLSMode, c.DBTLSCAFile}
 			want := tc.database
 			if want.engine == "" {
 				want = connectionCall{engine: "sqlite"}

@@ -20,6 +20,11 @@ const composeStopGracePeriod = "60s"
 // decision 5).
 const composeAuthServerStartPeriod = "300s"
 
+// composeDBTLSMode is the TLS mode every Compose file writes: the auth server's own default, written
+// so the auth server does not warn at every start, since the database is a service on the file's own
+// network and nothing the operator could set would change what reaches it (#502 decision 7).
+const composeDBTLSMode = defaultTLSMode
+
 func generateDockerCompose(config *Config, paths outputPaths) string {
 	var sb strings.Builder
 
@@ -155,6 +160,15 @@ func generateAuthServerService(config *Config) string {
 		writeComposeVariable(&sb, "GOIABADA_DB_HOST", config.Engine.composeService)
 		writeComposeVariable(&sb, "GOIABADA_DB_PORT", config.Engine.defaultPort)
 		writeComposeVariable(&sb, "GOIABADA_DB_NAME", "goiabada")
+		sb.WriteString("      # The database is a service on this file's own network, so the connection never leaves\n")
+		if config.Engine.name == "mssql" {
+			sb.WriteString("      # this host: prefer encrypts the login, and the rest only when the database forces\n")
+			sb.WriteString("      # encryption, and checks no certificate.\n")
+		} else {
+			sb.WriteString("      # this host: prefer encrypts it when the database offers TLS and checks no certificate.\n")
+		}
+		sb.WriteString("      # Set verify-full, with GOIABADA_DB_TLS_CA_FILE, for a database reached across a network.\n")
+		writeComposeVariable(&sb, "GOIABADA_DB_TLS_MODE", composeDBTLSMode)
 	} else {
 		writeComposeVariable(&sb, "GOIABADA_DB_DSN", config.Engine.mount+"/goiabada.db")
 	}

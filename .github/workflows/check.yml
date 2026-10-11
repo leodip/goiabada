@@ -651,6 +651,10 @@ jobs:
       credentials:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # The test authority the database serves TLS from, which serve-db-tls generates here and
+      # the database service reads from the same volume (#502).
+      volumes:
+        - db-tls:/db-tls
     services:
       # MYSQL_TCP_PORT rather than `command: --port=13306`, because service
       # containers cannot override a container's command. Verified against the
@@ -670,6 +674,8 @@ jobs:
         env:
           MYSQL_ROOT_PASSWORD: mySqlPass123
           MYSQL_TCP_PORT: 13306
+        volumes:
+          - db-tls:/db-tls:ro
         options: >-
           --tmpfs /var/lib/mysql
           --health-cmd "mysqladmin ping -uroot -pmySqlPass123 --port=13306 --protocol=tcp"
@@ -685,6 +691,10 @@ jobs:
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
+      - uses: ./.github/actions/serve-db-tls
+        with:
+          engine: mysql
+          container: ${{ job.services.mysql-server.id }}
       - name: Build
         working-directory: src/authserver
         run: ./build.sh
@@ -705,6 +715,10 @@ jobs:
       credentials:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # The test authority the database serves TLS from, which serve-db-tls generates here and
+      # the database service reads from the same volume (#502).
+      volumes:
+        - db-tls:/db-tls
     services:
       postgres-server:
         image: postgres:18
@@ -715,9 +729,14 @@ jobs:
           POSTGRES_PASSWORD: myPostgresPass123
           POSTGRES_DB: goiabada
           PGPORT: 15432
+        volumes:
+          - db-tls:/db-tls:ro
+        # pg_isready over TCP, not the socket it takes by default: the server the image's
+        # entrypoint runs while it initialises listens on the socket alone, and serve-db-tls's
+        # restart initialises it again, so only TCP says the real server is up.
         options: >-
           --tmpfs /var/lib/postgresql
-          --health-cmd "pg_isready -U postgres -p 15432"
+          --health-cmd "pg_isready -h localhost -U postgres -p 15432"
           --health-interval 3s --health-timeout 3s --health-retries 30
       mailpit:
         image: axllent/mailpit
@@ -730,6 +749,10 @@ jobs:
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
+      - uses: ./.github/actions/serve-db-tls
+        with:
+          engine: postgres
+          container: ${{ job.services.postgres-server.id }}
       - name: Build
         working-directory: src/authserver
         run: ./build.sh
@@ -750,6 +773,10 @@ jobs:
       credentials:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # The test authority the database serves TLS from, which serve-db-tls generates here and
+      # the database service reads from the same volume (#502).
+      volumes:
+        - db-tls:/db-tls
     services:
       mssql-server:
         image: mcr.microsoft.com/mssql/server:2022-latest
@@ -758,13 +785,19 @@ jobs:
           MSSQL_SA_PASSWORD: YourStr0ngPassw0rd!
           MSSQL_PID: Express
           MSSQL_TCP_PORT: 11433
+        volumes:
+          - db-tls:/db-tls:ro
         # Longer retries than the others: MSSQL routinely takes 30-60s to pass
         # a health check.
         # uid 10001 is the mssql user the image runs sqlservr as. A bare
-        # tmpfs is root-owned and the server cannot create its .system
-        # directory in it; the mysql and postgres entrypoints chown theirs.
+        # tmpfs is root-owned and the server cannot create its directories
+        # in it; the mysql and postgres entrypoints chown theirs.
+        # The tmpfs holds the data and the log, not /var/opt/mssql itself,
+        # because serve-db-tls writes mssql.conf there and restarts the
+        # container, which empties a tmpfs.
         options: >-
-          --tmpfs /var/opt/mssql:uid=10001,gid=0
+          --tmpfs /var/opt/mssql/data:uid=10001,gid=0
+          --tmpfs /var/opt/mssql/log:uid=10001,gid=0
           --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost,11433 -U sa -P 'YourStr0ngPassw0rd!' -Q 'SELECT 1'"
           --health-interval 5s --health-timeout 5s --health-retries 40
       mailpit:
@@ -778,6 +811,10 @@ jobs:
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
+      - uses: ./.github/actions/serve-db-tls
+        with:
+          engine: mssql
+          container: ${{ job.services.mssql-server.id }}
       - name: Build
         working-directory: src/authserver
         run: ./build.sh

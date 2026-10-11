@@ -63,6 +63,25 @@ You don't migrate the database yourself. The auth server brings the schema up to
 Running the setup wizard again generates new secrets. Before you use its output for a deployment that already has a database, copy your existing secret values over the new ones, as [Secrets](/deploy/secrets/#when-a-secret-changes) explains: a new AES key can't decrypt the database.
 </Aside>
 
+## If you set PGSSLMODE
+
+Earlier releases let PostgreSQL's own variables decide the connection's TLS, and [Database](/deploy/database/#where-the-database-sits) advised setting `PGSSLMODE=verify-full`, with `PGSSLROOTCERT` naming the database's CA file. Two settings of the auth server now decide it on every engine, and with `GOIABADA_DB_TYPE=postgres` the auth server refuses to start while any of PostgreSQL's TLS variables is set and not empty: `PGSSLMODE`, `PGSSLROOTCERT`, `PGSSLCERT`, `PGSSLKEY`, `PGSSLPASSWORD`, `PGSSLSNI` and `PGSSLNEGOTIATION`. It prints one line on standard error and exits with status 2, so the upgraded release never connects with less checking than you asked for:
+
+- `malformed configuration: PGSSLMODE is set, which the auth server no longer reads: unset it and set GOIABADA_DB_TLS_MODE (--db-tls-mode) instead`
+- `malformed configuration: PGSSLROOTCERT is set, which the auth server no longer reads: unset it and set GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) instead`
+
+Before you upgrade, move the values over in the auth server's environment, wherever it comes from: the Compose file, `goiabada.env`, or the auth server's ConfigMap.
+
+| Remove | Set instead |
+|---|---|
+| `PGSSLMODE=verify-full` | `GOIABADA_DB_TLS_MODE=verify-full`. `disable`, `prefer` and `verify-ca` carry over by the same name too. `require` beside `PGSSLROOTCERT` checked the certificate's chain, which is `verify-ca` now, and `require` alone is `require`. PostgreSQL's `allow` has no counterpart: use `prefer`. |
+| `PGSSLROOTCERT=/path/to/ca.pem` | `GOIABADA_DB_TLS_CA_FILE=/path/to/ca.pem`. It's read only with `verify-ca` or `verify-full`, and refused beside any other mode. |
+| `PGSSLCERT`, `PGSSLKEY`, `PGSSLPASSWORD`, `PGSSLSNI`, `PGSSLNEGOTIATION` | Nothing: the auth server presents no client certificate, always sends the host name, and negotiates TLS the way PostgreSQL does by default. |
+
+PostgreSQL's other variables, such as `PGAPPNAME`, don't stop the start.
+
+On any engine, an upgraded deployment that sets no `GOIABADA_DB_TLS_MODE` connects as before, checking no certificate, and writes `the database tls mode is unset, so the auth server does not check whose database it reached` at every start until you set one. See [Where the database sits](/deploy/database/#where-the-database-sits) for which to choose.
+
 ## How migrations run
 
 The auth server applies whatever migrations its release carries when it starts, between opening the database and starting its listeners. It refuses to start on a database that is half migrated, and on one a newer release has already migrated, since it can't know what that release changed. [Waiting for the migration lock, or marked dirty](/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/) covers both refusals.

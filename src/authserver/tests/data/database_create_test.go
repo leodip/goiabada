@@ -194,7 +194,7 @@ func serverDatabaseExists(t *testing.T, name string) bool {
 	var dsn, driver, query string
 	switch dbType() {
 	case data.MySQL:
-		driver, dsn = "mysql", mySQLServerDSN(cfg.Username, cfg.Password, cfg)
+		driver, dsn = "mysql", mySQLServerDSN(t, cfg.Username, cfg.Password, cfg)
 		query = "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?"
 	case data.Postgres:
 		driver, dsn = "pgx", postgresMaintenanceDSN(cfg.Username, cfg.Password, cfg)
@@ -635,7 +635,7 @@ func countServerDatabases(t *testing.T, name string) int {
 	var dsn, driver, query string
 	switch dbType() {
 	case data.MySQL:
-		driver, dsn = "mysql", mySQLServerDSN(cfg.Username, cfg.Password, cfg)
+		driver, dsn = "mysql", mySQLServerDSN(t, cfg.Username, cfg.Password, cfg)
 		query = "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?"
 	case data.Postgres:
 		driver, dsn = "pgx", postgresMaintenanceDSN(cfg.Username, cfg.Password, cfg)
@@ -782,7 +782,7 @@ func serverDatabasesMatchingFold(t *testing.T, name string) int {
 	var dsn, driver, query string
 	switch dbType() {
 	case data.MySQL:
-		driver, dsn = "mysql", mySQLServerDSN(cfg.Username, cfg.Password, cfg)
+		driver, dsn = "mysql", mySQLServerDSN(t, cfg.Username, cfg.Password, cfg)
 		query = "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE LOWER(SCHEMA_NAME) = LOWER(?)"
 	case data.Postgres:
 		driver, dsn = "pgx", postgresMaintenanceDSN(cfg.Username, cfg.Password, cfg)

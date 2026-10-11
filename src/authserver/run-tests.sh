@@ -792,6 +792,11 @@ if should_run_data || should_run_integration; then
 fi
 
 if should_run_data; then
+    # The test authority every test database server serves its certificate from, which the data
+    # tier checks each server against. src/.devcontainer/generate-db-tls.sh writes it into the
+    # db-tls volume, which the devcontainer and CI's database jobs both mount at /db-tls; a run
+    # without it fails TestDatabaseServer_ServesTheTestAuthority rather than skipping it (#502).
+    export TEST_DB_TLS_CA_FILE="${TEST_DB_TLS_CA_FILE:-/db-tls/ca.crt}"
     for db in "${databases[@]}"; do
         echo "=== Running data tests with $db ==="
         configure_database "$db" true

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/guard"
 	"github.com/microsoft/go-mssqldb/msdsn"
 	"github.com/stretchr/testify/assert"
@@ -97,6 +98,7 @@ func TestDSN_MatchesTheSetupWizardsCaseFile(t *testing.T) {
 			Name, Engine, Host, Username, Password, Database, DSN string
 			Port                                                  int
 			MaintenanceDSN                                        string `json:"maintenanceDSN"`
+			TLSMode                                               string `json:"tlsMode"`
 		} `json:"cases"`
 	}
 	require.NoError(t, json.Unmarshal(raw, &file))
@@ -107,7 +109,8 @@ func TestDSN_MatchesTheSetupWizardsCaseFile(t *testing.T) {
 			continue
 		}
 		found++
-		cfg := &DatabaseConfig{Username: c.Username, Password: c.Password, Host: c.Host, Port: c.Port, Name: c.Database}
+		cfg := &DatabaseConfig{Username: c.Username, Password: c.Password, Host: c.Host, Port: c.Port, Name: c.Database,
+			TLSMode: data.TLSMode(c.TLSMode)}
 		assert.Equalf(t, c.DSN, DSN(cfg), "%s: DSN", c.Name)
 		assert.Equalf(t, c.MaintenanceDSN, MaintenanceDSN(cfg), "%s: MaintenanceDSN", c.Name)
 	}

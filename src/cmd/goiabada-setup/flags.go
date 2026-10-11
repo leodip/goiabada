@@ -31,9 +31,13 @@ type CLIFlags struct {
 	DBUsername        string
 	DBPassword        string
 	DBPasswordFile    string
-	SkipDBTest        bool
-	NoColor           bool
-	Overwrite         bool
+	// DBTLSMode is --db-tls-mode and DBTLSCAFile --db-tls-ca-file, read by Kubernetes and native
+	// binaries alone, as --db-host is.
+	DBTLSMode   string
+	DBTLSCAFile string
+	SkipDBTest  bool
+	NoColor     bool
+	Overwrite   bool
 	// LocalProxy is --local-proxy, read by native binaries alone.
 	LocalProxy optionalBool
 	// GatewayTrafficPolicy is --gateway-traffic-policy and NetworkPolicy --network-policy, read by
@@ -140,6 +144,8 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 	fs.StringVar(&flags.DBUsername, "db-user", "", "Database username")
 	fs.StringVar(&flags.DBPassword, "db-password", "", "Database password")
 	fs.StringVar(&flags.DBPasswordFile, "db-password-file", "", "Read the database password from a file, - for standard input")
+	fs.StringVar(&flags.DBTLSMode, "db-tls-mode", "", "Database TLS mode: "+orList(tlsModeNames())+" (default: prefer)")
+	fs.StringVar(&flags.DBTLSCAFile, "db-tls-ca-file", "", "With verify-ca or verify-full, the PEM file of the authorities the database's certificate is checked against (default: the system's roots)")
 	fs.BoolVar(&flags.SkipDBTest, "skip-db-test", false, "Skip database connection test")
 	fs.BoolVar(&flags.NoColor, "no-color", false, "Disable colored output")
 	fs.BoolVar(&flags.Overwrite, "overwrite", false, "Overwrite output files that already exist, and the secrets in them")
@@ -189,6 +195,10 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 		p("  --db-password-file FILE\n")
 		p("                         Read the database password from FILE, - for standard input,\n")
 		p("                         one trailing line break dropped\n")
+		p("  --db-tls-mode MODE     How the auth server protects its database connection: %s\n", strings.Join(tlsModeNames(), ", "))
+		p("                         (default: prefer, which checks no certificate)\n")
+		p("  --db-tls-ca-file FILE  With verify-ca or verify-full, the PEM file of the authorities the\n")
+		p("                         database's certificate is checked against (default: the system's roots)\n")
 		p("  --skip-db-test         Skip database connection test\n\n")
 		p("Rate Limiter Options (for production/kubernetes/native):\n")
 		p("  --rate-limiter=BOOL    Turn on the auth server's built-in rate limiter (default: true, but\n")
@@ -255,6 +265,7 @@ func (f *CLIFlags) checkWritable() error {
 		{"--db-name", f.DBName},
 		{"--db-user", f.DBUsername},
 		{"--db-password", f.DBPassword},
+		{"--db-tls-ca-file", f.DBTLSCAFile},
 	} {
 		if err := checkWritable(entry.value); err != nil {
 			return errs.Wrapf(err, "%s cannot be written to the configuration", entry.name)

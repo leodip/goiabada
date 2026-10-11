@@ -1,0 +1,25 @@
+# Restarts a database job's service container serving TLS from the test authority, after checkout,
+# since GitHub starts service containers before it and passes them no command (#502). The job
+# container and the service must both mount the named volume db-tls at /db-tls, and the service must
+# declare a health check; serve-db-tls.sh says what it writes into each engine's container and why.
+
+name: Serve database TLS
+description: Generate the test database authority and restart the job's database service serving its certificate.
+
+inputs:
+  engine:
+    description: mysql, postgres or mssql
+    required: true
+  container:
+    description: The service container's id, job.services.<service>.id
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Serve database TLS
+      shell: bash
+      env:
+        ENGINE: ${{ inputs.engine }}
+        CONTAINER: ${{ inputs.container }}
+      run: 'bash "$GITHUB_ACTION_PATH/serve-db-tls.sh" "$ENGINE" "$CONTAINER"'
