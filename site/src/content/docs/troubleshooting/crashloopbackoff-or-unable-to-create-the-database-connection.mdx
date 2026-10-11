@@ -97,17 +97,24 @@ After `x509: certificate has expired or is not yet valid`, the `error` gives the
 
 <Steps>
 
-1. Read the dates of every certificate in the database's certificate file and in `GOIABADA_DB_TLS_CA_FILE`:
+1. Read the dates of the certificates the database serves. On PostgreSQL and MySQL, read them from the database itself, with your host and port:
 
    ```bash
-   openssl storeutl -noout -text -certs ca.pem | grep -E 'Subject:|Not (Before|After)'
+   openssl s_client -connect db.example.com:5432 -starttls postgres -showcerts </dev/null 2>/dev/null \
+     | sed -n '/BEGIN CERT/,/END CERT/p' > served.pem
+   openssl storeutl -noout -text -certs served.pem | grep -E 'Subject:|Not (Before|After)'
    ```
 
-   Don't use `openssl x509` for this: it reads only a file's first certificate.
+   On MySQL, use `-starttls mysql`. On SQL Server, or a managed database, read them in the database's or your provider's tools: SQL Server on Windows can keep its certificate in the Windows certificate store.
 
-2. Replace any certificate that has expired or doesn't start yet, and have the database serve the new one.
+2. If you set `GOIABADA_DB_TLS_CA_FILE`, read the dates of every authority in it: `openssl storeutl -noout -text -certs` and the file, as above. Don't use `openssl x509` for this: it reads only a file's first certificate.
 
-3. If the certificates are valid, check the auth server host's clock. On Kubernetes, check the node's clock.
+3. Replace whatever has expired or doesn't start yet:
+
+   - **A certificate the database serves:** renew it at the database, or have your provider renew it, and have the database serve the new one.
+   - **An authority in `GOIABADA_DB_TLS_CA_FILE`:** put the current one in the file, then restart the auth server.
+
+4. If every date is valid, check the auth server host's clock. On Kubernetes, check the node's clock.
 
 </Steps>
 
@@ -124,7 +131,7 @@ To fix it:
 
 1. Unset each variable the line names, wherever the auth server's environment comes from: the Compose file, `goiabada.env`, or the auth server's ConfigMap.
 
-2. Set `GOIABADA_DB_TLS_MODE` to the mode you want. The modes have PostgreSQL's `sslmode` names, so `PGSSLMODE=verify-full` becomes `GOIABADA_DB_TLS_MODE=verify-full`.
+2. Set `GOIABADA_DB_TLS_MODE` to the mode you want. The modes have PostgreSQL's `sslmode` names, so `PGSSLMODE=verify-full` becomes `GOIABADA_DB_TLS_MODE=verify-full`, with two exceptions. PostgreSQL's `allow` has no counterpart: use `prefer`. And `require` beside `PGSSLROOTCERT` checked the certificate's chain: use `verify-ca`.
 
 3. If you set `PGSSLROOTCERT`, set `GOIABADA_DB_TLS_CA_FILE` to the same file, with `verify-ca` or `verify-full`.
 
