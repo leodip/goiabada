@@ -126,19 +126,25 @@ Turn **Consent required** on when users should approve what a client can access 
 
 You usually don't need it for your own clients. Turn it on for third-party ones, so users can see who's asking for their data. Users see the consent screen anyway when a client asks for `offline_access` or sends `prompt=consent`.
 
+They also see it when a client asks for `authserver:manage-account`, until they've approved it for that client. That scope lets a client call the [Account API](/reference/api/scopes/#the-account-api-scope) for the user: change their profile, end their sessions and withdraw their consents. Every user holds it, so without the screen any client could get it for whoever is signed in. The admin console's own client is the one exception: it signs users in without the screen, so their **Account** pages work as they always do.
+
 Clients you create start with consent off. Clients that register themselves start with it on, since nobody has reviewed them yet.
 
 Whether a sign-in shows the consent screen depends on the setting, the request, and what the user approved before:
 
-| **Consent required** | `offline_access` asked for | `prompt=consent` | The user approved every scope before | Consent screen |
-|---|---|---|---|---|
-| Off | No | No | Either | Skipped |
-| Either | Yes | Either | Either | Shown |
-| Either | Either | Yes | Either | Shown |
-| On | No | No | No | Shown |
-| On | No | No | Yes | Skipped |
+| **Consent required** | `offline_access` asked for | `prompt=consent` | `authserver:manage-account` asked for | The user approved every scope before | Consent screen |
+|---|---|---|---|---|---|
+| Off | No | No | No | Either | Skipped |
+| Off | No | No | Yes | No | Shown |
+| Off | No | No | Yes | Yes | Skipped |
+| On | No | No | Either | No | Shown |
+| On | No | No | Either | Yes | Skipped |
+| Either | Yes | Either | Either | Either | Shown |
+| Either | Either | Yes | Either | Either | Shown |
 
-The scopes are the ones left once the auth server has dropped those the user doesn't hold, as [Tokens](/concepts/tokens/#which-scopes-a-token-gets) describes. On the screen the user can untick scopes, and the tokens carry only those they approved. Their answer is kept, so the next sign-in skips the screen while it covers every scope, and a user can withdraw it under **Account**, **Manage consents**.
+`authserver:manage-account` counts here only when a client other than the admin console's asks for it. With **Consent required** off, what the user must have approved before is `authserver:manage-account` alone: the client's other scopes follow the setting.
+
+The scopes are the ones left once the auth server has dropped those the user doesn't hold, as [Tokens](/concepts/tokens/#which-scopes-a-token-gets) describes. On the screen the user can untick scopes, and the tokens carry only those they approved. Their answer is kept, so the next sign-in skips the screen while it covers every scope, and a user can withdraw it under **Account**, **Manage consents**. A user who unticks `authserver:manage-account` is asked for it again at the client's next sign-in that asks for it.
 
 Choosing **Cancel consent** ends the sign-in. A client you created gets `access_denied`, "The user did not provide consent", at its redirect URI. A client that [registered itself](#self-registered-clients) gets nothing: the user sees a page naming the app and the address it asked to send them to, and the request stops there. So does a client whose redirect URI has been removed since the request began.
 
@@ -169,7 +175,7 @@ A client that isn't allowed and asks for an administrative scope is refused, nev
 
 The client credentials flow isn't affected. There a client gets only the permissions granted to the client itself, and granting it an administrative one already takes `authserver:manage`.
 
-Allowing a client changes nothing else. A token still carries only the scopes the signed-in user holds, and the consent screen still follows **Consent required**.
+Allowing a client changes nothing else. A token still carries only the scopes the signed-in user holds, and the consent screen is shown as [Consent required](#consent-required) describes: an allowed client asking for `authserver:manage-account` is asked for it like any other client.
 
 <Aside type="danger">
 **An allowed client is an administrator client.** It can get a signed-in administrator's whole authority, so changing it, reading its secret or deleting it takes `authserver:manage`. Allow a client as carefully as you'd grant `authserver:manage` itself.

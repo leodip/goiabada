@@ -69,6 +69,8 @@ The Account API acts on the account of the user the token was issued for, so it 
      &state=abc123
    ```
 
+   The first time, the user sees the consent screen, which names your app and says what `authserver:manage-account` lets it do, and approves it. Their answer is kept, so each user is asked once.
+
 2. Exchange the code the user comes back with for tokens:
 
    ```bash
@@ -90,7 +92,22 @@ The Account API acts on the account of the user the token was issued for, so it 
 
 </Steps>
 
-Every user holds the `manage-account` permission from the moment they're created, and it isn't an administrative permission, so your client needs no permission of its own to ask for it. [Add sign-in to a web app](/guides/add-sign-in-to-a-web-app/) covers the sign-in itself, PKCE included.
+Every user holds the `manage-account` permission from the moment they're created, and it isn't an administrative permission, so your client needs no permission of its own, and no allowance, to ask for it. What it needs is the user's approval. The consent screen is shown the first time each user signs in to your app asking for `authserver:manage-account`, whatever your client's **Consent required** says, and again if they untick it or withdraw it under **Account**, **Manage consents**. [Add sign-in to a web app](/guides/add-sign-in-to-a-web-app/) covers the sign-in itself, PKCE included.
+
+Until a user has approved it, your app can't get the scope without them:
+
+- a `prompt=none` request asking for it is answered `consent_required`;
+- a refresh renewing it is refused with `invalid_grant`, and the refresh token isn't spent, so a refresh whose `scope` leaves `authserver:manage-account` out still works.
+
+Both happen to a refresh token or a session your app got before the user approved it, however it got them. Send the user through an ordinary sign-in: they approve once, and the refreshes and silent requests after it work.
+
+## Change a user's account from your app
+
+There are three ways, and which one fits depends on who's making the change:
+
+- **The Account API, with the user's token.** For an app that changes the signed-in user's own account on their behalf. It asks for `authserver:manage-account` as [above](#call-the-account-api), and each user approves that once on the consent screen. The token reaches that user's account and nothing else.
+- **The Admin API, with your client's own token.** For a service that changes users' accounts with no user present, such as provisioning from an HR system. It gets its token through the client credentials flow, as in [Call the Admin API](#call-the-admin-api), holding `authserver:manage-users`, which only an administrator with `authserver:manage` can grant it. That makes the client an [administrator](/reference/api/administrators/), and it still can't change an administrator.
+- **A link to the admin console's Account pages.** For a change the user makes themselves. Link to `/account/profile` on the admin console, such as `https://admin.example.com/account/profile`. The user signs in there if they need to and edits their profile, email, phone, address, picture, password, two-factor authentication, sessions and consents. Your app needs no scope at all.
 
 ## The bearer token
 
