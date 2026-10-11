@@ -52,9 +52,14 @@ export async function submitNewClient(page: Page, client: NewClient) {
   await page.locator("#btnCreate").click();
 }
 
+// A table row holding a cell with exactly this text: a list's row for an identifier.
+export function rowWithCell(page: Page, text: string) {
+  return page.getByRole("row").filter({ has: page.getByRole("cell", { name: text, exact: true }) });
+}
+
 // The client list's row for an identifier.
 export function clientRow(page: Page, identifier: string) {
-  return page.getByRole("row").filter({ has: page.getByRole("cell", { name: identifier, exact: true }) });
+  return rowWithCell(page, identifier);
 }
 
 // The database id of a client, read from its Manage link on the list.
@@ -75,19 +80,77 @@ export async function signInAsAdmin(page: Page) {
   await expect(page).toHaveURL(`${env.adminUrl}/admin/clients`);
 }
 
-// Deletes a client the way an administrator does: type its identifier, press Delete. The identifier
-// is read from the delete page, so a client a test renamed is deleted all the same.
-export async function deleteClient(page: Page, id: number) {
-  await page.goto(clientUrl(id, "delete"));
-  const identifier = await page
-    .getByRole("row")
-    .filter({ has: page.getByRole("cell", { name: "Client identifier", exact: true }) })
-    .getByRole("cell")
-    .nth(1)
-    .innerText();
-  await page.locator('input[name="clientIdentifier"]').fill(identifier.trim());
+// Deletes something the way an administrator does on a delete page that asks for its identifier:
+// type it, press Delete. The identifier is read from the page's own table (the row labelled
+// rowLabel), so something a test renamed is deleted all the same.
+async function deleteTypingIdentifier(page: Page, deleteUrl: string, rowLabel: string, inputName: string, listUrl: string) {
+  await page.goto(deleteUrl);
+  const identifier = await rowWithCell(page, rowLabel).getByRole("cell").nth(1).innerText();
+  await page.locator(`input[name="${inputName}"]`).fill(identifier.trim());
   await page.getByRole("button", { name: "Delete", exact: true }).click();
-  await expect(page).toHaveURL(`${env.adminUrl}/admin/clients`);
+  await expect(page).toHaveURL(listUrl);
+}
+
+export async function deleteClient(page: Page, id: number) {
+  await deleteTypingIdentifier(page, clientUrl(id, "delete"), "Client identifier", "clientIdentifier", `${env.adminUrl}/admin/clients`);
+}
+
+export async function deleteResource(page: Page, id: number) {
+  await deleteTypingIdentifier(page, resourceUrl(id, "delete"), "Resource identifier", "resourceIdentifier", `${env.adminUrl}/admin/resources`);
+}
+
+export async function deleteGroup(page: Page, id: number) {
+  await deleteTypingIdentifier(page, `${env.adminUrl}/admin/groups/${id}/delete`, "Group identifier", "groupIdentifier", `${env.adminUrl}/admin/groups`);
+}
+
+// A user's delete page asks for no identifier.
+export async function deleteUser(page: Page, id: number) {
+  await page.goto(`${env.adminUrl}/admin/users/${id}/delete`);
+  await page.getByRole("button", { name: "Delete user" }).click();
+  await expect(page).toHaveURL(new RegExp(`^${env.adminUrl}/admin/users/?(\\?|$)`));
+}
+
+// The database id in a list row's link, such as /admin/resources/7/settings.
+export async function idFromListLink(page: Page, listUrl: string, text: string, linkName: string): Promise<number> {
+  await page.goto(listUrl);
+  const href = await rowWithCell(page, text).getByRole("link", { name: linkName }).getAttribute("href");
+  const match = href?.match(/\/admin\/\w+\/(\d+)\//);
+  if (!match) throw new Error(`no ${linkName} link for ${text} on ${listUrl}`);
+  return Number(match[1]);
+}
+
+export type ResourceTab = "settings" | "permissions" | "users-with-permission" | "groups-with-permission" | "delete";
+
+export function resourceUrl(id: number, tab: ResourceTab): string {
+  return `${env.adminUrl}/admin/resources/${id}/${tab}`;
+}
+
+// Fills and submits the new resource form, leaving the page wherever the console answers.
+export async function submitNewResource(page: Page, identifier: string, description = "") {
+  await page.goto(`${env.adminUrl}/admin/resources/new`);
+  await page.locator("#resourceIdentifier").fill(identifier);
+  await page.locator('input[name="description"]').fill(description);
+  await page.locator("#btnCreate").click();
+}
+
+// The Permissions tab's table row for a permission identifier.
+export function resourcePermissionRow(page: Page, identifier: string) {
+  return page.locator("#permissionsTable tbody tr").filter({ has: page.getByRole("cell", { name: identifier, exact: true }) });
+}
+
+// Adds a permission to the Permissions tab's table, without saving. The console validates it on the
+// server first, so wait for that answer.
+export async function addResourcePermission(page: Page, identifier: string, description = "") {
+  await page.locator("#permissionIdentifier").fill(identifier);
+  await page.locator("#permissionDescription").fill(description);
+  const validated = page.waitForResponse((r) => r.url().endsWith("/admin/resources/validate-permission"));
+  await page.getByRole("button", { name: "Create permission" }).click();
+  await validated;
+}
+
+export async function saveResourcePermissions(page: Page) {
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Resource permissions saved successfully")).toBeVisible();
 }
 
 // The confidential client's secret, as the Authentication tab holds it.

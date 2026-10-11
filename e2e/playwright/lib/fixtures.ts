@@ -1,7 +1,22 @@
 // The suite's test object: Playwright's, plus fixtures that create what a test needs and remove it
 // afterwards, pass or fail, so the shared environment stays as it was.
+import { randomBytes } from "node:crypto";
 import { test as base, expect } from "@playwright/test";
-import { clientIdFromList, deleteClient, signInAsAdmin, submitNewClient, type NewClient } from "./admin-console";
+import {
+  addResourcePermission,
+  clientIdFromList,
+  deleteClient,
+  deleteGroup,
+  deleteResource,
+  deleteUser,
+  idFromListLink,
+  resourceUrl,
+  saveResourcePermissions,
+  signInAsAdmin,
+  submitNewClient,
+  submitNewResource,
+  type NewClient,
+} from "./admin-console";
 import { env } from "./environment";
 import { userAgentFor } from "./devices";
 import { adminStorageState } from "./paths";
@@ -14,10 +29,39 @@ export interface TestClient {
   markDeleted(): void;
 }
 
+export interface TestResource {
+  id: number;
+  identifier: string;
+  // The resource's permissions, in the order given, by identifier.
+  permissions: string[];
+  markDeleted(): void;
+}
+
+export interface TestGroup {
+  id: number;
+  identifier: string;
+}
+
+export interface TestUser {
+  id: number;
+  email: string;
+}
+
 interface Fixtures {
   clients: {
     // Creates a client through the admin console under a fresh identifier.
     create(options?: Omit<NewClient, "identifier">): Promise<TestClient>;
+  };
+  resources: {
+    // Creates a resource under a fresh identifier, with these permissions saved on it.
+    create(options?: { description?: string; permissions?: string[] }): Promise<TestResource>;
+  };
+  groups: {
+    create(): Promise<TestGroup>;
+  };
+  users: {
+    // Creates a user with a password set, so no email is sent.
+    create(): Promise<TestUser>;
   };
 }
 
@@ -68,6 +112,81 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     for (const client of created.filter((c) => !c.deleted)) {
       await deleteClient(page, client.id);
     }
+    await page.close();
+  },
+
+  resources: async ({ context }, use) => {
+    const created: { id: number; deleted: boolean }[] = [];
+    const page = await context.newPage();
+
+    await use({
+      async create({ description = "", permissions = [] } = {}) {
+        const identifier = uniqueIdentifier("r");
+        await submitNewResource(page, identifier, description);
+        await expect(page).toHaveURL(`${env.adminUrl}/admin/resources`);
+        const id = await idFromListLink(page, `${env.adminUrl}/admin/resources`, identifier, "Manage");
+        const entry = { id, deleted: false };
+        created.push(entry);
+        if (permissions.length > 0) {
+          await page.goto(resourceUrl(id, "permissions"));
+          for (const permission of permissions) await addResourcePermission(page, permission);
+          await saveResourcePermissions(page);
+        }
+        return { id, identifier, permissions, markDeleted: () => (entry.deleted = true) };
+      },
+    });
+
+    for (const resource of created.filter((r) => !r.deleted)) {
+      await deleteResource(page, resource.id);
+    }
+    await page.close();
+  },
+
+  groups: async ({ context }, use) => {
+    const created: number[] = [];
+    const page = await context.newPage();
+
+    await use({
+      async create() {
+        const identifier = uniqueIdentifier("g");
+        await page.goto(`${env.adminUrl}/admin/groups/new`);
+        await page.locator("#groupIdentifier").fill(identifier);
+        await page.locator("#btnCreate").click();
+        await expect(page).toHaveURL(`${env.adminUrl}/admin/groups`);
+        const id = await idFromListLink(page, `${env.adminUrl}/admin/groups`, identifier, "Manage");
+        created.push(id);
+        return { id, identifier };
+      },
+    });
+
+    for (const id of created) await deleteGroup(page, id);
+    await page.close();
+  },
+
+  users: async ({ context }, use) => {
+    const created: number[] = [];
+    const page = await context.newPage();
+
+    await use({
+      async create() {
+        const email = `${uniqueIdentifier("u")}@example.com`;
+        await page.goto(`${env.adminUrl}/admin/users/new`);
+        await page.locator("#email").fill(email);
+        await page.locator("#givenName").fill("Playwright");
+        await page.locator("#familyName").fill("Tester");
+        // The choice between setting the password now and emailing a link is offered only with SMTP on.
+        const setNow = page.locator("#setPasswordTypeNow");
+        if ((await setNow.count()) > 0) await setNow.check();
+        await page.locator("#password").fill(randomBytes(18).toString("base64url"));
+        await page.locator("#btnCreate").click();
+        await expect(page).toHaveURL(/\/admin\/users\/\d+\/details/);
+        const id = Number(page.url().match(/\/admin\/users\/(\d+)\/details/)![1]);
+        created.push(id);
+        return { id, email };
+      },
+    });
+
+    for (const id of created) await deleteUser(page, id);
     await page.close();
   },
 });
