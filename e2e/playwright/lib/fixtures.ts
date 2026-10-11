@@ -21,7 +21,6 @@ import {
   type NewGroup,
 } from "./admin-console";
 import { env } from "./environment";
-import { userAgentFor } from "./devices";
 import { adminStorageState } from "./paths";
 import { uniqueIdentifier } from "./unique";
 
@@ -74,22 +73,17 @@ interface Fixtures {
 }
 
 interface WorkerFixtures {
-  // The administrator's session for this worker: each worker signs in for itself, as a device of its
+  // The administrator's session for this worker: each worker signs in for itself, in a browser of its
   // own, so parallel tests never share one session (whose one-time messages and token refreshes would
   // then cross) nor end each other's.
   adminSession: string;
-  workerUserAgent: string;
 }
 
 export const test = base.extend<Fixtures, WorkerFixtures>({
-  workerUserAgent: [
-    async ({}, use, workerInfo) => use(userAgentFor(`worker-${workerInfo.parallelIndex}`)),
-    { scope: "worker" },
-  ],
   adminSession: [
-    async ({ browser, workerUserAgent }, use, workerInfo) => {
+    async ({ browser }, use, workerInfo) => {
       const path = adminStorageState(workerInfo.parallelIndex);
-      const context = await browser.newContext({ userAgent: workerUserAgent });
+      const context = await browser.newContext();
       await signInAsAdmin(await context.newPage());
       await context.storageState({ path });
       await context.close();
@@ -98,7 +92,6 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     { scope: "worker" },
   ],
   storageState: ({ adminSession }, use) => use(adminSession),
-  userAgent: ({ workerUserAgent }, use) => use(workerUserAgent),
 
   clients: async ({ context }, use) => {
     const created: { id: number; identifier: string; deleted: boolean }[] = [];

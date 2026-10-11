@@ -2,7 +2,6 @@
 import { expect, type Browser } from "@playwright/test";
 import { submitPassword } from "./browser-sign-in";
 import { env } from "./environment";
-import { userAgentFor } from "./devices";
 import { freshTotp } from "./totp";
 
 export interface ConsoleUser {
@@ -14,10 +13,10 @@ export interface ConsoleUser {
 
 // Opens the console at path in a new browser as the user, signing in on the way, with a code when
 // the user has an authenticator. The caller closes the context.
-export async function signInToConsole(browser: Browser, user: ConsoleUser, device: string, path = "/account/profile") {
+export async function signInToConsole(browser: Browser, user: ConsoleUser, path = "/account/profile") {
   // An explicit empty state: inside a test, browser.newContext() starts from the test's options, which
   // carry the administrator's signed-in state.
-  const context = await browser.newContext({ userAgent: userAgentFor(device), storageState: { cookies: [], origins: [] } });
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
   await page.goto(`${env.adminUrl}${path}`);
   await submitPassword(page, user.email, user.password);

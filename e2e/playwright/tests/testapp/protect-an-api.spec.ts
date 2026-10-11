@@ -6,7 +6,7 @@ import { expect, test } from "../../lib/fixtures";
 import { expectResult, resultBody, shownClaims, signInToWebApp, testapp, userBrowser } from "../../lib/testapp";
 
 test("the service gets a token with the client credentials flow and the API accepts it", async ({ browser }) => {
-  const { context, page: service } = await userBrowser(browser, "testapp-service");
+  const { context, page: service } = await userBrowser(browser);
   await service.goto(testapp.service.url);
   await service.getByRole("button", { name: "Get a token and call the API" }).click();
   await expectResult(service, "Got a token; the API answered 200");
@@ -21,7 +21,7 @@ test("the service gets a token with the client credentials flow and the API acce
 });
 
 test("the service asking for no scope gets every permission it holds; asking for openid is refused", async ({ browser }) => {
-  const { context, page: service } = await userBrowser(browser, "testapp-service-scopes");
+  const { context, page: service } = await userBrowser(browser);
   await service.goto(testapp.service.url);
 
   await service.getByRole("button", { name: "Same, with no scope in the request" }).click();
@@ -42,7 +42,7 @@ test("the API refuses a request with no token, a token it can't verify, and a to
   // A user holding only write signs in for it: the token is for the API, but carries no read.
   const user = await users.create();
   await grantUserPermission(page, user.id, testapp.api.resource, "write");
-  const { context, page: app } = await userBrowser(browser, `testapp-api-write-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user, { scope: `openid ${testapp.api.resource}:write` });
   await expectResult(app, "Signed in");
   const access = await shownClaims(app, "Access token claims");

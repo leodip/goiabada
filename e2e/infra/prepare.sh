@@ -5,8 +5,9 @@
 #
 # Runs from your machine and reaches the VPS over SSH as E2E_VPS_USER@E2E_VPS_HOST (see
 # e2e/.env.example). It replaces whatever environment ran before: see remote-prepare.sh.
-# Leaves e2e/.state/environment.env (URLs, tag, admin email) and e2e/.state/admin-password for the
-# steps after it. Then sets up the test app with testapp.sh, which adds e2e/.state/testapp.env.
+# Leaves e2e/.state/environment.env (URLs, tag, admin email, rate limiter) and
+# e2e/.state/admin-password for the steps after it. Then sets up the test app with testapp.sh, which
+# adds e2e/.state/testapp.env.
 set -euo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -62,6 +63,7 @@ E2E_ADMIN_URL=https://$E2E_ADMIN_HOST
 E2E_WEBTEST1_URL=https://$E2E_WEBTEST1_HOST
 E2E_WEBTEST2_URL=https://$E2E_WEBTEST2_HOST
 E2E_ADMIN_EMAIL=$E2E_ADMIN_EMAIL
+E2E_RATE_LIMITER=$E2E_RATE_LIMITER
 EOF
 
 "$E2E_DIR/infra/testapp.sh"

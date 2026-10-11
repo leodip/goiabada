@@ -5,7 +5,7 @@ import { expectResult, resultBody, shownClaims, signInToWebApp, testapp, userBro
 
 test("signed in on the first site, the user signs in to the second without the password, as the same user", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-sso-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
 
   expect((await signInToWebApp(app, testapp.web, user)).askedForPassword).toBe(true);
   await expectResult(app, "Signed in");
@@ -25,7 +25,7 @@ test("signed in on the first site, the user signs in to the second without the p
 
 test("prompt=none signs in silently over a session, and answers login_required with none", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-prompt-none-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
 
   await signInToWebApp(app, testapp.web2, user, { prompt: "none" });
   await expectResult(app, "Sign-in failed");
@@ -42,7 +42,7 @@ test("prompt=none signs in silently over a session, and answers login_required w
 // of the session, and the session goes on for the other apps that share it.
 test("signing out on one site with the ID token leaves the other site signed in, though this browser signs in afresh", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-sso-signout-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user);
   await expectResult(app, "Signed in");
   await signInToWebApp(app, testapp.web2, user);
@@ -67,7 +67,7 @@ test("signing out on one site with the ID token leaves the other site signed in,
 // refuses the tokens it handed out, and their refresh tokens stop working.
 test("signing out on one site with no ID token ends the other site's part too", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-sso-signout-all-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user);
   await expectResult(app, "Signed in");
   await signInToWebApp(app, testapp.web2, user);

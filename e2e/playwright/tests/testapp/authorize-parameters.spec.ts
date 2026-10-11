@@ -9,7 +9,7 @@ const second = () => new Promise((resolve) => setTimeout(resolve, 1_100));
 
 test("prompt=login asks for the password over a session, and the new tokens say when", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-prompt-login-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user);
   const first = await shownClaims(app, "ID token claims");
   await second();
@@ -24,7 +24,7 @@ test("prompt=login asks for the password over a session, and the new tokens say 
 
 test("max_age asks for the password again once the sign-in is older than it", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-max-age-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user);
   await second();
 
@@ -37,7 +37,7 @@ test("max_age asks for the password again once the sign-in is older than it", as
 
 test("prompt=consent shows the consent screen even when the client doesn't require it", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-prompt-consent-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user, { prompt: "consent" });
   await expect(app).toHaveURL(/\/auth\/consent/);
   await app.getByRole("button", { name: "Give consent" }).click();
@@ -49,7 +49,7 @@ test("prompt=consent shows the consent screen even when the client doesn't requi
 test("an id_token_hint naming the signed-in user signs in silently; naming someone else asks for the password", async ({ browser, users }) => {
   const alice = await users.create();
   const bob = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-hint-${alice.id}`);
+  const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, alice);
   await expectResult(app, "Signed in");
   expect((await signInToWebApp(app, testapp.web, alice, { id_token_hint: "yes" })).askedForPassword).toBe(false);
@@ -67,7 +67,7 @@ test("an id_token_hint naming the signed-in user signs in silently; naming someo
 
 test("acr_values level 2 mandatory makes a user enrol an authenticator, and the tokens say a code was entered", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-acr-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user, { acr_values: "urn:goiabada:level2_mandatory" });
   // The enrolment page: a QR code and the secret, then a code from it.
   await expect(app).toHaveURL(/\/auth\/otp/);

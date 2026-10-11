@@ -8,8 +8,8 @@ import { browserSignInClient } from "../../../lib/test-clients";
 
 test("the user sees their sessions, the current one marked, and ends another", async ({ browser, users }) => {
   const user = await users.create();
-  const other = await signInToConsole(browser, user, `device-a-${user.id}`);
-  const own = await signInToConsole(browser, user, `device-b-${user.id}`, "/account/sessions");
+  const other = await signInToConsole(browser, user);
+  const own = await signInToConsole(browser, user, "/account/sessions");
   const rows = own.page.locator("table tbody tr");
   await expect(rows).toHaveCount(2);
   const current = rows.filter({ hasText: "Current session" });
@@ -36,11 +36,10 @@ test("the user sees the consent they gave a client, and revokes it", async ({ pa
     email: user.email,
     password: user.password,
     scope: "openid email",
-    device: `consent-${user.id}`,
   });
   await signIn.context.close();
 
-  const own = await signInToConsole(browser, user, `consents-${user.id}`, "/account/manage-consents");
+  const own = await signInToConsole(browser, user, "/account/manage-consents");
   const row = own.page.getByRole("row").filter({ hasText: client.identifier });
   await expect(row).toContainText("openid email");
   await row.getByRole("button", { name: "Revoke" }).click();
@@ -53,7 +52,7 @@ test("the user sees the consent they gave a client, and revokes it", async ({ pa
 
 test("the user uploads and deletes their picture", async ({ browser, users }) => {
   const user = await users.create();
-  const own = await signInToConsole(browser, user, `picture-${user.id}`, "/account/picture");
+  const own = await signInToConsole(browser, user, "/account/picture");
   await expect(own.page.locator("#deleteImageBtn")).toBeHidden();
   await own.page.locator("#imageUploadInput").setInputFiles({ name: "me.png", mimeType: "image/png", buffer: solidPng(300, 300, [90, 160, 60]) });
   await own.page.locator("#confirmCropBtn").click();

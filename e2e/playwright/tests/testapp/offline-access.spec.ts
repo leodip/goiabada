@@ -5,7 +5,7 @@ import { expectResult, resultBody, signInToWebApp, testapp, userBrowser } from "
 
 test("offline_access asks for consent, and its refresh token keeps working after the whole session ends", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-offline-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user, { scope: "openid email offline_access" });
   await expect(app).toHaveURL(/\/auth\/consent/);
   await expect(app.getByText(/offline/i).first()).toBeVisible();

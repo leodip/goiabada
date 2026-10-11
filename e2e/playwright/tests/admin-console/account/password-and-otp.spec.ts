@@ -8,7 +8,7 @@ import { freshTotp } from "../../../lib/totp";
 
 test("the user changes their password: the current one must be right, and the new one confirmed", async ({ browser, users }) => {
   const user = await users.create();
-  const own = await signInToConsole(browser, user, `password-${user.id}`, "/account/change-password");
+  const own = await signInToConsole(browser, user, "/account/change-password");
   const submit = async (current: string, next: string, confirmation: string) => {
     await own.page.locator('input[name="currentPassword"]').fill(current);
     await own.page.locator('input[name="newPassword"]').fill(next);
@@ -27,14 +27,14 @@ test("the user changes their password: the current one must be right, and the ne
   await own.context.close();
 
   // The new password signs in.
-  const again = await signInToConsole(browser, { ...user, password: "a-new-password" }, `password-again-${user.id}`);
+  const again = await signInToConsole(browser, { ...user, password: "a-new-password" });
   await expect(again.page).toHaveURL(`${env.adminUrl}/account/profile`);
   await again.context.close();
 });
 
 test("the user enrols an authenticator, is asked for its code at sign-in, and turns it off", async ({ page, browser, users }) => {
   const user = await users.create();
-  const own = await signInToConsole(browser, user, `otp-${user.id}`, "/account/otp");
+  const own = await signInToConsole(browser, user, "/account/otp");
   await expect(own.page.getByText("One-time password (OTP) is currently disabled for your account")).toBeVisible();
   await expect(own.page.getByRole("img", { name: "OTP QR code" })).toBeVisible();
   const secret = (await own.page.locator("pre").innerText()).trim();
@@ -55,7 +55,7 @@ test("the user enrols an authenticator, is asked for its code at sign-in, and tu
   await expect(page.locator('input[name="otpEnabled"]')).toBeChecked();
 
   // Signing in now takes a code. A wrong one is refused first.
-  const withOtp = await signInToConsole(browser, { ...user, otpSecret: secret }, `otp-signin-${user.id}`, "/account/otp");
+  const withOtp = await signInToConsole(browser, { ...user, otpSecret: secret }, "/account/otp");
   await expect(withOtp.page).toHaveURL(`${env.adminUrl}/account/otp`);
   await withOtp.page.locator('input[name="password"]').fill(user.password);
   await withOtp.page.getByRole("button", { name: "Disable OTP" }).click();
@@ -68,7 +68,7 @@ test("the user enrols an authenticator, is asked for its code at sign-in, and tu
 
 test("a wrong code at sign-in is refused", async ({ browser, users }) => {
   const user = await users.create();
-  const own = await signInToConsole(browser, user, `otp-wrong-${user.id}`, "/account/otp");
+  const own = await signInToConsole(browser, user, "/account/otp");
   const secret = (await own.page.locator("pre").innerText()).trim();
   await own.page.locator('input[name="password"]').fill(user.password);
   await own.page.locator('input[name="otp"]').fill(await freshTotp(secret));
@@ -89,7 +89,7 @@ test("a wrong code at sign-in is refused", async ({ browser, users }) => {
 
 test("the administrator turns off a user's authenticator", async ({ page, browser, users }) => {
   const user = await users.create();
-  const own = await signInToConsole(browser, user, `otp-admin-${user.id}`, "/account/otp");
+  const own = await signInToConsole(browser, user, "/account/otp");
   const secret = (await own.page.locator("pre").innerText()).trim();
   await own.page.locator('input[name="password"]').fill(user.password);
   await own.page.locator('input[name="otp"]').fill(await freshTotp(secret));
@@ -104,7 +104,7 @@ test("the administrator turns off a user's authenticator", async ({ page, browse
   await expect(page.getByText("Two-factor authentication is not enabled for this user")).toBeVisible();
 
   // Signing in no longer asks for a code.
-  const again = await signInToConsole(browser, user, `otp-admin-again-${user.id}`);
+  const again = await signInToConsole(browser, user);
   await expect(again.page).toHaveURL(`${env.adminUrl}/account/profile`);
   await again.context.close();
 });

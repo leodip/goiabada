@@ -24,7 +24,7 @@ test("a disabled user cannot sign in until enabled again", async ({ page, reques
 
   // The browser sign-in refuses too, on the password page.
   const web = await browserSignInClient(page, clients);
-  const signInPage = await openSignIn(browser, { clientId: web.client.identifier, scope: "openid", device: `disabled-${user.id}` });
+  const signInPage = await openSignIn(browser, { clientId: web.client.identifier, scope: "openid" });
   await submitPassword(signInPage.page, user.email, user.password);
   await expect(signInPage.page.getByText("Your user account is disabled.")).toBeVisible();
   await signInPage.context.close();

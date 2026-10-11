@@ -2,9 +2,8 @@
 // way a real application starts it. The tests use it where only a browser sign-in leaves a trace, a
 // session or a consent, which the password grant does not.
 import { createHash, randomBytes } from "node:crypto";
-import { test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { env } from "./environment";
-import { userAgentFor } from "./devices";
 
 // The redirect URI the tests register on their clients. Nothing answers there (nginx says 404), which
 // is all a test needs: the code arrives in the address.
@@ -19,13 +18,10 @@ export interface BrowserSignIn {
 
 // Starts a sign-in through the client in a browser of its own, and leaves the page at the auth
 // server's password form. The caller closes the context.
-export async function openSignIn(browser: Browser, options: { clientId: string; scope: string; device: string }) {
+export async function openSignIn(browser: Browser, options: { clientId: string; scope: string }) {
   // An explicit empty state: inside a test, browser.newContext() starts from the test's options, which
   // here carry the administrator's signed-in state, and the sign-in would be the administrator's.
-  const context = await browser.newContext({
-    userAgent: userAgentFor(options.device),
-    storageState: { cookies: [], origins: [] },
-  });
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
   const codeVerifier = randomBytes(32).toString("base64url");
   const query = new URLSearchParams({
@@ -42,27 +38,11 @@ export async function openSignIn(browser: Browser, options: { clientId: string; 
 }
 
 // Fills and submits the auth server's password form.
-//
-// The form is limited to 30 submissions a minute per client address (the pwd_ip tier), and the suite
-// signs users in often enough from one address to pass that. The refusal is the limiter doing its job,
-// not the test's subject, so the form is submitted again every few seconds, extending the test's
-// timeout by what it waits and noting it in the report.
 export async function submitPassword(page: Page, email: string, password: string) {
-  const tooMany = page.getByRole("heading", { name: "Too many attempts" });
-  // The form's own address, a GET, to come back to: going back from the refusal, which answers a POST,
-  // can fail with ERR_CACHE_MISS.
-  const form = page.url();
-  for (let waited = 0; ; waited += 3_000) {
-    await page.locator('input[name="email"]').fill(email);
-    await page.locator('input[name="password"]').fill(password);
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await page.waitForLoadState();
-    if (!(await tooMany.isVisible()) || waited >= 90_000) return;
-    if (waited === 0) test.info().annotations.push({ type: "rate-limited", description: "sign-in form answered too many attempts; waited" });
-    test.info().setTimeout(test.info().timeout + 3_000);
-    await new Promise((resolve) => setTimeout(resolve, 3_000));
-    await page.goto(form);
-  }
+  await page.locator('input[name="email"]').fill(email);
+  await page.locator('input[name="password"]').fill(password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForLoadState();
 }
 
 // Signs the user in through the client in a browser of their own, approving the consent screen if one
@@ -70,7 +50,7 @@ export async function submitPassword(page: Page, email: string, password: string
 // context.
 export async function signInThroughClient(
   browser: Browser,
-  options: { clientId: string; email: string; password: string; scope: string; device: string },
+  options: { clientId: string; email: string; password: string; scope: string },
 ): Promise<BrowserSignIn> {
   const { context, page, codeVerifier } = await openSignIn(browser, options);
   await submitPassword(page, options.email, options.password);
@@ -92,9 +72,8 @@ export async function authorizeAndLand(
   browser: Browser,
   params: Record<string, string>,
   user: { email: string; password: string },
-  device: string,
 ): Promise<URL> {
-  const context = await browser.newContext({ userAgent: userAgentFor(device), storageState: { cookies: [], origins: [] } });
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
   try {
     await page.goto(`${env.authUrl}/auth/authorize?${new URLSearchParams({ redirect_uri: testRedirectUri, ...params })}`);

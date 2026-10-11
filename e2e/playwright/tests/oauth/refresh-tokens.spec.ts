@@ -14,7 +14,6 @@ test("a refresh token already rotated is refused, and revokes the one that repla
     email: user.email,
     password: user.password,
     scope: "openid",
-    device: `refresh-replay-${user.id}`,
   });
   await signIn.context.close();
   const tokens = await codeToken(request, client.identifier, secret, signIn.code, signIn.codeVerifier, testRedirectUri);
@@ -45,7 +44,6 @@ test("a refresh token works only for the client it was issued to", async ({ page
     email: user.email,
     password: user.password,
     scope: "openid",
-    device: `refresh-client-${user.id}`,
   });
   await signIn.context.close();
   const tokens = await codeToken(request, client.identifier, secret, signIn.code, signIn.codeVerifier, testRedirectUri);

@@ -196,16 +196,16 @@ test("the global password grant switch applies to clients that follow it", async
 test("the global implicit flow switch applies to clients that follow it", async ({ page, browser, clients, users }) => {
   const user = await users.create();
   const { client } = await browserSignInClient(page, clients);
-  const implicit = (device: string) =>
-    authorizeAndLand(browser, { client_id: client.identifier, response_type: "token", scope: "openid", state: "s" }, user, device);
+  const implicit = () =>
+    authorizeAndLand(browser, { client_id: client.identifier, response_type: "token", scope: "openid", state: "s" }, user);
 
-  let params = redirectParams(await implicit(`implicit-off-${user.id}`));
+  let params = redirectParams(await implicit());
   expect(params.get("error")).toBe("unauthorized_client");
 
   await withSettingsRestored(page, general, async () => {
     await fillSettingsForm(page, { implicitFlowEnabled: true });
     await saveSettings(page);
-    params = redirectParams(await implicit(`implicit-on-${user.id}`));
+    params = redirectParams(await implicit());
     expect(params.get("access_token"), params.toString()).toBeTruthy();
     expect(params.get("token_type")).toBe("Bearer");
   });
@@ -214,16 +214,16 @@ test("the global implicit flow switch applies to clients that follow it", async 
 test("with PKCE no longer required, a confidential client may leave it out", async ({ page, browser, clients, users }) => {
   const user = await users.create();
   const { client } = await browserSignInClient(page, clients);
-  const withoutPkce = (device: string) =>
-    authorizeAndLand(browser, { client_id: client.identifier, response_type: "code", scope: "openid", state: "s" }, user, device);
+  const withoutPkce = () =>
+    authorizeAndLand(browser, { client_id: client.identifier, response_type: "code", scope: "openid", state: "s" }, user);
 
-  let params = redirectParams(await withoutPkce(`pkce-on-${user.id}`));
+  let params = redirectParams(await withoutPkce());
   expect(params.get("error")).toBe("invalid_request");
 
   await withSettingsRestored(page, general, async () => {
     await fillSettingsForm(page, { pkceRequired: false });
     await saveSettings(page);
-    params = redirectParams(await withoutPkce(`pkce-off-${user.id}`));
+    params = redirectParams(await withoutPkce());
     expect(params.get("code"), params.toString()).toBeTruthy();
   });
 
@@ -241,7 +241,6 @@ test("with PKCE no longer required, a confidential client may leave it out", asy
         code_challenge_method: "S256",
       },
       user,
-      `pkce-back-${user.id}`,
     ),
   );
   expect(params.get("code")).toBeTruthy();

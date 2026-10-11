@@ -116,7 +116,7 @@ test("the user verifies their email with the mailed code, and the administrator 
   users,
 }) => {
   const user = await users.create();
-  const own = await signInToConsole(browser, user, `verify-${user.id}`, "/account/email-verification");
+  const own = await signInToConsole(browser, user, "/account/email-verification");
   await expect(own.page.getByText("isn't verified")).toBeVisible();
   await own.page.getByRole("button", { name: "Send verification code" }).click();
   const dialog = own.page.locator("dialog[open]");
@@ -137,7 +137,7 @@ test("the user verifies their email with the mailed code, and the administrator 
 
 test("a wrong verification code is refused", async ({ browser, request, users }) => {
   const user = await users.create();
-  const own = await signInToConsole(browser, user, `verify-wrong-${user.id}`, "/account/email-verification");
+  const own = await signInToConsole(browser, user, "/account/email-verification");
   await own.page.getByRole("button", { name: "Send verification code" }).click();
   await own.page.locator("dialog[open]").getByRole("button", { name: "Close" }).click();
   await waitForMail(request, user.email);
@@ -169,7 +169,7 @@ test("changing a verified email sends a notice to the previous address, which do
 }) => {
   const user = await users.create({ emailVerified: true });
   const newEmail = `${uniqueIdentifier("u")}@example.com`;
-  const own = await signInToConsole(browser, user, `email-notice-${user.id}`, "/account/email");
+  const own = await signInToConsole(browser, user, "/account/email");
   await own.page.locator('input[name="email"]').fill(newEmail);
   await own.page.locator('input[name="emailConfirmation"]').fill(newEmail);
   await own.page.locator('input[name="currentPassword"]').fill(user.password);

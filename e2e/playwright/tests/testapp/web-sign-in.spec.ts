@@ -8,7 +8,7 @@ import { expectResult, resultBody, shownClaims, signInToWebApp, testapp, userBro
 test("a user signs in to the web app, which reads their claims, calls /userinfo and calls the API", async ({ page, browser, users }) => {
   const user = await users.create();
   await grantUserPermission(page, user.id, testapp.api.resource, "read");
-  const { context, page: app } = await userBrowser(browser, `testapp-web-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
 
   await app.goto(testapp.web.url);
   await expect(app.getByText("Not signed in to this app.")).toBeVisible();
@@ -51,7 +51,7 @@ test("a user signs in to the web app, which reads their claims, calls /userinfo 
 
 test("without the API's permission the user still signs in, but the token isn't for the API and the API refuses it", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-noperm-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
 
   await signInToWebApp(app, testapp.web, user);
   await expectResult(app, "Signed in");
@@ -67,7 +67,7 @@ test("without the API's permission the user still signs in, but the token isn't 
 
 test("the web app refreshes its tokens, and each refresh hands back a new refresh token", async ({ browser, users }) => {
   const user = await users.create();
-  const { context, page: app } = await userBrowser(browser, `testapp-refresh-${user.id}`);
+  const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user);
   await expectResult(app, "Signed in");
   const before = await shownClaims(app, "Access token claims");

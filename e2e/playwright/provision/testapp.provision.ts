@@ -24,12 +24,9 @@ import {
   submitNewResource,
   type NewClient,
 } from "../lib/admin-console";
-import { userAgentFor } from "../lib/devices";
 import { env } from "../lib/environment";
 import { testappEnvFile } from "../lib/paths";
 import { testapp } from "../lib/testapp";
-
-test.use({ userAgent: userAgentFor("provision") });
 
 const clientsList = `${env.adminUrl}/admin/clients`;
 const resourcesList = `${env.adminUrl}/admin/resources`;

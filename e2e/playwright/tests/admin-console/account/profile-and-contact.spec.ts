@@ -12,7 +12,7 @@ async function optionByLabel(page: Page, name: string, label: RegExp): Promise<s
 
 test("the user edits their own profile, and the administrator sees it", async ({ page, browser, users }) => {
   const user = await users.create();
-  const own = await signInToConsole(browser, user, `profile-${user.id}`);
+  const own = await signInToConsole(browser, user);
   await own.page.locator('input[name="givenName"]').fill("Katherine");
   await own.page.locator('input[name="familyName"]').fill("Johnson");
   await own.page.locator('input[name="nickname"]').fill("kat");
@@ -33,7 +33,7 @@ test("the user edits their own profile, and the administrator sees it", async ({
 test("the user changes their email with their password, which must be right and confirmed", async ({ page, browser, users }) => {
   const user = await users.create();
   const newEmail = `${uniqueIdentifier("u")}@example.com`;
-  const own = await signInToConsole(browser, user, `email-${user.id}`, "/account/email");
+  const own = await signInToConsole(browser, user, "/account/email");
   const submit = async (email: string, confirmation: string, password: string) => {
     await own.page.locator('input[name="email"]').fill(email);
     await own.page.locator('input[name="emailConfirmation"]').fill(confirmation);
@@ -60,7 +60,7 @@ test("the user changes their email with their password, which must be right and 
 
 test("the user saves their phone, and the administrator sees it", async ({ page, browser, users }) => {
   const user = await users.create();
-  const own = await signInToConsole(browser, user, `phone-${user.id}`, "/account/phone");
+  const own = await signInToConsole(browser, user, "/account/phone");
   // The page loads its country list for a user who is not an administrator too.
   await expect(own.page.locator('select[name="phoneCountryUniqueId"]')).toBeVisible();
   const country = await optionByLabel(own.page, "phoneCountryUniqueId", /Portugal/);
@@ -77,7 +77,7 @@ test("the user saves their phone, and the administrator sees it", async ({ page,
 
 test("the user saves their address, and the administrator sees it", async ({ page, browser, users }) => {
   const user = await users.create();
-  const own = await signInToConsole(browser, user, `address-${user.id}`, "/account/address");
+  const own = await signInToConsole(browser, user, "/account/address");
   await own.page.locator('input[name="addressLine1"]').fill("Rua Augusta 100");
   await own.page.locator('input[name="addressLocality"]').fill("Lisboa");
   await own.page.locator('input[name="addressPostalCode"]').fill("1100-053");
