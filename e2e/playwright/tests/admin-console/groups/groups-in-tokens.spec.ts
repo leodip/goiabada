@@ -1,36 +1,10 @@
 // What a group means outside the Groups pages: its members' tokens carry the group, its attributes and
 // its permissions, each as the include switches say, and a change on the Groups pages shows in the
 // next token. The tokens come from the password grant, on a client of the test's own that allows it.
-import type { APIRequestContext, Page } from "@playwright/test";
-import {
-  addGroupAttribute,
-  addGroupMember,
-  enablePasswordGrant,
-  grantGroupPermission,
-  groupUrl,
-  readClientSecret,
-  rowWithCell,
-} from "../../../lib/admin-console";
-import { expect, test, type TestClient, type TestUser } from "../../../lib/fixtures";
-import { jwtClaims, passwordToken, userinfo } from "../../../lib/oauth";
-
-// A confidential client that may use the password grant, and its secret.
-async function passwordGrantClient(page: Page, clients: { create(): Promise<TestClient> }) {
-  const client = await clients.create();
-  await enablePasswordGrant(page, client.id);
-  return { client, secret: await readClientSecret(page, client.id) };
-}
-
-// The user's tokens for this scope, decoded.
-async function tokensFor(request: APIRequestContext, client: TestClient, secret: string, user: TestUser, scope: string) {
-  const answer = await passwordToken(request, client.identifier, secret, user.email, user.password, scope);
-  expect(answer.status, JSON.stringify(answer.body)).toBe(200);
-  return {
-    body: answer.body,
-    access: jwtClaims(answer.body.access_token as string),
-    id: jwtClaims(answer.body.id_token as string),
-  };
-}
+import { addGroupAttribute, addGroupMember, grantGroupPermission, groupUrl, rowWithCell } from "../../../lib/admin-console";
+import { expect, test } from "../../../lib/fixtures";
+import { passwordToken, userTokens, userinfo } from "../../../lib/oauth";
+import { passwordGrantClient } from "../../../lib/test-clients";
 
 test("the groups claim follows each group's include switches, in each token and at userinfo", async ({
   page,
@@ -46,7 +20,7 @@ test("the groups claim follows each group's include switches, in each token and 
   for (const group of [both, accessOnly, idOnly]) await addGroupMember(page, group.id, user.email);
   const { client, secret } = await passwordGrantClient(page, clients);
 
-  const tokens = await tokensFor(request, client, secret, user, "openid groups");
+  const tokens = await userTokens(request, client.identifier, secret, user, "openid groups");
   expect((tokens.access.groups as string[]).sort()).toEqual([both.identifier, accessOnly.identifier].sort());
   expect((tokens.id.groups as string[]).sort()).toEqual([both.identifier, idOnly.identifier].sort());
   // Userinfo filters by the ID token's switch.
@@ -55,7 +29,7 @@ test("the groups claim follows each group's include switches, in each token and 
   expect((info.body.groups as string[]).sort()).toEqual([both.identifier, idOnly.identifier].sort());
 
   // Without the groups scope there is no groups claim at all.
-  const withoutScope = await tokensFor(request, client, secret, user, "openid");
+  const withoutScope = await userTokens(request, client.identifier, secret, user, "openid");
   expect(withoutScope.access.groups).toBeUndefined();
   expect(withoutScope.id.groups).toBeUndefined();
 });
@@ -71,13 +45,13 @@ test("a change to a group shows in the next token: switches, rename, removal", a
   const user = await users.create();
   await addGroupMember(page, group.id, user.email);
   const { client, secret } = await passwordGrantClient(page, clients);
-  expect((await tokensFor(request, client, secret, user, "openid groups")).access.groups).toEqual([group.identifier]);
+  expect((await userTokens(request, client.identifier, secret, user, "openid groups")).access.groups).toEqual([group.identifier]);
 
   await page.goto(groupUrl(group.id, "settings"));
   await page.locator('input[name="includeInAccessToken"]').uncheck();
   await page.locator("#btnSave").click();
   await expect(page.getByText("Group settings saved successfully")).toBeVisible();
-  let tokens = await tokensFor(request, client, secret, user, "openid groups");
+  let tokens = await userTokens(request, client.identifier, secret, user, "openid groups");
   expect(tokens.access.groups).toBeUndefined();
   expect(tokens.id.groups).toEqual([group.identifier]);
 
@@ -86,13 +60,13 @@ test("a change to a group shows in the next token: switches, rename, removal", a
   await page.locator("#btnSave").click();
   await page.locator("dialog[open]").getByRole("button", { name: "Yes" }).click();
   await expect(page.getByText("Group settings saved successfully")).toBeVisible();
-  expect((await tokensFor(request, client, secret, user, "openid groups")).id.groups).toEqual([renamed]);
+  expect((await userTokens(request, client.identifier, secret, user, "openid groups")).id.groups).toEqual([renamed]);
 
   await page.goto(groupUrl(group.id, "members"));
   await rowWithCell(page, user.email).getByRole("button", { name: "Remove" }).click();
   await page.locator("dialog[open]").getByRole("button", { name: "Yes" }).click();
   await expect(rowWithCell(page, user.email).getByText("Removed")).toBeVisible();
-  tokens = await tokensFor(request, client, secret, user, "openid groups");
+  tokens = await userTokens(request, client.identifier, secret, user, "openid groups");
   expect(tokens.id.groups).toBeUndefined();
 });
 
@@ -105,13 +79,13 @@ test("group attributes reach the attributes claim as their switches say", async 
   await addGroupMember(page, group.id, user.email);
   const { client, secret } = await passwordGrantClient(page, clients);
 
-  const tokens = await tokensFor(request, client, secret, user, "openid attributes");
+  const tokens = await userTokens(request, client.identifier, secret, user, "openid attributes");
   expect(tokens.access.attributes).toEqual({ department: "Sales", cost_center: "CC-42" });
   expect(tokens.id.attributes).toEqual({ department: "Sales", badge: "blue" });
   const info = await userinfo(request, tokens.body.access_token as string);
   expect(info.body.attributes).toEqual({ department: "Sales", badge: "blue" });
 
-  const withoutScope = await tokensFor(request, client, secret, user, "openid");
+  const withoutScope = await userTokens(request, client.identifier, secret, user, "openid");
   expect(withoutScope.access.attributes).toBeUndefined();
 });
 
@@ -135,7 +109,7 @@ test("a member holds the group's permissions, and loses them when removed", asyn
   expect(answer.body.error, JSON.stringify(answer.body)).toBe("invalid_scope");
 
   await addGroupMember(page, group.id, user.email);
-  const tokens = await tokensFor(request, client, secret, user, scope);
+  const tokens = await userTokens(request, client.identifier, secret, user, scope);
   expect(String(tokens.access.scope).split(" ")).toContain(`${resource.identifier}:read`);
   expect(tokens.access.aud).toContain(resource.identifier);
   // The group holds read, not write.

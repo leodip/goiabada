@@ -16,6 +16,7 @@ import {
   submitNewClient,
   submitNewGroup,
   submitNewResource,
+  submitNewUser,
   type NewClient,
   type NewGroup,
 } from "./admin-console";
@@ -175,16 +176,8 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     await use({
       async create() {
         const email = `${uniqueIdentifier("u")}@example.com`;
-        await page.goto(`${env.adminUrl}/admin/users/new`);
-        await page.locator("#email").fill(email);
-        await page.locator("#givenName").fill("Playwright");
-        await page.locator("#familyName").fill("Tester");
-        // The choice between setting the password now and emailing a link is offered only with SMTP on.
-        const setNow = page.locator("#setPasswordTypeNow");
-        if ((await setNow.count()) > 0) await setNow.check();
         const password = randomBytes(18).toString("base64url");
-        await page.locator("#password").fill(password);
-        await page.locator("#btnCreate").click();
+        await submitNewUser(page, { email, givenName: "Playwright", familyName: "Tester", password });
         await expect(page).toHaveURL(/\/admin\/users\/\d+\/details/);
         const id = Number(page.url().match(/\/admin\/users\/(\d+)\/details/)![1]);
         const entry = { id, deleted: false };

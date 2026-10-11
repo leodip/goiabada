@@ -133,6 +133,57 @@ export async function submitNewResource(page: Page, identifier: string, descript
   await page.locator("#btnCreate").click();
 }
 
+export type UserTab =
+  | "details"
+  | "profile"
+  | "email"
+  | "phone"
+  | "address"
+  | "authentication"
+  | "attributes"
+  | "consents"
+  | "sessions"
+  | "groups"
+  | "permissions"
+  | "picture"
+  | "delete";
+
+export function userUrl(id: number, tab: UserTab): string {
+  return `${env.adminUrl}/admin/users/${id}/${tab}`;
+}
+
+export interface NewUser {
+  email: string;
+  givenName?: string;
+  familyName?: string;
+  emailVerified?: boolean;
+  password?: string;
+}
+
+// Fills and submits the new user form with the password set now, leaving the page wherever the
+// console answers. The choice between setting the password now and emailing a link is offered only
+// when SMTP is configured; without it the password is set now.
+export async function submitNewUser(page: Page, user: NewUser) {
+  await page.goto(`${env.adminUrl}/admin/users/new`);
+  await page.locator("#email").fill(user.email);
+  await page.locator('input[name="emailVerified"]').setChecked(user.emailVerified ?? false);
+  await page.locator("#givenName").fill(user.givenName ?? "");
+  await page.locator("#familyName").fill(user.familyName ?? "");
+  const setNow = page.locator("#setPasswordTypeNow");
+  if ((await setNow.count()) > 0) await setNow.check();
+  await page.locator("#password").fill(user.password ?? "");
+  await page.locator("#btnCreate").click();
+}
+
+// Registers a redirect URI on a client's Redirect URIs tab and saves.
+export async function addRedirectUri(page: Page, id: number, uri: string) {
+  await page.goto(clientUrl(id, "redirect-uris"));
+  await page.locator("#redirectURI").fill(uri);
+  await page.getByRole("button", { name: "Add" }).click();
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Client redirect uris saved successfully")).toBeVisible();
+}
+
 export type GroupTab = "settings" | "attributes" | "members" | "permissions" | "delete";
 
 export function groupUrl(id: number, tab: GroupTab): string {
