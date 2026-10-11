@@ -61,8 +61,19 @@ The wizard asks only the questions that apply to your deployment, in this order,
 | Rate limiter | Every deployment but local testing, which leaves it off. See [why it's off under Cluster](#the-rate-limiter-under-the-cluster-traffic-policy). | On, but off on Kubernetes under the Cluster policy |
 | Metrics | Kubernetes. None, pod annotations, or a PodMonitor for the Prometheus Operator. See [Monitoring](/deploy/monitoring/). | None |
 | Admin credentials | Every deployment: the admin's email and password. | `admin@example.com` for local testing, otherwise `admin@` and the auth server's domain. A generated password. |
-| Database connection | Kubernetes and native binaries, with any database but SQLite: host, port, name, user and password, then an optional connection test. | The database's usual port and user, and the name `goiabada` |
-| Database password | Local testing and production, with any database but SQLite. The wizard runs that database for you. | A generated password |
+| Database connection | Kubernetes and native binaries, with any database but SQLite: host, port, name, user and password; the [TLS mode](#the-database-connections-tls), and for `verify-ca` and `verify-full` the CA file; then an optional connection test, which connects as the auth server will. After a failed test, you can enter all of them again. | The database's usual port and user, the name `goiabada`, the TLS mode `prefer`, and the system's roots |
+| Database password | Local testing and production, with any database but SQLite. The wizard runs that database for you, and writes the TLS mode `prefer`. | A generated password |
+
+## The database connection's TLS
+
+The wizard writes `GOIABADA_DB_TLS_MODE`, which decides how the auth server protects its connection to MySQL, PostgreSQL or SQL Server. See the [environment variables](/reference/environment-variables/) for what each mode does.
+
+- **Local testing and production** write `prefer`. The database is a service on the Compose file's own network, so the connection never leaves the host.
+- **Kubernetes and native binaries** ask for one of `disable`, `prefer`, `require`, `verify-ca` and `verify-full`. Only `verify-full` makes sure the auth server reached your database and nothing in between. For `verify-ca` and `verify-full`, the wizard then asks for the CA file: a PEM file of the authorities your database's certificate chains to, or nothing for the system's roots. It refuses a file the auth server would refuse: one it can't read, or one that holds no certificate.
+- **Native binaries** write the CA file's absolute path as `GOIABADA_DB_TLS_CA_FILE`, so the file must stay where it is.
+- **Kubernetes** writes the certificates into a `goiabada-db-ca` ConfigMap in the manifest, mounts it read-only into the auth server's pods at `/etc/goiabada/db-ca/ca.pem`, and names that path as `GOIABADA_DB_TLS_CA_FILE`. Only the certificates are copied: a private key in the same file is left out.
+
+Whenever the mode it writes checks no certificate, the wizard warns you.
 
 ## The rate limiter under the Cluster traffic policy
 
@@ -131,6 +142,8 @@ The wizard exits with 0 when it's done or when you abort it, 1 when it can't fin
 | `--db-user` | Kubernetes and native: the database user. Default: `root`, `postgres` or `sa`. |
 | `--db-password` | The database password. Generated when you leave it out. |
 | `--db-password-file` | Reads the database password from a file, or from standard input with `-`. |
+| `--db-tls-mode` | Kubernetes and native: how the auth server protects its database connection: `disable`, `prefer`, `require`, `verify-ca` or `verify-full`. Default: `prefer`. |
+| `--db-tls-ca-file` | Kubernetes and native, with `--db-tls-mode` `verify-ca` or `verify-full`: the PEM file of the authorities your database's certificate is checked against. Default: the system's roots. |
 | `--skip-db-test` | Skips the database connection test. Without it, a failed test warns and the files are still written. |
 | `--gateway-traffic-policy` | Kubernetes: `cluster` or `local`. Default: `cluster`. |
 | `--network-policy` | Kubernetes: admits only Envoy and the admin console to the servers, with NetworkPolicies. |

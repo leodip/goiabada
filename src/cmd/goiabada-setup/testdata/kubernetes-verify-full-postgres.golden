@@ -31,12 +31,12 @@ metadata:
   name: goiabada-authserver-config
   namespace: "goiabada"
 data:
-  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com/p\"a$HOME #x: y"
+  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com"
   # Plain HTTP: the admin console's secret and tokens cross this hop unencrypted, so it assumes a network you trust.
   GOIABADA_AUTHSERVER_INTERNALBASEURL: "http://goiabada-authserver:9090"
-  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com/`id`\\q'r ${PATH}"
+  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com"
   GOIABADA_APPNAME: "Goiabada"
-  GOIABADA_ADMIN_EMAIL: "a\"b$c`d\\e #f'g@example.com"
+  GOIABADA_ADMIN_EMAIL: "admin@example.com"
   # Envoy, the one gateway in front, appends the address it received each connection from
   # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list.
   # Under the gateway's Cluster traffic policy, Envoy receives each connection from a node,
@@ -66,12 +66,14 @@ data:
   GOIABADA_DB_HOST: "goiabada-db"
   GOIABADA_DB_PORT: "5432"
   GOIABADA_DB_NAME: "goiabada"
-  GOIABADA_DB_USERNAME: "us\"er\\na$me #x: '"
+  GOIABADA_DB_USERNAME: "goiabada-user"
   # How the auth server protects its connection to the database: disable, prefer, require,
   # verify-ca or verify-full.
-  # prefer: encrypted when the database offers TLS, plain text when it offers none; no certificate is checked.
-  # Only verify-full makes sure it reached your database and nothing in between.
-  GOIABADA_DB_TLS_MODE: "prefer"
+  # verify-full: verify-ca, and the certificate must name the host the auth server connects to.
+  # The certificate is checked against the authorities in GOIABADA_DB_TLS_CA_FILE alone.
+  GOIABADA_DB_TLS_MODE: "verify-full"
+  # The goiabada-db-ca ConfigMap below, mounted into the auth server's pods.
+  GOIABADA_DB_TLS_CA_FILE: "/etc/goiabada/db-ca/ca.pem"
 
 ---
 # What the admin console reads.
@@ -82,10 +84,10 @@ metadata:
   name: goiabada-adminconsole-config
   namespace: "goiabada"
 data:
-  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com/p\"a$HOME #x: y"
+  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com"
   # Plain HTTP: the admin console's secret and tokens cross this hop unencrypted, so it assumes a network you trust.
   GOIABADA_AUTHSERVER_INTERNALBASEURL: "http://goiabada-authserver:9090"
-  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com/`id`\\q'r ${PATH}"
+  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com"
   # Envoy, the one gateway in front, appends the address it received each connection from
   # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list.
   # Under the gateway's Cluster traffic policy, Envoy receives each connection from a node,
@@ -98,6 +100,31 @@ data:
   GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES: ""
   # One log record per request answered, as every other generated configuration writes.
   GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS: "true"
+
+---
+# The authorities the auth server checks the database's certificate against, in place of the
+# system's roots, mounted into its pods at /etc/goiabada/db-ca/ca.pem. To change them, edit this
+# ConfigMap, or run the wizard again, and restart the auth server:
+#   kubectl rollout restart -n goiabada deployment/goiabada-authserver
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: goiabada-db-ca
+  namespace: "goiabada"
+data:
+  ca.pem: |
+    -----BEGIN CERTIFICATE-----
+    MIIBtjCCAVugAwIBAgIUO7ogQYjkO1ZsFYR1NpvEwkBOJM0wCgYIKoZIzj0EAwIw
+    LzEtMCsGA1UEAwwkZ29pYWJhZGEgc2V0dXAgd2l6YXJkIHRlc3QgYXV0aG9yaXR5
+    MCAXDTI2MTAxMTAzMzk0NFoYDzIxMjYwOTE3MDMzOTQ0WjAvMS0wKwYDVQQDDCRn
+    b2lhYmFkYSBzZXR1cCB3aXphcmQgdGVzdCBhdXRob3JpdHkwWTATBgcqhkjOPQIB
+    BggqhkjOPQMBBwNCAARWel4nBgxxq+aBgcKNqiOgVmJyDE9QpzOVMYtKu/cJRxvM
+    wBGrN025zQZ9lnjkr3E1Nmle5hjNHfVXGirumQLVo1MwUTAdBgNVHQ4EFgQU9Ll1
+    3OjlHMnNtb4LmArvYSSGXJowHwYDVR0jBBgwFoAU9Ll13OjlHMnNtb4LmArvYSSG
+    XJowDwYDVR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNJADBGAiEAz39tNA6/zTQs
+    aD1JT/HXiILZMcONhZWhYWWX7eENEtUCIQCgrLoPggrsMF0MYySI5iTY2f9TcugR
+    yGECTcKV8r7nHA==
+    -----END CERTIFICATE-----
 
 ---
 apiVersion: apps/v1
@@ -222,6 +249,10 @@ spec:
               name: goiabada-encryption-key
               key: aes-encryption-key-previous
               optional: true
+        volumeMounts:
+        - name: goiabada-db-ca
+          mountPath: /etc/goiabada/db-ca
+          readOnly: true
         # Allows the container up to 5 minutes (60 failures, 5s apart) to start listening;
         # liveness and readiness wait for it, and its first success ends it.
         # The auth server opens the database, runs any outstanding migrations and seeds an
@@ -273,6 +304,10 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+      volumes:
+      - name: goiabada-db-ca
+        configMap:
+          name: goiabada-db-ca
 
 ---
 # A voluntary disruption, such as a node drain or a cluster upgrade, evicts one pod at a

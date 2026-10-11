@@ -67,6 +67,14 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	fmt.Fprintf(&sb, "  GOIABADA_DB_PORT: %s\n", yamlQuote(config.DBPort))
 	fmt.Fprintf(&sb, "  GOIABADA_DB_NAME: %s\n", yamlQuote(config.DBName))
 	fmt.Fprintf(&sb, "  GOIABADA_DB_USERNAME: %s\n", yamlQuote(config.DBUsername))
+	for _, line := range config.dbTLSComment() {
+		fmt.Fprintf(&sb, "  # %s\n", line)
+	}
+	fmt.Fprintf(&sb, "  GOIABADA_DB_TLS_MODE: %s\n", yamlQuote(config.DBTLSMode))
+	if config.DBTLSCA != "" {
+		fmt.Fprintf(&sb, "  # The %s ConfigMap below, mounted into the auth server's pods.\n", dbCAConfigMap)
+		fmt.Fprintf(&sb, "  GOIABADA_DB_TLS_CA_FILE: %s\n", yamlQuote(dbCAFileInPod))
+	}
 	sb.WriteString("\n")
 
 	writeConfigMapHead(&sb, ns, "goiabada-adminconsole-config", "What the admin console reads.")
@@ -74,6 +82,10 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	writeKubernetesTrust(&sb, "ADMINCONSOLE", config.GatewayTrafficPolicy)
 	writeObservability(&sb, "ADMINCONSOLE", config.exposedMetricsPort(adminConsoleMetricsPort))
 	sb.WriteString("\n")
+
+	if config.DBTLSCA != "" {
+		writeDatabaseCA(&sb, ns, config.DBTLSCA)
+	}
 
 	// Auth Server Deployment
 	writeDeploymentHead(&sb, ns, "goiabada-authserver", config.annotatedMetricsPort(authServerMetricsPort),
@@ -122,6 +134,12 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		previousKeyRef{"GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS", goiabadaSecrets, "auth-session-enc-key-previous"},
 		previousKeyRef{"GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS", encryptionKeySecret, "aes-encryption-key-previous"},
 	)
+	if config.DBTLSCA != "" {
+		sb.WriteString("        volumeMounts:\n")
+		fmt.Fprintf(&sb, "        - name: %s\n", dbCAConfigMap)
+		fmt.Fprintf(&sb, "          mountPath: %s\n", dbCAMountDir)
+		sb.WriteString("          readOnly: true\n")
+	}
 	writeProbes(&sb, 9090,
 		"The auth server opens the database, runs any outstanding migrations and seeds an",
 		"empty one before it listens; with several replicas, the first pod migrates and the",
@@ -136,6 +154,12 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		"with them. Cloud cores are often slower than the one measured, and the 100m request is all",
 		"the scheduler guarantees on a busy node. For a higher sign-in peak, raise the limit or add",
 		"replicas.")
+	if config.DBTLSCA != "" {
+		sb.WriteString("      volumes:\n")
+		fmt.Fprintf(&sb, "      - name: %s\n", dbCAConfigMap)
+		sb.WriteString("        configMap:\n")
+		fmt.Fprintf(&sb, "          name: %s\n", dbCAConfigMap)
+	}
 	sb.WriteString("\n")
 	writeDisruptionBudget(&sb, ns, "goiabada-authserver")
 	sb.WriteString("\n")
@@ -400,6 +424,37 @@ func generateKubernetesSecrets(config *Config, paths outputPaths) string {
 	fmt.Fprintf(&sb, "  aes-encryption-key: %s\n", base64Encode(config.AESEncryptionKey))
 
 	return sb.String()
+}
+
+// The CA the auth server checks the database's certificate against, on Kubernetes: a ConfigMap of
+// its own, since a certificate is no secret, mounted read-only into the auth server's pods at a
+// fixed path its ConfigMap names (#502 decision 8).
+const (
+	dbCAConfigMap = "goiabada-db-ca"
+	dbCAMountDir  = "/etc/goiabada/db-ca"
+	dbCAFileName  = "ca.pem"
+	dbCAFileInPod = dbCAMountDir + "/" + dbCAFileName
+)
+
+// writeDatabaseCA writes the ConfigMap holding the certificates of the CA file the operator named,
+// as PEM, which is ASCII lines alone, so each is written as it is inside a literal block.
+func writeDatabaseCA(sb *strings.Builder, ns, certificates string) {
+	sb.WriteString("---\n")
+	sb.WriteString("# The authorities the auth server checks the database's certificate against, in place of the\n")
+	fmt.Fprintf(sb, "# system's roots, mounted into its pods at %s. To change them, edit this\n", dbCAFileInPod)
+	sb.WriteString("# ConfigMap, or run the wizard again, and restart the auth server:\n")
+	fmt.Fprintf(sb, "#   kubectl rollout restart -n %s deployment/goiabada-authserver\n", ns)
+	sb.WriteString("apiVersion: v1\n")
+	sb.WriteString("kind: ConfigMap\n")
+	sb.WriteString("metadata:\n")
+	fmt.Fprintf(sb, "  name: %s\n", dbCAConfigMap)
+	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
+	sb.WriteString("data:\n")
+	fmt.Fprintf(sb, "  %s: |\n", dbCAFileName)
+	for _, line := range strings.Split(strings.TrimSuffix(certificates, "\n"), "\n") {
+		fmt.Fprintf(sb, "    %s\n", line)
+	}
+	sb.WriteString("\n")
 }
 
 // writeSecretHead writes the Secret name's fields down to its data.

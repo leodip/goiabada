@@ -42,6 +42,13 @@ func generateEnvFile(config *Config, paths outputPaths) string {
 		writeEnvVariable(&sb, "GOIABADA_DB_NAME", config.DBName)
 		writeEnvVariable(&sb, "GOIABADA_DB_USERNAME", config.DBUsername)
 		writeEnvVariable(&sb, "GOIABADA_DB_PASSWORD", config.DBPassword)
+		for _, line := range config.dbTLSComment() {
+			fmt.Fprintf(&sb, "# %s\n", line)
+		}
+		writeEnvVariable(&sb, "GOIABADA_DB_TLS_MODE", config.DBTLSMode)
+		if config.DBTLSCAFile != "" {
+			writeEnvVariable(&sb, "GOIABADA_DB_TLS_CA_FILE", config.DBTLSCAFile)
+		}
 	}
 	sb.WriteString("\n")
 

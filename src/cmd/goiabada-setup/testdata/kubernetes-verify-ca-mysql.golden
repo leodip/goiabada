@@ -31,12 +31,12 @@ metadata:
   name: goiabada-authserver-config
   namespace: "goiabada"
 data:
-  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com/p\"a$HOME #x: y"
+  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com"
   # Plain HTTP: the admin console's secret and tokens cross this hop unencrypted, so it assumes a network you trust.
   GOIABADA_AUTHSERVER_INTERNALBASEURL: "http://goiabada-authserver:9090"
-  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com/`id`\\q'r ${PATH}"
+  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com"
   GOIABADA_APPNAME: "Goiabada"
-  GOIABADA_ADMIN_EMAIL: "a\"b$c`d\\e #f'g@example.com"
+  GOIABADA_ADMIN_EMAIL: "admin@example.com"
   # Envoy, the one gateway in front, appends the address it received each connection from
   # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list.
   # Under the gateway's Cluster traffic policy, Envoy receives each connection from a node,
@@ -62,16 +62,17 @@ data:
   GOIABADA_AUTHSERVER_RATELIMITER_ENABLED: "false"
   # One log record per request answered, as every other generated configuration writes.
   GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS: "true"
-  GOIABADA_DB_TYPE: "postgres"
+  GOIABADA_DB_TYPE: "mysql"
   GOIABADA_DB_HOST: "goiabada-db"
-  GOIABADA_DB_PORT: "5432"
+  GOIABADA_DB_PORT: "3306"
   GOIABADA_DB_NAME: "goiabada"
-  GOIABADA_DB_USERNAME: "us\"er\\na$me #x: '"
+  GOIABADA_DB_USERNAME: "goiabada-user"
   # How the auth server protects its connection to the database: disable, prefer, require,
   # verify-ca or verify-full.
-  # prefer: encrypted when the database offers TLS, plain text when it offers none; no certificate is checked.
-  # Only verify-full makes sure it reached your database and nothing in between.
-  GOIABADA_DB_TLS_MODE: "prefer"
+  # verify-ca: require, and the certificate must chain to an authority you trust; its host name is not checked.
+  # The certificate is checked against the system's roots; GOIABADA_DB_TLS_CA_FILE names a
+  # PEM file of the authorities to trust instead.
+  GOIABADA_DB_TLS_MODE: "verify-ca"
 
 ---
 # What the admin console reads.
@@ -82,10 +83,10 @@ metadata:
   name: goiabada-adminconsole-config
   namespace: "goiabada"
 data:
-  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com/p\"a$HOME #x: y"
+  GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com"
   # Plain HTTP: the admin console's secret and tokens cross this hop unencrypted, so it assumes a network you trust.
   GOIABADA_AUTHSERVER_INTERNALBASEURL: "http://goiabada-authserver:9090"
-  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com/`id`\\q'r ${PATH}"
+  GOIABADA_ADMINCONSOLE_BASEURL: "https://admin.example.com"
   # Envoy, the one gateway in front, appends the address it received each connection from
   # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list.
   # Under the gateway's Cluster traffic policy, Envoy receives each connection from a node,

@@ -20,17 +20,18 @@ GOIABADA_ADMIN_PASSWORD="admin-password"
 # =============================================================================
 # Database settings
 # =============================================================================
-GOIABADA_DB_TYPE="mssql"
+GOIABADA_DB_TYPE="postgres"
 GOIABADA_DB_HOST="goiabada-db"
-GOIABADA_DB_PORT="1433"
+GOIABADA_DB_PORT="5432"
 GOIABADA_DB_NAME="goiabada"
 GOIABADA_DB_USERNAME="goiabada-user"
 GOIABADA_DB_PASSWORD="db-password"
 # How the auth server protects its connection to the database: disable, prefer, require,
 # verify-ca or verify-full.
-# prefer: encrypted when the database offers TLS, plain text when it offers none; no certificate is checked.
-# Only verify-full makes sure it reached your database and nothing in between.
-GOIABADA_DB_TLS_MODE="prefer"
+# verify-full: verify-ca, and the certificate must name the host the auth server connects to.
+# The certificate is checked against the authorities in GOIABADA_DB_TLS_CA_FILE alone.
+GOIABADA_DB_TLS_MODE="verify-full"
+GOIABADA_DB_TLS_CA_FILE="/etc/ssl/goiabada/db-ca.pem"
 
 # =============================================================================
 # Auth server settings

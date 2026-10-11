@@ -2,13 +2,21 @@ package main
 
 // Config holds all configuration values
 type Config struct {
-	Deployment          *deployment
-	Engine              *engine
-	DBPort              string
-	DBHost              string
-	DBName              string
-	DBUsername          string
-	DBPassword          string
+	Deployment *deployment
+	Engine     *engine
+	DBPort     string
+	DBHost     string
+	DBName     string
+	DBUsername string
+	DBPassword string
+	// DBTLSMode is GOIABADA_DB_TLS_MODE, one of the five modes, for an engine with a server: asked
+	// by Kubernetes and native binaries, prefer on Compose, whose database is on its own network.
+	// DBTLSCAFile is the absolute path of the CA file the operator named, for verify-ca and
+	// verify-full only, empty for the system's roots, and DBTLSCA the certificates it holds, as PEM:
+	// native binaries name the file, and Kubernetes carries the certificates in a ConfigMap (#502).
+	DBTLSMode           string
+	DBTLSCAFile         string
+	DBTLSCA             string
 	AuthServerURL       string
 	AdminConsoleURL     string
 	AdminEmail          string
@@ -61,6 +69,26 @@ const rateLimitsDocsURL = "https://goiabada.dev/reference/environment-variables/
 // so the per-IP limits would count everyone arriving through one node together (#396 decision 9).
 func (c *Config) rateLimiterDefault() bool {
 	return !c.Deployment.servedByEnvoyGateway || c.GatewayTrafficPolicy != trafficPolicyCluster
+}
+
+// dbTLSComment is the comment above the TLS mode in an output that asks it, Kubernetes and native
+// binaries: what the mode chosen does, and what a verifying one checks the certificate against.
+func (c *Config) dbTLSComment() []string {
+	lines := []string{
+		"How the auth server protects its connection to the database: disable, prefer, require,",
+		"verify-ca or verify-full.",
+		c.DBTLSMode + ": " + tlsModeDescription(c.DBTLSMode) + ".",
+	}
+	switch {
+	case !checksCertificate(c.DBTLSMode):
+		lines = append(lines, "Only verify-full makes sure it reached your database and nothing in between.")
+	case c.DBTLSCAFile == "":
+		lines = append(lines, "The certificate is checked against the system's roots; GOIABADA_DB_TLS_CA_FILE names a",
+			"PEM file of the authorities to trust instead.")
+	default:
+		lines = append(lines, "The certificate is checked against the authorities in GOIABADA_DB_TLS_CA_FILE alone.")
+	}
+	return lines
 }
 
 // aesKeyComment is the warning every output writes beside the AES key: it is the one secret whose
