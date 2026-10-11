@@ -113,13 +113,15 @@ var engines = []*engine{
 		mount:                   "/var/lib/postgresql",
 		composeEnvironment:      []composeEnvVar{{name: "POSTGRES_DB", value: "goiabada"}},
 		composePasswordVariable: "POSTGRES_PASSWORD",
-		healthcheck:             "pg_isready -U postgres",
-		healthInterval:          "1s",
-		healthTimeout:           "2s",
-		connection:              postgresConnection,
-		maintenanceConnection:   postgresMaintenanceConnection,
-		existenceQuery:          "SELECT COUNT(*) FROM pg_database WHERE datname = $1",
-		emptinessQuery:          "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'",
+		// Over TCP: the image's entrypoint initialises a fresh volume with a server listening on
+		// the socket alone, which a socket probe finds ready before the real server listens (#551).
+		healthcheck:           "pg_isready -h 127.0.0.1 -U postgres",
+		healthInterval:        "1s",
+		healthTimeout:         "2s",
+		connection:            postgresConnection,
+		maintenanceConnection: postgresMaintenanceConnection,
+		existenceQuery:        "SELECT COUNT(*) FROM pg_database WHERE datname = $1",
+		emptinessQuery:        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'",
 	},
 	{ //nolint:gosec // G101: composePasswordVariable names the variable the password is set in, and holds no password
 		number:                  "3",

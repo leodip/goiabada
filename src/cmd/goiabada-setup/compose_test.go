@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -165,6 +166,78 @@ func TestComposeFile_PinsTheDatabaseMajor(t *testing.T) {
 	if checked == 0 {
 		t.Fatal("no Compose golden case runs a database server, so this checked nothing")
 	}
+}
+
+// tcpHealthchecks is, per engine that runs a server, the program its generated healthcheck runs and
+// the arguments that make it ask over TCP. Each image's entrypoint initialises a fresh data
+// directory with a server no TCP client reaches, so a healthcheck that took the socket would pass
+// against it and start the auth server into the gap before the real server listens (#551).
+var tcpHealthchecks = map[string]struct {
+	program string
+	tcp     []string
+}{
+	// The entrypoint's init server runs with --skip-networking, and mysqladmin takes the socket
+	// for localhost unless told otherwise.
+	"mysql": {program: "mysqladmin", tcp: []string{"--protocol", "tcp"}},
+	// The entrypoint's init server listens on the socket alone, and with no host pg_isready takes
+	// the socket; a host starting with / would name a socket directory, so the host is an address.
+	"postgres": {program: "pg_isready", tcp: []string{"-h", "127.0.0.1"}},
+	// sqlcmd on Linux reaches a server over TCP only.
+	"mssql": {program: "/opt/mssql-tools18/bin/sqlcmd", tcp: []string{"-S", "localhost"}},
+}
+
+// Every database healthcheck a generated Compose file runs asks over TCP, so only the real server
+// answers it and the first docker compose up -d on a fresh volume starts every service. A socket
+// healthcheck passed against PostgreSQL's init server and failed that first start (#551).
+func TestComposeFile_ProbesTheDatabaseOverTCP(t *testing.T) {
+	for _, e := range engines {
+		if _, ok := tcpHealthchecks[e.name]; e.hasServer && !ok {
+			t.Errorf("%s runs a server and tcpHealthchecks has no row saying how its healthcheck reaches TCP", e.label)
+		}
+	}
+	checked := 0
+	for _, testCase := range composeCases(t) {
+		config := testCase.config()
+		if !config.Engine.hasServer {
+			continue
+		}
+		want, ok := tcpHealthchecks[config.Engine.name]
+		if !ok {
+			continue
+		}
+		t.Run(testCase.name, func(t *testing.T) {
+			doc := only[map[string]any](t, toAny(yamlDocuments(t, descriptionOf(config))), "the Compose file's documents")
+			test := at[[]any](t, doc, "services", config.Engine.composeService, "healthcheck", "test")
+			if len(test) != 2 || test[0] != "CMD-SHELL" {
+				t.Fatalf("healthcheck test is %q, want CMD-SHELL and a command", test)
+			}
+			command, ok := composeInterpolate(test[1].(string))
+			if !ok {
+				t.Fatalf("healthcheck command %q has a $ Compose would interpolate", test[1])
+			}
+			fields := strings.Fields(command)
+			if len(fields) == 0 || fields[0] != want.program {
+				t.Errorf("healthcheck %q does not run %s", command, want.program)
+			}
+			if !containsRun(fields, want.tcp) {
+				t.Errorf("healthcheck %q does not pass %q, so it may ask over the socket", command, strings.Join(want.tcp, " "))
+			}
+		})
+		checked++
+	}
+	if checked == 0 {
+		t.Fatal("no Compose golden case runs a database server, so this checked nothing")
+	}
+}
+
+// containsRun is whether run appears in fields as consecutive elements.
+func containsRun(fields, run []string) bool {
+	for i := 0; i+len(run) <= len(fields); i++ {
+		if slices.Equal(fields[i:i+len(run)], run) {
+			return true
+		}
+	}
+	return false
 }
 
 // developmentStacks are the files that run a database for development and testing: the dev

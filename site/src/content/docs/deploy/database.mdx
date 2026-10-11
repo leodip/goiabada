@@ -159,7 +159,7 @@ A cluster you're trying Goiabada on may have no database to give it. This runs o
            - containerPort: 5432
            readinessProbe:
              exec:
-               command: ["pg_isready", "-U", "goiabada", "-d", "goiabada"]
+               command: ["pg_isready", "-h", "127.0.0.1", "-U", "goiabada", "-d", "goiabada"]
              periodSeconds: 5
            volumeMounts:
            - name: data
