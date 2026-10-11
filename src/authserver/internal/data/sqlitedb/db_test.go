@@ -3,10 +3,12 @@ package sqlitedb
 import (
 	"context"
 	"database/sql"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -120,4 +122,78 @@ func descriptorsTo(t *testing.T, path string) int {
 		}
 	}
 	return n
+}
+
+// endlessQuery never finishes on its own, so the context it runs under is what ends it, always
+// while SQLite is stepping it.
+const endlessQuery = "WITH RECURSIVE c(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM c) SELECT count(*) FROM c"
+
+// interruptAQuery runs endlessQuery until its context ends, which the driver answers by
+// interrupting the connection. SQLite clears an interrupt only when the connection's next
+// statement starts, so the driver reports the connection unusable and database/sql closes it;
+// the pool's next statement runs on a connection it opens in its place. That replacement is what
+// both tests below are about, so its absence fails them rather than letting them pass on the
+// connection New set up.
+func interruptAQuery(t *testing.T, db *Database) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	var n int64
+	err := db.DB.QueryRowContext(ctx, endlessQuery).Scan(&n)
+	require.ErrorIs(t, err, context.DeadlineExceeded, "the query ends with its context")
+	require.Eventually(t, func() bool { return db.DB.Stats().OpenConnections == 0 }, time.Second, 10*time.Millisecond,
+		"the interrupted connection is closed rather than kept, so the next statement opens another")
+}
+
+// A connection the pool opens after an interrupted query is configured as the first was: foreign
+// keys enforced and a busy timeout set. Both are per-connection settings, and New applied them to
+// the pool's first connection alone, so a request whose context ended mid-query left every later
+// statement of the process with foreign keys off and no busy timeout (#562).
+func TestNew_EveryConnectionIsConfigured(t *testing.T) {
+	db, err := New(context.Background(), "file:"+filepath.ToSlash(filepath.Join(t.TempDir(), "s.db")), false)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	interruptAQuery(t, db)
+
+	var foreignKeys, busyTimeout int
+	require.NoError(t, db.DB.QueryRowContext(context.Background(), "PRAGMA foreign_keys;").Scan(&foreignKeys))
+	require.NoError(t, db.DB.QueryRowContext(context.Background(), "PRAGMA busy_timeout;").Scan(&busyTimeout))
+	assert.Equal(t, 1, foreignKeys, "foreign keys are enforced on the replacement connection")
+	assert.Equal(t, 5000, busyTimeout, "and it waits 5 seconds for a lock")
+}
+
+// Close leaves the database in one file even when the last query was interrupted. SQLite folds the
+// WAL into the database file when its last connection closes, but a checkpoint gives up while an
+// interrupt is pending, so the interrupted connection, the only one, closed and left the -wal and
+// -shm beside the file, with the data in them. A server stopped as its first query ran did exactly
+// that (#562): the -wal TestMain_AStopLeavesTheSQLiteDatabaseInOneFile found under load.
+func TestDatabase_CloseLeavesOneFileAfterAnInterruptedQuery(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.db")
+	db, err := New(context.Background(), "file:"+filepath.ToSlash(path), false)
+	require.NoError(t, err)
+	_, err = db.DB.ExecContext(context.Background(), "CREATE TABLE t (x INTEGER)")
+	require.NoError(t, err)
+	_, err = db.DB.ExecContext(context.Background(), "INSERT INTO t VALUES (42)")
+	require.NoError(t, err)
+
+	interruptAQuery(t, db)
+	require.NoError(t, db.Close())
+
+	for _, suffix := range []string{"-wal", "-shm"} {
+		_, statErr := os.Stat(path + suffix)
+		require.ErrorIsf(t, statErr, fs.ErrNotExist, "the database's %s file is left beside it", suffix)
+	}
+
+	// The database file alone, copied as a backup of it would be, holds the row.
+	backup := filepath.Join(t.TempDir(), "backup.db")
+	contents, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(backup, contents, 0o600))
+	copied, err := sql.Open("sqlite", "file:"+filepath.ToSlash(backup)+"?mode=ro")
+	require.NoError(t, err)
+	defer func() { _ = copied.Close() }()
+	var x int
+	require.NoError(t, copied.QueryRowContext(context.Background(), "SELECT x FROM t").Scan(&x))
+	assert.Equal(t, 42, x)
 }

@@ -99,7 +99,8 @@ func New(db *sql.DB, flavor sqlbuilder.Flavor, logSQL bool) *Database {
 // Close closes the connection pool, once nothing uses it any more: main defers it past the
 // server's drain, and datafactory closes a database whose start failed. On SQLite it is also what
 // keeps the database in one file: closing the last connection checkpoints the WAL into it and
-// removes goiabada.db-wal and goiabada.db-shm. Left open, as it was until #542's live check, a
+// removes goiabada.db-wal and goiabada.db-shm, which sqlitedb's Close makes sure of when an
+// interrupted connection was the last (#562). Left open, as it was until #542's live check, a
 // stopped server left most of the data in goiabada.db-wal, so a copy of goiabada.db alone was a
 // backup of almost nothing, and a directory another user took over still started, read-only.
 func (d *Database) Close() error {
