@@ -89,18 +89,19 @@ func (t *TokenIssuer) generateIdToken(ctx context.Context, tx *sql.Tx, settings 
 	return t.generateIdTokenCore(ctx, tx, settings, input, now, signingKey, keyIdentifier)
 }
 
-// claimMapper builds the user-claims mapper for one token type. The two fields after the port are
+// claimMapper builds the user-claims mapper for one token type. The fields after the port are
 // issuance's side of the two divergences userclaims keeps as inputs rather than merging: the base
-// URL is the one injected into this issuer, and the include flag is the token type's own (#387
+// URLs are the ones injected into this issuer, and the include flag is the token type's own (#387
 // decision 5). updated_at was a third until it turned out to be a defect: issuance wrote it for
 // any scope but a lone openid, and in an access token for a lone openid too, because the audience
 // loop used to append a scope to the slice the claim block read. It now rides with the profile
 // scope, as it does at /userinfo and as this repository's own documentation has always said.
 func (t *TokenIssuer) claimMapper(inclusion userclaims.Inclusion) userclaims.Mapper {
 	return userclaims.Mapper{
-		Database:  t.database,
-		BaseURL:   t.baseURL,
-		Inclusion: inclusion,
+		Database:            t.database,
+		BaseURL:             t.baseURL,
+		AdminConsoleBaseURL: t.adminConsoleBaseURL,
+		Inclusion:           inclusion,
 	}
 }
 

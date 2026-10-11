@@ -29,7 +29,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		rr := httptest.NewRecorder()
@@ -50,7 +50,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		jwtToken := oauth.JwtToken{
@@ -80,7 +80,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		jwtToken := oauth.JwtToken{
@@ -110,7 +110,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		sub := fake.UUID()
 
@@ -148,7 +148,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		sub := fake.UUID()
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
@@ -272,7 +272,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		sub := fake.UUID()
 		req := userInfoRequestForScopes(t, sub, "email")
@@ -325,7 +325,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		sub := fake.UUID()
 		req := userInfoRequestForScopes(t, sub, "profile")
@@ -374,7 +374,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		sub := fake.UUID()
 		req := userInfoRequestForScopes(t, sub, "groups attributes")
@@ -431,15 +431,17 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
-	// Divergence 2, userinfo's side: the base URL is the one the handler was handed at
-	// construction, as issuance's is the one injected into NewTokenIssuer (#434). The mapper
-	// takes it as an input rather than reading it back, so each caller keeps the source it has.
-	t.Run("userinfo builds profile and picture from the base URL it was handed", func(t *testing.T) {
+	// Divergence 2, userinfo's side: the base URLs are the ones the handler was handed at
+	// construction, as issuance's are the ones injected into NewTokenIssuer (#434). The mapper
+	// takes them as inputs rather than reading them back, so each caller keeps the source it has.
+	// profile is the admin console's /account/profile, the user's profile page, and picture stays
+	// on the auth server, which serves it (#527).
+	t.Run("userinfo builds profile and picture from the base URLs it was handed", func(t *testing.T) {
 		jsonWriter := handlersmocks.NewJSONWriter(t)
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		sub := fake.UUID()
 		req := userInfoRequestForScopes(t, sub, "profile")
@@ -460,7 +462,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(true, nil)
 
 		jsonWriter.On("EncodeJSON", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
-			assert.Equal(t, "https://auth.test/account/profile", claims["profile"])
+			assert.Equal(t, "https://admin.test/account/profile", claims["profile"])
 			assert.Equal(t, "https://auth.test/userinfo/picture/"+sub, claims["picture"])
 			return true
 		})).Return()
@@ -544,7 +546,7 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 
 			// templateFS is nil because JSONError renders no template; a 500 through the
 			// page writer would panic here, which is the fail-loud direction.
-			handler := HandleUserInfoGetPost(render.New(nil), database, auditLogger, testBaseURL)
+			handler := HandleUserInfoGetPost(render.New(nil), database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 			req, _ := http.NewRequest("GET", "/userinfo", nil)
 			jwtToken := oauth.JwtToken{

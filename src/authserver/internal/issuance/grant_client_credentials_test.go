@@ -15,7 +15,7 @@ import (
 
 func TestIssueClientCredentialsGrant(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -126,7 +126,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 
 func TestIssueClientCredentialsGrant_InvalidScope(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",

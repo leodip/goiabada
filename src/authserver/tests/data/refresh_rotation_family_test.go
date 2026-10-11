@@ -252,7 +252,7 @@ func requireNoRedeemableChild(t *testing.T, f *family, result rotationResult) {
 }
 
 func refreshIssuerOn(db data.Database) *issuance.TokenIssuer {
-	return issuance.NewTokenIssuer(db, implicitTestBaseURL, dataCipher, noBumps{})
+	return issuance.NewTokenIssuer(db, implicitTestBaseURL, "http://localhost:9091", dataCipher, noBumps{})
 }
 
 type rotationResult struct {

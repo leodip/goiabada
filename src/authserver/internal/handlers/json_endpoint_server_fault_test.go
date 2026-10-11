@@ -73,7 +73,7 @@ func TestHandleTokenPost_AServerFaultAnswersJSON(t *testing.T) {
 func TestHandleUserInfoGetPost_AServerFaultAnswersJSON(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	handler := HandleUserInfoGetPost(render.New(nil), database,
-		handlersmocks.NewAuditLogger(t), testBaseURL)
+		handlersmocks.NewAuditLogger(t), testBaseURL, testAdminConsoleBaseURL)
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user123").
 		Return(nil, errs.New("the database went away")).Once()

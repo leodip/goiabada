@@ -52,7 +52,7 @@ func newROPCGrantFixture(t *testing.T) ropcGrantFixture {
 		Return(nil)
 
 	return ropcGrantFixture{
-		issuer: NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil),
+		issuer: NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil),
 		settings: &record.Settings{
 			Issuer:                                  "https://test-issuer.com",
 			TokenExpirationInSeconds:                600,
@@ -125,7 +125,7 @@ func TestIssuePasswordGrant_TheIssuerStampsTheInstantNotTheCaller(t *testing.T) 
 // database call.
 func TestMintROPCRefreshTokens_ATokenWithNoInstantIsRefused(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	response, err := issuer.mintROPCRefreshTokens(context.Background(), nil, &record.Settings{},
 		&record.RefreshToken{

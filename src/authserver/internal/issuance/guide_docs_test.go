@@ -46,7 +46,7 @@ var (
 func signedInIDTokenClaims(t *testing.T) []string {
 	t.Helper()
 	mockDB := datamocks.NewDatabase(t)
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 	code := armCodeMint(t, mockDB, func(string) {})
 	code.Scope = "openid email"
 	code.Nonce = "n-0S6_WzA2Mj"
@@ -66,7 +66,7 @@ func signedInIDTokenClaims(t *testing.T) []string {
 func serviceAccessTokenClaims(t *testing.T) []string {
 	t.Helper()
 	mockDB := datamocks.NewDatabase(t)
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),

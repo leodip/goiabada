@@ -219,7 +219,7 @@ func TestIssueRefreshTokenGrant_ClaimsMintsThenBumpsTheSession(t *testing.T) {
 	var order []string
 	note := func(what string) { order = append(order, what) }
 	sessions := &fakeSessions{session: &record.UserSession{Id: 3, UserId: 5}, note: note}
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
 
 	input := codeRefreshInput()
 	input.ScopeRequested = "openid"
@@ -251,7 +251,7 @@ func TestIssueRefreshTokenGrant_ClaimsMintsThenBumpsTheSession(t *testing.T) {
 func TestIssueRefreshTokenGrant_ATokenBoundToNoSessionBumpsNothing(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	sessions := &fakeSessions{}
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
 
 	input := codeRefreshInput()
 	input.RefreshToken.SessionIdentifier = ""
@@ -274,7 +274,7 @@ func TestIssueRefreshTokenGrant_APasswordGrantsTokenBumpsNothing(t *testing.T) {
 	var order []string
 	note := func(what string) { order = append(order, what) }
 	sessions := &fakeSessions{note: note}
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
 
 	input := ropcRefreshInput()
 	input.RefreshToken.SessionIdentifier = "some-other-users-session"
@@ -308,7 +308,7 @@ func TestIssueRefreshTokenGrant_TheMintReadsThePictureOnTheRotationTransaction(t
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
-			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{session: &record.UserSession{}})
+			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, &fakeSessions{session: &record.UserSession{}})
 
 			input := tc.input()
 			input.ScopeRequested = "openid profile"
@@ -349,7 +349,7 @@ func TestIssueRefreshTokenGrant_AReplayContainsItsFamilyAndGoesNoFurther(t *test
 				t.Run(fmt.Sprintf("%s, %d members revoked, record written %v", tc.name, revokedCount, recorded), func(t *testing.T) {
 					mockDB := datamocks.NewDatabase(t)
 					sessions := &fakeSessions{}
-					issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+					issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
 
 					input := *tc.input
 					replayed := *input.RefreshToken
@@ -403,7 +403,7 @@ func TestIssueRefreshTokenGrant_AFailedContainmentIsAFault(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
-			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{})
+			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, &fakeSessions{})
 
 			input := codeRefreshInput()
 			input.RefreshToken.Revoked = true
@@ -432,7 +432,7 @@ func TestIssueRefreshTokenGrant_AContainmentThatLosesTheKeyRunsOnceMore(t *testi
 
 	t.Run("the second attempt finds the winner's record", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
-		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{})
+		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, &fakeSessions{})
 
 		input := codeRefreshInput()
 		input.RefreshToken.Revoked = true
@@ -457,7 +457,7 @@ func TestIssueRefreshTokenGrant_AContainmentThatLosesTheKeyRunsOnceMore(t *testi
 
 	t.Run("a second loss is a fault and is not retried again", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
-		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{})
+		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, &fakeSessions{})
 
 		input := codeRefreshInput()
 		input.RefreshToken.Revoked = true
@@ -513,7 +513,7 @@ func TestIssueRefreshTokenGrant_FlowGate(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
-			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{})
+			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, &fakeSessions{})
 
 			input := codeRefreshInput()
 			if tc.ropcToken {
@@ -557,7 +557,7 @@ func TestIssueRefreshTokenGrant_ContainmentPrecedesTheFlowGate(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
-			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{})
+			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, &fakeSessions{})
 
 			input := tc.input
 			input.Client = &record.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}
@@ -588,7 +588,7 @@ func TestIssueRefreshTokenGrant_ContainmentPrecedesTheFlowGate(t *testing.T) {
 func TestIssueRefreshTokenGrant_ALostClaimContainsAndMintsNothing(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	sessions := &fakeSessions{}
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
 	logs := logtest.CaptureSlog(t)
 
 	input := codeRefreshInput()
@@ -612,7 +612,7 @@ func TestIssueRefreshTokenGrant_ALostClaimContainsAndMintsNothing(t *testing.T) 
 
 func TestIssueRefreshTokenGrant_AClaimFailureIsAFault(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{})
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, &fakeSessions{})
 
 	input := codeRefreshInput()
 	failure := errs.New("connection refused")
@@ -644,7 +644,7 @@ func TestIssueRefreshTokenGrant_AFamilyRevokedInTheGapRollsTheRotationBack(t *te
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
 			sessions := &fakeSessions{}
-			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
 			var order []string
 			note := func(what string) { order = append(order, what) }
 			logs := logtest.CaptureSlog(t)
@@ -672,7 +672,7 @@ func TestIssueRefreshTokenGrant_AFamilyRevokedInTheGapRollsTheRotationBack(t *te
 func TestIssueRefreshTokenGrant_AFailedFamilyReadIsAFault(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	sessions := &fakeSessions{}
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
 
 	input := codeRefreshInput()
 	failure := errs.New("connection refused")
@@ -697,7 +697,7 @@ func TestIssueRefreshTokenGrant_AFailedFamilyReadIsAFault(t *testing.T) {
 func TestIssueRefreshTokenGrant_AFailedMintBumpsNothing(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	sessions := &fakeSessions{}
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
 
 	input := codeRefreshInput()
 	failure := errs.New("connection refused")
@@ -718,7 +718,7 @@ func TestIssueRefreshTokenGrant_AFailedMintBumpsNothing(t *testing.T) {
 func TestIssueRefreshTokenGrant_AFailedROPCMintIsAFault(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	sessions := &fakeSessions{}
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
 
 	input := ropcRefreshInput()
 	failure := errs.New("connection refused")
@@ -740,7 +740,7 @@ func TestIssueRefreshTokenGrant_AFailedROPCMintIsAFault(t *testing.T) {
 func TestIssueRefreshTokenGrant_ARefusedCommitHandsOutNothing(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	sessions := &fakeSessions{}
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
 
 	input := codeRefreshInput()
 	commitFailure := errs.New("commit refused")
@@ -785,7 +785,7 @@ func TestIssueRefreshTokenGrant_TakesTheTokensOwnersRowFirst(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
-			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{session: &record.UserSession{}})
+			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, &fakeSessions{session: &record.UserSession{}})
 
 			input := tc.input()
 			var order []string
@@ -811,7 +811,7 @@ func TestIssueRefreshTokenGrant_TakesTheTokensOwnersRowFirst(t *testing.T) {
 func TestIssueRefreshTokenGrant_AFailedAcquisitionIsAFaultBeforeTheClaim(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	sessions := &fakeSessions{}
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
 
 	input := codeRefreshInput()
 	failure := errs.New("lock wait timeout")
@@ -851,7 +851,7 @@ func TestIssueRefreshTokenGrant_TheChildIsStampedFromTheRowReadUnderTheLock(t *t
 		} {
 			t.Run(tc.name+", "+current.name, func(t *testing.T) {
 				mockDB := datamocks.NewDatabase(t)
-				issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{session: &record.UserSession{}})
+				issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, &fakeSessions{session: &record.UserSession{}})
 
 				input := tc.input()
 				input.RefreshToken.AuthStateGeneration = 3
@@ -890,7 +890,7 @@ func TestIssueRefreshTokenGrant_ATokenThatCannotBeReadBackIsAFault(t *testing.T)
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
 			sessions := &fakeSessions{}
-			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
 
 			input := codeRefreshInput()
 			stub := datamocks.ExpectRunInTransaction(mockDB, rotationTx)
@@ -920,7 +920,7 @@ func TestIssueRefreshTokenGrant_AFailedBumpIsAFault(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	failure := errs.New("connection refused")
 	sessions := &fakeSessions{err: failure}
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
 
 	input := codeRefreshInput()
 	armRotation(mockDB, input, true, false, func(string) {})

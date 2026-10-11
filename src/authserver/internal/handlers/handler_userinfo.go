@@ -32,6 +32,7 @@ func HandleUserInfoGetPost(
 	database userinfoDatabase,
 	auditLogger AuditLogger,
 	baseURL string,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -104,17 +105,18 @@ func HandleUserInfoGetPost(
 		// HasScope answers false for everything in that case.
 		scopes := strings.Split(jwtToken.StringClaim("scope"), " ")
 
-		// The two fields after the port are this endpoint's side of the two divergences
-		// userclaims keeps as inputs: the base URL is this handler's parameter, which routes.go
-		// supplies from the loaded configuration (#434), and is injected in issuance too, and all
+		// The fields after the port are this endpoint's side of the two divergences userclaims
+		// keeps as inputs: the two base URLs are this handler's parameters, which routes.go
+		// supplies from the loaded configuration (#434), and are injected in issuance too, and all
 		// three filter sites read the ID token's include flag
 		// (#387 decision 5). updated_at was a third until it turned out to be a defect rather
 		// than a difference: it now rides with the profile scope at every site, which is what
 		// this endpoint already did.
 		mapper := userclaims.Mapper{
-			Database:  database,
-			BaseURL:   baseURL,
-			Inclusion: userclaims.InclusionIdToken,
+			Database:            database,
+			BaseURL:             baseURL,
+			AdminConsoleBaseURL: adminConsoleBaseURL,
+			Inclusion:           userclaims.InclusionIdToken,
 		}
 		mapper.AddOpenIDConnectClaims(r.Context(), nil, claims, user, scopes)
 		mapper.AddGroupClaims(claims, user, scopes)

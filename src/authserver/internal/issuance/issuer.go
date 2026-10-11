@@ -46,18 +46,20 @@ type sessionBumper interface {
 }
 
 type TokenIssuer struct {
-	database   tokenIssuerDatabase
-	baseURL    string
-	dataCipher *encryption.DataCipher
-	sessions   sessionBumper
+	database            tokenIssuerDatabase
+	baseURL             string
+	adminConsoleBaseURL string
+	dataCipher          *encryption.DataCipher
+	sessions            sessionBumper
 }
 
-func NewTokenIssuer(database tokenIssuerDatabase, baseURL string, dataCipher *encryption.DataCipher,
-	sessions sessionBumper) *TokenIssuer {
+func NewTokenIssuer(database tokenIssuerDatabase, baseURL string, adminConsoleBaseURL string,
+	dataCipher *encryption.DataCipher, sessions sessionBumper) *TokenIssuer {
 	return &TokenIssuer{
-		database:   database,
-		baseURL:    baseURL,
-		dataCipher: dataCipher,
-		sessions:   sessions,
+		database:            database,
+		baseURL:             baseURL,
+		adminConsoleBaseURL: adminConsoleBaseURL,
+		dataCipher:          dataCipher,
+		sessions:            sessions,
 	}
 }
