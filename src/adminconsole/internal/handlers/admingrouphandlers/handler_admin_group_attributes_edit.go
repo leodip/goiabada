@@ -81,8 +81,9 @@ func HandleAttributesEditGet(
 		}
 
 		bind := map[string]interface{}{
-			"group":     group,
-			"attribute": attribute,
+			"group":           group,
+			"attribute":       attribute,
+			"storedAttribute": attribute,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_attributes_edit.html", bind)
@@ -159,7 +160,9 @@ func HandleAttributesEditPost(
 		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
 		includeInIdToken := r.FormValue("includeInIdToken") == "on"
 
-		// Create a temporary attribute for error rendering
+		// Create a temporary attribute for error rendering: its inputs show what was submitted, and
+		// the title names the attribute as stored, never a refused key or an empty one (#562
+		// decision 6)
 		tempAttribute := *currentAttribute
 		tempAttribute.Key = key
 		tempAttribute.Value = value
@@ -168,9 +171,10 @@ func HandleAttributesEditPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"group":     group,
-				"attribute": &tempAttribute,
-				"error":     message,
+				"group":           group,
+				"attribute":       &tempAttribute,
+				"storedAttribute": currentAttribute,
+				"error":           message,
 			}
 
 			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_attributes_edit.html", bind)

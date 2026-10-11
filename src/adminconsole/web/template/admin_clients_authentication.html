@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.authentication.page_title_prefix" }}{{.client.ClientIdentifier}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.authentication.page_title_prefix" }}<span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.authentication.page_title_prefix" }}{{.storedClient.ClientIdentifier}}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.authentication.page_title_prefix" }}<span class="text-accent">{{.storedClient.ClientIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -9,10 +9,10 @@
 
 <script>
 
-    var isPublic = {{if .client.IsPublic}}true{{else}}false{{end}};
-    var originalClientSecret = "{{.client.ClientSecret}}";
+    var isPublic = {{if .storedClient.IsPublic}}true{{else}}false{{end}};
+    var originalClientSecret = "{{.storedClient.ClientSecret}}";
 
-    var isSystemLevel = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
+    var isSystemLevel = {{if .storedClient.IsSystemLevelClient}}true{{else}}false{{end}};
 
     document.addEventListener("DOMContentLoaded", function() {
         refreshPublicConfidential();

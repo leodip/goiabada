@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_groups.attributes_form.edit_page_title_prefix" }}{{.attribute.Key}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_groups.attributes_form.edit_page_title_prefix" }}<span class="text-accent">{{.attribute.Key}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_groups.attributes_form.edit_page_title_prefix" }}{{.storedAttribute.Key}}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_groups.attributes_form.edit_page_title_prefix" }}<span class="text-accent">{{.storedAttribute.Key}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}

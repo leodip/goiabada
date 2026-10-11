@@ -120,7 +120,10 @@ func HandleDetailsPost(
 
 		// A refusal the administrator can resolve, 409 LAST_ADMINISTRATOR when disabling the last
 		// user holding manage, is shown on the details page again, with the user as stored, rather
-		// than as the 500 page (#402 decision 12).
+		// than as the 500 page (#402 decision 12). The Enabled switch is drawn as stored too, the one
+		// exception to the rule that a refused save keeps its inputs as submitted (#562 decision 10):
+		// its only refusal comes from the disable path, so the submitted "off" is exactly what cannot
+		// be saved.
 		renderError := func(message string) {
 			user, getErr := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 			if getErr != nil {

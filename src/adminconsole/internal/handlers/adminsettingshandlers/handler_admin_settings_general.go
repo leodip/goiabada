@@ -20,6 +20,26 @@ type settingsGeneralAPI interface {
 	UpdateSettingsGeneral(ctx context.Context, accessToken string, request *api.UpdateSettingsGeneralRequest) (*api.SettingsGeneralResponse, error)
 }
 
+// settingsGeneralFrom draws the General page from the settings as the auth server answers them.
+//
+// The page binds two: "settings", the values its inputs show, and "storedSettings", the settings as
+// the auth server holds them, which the original issuer the issuer-change warning compares against
+// is drawn from. They differ only when a refused save is drawn again, with the inputs keeping what
+// was submitted, so the warning shows again when the same issuer is saved again (#562 decision 6).
+func settingsGeneralFrom(s *api.SettingsGeneralResponse) SettingsGeneral {
+	return SettingsGeneral{
+		AppName:                 s.AppName,
+		Issuer:                  s.Issuer,
+		SelfRegistrationEnabled: s.SelfRegistrationEnabled,
+		SelfRegistrationRequiresEmailVerification: s.SelfRegistrationRequiresEmailVerification,
+		DynamicClientRegistrationEnabled:          s.DynamicClientRegistrationEnabled,
+		PasswordPolicy:                            s.PasswordPolicy,
+		PKCERequired:                              s.PKCERequired,
+		ImplicitFlowEnabled:                       s.ImplicitFlowEnabled,
+		ResourceOwnerPasswordCredentialsEnabled:   s.ResourceOwnerPasswordCredentialsEnabled,
+	}
+}
+
 func HandleGeneralGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
@@ -42,17 +62,7 @@ func HandleGeneralGet(
 			return
 		}
 
-		settingsInfo := SettingsGeneral{
-			AppName:                 apiResp.AppName,
-			Issuer:                  apiResp.Issuer,
-			SelfRegistrationEnabled: apiResp.SelfRegistrationEnabled,
-			SelfRegistrationRequiresEmailVerification: apiResp.SelfRegistrationRequiresEmailVerification,
-			DynamicClientRegistrationEnabled:          apiResp.DynamicClientRegistrationEnabled,
-			PasswordPolicy:                            apiResp.PasswordPolicy,
-			PKCERequired:                              apiResp.PKCERequired,
-			ImplicitFlowEnabled:                       apiResp.ImplicitFlowEnabled,
-			ResourceOwnerPasswordCredentialsEnabled:   apiResp.ResourceOwnerPasswordCredentialsEnabled,
-		}
+		settingsInfo := settingsGeneralFrom(apiResp)
 
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
@@ -71,6 +81,7 @@ func HandleGeneralGet(
 
 		bind := map[string]interface{}{
 			"settings":          settingsInfo,
+			"storedSettings":    settingsInfo,
 			"savedSuccessfully": savedSuccessfully,
 		}
 
@@ -120,8 +131,9 @@ func HandleGeneralPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"settings": settingsInfo,
-				"error":    message,
+				"settings":       settingsInfo,
+				"storedSettings": settingsGeneralFrom(currentSettingsResp),
+				"error":          message,
 			}
 
 			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_general.html", bind)

@@ -1,5 +1,5 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_groups.settings.page_title_prefix" }}{{.groupIdentifier}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_groups.settings.page_title_prefix" }}<span class="text-accent">{{.groupIdentifier}}</span>{{end}}
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_groups.settings.page_title_prefix" }}{{.storedGroup.GroupIdentifier}}{{end}}
+{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_groups.settings.page_title_prefix" }}<span class="text-accent">{{.storedGroup.GroupIdentifier}}</span>{{end}}
 {{define "subTitle"}}{{end}}
 {{define "menu"}}
     {{template "admin_menu" . }}
@@ -9,7 +9,7 @@
 
 <script>
 
-    var originalGroupIdentifier = "{{.groupIdentifier}}";
+    var originalGroupIdentifier = "{{.storedGroup.GroupIdentifier}}";
 
     document.addEventListener("DOMContentLoaded", function() {
         const btnSave = document.getElementById("btnSave");

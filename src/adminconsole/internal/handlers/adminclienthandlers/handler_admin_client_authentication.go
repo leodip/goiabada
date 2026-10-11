@@ -24,6 +24,31 @@ type clientAuthenticationAPI interface {
 	UpdateClientAuthentication(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error)
 }
 
+// ClientAuthentication is what the Authentication tab is drawn from. The tab binds two: "client",
+// the values its inputs show, and "storedClient", the client as the auth server holds it, which the
+// page title and the original state and secret its confirmation dialogs compare against are drawn
+// from. They differ only when a refused save is drawn again, with the inputs keeping what was
+// submitted, so the same change attempted again is asked again (#562 decision 6).
+type ClientAuthentication struct {
+	ClientId            int64
+	ClientIdentifier    string
+	IsPublic            bool
+	ClientSecret        string
+	IsSystemLevelClient bool
+}
+
+// clientAuthenticationFrom draws the Authentication tab from the client and its secret as the auth
+// server answers them.
+func clientAuthenticationFrom(c *api.ClientResponse, clientSecret string) ClientAuthentication {
+	return ClientAuthentication{
+		ClientId:            c.Id,
+		ClientIdentifier:    c.ClientIdentifier,
+		IsPublic:            c.IsPublic,
+		ClientSecret:        clientSecret,
+		IsSystemLevelClient: c.IsSystemLevelClient,
+	}
+}
+
 func HandleAuthenticationGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
@@ -70,19 +95,7 @@ func HandleAuthenticationGet(
 			}
 		}
 
-		adminClientAuthentication := struct {
-			ClientId            int64
-			ClientIdentifier    string
-			IsPublic            bool
-			ClientSecret        string
-			IsSystemLevelClient bool
-		}{
-			ClientId:            client.Id,
-			ClientIdentifier:    client.ClientIdentifier,
-			IsPublic:            client.IsPublic,
-			ClientSecret:        clientSecret,
-			IsSystemLevelClient: client.IsSystemLevelClient,
-		}
+		adminClientAuthentication := clientAuthenticationFrom(client, clientSecret)
 
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
@@ -101,6 +114,7 @@ func HandleAuthenticationGet(
 
 		bind := map[string]interface{}{
 			"client":            adminClientAuthentication,
+			"storedClient":      adminClientAuthentication,
 			"savedSuccessfully": savedSuccessfully,
 		}
 
@@ -170,13 +184,7 @@ func HandleAuthenticationPost(
 		// credential, leaving it in the browser's history, in the Referer of anything the page loads,
 		// and in the access log of every proxy in front of the deployment. This route is POST-only
 		// with a separate GET handler rendering the form, so the query was never a submission (#202).
-		adminClientAuthentication := struct {
-			ClientId            int64
-			ClientIdentifier    string
-			IsPublic            bool
-			ClientSecret        string
-			IsSystemLevelClient bool
-		}{
+		adminClientAuthentication := ClientAuthentication{
 			ClientId:            client.Id,
 			ClientIdentifier:    client.ClientIdentifier,
 			IsPublic:            isPublic,
@@ -184,10 +192,23 @@ func HandleAuthenticationPost(
 			IsSystemLevelClient: isSystemLevelClient,
 		}
 
+		// The stored secret is read only for a refusal, as the first draw reads it, so a save that
+		// succeeds records no viewed_client_secret of its own; a public client holds none.
 		renderError := func(message string) {
+			storedSecret := ""
+			if !client.IsPublic {
+				var secretErr error
+				storedSecret, secretErr = apiClient.GetClientSecret(r.Context(), jwtInfo.TokenResponse.AccessToken, client.Id)
+				if secretErr != nil {
+					render.HandleAPIError(httpHelper, w, r, secretErr)
+					return
+				}
+			}
+
 			bind := map[string]interface{}{
-				"client": adminClientAuthentication,
-				"error":  message,
+				"client":       adminClientAuthentication,
+				"storedClient": clientAuthenticationFrom(client, storedSecret),
+				"error":        message,
 			}
 
 			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_authentication.html", bind)

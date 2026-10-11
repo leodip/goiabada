@@ -14,7 +14,7 @@
     document.addEventListener('DOMContentLoaded', function () {
         const selfRegistrationEnabled = document.getElementById('selfRegistrationEnabled');
         const selfRegistrationRequiresEmailVerification = document.getElementById('selfRegistrationRequiresEmailVerification');
-        const originalIssuerValue = "{{.settings.Issuer}}";
+        const originalIssuerValue = "{{.storedSettings.Issuer}}";
 
         selfRegistrationEnabled.addEventListener('change', function () {
             refreshSelfRegistrationEmailVerification();

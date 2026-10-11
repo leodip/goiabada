@@ -71,6 +71,7 @@ func HandleSettingsGet(
 
 		bind := map[string]interface{}{
 			"groupId":              group.Id,
+			"storedGroup":          group,
 			"groupIdentifier":      group.GroupIdentifier,
 			"description":          group.Description,
 			"includeInIdToken":     group.IncludeInIdToken,
@@ -114,6 +115,15 @@ func HandleSettingsPost(
 			return
 		}
 
+		// The group as stored, which a refused save is drawn with: the page title and the original
+		// identifier the rename question compares against stand for the group as it is, so the same
+		// rename attempted again is asked again (#562 decision 6).
+		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		if err != nil {
+			render.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+
 		// Parse form data
 		groupIdentifier := strings.TrimSpace(r.FormValue("groupIdentifier"))
 		description := strings.TrimSpace(r.FormValue("description"))
@@ -122,7 +132,8 @@ func HandleSettingsPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"groupId":              id,
+				"groupId":              group.Id,
+				"storedGroup":          group,
 				"groupIdentifier":      groupIdentifier,
 				"description":          description,
 				"includeInIdToken":     includeInIdToken,
