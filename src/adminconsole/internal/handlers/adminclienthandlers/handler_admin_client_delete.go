@@ -21,6 +21,35 @@ type clientDeleteAPI interface {
 	GetClientPermissions(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error)
 }
 
+// clientDeleteView is what the delete page draws: the client, and the permissions it warns about.
+type clientDeleteView struct {
+	Id                       int64
+	ClientIdentifier         string
+	Description              string
+	Enabled                  bool
+	ConsentRequired          bool
+	IsPublic                 bool
+	IsSystemLevelClient      bool
+	AuthorizationCodeEnabled bool
+	ClientCredentialsEnabled bool
+	Permissions              []api.PermissionResponse
+}
+
+func newClientDeleteView(client *api.ClientResponse, perms []api.PermissionResponse) clientDeleteView {
+	return clientDeleteView{
+		Id:                       client.Id,
+		ClientIdentifier:         client.ClientIdentifier,
+		Description:              client.Description,
+		Enabled:                  client.Enabled,
+		ConsentRequired:          client.ConsentRequired,
+		IsPublic:                 client.IsPublic,
+		IsSystemLevelClient:      client.IsSystemLevelClient,
+		AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
+		ClientCredentialsEnabled: client.ClientCredentialsEnabled,
+		Permissions:              perms,
+	}
+}
+
 func HandleDeleteGet(
 	httpHelper HttpHelper,
 	apiClient clientDeleteAPI,
@@ -57,33 +86,8 @@ func HandleDeleteGet(
 			return
 		}
 
-		// Build a view model including permissions for template compatibility
-		view := struct {
-			Id                       int64
-			ClientIdentifier         string
-			Description              string
-			Enabled                  bool
-			ConsentRequired          bool
-			IsPublic                 bool
-			IsSystemLevelClient      bool
-			AuthorizationCodeEnabled bool
-			ClientCredentialsEnabled bool
-			Permissions              []api.PermissionResponse
-		}{
-			Id:                       client.Id,
-			ClientIdentifier:         client.ClientIdentifier,
-			Description:              client.Description,
-			Enabled:                  client.Enabled,
-			ConsentRequired:          client.ConsentRequired,
-			IsPublic:                 client.IsPublic,
-			IsSystemLevelClient:      client.IsSystemLevelClient,
-			AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
-			ClientCredentialsEnabled: client.ClientCredentialsEnabled,
-			Permissions:              perms,
-		}
-
 		bind := map[string]interface{}{
-			"client": view,
+			"client": newClientDeleteView(client, perms),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_delete.html", bind)
@@ -121,7 +125,7 @@ func HandleDeletePost(
 			return
 		}
 
-		client, _, err := apiClient.GetClientPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		client, perms, err := apiClient.GetClientPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -136,9 +140,11 @@ func HandleDeletePost(
 			return
 		}
 
+		// A refusal draws the page again from the view its first draw binds: the template reads the
+		// permissions, which the API's client alone does not carry (#562).
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"client": client,
+				"client": newClientDeleteView(client, perms),
 				"error":  message,
 			}
 
