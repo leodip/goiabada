@@ -1,6 +1,7 @@
 package render
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -47,6 +48,29 @@ func IsSessionEnded(err error) bool {
 	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusUnauthorized
 }
 
+// IsRateLimited reports whether the admin API refused the call under its rate limit.
+//
+// The auth server allows five wrong passwords per user per 15 minutes on the account API's
+// password, email and two-factor authentication changes, whatever its rate limiter switch says,
+// limits the email verification code the same way, and answers the next request 429
+// TOO_MANY_REQUESTS. Five mistyped passwords is ordinary use, so a page whose call the limiter can
+// refuse answers it the way it answers a 400, with RateLimitedMessage, rather than with the 500
+// page, which blamed the server for the limit doing its job (#559 decision 10). Exported for the
+// two-factor authentication page, which routes its refusals on code rather than through
+// HandleAPIErrorWithCallback.
+func IsRateLimited(err error) bool {
+	var apiErr *apiclient.APIError
+	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusTooManyRequests
+}
+
+// RateLimitedMessage is the console's own sentence for a 429 from the admin API, in the page's
+// language: the catalog's rate-limit message, the one the auth server's sign-in pages show. The
+// API's own 429 description is English and stays so, since its 429 text is not translated, so it
+// is never forwarded (#559 decision 10).
+func RateLimitedMessage(ctx context.Context) string {
+	return i18n.T(ctx, "auth_error.rate_limited.message")
+}
+
 // HandleAPIError - for simple operations without forms (delete, etc.)
 //
 // A 404 is answered with the 404 page. This is the console's live "the entity is gone" path and
@@ -89,9 +113,16 @@ func HandleAPIError(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Reque
 //
 // A 401 sends the browser to sessionEndedPath, as HandleAPIError does: no resubmission of the form
 // can succeed with a token the admin API has refused.
+//
+// A 429 re-renders the form too, with RateLimitedMessage rather than the API's sentence (see
+// IsRateLimited).
 func HandleAPIErrorWithCallback(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request, err error, renderErrorFunc func(string)) {
 	if IsSessionEnded(err) {
 		http.Redirect(w, r, sessionEndedPath, http.StatusFound)
+		return
+	}
+	if IsRateLimited(err) {
+		renderErrorFunc(RateLimitedMessage(r.Context()))
 		return
 	}
 	var apiErr *apiclient.APIError
@@ -140,10 +171,19 @@ func HandleAPIErrorWithCallback(httpHelper ErrorWriter, w http.ResponseWriter, r
 // 15.5.2 says a 401 "MUST send a WWW-Authenticate header field", and the console signs in with a
 // cookie and has no challenge to send; with 403 the client "MAY repeat the request with new or
 // different credentials", section 15.5.4, which is what signing in again is (#427 decision 18).
+//
+// A 429 opens the dialog too, answered 429 with the console's own code and RateLimitedMessage
+// rather than the API's sentence (see IsRateLimited). The status keeps JSONError silent and the
+// dialog's title "Error" rather than "Server error".
 func HandleAPIErrorJSON(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request, err error) {
 	if IsSessionEnded(err) {
 		httpHelper.JSONError(w, r, oauth.NewErrorDetailWithHTTPStatus(sessionEndedCode,
 			i18n.T(r.Context(), "adminconsole.session_ended.message"), http.StatusForbidden))
+		return
+	}
+	if IsRateLimited(err) {
+		httpHelper.JSONError(w, r, oauth.NewErrorDetailWithHTTPStatus("too_many_requests",
+			RateLimitedMessage(r.Context()), http.StatusTooManyRequests))
 		return
 	}
 	var apiErr *apiclient.APIError

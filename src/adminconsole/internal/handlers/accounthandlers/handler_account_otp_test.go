@@ -263,3 +263,54 @@ func TestHandleOtpPost_AConcurrentUpdateIsShownOnTheForm(t *testing.T) {
 		})
 	}
 }
+
+// The auth server allows five wrong passwords per user per 15 minutes on the two-factor
+// authentication change and answers the sixth 429 TOO_MANY_REQUESTS, whatever the rate limiter
+// switch says. This page sent every code it did not name to the generic handler, so five mistyped
+// passwords ended on the 500 page. It now redraws the form, the disable form and the enrolment
+// form alike, with the console's own rate-limit sentence in the page's language, not the API's
+// English one (#559 decision 10).
+func TestHandleOtpPost_ARateLimitIsShownOnTheForm(t *testing.T) {
+	rateLimited := &apiclient.APIError{Code: "TOO_MANY_REQUESTS",
+		Message: "Too many requests. Please try again later.", StatusCode: http.StatusTooManyRequests}
+
+	testCases := []struct {
+		name       string
+		otpEnabled bool
+		form       url.Values
+	}{
+		{name: "disabling", otpEnabled: true, form: url.Values{"password": {"wrong"}}},
+		{name: "enabling", otpEnabled: false, form: url.Values{"password": {"wrong"}, "otp": {"123456"}}},
+	}
+	languages := []struct{ name, tag, want string }{
+		{"with no language", "",
+			"Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again."},
+		{"in pt-BR", "pt-BR",
+			"Chegaram muitas solicitações deste navegador, ou para esta conta, em pouco tempo. Aguarde alguns minutos e tente novamente."},
+	}
+
+	for _, tc := range testCases {
+		for _, language := range languages {
+			t.Run(tc.name+" "+language.name, func(t *testing.T) {
+				httpHelper := handlersmocks.NewHttpHelper(t)
+				handlertest.RefuseInternalServerError(t, httpHelper)
+				handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
+
+				client := newStubApiClient(tc.otpEnabled)
+				client.updateErr = rateLimited
+
+				req := handlertest.Request(http.MethodPost, accountOTPPath, handlertest.WithAccessToken(),
+					handlertest.WithLocale(language.tag), handlertest.WithForm(tc.form))
+				HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
+
+				bind := handlertest.Bind(t, httpHelper)
+				assert.Equal(t, language.want, bind["error"])
+				assert.Equal(t, tc.otpEnabled, bind["otpEnabled"])
+				if !tc.otpEnabled {
+					assert.Equal(t, testSecretKey, bind["secretKey"],
+						"the enrolment form is redrawn with its seed, or the user cannot finish enrolling")
+				}
+			})
+		}
+	}
+}

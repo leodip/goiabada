@@ -148,6 +148,10 @@ func HandleOtpPost(
 				Password: password,
 			}
 			if _, err := apiClient.UpdateAccountOTP(r.Context(), jwtInfo.TokenResponse.AccessToken, req); err != nil {
+				if render.IsRateLimited(err) {
+					renderDisableError(render.RateLimitedMessage(r.Context()))
+					return
+				}
 				var apiErr *apiclient.APIError
 				if errors.As(err, &apiErr) && isHandledAccountOTPError(apiErr.Code) {
 					renderDisableError(apiErr.Message)
@@ -175,6 +179,10 @@ func HandleOtpPost(
 				OtpCode:  otpCode,
 			}
 			if _, err := apiClient.UpdateAccountOTP(r.Context(), jwtInfo.TokenResponse.AccessToken, req); err != nil {
+				if render.IsRateLimited(err) {
+					renderEnrollmentError(render.RateLimitedMessage(r.Context()))
+					return
+				}
 				var apiErr *apiclient.APIError
 				if errors.As(err, &apiErr) {
 					// An enrolment that has already succeeded, from another tab or another
@@ -202,7 +210,9 @@ func HandleOtpPost(
 // isHandledAccountOTPError says whether a 400 or 409 from PUT /api/v1/account/otp is one this page
 // can explain to the user by redrawing the form with the API's message. Anything else is a fault
 // rather than something they did, and HandleAPIError sends it to the log and shows a generic
-// error page.
+// error page. A 429 is decided before this is asked: the API allows five wrong passwords per user
+// per 15 minutes here, so the form is redrawn with the console's own rate-limit sentence, in the
+// page's language, rather than the API's English one (#559 decision 10).
 //
 // CONCURRENT_UPDATE is the 409 the API answers when the account's authenticator changed under the
 // request, from another tab or client, and nothing was saved: the user acts on it by trying again,

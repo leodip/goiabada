@@ -200,6 +200,12 @@ func TestHandleAPIError_RoutesOnStatus(t *testing.T) {
 			name: "a 409 from the API stays a 500 on this helper, for the same reason",
 			err:  &apiclient.APIError{Code: "EMAIL_ALREADY_EXISTS", Message: "This email address is already registered", StatusCode: http.StatusConflict},
 		},
+		// #559 decision 10 answers a 429 the way each path answers a 400, and this one has no form
+		// to redraw: no page reaches it with a call the limiter counts.
+		{
+			name: "a 429 from the API stays a 500 on this helper, as a 400 does",
+			err:  &apiclient.APIError{Code: "TOO_MANY_REQUESTS", Message: "Too many requests", StatusCode: http.StatusTooManyRequests},
+		},
 		{
 			name: "a transport error stays a 500",
 			err:  errs.New("connection refused"),
@@ -560,5 +566,75 @@ func TestJSONRefusals_AreInThePagesLanguage(t *testing.T) {
 				assert.Equal(t, language.want, detail.Description())
 			})
 		}
+	}
+}
+
+// The auth server allows five wrong passwords per user per 15 minutes on the account API's
+// password, email and two-factor authentication changes, and limits the email verification code
+// the same way, and answers the next 429 TOO_MANY_REQUESTS. Five mistyped passwords is ordinary
+// use, so the form and AJAX paths answer a 429 as they answer a 400: the form redrawn, or the
+// dialog opened, with the console's own rate-limit sentence in the page's language, never the
+// API's English one (#559 decision 10). It answered the 500 page before, blaming the server for
+// the limit doing its job.
+const (
+	rateLimitedEnglish    = "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again."
+	rateLimitedPortuguese = "Chegaram muitas solicitações deste navegador, ou para esta conta, em pouco tempo. Aguarde alguns minutos e tente novamente."
+)
+
+func rateLimitedAPIError() error {
+	return errs.Wrap(&apiclient.APIError{
+		Code:       "TOO_MANY_REQUESTS",
+		Message:    "Too many requests. Please try again later.",
+		StatusCode: http.StatusTooManyRequests,
+	}, "unable to change the password")
+}
+
+func TestHandleAPIErrorWithCallback_AnswersA429WithTheConsolesSentence(t *testing.T) {
+	for _, language := range []struct{ name, tag, want string }{
+		{"with no language", "", rateLimitedEnglish},
+		{"in pt-BR", "pt-BR", rateLimitedPortuguese},
+	} {
+		t.Run(language.name, func(t *testing.T) {
+			// No expectation: the mock fails on any page writer.
+			httpHelper := handlersmocks.NewHttpHelper(t)
+
+			req := httptest.NewRequest(http.MethodPost, "/account/change-password", nil)
+			if language.tag != "" {
+				req = req.WithContext(i18n.WithLocale(req.Context(), true, language.tag))
+			}
+			rendered := ""
+			w := httptest.NewRecorder()
+			HandleAPIErrorWithCallback(httpHelper, w, req, rateLimitedAPIError(),
+				func(message string) { rendered = message })
+
+			assert.Equal(t, language.want, rendered)
+			assertSessionEndedRedirect(t, w, false)
+		})
+	}
+}
+
+func TestHandleAPIErrorJSON_AnswersA429WithTheConsolesSentence(t *testing.T) {
+	for _, language := range []struct{ name, tag, want string }{
+		{"with no language", "", rateLimitedEnglish},
+		{"in pt-BR", "pt-BR", rateLimitedPortuguese},
+	} {
+		t.Run(language.name, func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			captured := captureJSONError(httpHelper)
+
+			req := httptest.NewRequest(http.MethodPost, "/account/email-verification/send", nil)
+			if language.tag != "" {
+				req = req.WithContext(i18n.WithLocale(req.Context(), true, language.tag))
+			}
+			HandleAPIErrorJSON(httpHelper, httptest.NewRecorder(), req, rateLimitedAPIError())
+
+			// The status is what keeps JSONError silent and the dialog's title "Error" rather than
+			// "Server error": a detail with no status is answered 500, with a stack in the log.
+			var detail *oauth.ErrorDetail
+			require.True(t, errors.As(*captured, &detail), "expected an *oauth.ErrorDetail, got %T", *captured)
+			assert.Equal(t, http.StatusTooManyRequests, detail.HTTPStatus())
+			assert.Equal(t, "too_many_requests", detail.Code())
+			assert.Equal(t, language.want, detail.Description())
+		})
 	}
 }
