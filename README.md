@@ -1,50 +1,25 @@
 # Goiabada
 
-An open-source OAuth2 and OpenID Connect server for simple, secure authentication.
+**Self-hosted sign-in, single sign-on, and permissions for your apps.**
 
-## What does Goiabada do?
+Goiabada is a standards-based, open-source authentication server built on **OAuth 2.0** and **OpenID Connect**. Your apps can use standard libraries to sign users in and obtain tokens; you choose where the auth server and database run.
 
-If you're building applications and need to handle user logins, manage permissions, or enable users to sign in across multiple apps with one account, Goiabada takes care of this for you. Instead of building authentication from scratch, you can integrate Goiabada and focus on what makes your application unique.
+**[Try it locally](https://goiabada.dev/get-started/quickstart/)** · **[Add sign-in to a web app](https://goiabada.dev/guides/add-sign-in-to-a-web-app/)** · **[Explore the docs](https://goiabada.dev/)**
 
-Goiabada handles:
+## What you get
 
-- **User authentication** - Secure login with passwords and two-factor authentication
-- **Authorization** - Control who can access what in your applications
-- **Single sign-on (SSO)** - Let users log in once and access multiple apps
-- **API security** - Protect server-to-server communications
-- **User self-service** - Give users control over their own profiles and security settings
+- **One account across your apps.** Single sign-on, authorization code flow with PKCE, and optional two-factor authentication with step-up for sensitive apps.
+- **Control over access.** Give users, groups, and clients permissions; include groups and custom attributes in tokens when your apps need them.
+- **An admin console and API.** Manage users, clients, settings, and signing keys through the web UI or automate them through the API. Review changes in the audit log.
+- **Account self-service.** Users can manage their profile and security settings, recover a password, and review their sessions. You can enable self-registration and email verification.
+- **A choice of deployment.** The setup wizard prepares Docker Compose, Kubernetes, or native binary deployments. Use SQLite, PostgreSQL, MySQL, or SQL Server. Docker images support x86_64 and ARM64.
 
-## Who is Goiabada for?
+You can also enable [dynamic client registration](https://goiabada.dev/guides/let-clients-register-themselves-dcr/) for apps such as MCP clients.
 
-- **Developers** building web or mobile apps who need authentication
-- **Teams** wanting to centralize user management across multiple applications
-- **Organizations** that need to self-host their identity provider for security or compliance
-- **Anyone** who wants an alternative to proprietary services like Auth0, Keycloak or cloud-only solutions
+## Get started
 
-## Key features
+The [quickstart](https://goiabada.dev/get-started/quickstart/) runs Goiabada locally with Docker Compose and SQLite in a few minutes. When you're ready to run it for others, [choose a deployment method](https://goiabada.dev/deploy/choose-a-method/).
 
-- **OAuth2 & OpenID Connect** - Industry-standard protocols. Compatibility with your existing tools.
-- **Single sign-on (SSO)** - One login for all your connected applications. Users authenticate once and access multiple apps seamlessly.
-- **Two-factor authentication & step-up auth** - Extra security with one-time passwords (OTP). Step-up authentication for sensitive operations.
-- **Fine-grained permissions** - Define exactly who can access what in your applications.
-- **Self-service account management** - Users can update their own profiles, change passwords, and manage their security settings.
-- **Dynamic client registration** - Apps can self-register via RFC 7591. Useful for MCP clients and native applications.
-- **Multiple database support** - Choose your database: MySQL, PostgreSQL, Microsoft SQL Server, or SQLite.
-- **Built with Go** - Fast, lightweight, and resource-efficient. Low resource usage means lower hosting costs.
-- **Multi-architecture Docker images** - Run on Intel/AMD (x86_64) or ARM64 (Raspberry Pi, Apple Silicon, AWS Graviton).
-
-## Why choose Goiabada?
-
-- **Self-hosted & private** - Keep full control of your user data and infrastructure. Your data never leaves your servers.
-- **Free & MIT licensed** - 100% free to use with no licensing fees, subscriptions, or vendor lock-in. Truly open source.
-- **Lightweight** - Low resource usage means lower hosting costs
-- **Standards-compliant** - Built on OAuth2 and OpenID Connect for maximum compatibility
-- **Developer-friendly** - Quick to set up, easy to integrate
-
-## Getting started
-
-Ready to try Goiabada? Check out the [documentation](https://goiabada.dev) to get up and running quickly.
-
-You can also explore our [Docker images](https://hub.docker.com/r/leodip/goiabada/tags) for easy deployment.
+[Documentation](https://goiabada.dev/) · [Contributing](https://goiabada.dev/about/contributing/) · [MIT license](LICENSE)
 
 [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge-flat.svg)](https://github.com/avelino/awesome-go)
