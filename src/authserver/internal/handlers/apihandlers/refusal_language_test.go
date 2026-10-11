@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -348,7 +349,7 @@ func TestResourcePermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			return rr
 		}
 	}
-	withoutManage := append(loadedEntries(builtIns)[:manage:manage], loadedEntries(builtIns)[manage+1:]...)
+	withoutManage := slices.Delete(loadedEntries(builtIns), manage, manage+1)
 	manageRenamed := loadedEntries(builtIns)
 	manageRenamed[manage].PermissionIdentifier = "manage-renamed"
 
