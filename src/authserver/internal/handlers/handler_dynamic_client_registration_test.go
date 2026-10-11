@@ -496,6 +496,31 @@ func TestHandleDynamicClientRegistrationPost_ASelfRegisteredClientNeverInheritsT
 	}
 }
 
+// A self-registered client follows the global setting for both "Include OpenID Connect claims"
+// choices, stored as "default", one of the three values the admin console's Tokens tab offers.
+// The ID token choice was left "", which the tab showed with nothing selected and refused to save
+// as loaded (#562).
+func TestHandleDynamicClientRegistrationPost_BothClaimChoicesAreDefault(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	var created *record.Client
+	datamocks.ExpectRunInTransaction(database, dcrTx)
+	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).
+		Run(func(args mock.Arguments) { created = args.Get(2).(*record.Client) }).Return(nil).Once()
+	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
+	auditLogger.On("Log", mock.Anything, audit.EventDynamicClientRegistration, mock.Anything).Return().Once()
+
+	rr := serveDCR(t, oidc.DynamicClientRegistrationRequest{
+		RedirectURIs: []string{"http://127.0.0.1:8765/callback"},
+	}, database, auditLogger)
+
+	require.Equal(t, http.StatusCreated, rr.Code)
+	require.NotNil(t, created)
+	assert.Equal(t, "default", created.IncludeOpenIDConnectClaimsInAccessToken)
+	assert.Equal(t, "default", created.IncludeOpenIDConnectClaimsInIdToken)
+}
+
 // The registration's audit entry records the client IP through the module's one reader, so it
 // names the address every other audit entry names: httptest's "192.0.2.1:1234" is recorded as
 // "192.0.2.1". This handler returned r.RemoteAddr as is until #435.

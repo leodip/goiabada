@@ -5563,8 +5563,16 @@ components:
           type: integer
         includeOpenIDConnectClaimsInAccessToken:
           type: string
+          enum: ["on", "off", "default"]
+          description: >-
+            "on" includes the OpenID Connect claims in this client's access tokens, "off" leaves them
+            out, "default" follows the global setting of the same name.
         includeOpenIDConnectClaimsInIdToken:
           type: string
+          enum: ["on", "off", "default"]
+          description: >-
+            "on" includes the OpenID Connect claims in this client's ID tokens, "off" leaves them out,
+            "default" follows the global setting of the same name.
         defaultAcrLevel:
           type: string
         redirectURIs:
@@ -5782,8 +5790,18 @@ components:
           type: integer
         includeOpenIDConnectClaimsInAccessToken:
           type: string
+          enum: ["on", "off", "default"]
+          description: >-
+            "on" includes the OpenID Connect claims in this client's access tokens, "off" leaves them
+            out, "default" follows the global setting of the same name. Any other value is refused
+            with 400.
         includeOpenIDConnectClaimsInIdToken:
           type: string
+          enum: ["on", "off", "default"]
+          description: >-
+            "on" includes the OpenID Connect claims in this client's ID tokens, "off" leaves them out,
+            "default" follows the global setting of the same name. Any other value is refused with
+            400.
 
     UpdateClientAdministrativeScopesRequest:
       type: object
