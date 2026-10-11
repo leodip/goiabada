@@ -435,9 +435,16 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	// A token issued before the upgrade gets no exception: nothing in it tells one obtained with no
 	// consent from one obtained with it. The refusals are a client requiring consent's, and come
 	// before the token is spent.
+	//
+	// Nothing is owed for a token whose own row is revoked: that one is a replay, and refused here
+	// it would never reach the containment the refresh redemption gives it, so its live successor
+	// would refresh on with manage-account narrowed away. Containment refuses it, and issues nothing.
 	var scopesFromConsent []string
 	consentEveryScope := client.ConsentRequired || refreshTokenType == issuance.TokenTypeOffline.String()
-	owed := userconsent.AlwaysOwed(client.ClientIdentifier, scopes)
+	var owed []string
+	if !refreshToken.Revoked {
+		owed = userconsent.AlwaysOwed(client.ClientIdentifier, scopes)
+	}
 	consentCheckRequired := !isROPCToken && (consentEveryScope || len(owed) > 0)
 	if consentCheckRequired {
 		consent, err := val.database.GetConsentByUserIdAndClientId(ctx, nil, tokenUserId, tokenClientId)

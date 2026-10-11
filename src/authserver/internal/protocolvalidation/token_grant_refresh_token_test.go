@@ -1599,6 +1599,9 @@ type storedGrant struct {
 	// administrativeScopesAllowed is the client's stored allowance to request the administrative
 	// scopes (#499).
 	administrativeScopesAllowed bool
+	// revoked makes the token's own row revoked, a replay, which the arm hands on to the refresh
+	// redemption to contain.
+	revoked bool
 }
 
 // newStoredGrantRefresh wires a validator over strict mocks for one refresh of g, and hands back the
@@ -1681,6 +1684,7 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 			SessionIdentifier: "test_session",
 			CodeId:            sql.NullInt64{Int64: 1, Valid: true},
 			Code:              record.Code{ClientId: 1, UserId: 1, Scope: g.scope, User: user},
+			Revoked:           g.revoked,
 		}
 		userSession := &record.UserSession{
 			SessionIdentifier: "test_session",
