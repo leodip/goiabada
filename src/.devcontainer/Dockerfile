@@ -54,11 +54,6 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 # to all users, but we DON'T set GOPATH globally. This allows project builds to use the
 # default per-user GOPATH (~/go) which is writable by the vscode user.
 # The GOPATH is set temporarily for each install command only.
-#
-# unparam and mockery are built against a newer golang.org/x/tools than their own go.mod requires,
-# because the one they require cannot read Go 1.27.2's export data; go-install-with-x-tools.sh says
-# why and when it can go.
-COPY go-install-with-x-tools.sh /usr/local/bin/go-install-with-x-tools.sh
 RUN GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/air-verse/air@latest && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v golang.org/x/tools/gopls@latest && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/go-delve/delve/cmd/dlv@latest && \
@@ -68,8 +63,8 @@ RUN GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/air-ve
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0 && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v golang.org/x/vuln/cmd/govulncheck@v1.8.0 && \
-    GOPATH=/usr/local/go-tools go-install-with-x-tools.sh mvdan.cc/unparam@v0.0.0-20260823230713-2fa3d841b0c8 golang.org/x/tools@v0.50.0 unparam && \
-    GOPATH=/usr/local/go-tools go-install-with-x-tools.sh github.com/vektra/mockery/v3@v3.8.0 golang.org/x/tools@v0.50.0 mockery
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v mvdan.cc/unparam@v0.0.0-20261011093844-7a2c2c0b7aa6 && \
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/vektra/mockery/v3@v3.8.1
 
 # Add Go tools bin directory to PATH (tools are accessible but don't affect project GOPATH)
 ENV PATH="/usr/local/go-tools/bin:${PATH}"

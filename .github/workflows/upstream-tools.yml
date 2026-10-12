@@ -5,7 +5,8 @@
 #
 # One issue, found by its title: opened once, then its body rewritten and a comment added only when
 # the report changes, so a day with nothing new sends nothing. A failed lookup fails the run, which
-# is the signal the check itself needs attention. With no override pinned, the run does nothing.
+# is the signal the check itself needs attention. With no override pinned, the run does nothing,
+# which is the case since both tools caught up with Go 1.27.2: the script is in git history.
 
 name: Upstream tools
 

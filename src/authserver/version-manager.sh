@@ -172,7 +172,6 @@ get_all_versions() {
         echo "tools.staticcheck=$(get_version 'tools.staticcheck')"
         echo "tools.unparam=$(get_version 'tools.unparam')"
         echo "tools.govulncheck=$(get_version 'tools.govulncheck')"
-        echo "tools.x-tools-override=$(get_version 'tools."x-tools-override"')"
         echo "tools.alpine=$(get_version 'tools.alpine')"
         echo "vendored.daisyui=$(get_version 'vendored.daisyui')"
         echo "vendored.humanize-duration=$(get_version 'vendored.humanize-duration')"
@@ -334,7 +333,6 @@ cmd_show() {
     printf "  %-23s ${GREEN}%s${NC}\n" "staticcheck" "$(get_version 'tools.staticcheck')"
     printf "  %-23s ${GREEN}%s${NC}\n" "unparam" "$(get_version 'tools.unparam')"
     printf "  %-23s ${GREEN}%s${NC}\n" "govulncheck" "$(get_version 'tools.govulncheck')"
-    printf "  %-23s ${GREEN}%s${NC}\n" "x-tools-override" "$(get_version 'tools."x-tools-override"')"
     printf "  %-23s ${GREEN}%s${NC}\n" "alpine" "$(get_version 'tools.alpine')"
 
     # Vendored web dependencies
@@ -673,8 +671,9 @@ cmd_update() {
             ((fail_count++))
         fi
 
-        # The x/tools unparam and mockery are built against: golang.org/x/tools@vX.Y.Z, an
-        # argument of go-install-with-x-tools.sh. gopls and goimports are installed from
+        # The x/tools unparam and mockery are built against, when an override is pinned:
+        # golang.org/x/tools@vX.Y.Z, an argument of go-install-with-x-tools.sh (in git history
+        # while none is). gopls and goimports are installed from
         # golang.org/x/tools/... paths, which this pattern does not match.
         if [ -n "$XTOOLS_OVERRIDE" ] && [ "$XTOOLS_OVERRIDE" != "null" ]; then
             if update_file "$BASE_DIR/src/.devcontainer/Dockerfile" \
