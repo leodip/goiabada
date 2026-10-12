@@ -222,12 +222,15 @@ func runPwd(m *RateLimiter, email, ip string, failed bool) (int, bool, *httptest
 // all: httptest.NewRequest parses its target as a request line and panics on one.
 func TestLimitPwd_PerIP(t *testing.T) {
 	assertAddressTierCountsFailures(t, pwdAddressRoute)
+	assertAddressCeilingCountsEveryCheck(t, pwdAddressRoute)
 }
 
 // addressTierRoute is a route a per-address password tier guards, pwd_ip on the sign-in form and
-// ropc_ip on the password grant, as assertAddressTierCountsFailures drives it.
+// ropc_ip on the password grant, as assertAddressTierCountsFailures drives it, with the ceiling on
+// every check in front of it that assertAddressCeilingCountsEveryCheck drives.
 type addressTierRoute struct {
 	limiter string
+	ceiling string
 	// contentType is the shape a refusal on the route takes.
 	contentType string
 	// serve sends one password check naming account from ip through the route's limiter, into
@@ -237,6 +240,7 @@ type addressTierRoute struct {
 
 var pwdAddressRoute = addressTierRoute{
 	limiter:     "pwd_ip",
+	ceiling:     "pwd_ip_requests",
 	contentType: "text/html; charset=UTF-8",
 	serve: func(m *RateLimiter, account, ip string, handler http.Handler) *httptest.ResponseRecorder {
 		form := url.Values{"email": {account}}
@@ -251,6 +255,7 @@ var pwdAddressRoute = addressTierRoute{
 
 var ropcAddressRoute = addressTierRoute{
 	limiter:     "ropc_ip",
+	ceiling:     "ropc_ip_requests",
 	contentType: "application/json",
 	serve: func(m *RateLimiter, account, ip string, handler http.Handler) *httptest.ResponseRecorder {
 		form := url.Values{"grant_type": {"password"}, "username": {account}, "client_id": {"app"}}
@@ -319,7 +324,9 @@ func assertAddressTierCountsFailures(t *testing.T, route addressTierRoute) {
 
 	t.Run("many people signing in from one address spend nothing", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
-		for i := 0; i < 100; i++ {
+		// 80 and the 31 below stay under the 120 checks a minute the ceiling in front allows,
+		// which assertAddressCeilingCountsEveryCheck holds.
+		for i := 0; i < 80; i++ {
 			account := fmt.Sprintf("user%d@example.com", i)
 			if code, reached, _ := runAddress(m, route, account, ip, false); code != http.StatusTeapot || !reached {
 				t.Fatalf("sign-in %d from one address: got code %d, handler reached %v; want %d and true",
@@ -464,6 +471,66 @@ func assertAddressTierCountsFailures(t *testing.T, route addressTierRoute) {
 	t.Run("the limiter switched off never applies the per-address tier", func(t *testing.T) {
 		m := newTestMiddleware(nil, false)
 		failures(t, m, 4*ipBudget, "user", "203.0.113.1:5000")
+	})
+}
+
+// assertAddressCeilingCountsEveryCheck holds a route's per-address ceiling to 120 password checks
+// per minute per client block, every one counted, a right password as much as a wrong one. The
+// failure budget behind it leaves a correct password's checks unbounded, and each is a bcrypt, so
+// without this one address holding one account's password, which anyone can have by registering,
+// drives that work as fast as it can send (#564). Every check names an account of its own and
+// none fails, so the failure budget and the account tiers cannot be what refuses.
+func assertAddressCeilingCountsEveryCheck(t *testing.T, route addressTierRoute) {
+	t.Helper()
+	const ceiling = 120
+	const ip = "198.51.100.9:5000"
+
+	successes := func(t *testing.T, m *RateLimiter, n int, ip string) {
+		t.Helper()
+		for i := 0; i < n; i++ {
+			account := fmt.Sprintf("holder%d@example.com", i)
+			if code, reached, _ := runAddress(m, route, account, ip, false); code != http.StatusTeapot || !reached {
+				t.Fatalf("check %d from %s: got code %d, handler reached %v; want %d and true",
+					i+1, ip, code, reached, http.StatusTeapot)
+			}
+		}
+	}
+
+	t.Run("the ceiling is exactly 120 checks, a right password counted", func(t *testing.T) {
+		m, auditLog := newAuditedTestMiddleware(nil, true)
+		successes(t, m, ceiling, ip)
+
+		code, reached, rr := runAddress(m, route, "next@example.com", ip, false)
+		if code != http.StatusTooManyRequests || reached {
+			t.Fatalf("check %d: got code %d, handler reached %v; want %d and false",
+				ceiling+1, code, reached, http.StatusTooManyRequests)
+		}
+		if got := rr.Header().Get("Retry-After"); got != "60" {
+			t.Errorf("Retry-After = %q, want 60", got)
+		}
+		if got := rr.Header().Get("Content-Type"); !strings.HasPrefix(got, route.contentType) {
+			t.Errorf("Content-Type = %q, want %s, the route's own shape", got, route.contentType)
+		}
+		assertNoRateLimitHeaders(t, rr, route.ceiling+" rejection")
+
+		auditLog.mu.Lock()
+		events := append([]auditEvent(nil), auditLog.events...)
+		auditLog.mu.Unlock()
+		want := map[string]interface{}{"limiter": route.ceiling, "ip": "198.51.100.9"}
+		if len(events) != 1 || events[0].name != audit.EventRateLimitExceeded || !reflect.DeepEqual(events[0].details, want) {
+			t.Errorf("audited %+v, want one %s event with details %v", events, audit.EventRateLimitExceeded, want)
+		}
+	})
+
+	t.Run("another address has a ceiling of its own", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		successes(t, m, ceiling, ip)
+		successes(t, m, 1, "198.51.100.10:5000")
+	})
+
+	t.Run("the limiter switched off never applies the ceiling", func(t *testing.T) {
+		m := newTestMiddleware(nil, false)
+		successes(t, m, 2*ceiling, ip)
 	})
 }
 
@@ -2464,10 +2531,10 @@ func TestBuiltLimiters_EachKeepsItsOwnRefusal(t *testing.T) {
 //
 // Over every tier the production constructor builds, found by walking the struct rather than by
 // listing them, because a listed set is green on the tier nobody added it to: the two keys a trip
-// test can reach today are two of fifteen tiers, and the next tier is what this exists for (#320
-// decision 3). The fifteen are ten request tiers and three failures-only ones, plus the two
-// failures-only tiers of the password gate, which ratelimit.AccountLimiter counts and accountTiers
-// names (#439).
+// test can reach today are two of seventeen tiers, and the next tier is what this exists for (#320
+// decision 3). The seventeen are ten request tiers, two of them the per-address ceilings on
+// password checks, and five failures-only ones, plus the two failures-only tiers of the password
+// gate, which ratelimit.AccountLimiter counts and accountTiers names (#439, #564).
 func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
 	// Decision 3's vocabulary. Spelled out rather than imported: the lint's copy is unexported,
 	// and this is deliberately the same rule applied to the one value the lint cannot see.
@@ -2479,10 +2546,10 @@ func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
 
 	// The count is asserted because a walk that silently stopped matching would pass over an
 	// empty set exactly as it passes over a conformant one. It counts instances rather than
-	// distinct names, so a second tier carrying a name an earlier one already used is a
-	// sixteenth tier here rather than a replacement for the fifteenth.
-	if len(tiers) != 15 {
-		t.Fatalf("walked %d tiers, expected the 15 the constructor builds: %v", len(tiers), tiers)
+	// distinct names, so a second tier carrying a name an earlier one already used is an
+	// eighteenth tier here rather than a replacement for the seventeenth.
+	if len(tiers) != 17 {
+		t.Fatalf("walked %d tiers, expected the 17 the constructor builds: %v", len(tiers), tiers)
 	}
 	for _, found := range tiers {
 		if found.keyField == "" {
@@ -2823,6 +2890,7 @@ func runROPC(m *RateLimiter, grantType, username, clientId, ip string,
 // is a stream of failures, and every one of them still counts here.
 func TestLimitROPC_PerIP(t *testing.T) {
 	assertAddressTierCountsFailures(t, ropcAddressRoute)
+	assertAddressCeilingCountsEveryCheck(t, ropcAddressRoute)
 
 	t.Run("only the password grant is limited", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
