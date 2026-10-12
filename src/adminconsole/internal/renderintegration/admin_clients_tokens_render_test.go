@@ -149,11 +149,11 @@ func TestRender_AdminClientTokens_ARefusedSaveKeepsWhatWasSubmitted(t *testing.T
 		wantSaved  bool
 	}{
 		{name: "an expiration that is not a number", expiration: "5 minutes", idle: "7200", maxLife: "90000",
-			message: "Invalid value for token expiration in seconds."},
+			message: "Valor inválido para a expiração do token em segundos."},
 		{name: "an idle timeout that is not a number", expiration: "600", idle: "two hours", maxLife: "90000",
-			message: "Invalid value for refresh token offline - idle timeout in seconds."},
+			message: "Valor inválido para o refresh token offline - timeout por inatividade em segundos."},
 		{name: "a max lifetime that is not a number", expiration: "600", idle: "7200", maxLife: "a day",
-			message: "Invalid value for refresh token offline - max lifetime in seconds."},
+			message: "Valor inválido para o refresh token offline - tempo máximo de vida em segundos."},
 		{name: "numbers the auth server refuses", expiration: "10", idle: "7200", maxLife: "90000",
 			message: apiRefusal, wantSaved: true},
 	}

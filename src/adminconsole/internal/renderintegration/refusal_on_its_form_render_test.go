@@ -19,7 +19,8 @@ import (
 )
 
 // A refusal the person can act on is drawn on the form they submitted, with the auth server's
-// sentence, never as the 500 page or a page with no message (#562 decision 7).
+// sentence, or the console's own for too many attempts, never as the 500 page or a page with no
+// message (#562 decision 7).
 
 // tooManyRequests is the auth server's rate limiter's answer to an API caller, word for word.
 var tooManyRequests = &apiclient.APIError{Code: "TOO_MANY_REQUESTS",
@@ -93,15 +94,19 @@ func TestRender_AccountEmailVerification_ARefusalIsDrawnWhateverEmailsState(t *t
 	smtpOff := &apiclient.APIError{Code: "SMTP_NOT_ENABLED", Message: "SMTP is not enabled", StatusCode: http.StatusBadRequest}
 
 	testCases := []struct {
-		name         string
-		smtpEnabled  bool
-		verified     bool
-		refusal      *apiclient.APIError
+		name        string
+		smtpEnabled bool
+		verified    bool
+		refusal     *apiclient.APIError
+		// want is the sentence drawn, the API's own when empty.
+		want         string
 		wantCodeForm bool
 	}{
 		{name: "email off, the address not verified", smtpEnabled: false, refusal: smtpOff},
 		{name: "email off, the address verified", smtpEnabled: false, verified: true, refusal: smtpOff},
-		{name: "email on, too many attempts", smtpEnabled: true, refusal: tooManyRequests, wantCodeForm: true},
+		{name: "email on, too many attempts", smtpEnabled: true, refusal: tooManyRequests, wantCodeForm: true,
+			// A 429 is drawn with the console's own sentence in the page's language (#559 decision 10).
+			want: "Chegaram muitas solicitações deste navegador, ou para esta conta, em pouco tempo. Aguarde alguns minutos e tente novamente."},
 	}
 
 	for _, tc := range testCases {
@@ -116,7 +121,11 @@ func TestRender_AccountEmailVerification_ARefusalIsDrawnWhateverEmailsState(t *t
 				"/account/email-verification", url.Values{"verificationCode": {"ABC123"}},
 				handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: tc.smtpEnabled}))
 
-			assert.Contains(t, out, `<p>`+tc.refusal.Message+`</p>`, "the refusal's sentence is drawn")
+			want := tc.want
+			if want == "" {
+				want = tc.refusal.Message
+			}
+			assert.Contains(t, out, `<p>`+want+`</p>`, "the refusal's sentence is drawn")
 			assert.Contains(t, out, `value="someone@example.com"`, "the address the page is about")
 			code := inputRe("verificationCode").FindString(out)
 			if tc.wantCodeForm {

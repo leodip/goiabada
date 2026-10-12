@@ -377,7 +377,7 @@ func TestRender_AdminUserAttributeEdit_ARefusedSaveNamesTheStoredKey(t *testing.
 		wantRefusal string
 	}{
 		{typedKey: "cost centre", wantRefusal: "The attribute key is invalid."},
-		{typedKey: "", wantRefusal: "Attribute key is required"},
+		{typedKey: "", wantRefusal: "A chave do atributo é obrigatória"},
 	}
 
 	for _, tc := range testCases {
