@@ -31,8 +31,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -uo pipefail
-          report=$(cd src/authserver && ./version-manager.sh override-status)
-          rc=$?
+          # The step's shell is bash -e, which would end it at the 3 this case is written for.
+          rc=0
+          report=$(cd src/authserver && ./version-manager.sh override-status) || rc=$?
           echo "$report"
           case "$rc" in
             0) exit 0 ;;
