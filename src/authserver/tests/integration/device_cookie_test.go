@@ -3,17 +3,22 @@ package integration
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -79,13 +84,15 @@ func newDeviceBrowser(t *testing.T) *deviceBrowser {
 }
 
 // deviceFixture is a user who signs in at a level 1 client that asks no consent, so a sign-in goes
-// from the password straight to a code.
+// from the password straight to a code. The client is confidential, so signInForTokens can redeem
+// the code.
 type deviceFixture struct {
-	client      *record.Client
-	redirectURI *record.RedirectURI
-	user        *record.User
-	password    string
-	adminToken  string
+	client       *record.Client
+	clientSecret string
+	redirectURI  *record.RedirectURI
+	user         *record.User
+	password     string
+	adminToken   string
 }
 
 func newDeviceFixture(t *testing.T) *deviceFixture {
@@ -94,11 +101,15 @@ func newDeviceFixture(t *testing.T) *deviceFixture {
 	adminToken, adminClient := createAdminClientWithToken(t)
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
 
+	clientSecret := fake.LetterN(32)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
+	require.NoError(t, err)
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		DefaultAcrLevel:          record.AcrLevel1,
+		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
@@ -118,18 +129,63 @@ func newDeviceFixture(t *testing.T) *deviceFixture {
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
 
-	return &deviceFixture{client: client, redirectURI: redirectURI, user: user, password: password, adminToken: adminToken}
+	return &deviceFixture{client: client, clientSecret: clientSecret, redirectURI: redirectURI, user: user,
+		password: password, adminToken: adminToken}
 }
 
 func (f *deviceFixture) authorizeURL() string {
+	return f.authorizeURLFor("openid", fake.LetterN(43))
+}
+
+func (f *deviceFixture) authorizeURLFor(scope, codeChallenge string) string {
 	return appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + f.client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(f.redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
-		"&scope=" + url.QueryEscape("openid") +
+		"&code_challenge=" + codeChallenge +
+		"&scope=" + url.QueryEscape(scope) +
 		"&state=" + fake.LetterN(8) +
 		"&nonce=" + fake.LetterN(8)
+}
+
+// deviceAccountScope is the scope signInForTokens asks for: an id token to sign out with, and an
+// access token the account API accepts.
+const deviceAccountScope = "openid " + builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
+
+// signInForTokens signs the user in on browser as signIn does, asking for deviceAccountScope, and
+// redeems the code. It grants the user the account permission and the consent to it first, which no
+// client but the admin console's obtains without (#509).
+func (f *deviceFixture) signInForTokens(t *testing.T, browser *deviceBrowser) map[string]interface{} {
+	t.Helper()
+	resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, resource)
+	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
+	require.NoError(t, err)
+	idx := slices.IndexFunc(perms, func(p record.Permission) bool {
+		return p.PermissionIdentifier == builtin.ManageAccountPermissionIdentifier
+	})
+	require.GreaterOrEqual(t, idx, 0, "the account permission is seeded")
+	assignPermissionToUser(t, f.user.Id, perms[idx].Id)
+	require.NoError(t, database.CreateUserConsent(context.Background(), nil, &record.UserConsent{
+		UserId: f.user.Id, ClientId: f.client.Id, Scope: deviceAccountScope,
+		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
+	}))
+
+	browser.requestId = "device-" + fake.LetterN(16)
+	browser.observed = nil
+	code := signInWithPassword(t, browser.Client,
+		f.authorizeURLFor(deviceAccountScope, oauth.GeneratePKCECodeChallenge(testCodeVerifier)),
+		f.user.Email, f.password, false, "")
+	require.NotEmpty(t, code, "the sign-in reaches the client with a code")
+	return postToTokenEndpoint(t, browser.Client, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {f.client.ClientIdentifier},
+		"client_secret": {f.clientSecret},
+		"code":          {code},
+		"redirect_uri":  {f.redirectURI.URI},
+		"code_verifier": {testCodeVerifier},
+	})
 }
 
 // signIn signs the user in on browser with the password, under a request id of its own, and
@@ -281,6 +337,92 @@ func TestDeviceCookie_ABrowserThatLostItsSessionCookieReplacesItsOwnSession(t *t
 		"logged_in_user":  "",
 		"reason":          "same_device",
 	}}, auditRows(t, f.adminToken, "deleted_user_session", requestId))
+}
+
+// Ending a session, by signing out or through either API, leaves the device cookie as it is: it
+// names the browser, not the session (#564 decision 4). Every ending answers with no device cookie,
+// neither a deletion nor a new value, and the browser's next sign-in gets the same identifier back,
+// whose digest the new session stores. The API calls go through the browser's own client, so a
+// Set-Cookie on their answers would reach its jar.
+func TestDeviceCookie_EndingTheSessionKeepsIt(t *testing.T) {
+	endings := []struct {
+		name string
+		end  func(t *testing.T, f *deviceFixture, browser *deviceBrowser, session record.UserSession, tokens map[string]interface{})
+	}{
+		{
+			name: "signing out with no id_token_hint",
+			end: func(t *testing.T, _ *deviceFixture, browser *deviceBrowser, _ record.UserSession, _ map[string]interface{}) {
+				resp := logoutThroughConsentPage(t, browser.Client, nil)
+				_ = resp.Body.Close()
+				require.Equal(t, http.StatusOK, resp.StatusCode)
+			},
+		},
+		{
+			name: "signing out with a confirmed id_token_hint",
+			end: func(t *testing.T, _ *deviceFixture, browser *deviceBrowser, _ record.UserSession, tokens map[string]interface{}) {
+				idToken, ok := tokens["id_token"].(string)
+				require.True(t, ok, "the sign-in yields an id token: %v", tokens)
+				resp := loadPage(t, browser.Client, appConfig.AuthServer.BaseURL+"/auth/logout?id_token_hint="+url.QueryEscape(idToken))
+				_ = resp.Body.Close()
+				require.Equal(t, http.StatusOK, resp.StatusCode, "the hint is confirmed and the signed-out page answers")
+			},
+		},
+		{
+			name: "the user ending it through the account API",
+			end: func(t *testing.T, _ *deviceFixture, browser *deviceBrowser, session record.UserSession, tokens map[string]interface{}) {
+				accessToken, ok := tokens["access_token"].(string)
+				require.True(t, ok, "the sign-in yields an access token: %v", tokens)
+				deleteThroughBrowser(t, browser, appConfig.AuthServer.BaseURL+"/api/v1/account/sessions/"+
+					strconv.FormatInt(session.Id, 10), accessToken)
+			},
+		},
+		{
+			name: "an administrator ending it through the admin API",
+			end: func(t *testing.T, f *deviceFixture, browser *deviceBrowser, session record.UserSession, _ map[string]interface{}) {
+				deleteThroughBrowser(t, browser, appConfig.AuthServer.BaseURL+"/api/v1/admin/user-sessions/"+
+					strconv.FormatInt(session.Id, 10), f.adminToken)
+			},
+		},
+	}
+
+	for _, ending := range endings {
+		t.Run(ending.name, func(t *testing.T) {
+			f := newDeviceFixture(t)
+			browser := newDeviceBrowser(t)
+			tokens := f.signInForTokens(t, browser)
+			device := theDeviceCookieSet(t, browser).cookie.Value
+			sessions := f.storedSessions(t)
+			require.Len(t, sessions, 1)
+
+			browser.observed = nil
+			ending.end(t, f, browser, sessions[0], tokens)
+
+			assert.Empty(t, f.storedSessions(t), "the session ended")
+			assert.Empty(t, browser.observed, "ending the session sets no device cookie")
+			assert.Equal(t, device, deviceCookieIn(t, browser.Client).Value, "the browser keeps its identifier")
+
+			f.signIn(t, browser)
+			assert.Equal(t, device, theDeviceCookieSet(t, browser).cookie.Value,
+				"the next sign-in gets the same identifier back")
+			after := f.storedSessions(t)
+			require.Len(t, after, 1)
+			assert.NotEqual(t, sessions[0].Id, after[0].Id, "on a new session")
+			assert.Equal(t, sha256OfDevice(device), after[0].DeviceId, "which stores its digest")
+		})
+	}
+}
+
+// deleteThroughBrowser sends an API DELETE carrying accessToken from browser, and requires it to
+// succeed.
+func deleteThroughBrowser(t *testing.T, browser *deviceBrowser, target, accessToken string) {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodDelete, target, nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := browser.Do(req)
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode, target)
 }
 
 // deviceCookieIn is the device cookie httpClient's jar holds.

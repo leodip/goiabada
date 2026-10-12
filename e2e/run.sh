@@ -2,8 +2,8 @@
 # Everything from scratch: rebuild the environment from a release, then run the whole suite.
 #
 #   e2e/run.sh                       # the latest GitHub release
-#   e2e/run.sh v1.7.0                # a given tag
-#   e2e/run.sh v1.7.0 --headed       # anything after the tag goes to Playwright
+#   e2e/run.sh vX.Y.Z                # a given tag, a release after v1.7.0
+#   e2e/run.sh vX.Y.Z --headed       # anything after the tag goes to Playwright
 set -euo pipefail
 here="$(dirname "${BASH_SOURCE[0]}")"
 

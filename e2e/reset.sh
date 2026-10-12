@@ -2,7 +2,7 @@
 # Wipe the e2e environment and build it again from a release, then check it is reachable.
 #
 #   e2e/reset.sh            # the latest GitHub release
-#   e2e/reset.sh v1.7.0     # a given tag
+#   e2e/reset.sh vX.Y.Z     # a given tag, a release after v1.7.0
 set -euo pipefail
 # shellcheck source=infra/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/infra/lib.sh"
@@ -13,7 +13,7 @@ esac
 
 tag="${1:-}"
 if [[ -z "$tag" ]]; then
-  tag="$(latest_release_tag)" || die "could not read the latest release from GitHub; pass a tag, such as v1.7.0"
+  tag="$(latest_release_tag)" || die "could not read the latest release from GitHub; pass the tag of a release after v1.7.0"
   echo "No tag given: using the latest release, ${BOLD}$tag${RESET}."
 fi
 
