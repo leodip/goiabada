@@ -638,8 +638,12 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		require.NoError(t, err)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
+		// The session row stays, so nothing records it as deleted.
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventDeletedUserSession, mock.Anything)
 	})
 
+	// The last client gone, the session goes with it, and is recorded as every other deletion of
+	// one is: deleted_user_session with the reason the sign-out without a hint gives (#564).
 	t.Run("Delete entire user session", func(t *testing.T) {
 		r := &http.Request{}
 		sessionIdentifier := "test-session"
@@ -669,6 +673,11 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(1)).Return(nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, map[string]interface{}{
+			"user_session_id": int64(1),
+			"logged_in_user":  "",
+			"reason":          audit.DeletedUserSessionSignedOut,
+		}).Return().Once()
 		auditLogger.On("Log", mock.Anything, audit.EventLogout, mock.Anything).Return()
 
 		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger)
@@ -846,6 +855,11 @@ func stubPerClientTeardown(
 	database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
+	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, map[string]interface{}{
+		"user_session_id": int64(42),
+		"logged_in_user":  "",
+		"reason":          audit.DeletedUserSessionSignedOut,
+	}).Return()
 	auditLogger.On("Log", mock.Anything, audit.EventLogout, mock.Anything).Return()
 }
 
