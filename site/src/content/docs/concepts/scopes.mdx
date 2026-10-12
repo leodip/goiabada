@@ -46,7 +46,7 @@ Ask only for what you use: the user sees the list on the consent screen, when th
 
 A claim with no value is left out rather than sent empty: a user with no nickname has no `nickname`. `email_verified` and `phone_number_verified` are always sent with their scope, `address` only when some part of the address is set, and `picture` only when the user has a profile picture. `profile` is the admin console's base URL followed by `/account/profile`, the page where the user manages their own profile, so you can link users to it. `locale` is the language the user chose.
 
-`phone_number` is in E.164, the calling code followed by the digits, such as `+351912345678` for a Portuguese number entered as `912 345 678`. The digits are sent as the user entered them, so a leading `0`, the way many countries dial at home, stays in the claim. A number that isn't valid E.164 is left out, such as one over 15 digits with its calling code, which the phone forms accept.
+`phone_number` is in E.164, the calling code followed by the digits, such as `+351912345678` for a Portuguese number entered as `912 345 678`. The number is sent as the user entered it after the calling code, so a leading `0`, the way many countries dial at home, stays in the claim. A number that isn't valid E.164 is left out, such as one over 15 digits with its calling code, which the phone forms accept.
 
 `groups` lists only the groups set to be included, and `attributes` only the attributes set to be included: see [Users and groups](/concepts/users-and-groups/#groups).
 
