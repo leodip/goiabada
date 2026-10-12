@@ -32,6 +32,8 @@ The refusal at the top of this page, to a request sent with `Accept-Language: pt
 }
 ```
 
+A refusal of the access token itself is always in English, whatever the request's language: `ACCESS_TOKEN_REQUIRED`, `INVALID_REQUEST`, `INVALID_TOKEN`, `INSUFFICIENT_SCOPE` and `USER_CONTEXT_REQUIRED`. These are answered before the operation runs, and apart from `ACCESS_TOKEN_REQUIRED` each one sends its sentence again as `error_description` in the `WWW-Authenticate` header, which allows only plain ASCII. Keeping it in English means the body and the header say the same thing.
+
 The protocol endpoints, `/auth/authorize`, `/auth/token`, `/connect/register` and `/userinfo`, answer errors in the format their standards define, not this one. [Authorize](/reference/endpoints/authorize/), [Token](/reference/endpoints/token/) and [UserInfo](/reference/endpoints/userinfo/) cover theirs, and [Dynamic client registration](/reference/endpoints/dynamic-client-registration/#errors) the registration endpoint's.
 
 ## Error codes

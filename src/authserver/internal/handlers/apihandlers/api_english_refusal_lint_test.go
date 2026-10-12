@@ -51,7 +51,8 @@ import (
 //     writeLocalizedError even when a path id's English refusal says the same words, as the group
 //     attribute's groupId does with handler.group_attribute.group_id_required.
 //   - The bearer middleware's 400 is outside the scope: it answers RFC 6750's invalid_request before
-//     any handler runs, on a token no console request can send twice.
+//     any handler runs, on a token no console request can send twice. Its refusals are held English
+//     by TestBearerRefusals_EnglishOnly in internal/middleware instead.
 
 // machineOnlyClass is one of the four classes of #559 decision 1, the refusals only a malformed
 // request can produce.
