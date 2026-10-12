@@ -62,19 +62,6 @@ Each bound includes its last second: a session idle for exactly the idle timeout
 
 A session that fails one of them isn't used, and the user signs in again. It isn't ended either: a session that has merely expired revokes nothing, and its offline refresh tokens keep working. A background job removes idle and expired sessions every 12 hours.
 
-## How many sessions a user can hold
-
-Each sign-in that starts a new session adds one to the user's sessions, and one person rarely needs more than a handful: a phone, a laptop, a browser at work. **User session - max sessions per user** caps them, at 20 unless you change it, from 0 to 1000.
-
-When a sign-in starts a new session and the user would then hold more than the cap, the auth server ends as many of their other sessions as it takes, never the new one:
-
-1. **Expired sessions first:** those past their idle timeout or maximum lifetime that the background job hasn't removed yet. They count toward the cap until it does.
-2. **Then the least recently used,** the session whose last activity is the oldest.
-
-It counts what's left after the sign-in has replaced the browser's own session and its other sessions from the same browser, as [At the end of a sign-in](#at-the-end-of-a-sign-in) describes. Ending a session this way revokes nothing it handed out, though its normal refresh tokens stop working with it, and the audit log records it with the reason `session_cap`.
-
-The cap catches pile-ups, such as a script that signs in with a fresh browser every time, and accounts shared across more browsers than the cap. Set 1 for one session per user, or 0 for no limit. Lowering it ends nothing at once: a user's sessions over the new cap end at their next sign-in.
-
 ## What keeps a session alive
 
 A session's last activity moves forward whenever it's used:
@@ -100,7 +87,7 @@ Once the user has signed in, the auth server checks them again before it records
 Then it records the sign-in in a session:
 
 - **The browser's session is valid and the user's own.** It's reused: its last activity moves forward, and its ACR level goes up when this sign-in reached a higher one. Reusing it never lowers its level. When the user entered a credential in this sign-in, its `auth_time` is updated to then. A sign-in that asked for the password again, such as one with `prompt=login`, replaces the session's level and methods with its own, as described in [A session that's already there](/concepts/acr-and-amr/#a-session-thats-already-there).
-- **Otherwise, a new session starts.** It replaces the user's own session the browser had, if it had one that's no longer valid, and the user's other sessions from the same browser, which the browser's [device cookie](#how-the-auth-server-recognizes-a-browser) tells apart. Sessions in any other browser stay, even one sending the same `User-Agent` from the same IP address, like a second browser profile or a colleague's machine behind the same router, unless the user would then hold more sessions than [the cap](#how-many-sessions-a-user-can-hold). Nothing those sessions handed out is revoked, though their normal refresh tokens stop working with them. A session the browser had for **another** user is ended, as [Ending sessions](/concepts/ending-sessions/#a-different-user-signs-in-on-the-same-browser) describes.
+- **Otherwise, a new session starts.** It replaces the user's own session the browser had, if it had one that's no longer valid, and the user's other sessions from the same browser, recognized by its [device cookie](#how-the-auth-server-recognizes-a-browser). Their sessions in other browsers stay, unless the user would then hold more than [the cap](#how-many-sessions-a-user-can-hold). Nothing those sessions handed out is revoked, though their normal refresh tokens stop working with them. A session the browser had for **another** user is ended, as [Ending sessions](/concepts/ending-sessions/#a-different-user-signs-in-on-the-same-browser) describes.
 
 A new session needs a password entered in this sign-in. A sign-in that was relying on a session that ended partway through goes back to the password step rather than starting one from nothing.
 
@@ -108,14 +95,27 @@ The cookie's identifier changes whenever a session starts and whenever its ACR l
 
 ## How the auth server recognizes a browser
 
-To know which of a user's sessions came from the browser they're signing in on, the auth server gives each browser a cookie of its own, `__Host-authserver_device`, or `authserver_device` when the auth server's base URL is plain `http`. It's a first-party cookie the auth server needs to work, not a tracker: it holds a random identifier, 32 bytes from a secure random generator, only the auth server reads it, and it's used for one thing, ending the user's own earlier sessions from that browser when they sign in again.
+The auth server gives each browser a cookie of its own, `__Host-authserver_device`, or `authserver_device` when its base URL is plain `http`, so a sign-in can tell which of the user's sessions came from that browser. It holds a random identifier that only the auth server reads, and it's used for nothing else: a first-party cookie the auth server needs to work, not a tracker.
 
-- **It's written when a sign-in starts a new session,** and lasts 400 days from then, the longest a browser keeps a cookie. A browser that already has one keeps its identifier. Single sign-on through an existing session doesn't touch it.
+- **It's written when a sign-in starts a new session,** for 400 days, the longest a browser keeps a cookie. A browser that already has one keeps its identifier.
 - **Signing out doesn't clear it,** and neither does an administrator ending a session: it names the browser, not a session.
-- **A session stores the identifier's SHA-256, never the identifier.** Neither is shown in the admin console, returned by an API, logged or written to the audit log.
-- **A browser whose cookies were cleared counts as a new browser.** Its next sign-in leaves the old session alone, and that one expires on its own.
+- **A session stores the identifier's SHA-256, never the identifier,** and neither is shown in the admin console, returned by an API or logged.
+- **A browser whose cookies were cleared counts as a new browser.** Its next sign-in leaves the old session alone, to expire or be ended by [the cap](#how-many-sessions-a-user-can-hold).
 
-The browser and IP address shown on a sessions page are there for you to read. They don't decide which sessions a sign-in replaces.
+The browser and IP address shown on a sessions page play no part: a second browser profile, or a colleague's machine behind the same router, keeps its own session.
+
+## How many sessions a user can hold
+
+One person rarely needs more than a handful of sessions: a phone, a laptop, a browser at work. **User session - max sessions per user** caps them, from 0 to 1000.
+
+When a sign-in starts a new session and leaves the user over the cap, the auth server ends as many of their other sessions as it takes, never the new one:
+
+1. **Expired sessions first,** those past their idle timeout or maximum lifetime that the background job hasn't removed yet.
+2. **Then the least recently used.**
+
+Ending a session this way revokes nothing it handed out, though its normal refresh tokens stop working with it. The audit log records it with the reason `session_cap`.
+
+The cap catches pile-ups, such as a script that signs in with a fresh browser every time. Set 1 for one session per user, or 0 for no limit. Lowering it ends nothing at once: a user's sessions over the new cap end at their next sign-in.
 
 ## Closing the browser
 

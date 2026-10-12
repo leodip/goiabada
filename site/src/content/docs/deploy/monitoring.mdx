@@ -301,7 +301,7 @@ The values of the `limiter` label, and what each one refuses:
 | `pwd_account_net` | Failed sign-ins on one account from one address, at the sign-in form and the password grant together |
 | `pwd_account` | Failed sign-ins on one account from any address, at the sign-in form and the password grant together |
 | `pwd_ip` | Failed sign-ins at the sign-in form from one address |
-| `pwd_ip_requests` | Sign-ins at the sign-in form from one address, successful or not |
+| `pwd_ip_requests` | Every sign-in form submission from one address |
 | `otp` | Failed OTP codes for one user |
 | `email_verification` | Failed email verification codes for one account |
 | `email_verification_send` | Requests to send a verification email for one account |
@@ -314,7 +314,7 @@ The values of the `limiter` label, and what each one refuses:
 | `forgot_pwd_ip` | Forgot-password requests from one address |
 | `dcr` | Dynamic client registrations from one address |
 | `ropc_ip` | Failed sign-ins through the password grant from one address |
-| `ropc_ip_requests` | Sign-ins through the password grant from one address, successful or not |
+| `ropc_ip_requests` | Every password grant request from one address |
 
 ## Next steps
 

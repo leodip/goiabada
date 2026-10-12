@@ -21,9 +21,9 @@ Decide what to do from the HTTP status first: a `4xx` is something your request 
 ## The fields
 
 - **`error_code`** is a stable identifier for the failure. It's either an `UPPER_SNAKE` code from the table below, or, for some refused fields, the key of the sentence in the auth server's text catalogs, in dotted lowercase, such as `validator.email.invalid_format`. It's never translated.
-- **`error_description`** is a sentence for people. It's in the request's language, taken from the `ui_locales` query parameter or else the `Accept-Language` header, when the auth server has that sentence in that language, and in English otherwise. Don't match on it: the wording and the language can change, the code won't.
+- **`error_description`** is a sentence for people. Don't match on it: the wording and the language can change, the code won't.
 
-The refusal at the top of this page, to a request sent with `Accept-Language: pt-BR`:
+A refusal of a value you sent, a `400` or `409` such as `VALIDATION_ERROR`, comes in the request's language: the `ui_locales` query parameter, or else the `Accept-Language` header, when the auth server has the sentence in that language. The rest are in English: a refused access token, a body that doesn't parse, a malformed id, and every other status. The refusal at the top of this page, sent with `Accept-Language: pt-BR`:
 
 ```json
 {
@@ -31,8 +31,6 @@ The refusal at the top of this page, to a request sent with `Accept-Language: pt
   "error_description": "O host SMTP é obrigatório."
 }
 ```
-
-A refusal of the access token itself is always in English, whatever the request's language: `ACCESS_TOKEN_REQUIRED`, `INVALID_REQUEST`, `INVALID_TOKEN`, `INSUFFICIENT_SCOPE` and `USER_CONTEXT_REQUIRED`. These are answered before the operation runs, and apart from `ACCESS_TOKEN_REQUIRED` each one sends its sentence again as `error_description` in the `WWW-Authenticate` header, which allows only plain ASCII. Keeping it in English means the body and the header say the same thing.
 
 The protocol endpoints, `/auth/authorize`, `/auth/token`, `/connect/register` and `/userinfo`, answer errors in the format their standards define, not this one. [Authorize](/reference/endpoints/authorize/), [Token](/reference/endpoints/token/) and [UserInfo](/reference/endpoints/userinfo/) cover theirs, and [Dynamic client registration](/reference/endpoints/dynamic-client-registration/#errors) the registration endpoint's.
 

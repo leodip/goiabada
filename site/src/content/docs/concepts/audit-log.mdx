@@ -184,19 +184,17 @@ An email address typed into a form nobody has signed in to is recorded only as `
 
 ## Why a session was deleted
 
-Every `deleted_user_session` entry has a `reason`, so you can filter on why sessions go:
+Every `deleted_user_session` entry has a `reason`:
 
 | `reason` | Why the session was deleted |
 |---|---|
 | `replaced_by_sign_in` | The user signed in again, and the new session replaced the one the browser had. |
 | `same_device` | The user signed in again, and the new session replaced another of their sessions from the same browser, recognized by its [device cookie](/concepts/sessions/#how-the-auth-server-recognizes-a-browser). |
-| `session_cap` | The user signed in, and would have held more sessions than **User session - max sessions per user** allows, so this one, expired or the least recently used, was ended. See [How many sessions a user can hold](/concepts/sessions/#how-many-sessions-a-user-can-hold). |
+| `session_cap` | A sign-in took the user over **User session - max sessions per user**, and this session, expired or the least recently used, was ended. See [How many sessions a user can hold](/concepts/sessions/#how-many-sessions-a-user-can-hold). |
 | `replaced_by_other_user` | Another user signed in on the browser that held it. |
 | `signed_out` | The user signed out: of the whole session, or of the last app on it, which ends the session too. |
 | `ended_by_user` | The user ended it from their account. |
 | `ended_by_administrator` | An administrator ended it. |
-
-A session that's both the one the browser had and one from the same browser's device cookie is deleted once, and its entry says `replaced_by_sign_in`.
 
 ## The Admin API
 
@@ -238,7 +236,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 |---|---|
 | `logout` | A user signed out and their session ended. A sign-out confirmed with no session to end writes it too. |
 | `deleted_user_session_client` | A client signed a user out, and was removed from the user's session. The session ends only when no other client is left on it. |
-| `deleted_user_session` | A session was deleted. Its `reason` says why: see [Why a session was deleted](#why-a-session-was-deleted). |
+| `deleted_user_session` | A session was deleted by a sign-in, a sign-out, its user or an administrator. Its `reason` says which: see [Why a session was deleted](#why-a-session-was-deleted). |
 | `terminated_user_session` | A session was ended by an administrator, by its own user, or by another user signing in on the same browser, and its codes and refresh tokens were revoked. |
 | `revoked_user_auth_state` | A user's password was reset or changed, or the user was disabled, so their sessions and refresh tokens were revoked. A user changing their own password keeps the session they did it from. |
 

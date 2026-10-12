@@ -147,9 +147,9 @@ On the auth server's pages, the sign-in, one-time code, consent, sign-out, regis
 
 In the admin console, the user's own choice comes first: the **Locale** they picked under **Account**, **Profile**, which reaches the console as the `locale` claim of their ID token. The console picks a change up the next time it refreshes the user's tokens, within five minutes with the default token lifetime. Without one, the browser's `Accept-Language` decides, then English.
 
-What the auth server refuses on an admin console page, such as a value a form won't take, comes in that page's language: the console names it to the auth server on every call. That's why the override catalogs go to both servers. A sentence the auth server has no text for in that language shows in English.
-
 Whichever of these decides, it gets the first of its languages Goiabada has text for, or English when it has none of them: `ui_locales=fr es` shows Spanish when you've added Spanish but not French, and `ui_locales=fr` alone shows English.
+
+A value an admin console form won't take is refused by the auth server, in the console page's language, which is why both servers need your override catalogs.
 
 An email is written in its recipient's language: the **Locale** on their profile, or English when they haven't picked one. The activation link and the welcome email a user gets when they register are written in the language of the page they registered on, since their account has no language yet.
 
