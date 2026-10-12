@@ -54,7 +54,9 @@ for (const { name, user, message } of [
 ]) {
   test(`a user with ${name} is refused, and the form keeps what was typed`, async ({ page }) => {
     const email = `${uniqueIdentifier("u")}@example.com`;
-    const submitted = { email, givenName: "Grace", familyName: "Hopper", password: "a-good-password", ...user };
+    // The two refused-email cases replace the generated address with their own.
+    const defaults = { email, givenName: "Grace", familyName: "Hopper", password: "a-good-password" };
+    const submitted = { ...defaults, ...user };
     await submitNewUser(page, submitted);
     await expect(page).toHaveURL(`${list}/new`);
     await expect(page.getByText(message)).toBeVisible();
