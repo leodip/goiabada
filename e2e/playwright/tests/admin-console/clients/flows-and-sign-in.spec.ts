@@ -119,7 +119,9 @@ test("a client requiring ACR level 2 mandatory makes a user without an authentic
 }) => {
   const user = await users.create();
   const { client, secret } = await browserSignInClient(page, clients);
-  await saveClientSettings(page, client.id, () => page.locator('select[name="defaultAcrLevel"]').selectOption("urn:goiabada:level2_mandatory"));
+  await saveClientSettings(page, client.id, async () => {
+    await page.locator('select[name="defaultAcrLevel"]').selectOption("urn:goiabada:level2_mandatory");
+  });
 
   const verifier = randomBytes(32).toString("base64url");
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
