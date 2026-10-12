@@ -41,7 +41,9 @@ type bearerRefusals interface {
 // apiBearerRefusals answers in the admin and account API's envelope, through the same writer every
 // API handler uses.
 //
-// i18n surface: B — machine. Bearer-token failures on /api/v1/* do not localize.
+// i18n surface: B — machine. Bearer-token failures on /api/v1/* do not localize: each description
+// is also the challenge's, which RFC 6750 section 3 holds to ASCII. TestBearerRefusals_EnglishOnly
+// holds every sentence to bearerEnglishRefusals and the body to the challenge's string.
 type apiBearerRefusals struct{}
 
 func (apiBearerRefusals) missing(w http.ResponseWriter, _ *http.Request) {
