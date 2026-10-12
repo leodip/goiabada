@@ -3,12 +3,13 @@
 #
 #   e2e/reset.sh            # the latest GitHub release
 #   e2e/reset.sh vX.Y.Z     # a given tag, a release after v1.7.0
+#   e2e/reset.sh --source   # this checkout's src/, built on the VPS: what the next release would ship
 set -euo pipefail
 # shellcheck source=infra/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/infra/lib.sh"
 
 case "${1:-}" in
-  -h | --help) sed -n '2,6s/^# \{0,1\}//p' "$0"; exit 0 ;;
+  -h | --help) sed -n '2,7s/^# \{0,1\}//p' "$0"; exit 0 ;;
 esac
 
 tag="${1:-}"
@@ -19,4 +20,6 @@ fi
 
 started=$SECONDS
 "$E2E_DIR/infra/prepare.sh" "$tag"
+# For --source, the version prepare.sh named the build.
+tag="$(sed -n 's/^E2E_TAG=//p' "$STATE_DIR/environment.env")"
 printf '\n%sThe environment runs %s%s (%ds). Next: e2e/test.sh\n' "$GREEN" "$tag" "$RESET" $((SECONDS - started))

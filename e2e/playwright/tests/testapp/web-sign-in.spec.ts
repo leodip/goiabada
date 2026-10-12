@@ -2,6 +2,7 @@
 // guides tell a developer to build, working against the real auth server.
 import { grantUserPermission } from "../../lib/admin-console";
 import { submitPassword } from "../../lib/browser-sign-in";
+import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { expectResult, resultBody, shownClaims, signInToWebApp, testapp, userBrowser } from "../../lib/testapp";
 
@@ -41,11 +42,20 @@ test("a user signs in to the web app, which reads their claims, calls /userinfo 
   expect(info.sub).toBe(id.sub);
   expect(info.email).toBe(user.email);
   expect(info.given_name).toBe("Playwright");
+  // profile is the page where the user manages their profile, the admin console's, in both places.
+  const profilePage = `${env.adminUrl}/account/profile`;
+  expect(id.profile).toBe(profilePage);
+  expect(info.profile).toBe(profilePage);
 
   await app.getByRole("button", { name: "Call the API" }).click();
   await expectResult(app, "The API answered 200");
   const api = await resultBody(app);
   expect((api.body as Record<string, unknown>).caller).toBe(id.sub);
+
+  // And it opens: the user's session signs them in to the admin console, at their own profile.
+  await app.goto(profilePage);
+  await app.waitForURL(profilePage);
+  await expect(app.locator('input[name="givenName"]')).toHaveValue("Playwright");
   await context.close();
 });
 

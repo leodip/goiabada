@@ -1,4 +1,4 @@
-import { clientRow, clientUrl, readClientSecret } from "../../../lib/admin-console";
+import { clientRow, clientUrl, grantClientPermission, readClientSecret, rowWithCell } from "../../../lib/admin-console";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { clientCredentialsToken } from "../../../lib/oauth";
@@ -31,6 +31,24 @@ test("deleting needs the identifier typed: a wrong one is refused, the right one
   const answer = await clientCredentialsToken(request, client.identifier, secret);
   expect(answer.status).toBe(401);
   expect(answer.body.error).toBe("invalid_client");
+});
+
+test("deleting with the identifier left empty is refused on the page, which still lists the permissions", async ({
+  page,
+  clients,
+}) => {
+  const client = await clients.create({ authorizationCode: false, clientCredentials: true });
+  await grantClientPermission(page, client.id, "authserver", "manage-account");
+
+  await page.goto(clientUrl(client.id, "delete"));
+  await expect(page.locator('input[name="clientIdentifier"]')).toHaveValue("");
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page).toHaveURL(clientUrl(client.id, "delete"));
+  await expect(page.getByText("Client identifier is required.")).toBeVisible();
+  // Drawn as the first draw is, the permissions the page warns about included.
+  await expect(rowWithCell(page, "Assigned permissions")).toContainText("authserver:manage-account");
+  await page.goto(`${env.adminUrl}/admin/clients`);
+  await expect(clientRow(page, client.identifier)).toHaveCount(1);
 });
 
 test("the system client cannot be deleted", async ({ page }) => {

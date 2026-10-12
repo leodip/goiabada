@@ -55,9 +55,11 @@ test("a permission is edited, and Cancel edit leaves it as it was", async ({ pag
   await editButton().click();
   await page.locator("#permissionIdentifier").fill("view");
   await page.locator("#permissionDescription").fill("View things");
-  const validated = page.waitForResponse((r) => r.url().endsWith("/admin/resources/validate-permission"));
+  const validated = page.waitForResponse((r) => new URL(r.url()).pathname === "/admin/resources/validate-permission");
   await page.getByRole("button", { name: "Update permission" }).click();
   await validated;
+  // The table changes once the page has read the answer, which is after the answer arrives.
+  await expect(resourcePermissionRow(page, "view")).toHaveCount(1);
   await saveResourcePermissions(page);
 
   await page.reload();

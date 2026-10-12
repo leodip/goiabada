@@ -43,6 +43,24 @@ test("a user is added from the search, shows as a member everywhere, and is remo
   await expect(page.locator("#groupsTable")).not.toContainText(group.identifier);
 });
 
+test("Enter in the search box only searches: it adds nobody and stays on the page", async ({ page, groups, users }) => {
+  const group = await groups.create();
+  const user = await users.create();
+  const addUrl = `${env.adminUrl}/admin/groups/${group.id}/members/add`;
+  await page.goto(addUrl);
+  await page.locator("#search").pressSequentially(user.email.split("@")[0]);
+  const row = rowWithCell(page, user.email);
+  await expect(row.getByRole("button", { name: "Add to group" })).toBeVisible();
+
+  // Enter's keyup runs the search again; by its answer, a click or a submit would have happened.
+  const searched = page.waitForResponse((r) => new URL(r.url()).pathname === `/admin/groups/${group.id}/members/search`);
+  await page.locator("#search").press("Enter");
+  await searched;
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  await expect(page).toHaveURL(addUrl);
+  await expect(row.getByRole("button", { name: "Add to group" })).toBeVisible();
+});
+
 test("a search that matches nobody says so", async ({ page, groups }) => {
   const group = await groups.create();
   await page.goto(`${env.adminUrl}/admin/groups/${group.id}/members/add`);

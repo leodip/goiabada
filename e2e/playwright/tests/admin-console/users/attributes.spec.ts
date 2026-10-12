@@ -68,6 +68,18 @@ for (const { key, value, message } of [
   });
 }
 
+test("a refused edit keeps the typed key, and the title names the stored one", async ({ page, users }) => {
+  const user = await users.create();
+  await addAttribute(page, user.id, { key: "employee_id", value: "E-1001" });
+  await rowWithCell(page, "employee_id").getByRole("button", { name: "Edit" }).click();
+  await submitAttribute(page, { key: "not valid", value: "E-1001" });
+  await expect(page.getByText("Invalid identifier format.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Edit user attribute - employee_id", exact: true })).toBeVisible();
+  await expect(page.locator("#attributeKey")).toHaveValue("not valid");
+  await page.goto(userUrl(user.id, "attributes"));
+  await expect(rowWithCell(page, "employee_id")).toHaveCount(1);
+});
+
 test("user attributes reach the attributes claim, and a group's attribute wins a shared key", async ({
   page,
   request,

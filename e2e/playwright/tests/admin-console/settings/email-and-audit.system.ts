@@ -47,6 +47,28 @@ test("with SMTP off, the features that mail are withdrawn", async ({ page, brows
   });
 });
 
+test("a verification code sent after SMTP is turned off is refused on the page", async ({ page, browser, users }) => {
+  const user = await users.create();
+  await withSettingsRestored(page, email, async () => {
+    // The user opens the page while email is on, so it draws the code form.
+    const own = await signInToConsole(browser, user, "/account/email-verification");
+    const code = own.page.locator('input[name="verificationCode"]');
+    await expect(code).toBeVisible();
+
+    await fillSettingsForm(page, { smtpEnabled: false });
+    await saveSettings(page);
+
+    // The auth server refuses it before it compares the code. The page now draws no code form, and
+    // draws the refusal all the same: it used to draw it only inside that form, so it showed nothing.
+    await code.fill("ABCD1234");
+    await own.page.getByRole("button", { name: "Verify email" }).click();
+    await expect(own.page.getByText("SMTP is not enabled")).toBeVisible();
+    await expect(own.page).toHaveURL(`${env.adminUrl}/account/email-verification`);
+    await expect(code).toHaveCount(0);
+    await own.context.close();
+  });
+});
+
 test("audit log retention is saved, and refused when out of range", async ({ page }) => {
   const path = "/admin/settings/audit-logs";
   await withSettingsRestored(page, path, async () => {

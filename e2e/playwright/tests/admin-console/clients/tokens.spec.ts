@@ -59,3 +59,23 @@ for (const { value, message } of [
     await expect(page.locator("#tokenExpirationInSeconds")).toHaveValue("0");
   });
 }
+
+test("a refused save keeps what was typed, both claim choices included", async ({ page, clients }) => {
+  const client = await clients.create();
+  const accessOff = page.locator('input[name="includeOpenIDConnectClaimsInAccessToken"][value="off"]');
+  const idOn = page.locator('input[name="includeOpenIDConnectClaimsInIdToken"][value="on"]');
+  await page.goto(clientUrl(client.id, "tokens"));
+  await accessOff.check();
+  await idOn.check();
+  await page.locator("#tokenExpirationInSeconds").fill("abc");
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Invalid value for token expiration in seconds.")).toBeVisible();
+  await expect(page.locator("#tokenExpirationInSeconds")).toHaveValue("abc");
+  await expect(accessOff).toBeChecked();
+  await expect(idOn).toBeChecked();
+
+  // Nothing was saved: the tab opens on the stored choices again.
+  await page.goto(clientUrl(client.id, "tokens"));
+  await expect(page.locator('input[name="includeOpenIDConnectClaimsInAccessToken"][value="default"]')).toBeChecked();
+  await expect(page.locator('input[name="includeOpenIDConnectClaimsInIdToken"][value="default"]')).toBeChecked();
+});

@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Runs on the VPS. prepare.sh copies it, the nginx template and the admin password into a staging
 # directory there, passes that directory as $1 and the settings in the environment (E2E_*), and
-# removes the directory afterwards.
+# removes the directory afterwards. For a build of a checkout (E2E_SOURCE_BUILD=true) it copies the
+# checkout's src/ there too, as src.tar.gz.
 #
 # It replaces whatever environment ran before, from scratch: the Compose project and its volumes go,
 # the release's own setup wizard writes new Compose files, and nginx is pointed at the new servers.
+# For a build of a checkout, the wizard and both images are built here from that source first.
 # The certificate is the one thing kept, and requested only when it is missing or does not cover
 # the four hosts.
 set -euo pipefail
@@ -53,11 +55,55 @@ mkdir -m 700 "$E2E_REMOTE_DIR"
 cd "$E2E_REMOTE_DIR"
 
 wizard="goiabada-setup-linux-$arch"
-base="https://github.com/leodip/goiabada/releases/download/$E2E_TAG"
-log "downloading $wizard from release $E2E_TAG"
-curl -fsSLO "$base/$wizard" || fail "release $E2E_TAG has no $wizard"
-curl -fsSLO "$base/checksums.txt" || fail "release $E2E_TAG has no checksums.txt"
-grep " $wizard\$" checksums.txt | sha256sum -c --quiet - || fail "$wizard does not match checksums.txt"
+if [[ "${E2E_SOURCE_BUILD:-false}" == true ]]; then
+  # What a release ships, built from the checkout's source as the release builds it: both servers from
+  # their Dockerfiles with the same build arguments, and the wizard with the same tag and -X values,
+  # imageTag naming the images built here. The images are labelled so the next build, and
+  # teardown.sh, remove them without touching anyone else's.
+  tar -xzf "$stage/src.tar.gz" -C "$stage"
+  src="$stage/src"
+  commit="${E2E_TAG#e2e-}"
+  for server in authserver adminconsole; do
+    log "building leodip/goiabada:$server-$version"
+    if ! docker build --label goiabada-e2e=server -f "$src/build/Dockerfile-$server" \
+      -t "leodip/goiabada:$server-$version" --build-arg "version=$version" \
+      --build-arg "buildDate=$(date -u +%Y-%m-%d)" --build-arg "gitCommit=${commit%-dirty}" "$src" \
+      >"$stage/build-$server.log" 2>&1; then
+      tail -40 "$stage/build-$server.log" >&2
+      fail "the $server image did not build"
+    fi
+  done
+  docker image ls --filter label=goiabada-e2e=server --format '{{.Repository}}:{{.Tag}}' |
+    { grep -v -e "-$version\$" -e '<none>' || true; } | xargs -r docker image rm >/dev/null
+  docker image prune -f --filter label=goiabada-e2e=server >/dev/null
+
+  golang="$(sed -n 's/^FROM \(golang:[^ ]*\) AS build$/\1/p' "$src/build/Dockerfile-authserver")"
+  [[ -n "$golang" ]] || fail "build/Dockerfile-authserver names no golang image"
+  log "building $wizard with $golang"
+  if ! docker build --output "type=local,dest=$E2E_REMOTE_DIR" --build-arg "version=$version" \
+    -f - "$src" >"$stage/build-wizard.log" 2>&1 <<EOF
+FROM $golang AS build
+COPY core /src/core
+COPY cmd/goiabada-setup /src/cmd/goiabada-setup
+WORKDIR /src/cmd/goiabada-setup
+ARG version
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \\
+  CGO_ENABLED=0 go build -buildvcs=false -tags=production \\
+  -ldflags "-w -X main.version=\${version} -X main.imageTag=\${version}" -o /out/$wizard .
+FROM scratch
+COPY --from=build /out/$wizard /
+EOF
+  then
+    tail -40 "$stage/build-wizard.log" >&2
+    fail "the setup wizard did not build"
+  fi
+else
+  base="https://github.com/leodip/goiabada/releases/download/$E2E_TAG"
+  log "downloading $wizard from release $E2E_TAG"
+  curl -fsSLO "$base/$wizard" || fail "release $E2E_TAG has no $wizard"
+  curl -fsSLO "$base/checksums.txt" || fail "release $E2E_TAG has no checksums.txt"
+  grep " $wizard\$" checksums.txt | sha256sum -c --quiet - || fail "$wizard does not match checksums.txt"
+fi
 chmod +x "$wizard"
 log "$("./$wizard" --version)"
 
@@ -101,7 +147,12 @@ printf 'COMPOSE_FILE=docker-compose.yml:docker-compose.override.yml:mailpit.yml\
 # --- 3. Start it ------------------------------------------------------------------------------------
 
 log "pulling images"
-docker compose pull --quiet >pull.log 2>&1 || { cat pull.log >&2; fail "docker compose pull failed"; }
+# Not the two servers' for a build of a checkout: they were built here, and no registry has them.
+pull=()
+if [[ "${E2E_SOURCE_BUILD:-false}" == true ]]; then
+  mapfile -t pull < <(docker compose config --services | grep -vx -e goiabada-authserver -e goiabada-adminconsole)
+fi
+docker compose pull --quiet "${pull[@]}" >pull.log 2>&1 || { cat pull.log >&2; fail "docker compose pull failed"; }
 
 log "starting"
 # The environment targets releases after v1.7.0, whose wizard probes PostgreSQL over TCP, so a failed

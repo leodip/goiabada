@@ -20,6 +20,17 @@ test("a test email from Settings - Email arrives", async ({ page, request }) => 
   expect(mail.subject).toBeTruthy();
 });
 
+test("a test email to a malformed address is refused on the form, which keeps the address", async ({ page }) => {
+  const sendTest = `${env.adminUrl}/admin/settings/email/send-test-email`;
+  await page.goto(sendTest);
+  await page.locator('input[name="destinationEmail"]').fill("not-an-email");
+  await page.locator("#btnSend").click();
+  await expect(page).toHaveURL(sendTest);
+  await expect(page.getByText("Please enter a valid email address.")).toBeVisible();
+  await expect(page.locator('input[name="destinationEmail"]')).toHaveValue("not-an-email");
+  await expect(page.getByText("Email sent successfully")).toHaveCount(0);
+});
+
 test("a user created with an emailed link sets their password through it, and signs in", async ({
   page,
   browser,

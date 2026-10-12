@@ -68,6 +68,28 @@ test("a user who already holds the permission shows so in the search", async ({ 
   await expect(rowWithCell(page, user.email).getByRole("button", { name: "Grant permission" })).toHaveCount(0);
 });
 
+test("Enter in the search box only searches: it grants nothing and stays on the page", async ({ page, resources, users }) => {
+  const resource = await resources.create({ permissions: ["read"] });
+  const user = await users.create();
+  await page.goto(resourceUrl(resource.id, "users-with-permission"));
+  await page.getByRole("link", { name: "Grant permission to user" }).click();
+  await expect(page.locator("#usersTable")).toContainText("Enter a search term.");
+  const addUrl = page.url();
+  await page.locator("#search").pressSequentially(user.email.split("@")[0]);
+  const row = rowWithCell(page, user.email);
+  await expect(row.getByRole("button", { name: "Grant permission" })).toBeVisible();
+
+  // Enter's keyup runs the search again; by its answer, a click or a submit would have happened.
+  const searched = page.waitForResponse((r) =>
+    new URL(r.url()).pathname.startsWith(`/admin/resources/${resource.id}/users-with-permission/search/`),
+  );
+  await page.locator("#search").press("Enter");
+  await searched;
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  await expect(page).toHaveURL(addUrl);
+  await expect(row.getByRole("button", { name: "Grant permission" })).toBeVisible();
+});
+
 test("a search that matches nobody says so", async ({ page, resources }) => {
   const resource = await resources.create({ permissions: ["read"] });
   await page.goto(resourceUrl(resource.id, "users-with-permission"));

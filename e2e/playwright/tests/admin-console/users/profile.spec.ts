@@ -89,6 +89,23 @@ for (const { field, value, message } of [
   });
 }
 
+test("a refused date of birth over a stored one is kept as typed, and the stored one stays", async ({ page, users }) => {
+  const user = await users.create();
+  const dateOfBirth = page.locator('input[name="dateOfBirth"]');
+  await page.goto(userUrl(user.id, "profile"));
+  await dateOfBirth.fill("1990-05-17");
+  await page.locator("#btnSave").click();
+  await expect(page.getByText(saved)).toBeVisible();
+
+  await dateOfBirth.fill("17/05/1991");
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("The date of birth is invalid. Please use the format YYYY-MM-DD.")).toBeVisible();
+  // What was typed, not the stored date beside a refusal of it.
+  await expect(dateOfBirth).toHaveValue("17/05/1991");
+  await page.goto(userUrl(user.id, "profile"));
+  await expect(dateOfBirth).toHaveValue("1990-05-17");
+});
+
 test("a username already taken is refused", async ({ page, users }) => {
   const first = await users.create();
   const second = await users.create();

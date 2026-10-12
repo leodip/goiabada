@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { userUrl } from "../../../lib/admin-console";
 import { expect, test } from "../../../lib/fixtures";
-import { passwordToken, userTokens } from "../../../lib/oauth";
+import { passwordToken, userinfo, userTokens } from "../../../lib/oauth";
 import { passwordGrantClient } from "../../../lib/test-clients";
 import { uniqueIdentifier } from "../../../lib/unique";
 
@@ -77,11 +77,32 @@ test("a phone number is saved and reaches the phone claims", async ({ page, requ
   await expect(page.locator('input[name="phoneNumber"]')).toHaveValue("912 345 678");
 
   const { client, secret } = await passwordGrantClient(page, clients);
-  const { id } = await userTokens(request, client.identifier, secret, user, "openid phone");
-  // With the country's calling code: without it a client cannot tell which country the number is in.
-  // OIDC Core 1.0 section 5.1 recommends E.164; any spacing is accepted here.
-  expect(id.phone_number).toMatch(/^\+351[ -]?912[ -]?345[ -]?678$/);
+  const { body, id } = await userTokens(request, client.identifier, secret, user, "openid phone");
+  // In E.164, the calling code then the digits with no spacing, in the ID token and at /userinfo alike.
+  expect(id.phone_number).toBe("+351912345678");
   expect(id.phone_number_verified).toBe(true);
+  const info = await userinfo(request, body.access_token as string);
+  expect(info.status).toBe(200);
+  expect(info.body.phone_number).toBe("+351912345678");
+  expect(info.body.phone_number_verified).toBe(true);
+});
+
+test("a number too long for E.164 with its calling code is saved, but left out of the claims", async ({ page, request, clients, users }) => {
+  const user = await users.create();
+  await page.goto(userUrl(user.id, "phone"));
+  await expect(page.getByText("Enter the number as it's dialled from another country, after the country code.")).toBeVisible();
+  await page.locator('select[name="phoneCountryUniqueId"]').selectOption(await optionByLabel(page, "phoneCountryUniqueId", /Portugal/));
+  // 13 digits, 16 with Portugal's 351: the form takes up to 30 characters, E.164 at most 15 digits.
+  await page.locator('input[name="phoneNumber"]').fill("9123 4567 89123");
+  await page.locator("#btnSave").click();
+  await expect(page.getByText(saved)).toBeVisible();
+
+  const { client, secret } = await passwordGrantClient(page, clients);
+  const { body, id } = await userTokens(request, client.identifier, secret, user, "openid phone");
+  expect(id).not.toHaveProperty("phone_number");
+  expect(id.phone_number_verified).toBe(false);
+  const info = await userinfo(request, body.access_token as string);
+  expect(info.body).not.toHaveProperty("phone_number");
 });
 
 for (const { name, country, number, message } of [
@@ -96,6 +117,13 @@ for (const { name, country, number, message } of [
     await page.locator('input[name="phoneNumber"]').fill(number);
     await page.locator("#btnSave").click();
     await expect(page.getByText(message)).toBeVisible();
+    // Drawn with the stored user: the title names them, and every tab links to their pages.
+    await expect(page.getByRole("heading", { name: `User - Phone - ${user.email}`, exact: true })).toBeVisible();
+    const tabs = page.locator(".tabs a");
+    await expect(tabs).toHaveCount(12);
+    for (const href of await tabs.evaluateAll((links) => links.map((a) => a.getAttribute("href")))) {
+      expect(href).toMatch(new RegExp(`^/admin/users/${user.id}/`));
+    }
     await page.goto(userUrl(user.id, "phone"));
     await expect(page.locator('input[name="phoneNumber"]')).toHaveValue("");
   });

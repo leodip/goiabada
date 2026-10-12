@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Removes the e2e environment from the VPS.
 #
-#   e2e/infra/teardown.sh          # the Compose project, its volumes and directory, the test app image
+#   e2e/infra/teardown.sh          # the Compose project, its volumes and directory, the images built here
 #   e2e/infra/teardown.sh --all    # also the nginx configuration and the certificate
 #
 # DNS records are left alone.
@@ -25,6 +25,7 @@ ssh_vps "set -e
   if [ -f $dir/docker-compose.yml ]; then (cd $dir && docker compose down -v --remove-orphans --timeout 30); fi
   docker compose -p $project down -v --remove-orphans --timeout 30 >/dev/null 2>&1 || true
   docker image ls -q --filter label=goiabada-e2e=testapp | xargs -r docker image rm -f >/dev/null
+  docker image ls -q --filter label=goiabada-e2e=server | xargs -r docker image rm -f >/dev/null
   rm -rf $dir"
 
 if [[ "$all" == true ]]; then

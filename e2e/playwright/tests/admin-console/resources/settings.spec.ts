@@ -78,6 +78,28 @@ test("an invalid identifier or description is refused on save", async ({ page, r
   await expect(page.locator('input[name="description"]')).toHaveValue("");
 });
 
+test("a refused rename is drawn with the stored identifier, and the same rename asks again", async ({ page, resources }) => {
+  const resource = await resources.create();
+  const renamed = uniqueIdentifier("r");
+  const dialog = page.locator("dialog[open]");
+  await page.goto(resourceUrl(resource.id, "settings"));
+  await page.locator("#resourceIdentifier").fill(renamed);
+  await page.locator('input[name="description"]').fill("a <script> tag");
+  await page.locator("#btnSave").click();
+  await expect(dialog).toContainText("You've modified the resource identifier");
+  await dialog.getByRole("button", { name: "Yes" }).click();
+  await expect(page.getByText("The description cannot contain the characters < or >.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: `Resource settings - ${resource.identifier}`, exact: true })).toBeVisible();
+  await expect(page.locator("#resourceIdentifier")).toHaveValue(renamed);
+
+  // Still a rename of the stored resource, so Save asks again.
+  await page.locator("#btnSave").click();
+  await expect(dialog).toContainText("You've modified the resource identifier");
+  await dialog.getByRole("button", { name: "No" }).click();
+  await page.goto(resourceUrl(resource.id, "settings"));
+  await expect(page.locator("#resourceIdentifier")).toHaveValue(resource.identifier);
+});
+
 test("the system resource warns, keeps its identifier read-only, and asks before saving", async ({ page }) => {
   const id = await idFromListLink(page, list, "authserver", "Manage");
   await page.goto(resourceUrl(id, "settings"));

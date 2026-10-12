@@ -6,13 +6,14 @@
 #   e2e/test.sh --ui                     # Playwright's UI mode
 #   e2e/test.sh tests/admin-console      # one area (any Playwright argument passes through)
 #
-# Installs the suite's packages and Chromium the first time, and when package-lock.json changes.
+# Installs the suite's packages and Chromium the first time, and when package-lock.json changes, and
+# checks the suite's types before it runs.
 set -uo pipefail
 # shellcheck source=infra/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/infra/lib.sh"
 
 case "${1:-}" in
-  -h | --help) sed -n '2,9s/^# \{0,1\}//p' "$0"; exit 0 ;;
+  -h | --help) sed -n '2,10s/^# \{0,1\}//p' "$0"; exit 0 ;;
 esac
 
 suite="$E2E_DIR/playwright"
@@ -27,6 +28,9 @@ auth_url="$(sed -n 's/^E2E_AUTH_URL=//p' "$state")"
 ensure_suite_packages
 cd "$suite" || die "no $suite"
 
+# Playwright strips the suite's types and runs it unchecked, so a type error would fail nothing.
+npm run --silent typecheck || die "the suite has type errors (cd e2e/playwright && npm run typecheck)"
+
 curl -fsS -o /dev/null --max-time 10 "$auth_url/health" ||
   die "$auth_url does not answer: check it with e2e/infra/verify.sh, or rebuild with e2e/reset.sh"
 
@@ -39,7 +43,7 @@ ssh "${SSH_OPTS[@]}" -o ExitOnForwardFailure=yes -N -L "127.0.0.1:$tunnel_port:1
 tunnel_pid=$!
 trap 'kill "$tunnel_pid" 2>/dev/null' EXIT
 for _ in $(seq 1 20); do
-  curl -fsS -o /dev/null --max-time 2 "http://127.0.0.1:$tunnel_port/api/v1/info" && break
+  curl -fs -o /dev/null --max-time 2 "http://127.0.0.1:$tunnel_port/api/v1/info" && break
   sleep 0.5
 done
 curl -fsS -o /dev/null --max-time 2 "http://127.0.0.1:$tunnel_port/api/v1/info" ||

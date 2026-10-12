@@ -30,6 +30,23 @@ test("the user edits their own profile, and the administrator sees it", async ({
   await expect(page.locator('input[name="nickname"]')).toHaveValue("kat");
 });
 
+test("the user's refused date of birth is kept as typed, and their stored one stays", async ({ browser, users }) => {
+  const user = await users.create();
+  const own = await signInToConsole(browser, user);
+  const dateOfBirth = own.page.locator('input[name="dateOfBirth"]');
+  await dateOfBirth.fill("1990-05-17");
+  await own.page.getByRole("button", { name: "Update" }).click();
+  await expect(own.page.getByText("Profile saved successfully")).toBeVisible();
+
+  await dateOfBirth.fill("17/05/1991");
+  await own.page.getByRole("button", { name: "Update" }).click();
+  await expect(own.page.getByText("The date of birth is invalid. Please use the format YYYY-MM-DD.")).toBeVisible();
+  await expect(dateOfBirth).toHaveValue("17/05/1991");
+  await own.page.goto(`${env.adminUrl}/account/profile`);
+  await expect(dateOfBirth).toHaveValue("1990-05-17");
+  await own.context.close();
+});
+
 test("the user changes their email with their password, which must be right and confirmed", async ({ page, browser, users }) => {
   const user = await users.create();
   const newEmail = `${uniqueIdentifier("u")}@example.com`;
@@ -63,8 +80,14 @@ test("the user saves their phone, and the administrator sees it", async ({ page,
   const own = await signInToConsole(browser, user, "/account/phone");
   // The page loads its country list for a user who is not an administrator too.
   await expect(own.page.locator('select[name="phoneCountryUniqueId"]')).toBeVisible();
+  await expect(own.page.getByText("Enter the number as it's dialled from another country, after the country code.")).toBeVisible();
   const country = await optionByLabel(own.page, "phoneCountryUniqueId", /Portugal/);
   await own.page.locator('select[name="phoneCountryUniqueId"]').selectOption(country);
+  // A refused number draws the page again, country list and all, with the refusal on it.
+  await own.page.locator('input[name="phoneNumber"]').fill("91x 345 678");
+  await own.page.getByRole("button", { name: "Update phone" }).click();
+  await expect(own.page.getByText("Please enter a valid number.")).toBeVisible();
+  await expect(own.page.locator('select[name="phoneCountryUniqueId"]')).toHaveValue(country);
   await own.page.locator('input[name="phoneNumber"]').fill("912 345 678");
   await own.page.getByRole("button", { name: "Update phone" }).click();
   await expect(own.page.getByText("Phone number updated successfully")).toBeVisible();

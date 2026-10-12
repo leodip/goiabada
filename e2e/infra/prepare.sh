@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Prepares the e2e environment from scratch for one release tag, then verifies it.
+# Prepares the e2e environment from scratch for one release tag, or for this checkout, then verifies it.
 #
 #   e2e/infra/prepare.sh vX.Y.Z     # a release after v1.7.0
+#   e2e/infra/prepare.sh --source   # the servers and the setup wizard built from this checkout's src/
 #
 # Runs from your machine and reaches the VPS over SSH as E2E_VPS_USER@E2E_VPS_HOST (see
 # e2e/.env.example). It replaces whatever environment ran before: see remote-prepare.sh.
@@ -13,17 +14,32 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 require_vps
 
-tag="${1:-}"
-[[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]] || die "usage: $0 <release tag>, of a release after v1.7.0"
+source_build=false
+case "${1:-}" in
+  --source) source_build=true ;;
+  v[0-9]*.[0-9]*.[0-9]*) ;;
+  *) die "usage: $0 <release tag, of a release after v1.7.0> | --source" ;;
+esac
 
 step "Checking prerequisites"
-for cmd in ssh scp curl openssl python3 tar npm; do
+for cmd in ssh scp curl openssl python3 tar npm git; do
   command -v "$cmd" >/dev/null || die "$cmd is not installed"
 done
-curl -fsS -o /dev/null --head "https://github.com/leodip/goiabada/releases/tag/$tag" ||
-  die "no GitHub release $tag"
+if [[ "$source_build" == true ]]; then
+  # A build of this checkout stands in for a release: the VPS builds both images and the wizard from
+  # src/ as it is on disk, under a version naming the commit, and -dirty when src/ has uncommitted
+  # changes, so the images can never be taken for a release's.
+  tag="e2e-$(git -C "$E2E_DIR/.." rev-parse --short=8 HEAD)" || die "cannot read this checkout's commit"
+  [[ -z "$(git -C "$E2E_DIR/.." status --porcelain -- src)" ]] || tag+="-dirty"
+  echo "building $tag from $(cd "$E2E_DIR/.." && pwd)/src"
+else
+  tag="$1"
+  curl -fsS -o /dev/null --head "https://github.com/leodip/goiabada/releases/tag/$tag" ||
+    die "no GitHub release $tag"
+  echo "release $tag exists"
+fi
 ssh_vps true || die "cannot reach $E2E_VPS_USER@$E2E_VPS_HOST over SSH"
-echo "release $tag exists; $E2E_VPS_USER@$E2E_VPS_HOST answers over SSH"
+echo "$E2E_VPS_USER@$E2E_VPS_HOST answers over SSH"
 
 step "Checking DNS"
 # Every name must reach the VPS before anything asks Let's Encrypt for it.
@@ -47,7 +63,17 @@ step "Preparing the VPS"
 stage="$(ssh_vps 'mktemp -d /tmp/goiabada-e2e.XXXXXX')"
 scp_vps "$E2E_DIR/infra/remote-prepare.sh" "$E2E_DIR/infra/nginx.conf.template" \
   "$STATE_DIR/admin-password" "$E2E_VPS_USER@$E2E_VPS_HOST:$stage/"
-settings="E2E_TAG=$(printf %q "$tag")"
+if [[ "$source_build" == true ]]; then
+  # The tracked and untracked files under src/ as they are on disk, without what .gitignore ignores
+  # (build output, binaries) or what has been deleted and not yet committed.
+  archive="$(mktemp)"
+  trap 'rm -f "$archive"' EXIT
+  (cd "$E2E_DIR/.." && git ls-files -z --cached --others --exclude-standard --deduplicate -- src |
+    python3 -c 'import os, sys; sys.stdout.buffer.write(b"".join(f + b"\0" for f in sys.stdin.buffer.read().split(b"\0") if f and os.path.isfile(f)))' |
+    tar --null -T - -czf "$archive") || die "could not archive src/"
+  scp_vps "$archive" "$E2E_VPS_USER@$E2E_VPS_HOST:$stage/src.tar.gz"
+fi
+settings="E2E_TAG=$(printf %q "$tag") E2E_SOURCE_BUILD=$source_build"
 for name in E2E_AUTH_HOST E2E_ADMIN_HOST E2E_WEBTEST1_HOST E2E_WEBTEST2_HOST E2E_ADMIN_EMAIL \
   E2E_DB E2E_RATE_LIMITER E2E_REMOTE_DIR E2E_CERT_NAME E2E_MAILPIT_IMAGE E2E_MAILPIT_PORT; do
   settings+=" $name=$(printf %q "${!name}")"

@@ -1,0 +1,13 @@
+{
+  // Read by `npm run typecheck` only: Playwright strips the types and runs the suite unchecked.
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["tests", "lib", "provision", "*.config.ts"]
+}

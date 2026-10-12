@@ -246,13 +246,18 @@ export function resourcePermissionRow(page: Page, identifier: string) {
 }
 
 // Adds a permission to the Permissions tab's table, without saving. The console validates it on the
-// server first, so wait for that answer.
+// server first (by path: the console adds the page's ui_locales to the address), then adds the row and
+// empties the form once it has read the answer, or opens a dialog with the refusal: wait for one or the
+// other, since a next permission filled in before the form is emptied would be emptied with it.
 export async function addResourcePermission(page: Page, identifier: string, description = "") {
   await page.locator("#permissionIdentifier").fill(identifier);
   await page.locator("#permissionDescription").fill(description);
-  const validated = page.waitForResponse((r) => r.url().endsWith("/admin/resources/validate-permission"));
+  const validated = page.waitForResponse((r) => new URL(r.url()).pathname === "/admin/resources/validate-permission");
   await page.getByRole("button", { name: "Create permission" }).click();
   await validated;
+  await page.waitForFunction(
+    () => (document.getElementById("permissionIdentifier") as HTMLInputElement).value === "" || document.querySelector("dialog[open]") !== null,
+  );
 }
 
 export async function saveResourcePermissions(page: Page) {

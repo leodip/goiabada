@@ -67,3 +67,25 @@ test("renaming to an identifier in use, or an invalid one, is refused", async ({
   await page.goto(groupUrl(second.id, "settings"));
   await expect(page.locator("#groupIdentifier")).toHaveValue(second.identifier);
 });
+
+test("a refused rename is drawn with the stored identifier, and the same rename asks again", async ({ page, groups }) => {
+  const group = await groups.create();
+  const renamed = uniqueIdentifier("g");
+  const dialog = page.locator("dialog[open]");
+  await page.goto(groupUrl(group.id, "settings"));
+  await page.locator("#groupIdentifier").fill(renamed);
+  await page.locator('input[name="description"]').fill("a <b> tag");
+  await page.locator("#btnSave").click();
+  await expect(dialog).toContainText("You've modified the group identifier");
+  await dialog.getByRole("button", { name: "Yes" }).click();
+  await expect(page.getByText("The description cannot contain the characters < or >.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: `Group settings - ${group.identifier}`, exact: true })).toBeVisible();
+  await expect(page.locator("#groupIdentifier")).toHaveValue(renamed);
+
+  // Still a rename of the stored group, so Save asks again.
+  await page.locator("#btnSave").click();
+  await expect(dialog).toContainText("You've modified the group identifier");
+  await dialog.getByRole("button", { name: "No" }).click();
+  await page.goto(groupUrl(group.id, "settings"));
+  await expect(page.locator("#groupIdentifier")).toHaveValue(group.identifier);
+});

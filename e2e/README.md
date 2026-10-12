@@ -18,7 +18,8 @@ nginx on the VPS terminates TLS with a Let's Encrypt certificate, and the DNS re
 The suite and its scripts follow the code on `main`, not the releases before it, so they need a
 release after v1.7.0: they no longer work around how v1.7.0 signed people in from one address (#564)
 or started its first PostgreSQL (#551). Against v1.7.0 the suite fails, and the environment may fail
-to start.
+to start. Before a release, build the environment from the checkout instead (`--source`), which is
+what that release will ship.
 
 ## Run it
 
@@ -27,25 +28,30 @@ From the repository root, on a machine with an SSH key the VPS accepts:
 ```bash
 cp e2e/.env.example e2e/.env    # once: set E2E_VPS_HOST
 
-e2e/run.sh [tag]                # everything from scratch: reset, then the whole suite
-e2e/reset.sh [tag]              # wipe the environment and build it again from a release
+e2e/run.sh [tag | --source]     # everything from scratch: reset, then the whole suite
+e2e/reset.sh [tag | --source]   # wipe the environment and build it again from a release, or this checkout
 e2e/test.sh [playwright args]   # run the suite against the current environment
 e2e/wipe.sh [--all] [-y]        # remove the environment (asks first)
 ```
 
-With no tag, `run.sh` and `reset.sh` take the latest GitHub release. `test.sh` installs the suite's
-packages and Chromium the first time, and passes its arguments to Playwright: `--headed`, `--ui`, or
-a folder such as `tests/admin-console`. Each script answers `--help`.
+With no tag, `run.sh` and `reset.sh` take the latest GitHub release. With `--source` they build what
+a release would ship from this checkout's `src/` instead, on the VPS: both servers' images from their
+Dockerfiles and the setup wizard, under the version `e2e-<commit>`, with `-dirty` when `src/` has
+uncommitted changes. `test.sh` installs the suite's packages and Chromium the first time, checks the
+suite's types (`npm run typecheck`), and passes its arguments to Playwright: `--headed`, `--ui`, or a
+folder such as `tests/admin-console`. Each script answers `--help`.
 
-They wrap the scripts in `infra/`, which can also be run on their own: `prepare.sh <tag>`,
+They wrap the scripts in `infra/`, which can also be run on their own: `prepare.sh <tag | --source>`,
 `verify.sh [tag]` (check the environment again at any time) and `teardown.sh [--all]`.
 
 `prepare.sh`:
 
-1. Checks the release exists, the VPS answers over SSH, and each host's DNS reaches the VPS.
+1. Checks the release exists (or archives `src/`, for `--source`), the VPS answers over SSH, and
+   each host's DNS reaches the VPS.
 2. Generates the admin password into `e2e/.state/admin-password`.
 3. On the VPS (`remote-prepare.sh`): removes the previous environment and its volumes, downloads
-   the release's `goiabada-setup` and checks it against the release's `checksums.txt`, runs it, starts
+   the release's `goiabada-setup` and checks it against the release's `checksums.txt` (or, for
+   `--source`, builds it and both images, labelled `goiabada-e2e=server`), runs it, starts
    the stack, waits for both servers, and writes `/etc/nginx/conf.d/goiabada-e2e.conf` from
    `nginx.conf.template`. The certificate is requested only when it is missing or does not cover the
    four hosts.
@@ -65,10 +71,10 @@ and that its API refuses a request with no token.
 as in production, and then the limits counted by an IP address apply to the suite, which signs
 everyone in from this machine's one address: 30 wrong passwords and 120 password checks a minute, at
 the sign-in form and the password grant each. The suite is written to stay under them, and the `system`
-test for the first runs only in this mode.
+tests for them run only in this mode.
 
 `E2E_RATE_LIMITER=false` turns those limits off, for a faster run with nothing to wait for, and skips
-that test. It is the only switch there is: the limits counted by an account or a user apply either way,
+those tests. It is the only switch there is: the limits counted by an account or a user apply either way,
 since no proxy can count them. The suite does not spend them, because a successful sign-in spends
 nothing and the tests that fail a password or a code do it on throwaway accounts of their own. Run with
 the switch on before a release.
@@ -94,7 +100,7 @@ reset:
 - **It changes nothing global**: no settings, and the system client and the system resource
   (`authserver`) are only read; a test reaching their save answers No to the confirmation. The
   exceptions are the tests whose subject is global, the settings pages, the signing keys, the
-  guards around the system resource, and the limit on wrong passwords from one address, which every
+  guards around the system resource, and the limits on sign-ins from one address, which every
   test signs in from. They are named `*.system.ts` and run in the `system` project, which
   `playwright.config.ts` runs after every other test, on one worker. Each puts back what it changes
   (`lib/settings.ts`), the address test waiting until the address may sign in again, and the setup
@@ -113,7 +119,8 @@ reset:
 
 It is shared with other services, so the scripts touch only what is theirs: the Compose project in
 `/root/goiabada-e2e`, the test app's image (`goiabada-e2e-testapp:local`, labelled
-`goiabada-e2e=testapp`), `/etc/nginx/conf.d/goiabada-e2e.conf`, and the certificate `e2e.goiabada.dev`. It needs Docker with the Compose plugin, nginx with certbot's
+`goiabada-e2e=testapp`), the servers' images a `--source` build makes (labelled `goiabada-e2e=server`),
+`/etc/nginx/conf.d/goiabada-e2e.conf`, and the certificate `e2e.goiabada.dev`. It needs Docker with the Compose plugin, nginx with certbot's
 `options-ssl-nginx.conf`, and certbot with a registered account, and ports 9090 to 9093 and 18025 free on
 127.0.0.1.
 

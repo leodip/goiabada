@@ -9,6 +9,7 @@ import {
   resourceUrl,
   saveResourcePermissions,
   addResourcePermission,
+  resourcePermissionRow,
 } from "../../../lib/admin-console";
 import { expect, test } from "../../../lib/fixtures";
 import { clientCredentialsToken, jwtClaims } from "../../../lib/oauth";
@@ -45,9 +46,11 @@ test("renaming a permission carries the grant over to the new name", async ({ pa
   await page.goto(resourceUrl(resource.id, "permissions"));
   await page.getByRole("button", { name: "Edit permission read", exact: true }).click();
   await page.locator("#permissionIdentifier").fill("view");
-  const validated = page.waitForResponse((r) => r.url().endsWith("/admin/resources/validate-permission"));
+  const validated = page.waitForResponse((r) => new URL(r.url()).pathname === "/admin/resources/validate-permission");
   await page.getByRole("button", { name: "Update permission" }).click();
   await validated;
+  // The table changes once the page has read the answer, which is after the answer arrives.
+  await expect(resourcePermissionRow(page, "view")).toHaveCount(1);
   await saveResourcePermissions(page);
 
   const renamed = await clientCredentialsToken(request, client.identifier, secret, `${resource.identifier}:view`);

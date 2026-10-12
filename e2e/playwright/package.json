@@ -4,10 +4,12 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
-    "report": "playwright show-report"
+    "report": "playwright show-report",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
     "@playwright/test": "1.64.0",
-    "@types/node": "26.6.5"
+    "@types/node": "26.6.5",
+    "typescript": "5.9.3"
   }
 }

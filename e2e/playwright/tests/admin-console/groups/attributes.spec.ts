@@ -49,6 +49,18 @@ test("removing an attribute can be cancelled", async ({ page, groups }) => {
   await expect(rowWithCell(page, "department")).toHaveCount(1);
 });
 
+test("a refused edit keeps the typed key, and the title names the stored one", async ({ page, groups }) => {
+  const group = await groups.create();
+  await addGroupAttribute(page, group.id, { key: "department", value: "Sales" });
+  await rowWithCell(page, "department").getByRole("button", { name: "Edit" }).click();
+  await submitGroupAttributeForm(page, { key: "not valid", value: "Sales" });
+  await expect(page.getByText("Invalid identifier format.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Edit group attribute - department", exact: true })).toBeVisible();
+  await expect(page.locator("#attributeKey")).toHaveValue("not valid");
+  await page.goto(groupUrl(group.id, "attributes"));
+  await expect(rowWithCell(page, "department")).toHaveCount(1);
+});
+
 for (const { key, value, message } of [
   { key: "", value: "x", message: "Attribute key is required" },
   { key: "not valid", value: "x", message: "Invalid identifier format." },

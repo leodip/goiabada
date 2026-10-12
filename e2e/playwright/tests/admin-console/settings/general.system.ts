@@ -1,7 +1,7 @@
 // Settings - General, each switch followed to what it changes. Runs alone, and every test puts the
 // settings back (lib/settings.ts).
 import { createHash, randomBytes } from "node:crypto";
-import { clientUrl, deleteUser, idFromListLink, submitNewUser } from "../../../lib/admin-console";
+import { clientUrl, deleteUser, idFromListLink, saveAndExpectSaved, submitNewUser } from "../../../lib/admin-console";
 import { authorizeAndLand, redirectParams } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
@@ -55,6 +55,29 @@ test("changing the issuer asks first, and No changes nothing", async ({ page }) 
   await dialog.getByRole("button", { name: "No" }).click();
   await page.goto(`${env.adminUrl}${general}`);
   await expect(page.locator('input[name="issuer"]')).toHaveValue(issuer);
+});
+
+test("a refused save keeps comparing against the stored issuer, so saving it again asks again", async ({ page }) => {
+  await withSettingsRestored(page, general, async () => {
+    const issuer = await page.locator('input[name="issuer"]').inputValue();
+    const changed = `${issuer}/changed`;
+    // The app name is refused before the issuer is looked at, so nothing is saved and no one is signed out.
+    await fillSettingsForm(page, { appName: "x".repeat(100), issuer: changed });
+    await page.locator("#btnSave").click();
+    const dialog = page.locator("dialog[open]");
+    await expect(dialog).toContainText("You are changing the issuer");
+    await dialog.getByRole("button", { name: "Yes" }).click();
+    await expect(page.getByText("App name is too long. The maximum length is 30 characters.")).toBeVisible();
+    // The inputs keep what was submitted; the issuer they are compared against is the stored one.
+    await expect(page.locator('input[name="issuer"]')).toHaveValue(changed);
+
+    await page.locator("#btnSave").click();
+    await expect(dialog).toContainText("You are changing the issuer");
+    await dialog.getByRole("button", { name: "No" }).click();
+    await expect(dialog).toHaveCount(0);
+    await page.goto(`${env.adminUrl}${general}`);
+    await expect(page.locator('input[name="issuer"]')).toHaveValue(issuer);
+  });
 });
 
 test("the password policy applies to passwords set from then on", async ({ page }) => {
@@ -167,6 +190,11 @@ test("dynamic client registration opens the registration endpoint, and closes it
     const id = await idFromListLink(page, clients, client_id, "Manage");
     await page.goto(clientUrl(id, "settings"));
     await expect(page.locator('input[name="clientIdentifier"]')).toHaveAttribute("readonly", "");
+    // Registered with the global setting for the ID token, as a client created here is, so its Tokens
+    // tab has a choice checked and saves as loaded.
+    await page.goto(clientUrl(id, "tokens"));
+    await expect(page.locator('input[name="includeOpenIDConnectClaimsInIdToken"][value="default"]')).toBeChecked();
+    await saveAndExpectSaved(page, "Client settings saved successfully");
     await page.goto(clientUrl(id, "delete"));
     await page.locator('input[name="clientIdentifier"]').fill(client_id);
     await page.getByRole("button", { name: "Delete", exact: true }).click();

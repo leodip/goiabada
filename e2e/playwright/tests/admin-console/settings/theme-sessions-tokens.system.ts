@@ -2,9 +2,11 @@
 import { expect, test } from "../../../lib/fixtures";
 import { env } from "../../../lib/environment";
 import { clientUrl, grantClientPermission, readClientSecret } from "../../../lib/admin-console";
+import { signInThroughClient, type BrowserSignIn } from "../../../lib/browser-sign-in";
 import { clientCredentialsToken, userTokens } from "../../../lib/oauth";
 import { fillSettingsForm, readSettingsForm, saveSettings, withSettingsRestored } from "../../../lib/settings";
-import { passwordGrantClient } from "../../../lib/test-clients";
+import { authorizeAgain, expectSessionDeleted, sessionIds } from "../../../lib/sessions";
+import { browserSignInClient, passwordGrantClient } from "../../../lib/test-clients";
 
 test("a UI theme chosen here themes the console and the sign-in pages", async ({ page, browser }) => {
   await withSettingsRestored(page, "/admin/settings/ui-theme", async () => {
@@ -41,6 +43,49 @@ test("session timeouts are saved, and refused when out of range or inconsistent"
     await fillSettingsForm(page, { userSessionIdleTimeoutInSeconds: "3600", userSessionMaxLifetimeInSeconds: "43200" });
     await saveSettings(page);
     expect(await readSettingsForm(page, path)).toMatchObject({ userSessionIdleTimeoutInSeconds: "3600", userSessionMaxLifetimeInSeconds: "43200" });
+  });
+});
+
+test("the session cap is refused out of range, and past it a sign-in ends the user's least recently used session", async ({
+  page,
+  browser,
+  clients,
+  users,
+}) => {
+  const path = "/admin/settings/sessions";
+  const user = await users.create();
+  const { client } = await browserSignInClient(page, clients);
+  await withSettingsRestored(page, path, async () => {
+    for (const value of ["1001", "-1", "abc"]) {
+      await page.goto(`${env.adminUrl}${path}`);
+      await fillSettingsForm(page, { maxUserSessionsPerUser: value });
+      await page.locator("#btnSave").click();
+      await expect(page.getByText("User session - max sessions per user must be between 0 and 1000.")).toBeVisible();
+    }
+    await page.goto(`${env.adminUrl}${path}`);
+    await fillSettingsForm(page, { maxUserSessionsPerUser: "2" });
+    await saveSettings(page);
+    expect(await readSettingsForm(page, path)).toMatchObject({ maxUserSessionsPerUser: "2" });
+
+    // Three browsers, each signing the user in after the one before: the third sign-in ends the first's
+    // session, and the first browser is asked for the password again.
+    const signIns: BrowserSignIn[] = [];
+    const signInAgain = async () =>
+      signIns.push(await signInThroughClient(browser, { clientId: client.identifier, email: user.email, password: user.password, scope: "openid" }));
+    try {
+      await signInAgain();
+      const [first] = await sessionIds(page, user.id);
+      await signInAgain();
+      await signInAgain();
+      const left = await sessionIds(page, user.id);
+      expect(left).toHaveLength(2);
+      expect(left).not.toContain(first);
+      expect((await authorizeAgain(signIns[0].context, client.identifier)).landed).toBe("password");
+      expect((await authorizeAgain(signIns[2].context, client.identifier)).landed).toBe("client");
+      await expectSessionDeleted(page, first, "session_cap");
+    } finally {
+      for (const signIn of signIns) await signIn.context.close();
+    }
   });
 });
 
