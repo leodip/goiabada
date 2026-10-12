@@ -61,6 +61,8 @@ jobs:
       - name: Show the resulting digests
         run: |
           set -euo pipefail
+          # sed rather than head, which exits after its lines and, under pipefail, fails the step
+          # with inspect's write error while inspect is still printing.
           for img in authserver adminconsole; do
-            docker buildx imagetools inspect "leodip/goiabada:$img-latest" | head -3
+            docker buildx imagetools inspect "leodip/goiabada:$img-latest" | sed -n 1,3p
           done
