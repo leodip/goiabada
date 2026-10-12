@@ -16,8 +16,10 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // Seam 4 for the client pages whose calls have moved (#386). See accounthandlers' file of the same
@@ -379,6 +381,48 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				"the request must reach the page's write, and only that one")
 		})
 	}
+}
+
+// The settings save makes a second write, the administrative-scopes allowance, only once UpdateClient
+// has succeeded and only when an administrator holding authserver:manage switches it. The table's
+// case stops at UpdateClient, which refuses there, so this one reaches the second write as well.
+func TestAdminClientHandlers_TheAllowanceWriteCarriesTheRequestsContext(t *testing.T) {
+	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
+	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
+		mock.Anything, mock.Anything).Return(nil).Maybe()
+
+	apiClient := &allowanceWriteApiClient{}
+
+	// GetClientById answers a client whose allowance is off, so the switch submitted on is a change.
+	request := handlertest.Request(http.MethodPost, "/admin/clients/3/settings",
+		handlertest.WithJwtInfo(oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{
+			AccessToken: handlertest.AccessToken, Scope: manageGrant}}),
+		handlertest.WithRouteParam("clientId", "3"),
+		handlertest.WithForm(url.Values{"clientIdentifier": {"a-client"}, "administrativeScopesAllowed": {"on"}}))
+	marked := request.WithContext(context.WithValue(request.Context(), clientCtxMarkerKey{}, "allowance"))
+
+	HandleSettingsPost(httpHelper, newTestSessionStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), marked)
+
+	assert.Equal(t, []string{"UpdateClient", "UpdateClientAdministrativeScopes"}, apiClient.writes,
+		"the save must reach both of its writes")
+	require.NotEmpty(t, apiClient.seen, "the handler must consult its API client")
+	for i, seen := range apiClient.seen {
+		assert.Equal(t, "allowance", seen.Value(clientCtxMarkerKey{}),
+			"call %d carried a context that is not the request's", i)
+	}
+}
+
+// allowanceWriteApiClient lets UpdateClient record and then succeed, so the allowance write below it
+// is reached at all.
+type allowanceWriteApiClient struct {
+	ctxRecordingApiClient
+}
+
+func (s *allowanceWriteApiClient) UpdateClient(ctx context.Context, _ string, clientId int64, _ *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
+	s.seen = append(s.seen, ctx)
+	s.writes = append(s.writes, "UpdateClient")
+	return &api.ClientResponse{Id: clientId, ClientIdentifier: "a-client"}, nil
 }
 
 // logoUpload is the one request here that is not form-encoded or JSON: the upload handler reads a
