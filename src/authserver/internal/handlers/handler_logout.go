@@ -576,7 +576,14 @@ func handleExistingSessionOnLogout(
 				}
 
 				// "" for the reason given above: no bearer token reaches /auth/logout, and
-				// the actor is this event's own user_id.
+				// the actor is this event's own user_id. The session went, so it is recorded
+				// as every other deletion of one is, with the reason the sign-out without a
+				// hint gives (#564).
+				auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
+					"user_session_id": userSession.Id,
+					"logged_in_user":  "",
+					"reason":          audit.DeletedUserSessionSignedOut,
+				})
 				auditLogger.Log(r.Context(), audit.EventLogout, map[string]interface{}{
 					"user_id":            userSession.UserId,
 					"session_identifier": sessionIdentifier,
