@@ -77,6 +77,17 @@ func TestSettingsGeneralSessionsTokensRefusals_AreInTheRequestsLanguage(t *testi
 				return HandleSettingsSessionsPut(database, handlersmocks.NewAuditLogger(t))
 			})
 	}
+	// sessionCap sends valid lifetimes and the cap given, which a nil leaves out.
+	sessionCap := func(maxSessions any) func(*testing.T, string) *httptest.ResponseRecorder {
+		body := map[string]any{"userSessionIdleTimeoutInSeconds": 100, "userSessionMaxLifetimeInSeconds": 200}
+		if maxSessions != nil {
+			body["maxUserSessionsPerUser"] = maxSessions
+		}
+		return settingsRefusal(http.MethodPut, "/api/v1/admin/settings/sessions", body, &record.Settings{}, nil,
+			func(t *testing.T, database *datamocks.Database) http.Handler {
+				return HandleSettingsSessionsPut(database, handlersmocks.NewAuditLogger(t))
+			})
+	}
 	tokens := func(expiration, idle, lifetime int) func(*testing.T, string) *httptest.ResponseRecorder {
 		body := map[string]any{
 			"tokenExpirationInSeconds":                expiration,
@@ -192,6 +203,22 @@ func TestSettingsGeneralSessionsTokensRefusals_AreInTheRequestsLanguage(t *testi
 			code:       "VALIDATION_ERROR",
 			english:    "User session - the idle timeout cannot be greater than the max lifetime.",
 			portuguese: "Sessão de usuário - o timeout por inatividade não pode ser maior que o tempo máximo de vida.",
+		},
+		{
+			name:       "no session cap",
+			serve:      sessionCap(nil),
+			status:     http.StatusBadRequest,
+			code:       "VALIDATION_ERROR",
+			english:    "User session - max sessions per user is required.",
+			portuguese: "Sessão de usuário - o máximo de sessões por usuário é obrigatório.",
+		},
+		{
+			name:       "a session cap past the bound",
+			serve:      sessionCap(1001),
+			status:     http.StatusBadRequest,
+			code:       "VALIDATION_ERROR",
+			english:    "User session - max sessions per user must be between 0 and 1000.",
+			portuguese: "Sessão de usuário - o máximo de sessões por usuário precisa estar entre 0 e 1000.",
 		},
 		{
 			name:       "a token expiration of zero",
