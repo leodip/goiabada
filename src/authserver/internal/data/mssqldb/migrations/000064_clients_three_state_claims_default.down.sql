@@ -1,0 +1,1 @@
+-- Migration 000064 down: intentional no-op. See the sqlite migration of the same number.
