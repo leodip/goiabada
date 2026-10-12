@@ -237,11 +237,13 @@ const (
 	ErrCodeSettingsGeneralIssuerTooLong           = "handler.settings_general.issuer_too_long"  // Args: {"max": int}
 	ErrCodeSettingsGeneralPasswordPolicyInvalid   = "handler.settings_general.password_policy_invalid"
 
-	ErrCodeSettingsSessionsIdleTimeoutNotPositive      = "handler.settings_sessions.idle_timeout_not_positive"
-	ErrCodeSettingsSessionsMaxLifetimeNotPositive      = "handler.settings_sessions.max_lifetime_not_positive"
-	ErrCodeSettingsSessionsIdleTimeoutTooLarge         = "handler.settings_sessions.idle_timeout_too_large" // Args: {"max": int}
-	ErrCodeSettingsSessionsMaxLifetimeTooLarge         = "handler.settings_sessions.max_lifetime_too_large" // Args: {"max": int}
-	ErrCodeSettingsSessionsIdleTimeoutAboveMaxLifetime = "handler.settings_sessions.idle_timeout_above_max_lifetime"
+	ErrCodeSettingsSessionsIdleTimeoutNotPositive       = "handler.settings_sessions.idle_timeout_not_positive"
+	ErrCodeSettingsSessionsMaxLifetimeNotPositive       = "handler.settings_sessions.max_lifetime_not_positive"
+	ErrCodeSettingsSessionsIdleTimeoutTooLarge          = "handler.settings_sessions.idle_timeout_too_large" // Args: {"max": int}
+	ErrCodeSettingsSessionsMaxLifetimeTooLarge          = "handler.settings_sessions.max_lifetime_too_large" // Args: {"max": int}
+	ErrCodeSettingsSessionsIdleTimeoutAboveMaxLifetime  = "handler.settings_sessions.idle_timeout_above_max_lifetime"
+	ErrCodeSettingsSessionsMaxSessionsPerUserRequired   = "handler.settings_sessions.max_sessions_per_user_required"
+	ErrCodeSettingsSessionsMaxSessionsPerUserOutOfRange = "handler.settings_sessions.max_sessions_per_user_out_of_range" // Args: {"max": int}
 
 	ErrCodeSettingsTokensTokenExpirationNotPositive    = "handler.settings_tokens.token_expiration_not_positive"
 	ErrCodeSettingsTokensTokenExpirationTooLarge       = "handler.settings_tokens.token_expiration_too_large" // Args: {"max": int}

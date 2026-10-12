@@ -80,12 +80,12 @@ func HandleSettingsSessionsPut(
 		// The cap is required: a PUT replaces the whole resource, and an absent or null value read
 		// as 0 would turn the cap off for a caller that does not know the field (#564 decision 6).
 		if req.MaxUserSessionsPerUser == nil {
-			writeJSONError(w, "User session - max sessions per user is required.", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsMaxSessionsPerUserRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		const maxSessionsPerUser = 1000
 		if *req.MaxUserSessionsPerUser < 0 || *req.MaxUserSessionsPerUser > maxSessionsPerUser {
-			writeJSONError(w, fmt.Sprintf("User session - max sessions per user must be between 0 and %v.", maxSessionsPerUser), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsMaxSessionsPerUserOutOfRange, map[string]any{"max": maxSessionsPerUser}), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
