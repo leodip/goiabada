@@ -162,7 +162,7 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 | State | Assigned by | When |
 |---|---|---|
 | `requires_level_1` | `HandleAuthorizeGet` | four conditions: a deferred error is parked; `prompt=login`; `id_token_hint` names another user; no valid session |
-| | `HandleAuthCompletedGet` | no reusable session and `!Level1AuthCompleted`, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked before any session is bound and again by the session write (restart route 1, through `Restart()`) |
+| | `HandleAuthCompletedGet` | no reusable session and `!Level1AuthCompleted`, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked before any session is bound and again by the session write, or a newer authentication has already reached the session (restart route 1, through `Restart()`) |
 | | `refuseIssuanceUnusableSession` | bound session gone, expired or foreign, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked again by the issuer, and not `prompt=none` (restart route 2, through `Restart()`) |
 | `level1_password` | `HandleAuthLevel1Get` | unconditional |
 | `level1_password_completed` | `HandleAuthPwdPost` | password verified, user enabled |
@@ -267,7 +267,7 @@ When user has valid session (`UserSession` in DB + session cookie):
 - If valid → uses existing `AcrLevel` and `AuthMethods` from session
 - May still need level2 re-auth if target ACR higher than session ACR
 - Reuse never lowers a session: `BumpUserSession` only raises its ACR and only adds methods (#537)
-- Every whole-row session write takes the session's row first (`AcquireUserSessionRow`) and reads it after, in one transaction: `BumpUserSession`, and `BindUserSession`, which is `/auth/completed`'s reuse arm and also writes a replacing authentication and the auth time there rather than in a second write. Read without the lock, a concurrent removal's lowering was written back over (#542). The token endpoint and `prompt=none` bump with no methods and no level
+- Every whole-row session write takes the session's row first (`AcquireUserSessionRow`) and reads it after, in one transaction: `BumpUserSession`, and `BindUserSession`, which is `/auth/completed`'s reuse arm and also writes a replacing authentication and the auth time there rather than in a second write. Read without the lock, a concurrent removal's lowering was written back over (#542). The token endpoint and `prompt=none` bump with no methods and no level. A bind whose sign-in is older than the session's current `AuthTime` writes nothing (`ErrStaleAuthentication`, the session write answers the ordering #538 asks): a newer sign-in's level, methods and auth_time are not overwritten by an older ceremony that resumed after it, and `/auth/completed` restarts that ceremony at level 1
 
 ## SSO and ACR/AMR Details
 

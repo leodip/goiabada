@@ -187,6 +187,20 @@ func HandleAuthCompletedGet(
 			restart()
 			return
 		}
+		if errors.Is(err, usersession.ErrStaleAuthentication) {
+			// The ordering rule of the bind's transaction (#538): another ceremony completed on
+			// this session while this one was in flight, and its credential was accepted after
+			// this one's, so the session describes that newer authentication. Writing this
+			// ceremony's level, methods or auth_time onto it would either raise it with an
+			// authentication older than the one it holds or move auth_time backwards, so the bind
+			// wrote nothing, and the ceremony restarts, exactly as one whose one-time code no
+			// longer stands: the second pass reads the session the newer sign-in left and asks
+			// for whatever its target needs on top of it.
+			slog.WarnContext(r.Context(), "a newer authentication has already reached this session, restarting level 1 instead of binding an older one onto it",
+				"ceremony_user_id", authContext.UserId)
+			restart()
+			return
+		}
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
