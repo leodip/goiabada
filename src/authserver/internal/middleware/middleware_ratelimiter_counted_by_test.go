@@ -10,8 +10,8 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// TestRateLimiter_EveryTierDeclaresWhatItCountsBy holds each of the fifteen tiers the constructor
-// builds to the kind #522 decision 11 gives it: seven by IP address, three by the account a form
+// TestRateLimiter_EveryTierDeclaresWhatItCountsBy holds each of the seventeen tiers the constructor
+// builds to the kind #522 decision 11 gives it: nine by IP address, three by the account a form
 // names, one by IP address and account, one by the signing-in user and three by the access token's
 // user. The kinds are written here rather than read from the constructor, because the rate-limit
 // table's Counted by column is held to the declaration, and a declaration changed by mistake would
@@ -22,12 +22,14 @@ import (
 func TestRateLimiter_EveryTierDeclaresWhatItCountsBy(t *testing.T) {
 	want := map[string]countedBy{
 		"pwd_ip":                  countedByIP,
+		"pwd_ip_requests":         countedByIP,
 		"activate":                countedByIP,
 		"register":                countedByIP,
 		"reset_pwd":               countedByIP,
 		"forgot_pwd_ip":           countedByIP,
 		"dcr":                     countedByIP,
 		"ropc_ip":                 countedByIP,
+		"ropc_ip_requests":        countedByIP,
 		"pwd_account":             countedByAccount,
 		"register_email":          countedByAccount,
 		"forgot_pwd_email":        countedByAccount,
@@ -47,7 +49,7 @@ func TestRateLimiter_EveryTierDeclaresWhatItCountsBy(t *testing.T) {
 	for _, found := range tiers {
 		kind, ok := want[found.name]
 		if !ok {
-			t.Errorf("tier %q at %s is not one of the fifteen this test knows", found.name, found.where)
+			t.Errorf("tier %q at %s is not one of the seventeen this test knows", found.name, found.where)
 			continue
 		}
 		if found.countedBy != kind {

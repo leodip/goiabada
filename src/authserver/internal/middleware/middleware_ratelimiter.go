@@ -400,7 +400,10 @@ type RateLimiter struct {
 	// account, so one budget covers them.
 	pwdAccount *accountTiers
 	pwdIp      *failureTier
-	otp        *failureTier
+	// pwdIpRequests is the per-address ceiling on every password check, successful ones included,
+	// beside pwdIp's budget of failures. ropcIpRequests is its twin on the password grant.
+	pwdIpRequests *requestTier
+	otp           *failureTier
 	// emailVerification bounds guessing at the account's own email verification code.
 	emailVerification *failureTier
 	// emailVerificationSend bounds the verification mail an account can have sent.
@@ -416,6 +419,7 @@ type RateLimiter struct {
 	forgotPwdIp     *requestTier
 	dcr             *requestTier
 	ropcIp          *failureTier // RFC 6749 §4.3.2 MUST protect against brute force
+	ropcIpRequests  *requestTier
 
 	// refusals counts every refusal by the tier that refused it, on the metrics listener (#400
 	// decision 5). Every refusal, where the audit event is one per key per window: a rate is what an
@@ -473,6 +477,14 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// can find counts, as on the account tiers. Counted in the process on every engine
 		// (#564 decisions 2 and 3).
 		pwdIp: failureInProcess("pwd_ip", countedByIP, "ip", 30, 1*time.Minute),
+		// per-IP password checks, every request counted, successful ones and a disabled account's
+		// right password included. pwdIp's budget of failures leaves the checks a correct password
+		// passes unbounded, and each costs a bcrypt, an audit row and a session write: one account
+		// anyone can register, looped from one address, kept that work going with nothing in its way
+		// but the 30 checks in flight at once the address tier admits. 120 a minute is four times the
+		// 30 every request used to spend, which a few hundred people signing in at once from one
+		// office stay under, and bcrypt at two a second is a fraction of one core (#564).
+		pwdIpRequests: request("pwd_ip_requests", countedByIP, "ip", 120, 1*time.Minute),
 		// per-user OTP failures. 5 per 15 minutes is 480 guesses a day against the 14,400
 		// the 10 a minute it replaces allowed, which takes the chance of a hit over a
 		// month from 72.6% to 4.2% against an attacker who already holds the password.
@@ -548,6 +560,9 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// source address a fresh budget against one account, so the per-account ceiling RFC
 		// 6749 §4.3.2 makes a MUST did not exist at all (#107, #219).
 		ropcIp: failureInProcess("ropc_ip", countedByIP, "ip", 30, 1*time.Minute),
+		// per-IP password grants, every request counted, as pwdIpRequests counts the sign-in form's
+		// and for its reason: the grant runs the same bcrypt on a correct password (#564).
+		ropcIpRequests: request("ropc_ip_requests", countedByIP, "ip", 120, 1*time.Minute),
 	}
 	m.refusals = reg.Counter("goiabada_rate_limit_refusals_total",
 		"Requests the rate limiter refused, by the limiter that refused them.",
@@ -711,8 +726,8 @@ func (m *RateLimiter) reject(w http.ResponseWriter, r *http.Request, class rejec
 	}
 }
 
-// LimitPwd rate limits the sign-in form's password check: per client block with the switch on, and
-// per account always, in the tiers reservePassword reserves.
+// LimitPwd rate limits the sign-in form's password check: per client block with the switch on, on
+// every check and on failures, and per account always, in the tiers reservePassword reserves.
 func (m *RateLimiter) LimitPwd(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Per-IP ceiling first, which stops a single host spraying wrong passwords across many
@@ -722,6 +737,12 @@ func (m *RateLimiter) LimitPwd(next http.Handler) http.Handler {
 		// in normally are never refused by them however often they do, from however few
 		// addresses. The key is drawn whether or not the per-IP tier applies, because a refusal
 		// by the account tiers records the client's address beside the address typed.
+		//
+		// In front of them all, the per-IP ceiling every check spends, right password or wrong,
+		// which is what bounds the work one address holding a correct password can drive.
+		if m.trippedCeiling(w, r, m.pwdIpRequests, rejectBrowser) {
+			return
+		}
 		ipKey, ipAudited, _ := m.bucket(r, &m.pwdIp.tier, "")
 		held, t, key, err := m.reservePassword(r, m.pwdIp, ipKey, m.pwdAccount, r.FormValue("email"))
 		if err != nil {
@@ -751,6 +772,16 @@ func (m *RateLimiter) LimitPwd(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// trippedCeiling charges one request against an every-request tier in front of a password check,
+// when the tier applies, and reports whether it refused the request, having written the refusal.
+func (m *RateLimiter) trippedCeiling(w http.ResponseWriter, r *http.Request, t *requestTier, class rejectClass) bool {
+	if !m.applies(&t.tier) {
+		return false
+	}
+	key, audited, _ := m.bucket(r, &t.tier, "")
+	return m.tripped(w, r, t, key, class, audited)
 }
 
 // applies reports whether a tier limits this server: every tier when the switch is on, and a tier
@@ -1114,7 +1145,7 @@ func accountNetworkRateLimitKey(r *http.Request, identifier string) string {
 // against brute force attacks (e.g., using rate-limitation or generating alerts)."
 // SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 //
-// The same three tiers the browser password form carries, and the account pair is literally
+// The same four tiers the browser password form carries, and the account pair is literally
 // the same pair of buckets rather than a copy of its budget: a password guessed against one
 // account is one event wherever it arrives, so an attacker cannot get a second allowance by
 // moving from the form to the grant. It also means the ceiling holds when a deployment turns
@@ -1125,7 +1156,7 @@ func accountNetworkRateLimitKey(r *http.Request, identifier string) string {
 // folding in the address meant they escaped it by moving host, so the per-account ceiling
 // RFC 6749 Section 4.3.2 makes a MUST did not exist at all (#107, #219).
 //
-// With the switch off the per-IP tier and the per-network half of the account pair are off, and the
+// With the switch off the two per-IP tiers and the per-network half of the account pair are off, and the
 // account-wide tier still applies: the MUST does not wait for the switch (#503 decision 1). So the
 // form is parsed here either way.
 func (m *RateLimiter) LimitROPC(next http.Handler) http.Handler {
@@ -1155,7 +1186,10 @@ func (m *RateLimiter) LimitROPC(next http.Handler) http.Handler {
 		// machine-driven integration authenticating one account over and over is never refused
 		// by them. client_id is deliberately absent from the keys: a ceiling an attacker escapes
 		// by registering a second client is not a ceiling. The per-IP key is drawn either way,
-		// for LimitPwd's reason.
+		// for LimitPwd's reason. The per-IP ceiling on every grant goes first, as on the form.
+		if m.trippedCeiling(w, r, m.ropcIpRequests, rejectOAuth) {
+			return
+		}
 		ipKey, ipAudited, _ := m.bucket(r, &m.ropcIp.tier, "")
 		held, t, key, err := m.reservePassword(r, m.ropcIp, ipKey, m.pwdAccount, r.PostFormValue("username"))
 		if err != nil {

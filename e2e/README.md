@@ -58,6 +58,21 @@ runs the tag's images, the auth server's health, discovery and JWKS, the admin c
 sign-in lands on the auth server's password page, that the test app runs configured on both hosts,
 and that its API refuses a request with no token.
 
+### With the rate limiter on or off
+
+`E2E_RATE_LIMITER` in `e2e/.env` is what the setup wizard is given for
+`GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`, so it takes a `reset.sh` to change. It is `true` by default,
+as in production, and then the limits counted by an IP address apply to the suite, which signs
+everyone in from this machine's one address: 30 wrong passwords and 120 password checks a minute, at
+the sign-in form and the password grant each. The suite is written to stay under them, and the `system`
+test for the first runs only in this mode.
+
+`E2E_RATE_LIMITER=false` turns those limits off, for a faster run with nothing to wait for, and skips
+that test. It is the only switch there is: the limits counted by an account or a user apply either way,
+since no proxy can count them. The suite does not spend them, because a successful sign-in spends
+nothing and the tests that fail a password or a code do it on throwaway accounts of their own. Run with
+the switch on before a release.
+
 ## Browser tests
 
 `playwright/` holds the Playwright suite. It reads the URLs and the admin password `prepare.sh` left in

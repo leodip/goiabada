@@ -1,7 +1,9 @@
 // Many people signing in from one address: an office, a school or a carrier-grade NAT behind one
 // router, and this suite (#564). The sign-in form and the password grant each limit one client address
 // to 30 failed password checks a minute (the pwd_ip and ropc_ip tiers); a successful sign-in spends
-// none of it. A system test because the limit is the address's, which every other test shares: it runs
+// none of it. Each also has a ceiling of 120 checks a minute, every one counted (pwd_ip_requests and
+// ropc_ip_requests), which each test here stays under: its successes, its failures and the polling
+// after them. A system test because the limit is the address's, which every other test shares: it runs
 // alone, and waits until the address may sign in again before it ends.
 import type { APIRequestContext, Browser, Page } from "@playwright/test";
 import { openSignIn, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";

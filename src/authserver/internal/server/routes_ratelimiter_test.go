@@ -103,8 +103,10 @@ const (
 	// the password check, and a wrong password spends the failures-only tiers there.
 	routesTestROPCClientId = "ropc-client"
 	// The two per-address password tiers: failures per minute per /64 (#564 decision 2).
-	pwdIpBudget          = 30
-	pwdIpWindow          = 60
+	pwdIpBudget = 30
+	pwdIpWindow = 60
+	// The per-address ceiling in front of each: every password check per minute per /64 (#564).
+	pwdIpCeiling         = 120
 	routesTestCeremonyId = "9f1c2c2f-2a0f-4a3b-8b6d-1f0a5c9e7d21"
 	// A well-formed base32 TOTP secret, so the code the OTP case submits is refused for
 	// being wrong rather than for the secret being unreadable.
@@ -482,6 +484,30 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 	t.Run("POST /auth/token is limited", func(t *testing.T) {
 		server := newRoutesTestServer(t)
 		assertRefused(t, exhaust(t, server, pwdIpBudget, ropcGuess), pwdIpWindow, shapeOAuth)
+	})
+
+	// The ceiling in front of both counts every check, so it is spent here by checks that charge no
+	// failure at all: a form and a grant with no password, which the handler answers without
+	// guessing anything, as it answers a right password without charging one (#564).
+	t.Run("POST /auth/pwd has a ceiling on every check", func(t *testing.T) {
+		server := newRoutesTestServer(t)
+		cookie := pwdCeremonyCookie(t, server)
+		noPassword := func(attempt int) *http.Request {
+			r := browserForm(http.MethodPost, "/auth/pwd", "ceremonyId="+routesTestCeremonyId+
+				"&email=user"+strconv.Itoa(attempt)+"%40example.com&password=")
+			r.AddCookie(cookie)
+			return r
+		}
+		assertRefused(t, exhaust(t, server, pwdIpCeiling, noPassword), pwdIpWindow, shapeBrowser)
+	})
+
+	t.Run("POST /auth/token has a ceiling on every password grant", func(t *testing.T) {
+		server := newRoutesTestServer(t)
+		noPassword := func(attempt int) *http.Request {
+			return browserForm(http.MethodPost, "/auth/token", "grant_type=password&client_id="+routesTestROPCClientId+
+				"&username=user"+strconv.Itoa(attempt)+"%40example.com")
+		}
+		assertRefused(t, exhaust(t, server, pwdIpCeiling, noPassword), pwdIpWindow, shapeOAuth)
 	})
 
 	// The last registration, and the only one whose tier is keyed on something the request
