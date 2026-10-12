@@ -13,16 +13,18 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 )
 
-// A refused code is drawn on the verification form with the auth server's sentence and the code as
-// typed, whatever refused it: the code itself, email switched off since the page was drawn, or too
-// many attempts, which is the user's to wait out (RFC 6585 section 4) and answered the 500 page
-// until #562 decision 7. The page is told whether email is on, so it can draw the form or not; the
+// A refused code is drawn on the verification form with its sentence and the code as typed,
+// whatever refused it: the code itself, email switched off since the page was drawn, or too many
+// attempts, which is the user's to wait out (RFC 6585 section 4), answered the 500 page until
+// #562 decision 7, and is drawn with the console's rate-limit sentence (#559 decision 10). The page is told whether email is on, so it can draw the form or not; the
 // sentence is drawn either way (the template's half is in renderintegration).
 func TestHandleEmailVerificationPost_ARefusalIsDrawnWithItsSentence(t *testing.T) {
 	testCases := []struct {
 		name        string
 		smtpEnabled bool
 		refusal     *apiclient.APIError
+		// want is the sentence drawn, the API's own when empty.
+		want string
 	}{
 		{
 			name:        "a code the API calls expired",
@@ -38,6 +40,7 @@ func TestHandleEmailVerificationPost_ARefusalIsDrawnWithItsSentence(t *testing.T
 			name:        "too many attempts",
 			smtpEnabled: true,
 			refusal:     &apiclient.APIError{Code: "TOO_MANY_REQUESTS", Message: "Too many requests. Please wait and try again later.", StatusCode: http.StatusTooManyRequests},
+			want:        "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again.",
 		},
 	}
 
@@ -54,7 +57,11 @@ func TestHandleEmailVerificationPost_ARefusalIsDrawnWithItsSentence(t *testing.T
 					handlertest.WithForm(url.Values{"verificationCode": {"ABC123"}})))
 
 			bind := handlertest.Bind(t, httpHelper)
-			assert.Equal(t, tc.refusal.Message, bind["error"])
+			want := tc.want
+			if want == "" {
+				want = tc.refusal.Message
+			}
+			assert.Equal(t, want, bind["error"])
 			assert.Equal(t, "ABC123", bind["verificationCode"], "the code as typed")
 			assert.Equal(t, tc.smtpEnabled, bind["smtpEnabled"])
 			assert.Empty(t, rec.Header().Get("Location"), "drawn again, not redirected")

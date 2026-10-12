@@ -62,9 +62,9 @@ func TestRender_AdminClientDelete_ARefusalDrawsTheDeletePageAgain(t *testing.T) 
 		identifier string
 		message    string
 	}{
-		{name: "an empty identifier", identifier: "", message: "Client identifier is required."},
+		{name: "an empty identifier", identifier: "", message: "O identificador do cliente é obrigatório."},
 		{name: "a wrong identifier", identifier: "portal-typo",
-			message: "Client identifier does not match the client being deleted."},
+			message: "O identificador do cliente não corresponde ao cliente que está sendo excluído."},
 	}
 
 	for _, tc := range testCases {
