@@ -3064,6 +3064,15 @@
       translate: 0 -40%;
       clip-path: polygon(20% 100%, 20% 80%, 50% 80%, 50% 80%, 80% 80%, 80% 100%);
     }
+    @media (forced-colors: active) {
+      .checkbox:indeterminate:before {
+        rotate: 0deg;
+        background-color: transparent;
+        --tw-content: "−";
+        clip-path: none;
+        translate: 0;
+      }
+    }
     .checkbox[aria-checked="mixed"] {
       background-color: var( --input-color, var(--color-base-content) );
     }
@@ -3077,6 +3086,15 @@
       opacity: 100%;
       translate: 0 -40%;
       clip-path: polygon(20% 100%, 20% 80%, 50% 80%, 50% 80%, 80% 80%, 80% 100%);
+    }
+    @media (forced-colors: active) {
+      .checkbox[aria-checked="mixed"]:before {
+        rotate: 0deg;
+        background-color: transparent;
+        --tw-content: "−";
+        clip-path: none;
+        translate: 0;
+      }
     }
   }
   @layer daisyui.l1.l2 {
