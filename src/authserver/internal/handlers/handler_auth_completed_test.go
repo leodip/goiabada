@@ -3233,74 +3233,109 @@ func TestHandleAuthCompletedGet_AnAuthenticatorRemovedAtTheWriteRestarts(t *test
 	}
 }
 
-// The reuse arm's other refusal at the write: a bind that answered the ordering rule of #538
-// restarts level 1 too, exactly like one whose authenticator was removed. Only BindUserSession
-// returns ErrStaleAuthentication, so this is the reuse arm alone: the create arm has no session
-// whose authentication could have moved on.
-func TestHandleAuthCompletedGet_AStaleBindAtTheWriteRestarts(t *testing.T) {
-	t.Run("reuse arm", func(t *testing.T) {
-		pageRenderer := handlersmocks.NewPageRenderer(t)
-		ceremonyStore := handlersmocks.NewCeremonyStore(t)
-		userSessionManager := handlersmocks.NewUserSessionManager(t)
-		database := datamocks.NewDatabase(t)
-		auditLogger := handlersmocks.NewAuditLogger(t)
-		permissionChecker := handlersmocks.NewPermissionChecker(t)
+// The reuse arm's other refusal at the write: a bind that found a newer authentication already on the
+// session (#538) is answered with the "no longer active" page, and the auth context is not saved,
+// because the newer sign-in's own /auth/authorize replaced this ceremony first. It is not restarted:
+// the session is valid and this user's, and a restart would ask an SSO ceremony for a password.
+// Only BindUserSession returns ErrStaleAuthentication, so this is the reuse arm alone.
+//
+// Each case also pins what the bind is handed, because the rule can only refuse what it is given:
+// an SSO ceremony hands over the instant it adopted the session at and none of its own, and a
+// ceremony that authenticated afresh hands over its credential's instant and no adopted one.
+func TestHandleAuthCompletedGet_AStaleBindAtTheWriteIsAnsweredAsReplaced(t *testing.T) {
+	adopted := time.Date(2026, 10, 10, 8, 0, 0, 0, time.UTC)
+	entered := time.Now().UTC().Add(-time.Minute)
+	generation := int64(4)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
-			auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+	for _, tc := range []struct {
+		name        string
+		authContext func() *ceremony.AuthContext
+		replace     bool
+		handed      func(usersession.Authentication) bool
+	}{
+		{
+			name: "an SSO ceremony hands over the instant it adopted",
+			authContext: func() *ceremony.AuthContext {
+				return &ceremony.AuthContext{
+					AuthMethods:            "pwd otp",
+					AdoptedSessionAuthTime: &adopted,
+					OtpClaimGeneration:     &generation,
+				}
+			},
+			replace: false,
+			handed: func(a usersession.Authentication) bool {
+				return a.AdoptedAuthTime != nil && a.AdoptedAuthTime.Equal(adopted) && a.AuthTime == nil
+			},
+		},
+		{
+			name: "a ceremony that authenticated afresh hands over its credential's instant",
+			authContext: func() *ceremony.AuthContext {
+				return &ceremony.AuthContext{
+					AuthMethods:         "pwd",
+					AuthenticatedAt:     &entered,
+					PasswordVerifiedAt:  &entered,
+					Level1AuthCompleted: true,
+				}
+			},
+			replace: true,
+			handed: func(a usersession.Authentication) bool {
+				return a.AuthTime != nil && a.AuthTime.Equal(entered) && a.AdoptedAuthTime == nil
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
-		req = withSessionSettings(req)
-		sessionIdentifier := "test-session"
-		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
-		rr := httptest.NewRecorder()
+			handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
+				auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		generation := int64(4)
-		at := time.Now().UTC().Add(-time.Minute)
-		authContext := &ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
-			AuthState:           ceremony.AuthStateAuthenticationCompleted,
-			ClientId:            "test-client",
-			UserId:              1,
-			Scope:               "openid",
-			RequestedScope:      "openid",
-			AuthMethods:         "pwd otp",
-			AuthenticatedAt:     &at,
-			PasswordVerifiedAt:  &at,
-			Level1AuthCompleted: false,
-			OtpConfigGeneration: &generation,
-			OtpClaimGeneration:  &generation,
-		}
-		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+			req = withSessionSettings(req)
+			sessionIdentifier := "test-session"
+			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
+			rr := httptest.NewRecorder()
 
-		session := &record.UserSession{Id: 9, UserId: 1, AcrLevel: record.AcrLevel2Mandatory, AuthMethods: "pwd otp",
-			OtpConfigGeneration: generation}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(session, nil)
-		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, session).Return(nil)
-		client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel2Mandatory}
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
-		userSessionManager.On("HasValidUserSession", session, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
-			mock.AnythingOfType("*int64")).Return(true)
-		// The check before binding still sees the authenticator the code came from; the write is
-		// where the ordering rule of #538 refuses this ceremony.
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-			Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: generation}, nil).Once()
+			authContext := tc.authContext()
+			authContext.CeremonyId = testCeremonyId
+			authContext.AuthState = ceremony.AuthStateAuthenticationCompleted
+			authContext.ClientId = "test-client"
+			authContext.UserId = 1
+			authContext.Scope = "openid"
+			authContext.RequestedScope = "openid"
+			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		stale := errs.WithStack(usersession.ErrStaleAuthentication)
-		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1), mock.Anything, false, "").
-			Return(nil, stale).Once()
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateRequiresLevel1 && ac.AuthMethods == "" && ac.OtpClaimGeneration == nil &&
-				ac.AdoptedSessionAuthTime == nil
-		})).Return(nil).Once()
+			// A level 3 session holding pwd otp, at a level 1 client, so neither case raises a
+			// privilege and the identifier is not rotated before the bind.
+			session := &record.UserSession{Id: 9, UserId: 1, AcrLevel: record.AcrLevel2Mandatory, AuthMethods: "pwd otp",
+				OtpConfigGeneration: generation}
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(session, nil)
+			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, session).Return(nil)
+			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
+			userSessionManager.On("HasValidUserSession", session, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
+				mock.AnythingOfType("*int64")).Return(true)
+			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
+				Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: generation}, nil).Once()
 
-		handler.ServeHTTP(rr, req)
+			userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
+				mock.MatchedBy(tc.handed), tc.replace, "").
+				Return(nil, errs.WithStack(usersession.ErrStaleAuthentication)).Once()
+			expectCeremonyNoLongerActive(t, pageRenderer, rr, req)
 
-		require.Equal(t, http.StatusFound, rr.Code)
-		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-		database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-		pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
-		permissionChecker.AssertNotCalled(t, "FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything)
-	})
+			handler.ServeHTTP(rr, req)
+
+			// The newer ceremony's auth context, stored in this browser's session, is left as it is.
+			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
+			permissionChecker.AssertNotCalled(t, "FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
 }

@@ -43,7 +43,7 @@ func TestBindUserSession_AnOlderStepUpDoesNotRaiseTheSessionOverANewerSignIn(t *
 	database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 
-	// The step-up ceremony accepted its code before the newer sign-in password.
+	// The step-up ceremony accepted its code before the newer sign-in's password.
 	olderInstant := older
 	result, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
 		UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory,
@@ -96,9 +96,9 @@ func TestBindUserSession_AnOlderReplaceDoesNotWriteOverANewerSignIn(t *testing.T
 
 // The newer authentication of each pair takes the session: the ordering refuses the older one
 // only, so the write the newer sign-in makes still happens, whichever arm it arrives on. A bind
-// whose instant is exactly the session's own auth_time is current, not stale: that is a retry of
-// the sign-in that already holds the session, or the instant the password handler recorded and
-// the bind reads again, and refusing it would restart sign-ins holding their own authentication.
+// whose instant is exactly the session's own auth_time is current, not stale: that is the sign-in
+// the session already describes, binding again, and refusing it would turn that sign-in away from
+// its own session.
 func TestBindUserSession_ANewerSignInStillBindsAndAnEqualInstantIsCurrent(t *testing.T) {
 	older := time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)
 	newer := older.Add(2 * time.Minute)
@@ -199,17 +199,27 @@ func TestBindUserSession_NoAuthTimeTakesAnyInstantAndACarrylessBumpIsNeverStale(
 // bind answers ErrStaleAuthentication and writes nothing. A session that still holds the adopted
 // instant is exactly what the ceremony was built on, so the bind takes it and, entering no
 // credential of its own, leaves auth_time where the row had it.
+//
+// The comparison runs whenever the adopted instant is set, so an SSO ceremony that then stepped up
+// is refused on a moved session even though its own code is newer than the row's auth_time: the
+// methods it would merge beside that code came from the session it adopted. And a legacy row
+// adopted with no auth_time still holds that zero, so it takes the bind.
 func TestBindUserSession_AnSSOBindWhoseSessionMovedIsRefused(t *testing.T) {
 	adopted := time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)
 	moved := adopted.Add(2 * time.Minute)
+	steppedUp := moved.Add(time.Minute)
 
 	for _, tc := range []struct {
 		name            string
 		sessionAuthTime time.Time
+		adopted         time.Time
+		ownInstant      *time.Time
 		wantStale       bool
 	}{
-		{"a session a newer sign-in has reached refuses the SSO bind", moved, true},
-		{"a session that still holds the adopted instant takes the SSO bind", adopted, false},
+		{"a session a newer sign-in has reached refuses the SSO bind", moved, adopted, nil, true},
+		{"a session that still holds the adopted instant takes the SSO bind", adopted, adopted, nil, false},
+		{"an SSO ceremony that stepped up is refused on a moved session, its newer code notwithstanding", moved, adopted, &steppedUp, true},
+		{"a legacy row adopted with no auth_time takes the SSO bind", time.Time{}, time.Time{}, nil, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
@@ -230,11 +240,11 @@ func TestBindUserSession_AnSSOBindWhoseSessionMovedIsRefused(t *testing.T) {
 			}
 
 			// The SSO bind: the methods and level its ceremony adopted from the session, and the
-			// instant it adopted them at, entering no credential of its own.
-			adoptedInstant := adopted
+			// instant it adopted them at, with the instant of a code it entered when it stepped up.
+			adoptedInstant := tc.adopted
 			result, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456,
 				Authentication{UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory,
-					AdoptedAuthTime: &adoptedInstant}, false, "")
+					AuthTime: tc.ownInstant, AdoptedAuthTime: &adoptedInstant}, false, "")
 
 			if tc.wantStale {
 				require.ErrorIs(t, err, ErrStaleAuthentication)

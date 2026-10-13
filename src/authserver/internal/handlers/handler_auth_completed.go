@@ -150,9 +150,7 @@ func HandleAuthCompletedGet(
 		// Restart route 1, taken when no session is reusable and level 1 was never completed, or
 		// when the user's generation has moved on since the ceremony authenticated, which
 		// /auth/issue would restart one step later after a consent screen whose answer it throws
-		// away, or when the ceremony's one-time code no longer stands,
-		// or when the session's authentication has moved on since the ceremony adopted or
-		// authenticated it and the bind answered ErrStaleAuthentication (#538). The attempt is discarded
+		// away, or when the ceremony's one-time code no longer stands. The attempt is discarded
 		// with it, so methods and the user carried in from the session that ended do not reach the
 		// session the second pass creates (#140, #436).
 		restart := func() {
@@ -191,16 +189,24 @@ func HandleAuthCompletedGet(
 		}
 		if errors.Is(err, usersession.ErrStaleAuthentication) {
 			// The ordering rule of the bind's transaction (#538): another ceremony completed on
-			// this session while this one was in flight, and its credential was accepted after
-			// this one's, so the session describes that newer authentication. Writing this
-			// ceremony's level, methods or auth_time onto it would either raise it with an
-			// authentication older than the one it holds or move auth_time backwards, so the bind
-			// wrote nothing, and the ceremony restarts, exactly as one whose one-time code no
-			// longer stands: the second pass reads the session the newer sign-in left and asks
-			// for whatever its target needs on top of it.
-			slog.WarnContext(r.Context(), "a newer authentication has already reached this session, restarting level 1 instead of binding an older one onto it",
+			// this session while this request was stalled, so the session holds that newer
+			// authentication and the bind wrote nothing. That ceremony began with its own
+			// /auth/authorize in this browser, which replaced this one's auth context; this request
+			// got this far only because it had loaded the context before. So it is answered as any
+			// step of a replaced ceremony is, with the "no longer active" page, and the auth context
+			// is not saved: the newer ceremony keeps the browser as it keeps the session, and its
+			// consent or issuance still to come is not undone (rejectCeremonyMismatch). The user
+			// starts again from the application, which is plain SSO over the session as it is now.
+			//
+			// A restart at level 1 is not the answer here, as it is for a code whose authenticator
+			// is gone: the session is valid and this user's. A restarted ceremony verifies the
+			// password itself, so the session counts for nothing towards it and its bind replaces
+			// the session's authentication (#537). An SSO ceremony would be asked for a password
+			// nobody requested, and at a level 1 client would lower a session the newer sign-in
+			// had just raised.
+			slog.WarnContext(r.Context(), "a newer authentication has already reached this session, answering this ceremony as one the browser has replaced",
 				"ceremony_user_id", authContext.UserId)
-			restart()
+			renderCeremonyNoLongerActive(pageRenderer, w, r)
 			return
 		}
 		if err != nil {

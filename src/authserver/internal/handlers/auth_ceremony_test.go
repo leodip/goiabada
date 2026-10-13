@@ -70,6 +70,22 @@ func expectCeremonyMismatch(t *testing.T, pageRenderer *handlersmocks.PageRender
 		})).Return(nil).Once()
 }
 
+// expectCeremonyNoLongerActive sets the one call renderCeremonyNoLongerActive makes, and asserts it
+// is the ceremony mismatch pair at 400. It sets no audit expectation: /auth/completed answers a stale
+// bind with this page and records no ceremony mismatch, because the request named its ceremony
+// correctly (#538).
+func expectCeremonyNoLongerActive(t *testing.T, pageRenderer *handlersmocks.PageRenderer,
+	rr *httptest.ResponseRecorder, req *http.Request) {
+	t.Helper()
+
+	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
+		mock.MatchedBy(func(data map[string]interface{}) bool {
+			return data["_httpStatus"] == http.StatusBadRequest &&
+				data["title"] == i18n.T(req.Context(), "auth_error.ceremony_mismatch.title") &&
+				data["error"] == i18n.T(req.Context(), "auth_error.ceremony_mismatch.message")
+		})).Return(nil).Once()
+}
+
 // expectAuthStateMismatch sets the one call requireAuthState makes on a refusal, and asserts the
 // page it renders is the 400 error page rather than a 500 with a stack, which is what ten of these
 // eleven sites answered before #279 decision 21 and /auth/level1completed until #436.

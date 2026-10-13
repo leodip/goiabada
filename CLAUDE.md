@@ -162,7 +162,7 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 | State | Assigned by | When |
 |---|---|---|
 | `requires_level_1` | `HandleAuthorizeGet` | four conditions: a deferred error is parked; `prompt=login`; `id_token_hint` names another user; no valid session |
-| | `HandleAuthCompletedGet` | no reusable session and `!Level1AuthCompleted`, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked before any session is bound and again by the session write, or a newer authentication has already reached the session (restart route 1, through `Restart()`) |
+| | `HandleAuthCompletedGet` | no reusable session and `!Level1AuthCompleted`, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked before any session is bound and again by the session write (restart route 1, through `Restart()`) |
 | | `refuseIssuanceUnusableSession` | bound session gone, expired or foreign, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked again by the issuer, and not `prompt=none` (restart route 2, through `Restart()`) |
 | `level1_password` | `HandleAuthLevel1Get` | unconditional |
 | `level1_password_completed` | `HandleAuthPwdPost` | password verified, user enabled |
@@ -222,13 +222,16 @@ discards the attempt: `AuthContext.Restart()` zeroes every attempt field, puts `
 consent (#140, #436). There are two restart routes: `HandleAuthCompletedGet` when no session is
 reusable and level 1 was never completed, or when the user's generation has moved on, or when the
 ceremony names `otp` from an authenticator the user no longer has (#542), decided before
-it binds a session (#522), or when the session's authentication has moved on since the ceremony
-adopted or authenticated it and the bind wrote nothing (`ErrStaleAuthentication`, #538), decided
-by the bind's own transaction, and `refuseIssuanceUnusableSession` at `/auth/issue` when the
+it binds a session (#522), and `refuseIssuanceUnusableSession` at `/auth/issue` when the
 bound session is gone, expired or foreign, or the user's generation has moved on, or the ceremony names `otp` from an authenticator the user no longer has, and the request is not `prompt=none`. The split is held by
 `TestAuthContextFields_EveryFieldIsClassifiedOnce` in `ceremony`, which fails on a field in neither
 list. Request fields are written only in `HandleAuthorizeGet`, which
-`TestRequestFields_WrittenOnlyAtAuthorize` in `ceremony` holds with `go/types`.
+`TestRequestFields_WrittenOnlyAtAuthorize` in `ceremony` holds with `go/types`. A bind that finds a
+newer authentication already on the session is not a restart: it writes nothing
+(`ErrStaleAuthentication`, #538) and `/auth/completed` answers it with the "no longer active"
+page, saving no auth context, because the newer sign-in's own `/auth/authorize` had already
+replaced the ceremony. A restart would make it verify the password itself, so its bind would
+replace the session's authentication, asking an SSO ceremony for a password nobody requested.
 
 ### Deferred error redirects (#213)
 `/auth/authorize` never redirects an unauthenticated browser to a client's `redirect_uri` on a failed
@@ -269,7 +272,7 @@ When user has valid session (`UserSession` in DB + session cookie):
 - If valid → uses existing `AcrLevel` and `AuthMethods` from session
 - May still need level2 re-auth if target ACR higher than session ACR
 - Reuse never lowers a session: `BumpUserSession` only raises its ACR and only adds methods (#537)
-- Every whole-row session write takes the session's row first (`AcquireUserSessionRow`) and reads it after, in one transaction: `BumpUserSession`, and `BindUserSession`, which is `/auth/completed`'s reuse arm and also writes a replacing authentication and the auth time there rather than in a second write. Read without the lock, a concurrent removal's lowering was written back over (#542). The token endpoint and `prompt=none` bump with no methods and no level. A bind whose sign-in is older than the session's current `AuthTime`, or whose ceremony adopted the session and the row no longer holds the `AuthTime` it adopted (`AdoptedAuthTime`, the SSO case, which enters no credential of its own), writes nothing and returns `ErrStaleAuthentication` (#538): a newer sign-in's level, methods and auth_time are not overwritten by an older ceremony that resumed after it, and `/auth/completed` restarts that ceremony at level 1
+- Every whole-row session write takes the session's row first (`AcquireUserSessionRow`) and reads it after, in one transaction: `BumpUserSession`, and `BindUserSession`, which is `/auth/completed`'s reuse arm and also writes a replacing authentication and the auth time there rather than in a second write. Read without the lock, a concurrent removal's lowering was written back over (#542). The token endpoint and `prompt=none` bump with no methods and no level. A bind whose sign-in is older than the session's current `AuthTime`, or whose ceremony adopted the session and the row no longer holds the `AuthTime` it adopted (`AdoptedAuthTime`, the SSO case, which enters no credential of its own), writes nothing and returns `ErrStaleAuthentication` (#538): a newer sign-in's level, methods and auth_time are not overwritten by an older ceremony that resumed after it, and `/auth/completed` answers that ceremony with the "no longer active" page, since the newer sign-in's own `/auth/authorize` had already replaced it
 
 ## SSO and ACR/AMR Details
 
