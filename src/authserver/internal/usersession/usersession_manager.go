@@ -119,9 +119,9 @@ type Authentication struct {
 // authentication had already reached, the ordering rule of the reuse arm's single transaction
 // (#538). A transaction alone serialises two binds, but it does not decide which of two concurrent
 // sign-ins the session should describe. The instants do: a ceremony whose credential predates the
-// session's current auth_time, or whose adopted session no longer holds the auth_time it adopted,
-// writes nothing -- not its level, not its methods, not its auth_time -- and /auth/completed
-// answers it as a ceremony the browser has replaced.
+// session's current auth_time, or whose adopted session holds neither the auth_time it adopted nor
+// the ceremony's own, writes nothing -- not its level, not its methods, not its auth_time -- and
+// /auth/completed answers it as a ceremony the browser has replaced.
 var ErrStaleAuthentication = errors.New("a newer authentication has already reached this session")
 
 // SessionLimits is what the settings bound a user's sessions to when a sign-in starts a new one. The
@@ -562,14 +562,34 @@ func (u *Manager) BumpUserSession(ctx context.Context, sessionIdentifier string,
 // could undo a removal's lowering as the bump's own write could (#542).
 //
 // A bind whose sign-in predates the session's current authentication, or whose adopted session
-// no longer holds the auth_time it adopted, writes nothing and returns ErrStaleAuthentication
-// (#538).
+// holds neither the auth_time it adopted nor the ceremony's own, writes nothing and returns
+// ErrStaleAuthentication (#538).
 func (u *Manager) BindUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
 	authentication Authentication, replace bool, ipAddress string) (*record.UserSession, error) {
 	if replace && (authentication.PasswordAuthTime == nil || authentication.PasswordAuthTime.IsZero()) {
 		return nil, errs.New("no password instant captured; refusing to replace a session's authentication with a password_auth_time that would be invented")
 	}
 	return u.bindUserSession(ctx, sessionIdentifier, clientId, authentication, replace, ipAddress)
+}
+
+// AuthenticationIsStale answers, from the session row as it is now, whether the ordering rule would
+// refuse a bind of authentication (#538). It locks nothing and writes nothing, and a session that is
+// gone is not stale here: the bind answers that itself.
+//
+// /auth/completed asks it before rotating the browser session's identifier, because the rotation
+// writes the request's own copy of the browser session, read when the request began, over whatever
+// a newer ceremony saved there since, and a ceremony this would refuse must not do that. The bind
+// asks again under the row lock, for a sign-in that lands between the two.
+func (u *Manager) AuthenticationIsStale(ctx context.Context, sessionIdentifier string,
+	authentication Authentication) (bool, error) {
+	userSession, err := u.database.GetUserSessionBySessionIdentifier(ctx, nil, sessionIdentifier)
+	if err != nil {
+		return false, err
+	}
+	if userSession == nil {
+		return false, nil
+	}
+	return staleAuthentication(userSession, authentication), nil
 }
 
 func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
@@ -743,16 +763,21 @@ func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string,
 //
 // The second is the instant the ceremony adopted the session at: AdoptedAuthTime, copied from the
 // adopted session's auth_time when /auth/authorize adopted it. When the session's current auth_time
-// no longer equals it, a newer sign-in has reached the session since the adoption, and the methods
-// such a bind merges back and the level it raises the session to would describe the older sign-in
-// rather than the one the session holds now, which is what #538 refuses. An equality, because a
-// session that still holds the adopted authentication is one the ceremony may bind, whatever its
-// target asks on top of it.
+// is neither that nor the ceremony's own credential instant, a newer sign-in has reached the session
+// since the adoption, and the methods such a bind merges back and the level it raises the session to
+// would describe the older sign-in rather than the one the session holds now, which is what #538
+// refuses. The ceremony's own instant counts because a ceremony that adopted the session and then
+// entered a code moved auth_time to that code with its own first bind: a second bind of the same
+// ceremony, a reload of /auth/completed after a step that failed once the bind had committed, finds
+// its own authentication there and is current.
 //
-// Equal instants are current, not stale, in the first comparison: a bind carrying the session's own
-// auth_time is the sign-in the session already describes, binding again, as a reload of
-// /auth/completed does after a save that failed once the bind had committed. Refusing it would turn
-// that sign-in away from its own session.
+// Equal instants are current, not stale, in the first comparison too, for the same second bind: a
+// bind carrying the session's own auth_time is the sign-in the session already describes.
+//
+// Equal means equal at the auth_time column's precision, a microsecond on every engine
+// (sameInstant). The instants a ceremony carries are the clock's, to the nanosecond, while the row
+// holds what the engine kept of the same instant, so a ceremony's own instant and the row it wrote
+// differ below a microsecond, in either direction when an engine rounds rather than truncates.
 //
 // The instants the password and OTP handlers stamp come from the auth server instance's clock, so
 // the first comparison assumes the instances of one deployment share a synchronized clock, as NTP
@@ -760,23 +785,26 @@ func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string,
 // sign-in that enters a credential is stamped by the same slow clock, so it can be refused again
 // until the gap has passed. The second comparison reads no clock at all.
 func staleAuthentication(session *record.UserSession, authentication Authentication) bool {
-	// The authentication this ceremony was built on, when it adopted a session at
-	// /auth/authorize: if the session's auth_time has moved since, a newer sign-in owns it
-	// now, and a ceremony built on an authentication the session no longer holds must start
-	// again, even though it entered no credential of its own. Both values come from the
-	// database, so the equality is exact and no clock is involved, and it applies whenever
-	// the field is set, including an SSO ceremony that then stepped up.
-	if authentication.AdoptedAuthTime != nil {
-		if !session.AuthTime.UTC().Equal(authentication.AdoptedAuthTime.UTC()) {
-			return true
-		}
-	}
-
 	// The instant this sign-in claims, AuthTime, the credential the ceremony last accepted.
 	claimed := time.Time{}
 	if authentication.AuthTime != nil {
 		claimed = authentication.AuthTime.UTC()
 	}
+
+	// The authentication this ceremony was built on, when it adopted a session at
+	// /auth/authorize: if the session's auth_time has moved since, to anything but this
+	// ceremony's own credential, a newer sign-in owns it now, and a ceremony built on an
+	// authentication the session no longer holds must start again, even though it entered no
+	// credential of its own. It applies whenever the field is set, including an SSO ceremony
+	// that then stepped up.
+	if authentication.AdoptedAuthTime != nil {
+		holdsAdopted := sameInstant(session.AuthTime, *authentication.AdoptedAuthTime)
+		holdsOwn := !claimed.IsZero() && sameInstant(session.AuthTime, claimed)
+		if !holdsAdopted && !holdsOwn {
+			return true
+		}
+	}
+
 	if claimed.IsZero() {
 		return false
 	}
@@ -784,7 +812,18 @@ func staleAuthentication(session *record.UserSession, authentication Authenticat
 	if session.AuthTime.IsZero() {
 		return false
 	}
-	return claimed.Before(session.AuthTime.UTC())
+	return claimed.Before(session.AuthTime) && !sameInstant(claimed, session.AuthTime)
+}
+
+// authTimePrecision is the precision of the user_sessions.auth_time column on every engine:
+// datetime(6) on MySQL, timestamp(6) on PostgreSQL, datetime2(6) on SQL Server, and SQLite holds
+// at least as much.
+const authTimePrecision = time.Microsecond
+
+// sameInstant reports whether a and b are the same instant at the auth_time column's precision,
+// within a microsecond of each other whichever way an engine reduced the one it stored.
+func sameInstant(a, b time.Time) bool {
+	return a.Sub(b).Abs() < authTimePrecision
 }
 
 // WillRaisePrivilege reports whether bumping a session with these values would raise its

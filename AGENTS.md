@@ -231,7 +231,10 @@ newer authentication already on the session is not a restart: it writes nothing
 (`ErrStaleAuthentication`, #538) and `/auth/completed` answers it with the "no longer active"
 page, saving no auth context, because the newer sign-in's own `/auth/authorize` had already
 replaced the ceremony. A restart would make it verify the password itself, so its bind would
-replace the session's authentication, asking an SSO ceremony for a password nobody requested.
+replace the session's authentication, asking an SSO ceremony for a password nobody requested. A
+reuse arm that rotates the browser session's identifier asks the same rule first
+(`AuthenticationIsStale`) and answers the same page without rotating: the rotation writes the
+request's own copy of the browser session, read when it began, over the newer ceremony's.
 
 ### Deferred error redirects (#213)
 `/auth/authorize` never redirects an unauthenticated browser to a client's `redirect_uri` on a failed
@@ -272,7 +275,7 @@ When user has valid session (`UserSession` in DB + session cookie):
 - If valid → uses existing `AcrLevel` and `AuthMethods` from session
 - May still need level2 re-auth if target ACR higher than session ACR
 - Reuse never lowers a session: `BumpUserSession` only raises its ACR and only adds methods (#537)
-- Every whole-row session write takes the session's row first (`AcquireUserSessionRow`) and reads it after, in one transaction: `BumpUserSession`, and `BindUserSession`, which is `/auth/completed`'s reuse arm and also writes a replacing authentication and the auth time there rather than in a second write. Read without the lock, a concurrent removal's lowering was written back over (#542). The token endpoint and `prompt=none` bump with no methods and no level. A bind whose sign-in is older than the session's current `AuthTime`, or whose ceremony adopted the session and the row no longer holds the `AuthTime` it adopted (`AdoptedAuthTime`, the SSO case, which enters no credential of its own), writes nothing and returns `ErrStaleAuthentication` (#538): a newer sign-in's level, methods and auth_time are not overwritten by an older ceremony that resumed after it, and `/auth/completed` answers that ceremony with the "no longer active" page, since the newer sign-in's own `/auth/authorize` had already replaced it
+- Every whole-row session write takes the session's row first (`AcquireUserSessionRow`) and reads it after, in one transaction: `BumpUserSession`, and `BindUserSession`, which is `/auth/completed`'s reuse arm and also writes a replacing authentication and the auth time there rather than in a second write. Read without the lock, a concurrent removal's lowering was written back over (#542). The token endpoint and `prompt=none` bump with no methods and no level. A bind whose sign-in is older than the session's current `AuthTime`, or whose ceremony adopted the session and the row holds neither the `AuthTime` it adopted (`AdoptedAuthTime`, the SSO case, which enters no credential of its own) nor the ceremony's own credential instant (its own earlier bind, which a reload after a later failure binds again), compared at the column's microsecond, writes nothing and returns `ErrStaleAuthentication` (#538): a newer sign-in's level, methods and auth_time are not overwritten by an older ceremony that resumed after it, and `/auth/completed` answers that ceremony with the "no longer active" page, since the newer sign-in's own `/auth/authorize` had already replaced it
 
 ## SSO and ACR/AMR Details
 

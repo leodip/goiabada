@@ -195,8 +195,11 @@ func HandleAuthCompletedGet(
 			// got this far only because it had loaded the context before. So it is answered as any
 			// step of a replaced ceremony is, with the "no longer active" page, and the auth context
 			// is not saved: the newer ceremony keeps the browser as it keeps the session, and its
-			// consent or issuance still to come is not undone (rejectCeremonyMismatch). The user
-			// starts again from the application, which is plain SSO over the session as it is now.
+			// consent or issuance still to come is not undone (rejectCeremonyMismatch). That holds on
+			// a plan that rotates the browser session's identifier too, because bindReusedSession
+			// asks the rule before rotating, and the rotation would otherwise have written this
+			// request's copy of the browser session over the newer ceremony's. The user starts again
+			// from the application, which is plain SSO over the session as it is now.
 			//
 			// A restart at level 1 is not the answer here, as it is for a code whose authenticator
 			// is gone: the session is valid and this user's. A restarted ceremony verifies the
@@ -495,20 +498,6 @@ func bindReusedSession(
 	sessionIdentifier string,
 	targetAcrLevel record.AcrLevel,
 ) (*record.UserSession, error) {
-	// Rotate the browser session's identifier before the privilege is committed.
-	//
-	// The order is the whole of it. BumpUserSession opens its own transaction and commits before
-	// it returns, so rotating afterwards leaves a window in which the identifier the browser
-	// arrived with names a user session that is already at the higher level: an identifier stolen
-	// at level 1 would keep working after the step-up, which is the carryover rotation exists to
-	// stop. Deciding from the pre-bump session and rotating first means a failure between the two
-	// leaves a fresh identifier on a session that has not been raised, which is the safe direction.
-	if plan.rotateIdentifier {
-		if err := ceremonyStore.RegenerateSession(w, r); err != nil {
-			return nil, err
-		}
-	}
-
 	// Bind the session with the ceremony's methods and target ACR level, in one transaction under
 	// the session's row (BindUserSession). This handles step-up authentication: if the user had a
 	// level1 session but just completed OTP for a level2 client, the session's AuthMethods and
@@ -543,6 +532,35 @@ func bindReusedSession(
 	if plan.replaceAuthentication {
 		authentication.PasswordAuthTime = authContext.PasswordVerifiedAt
 	}
+
+	// Rotate the browser session's identifier before the privilege is committed.
+	//
+	// The order is the whole of it. BumpUserSession opens its own transaction and commits before
+	// it returns, so rotating afterwards leaves a window in which the identifier the browser
+	// arrived with names a user session that is already at the higher level: an identifier stolen
+	// at level 1 would keep working after the step-up, which is the carryover rotation exists to
+	// stop. Deciding from the pre-bump session and rotating first means a failure between the two
+	// leaves a fresh identifier on a session that has not been raised, which is the safe direction.
+	//
+	// A ceremony the bind would refuse as stale (#538) is refused here instead, before the rotation.
+	// Regenerate writes this request's own copy of the browser session, read when the request
+	// began, under the new identifier and deletes the old one, so rotating for a ceremony that a
+	// newer sign-in has overtaken would put this ceremony's auth context back over the newer one's
+	// and end it. The bind asks again under the session's row lock, for a sign-in landing between
+	// the two.
+	if plan.rotateIdentifier {
+		stale, err := userSessionManager.AuthenticationIsStale(r.Context(), sessionIdentifier, authentication)
+		if err != nil {
+			return nil, err
+		}
+		if stale {
+			return nil, errs.WithStack(usersession.ErrStaleAuthentication)
+		}
+		if err = ceremonyStore.RegenerateSession(w, r); err != nil {
+			return nil, err
+		}
+	}
+
 	bumpedSession, err := userSessionManager.BindUserSession(r.Context(), sessionIdentifier, client.Id,
 		authentication, plan.replaceAuthentication, middleware.ClientIP(r))
 	if err != nil {

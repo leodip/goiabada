@@ -107,6 +107,12 @@ type UserSessionManager interface {
 	// writes the sign-in's authentication over it, and sets its auth_time (#542).
 	BindUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
 		authentication usersession.Authentication, replace bool, ipAddress string) (*record.UserSession, error)
+
+	// AuthenticationIsStale answers, without locking or writing, whether BindUserSession would
+	// refuse authentication as older than the session's (#538), so the reuse arm can refuse before
+	// it rotates the browser session's identifier rather than after.
+	AuthenticationIsStale(ctx context.Context, sessionIdentifier string,
+		authentication usersession.Authentication) (bool, error)
 }
 
 type TokenValidator interface {

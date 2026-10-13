@@ -345,3 +345,55 @@ func TestBindUserSession_AnSSOBindWhoseAdoptedSessionWasReplacedWritesNothing(t 
 	assert.Equal(t, "pwd", final.AuthMethods, "and its methods, without the otp the SSO ceremony would merge back")
 	assert.Truef(t, final.AuthTime.Equal(newer), "auth_time is the newer password's, not the adopted instant: %v", final.AuthTime)
 }
+
+// A ceremony's second bind is current, not stale, on every engine: a reload of /auth/completed
+// after a step that failed once the bind had committed binds the same authentication again. The
+// instants carry nanoseconds the auth_time column does not keep, so the row the first bind wrote
+// holds them truncated or rounded, and the rule compares at the column's microsecond. An SSO
+// ceremony that stepped up moved auth_time to its own code with that first bind, so the second
+// finds its own instant there instead of the one it adopted, and binds.
+func TestBindUserSession_TheSameSignInBindsTwice(t *testing.T) {
+	t.Run("an SSO ceremony that stepped up", func(t *testing.T) {
+		user := createTestUser(t)
+		client := createTestClient(t)
+		session := createTestUserSession(t, user.Id)
+
+		adopted := time.Now().UTC().Truncate(time.Microsecond)
+		session.AcrLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime =
+			record.AcrLevel1, "pwd", adopted, adopted
+		require.NoError(t, database.UpdateUserSession(context.Background(), nil, session))
+
+		code := adopted.Add(time.Minute + 1600*time.Nanosecond)
+		stepUp := usersession.Authentication{UserId: user.Id, AuthMethods: "pwd otp",
+			AcrLevel: record.AcrLevel2Mandatory, AuthTime: &code, AdoptedAuthTime: &adopted}
+
+		manager := usersession.NewManager(nil, "", database, false)
+		for attempt := 1; attempt <= 2; attempt++ {
+			_, err := manager.BindUserSession(context.Background(), session.SessionIdentifier, client.Id,
+				stepUp, false, "")
+			require.NoErrorf(t, err, "bind %d of the same step-up", attempt)
+		}
+
+		final := readStaleTestSession(t, session.SessionIdentifier)
+		assert.Equal(t, record.AcrLevel2Mandatory, final.AcrLevel)
+		assert.Equal(t, "pwd otp", final.AuthMethods)
+		assert.Lessf(t, final.AuthTime.Sub(code).Abs(), time.Microsecond,
+			"auth_time is the step-up's code at the column's precision: %v", final.AuthTime)
+	})
+
+	t.Run("a ceremony that authenticated afresh", func(t *testing.T) {
+		user := createTestUser(t)
+		client := createTestClient(t)
+		session := createTestUserSession(t, user.Id)
+
+		password := time.Now().UTC().Add(time.Minute).Truncate(time.Microsecond).Add(1600 * time.Nanosecond)
+		signIn := signInOf(user.Id, "pwd", record.AcrLevel1, password, &password)
+
+		manager := usersession.NewManager(nil, "", database, false)
+		for attempt := 1; attempt <= 2; attempt++ {
+			_, err := manager.BindUserSession(context.Background(), session.SessionIdentifier, client.Id,
+				signIn, true, "")
+			require.NoErrorf(t, err, "bind %d of the same sign-in", attempt)
+		}
+	})
+}
