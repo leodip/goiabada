@@ -150,9 +150,7 @@ func HandleAuthCompletedGet(
 		// Restart route 1, taken when no session is reusable and level 1 was never completed, or
 		// when the user's generation has moved on since the ceremony authenticated, which
 		// /auth/issue would restart one step later after a consent screen whose answer it throws
-		// away, or when the ceremony's one-time code no longer stands,
-		// or when the session's authentication has moved on since the ceremony adopted or
-		// authenticated it and the bind answered ErrStaleAuthentication (#538). The attempt is discarded
+		// away, or when the ceremony's one-time code no longer stands. The attempt is discarded
 		// with it, so methods and the user carried in from the session that ended do not reach the
 		// session the second pass creates (#140, #436).
 		restart := func() {
@@ -191,16 +189,29 @@ func HandleAuthCompletedGet(
 		}
 		if errors.Is(err, usersession.ErrStaleAuthentication) {
 			// The ordering rule of the bind's transaction (#538): another ceremony completed on
-			// this session while this one was in flight, and its credential was accepted after
-			// this one's, so the session describes that newer authentication. Writing this
-			// ceremony's level, methods or auth_time onto it would either raise it with an
-			// authentication older than the one it holds or move auth_time backwards, so the bind
-			// wrote nothing, and the ceremony restarts, exactly as one whose one-time code no
-			// longer stands: the second pass reads the session the newer sign-in left and asks
-			// for whatever its target needs on top of it.
-			slog.WarnContext(r.Context(), "a newer authentication has already reached this session, restarting level 1 instead of binding an older one onto it",
+			// this session while this request was stalled, so the session holds that newer
+			// authentication and the bind wrote nothing. That ceremony began with its own
+			// /auth/authorize in this browser, which replaced this one's auth context; this request
+			// got this far only because it had loaded the context before. So it is answered as any
+			// step of a replaced ceremony is, with the "no longer active" page, and it writes nothing
+			// to the browser session: no auth context is saved, and a plan that rotates the
+			// identifier asked the rule before rotating (bindReusedSession), so nothing was rotated
+			// either unless the newer sign-in landed between that check and the rotation. This
+			// request does not put its own ceremony back over the newer one (rejectCeremonyMismatch).
+			// That is all it establishes: the browser-session store is last-writer-wins, so a
+			// ceremony that is still current can write over one started after it loaded, at any
+			// step (#579). The user starts again from the application, which is plain SSO over the
+			// session as it is now.
+			//
+			// A restart at level 1 is not the answer here, as it is for a code whose authenticator
+			// is gone: the session is valid and this user's. A restarted ceremony verifies the
+			// password itself, so the session counts for nothing towards it and its bind replaces
+			// the session's authentication (#537). An SSO ceremony would be asked for a password
+			// nobody requested, and at a level 1 client would lower a session the newer sign-in
+			// had just raised.
+			slog.WarnContext(r.Context(), "a newer authentication has already reached this session, answering this ceremony as one the browser has replaced",
 				"ceremony_user_id", authContext.UserId)
-			restart()
+			renderCeremonyNoLongerActive(pageRenderer, w, r)
 			return
 		}
 		if err != nil {
@@ -489,20 +500,6 @@ func bindReusedSession(
 	sessionIdentifier string,
 	targetAcrLevel record.AcrLevel,
 ) (*record.UserSession, error) {
-	// Rotate the browser session's identifier before the privilege is committed.
-	//
-	// The order is the whole of it. BumpUserSession opens its own transaction and commits before
-	// it returns, so rotating afterwards leaves a window in which the identifier the browser
-	// arrived with names a user session that is already at the higher level: an identifier stolen
-	// at level 1 would keep working after the step-up, which is the carryover rotation exists to
-	// stop. Deciding from the pre-bump session and rotating first means a failure between the two
-	// leaves a fresh identifier on a session that has not been raised, which is the safe direction.
-	if plan.rotateIdentifier {
-		if err := ceremonyStore.RegenerateSession(w, r); err != nil {
-			return nil, err
-		}
-	}
-
 	// Bind the session with the ceremony's methods and target ACR level, in one transaction under
 	// the session's row (BindUserSession). This handles step-up authentication: if the user had a
 	// level1 session but just completed OTP for a level2 client, the session's AuthMethods and
@@ -537,6 +534,36 @@ func bindReusedSession(
 	if plan.replaceAuthentication {
 		authentication.PasswordAuthTime = authContext.PasswordVerifiedAt
 	}
+
+	// Rotate the browser session's identifier before the privilege is committed.
+	//
+	// The order is the whole of it. BumpUserSession opens its own transaction and commits before
+	// it returns, so rotating afterwards leaves a window in which the identifier the browser
+	// arrived with names a user session that is already at the higher level: an identifier stolen
+	// at level 1 would keep working after the step-up, which is the carryover rotation exists to
+	// stop. Deciding from the pre-bump session and rotating first means a failure between the two
+	// leaves a fresh identifier on a session that has not been raised, which is the safe direction.
+	//
+	// A ceremony the bind would refuse as stale (#538) is refused here instead, before the rotation.
+	// Regenerate writes this request's own copy of the browser session, read when the request
+	// began, under the new identifier and deletes the old one, so rotating for a ceremony that a
+	// newer sign-in has overtaken would put this ceremony's auth context back over the newer one's
+	// and end it. The bind asks again under the session's row lock, for a sign-in landing between
+	// the two. A ceremony that is still current rotates from the same copy, over a ceremony started
+	// after this request loaded, as any of its writes would: the store is last-writer-wins (#579).
+	if plan.rotateIdentifier {
+		stale, err := userSessionManager.AuthenticationIsStale(r.Context(), sessionIdentifier, authentication)
+		if err != nil {
+			return nil, err
+		}
+		if stale {
+			return nil, errs.WithStack(usersession.ErrStaleAuthentication)
+		}
+		if err = ceremonyStore.RegenerateSession(w, r); err != nil {
+			return nil, err
+		}
+	}
+
 	bumpedSession, err := userSessionManager.BindUserSession(r.Context(), sessionIdentifier, client.Id,
 		authentication, plan.replaceAuthentication, middleware.ClientIP(r))
 	if err != nil {

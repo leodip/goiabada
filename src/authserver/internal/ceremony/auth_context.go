@@ -70,14 +70,6 @@ type AuthContext struct {
 	// user mid-ceremony: doing that would launder a ceremony that began before a
 	// credential change into the generation that change established (#106 decision 11).
 	AuthStateGeneration int64
-	// AdoptedSessionAuthTime is the auth_time the adopted session held when /auth/authorize
-	// adopted it, zero for a legacy row that never carried one. It is what the reuse bind
-	// compares against the session's current auth_time, under the transaction's row lock:
-	// a session that a newer sign-in has reached since the adoption no longer holds the
-	// authentication this ceremony was built on, so the bind refuses it, exactly as it refuses
-	// a bind whose own credential predates the session's authentication (#538). A legacy row
-	// adopted with no auth_time compares equal only while no bind has stamped one, so the
-	// first sign-in to reach it still takes it.
 	// OtpConfigGeneration is the user's otp_config_generation as this ceremony observed it
 	// when it answered the level 2 question, and it is what /auth/completed promotes onto
 	// the session this ceremony binds to. Captured at password verification and again on
@@ -97,8 +89,7 @@ type AuthContext struct {
 	// "this ceremony observed nothing, promote nothing" and leaves the session owing its
 	// re-prompt. That is the fail-closed direction, exactly as Level1AuthCompleted,
 	// CeremonyId and DeferredErrorCode each document for their own fields.
-	OtpConfigGeneration    *int64
-	AdoptedSessionAuthTime *time.Time
+	OtpConfigGeneration *int64
 	// OTPKeyURL holds the otpauth:// URL of the TOTP key this ceremony's user is enrolling:
 	// written by the /auth/otp render that generated it, read by HandleAuthOtpPost to verify
 	// the code the user types.
@@ -225,6 +216,18 @@ type AuthContext struct {
 	// Absent from a context written by an older binary it unmarshals as nil, and a claim with no
 	// generation never stands: the ceremony starts over from the password.
 	OtpClaimGeneration *int64
+	// AdoptedSessionAuthTime is the auth_time the session held when this ceremony adopted it
+	// (AdoptSession), zero for a legacy row that never carried one, and nil when the ceremony adopted
+	// no session. The reuse bind compares it with the session's current auth_time under the
+	// transaction's row lock: a session a newer sign-in has reached since the adoption no longer holds
+	// the authentication this ceremony was built on, so the bind refuses it, exactly as it refuses a
+	// bind whose own credential predates the session's authentication (#538). A legacy row adopted
+	// with no auth_time compares equal only while no bind has stamped one, so the first sign-in to
+	// reach it still takes it.
+	//
+	// Absent from a context written by an older binary it unmarshals as nil, and the comparison does
+	// not run: a ceremony in flight across the deploy binds as it did before #538.
+	AdoptedSessionAuthTime *time.Time
 }
 
 func (ac *AuthContext) SetScope(scope string) {
@@ -314,9 +317,9 @@ func (ac *AuthContext) RecordOTPVerified(now time.Time, generation int64, enroll
 }
 
 // AdoptSession records that this ceremony reuses userSession rather than authenticating: the user,
-// the level and methods the session reached, the auth_time it held, its authentication generation, and
-// the generation of the authenticator its methods' one-time code came from, which is the session's OTP config
-// snapshot. /auth/authorize's SSO path and prompt=none both reuse one this way.
+// the level and methods the session reached, the auth_time it held, its authentication generation,
+// and the generation of the authenticator its methods' one-time code came from, which is the
+// session's OTP config snapshot. /auth/authorize's SSO path and prompt=none both reuse one this way.
 //
 // The generation is inherited from the SESSION, never read from the user. Neither path reaches the
 // password handler, and reading the user's current generation here would launder an old session

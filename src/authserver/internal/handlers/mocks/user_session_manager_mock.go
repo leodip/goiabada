@@ -54,6 +54,78 @@ func (_m *UserSessionManager) EXPECT() *UserSessionManager_Expecter {
 	return &UserSessionManager_Expecter{mock: &_m.Mock}
 }
 
+// AuthenticationIsStale provides a mock function for the type UserSessionManager
+func (_mock *UserSessionManager) AuthenticationIsStale(ctx context.Context, sessionIdentifier string, authentication usersession.Authentication) (bool, error) {
+	ret := _mock.Called(ctx, sessionIdentifier, authentication)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AuthenticationIsStale")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, usersession.Authentication) (bool, error)); ok {
+		return returnFunc(ctx, sessionIdentifier, authentication)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, usersession.Authentication) bool); ok {
+		r0 = returnFunc(ctx, sessionIdentifier, authentication)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, usersession.Authentication) error); ok {
+		r1 = returnFunc(ctx, sessionIdentifier, authentication)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// UserSessionManager_AuthenticationIsStale_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AuthenticationIsStale'
+type UserSessionManager_AuthenticationIsStale_Call struct {
+	*mock.Call
+}
+
+// AuthenticationIsStale is a helper method to define mock.On call
+//   - ctx context.Context
+//   - sessionIdentifier string
+//   - authentication usersession.Authentication
+func (_e *UserSessionManager_Expecter) AuthenticationIsStale(ctx any, sessionIdentifier any, authentication any) *UserSessionManager_AuthenticationIsStale_Call {
+	return &UserSessionManager_AuthenticationIsStale_Call{Call: _e.mock.On("AuthenticationIsStale", ctx, sessionIdentifier, authentication)}
+}
+
+func (_c *UserSessionManager_AuthenticationIsStale_Call) Run(run func(ctx context.Context, sessionIdentifier string, authentication usersession.Authentication)) *UserSessionManager_AuthenticationIsStale_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 usersession.Authentication
+		if args[2] != nil {
+			arg2 = args[2].(usersession.Authentication)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *UserSessionManager_AuthenticationIsStale_Call) Return(b bool, err error) *UserSessionManager_AuthenticationIsStale_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *UserSessionManager_AuthenticationIsStale_Call) RunAndReturn(run func(ctx context.Context, sessionIdentifier string, authentication usersession.Authentication) (bool, error)) *UserSessionManager_AuthenticationIsStale_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // BindUserSession provides a mock function for the type UserSessionManager
 func (_mock *UserSessionManager) BindUserSession(ctx context.Context, sessionIdentifier string, clientId int64, authentication usersession.Authentication, replace bool, ipAddress string) (*record.UserSession, error) {
 	ret := _mock.Called(ctx, sessionIdentifier, clientId, authentication, replace, ipAddress)

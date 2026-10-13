@@ -2,6 +2,8 @@ package usersession
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"testing"
 	"time"
 
@@ -43,7 +45,7 @@ func TestBindUserSession_AnOlderStepUpDoesNotRaiseTheSessionOverANewerSignIn(t *
 	database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 
-	// The step-up ceremony accepted its code before the newer sign-in password.
+	// The step-up ceremony accepted its code before the newer sign-in's password.
 	olderInstant := older
 	result, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
 		UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory,
@@ -96,9 +98,9 @@ func TestBindUserSession_AnOlderReplaceDoesNotWriteOverANewerSignIn(t *testing.T
 
 // The newer authentication of each pair takes the session: the ordering refuses the older one
 // only, so the write the newer sign-in makes still happens, whichever arm it arrives on. A bind
-// whose instant is exactly the session's own auth_time is current, not stale: that is a retry of
-// the sign-in that already holds the session, or the instant the password handler recorded and
-// the bind reads again, and refusing it would restart sign-ins holding their own authentication.
+// whose instant is exactly the session's own auth_time is current, not stale: that is the sign-in
+// the session already describes, binding again, and refusing it would turn that sign-in away from
+// its own session.
 func TestBindUserSession_ANewerSignInStillBindsAndAnEqualInstantIsCurrent(t *testing.T) {
 	older := time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)
 	newer := older.Add(2 * time.Minute)
@@ -199,17 +201,27 @@ func TestBindUserSession_NoAuthTimeTakesAnyInstantAndACarrylessBumpIsNeverStale(
 // bind answers ErrStaleAuthentication and writes nothing. A session that still holds the adopted
 // instant is exactly what the ceremony was built on, so the bind takes it and, entering no
 // credential of its own, leaves auth_time where the row had it.
+//
+// The comparison runs whenever the adopted instant is set, so an SSO ceremony that then stepped up
+// is refused on a moved session even though its own code is newer than the row's auth_time: the
+// methods it would merge beside that code came from the session it adopted. And a legacy row
+// adopted with no auth_time still holds that zero, so it takes the bind.
 func TestBindUserSession_AnSSOBindWhoseSessionMovedIsRefused(t *testing.T) {
 	adopted := time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)
 	moved := adopted.Add(2 * time.Minute)
+	steppedUp := moved.Add(time.Minute)
 
 	for _, tc := range []struct {
 		name            string
 		sessionAuthTime time.Time
+		adopted         time.Time
+		ownInstant      *time.Time
 		wantStale       bool
 	}{
-		{"a session a newer sign-in has reached refuses the SSO bind", moved, true},
-		{"a session that still holds the adopted instant takes the SSO bind", adopted, false},
+		{"a session a newer sign-in has reached refuses the SSO bind", moved, adopted, nil, true},
+		{"a session that still holds the adopted instant takes the SSO bind", adopted, adopted, nil, false},
+		{"an SSO ceremony that stepped up is refused on a moved session, its newer code notwithstanding", moved, adopted, &steppedUp, true},
+		{"a legacy row adopted with no auth_time takes the SSO bind", time.Time{}, time.Time{}, nil, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
@@ -230,11 +242,11 @@ func TestBindUserSession_AnSSOBindWhoseSessionMovedIsRefused(t *testing.T) {
 			}
 
 			// The SSO bind: the methods and level its ceremony adopted from the session, and the
-			// instant it adopted them at, entering no credential of its own.
-			adoptedInstant := adopted
+			// instant it adopted them at, with the instant of a code it entered when it stepped up.
+			adoptedInstant := tc.adopted
 			result, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456,
 				Authentication{UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory,
-					AdoptedAuthTime: &adoptedInstant}, false, "")
+					AuthTime: tc.ownInstant, AdoptedAuthTime: &adoptedInstant}, false, "")
 
 			if tc.wantStale {
 				require.ErrorIs(t, err, ErrStaleAuthentication)
@@ -250,6 +262,94 @@ func TestBindUserSession_AnSSOBindWhoseSessionMovedIsRefused(t *testing.T) {
 					"a bind that entered no credential leaves auth_time where the row had it: %v", result.AuthTime)
 				database.AssertExpectations(t)
 			}
+		})
+	}
+}
+
+// A ceremony's instants and the row it wrote are equal at the auth_time column's precision, a
+// microsecond, and never exactly: the ceremony carries the clock's nanoseconds, and the row what
+// the engine kept, truncated or rounded. And a ceremony that adopted the session and then entered a
+// code moved auth_time to that code with its own first bind, so its second bind, a reload of
+// /auth/completed after a step that failed once the bind had committed, finds its own instant there
+// rather than the adopted one. Both are the authentication the session already describes, and
+// neither is stale; an instant a microsecond away, or one belonging to someone else, still is.
+func TestStaleAuthentication_TheCeremonysOwnInstantAtTheColumnsPrecision(t *testing.T) {
+	adopted := time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)
+	// A code instant with nanoseconds the column does not keep.
+	code := adopted.Add(time.Minute + 1600*time.Nanosecond)
+	truncated := code.Truncate(time.Microsecond)
+	roundedUp := truncated.Add(time.Microsecond)
+	someoneElse := code.Add(time.Minute)
+
+	ptr := func(at time.Time) *time.Time { return &at }
+
+	for _, tc := range []struct {
+		name      string
+		row       time.Time
+		adopted   *time.Time
+		own       *time.Time
+		wantStale bool
+	}{
+		{"an SSO step-up binds again over its own first bind, truncated", truncated, ptr(adopted), ptr(code), false},
+		{"an SSO step-up binds again over its own first bind, rounded up", roundedUp, ptr(adopted), ptr(code), false},
+		{"an SSO step-up whose row moved to another sign-in is refused", someoneElse, ptr(adopted), ptr(code), true},
+		{"a credential's retry over the row it truncated is current", truncated, nil, ptr(code), false},
+		{"a credential's retry over the row it rounded up is current", roundedUp, nil, ptr(code), false},
+		{"a credential a microsecond older than the row is refused", code.Add(time.Microsecond), nil, ptr(code), true},
+		{"an adopted instant read back from the row matches it", adopted, ptr(adopted), nil, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			session := bumpedSession()
+			session.AuthTime = tc.row
+
+			stale := staleAuthentication(session, Authentication{AuthTime: tc.own, AdoptedAuthTime: tc.adopted})
+
+			assert.Equal(t, tc.wantStale, stale)
+		})
+	}
+}
+
+// AuthenticationIsStale is the ordering rule asked of the session row as it is now, with no lock
+// and no write, which /auth/completed asks before it rotates the browser session's identifier. A
+// session that is gone is not stale here, since the bind answers that itself, and a failed read is
+// returned rather than read as either answer.
+func TestAuthenticationIsStale_AsksTheRuleOfTheRowAsItIsNow(t *testing.T) {
+	adopted := time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)
+	moved := adopted.Add(2 * time.Minute)
+	readFailure := errors.New("read failed")
+
+	for _, tc := range []struct {
+		name      string
+		row       *record.UserSession
+		readErr   error
+		wantStale bool
+	}{
+		{"a row a newer sign-in has reached is stale", &record.UserSession{UserId: 123, AuthTime: moved}, nil, true},
+		{"a row that still holds the adopted instant is not", &record.UserSession{UserId: 123, AuthTime: adopted}, nil, false},
+		{"a session that is gone is not stale here", nil, nil, false},
+		{"a failed read is returned", nil, readFailure, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			manager := &Manager{database: database}
+
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), bumpSessionIdentifier).
+				Return(tc.row, tc.readErr).Once()
+
+			adoptedInstant := adopted
+			stale, err := manager.AuthenticationIsStale(context.Background(), bumpSessionIdentifier,
+				Authentication{UserId: 123, AuthMethods: "pwd otp", AdoptedAuthTime: &adoptedInstant})
+
+			if tc.readErr != nil {
+				require.ErrorIs(t, err, readFailure)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tc.wantStale, stale)
+
+			// It writes nothing and locks nothing.
+			database.AssertNotCalled(t, "AcquireUserSessionRow", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }

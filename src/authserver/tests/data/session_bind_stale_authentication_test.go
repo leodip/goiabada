@@ -25,8 +25,8 @@ import (
 // tab A's transaction then reads: an authentication older than the session's current auth_time
 // writes nothing, not the level or methods a step-up would raise, not the level and methods a
 // prompt=login would replace them with, and not an auth_time that moves backwards. The older
-// ceremony answers ErrStaleAuthentication and /auth/completed restarts it, as it restarts a
-// ceremony whose one-time code no longer stands.
+// ceremony answers ErrStaleAuthentication, and /auth/completed answers it as a ceremony the
+// browser has replaced, which it is: tab B's own /auth/authorize replaced it first.
 //
 // The stall is forced rather than hoped for: tab A's request carries a decorator whose
 // RunInTransaction waits until tab B's bind has committed, so the older bind always opens its
@@ -35,9 +35,10 @@ import (
 
 // staleBindStaller is what one /auth/completed request is handed: the real database, with the
 // bind's transaction held closed until the sign-in that is meant to complete first has
-// committed. reached proves the stalled bind has entered its transaction callback before the
-// other sign-in starts, so the test parks tab A where it says it does; release lets it go, and
-// the test's cleanup closes it too, so a failing run never leaves the goroutine blocked.
+// committed. reached proves the stalled bind has called RunInTransaction, so it is parked before
+// its transaction opens when the other sign-in starts, which is where the test says it parks
+// tab A; release lets it go, and the test's deferred proceed closes it too, so a failing run
+// never leaves the goroutine blocked. parkTabA waits on reached.
 type staleBindStaller struct {
 	data.Database
 	reached     chan struct{}
@@ -56,6 +57,17 @@ func (s *staleBindStaller) proceed() {
 	s.releaseOnce.Do(func() { close(s.release) })
 }
 
+// parkTabA waits until tab A's bind is parked at the stall, and fails the test instead of waiting
+// for ever when the bind returned before it got there, which no tab B can then be ordered after.
+func parkTabA(t *testing.T, stalled *staleBindStaller, signaled <-chan error) {
+	t.Helper()
+	select {
+	case <-stalled.reached:
+	case err := <-signaled:
+		t.Fatalf("tab A's bind returned before it reached its transaction: %v", err)
+	}
+}
+
 // signInOf answers what one completed sign-in hands its bind, at the instant given.
 func signInOf(userId int64, methods string, level record.AcrLevel, at time.Time, passwordAt *time.Time) usersession.Authentication {
 	return usersession.Authentication{
@@ -67,12 +79,12 @@ func signInOf(userId int64, methods string, level record.AcrLevel, at time.Time,
 	}
 }
 
-// An older sign-in raising the session over a newer one, the second scenario #538 names: tab A verified its code before tab B's password was
-// accepted; tab A's request stalls, tab B completes a whole prompt=login at a level 1 client that
-// leaves the session at level 1, pwd, and tab A resumes. The step-up's bind then opens against the
-// row tab B committed: its authentication is the older one, so it writes nothing, and the session
-// keeps the newer sign-in's level 1 and pwd rather than being raised to level 2 mandatory, pwd otp by an
-// authentication that predates it.
+// An older sign-in raising the session over a newer one, the second scenario #538 names: tab A
+// verified its code before tab B's password was accepted; tab A's request stalls, tab B completes a
+// whole prompt=login at a level 1 client that leaves the session at level 1, pwd, and tab A
+// resumes. The step-up's bind then opens against the row tab B committed: its authentication is the
+// older one, so it writes nothing, and the session keeps the newer sign-in's level 1 and pwd rather
+// than being raised to level 2 mandatory, pwd otp by an authentication that predates it.
 func TestBindUserSession_AnOlderStepUpThatResumesAfterANewerSignInWritesNothing(t *testing.T) {
 	user := createTestUser(t)
 	clientA := createTestClient(t)
@@ -94,7 +106,7 @@ func TestBindUserSession_AnOlderStepUpThatResumesAfterANewerSignInWritesNothing(
 	}()
 
 	// Park tab A inside its bind's transaction before tab B's sign-in starts.
-	<-stalled.reached
+	parkTabA(t, stalled, signaled)
 
 	// Tab B's whole prompt=login, completing while tab A's request is stalled.
 	tabB := usersession.NewManager(nil, "", database, false)
@@ -116,10 +128,11 @@ func TestBindUserSession_AnOlderStepUpThatResumesAfterANewerSignInWritesNothing(
 	assert.Truef(t, final.PasswordAuthTime.Equal(newer), "password_auth_time is the newer password's: %v", final.PasswordAuthTime)
 }
 
-// The same window, the other ordering, the first scenario #538 names (a step-up is lost): tab A's prompt=login accepted its password before tab B
-// verified a code. Tab A resumes after tab B's step-up has left the session at level 2 mandatory, pwd otp,
-// and its replace must not write the older password's level 1 and pwd over the newer
-// authentication, as it would without the ordering rule.
+// The same window, the other ordering, the first scenario #538 names (a step-up is lost): tab A's
+// prompt=login accepted its password before tab B verified a code. Tab A resumes after tab B's
+// step-up has left the session at level 2 mandatory, pwd otp, and its replace must not write the
+// older password's level 1 and pwd over the newer authentication, as it would without the ordering
+// rule.
 func TestBindUserSession_AnOlderReplaceThatResumesAfterANewerStepUpWritesNothing(t *testing.T) {
 	user := createTestUser(t)
 	clientA := createTestClient(t)
@@ -141,7 +154,7 @@ func TestBindUserSession_AnOlderReplaceThatResumesAfterANewerStepUpWritesNothing
 	}()
 
 	// Park tab A inside its bind's transaction before tab B's step-up starts.
-	<-stalled.reached
+	parkTabA(t, stalled, signaled)
 
 	// Tab B's whole step-up, completing while tab A's request is stalled.
 	tabB := usersession.NewManager(nil, "", database, false)
@@ -227,9 +240,9 @@ func TestBindUserSession_TheNewerSignInWinsWhicheverBindRunsSecond(t *testing.T)
 }
 
 // The ordering rule refuses only the older sign-in of a pair, never a current one: a bind whose
-// instant equals the session's own auth_time is a retry of the sign-in that holds it, or the
-// instant the password handler recorded and the bind reads again, and a newer one writes as it
-// always did. The equal-instant case is the one a refusal would break sign-ins with.
+// instant equals the session's own auth_time is the sign-in that holds it binding again, and a
+// newer one writes as it always did. The equal-instant case is the one a refusal would break
+// sign-ins with.
 func TestBindUserSession_CurrentAndNewerBindsAreNotRefused(t *testing.T) {
 	user := createTestUser(t)
 	client := createTestClient(t)
@@ -293,7 +306,9 @@ func TestBindUserSession_AnSSOBindWhoseAdoptedSessionWasReplacedWritesNothing(t 
 		signInOf(user.Id, "pwd otp", record.AcrLevel2Mandatory, adopted, &adopted), true, "")
 	require.NoError(t, err)
 
-	newer := time.Now().UTC().Truncate(time.Microsecond)
+	// Later than the adopted instant by construction: two clock reads could return the same
+	// microsecond, and tab B's sign-in would then hold the instant tab A adopted.
+	newer := adopted.Add(time.Minute)
 
 	stalled := &staleBindStaller{Database: database, reached: make(chan struct{}), release: make(chan struct{})}
 	defer stalled.proceed()
@@ -310,7 +325,7 @@ func TestBindUserSession_AnSSOBindWhoseAdoptedSessionWasReplacedWritesNothing(t 
 	}()
 
 	// Park tab A inside its bind's transaction before tab B's sign-in starts.
-	<-stalled.reached
+	parkTabA(t, stalled, signaled)
 
 	// Tab B's whole prompt=login, completing while tab A's request is stalled.
 	tabB := usersession.NewManager(nil, "", database, false)
@@ -329,4 +344,56 @@ func TestBindUserSession_AnSSOBindWhoseAdoptedSessionWasReplacedWritesNothing(t 
 	assert.Equal(t, record.AcrLevel1, final.AcrLevel, "the session keeps the newer sign-in's level")
 	assert.Equal(t, "pwd", final.AuthMethods, "and its methods, without the otp the SSO ceremony would merge back")
 	assert.Truef(t, final.AuthTime.Equal(newer), "auth_time is the newer password's, not the adopted instant: %v", final.AuthTime)
+}
+
+// A ceremony's second bind is current, not stale, on every engine: a reload of /auth/completed
+// after a step that failed once the bind had committed binds the same authentication again. The
+// instants carry nanoseconds the auth_time column does not keep, so the row the first bind wrote
+// holds them truncated or rounded, and the rule compares at the column's microsecond. An SSO
+// ceremony that stepped up moved auth_time to its own code with that first bind, so the second
+// finds its own instant there instead of the one it adopted, and binds.
+func TestBindUserSession_TheSameSignInBindsTwice(t *testing.T) {
+	t.Run("an SSO ceremony that stepped up", func(t *testing.T) {
+		user := createTestUser(t)
+		client := createTestClient(t)
+		session := createTestUserSession(t, user.Id)
+
+		adopted := time.Now().UTC().Truncate(time.Microsecond)
+		session.AcrLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime =
+			record.AcrLevel1, "pwd", adopted, adopted
+		require.NoError(t, database.UpdateUserSession(context.Background(), nil, session))
+
+		code := adopted.Add(time.Minute + 1600*time.Nanosecond)
+		stepUp := usersession.Authentication{UserId: user.Id, AuthMethods: "pwd otp",
+			AcrLevel: record.AcrLevel2Mandatory, AuthTime: &code, AdoptedAuthTime: &adopted}
+
+		manager := usersession.NewManager(nil, "", database, false)
+		for attempt := 1; attempt <= 2; attempt++ {
+			_, err := manager.BindUserSession(context.Background(), session.SessionIdentifier, client.Id,
+				stepUp, false, "")
+			require.NoErrorf(t, err, "bind %d of the same step-up", attempt)
+		}
+
+		final := readStaleTestSession(t, session.SessionIdentifier)
+		assert.Equal(t, record.AcrLevel2Mandatory, final.AcrLevel)
+		assert.Equal(t, "pwd otp", final.AuthMethods)
+		assert.Lessf(t, final.AuthTime.Sub(code).Abs(), time.Microsecond,
+			"auth_time is the step-up's code at the column's precision: %v", final.AuthTime)
+	})
+
+	t.Run("a ceremony that authenticated afresh", func(t *testing.T) {
+		user := createTestUser(t)
+		client := createTestClient(t)
+		session := createTestUserSession(t, user.Id)
+
+		password := time.Now().UTC().Add(time.Minute).Truncate(time.Microsecond).Add(1600 * time.Nanosecond)
+		signIn := signInOf(user.Id, "pwd", record.AcrLevel1, password, &password)
+
+		manager := usersession.NewManager(nil, "", database, false)
+		for attempt := 1; attempt <= 2; attempt++ {
+			_, err := manager.BindUserSession(context.Background(), session.SessionIdentifier, client.Id,
+				signIn, true, "")
+			require.NoErrorf(t, err, "bind %d of the same sign-in", attempt)
+		}
+	})
 }

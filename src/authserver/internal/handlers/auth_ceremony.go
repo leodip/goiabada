@@ -76,6 +76,14 @@ func rejectCeremonyMismatch(pageRenderer PageRenderer, auditLogger AuditLogger, 
 	}
 	auditLogger.Log(r.Context(), audit.EventAuthCeremonyMismatch, details)
 
+	renderCeremonyNoLongerActive(pageRenderer, w, r)
+}
+
+// renderCeremonyNoLongerActive renders the page a ceremony this browser has replaced is answered
+// with, at 400, touching no auth context. rejectCeremonyMismatch answers a request naming another
+// ceremony with it, and /auth/completed answers a bind that found a newer sign-in already on the
+// session with it, because that sign-in's own /auth/authorize replaced the ceremony first (#538).
+func renderCeremonyNoLongerActive(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request) {
 	bind := map[string]interface{}{
 		"title":       i18n.T(r.Context(), "auth_error.ceremony_mismatch.title"),
 		"error":       i18n.T(r.Context(), "auth_error.ceremony_mismatch.message"),
