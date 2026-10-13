@@ -106,6 +106,13 @@ type Authentication struct {
 	// OTPClaim is the sign-in's claim to a one-time code, checked on the user under the user's row
 	// lock before anything is written (otpcredential.OTPClaim.Recheck).
 	OTPClaim otpcredential.OTPClaim
+	// AdoptedAuthTime is the auth_time the session the ceremony adopted held when
+	// /auth/authorize adopted it, copied from the ceremony's AuthContext by the reuse arm.
+	// The bind compares it with the session's current auth_time under the row lock and
+	// refuses the ceremony when the two no longer match: a session a newer sign-in has
+	// reached since the adoption is not one this ceremony may still write, however many of
+	// its methods it merges back (#538). Nil on every bind that adopted no session.
+	AdoptedAuthTime *time.Time
 }
 
 // ErrStaleAuthentication is returned by a bind that refused to write a sign-in's authentication onto
@@ -114,7 +121,7 @@ type Authentication struct {
 // of two concurrent sign-ins describes the session better. The instants do -- the credential each
 // ceremony accepted has one -- so a ceremony whose instant is older than the session's current
 // auth_time writes nothing, not its level, not its methods, not its auth_time, and the caller
-// restarts it, as it restarts a ceremony whose one-time code no longer stands.
+// restarts it, as it restarts a ceremony whose one-time code no longer stands, and so does a ceremony whose adopted session no longer holds the auth_time it adopted.
 var ErrStaleAuthentication = errors.New("a newer authentication has already reached this session")
 
 // SessionLimits is what the settings bound a user's sessions to when a sign-in starts a new one. The
@@ -553,6 +560,11 @@ func (u *Manager) BumpUserSession(ctx context.Context, sessionIdentifier string,
 // All of it is one transaction under the session's row, where the replacement and the auth_time
 // used to be a second whole-row write after the bump's, unlocked and outside its transaction, which
 // could undo a removal's lowering as the bump's own write could (#542).
+//
+// A bind whose sign-in predates the session's current authentication, or whose adopted session
+// no longer holds the auth_time it adopted, writes nothing and returns ErrStaleAuthentication,
+// and the caller restarts the ceremony, as it restarts one whose one-time code no longer stands
+// (#538).
 func (u *Manager) BindUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
 	authentication Authentication, replace bool, ipAddress string) (*record.UserSession, error) {
 	if replace && (authentication.PasswordAuthTime == nil || authentication.PasswordAuthTime.IsZero()) {
@@ -597,7 +609,8 @@ func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string,
 		// at this handler's stall point, and a second tab that runs a whole prompt=login or a
 		// step-up while the first waits. The transaction above already makes the two writes
 		// serial, one whole bind at a time; what it cannot decide is which sign-in the session
-		// should describe when both wrote. The instants decide: a ceremony whose credential was
+		// should describe when both wrote. The instants decide, and there are two of them: a
+		// ceremony whose credential was
 		// accepted before the session's current auth_time is an older authentication, and its
 		// bind writes nothing -- not the level or the methods a step-up would raise, not the
 		// level and methods a prompt=login would replace them with, and not an auth_time that
@@ -608,9 +621,11 @@ func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string,
 		// the same question waits on AcquireUserSessionRow and then reads the auth_time the
 		// winner committed: the older ceremony loses, the newer one wins, whichever arrives
 		// second, which is the whole of what the ordering adds to the serialisation.
-		if stale, staleErr := staleAuthentication(userSession, authentication); staleErr != nil {
-			return staleErr
-		} else if stale {
+		//
+		// The second instant is the one the ceremony adopted the session at: a bind built on an
+		// authentication the row no longer holds, adopted at /auth/authorize and since replaced by
+		// a newer sign-in, writes nothing either, for the same reason (#538, the SSO case).
+		if staleAuthentication(userSession, authentication) {
 			return errs.WithStack(ErrStaleAuthentication)
 		}
 
@@ -720,36 +735,57 @@ func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string,
 
 // staleAuthentication answers whether authentication is an older authentication than the one
 // userSession's row already records, under the lock the caller's transaction holds on it, and so
-// must not be written onto the session (#538).
+// must not be written onto the session (#538). Two comparisons run, and either refusing is enough.
 //
-// The instant compared is the one the sign-in carries: AuthTime, the credential the ceremony last
-// accepted, or PasswordAuthTime, the password it verified. A bind that carries neither (an SSO
-// reuse bump, which authenticated nothing) claims no authentication, so it cannot be stale; it
-// writes no auth_time and cannot raise the session over a newer sign-in's level by the merge rules
-// alone. A session whose auth_time is zero -- a legacy row, or one no bind has stamped yet -- has
-// no newer authentication for an arriving one to be older than, so every sign-in takes it.
+// The first is the instant the sign-in claims: AuthTime, the credential the ceremony last accepted.
+// A bind that carries none claims no authentication of its own, so by this comparison alone it is
+// never stale. A session whose auth_time is zero -- a legacy row, or one no bind has stamped yet --
+// has no newer authentication for an arriving one to be older than, so every sign-in takes it.
 //
-// Equal instants are current, not stale: two ceremonies sharing an instant means the same
-// credential instant was carried twice (a retry of the same completed sign-in, or the level the
-// password handler recorded and the OTP handler read again), and refusing those would restart
-// sign-ins that hold the session's own authentication.
-func staleAuthentication(session *record.UserSession, authentication Authentication) (bool, error) {
-	// The instant this sign-in claims, AuthTime first, the password instant when only that is
-	// carried, none when the bind carries neither.
+// The second is the instant the ceremony adopted the session at: AdoptedAuthTime, copied from the
+// adopted session's auth_time when /auth/authorize adopted it. When the session's current auth_time
+// no longer equals it, a newer sign-in has reached the session since the adoption, and the methods
+// such a bind merges back and the level it raises the session to would describe the older sign-in
+// rather than the one the session holds now, which is what #538 refuses. An equality, because a
+// session that still holds the adopted authentication is one the ceremony may bind, whatever its
+// target asks on top of it.
+//
+// Equal instants are current, not stale, in the first comparison: two ceremonies sharing an instant
+// means the same credential instant was carried twice (a retry of the same completed sign-in, or the
+// level the password handler recorded and the OTP handler read again), and refusing those would
+// restart sign-ins that hold the session's own authentication.
+//
+// The instants the password and OTP handlers stamp come from the auth server instance's clock, so
+// the first comparison assumes the instances of one deployment share a synchronized clock, as NTP
+// keeps them. A host minutes adrift can refuse a genuinely later sign-in; the refused ceremony
+// restarts, and its second attempt is stamped by the same slow clock, so it can be refused again
+// until the gap has passed. The second comparison reads no clock at all.
+func staleAuthentication(session *record.UserSession, authentication Authentication) bool {
+	// The authentication this ceremony was built on, when it adopted a session at
+	// /auth/authorize: if the session's auth_time has moved since, a newer sign-in owns it
+	// now, and a ceremony built on an authentication the session no longer holds must start
+	// again, even though it entered no credential of its own. Both values come from the
+	// database, so the equality is exact and no clock is involved, and it applies whenever
+	// the field is set, including an SSO ceremony that then stepped up.
+	if authentication.AdoptedAuthTime != nil {
+		if !session.AuthTime.UTC().Equal(authentication.AdoptedAuthTime.UTC()) {
+			return true
+		}
+	}
+
+	// The instant this sign-in claims, AuthTime, the credential the ceremony last accepted.
 	claimed := time.Time{}
 	if authentication.AuthTime != nil {
 		claimed = authentication.AuthTime.UTC()
-	} else if authentication.PasswordAuthTime != nil {
-		claimed = authentication.PasswordAuthTime.UTC()
 	}
 	if claimed.IsZero() {
-		return false, nil
+		return false
 	}
 
 	if session.AuthTime.IsZero() {
-		return false, nil
+		return false
 	}
-	return claimed.Before(session.AuthTime.UTC()), nil
+	return claimed.Before(session.AuthTime.UTC())
 }
 
 // WillRaisePrivilege reports whether bumping a session with these values would raise its

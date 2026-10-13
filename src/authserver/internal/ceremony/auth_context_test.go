@@ -1025,6 +1025,7 @@ func TestAdoptSession(t *testing.T) {
 	userSession := &record.UserSession{
 		UserId:              42,
 		AcrLevel:            record.AcrLevel2Optional,
+		AuthTime:            time.Date(2026, 10, 10, 8, 0, 0, 0, time.UTC),
 		AuthMethods:         "pwd otp",
 		AuthStateGeneration: 3,
 		OtpConfigGeneration: 5,
@@ -1049,6 +1050,9 @@ func TestAdoptSession(t *testing.T) {
 	assert.Equal(t, "openid", ac.Scope, "adopting writes no request field")
 	require.NotNil(t, ac.OtpConfigGeneration)
 	assert.Equal(t, int64(7), *ac.OtpConfigGeneration, "the OTP snapshot is not the session's to write")
+	require.NotNil(t, ac.AdoptedSessionAuthTime)
+	assert.Truef(t, ac.AdoptedSessionAuthTime.Equal(userSession.AuthTime),
+		"the adopted auth_time is the session's, so the reuse bind can tell a session that moved from one that did not (#538): %v", ac.AdoptedSessionAuthTime)
 	require.NotNil(t, ac.OtpClaimGeneration)
 	assert.Equal(t, int64(5), *ac.OtpClaimGeneration,
 		"the claim is the session's snapshot and never the user's, or a removed authenticator's code is laundered into the next one's (#542)")

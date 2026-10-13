@@ -150,7 +150,9 @@ func HandleAuthCompletedGet(
 		// Restart route 1, taken when no session is reusable and level 1 was never completed, or
 		// when the user's generation has moved on since the ceremony authenticated, which
 		// /auth/issue would restart one step later after a consent screen whose answer it throws
-		// away, or when the ceremony's one-time code no longer stands. The attempt is discarded
+		// away, or when the ceremony's one-time code no longer stands,
+		// or when the session's authentication has moved on since the ceremony adopted or
+		// authenticated it and the bind answered ErrStaleAuthentication (#538). The attempt is discarded
 		// with it, so methods and the user carried in from the session that ended do not reach the
 		// session the second pass creates (#140, #436).
 		restart := func() {
@@ -527,6 +529,11 @@ func bindReusedSession(
 	if plan.refreshAuthTime {
 		authentication.AuthTime = authContext.AuthenticatedAt
 	}
+	// The instant the ceremony adopted the session at, when it did: the ordering rule of #538
+	// compares it with the row the bind locks, so a session a newer sign-in has reached since the
+	// adoption refuses this ceremony. A ceremony that authenticated afresh adopted nothing, so the
+	// field is nil there and the rule does not run.
+	authentication.AdoptedAuthTime = authContext.AdoptedSessionAuthTime
 	if plan.replaceAuthentication {
 		authentication.PasswordAuthTime = authContext.PasswordVerifiedAt
 	}

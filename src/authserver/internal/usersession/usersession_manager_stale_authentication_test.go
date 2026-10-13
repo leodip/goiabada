@@ -14,19 +14,19 @@ import (
 )
 
 // The ordering rule of the reuse arm (#538): a bind whose credential was accepted before the
-// session current auth_time writes nothing. These cases pin the two orderings the issue names,
+// session's current auth_time writes nothing. These cases pin the two orderings the issue names,
 // at the transaction the bind runs in, against the row the transaction locked.
 //
-// WHAT MAIN DID. The two writes were already one transaction (#542), so the wrong result each
-// ordering produced on main was not a torn write but the wrong winner: the bump raised the session
-// to the older step-up level, or a prompt=login replaced it with an authentication earlier than
-// the one it held. On main both binds succeed and the session ends up describing the older
-// sign-in, which is what these tests fail on before the fix.
+// WITHOUT THE ORDERING RULE. The two writes were already one transaction (#542), so the wrong
+// result each ordering produced before #538 was not a torn write but the wrong winner: the bump
+// raised the session to the older step-up's level, or a prompt=login replaced it with an
+// authentication earlier than the one it held. Without the rule both binds succeed and the
+// session ends up describing the older sign-in, which is what these tests fail on before the fix.
 
 // A step-up completing after a newer prompt=login wrote the session is refused: the session keeps
-// the newer sign-in level and methods, and the older step-up answers ErrStaleAuthentication
+// the newer sign-in's level and methods, and the older step-up answers ErrStaleAuthentication
 // rather than raising level 2 and "pwd otp" over what the newer authentication set. This is the
-// issue second ordering, at the write itself.
+// issue's second ordering, at the write itself.
 func TestBindUserSession_AnOlderStepUpDoesNotRaiseTheSessionOverANewerSignIn(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	manager := &Manager{database: database}
@@ -61,9 +61,9 @@ func TestBindUserSession_AnOlderStepUpDoesNotRaiseTheSessionOverANewerSignIn(t *
 }
 
 // A prompt=login whose password was accepted before a newer sign-in is refused too: replace is
-// the arm that writes the sign-in level and methods over the session, and an older sign-in
-// must not do that over a newer one. This is the issue first ordering, the step-up Tab B won
-// being the thing Tab A replace would have lost.
+// the arm that writes the sign-in's level and methods over the session, and an older sign-in
+// must not do that over a newer one. This is the issue's first ordering, the step-up Tab B won
+// being the thing Tab A's replace would have lost.
 func TestBindUserSession_AnOlderReplaceDoesNotWriteOverANewerSignIn(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	manager := &Manager{database: database}
@@ -96,7 +96,7 @@ func TestBindUserSession_AnOlderReplaceDoesNotWriteOverANewerSignIn(t *testing.T
 
 // The newer authentication of each pair takes the session: the ordering refuses the older one
 // only, so the write the newer sign-in makes still happens, whichever arm it arrives on. A bind
-// whose instant is exactly the session own auth_time is current, not stale: that is a retry of
+// whose instant is exactly the session's own auth_time is current, not stale: that is a retry of
 // the sign-in that already holds the session, or the instant the password handler recorded and
 // the bind reads again, and refusing it would restart sign-ins holding their own authentication.
 func TestBindUserSession_ANewerSignInStillBindsAndAnEqualInstantIsCurrent(t *testing.T) {
@@ -152,9 +152,10 @@ func TestBindUserSession_ANewerSignInStillBindsAndAnEqualInstantIsCurrent(t *tes
 
 // A session with no auth_time yet -- a legacy row, or one no bind has stamped -- has no newer
 // authentication for an arriving sign-in to be older than: the first bind that carries an instant
-// takes it, however old the instant is. And an SSO reuse bump, which carries no instant, claims no
-// authentication and cannot be stale: it writes neither auth_time nor the level of a ceremony
-// that authenticated nothing.
+// takes it, however old the instant is. And a bump that carries neither an instant nor an adopted
+// one -- the token endpoint's, or prompt=none's -- claims no authentication and cannot be stale:
+// it writes neither auth_time nor the level of a ceremony that authenticated nothing. An SSO
+// bind, which carries the instant its ceremony adopted, is the test below.
 func TestBindUserSession_NoAuthTimeTakesAnyInstantAndACarrylessBumpIsNeverStale(t *testing.T) {
 	staleInstant := time.Date(2026, 10, 10, 6, 0, 0, 0, time.UTC)
 
@@ -164,7 +165,7 @@ func TestBindUserSession_NoAuthTimeTakesAnyInstantAndACarrylessBumpIsNeverStale(
 	}{
 		{"a legacy row with no auth_time takes any instant",
 			Authentication{UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory, AuthTime: &staleInstant}},
-		{"an SSO reuse bump carrying no instant is never stale",
+		{"a carryless bump that adopted nothing is never stale",
 			Authentication{UserId: 123, AuthMethods: "pwd", AcrLevel: record.AcrLevel1}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -187,6 +188,68 @@ func TestBindUserSession_NoAuthTimeTakesAnyInstantAndACarrylessBumpIsNeverStale(
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			database.AssertExpectations(t)
+		})
+	}
+}
+
+// The adopted instant of #538's SSO case. A bind whose ceremony adopted the session compares the
+// auth_time it adopted with the row the transaction locks, so a session a newer sign-in has
+// reached since the adoption is not one the ceremony may still write: merging its adopted methods
+// back would raise the session with an authentication older than the one it holds now, and the
+// bind answers ErrStaleAuthentication and writes nothing. A session that still holds the adopted
+// instant is exactly what the ceremony was built on, so the bind takes it and, entering no
+// credential of its own, leaves auth_time where the row had it.
+func TestBindUserSession_AnSSOBindWhoseSessionMovedIsRefused(t *testing.T) {
+	adopted := time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)
+	moved := adopted.Add(2 * time.Minute)
+
+	for _, tc := range []struct {
+		name            string
+		sessionAuthTime time.Time
+		wantStale       bool
+	}{
+		{"a session a newer sign-in has reached refuses the SSO bind", moved, true},
+		{"a session that still holds the adopted instant takes the SSO bind", adopted, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			manager := &Manager{database: database}
+
+			session := bumpedSession()
+			session.AcrLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime =
+				record.AcrLevel1, "pwd", tc.sessionAuthTime, tc.sessionAuthTime
+
+			datamocks.ExpectRunInTransaction(database, txSentinel)
+			database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
+
+			if !tc.wantStale {
+				database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(nil).Once()
+				database.On("UpdateUserSession", mock.Anything, txSentinel, session).Return(nil).Once()
+				database.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
+			}
+
+			// The SSO bind: the methods and level its ceremony adopted from the session, and the
+			// instant it adopted them at, entering no credential of its own.
+			adoptedInstant := adopted
+			result, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456,
+				Authentication{UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory,
+					AdoptedAuthTime: &adoptedInstant}, false, "")
+
+			if tc.wantStale {
+				require.ErrorIs(t, err, ErrStaleAuthentication)
+				assert.Nil(t, result)
+				database.AssertNotCalled(t, "UserSessionLoadClients", mock.Anything, mock.Anything, mock.Anything)
+				database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything, mock.Anything)
+				database.AssertNotCalled(t, "CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything)
+				database.AssertNotCalled(t, "UpdateUserSessionClient", mock.Anything, mock.Anything, mock.Anything)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				assert.Truef(t, result.AuthTime.Equal(tc.sessionAuthTime),
+					"a bind that entered no credential leaves auth_time where the row had it: %v", result.AuthTime)
+				database.AssertExpectations(t)
+			}
 		})
 	}
 }
