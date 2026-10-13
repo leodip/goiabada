@@ -303,10 +303,10 @@ func TestBindUserSession_AnSSOBindWhoseAdoptedSessionWasReplacedWritesNothing(t 
 	go func() {
 		// The SSO bind: the methods and level the ceremony adopted, and the instant it adopted
 		// them at, entering no credential of its own.
-		_, err := tabA.BindUserSession(context.Background(), session.SessionIdentifier, clientA.Id,
+		_, bindErr := tabA.BindUserSession(context.Background(), session.SessionIdentifier, clientA.Id,
 			usersession.Authentication{UserId: user.Id, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory,
 				AdoptedAuthTime: &adopted}, false, "")
-		signaled <- err
+		signaled <- bindErr
 	}()
 
 	// Park tab A inside its bind's transaction before tab B's sign-in starts.
