@@ -8,7 +8,9 @@
 //
 // A store is configured only through NewServerSideStore: backend, authenticated key, the
 // Secure attribute, the cookie's lifetime and the key pairs. It has no exported field, so
-// what a binary chose is what it passed there (#431).
+// what a binary chose is what it passed there (#431). The auth server then wraps its store with
+// NewConditionalStore, over a ConditionalBackend, for the writes that apply only their own change
+// to a fresh read; the admin console's store has no such writes (#579).
 //
 // Handlers take the narrow Store interface; the in-memory Backend tests drive the real
 // store over is in sessiontest, a package of its own so no binary links it.

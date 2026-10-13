@@ -69,6 +69,15 @@ type fakeBackend struct {
 	lastDeletedId     string
 
 	expiresAt time.Time
+
+	// The conditional pair's own counters and failure, and beforeConditional, which runs at
+	// the start of each conditional write or delete: what another request of the same browser
+	// does between this one's fresh read and its write (#579).
+	conditionalUpdates   int
+	conditionalDeletes   int
+	conditionalUpdateErr error
+	conditionalDeleteErr error
+	beforeConditional    func(id string)
 }
 
 func newFakeBackend() *fakeBackend {
@@ -87,7 +96,10 @@ func (f *fakeBackend) Load(ctx context.Context, id string) (*Record, error) {
 	if !ok {
 		return nil, ErrNotFound
 	}
-	return record, nil
+	// A copy, as the real backends hand back: a conditional write compares against what was
+	// read, which a later write to the row must not change underneath it.
+	copied := *record
+	return &copied, nil
 }
 
 func (f *fakeBackend) Create(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {

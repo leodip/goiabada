@@ -6,6 +6,7 @@
 package sessiontest
 
 import (
+	"bytes"
 	"context"
 	"sync"
 	"time"
@@ -13,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-var _ sessionstore.Backend = (*MemoryBackend)(nil)
+var _ sessionstore.ConditionalBackend = (*MemoryBackend)(nil)
 
 // MemoryBackend keeps browser sessions in a map. No binary constructs it: it exists so a
 // test that needs a real store rather than a mock can have one without a database.
@@ -133,6 +134,39 @@ func (b *MemoryBackend) Touch(_ context.Context, id string, _ bool) (time.Time, 
 func (b *MemoryBackend) Delete(_ context.Context, id string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	delete(b.rows, id)
+	return nil
+}
+
+// UpdateIfUnchanged is Update on condition that the stored contents are still expected: what the
+// database backend's statement carries in its WHERE, so a test over this backend loses a
+// conditional write exactly where a deployment would (#579).
+func (b *MemoryBackend) UpdateIfUnchanged(_ context.Context, id string, expected, data []byte, _ bool) (time.Time, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	now := b.now()
+	record, ok := b.live(id, now)
+	if !ok || !bytes.Equal(record.Data, expected) {
+		return time.Time{}, sessionstore.ErrChanged
+	}
+
+	record.Data = data
+	record.ExpiresAt = now.Add(b.lifetime)
+	return record.ExpiresAt, nil
+}
+
+// DeleteIfUnchanged is Delete on the same condition. Unlike Delete it is not silent about a
+// session that is not there: the caller is asking whether the row it read is the one removed.
+func (b *MemoryBackend) DeleteIfUnchanged(_ context.Context, id string, expected []byte) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	record, ok := b.live(id, b.now())
+	if !ok || !bytes.Equal(record.Data, expected) {
+		return sessionstore.ErrChanged
+	}
 
 	delete(b.rows, id)
 	return nil

@@ -455,8 +455,16 @@ func dispatch(args []string) (migrateArgs []string, isMigrate bool, err error) {
 // in full in #266. A function of its own so the choice is pinned where it is made: the store's
 // tests pin what each lifetime writes, and this package's pin which one this binary passes
 // (#431).
-func newSessionStore(backend sessionstore.Backend, secure bool,
-	current sessionstore.KeyPair, previous *sessionstore.KeyPair) (*sessionstore.ServerSideStore, error) {
-	return sessionstore.NewServerSideStore(backend, sessionkeys.SessionIdentifier, secure,
+//
+// It is built with a ConditionalBackend, so the store can write a session on condition nothing
+// wrote it since its request read it, which is what keeps a ceremony step from putting back a
+// sign-in another tab has replaced (#579).
+func newSessionStore(backend sessionstore.ConditionalBackend, secure bool,
+	current sessionstore.KeyPair, previous *sessionstore.KeyPair) (*sessionstore.ConditionalStore, error) {
+	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionIdentifier, secure,
 		sessionstore.PersistentCookie, current, previous)
+	if err != nil {
+		return nil, err
+	}
+	return sessionstore.NewConditionalStore(store, backend)
 }
