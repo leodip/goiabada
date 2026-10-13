@@ -3232,3 +3232,75 @@ func TestHandleAuthCompletedGet_AnAuthenticatorRemovedAtTheWriteRestarts(t *test
 		})
 	}
 }
+
+// The reuse arm's other refusal at the write: a bind that answered the ordering rule of #538
+// restarts level 1 too, exactly like one whose authenticator was removed. Only BindUserSession
+// returns ErrStaleAuthentication, so this is the reuse arm alone: the create arm has no session
+// whose authentication could have moved on.
+func TestHandleAuthCompletedGet_AStaleBindAtTheWriteRestarts(t *testing.T) {
+	t.Run("reuse arm", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
+			auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req = withSessionSettings(req)
+		sessionIdentifier := "test-session"
+		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
+		rr := httptest.NewRecorder()
+
+		generation := int64(4)
+		at := time.Now().UTC().Add(-time.Minute)
+		authContext := &ceremony.AuthContext{
+			CeremonyId:          testCeremonyId,
+			AuthState:           ceremony.AuthStateAuthenticationCompleted,
+			ClientId:            "test-client",
+			UserId:              1,
+			Scope:               "openid",
+			RequestedScope:      "openid",
+			AuthMethods:         "pwd otp",
+			AuthenticatedAt:     &at,
+			PasswordVerifiedAt:  &at,
+			Level1AuthCompleted: false,
+			OtpConfigGeneration: &generation,
+			OtpClaimGeneration:  &generation,
+		}
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		session := &record.UserSession{Id: 9, UserId: 1, AcrLevel: record.AcrLevel2Mandatory, AuthMethods: "pwd otp",
+			OtpConfigGeneration: generation}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(session, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, session).Return(nil)
+		client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel2Mandatory}
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
+		userSessionManager.On("HasValidUserSession", session, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
+			mock.AnythingOfType("*int64")).Return(true)
+		// The check before binding still sees the authenticator the code came from; the write is
+		// where the ordering rule of #538 refuses this ceremony.
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
+			Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: generation}, nil).Once()
+
+		stale := errs.WithStack(usersession.ErrStaleAuthentication)
+		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1), mock.Anything, false, "").
+			Return(nil, stale).Once()
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateRequiresLevel1 && ac.AuthMethods == "" && ac.OtpClaimGeneration == nil &&
+				ac.AdoptedSessionAuthTime == nil
+		})).Return(nil).Once()
+
+		handler.ServeHTTP(rr, req)
+
+		require.Equal(t, http.StatusFound, rr.Code)
+		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
+		permissionChecker.AssertNotCalled(t, "FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything)
+	})
+}

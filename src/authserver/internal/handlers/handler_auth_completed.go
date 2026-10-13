@@ -150,7 +150,9 @@ func HandleAuthCompletedGet(
 		// Restart route 1, taken when no session is reusable and level 1 was never completed, or
 		// when the user's generation has moved on since the ceremony authenticated, which
 		// /auth/issue would restart one step later after a consent screen whose answer it throws
-		// away, or when the ceremony's one-time code no longer stands. The attempt is discarded
+		// away, or when the ceremony's one-time code no longer stands,
+		// or when the session's authentication has moved on since the ceremony adopted or
+		// authenticated it and the bind answered ErrStaleAuthentication (#538). The attempt is discarded
 		// with it, so methods and the user carried in from the session that ended do not reach the
 		// session the second pass creates (#140, #436).
 		restart := func() {
@@ -183,6 +185,20 @@ func HandleAuthCompletedGet(
 			// write itself: an authenticator removed between the two is answered as it would have
 			// been there, and nothing was written (#542).
 			slog.WarnContext(r.Context(), "this ceremony names a one-time code from an authenticator the user no longer has, restarting level 1 instead of binding a session",
+				"ceremony_user_id", authContext.UserId)
+			restart()
+			return
+		}
+		if errors.Is(err, usersession.ErrStaleAuthentication) {
+			// The ordering rule of the bind's transaction (#538): another ceremony completed on
+			// this session while this one was in flight, and its credential was accepted after
+			// this one's, so the session describes that newer authentication. Writing this
+			// ceremony's level, methods or auth_time onto it would either raise it with an
+			// authentication older than the one it holds or move auth_time backwards, so the bind
+			// wrote nothing, and the ceremony restarts, exactly as one whose one-time code no
+			// longer stands: the second pass reads the session the newer sign-in left and asks
+			// for whatever its target needs on top of it.
+			slog.WarnContext(r.Context(), "a newer authentication has already reached this session, restarting level 1 instead of binding an older one onto it",
 				"ceremony_user_id", authContext.UserId)
 			restart()
 			return
@@ -513,6 +529,11 @@ func bindReusedSession(
 	if plan.refreshAuthTime {
 		authentication.AuthTime = authContext.AuthenticatedAt
 	}
+	// The instant the ceremony adopted the session at, when it did: the ordering rule of #538
+	// compares it with the row the bind locks, so a session a newer sign-in has reached since the
+	// adoption refuses this ceremony. A ceremony that authenticated afresh adopted nothing, so the
+	// field is nil there and the rule does not run.
+	authentication.AdoptedAuthTime = authContext.AdoptedSessionAuthTime
 	if plan.replaceAuthentication {
 		authentication.PasswordAuthTime = authContext.PasswordVerifiedAt
 	}
