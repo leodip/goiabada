@@ -1,7 +1,7 @@
 // Clients a test sets up to get a user's tokens or browser sign-ins, through the clients fixture so
 // they are removed afterwards.
 import { expect, type Page } from "@playwright/test";
-import { addRedirectUri, clientUrl, enablePasswordGrant, readClientSecret } from "./admin-console";
+import { addRedirectUri, clientUrl, confirmDialog, enablePasswordGrant, readClientSecret } from "./admin-console";
 import { testRedirectUri } from "./browser-sign-in";
 import type { TestClient } from "./fixtures";
 
@@ -29,4 +29,17 @@ export async function browserSignInClient(page: Page, clients: ClientsFixture, {
     await expect(page.getByText("Client settings saved successfully")).toBeVisible();
   }
   return { client, secret: await readClientSecret(page, client.id) };
+}
+
+// A public authorization code client with the tests' redirect URI: it holds no secret, so it names
+// itself with client_id alone.
+export async function publicSignInClient(page: Page, clients: ClientsFixture) {
+  const client = await clients.create();
+  await addRedirectUri(page, client.id, testRedirectUri);
+  await page.goto(clientUrl(client.id, "authentication"));
+  await page.getByRole("radio", { name: "Public client" }).check();
+  await page.locator("#btnSave").click();
+  await confirmDialog(page, "You are switching from confidential to public client");
+  await expect(page.getByText("Client authentication saved successfully")).toBeVisible();
+  return client;
 }

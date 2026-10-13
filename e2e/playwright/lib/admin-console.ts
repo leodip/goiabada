@@ -304,6 +304,14 @@ export async function enablePasswordGrant(page: Page, id: number) {
   await expect(page.getByText("Client OAuth2 flows saved successfully")).toBeVisible();
 }
 
+// Sets the client's implicit grant to on or off, whatever the global setting.
+export async function setImplicitGrant(page: Page, id: number, value: "on" | "off") {
+  await page.goto(clientUrl(id, "oauth2-flows"));
+  await page.locator(`input[name="implicitGrantEnabled"][value="${value}"]`).check();
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Client OAuth2 flows saved successfully")).toBeVisible();
+}
+
 // Adds resource:permission to the Permissions tab's table, without saving. Choosing a resource
 // reloads the permission list from /admin/get-permissions, and that reload resets the choice, so the
 // permission is picked only once the list has arrived.
