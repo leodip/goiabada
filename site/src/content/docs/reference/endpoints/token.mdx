@@ -228,11 +228,11 @@ Pragma: no-cache
 
 | `error` | Status | |
 |---|---|---|
-| `invalid_request` | 400 | A parameter is missing, repeated or not allowed for this client |
+| `invalid_request` | 400 | A parameter is missing, repeated or not allowed for this client. A token request with no `grant_type` is answered this way: "Missing required grant_type parameter." |
 | `invalid_client` | 401 | The client couldn't be authenticated, with `WWW-Authenticate: Basic realm="goiabada"` |
 | `invalid_grant` | 400 | The code, refresh token or user's credentials can't be used |
 | `unauthorized_client` | 400 | The grant is off for this client |
-| `unsupported_grant_type` | 400 | `grant_type` is missing or isn't one of the four: "Unsupported grant_type." |
+| `unsupported_grant_type` | 400 | `grant_type` isn't one of the four: "Unsupported grant_type." |
 | `invalid_scope` | 400 | A scope is malformed, unknown, or more than the client or user may have |
 | `server_error` | 500 | Something failed on the server. The description ends with a request id to find it in the logs |
 

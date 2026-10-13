@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -239,6 +241,48 @@ func TestWriteResponseParams_ByteExactValues(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+// RFC 6749 section 5.1 requires the Cache-Control/Pragma pair on any response carrying tokens or
+// credentials. Both redirect writers carry a credential (a code or an access token) in the
+// Location, so both must mark the response no-store; only writeFormPost did before #573.
+func TestRedirectWriters_AreNoStore(t *testing.T) {
+	t.Run("the query redirect is no-store", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
+
+		require.NoError(t, writeQueryRedirect(rec, r, "https://app.example.com/cb",
+			[]responseParam{{"code", "abc"}, {"state", "st"}}))
+
+		assert.Equal(t, http.StatusFound, rec.Code)
+		assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+		assert.Equal(t, "no-cache", rec.Header().Get("Pragma"))
+		assert.Equal(t, "https://app.example.com/cb?code=abc&state=st", rec.Header().Get("Location"))
+	})
+
+	t.Run("the fragment redirect is no-store", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
+
+		writeFragmentRedirect(rec, r, "https://app.example.com/cb",
+			[]responseParam{{"access_token", "tok"}, {"state", "st"}})
+
+		assert.Equal(t, http.StatusFound, rec.Code)
+		assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+		assert.Equal(t, "no-cache", rec.Header().Get("Pragma"))
+		assert.Equal(t, "https://app.example.com/cb#access_token=tok&state=st", rec.Header().Get("Location"))
+	})
+
+	t.Run("an error query redirect is no-store too", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
+
+		require.NoError(t, writeQueryRedirect(rec, r, "https://app.example.com/cb",
+			[]responseParam{{"error", "access_denied"}, {"state", "st"}}))
+
+		assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+		assert.Equal(t, "no-cache", rec.Header().Get("Pragma"))
+	})
 }
 
 func TestEncodeResponseParams(t *testing.T) {

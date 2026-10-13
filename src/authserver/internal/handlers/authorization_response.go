@@ -209,6 +209,16 @@ func writeAuthorizationResponse(w http.ResponseWriter, r *http.Request, template
 	}
 }
 
+// noStoreAuthorizationResponse writes the Cache-Control/Pragma pair RFC 6749 section 5.1 requires of
+// any response carrying tokens, credentials or other sensitive information. Every authorization
+// response this package writes carries at least an authorization code or an access token, so all
+// three encodings set it. The two redirect writers below set neither before #573, leaving the
+// credential in the Location of a response a cache was free to store and replay.
+func noStoreAuthorizationResponse(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+}
+
 // implicitResponseMode is the mode an implicit response is delivered in, its tokens or its error:
 // the form_post the client asked for, and the fragment for anything else.
 //
@@ -236,6 +246,7 @@ func implicitResponseMode(requested string) string {
 // every caller), so there is no registered field list here to preserve or replace. Its query, if it
 // registered one, is left exactly as it stands.
 func writeFragmentRedirect(w http.ResponseWriter, r *http.Request, redirectURI string, params []responseParam) {
+	noStoreAuthorizationResponse(w)
 	//nolint:gosec // G710: a redirect URI registered on the client and matched exactly, checked again at gate 4 by every caller
 	http.Redirect(w, r, redirectURI+"#"+encodeResponseParams(params), http.StatusFound)
 }
@@ -262,6 +273,7 @@ func writeQueryRedirect(w http.ResponseWriter, r *http.Request, redirectURI stri
 		return errs.Wrap(err, "unable to build the authorization response redirect")
 	}
 
+	noStoreAuthorizationResponse(w)
 	//nolint:gosec // G710: a redirect URI registered on the client and matched exactly, checked again at gate 4 by every caller
 	http.Redirect(w, r, location, http.StatusFound)
 	return nil
