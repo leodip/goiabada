@@ -234,7 +234,10 @@ replaced the ceremony. A restart would make it verify the password itself, so it
 replace the session's authentication, asking an SSO ceremony for a password nobody requested. A
 reuse arm that rotates the browser session's identifier asks the same rule first
 (`AuthenticationIsStale`) and answers the same page without rotating: the rotation writes the
-request's own copy of the browser session, read when it began, over the newer ceremony's.
+request's own copy of the browser session, read when it began, over the newer ceremony's. That
+keeps a stale ceremony from writing over the newer one. It does not keep a ceremony that is still
+current from writing over one started after it loaded, at any step: the browser-session store is
+last-writer-wins (#579).
 
 ### Deferred error redirects (#213)
 `/auth/authorize` never redirects an unauthenticated browser to a client's `redirect_uri` on a failed
