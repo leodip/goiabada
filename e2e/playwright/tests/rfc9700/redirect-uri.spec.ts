@@ -1,0 +1,133 @@
+// RFC 9700 sections 2.1, 4.1 and 2.6 on redirect URIs. A requested redirect URI is compared with the
+// registered ones by simple string comparison (RFC 3986 section 6.2.1), with no patterns, and the only
+// exception is the port of a loopback redirect URI (RFC 8252 section 7.3). And no authorization
+// response travels without TLS: the auth server allows no http redirect URI but on loopback. The near
+// misses ../rfc6749/redirect-uri.spec.ts tries are not repeated here; dynamic registration is in
+// client-registration.system.ts.
+import type { Page } from "@playwright/test";
+import { addRedirectUri, clientUrl } from "../../lib/admin-console";
+import { signInThroughClient, testRedirectUri } from "../../lib/browser-sign-in";
+import { env } from "../../lib/environment";
+import { expect, test } from "../../lib/fixtures";
+import { codeToken } from "../../lib/oauth";
+import { codeRequest, emptyBrowser, expectRefusedOnPage, followAuthorize, getAuthorize } from "../../lib/rfc6749";
+import { browserSignInClient } from "../../lib/test-clients";
+
+const notRegistered = /The client does not have this redirect URI registered/;
+const host = new URL(testRedirectUri).host;
+
+// Adds uri on the client's Redirect URIs tab and saves: true when the console saved it, false when it
+// answered with its error dialog.
+async function tryAddRedirectUri(page: Page, id: number, uri: string): Promise<boolean> {
+  await page.goto(clientUrl(id, "redirect-uris"));
+  await page.locator("#redirectURI").fill(uri);
+  await page.getByRole("button", { name: "Add" }).click();
+  await page.locator("#btnSave").click();
+  const saved = page.getByText("Client redirect uris saved successfully");
+  const refused = page.locator("dialog[open]");
+  await expect(saved.or(refused)).toBeVisible();
+  return saved.isVisible();
+}
+
+test("a redirect URI equal to the registered one only after normalisation is refused (section 4.1.3: simple string comparison)", async ({
+  page,
+  browser,
+  clients,
+}) => {
+  const { client } = await browserSignInClient(page, clients);
+  const anonymous = await emptyBrowser(browser);
+
+  for (const nearMiss of [
+    `HTTPS://${host}/callback`,
+    `https://${host}/c%61llback`,
+    `https://${host}/x/../callback`,
+    `https://user@${host}/callback`,
+    `https://${host}.evil.example/callback`,
+    `${testRedirectUri}/x`,
+    `${testRedirectUri}x`,
+  ]) {
+    await test.step(nearMiss, async () => {
+      const answer = await getAuthorize(anonymous.request, codeRequest(client.identifier, { redirect_uri: nearMiss }).params);
+      expectRefusedOnPage(answer, notRegistered);
+    });
+  }
+  await anonymous.close();
+});
+
+test("a registered redirect URI with a wildcard is no pattern: a URI it would match is refused (section 4.1)", async ({ page, browser, clients }) => {
+  const client = await clients.create();
+  const parentDomain = host.split(".").slice(1).join(".");
+  const anonymous = await emptyBrowser(browser);
+
+  for (const pattern of [`https://*.${parentDomain}/callback`, `${env.webtest1Url}/*`]) {
+    await test.step(pattern, async () => {
+      // Refusing it at registration is as good as storing it literally.
+      if (!(await tryAddRedirectUri(page, client.id, pattern))) return;
+      const answer = await getAuthorize(anonymous.request, codeRequest(client.identifier, { redirect_uri: testRedirectUri }).params);
+      expectRefusedOnPage(answer, notRegistered);
+    });
+  }
+  await anonymous.close();
+});
+
+test("only a loopback redirect URI takes any port: [::1] and localhost as 127.0.0.1 does (section 4.1.3, RFC 8252 section 7.3)", async ({
+  page,
+  browser,
+  clients,
+  users,
+  request,
+}) => {
+  const user = await users.create();
+  const { client, secret } = await browserSignInClient(page, clients);
+  await addRedirectUri(page, client.id, "http://[::1]/callback");
+  await addRedirectUri(page, client.id, "http://localhost/callback");
+  const signIn = await signInThroughClient(browser, { clientId: client.identifier, email: user.email, password: user.password, scope: "openid" });
+
+  for (const loopback of ["http://[::1]:53682/callback", "http://localhost:53682/callback"]) {
+    await test.step(loopback, async () => {
+      const { params, verifier } = codeRequest(client.identifier, { redirect_uri: loopback });
+      const { redirect } = await followAuthorize(signIn.context.request, params);
+      expect(redirect?.href.startsWith(`${loopback}?`), redirect?.href).toBe(true);
+      const redeemed = await codeToken(request, client.identifier, secret, redirect!.searchParams.get("code")!, verifier, loopback);
+      expect(redeemed.status, JSON.stringify(redeemed.body)).toBe(200);
+    });
+  }
+
+  // The exception is loopback's alone: on any other host, another port is another redirect URI.
+  const answer = await getAuthorize(signIn.context.request, codeRequest(client.identifier, { redirect_uri: `https://${host}:8443/callback` }).params);
+  expectRefusedOnPage(answer, notRegistered);
+  await signIn.context.close();
+});
+
+test("an http redirect URI on a host other than loopback is refused at registration (section 2.6 MUST NOT)", async ({ page, clients }) => {
+  // #575: the admin console saves it today. Remove this line once it is refused.
+  test.fail();
+  const client = await clients.create();
+  const plainHttp = `http://${host}/callback`;
+
+  expect(await tryAddRedirectUri(page, client.id, plainHttp), "refused with the error dialog").toBe(false);
+  await page.reload();
+  await expect(page.locator("#redirectURIsTable")).not.toContainText(plainHttp);
+});
+
+test("no authorization response is sent to an http redirect URI on a host other than loopback (section 2.6 MUST NOT)", async ({
+  page,
+  browser,
+  clients,
+  users,
+}) => {
+  // #575: the code is sent today. That issue refuses such a URI when it is saved and keeps a stored
+  // one working, so once it lands this test can no longer register its URI: delete it then, and the
+  // test above holds the rule.
+  test.fail();
+  const user = await users.create();
+  const { client } = await browserSignInClient(page, clients);
+  const plainHttp = `http://${host}/callback`;
+  await addRedirectUri(page, client.id, plainHttp);
+  const signIn = await signInThroughClient(browser, { clientId: client.identifier, email: user.email, password: user.password, scope: "openid" });
+
+  const { redirect, page: refusal } = await followAuthorize(signIn.context.request, codeRequest(client.identifier, { redirect_uri: plainHttp }).params);
+  expect(redirect?.href, "a code was sent without TLS").toBeUndefined();
+  expectRefusedOnPage(refusal!, /http/);
+  await signIn.context.close();
+});
