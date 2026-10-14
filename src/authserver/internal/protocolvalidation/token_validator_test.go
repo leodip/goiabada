@@ -176,6 +176,22 @@ func TestValidateTokenRequest(t *testing.T) {
 		assert.Equal(t, "invalid_request", customErr.Code())
 		assert.Equal(t, "Missing required client_id parameter.", customErr.Description())
 	})
+
+	// A request with no grant_type names no grant type at all, so it is a missing required
+	// parameter (RFC 6749 section 5.2, invalid_request) rather than a value the server does not
+	// support. The answer used to be unsupported_grant_type (#573).
+	t.Run("an empty grant_type is invalid_request, not unsupported_grant_type", func(t *testing.T) {
+		input := &ValidateTokenRequestInput{GrantType: "", ClientId: "grant_table_client"}
+
+		result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, input)
+
+		assert.Nil(t, result)
+		var customErr *oauth.ErrorDetail
+		require.ErrorAs(t, err, &customErr)
+		assert.Equal(t, "invalid_request", customErr.Code())
+		assert.Equal(t, "Missing required grant_type parameter.", customErr.Description())
+		assert.Equal(t, 400, customErr.HTTPStatus())
+	})
 }
 
 // TestValidateTokenRequest_AuthStateGeneration covers the three places the generation

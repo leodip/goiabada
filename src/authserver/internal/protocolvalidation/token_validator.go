@@ -111,6 +111,16 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *r
 		return nil, invalidClientError(clientDisabledErrorMsg)
 	}
 
+	// RFC 6749 section 5.2 reserves unsupported_grant_type for a grant type the authorization
+	// server does not support, and section 4 makes grant_type a required parameter of every token
+	// request (4.1.3, 4.3.2, 4.4.2, 6). An absent one is therefore a missing required parameter,
+	// invalid_request, and not a value the server failed to recognise. Read after the client checks
+	// above so an unknown client is still answered first, as the row below holds (#573).
+	if len(input.GrantType) == 0 {
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
+			"Missing required grant_type parameter.", http.StatusBadRequest)
+	}
+
 	// Whether the grant is redeemed here at all is the grant table's answer, read after the
 	// client checks above so an unknown client is still answered first, as it always was (#437).
 	if !input.GrantType.AcceptedAtTokenEndpoint() {
