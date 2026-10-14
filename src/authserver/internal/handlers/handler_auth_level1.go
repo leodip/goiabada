@@ -36,7 +36,7 @@ func HandleAuthLevel1Get(
 		authContext.AuthState = ceremony.AuthStateLevel1Password
 		err := ceremonyStore.SaveAuthContext(w, r, authContext)
 		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
+			answerStepSaveFailure(pageRenderer, w, r, err)
 			return
 		}
 		http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/pwd", authContext), http.StatusFound)
@@ -178,7 +178,7 @@ func HandleAuthLevel1CompletedGet(
 			authContext.AuthState = ceremony.AuthStateRequiresLevel2
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
+				answerStepSaveFailure(pageRenderer, w, r, err)
 				return
 			}
 			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level2", authContext), http.StatusFound)
@@ -188,7 +188,7 @@ func HandleAuthLevel1CompletedGet(
 			authContext.AuthState = ceremony.AuthStateAuthenticationCompleted
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
+				answerStepSaveFailure(pageRenderer, w, r, err)
 				return
 			}
 			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/completed", authContext), http.StatusFound)

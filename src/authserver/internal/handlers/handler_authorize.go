@@ -365,7 +365,7 @@ func HandleAuthorizeGet(
 		}
 
 		saveAndRedirect := func(path string) {
-			err := ceremonyStore.SaveAuthContext(w, r, &authContext)
+			err := ceremonyStore.ReplaceAuthContext(w, r, &authContext)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return
@@ -969,7 +969,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 
 	// Ready to issue code
 	authContext.AuthState = ceremony.AuthStateReadyToIssueCode
-	err = ceremonyStore.SaveAuthContext(w, r, authContext)
+	err = ceremonyStore.ReplaceAuthContext(w, r, authContext)
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 		return

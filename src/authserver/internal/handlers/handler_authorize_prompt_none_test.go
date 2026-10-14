@@ -145,7 +145,7 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 		{"the effective scope", "FilterOutScopesWhereUserIsNotAuthorized"},
 		{"the consent", "GetConsentByUserIdAndClientId"},
 		{"the session bump", "BumpUserSession"},
-		{"the save", "SaveAuthContext"},
+		{"the save", "ReplaceAuthContext"},
 	}
 
 	for _, tc := range testCases {
@@ -230,8 +230,8 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 					userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.AcrLevel(""), mock.Anything).Return(userSession, nil)
 					auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 				}},
-				{"SaveAuthContext", func(fail bool) {
-					ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(fault)
+				{"ReplaceAuthContext", func(fail bool) {
+					ceremonyStore.On("ReplaceAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(fault)
 				}},
 			}
 			for _, step := range steps {
@@ -324,7 +324,7 @@ func TestHandlePromptNone_ManageAccountConsent(t *testing.T) {
 			if tc.wantIssue {
 				userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.AcrLevel(""), mock.Anything).Return(userSession, nil)
 				auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
-				ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
+				ceremonyStore.On("ReplaceAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
 			} else {
 				database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(7), int64(1)).Return(nil, nil).Once()
 				stubRegisteredRedirectURI(database, "https://example.com")

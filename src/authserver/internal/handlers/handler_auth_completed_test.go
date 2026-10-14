@@ -3451,3 +3451,122 @@ func TestHandleAuthCompletedGet_AStaleCeremonyIsRefusedBeforeItRotates(t *testin
 		})
 	}
 }
+
+// Each of /auth/completed's three saves, finding the browser session holding another ceremony,
+// answers the "no longer active" page and goes no further (#579). The binding before the last two
+// stands, as it does when a save fails: the session is the user's.
+func TestHandleAuthCompletedGet_ASaveFindingItsCeremonyReplacedAnswersNoLongerActive(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		consentRequired bool
+	}{
+		{name: "a ceremony replaced before the save to issuance answers no longer active"},
+		{name: "a ceremony replaced before the save to consent answers no longer active", consentRequired: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
+
+			handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{}, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+
+			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+			req = withSessionSettings(req)
+			rr := httptest.NewRecorder()
+
+			pwdAuthTime := time.Now().UTC()
+			sessionIdentifier := "new-test-session"
+			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
+
+			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
+				CeremonyId:          testCeremonyId,
+				AuthState:           ceremony.AuthStateAuthenticationCompleted,
+				ClientId:            "test-client",
+				UserId:              1,
+				Scope:               "openid profile",
+				AuthMethods:         "pwd",
+				AuthStateGeneration: 7,
+				AuthenticatedAt:     &pwdAuthTime,
+				PasswordVerifiedAt:  &pwdAuthTime,
+				Level1AuthCompleted: true,
+			}, nil)
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(nil, nil)
+			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(&record.Client{
+				Id:                       1,
+				ClientIdentifier:         "test-client",
+				ConsentRequired:          tc.consentRequired,
+				DefaultAcrLevel:          record.AcrLevel1,
+				AuthorizationCodeEnabled: true,
+			}, nil)
+			userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
+			userSessionManager.On("StartNewUserSession", rr, req, int64(1), mock.Anything, int64(7), (*int64)(nil), "", (*record.UserSession)(nil), testSessionLimits).
+				Return(&record.UserSession{Id: 1, UserId: 1, AcrLevel: record.AcrLevel1, AuthTime: time.Now().UTC()}, nil, nil)
+			auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return().Once()
+			user := &record.User{Id: 1, Enabled: true, AuthStateGeneration: 7}
+			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
+			expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)
+
+			handler.ServeHTTP(rr, req)
+
+			assertAnsweredNoLongerActive(t, rr)
+			pageRenderer.AssertExpectations(t)
+			ceremonyStore.AssertExpectations(t)
+			userSessionManager.AssertExpectations(t)
+			database.AssertExpectations(t)
+			auditLogger.AssertExpectations(t)
+			permissionChecker.AssertExpectations(t)
+		})
+	}
+
+	t.Run("a ceremony replaced before the restart's save answers no longer active", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+
+		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{}, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req = withSessionSettings(req)
+		rr := httptest.NewRecorder()
+
+		sessionIdentifier := "terminated-session"
+		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
+
+		// An SSO ceremony whose session ended mid-flight: restart route 1.
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
+			CeremonyId:          testCeremonyId,
+			AuthState:           ceremony.AuthStateAuthenticationCompleted,
+			ClientId:            "test-client",
+			UserId:              1,
+			Scope:               "openid profile",
+			AuthMethods:         "pwd",
+			AuthStateGeneration: 7,
+		}, nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(&record.Client{
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			DefaultAcrLevel:          record.AcrLevel1,
+			AuthorizationCodeEnabled: true,
+		}, nil)
+		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
+		expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)
+
+		handler.ServeHTTP(rr, req)
+
+		assertAnsweredNoLongerActive(t, rr)
+		pageRenderer.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		database.AssertExpectations(t)
+	})
+}

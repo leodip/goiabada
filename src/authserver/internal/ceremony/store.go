@@ -2,19 +2,24 @@ package ceremony
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 // authSessionStore is what Store calls on the browser session store. Regenerate is in
 // it, so a store that cannot rotate does not compile here, where it used to make
-// RegenerateSession a silent no-op (#431).
+// RegenerateSession a silent no-op (#431). So is ChangeAndSave, the conditional write every
+// step's save is made with, which only sessionstore.ConditionalStore has (#579).
 type authSessionStore interface {
 	Get(r *http.Request, name string) (*sessionstore.Session, error)
 	Save(r *http.Request, w http.ResponseWriter, session *sessionstore.Session) error
 	Regenerate(w http.ResponseWriter, r *http.Request, session *sessionstore.Session) error
+	ChangeAndSave(r *http.Request, w http.ResponseWriter, session *sessionstore.Session,
+		change func(values map[string]any) error) error
 }
 
 // Store keeps a browser's AuthContext in the server-side session, under
@@ -51,8 +56,65 @@ func (s *Store) GetAuthContext(r *http.Request) (*AuthContext, error) {
 	return &authContext, nil
 }
 
+// SaveAuthContext is every step's save after /auth/authorize, and it writes only while the
+// browser session still holds the ceremony authContext names (#579). The step loaded its context
+// when its request began, and another tab's /auth/authorize may have replaced it since, so the
+// session is read afresh, its ceremony compared with this one, and the context written on
+// condition nothing wrote the session in between, through ChangeAndSave. Anything else the session
+// holds is kept as the fresh read found it, rather than put back as the request read it.
+//
+// It answers ErrCeremonyReplaced, writing nothing, when the session holds another ceremony, none,
+// or is gone: the browser has moved on from this ceremony, and the newer one carries on. Ownership
+// is the ceremony id, not the state, so two requests of one ceremony stay last-writer-wins between
+// themselves, as a double-submitted consent form needs. An empty stored id is never owned, as
+// ceremonyMatches refuses it.
 func (s *Store) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *AuthContext) error {
+	sess, err := s.sessionStore.Get(r, s.sessionName)
+	if err != nil {
+		return err
+	}
 
+	jsonData, err := json.Marshal(authContext)
+	if err != nil {
+		return err
+	}
+
+	err = s.sessionStore.ChangeAndSave(r, w, sess, func(values map[string]any) error {
+		owned, ownedErr := holdsCeremony(values, authContext.CeremonyId)
+		if ownedErr != nil {
+			return ownedErr
+		}
+		if !owned {
+			return errs.WithStack(ErrCeremonyReplaced)
+		}
+		values[sessionkeys.AuthContext] = string(jsonData)
+		return nil
+	})
+	if errors.Is(err, sessionstore.ErrNotFound) {
+		// The session this step loaded is gone: signed out in another tab, rotated away by another
+		// request of this browser, or expired. Its ceremony is not in the browser's session any
+		// more, which is a replaced ceremony too, and ChangeAndSave has not put it back.
+		return errs.Wrap(ErrCeremonyReplaced, "the browser session is gone")
+	}
+	return err
+}
+
+// holdsCeremony reports whether the session values a fresh read found hold the ceremony named.
+func holdsCeremony(values map[string]any, ceremonyId string) (bool, error) {
+	jsonData, ok := values[sessionkeys.AuthContext].(string)
+	if !ok || ceremonyId == "" {
+		return false, nil
+	}
+	var stored AuthContext
+	if err := json.Unmarshal([]byte(jsonData), &stored); err != nil {
+		return false, errs.Wrap(err, "unable to read the auth context the browser session holds")
+	}
+	return stored.CeremonyId == ceremonyId, nil
+}
+
+// ReplaceAuthContext is /auth/authorize's save. It starts a ceremony, so it replaces whatever the
+// browser session held, the session's other values included, as every save did before #579.
+func (s *Store) ReplaceAuthContext(w http.ResponseWriter, r *http.Request, authContext *AuthContext) error {
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return err
@@ -63,12 +125,7 @@ func (s *Store) SaveAuthContext(w http.ResponseWriter, r *http.Request, authCont
 		return err
 	}
 	sess.Values[sessionkeys.AuthContext] = string(jsonData)
-	err = s.sessionStore.Save(r, w, sess)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.sessionStore.Save(r, w, sess)
 }
 
 func (s *Store) ClearAuthContext(w http.ResponseWriter, r *http.Request) error {

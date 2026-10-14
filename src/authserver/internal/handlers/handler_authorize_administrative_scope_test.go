@@ -99,7 +99,7 @@ func TestHandleAuthorizeGet_AnAdministrativeScopeTheClientMayNotRequest(t *testi
 
 			switch tc.want {
 			case deferToLogin:
-				ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+				ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 					return ac.AuthState == ceremony.AuthStateRequiresLevel1 &&
 						ac.DeferredErrorCode == "invalid_scope" &&
 						ac.DeferredErrorDescription == administrativeScopeRefusedDescription
@@ -202,7 +202,7 @@ func TestHandleAuthorizeGet_AnAllowedClientIsNotRefusedAnAdministrativeScope(t *
 			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Return(false)
-			ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 				return ac.AuthState == ceremony.AuthStateRequiresLevel1 && ac.DeferredErrorCode == "" &&
 					ac.Scope == "openid authserver:manage"
 			})).Return(nil).Once()

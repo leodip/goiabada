@@ -1035,6 +1035,60 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
+	t.Run("a ceremony replaced before the save answers no longer active", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+
+		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+
+		key, err := totp.Generate(totp.GenerateOpts{
+			Issuer:      "TestApp",
+			AccountName: "test@test.com",
+		})
+		require.NoError(t, err)
+
+		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
+		require.NoError(t, err)
+
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("otp", otpCode)
+		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
+		}, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
+			Id:                  1,
+			Enabled:             true,
+			OTPEnabled:          true,
+			OTPSecretEncrypted:  encryptOTPForTest(t, key.Secret()),
+			OtpConfigGeneration: 3,
+		}, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
+			&record.Client{ClientIdentifier: "test-client"}, nil)
+		database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
+			Return(true, nil)
+		auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything).Return().Once()
+		ceremonyStore.On("RegenerateSession", rr, req).Return(nil).Once()
+		expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)
+
+		handler.ServeHTTP(rr, req)
+
+		assertAnsweredNoLongerActive(t, rr)
+		pageRenderer.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
 	t.Run("Successful OTP validation for disabled OTP (enrollment)", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)

@@ -157,7 +157,7 @@ func HandleAuthCompletedGet(
 			authContext.Restart()
 			saveErr := ceremonyStore.SaveAuthContext(w, r, authContext)
 			if saveErr != nil {
-				pageRenderer.InternalServerError(w, r, saveErr)
+				answerStepSaveFailure(pageRenderer, w, r, saveErr)
 				return
 			}
 			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level1", authContext), http.StatusFound)
@@ -277,7 +277,7 @@ func HandleAuthCompletedGet(
 			authContext.AuthState = ceremony.AuthStateRequiresConsent
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
+				answerStepSaveFailure(pageRenderer, w, r, err)
 				return
 			}
 			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/consent", authContext), http.StatusFound)
@@ -285,7 +285,7 @@ func HandleAuthCompletedGet(
 			authContext.AuthState = ceremony.AuthStateReadyToIssueCode
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
+				answerStepSaveFailure(pageRenderer, w, r, err)
 				return
 			}
 			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/issue", authContext), http.StatusFound)

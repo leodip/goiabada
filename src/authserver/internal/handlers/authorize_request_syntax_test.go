@@ -68,7 +68,7 @@ func parkedBy(t *testing.T, e *authorizeEndpoint, query string) *ceremony.AuthCo
 	t.Helper()
 	e.stubLoggedOutBrowser()
 	var saved *ceremony.AuthContext
-	e.ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).
+	e.ceremonyStore.On("ReplaceAuthContext", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) { saved = args.Get(2).(*ceremony.AuthContext) }).Return(nil).Once()
 
 	rr := e.get(t, query)
@@ -257,7 +257,7 @@ func TestHandleAuthorizeGet_SelectAccountIsAnsweredAsUnsupported(t *testing.T) {
 	t.Run("beside login, parked whatever session the browser holds", func(t *testing.T) {
 		e := newSyntaxAuthorizeEndpoint(t)
 		var saved *ceremony.AuthContext
-		e.ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).
+		e.ceremonyStore.On("ReplaceAuthContext", mock.Anything, mock.Anything, mock.Anything).
 			Run(func(args mock.Arguments) { saved = args.Get(2).(*ceremony.AuthContext) }).Return(nil).Once()
 
 		rr := e.get(t, syntaxQuery(map[string]string{"prompt": "select_account login"}))

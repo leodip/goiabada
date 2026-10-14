@@ -361,6 +361,39 @@ func TestHandleConsentGet(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
+	t.Run("a ceremony replaced before the save answers no longer active", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		database := datamocks.NewDatabase(t)
+
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+
+		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
+		rr := httptest.NewRecorder()
+
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateRequiresConsent,
+			UserId:     1,
+			ClientId:   "test-client",
+			Scope:      "openid profile",
+		}, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
+			&record.Client{Id: 1, ClientIdentifier: "test-client", Description: "Test Client"}, nil)
+		database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(
+			&record.UserConsent{UserId: 1, ClientId: 1, Scope: "openid profile"}, nil)
+		expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)
+
+		handler.ServeHTTP(rr, req)
+
+		assertAnsweredNoLongerActive(t, rr)
+		pageRenderer.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
+		database.AssertExpectations(t)
+	})
+
 	t.Run("Partial consent, render consent page", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
@@ -901,6 +934,56 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
+		pageRenderer.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	t.Run("a ceremony replaced before the save answers no longer active", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+
+		stubUserHoldsEveryScope(permissionChecker)
+
+		form := url.Values{}
+		form.Add("btnSubmit", "submit")
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("consent0", "openid")
+		form.Add("consent1", "profile")
+		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateRequiresConsent,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
+			Scope:      "openid profile email",
+		}, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
+			&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
+
+		// The consent is the user's, given before the save, and stands as the stored consent
+		// stands whatever the browser then holds.
+		datamocks.ExpectRunInTransaction(database, consentSaveTx)
+		database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, nil)
+		database.On("CreateUserConsent", mock.Anything, consentSaveTx, mock.Anything).Return(nil)
+		auditLogger.On("Log", mock.Anything, audit.EventSavedConsent, mock.Anything).Return().Once()
+
+		expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)
+
+		handler.ServeHTTP(rr, req)
+
+		assertAnsweredNoLongerActive(t, rr)
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)

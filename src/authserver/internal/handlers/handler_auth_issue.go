@@ -934,7 +934,7 @@ func refuseIssuanceUnusableSession(
 	authContext.Restart()
 	err := ceremonyStore.SaveAuthContext(w, r, authContext)
 	if err != nil {
-		pageRenderer.InternalServerError(w, r, err)
+		answerStepSaveFailure(pageRenderer, w, r, err)
 		return
 	}
 	http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level1", authContext), http.StatusFound)

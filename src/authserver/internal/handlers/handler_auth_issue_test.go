@@ -285,6 +285,46 @@ func TestHandleIssueGet(t *testing.T) {
 		codeIssuer.AssertExpectations(t)
 	})
 
+	t.Run("a ceremony replaced before the restart's save answers no longer active", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, fstest.MapFS{}, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		require.NoError(t, err)
+		req = withSessionSettings(req)
+
+		rr := httptest.NewRecorder()
+
+		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
+			Scope:        "openid profile",
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseMode: "query",
+			ResponseType: "code",
+			RedirectURI:  "https://example.com/callback",
+		}
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
+		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+		expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)
+
+		handler.ServeHTTP(rr, req)
+
+		assertAnsweredNoLongerActive(t, rr)
+		pageRenderer.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
+		codeIssuer.AssertExpectations(t)
+	})
+
 	t.Run("Session identifier resolves to no session, restarts level 1", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)

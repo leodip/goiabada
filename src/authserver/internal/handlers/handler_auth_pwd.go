@@ -298,7 +298,7 @@ func HandleAuthPwdPost(
 
 		err = ceremonyStore.SaveAuthContext(w, r, authContext)
 		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
+			answerStepSaveFailure(pageRenderer, w, r, err)
 			return
 		}
 		http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level1completed", authContext), http.StatusFound)

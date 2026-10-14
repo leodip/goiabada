@@ -95,6 +95,22 @@ func renderCeremonyNoLongerActive(pageRenderer PageRenderer, w http.ResponseWrit
 	}
 }
 
+// answerStepSaveFailure answers a step whose save of its auth context failed. A save that found
+// the browser session no longer holding this ceremony (ceremony.ErrCeremonyReplaced: another
+// /auth/authorize replaced it, it ended, or the session is gone) wrote nothing, and is answered
+// with the "no longer active" page at 400, as a request naming another ceremony is, so the newer
+// sign-in carries on (#579). Logged at warn and audited nowhere, as /auth/completed's stale bind
+// is: the request named its ceremony correctly, so it is no ceremony mismatch (#578). Nothing goes
+// to the client, for rejectCeremonyMismatch's reason. Any other failure is the 500 it always was.
+func answerStepSaveFailure(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, ceremony.ErrCeremonyReplaced) {
+		slog.WarnContext(r.Context(), "the browser session no longer holds this ceremony, answering it as no longer active")
+		renderCeremonyNoLongerActive(pageRenderer, w, r)
+		return
+	}
+	pageRenderer.InternalServerError(w, r, err)
+}
+
 // loadAuthContext reads the ceremony's auth context for a gated route, and answers the request
 // itself when there is none to read or it is not the one the request names. It reports false when it
 // answered, and the caller then returns without writing anything.

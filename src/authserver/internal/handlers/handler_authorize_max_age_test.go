@@ -63,7 +63,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		f.req = f.req.WithContext(reqctx.WithSessionIdentifier(f.req.Context(), sessionIdentifier))
 		f.rr = httptest.NewRecorder()
 
-		f.ceremonyStore.On("SaveAuthContext", f.rr, f.req, mock.AnythingOfType("*ceremony.AuthContext")).
+		f.ceremonyStore.On("ReplaceAuthContext", f.rr, f.req, mock.AnythingOfType("*ceremony.AuthContext")).
 			Run(func(args mock.Arguments) {
 				saved := *args.Get(2).(*ceremony.AuthContext)
 				f.saved = &saved

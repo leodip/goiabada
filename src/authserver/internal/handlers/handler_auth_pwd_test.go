@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -980,6 +981,64 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		assert.Equal(t, testBaseURL+"/auth/level1completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 		assert.True(t, authContextSaved, "the ceremony must still record that the password was accepted")
 
+		pageRenderer.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	t.Run("a ceremony replaced before the save answers no longer active", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+
+		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+
+		password := "testpassword"
+		passwordHash, err := passwordhash.Hash(password)
+		require.NoError(t, err)
+
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("email", "test@example.com")
+		form.Add("password", password)
+		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel1Password,
+			CeremonyId: testCeremonyId,
+			ClientId:   "test-client",
+		}, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
+			&record.Client{ClientIdentifier: "test-client"}, nil)
+
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true}))
+
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
+			Id:           1,
+			Email:        "test@example.com",
+			PasswordHash: passwordHash,
+			Enabled:      true,
+		}, nil)
+		auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.Anything).Return().Once()
+		ceremonyStore.On("RegenerateSession", rr, mock.Anything).Return(nil).Once()
+
+		// mock.Anything for the request, as in the successful case: the handler refines the
+		// localizer onto a fresh *http.Request after the password verifies.
+		ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.Anything).Return(ceremony.ErrCeremonyReplaced).Once()
+		pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
+			mock.MatchedBy(func(data map[string]interface{}) bool {
+				return data["_httpStatus"] == http.StatusBadRequest &&
+					data["title"] == i18n.T(req.Context(), "auth_error.ceremony_mismatch.title") &&
+					data["error"] == i18n.T(req.Context(), "auth_error.ceremony_mismatch.message")
+			})).Return(nil).Once()
+
+		handler.ServeHTTP(rr, req)
+
+		assertAnsweredNoLongerActive(t, rr)
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)

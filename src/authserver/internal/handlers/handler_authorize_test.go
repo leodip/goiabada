@@ -124,7 +124,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession &&
 				ac.UserId == 123 &&
 				ac.AcrLevel == userSession.AcrLevel &&
@@ -192,7 +192,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Return(nil)
 
@@ -400,7 +400,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			var saved *ceremony.AuthContext
-			ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 				saved = ac
 				return ac.AuthState == ceremony.AuthStateRequiresLevel1
 			})).Return(nil).Once()
@@ -816,7 +816,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		saveErr := errors.New("the session store is unreachable")
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(saveErr).Once()
+		ceremonyStore.On("ReplaceAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(saveErr).Once()
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return errors.Is(err, saveErr)
@@ -883,7 +883,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession &&
 				ac.UserId == 123 &&
 				ac.ClientId == "test-client" &&
@@ -953,7 +953,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Return(nil)
 
@@ -1077,7 +1077,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// The one save, on the way to /auth/level1, carries the captured UILocales. The request
 		// pointer changes when the handler refines the localizer to the ui_locales it just
 		// captured, so mock.Anything stands in the request slot.
-		ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("ReplaceAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1 && hasUILocales(ac)
 		})).Return(nil).Once()
 
@@ -1144,7 +1144,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("ReplaceAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1 && hasUILocales(ac)
 		})).Return(nil).Once()
 
@@ -2195,7 +2195,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Return(nil)
 
@@ -2260,7 +2260,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Return(nil)
 
@@ -2385,7 +2385,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Return(nil)
 
@@ -2775,7 +2775,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession && ac.UserId == 123 && ac.IdTokenHintSub == userSubject
 		})).Return(nil)
 
@@ -2859,7 +2859,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession && ac.UserId == 123 && ac.IdTokenHintSub == userSubject
 		})).Return(nil)
 
@@ -2945,7 +2945,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1 && ac.IdTokenHintSub == hintSubject
 		})).Return(nil)
 
@@ -3051,7 +3051,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		// The one save the silent path makes, just before code issuance. It carries the hint and
 		// the prompt, and it inherits the session's generation rather than the user's.
 		var savedCeremonyId string
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
 				ac.IdTokenHintSub == userSubject && ac.Prompt == "none" &&
 				ac.UserId == 789 && ac.AuthStateGeneration == 7
@@ -3164,7 +3164,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		})).Return()
 
 		var savedCeremonyId string
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode && ac.Scope == requestedScope &&
 				ac.IdTokenHintSub == userSubject && ac.Prompt == "none"
 		})).Run(func(args mock.Arguments) {
@@ -3896,7 +3896,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 				Return(tc.hasSession).Maybe()
 
 			if tc.want == deferToLogin {
-				ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+				ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 					return ac.AuthState == ceremony.AuthStateRequiresLevel1 && ac.DeferredErrorCode == "invalid_scope"
 				})).Return(nil).Once()
 			} else {
@@ -4011,7 +4011,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 			case "client":
 				ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 			case "level1":
-				ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+				ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 					return ac.AuthState == ceremony.AuthStateRequiresLevel1
 				})).Return(nil).Once()
 			case "500":
@@ -4071,7 +4071,7 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 
 	// The one save is the deferral.
 	var parked string
-	ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+	ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 		return ac.DeferredErrorCode == "invalid_scope"
 	})).Run(func(args mock.Arguments) {
 		parked = args.Get(2).(*ceremony.AuthContext).DeferredErrorDescription
