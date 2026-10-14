@@ -314,18 +314,19 @@ func TestHandleIssueGet_ImplicitFlow_FormPost(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	authContext := &ceremony.AuthContext{
-		CeremonyId:   testCeremonyId,
-		AuthState:    ceremony.AuthStateReadyToIssueCode,
-		ClientId:     "test-client",
-		UserId:       123,
-		ResponseMode: "form_post",
-		ResponseType: "id_token token",
-		RedirectURI:  "https://example.com/callback",
-		Scope:        "openid",
-		State:        "test-state",
-		Nonce:        "test-nonce",
-		AcrLevel:     "urn:goiabada:pwd",
-		AuthMethods:  "pwd",
+		CeremonyId:      testCeremonyId,
+		AuthState:       ceremony.AuthStateReadyToIssueCode,
+		ClientId:        "test-client",
+		UserId:          123,
+		ResponseMode:    "form_post",
+		ResponseType:    "id_token token",
+		RedirectURI:     "https://example.com/callback",
+		Scope:           "openid",
+		State:           "test-state",
+		Nonce:           "test-nonce",
+		AcrLevel:        "urn:goiabada:pwd",
+		AuthMethods:     "pwd",
+		AuthenticatedAt: &testIssueAuthTime,
 	}
 	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 

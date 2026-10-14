@@ -101,6 +101,7 @@ func newRecheckFixtureFor(t *testing.T, responseType string, prompt string, sess
 			AuthMethods:         "pwd",
 			Prompt:              prompt,
 			AuthStateGeneration: recheckGeneration,
+			AuthenticatedAt:     &testIssueAuthTime,
 		},
 		rr: httptest.NewRecorder(),
 	}

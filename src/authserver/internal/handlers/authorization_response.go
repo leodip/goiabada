@@ -249,7 +249,6 @@ func implicitResponseMode(requested string) string {
 // registered one, is left exactly as it stands.
 func writeFragmentRedirect(w http.ResponseWriter, r *http.Request, redirectURI string, params []responseParam) {
 	noStoreAuthorizationResponse(w)
-	//nolint:gosec // G710: a redirect URI registered on the client and matched exactly, checked again at gate 4 by every caller
 	http.Redirect(w, r, redirectURI+"#"+encodeResponseParams(params), http.StatusFound)
 }
 
@@ -276,7 +275,6 @@ func writeQueryRedirect(w http.ResponseWriter, r *http.Request, redirectURI stri
 	}
 
 	noStoreAuthorizationResponse(w)
-	//nolint:gosec // G710: a redirect URI registered on the client and matched exactly, checked again at gate 4 by every caller
 	http.Redirect(w, r, location, http.StatusFound)
 	return nil
 }

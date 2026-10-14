@@ -56,7 +56,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/handlers/accounthandlers/` - Pages reached without a session: self-registration and its activation link, forgot password and its reset link (#435)
 - `internal/handlers/apihandlers/` - Admin API handlers
 - `internal/{ceremony,issuance,signingkeys}/` - Provider-side issuance: codes, tokens, key rotation, ceremony context
-- `internal/authflow/` - The ceremony steps' operations, one per step: its loads, the decision it applies, its database and browser-session writes, and a typed result its handler answers from. It cannot reach HTTP (`import_lint_test.go` refuses `net/http`, chi, `internal/handlers`, `internal/middleware` and `internal/reqctx`): what the request carries arrives as plain values, every browser-session write goes through a port the handler satisfies with a per-request adapter (`handlers.browserSession`), and the handler writes the response after the operation returns. Today `/auth/level1` (`SelectLevel1Method`), `/auth/level1completed` (`Level1Completion`), `/auth/level2` (`Level2Selection`) and `/auth/completed` (`Completion`); the other steps are still written in `internal/handlers` (#580)
+- `internal/authflow/` - The ceremony steps' operations, one per step: its loads, the decision it applies, its database and browser-session writes, and a typed result its handler answers from. It cannot reach HTTP (`import_lint_test.go` refuses `net/http`, chi, `internal/handlers`, `internal/middleware` and `internal/reqctx`): what the request carries arrives as plain values, every browser-session write goes through a port the handler satisfies with a per-request adapter (`handlers.browserSession`), and the handler writes the response after the operation returns. Today `/auth/level1` (`SelectLevel1Method`), `/auth/level1completed` (`Level1Completion`), `/auth/level2` (`Level2Selection`), `/auth/completed` (`Completion`) and `/auth/issue` (`Issuance`); the other steps are still written in `internal/handlers` (#580)
 - `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imageupload,uithemes}/` - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, image uploads, themes
 - `internal/revocation/` - The five revocation operations, their results, reason constants and audit helpers. No handler package owns revocation orchestration or its transactions any more (#387)
 - `internal/reqctx/` - The five request-scoped values (settings, session identifier, bearer token, validated token, and the credential reservation a failures-only rate-limit tier holds), each written by one middleware and read through a typed accessor; services take theirs as parameters, and the context-value guard holds every module file to them with no exemption (#433, #439)
@@ -125,7 +125,7 @@ Legacy flow returning tokens directly in redirect URI fragment. **Deprecated in 
 - Endpoint: `GET /auth/authorize` with `response_type=token|id_token|id_token token`
 - Disabled by default. Enable via `Settings.ImplicitFlowEnabled` or `Client.ImplicitGrantEnabled`
 - Security risk: Tokens exposed in browser history/Referer headers
-- Implementation: `handler_auth_issue.go`, `issuance/grant_implicit.go`, `protocolvalidation/authorize_validator.go`
+- Implementation: `handler_auth_issue.go`, `authflow/issuance.go`, `issuance/grant_implicit.go`, `protocolvalidation/authorize_validator.go`
 
 ### ROPC - Resource Owner Password Credentials (Deprecated)
 Direct username/password exchange for tokens. **Deprecated in OAuth 2.1** due to credential exposure.
@@ -164,7 +164,7 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 |---|---|---|
 | `requires_level_1` | `HandleAuthorizeGet` | four conditions: a deferred error is parked; `prompt=login`; `id_token_hint` names another user; no valid session |
 | | `authflow.Completion` | no reusable session and `!Level1AuthCompleted`, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked before any session is bound and again by the session write (restart route 1, through `Restart()`) |
-| | `refuseIssuanceUnusableSession` | bound session gone, expired or foreign, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked again by the issuer, and not `prompt=none` (restart route 2, through `Restart()`) |
+| | `authflow.Issuance` | bound session gone, expired or foreign, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked again by the issuer, and not `prompt=none` (restart route 2, through `Restart()`) |
 | `level1_password` | `authflow.SelectLevel1Method` | unconditional |
 | `level1_password_completed` | `HandleAuthPwdPost` | password verified, user enabled |
 | `level1_existing_session` | `HandleAuthorizeGet` | valid session, hint matches, user enabled. The SSO shortcut: password entry is skipped and `/auth/level1completed` accepts this state directly |
@@ -220,7 +220,7 @@ not one it accepts (#246, #437):
 | `/auth/otp` | `handler_auth_otp.go` | OTP verification (or enrollment if user doesn't have OTP yet) |
 | `/auth/completed` | `handler_auth_completed.go`, `authflow/completion.go` | Final auth check (a disabled user refused, a moved-on generation restarted, both before any session is bound), session bump/create, scope filtering, consent check |
 | `/auth/consent` | `handler_consent.go` | User consent screen (if required) |
-| `/auth/issue` | `handler_auth_issue.go` | Issues authorization code, redirects to client |
+| `/auth/issue` | `handler_auth_issue.go`, `authflow/issuance.go` | Final re-checks (redirect URI, client, flow, hint, session, user, scope), then issues the authorization code or the implicit tokens, redirects to client |
 
 ### AuthContext field rule
 Every field on `AuthContext` is either request or attempt. The request is what `/auth/authorize`
@@ -231,7 +231,7 @@ discards the attempt: `AuthContext.Restart()` zeroes every attempt field, puts `
 consent (#140, #436). There are two restart routes: `authflow.Completion` when no session is
 reusable and level 1 was never completed, or when the user's generation has moved on, or when the
 ceremony names `otp` from an authenticator the user no longer has (#542), decided before
-it binds a session (#522), and `refuseIssuanceUnusableSession` at `/auth/issue` when the
+it binds a session (#522), and `authflow.Issuance` at `/auth/issue` when the
 bound session is gone, expired or foreign, or the user's generation has moved on, or the ceremony names `otp` from an authenticator the user no longer has, and the request is not `prompt=none`. The split is held by
 `TestAuthContextFields_EveryFieldIsClassifiedOnce` in `ceremony`, which fails on a field in neither
 list. Request fields are written only in `HandleAuthorizeGet`, which

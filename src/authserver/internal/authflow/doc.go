@@ -12,6 +12,10 @@
 //   - Completion, GET /auth/completed: decides on the user (decideBeforeBinding), binds the ceremony
 //     to a user session by reusing the browser's or creating one, or restarts it at level 1
 //     (decideCompletion), then sends it to consent or to issuance (DecideAfterBinding).
+//   - Issuance, GET /auth/issue: checks again what may have changed since /auth/authorize
+//     (decideIssuance), restarts a ceremony whose session can no longer carry a grant, and issues an
+//     authorization code or the implicit grant's tokens. The handler delivers them: the encoders of
+//     the authorization response are response writers and stay in internal/handlers.
 //
 // The other steps are still written in internal/handlers.
 //
@@ -42,4 +46,7 @@
 //   - Completion's create arm confirms the browser session still holds the ceremony before it ends a
 //     foreign session or creates one, and the session start commits before its rotation (#579).
 //   - Audit records of a session write follow its commit.
+//   - Issuance clears the ceremony only after the code or the tokens are committed and audited, and
+//     a failed clear withholds them (#248). An issuer's refusal, a session or an authenticator gone
+//     by the time of the write, is answered after the issuer has rolled back (#139, #542).
 package authflow

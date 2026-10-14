@@ -213,8 +213,9 @@ func buildIssueGet(d issueGetDeps) http.HandlerFunc {
 	}
 	return HandleIssueGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
 		testClientErrorResponder(d.database, d.pageRenderer, d.templateFS),
-		d.pageRenderer, d.ceremonyStore, d.codeIssuer, d.implicitTokenIssuer,
-		d.database, d.auditLogger, d.userSessionManager, d.permissionChecker, tokenMetrics)
+		d.pageRenderer, d.ceremonyStore,
+		authflow.NewIssuance(d.database, d.codeIssuer, d.implicitTokenIssuer, d.userSessionManager,
+			d.permissionChecker, d.auditLogger, tokenMetrics))
 }
 
 func credentialFailuresOrNone(credentialFailures CredentialFailureRecorder) CredentialFailureRecorder {

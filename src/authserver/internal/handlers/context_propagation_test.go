@@ -191,7 +191,7 @@ func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
 	}
 	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-	// The row is gone, which is the shape refuseIssuanceUnusableSession answers.
+	// The row is gone, which is the shape authflow.Issuance answers as unusable.
 	database.On("GetUserSessionBySessionIdentifier", theRequestsContext(), (*sql.Tx)(nil), liveSessionIdentifier).
 		Return(nil, nil)
 	ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(nil)
