@@ -333,6 +333,6 @@ func TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPStillProceeds(t *
 	assert.NotEqual(t, "Unable to authorize", title,
 		"a stored http redirect URI must not be refused at /auth/authorize; the rule is a save gate only")
 	errorMsg := doc.Find("p#errorMsg").Text()
-	assert.Equal(t, "", errorMsg,
+	assert.Empty(t, errorMsg,
 		"validation must proceed past a stored http redirect URI into the ceremony")
 }
