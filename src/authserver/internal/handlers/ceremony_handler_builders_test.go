@@ -91,7 +91,7 @@ type authPwdGetDeps struct {
 
 func buildAuthPwdGet(d authPwdGetDeps) http.HandlerFunc {
 	return HandleAuthPwdGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
-		d.pageRenderer, d.database)
+		d.pageRenderer, authflow.NewPasswordPrompt(d.database))
 }
 
 // authPwdPostDeps.credentialFailures left out records nothing (noCredentialFailures).
@@ -105,7 +105,8 @@ type authPwdPostDeps struct {
 
 func buildAuthPwdPost(d authPwdPostDeps) http.HandlerFunc {
 	return HandleAuthPwdPost(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
-		d.pageRenderer, d.ceremonyStore, d.database, d.auditLogger, credentialFailuresOrNone(d.credentialFailures))
+		d.pageRenderer, d.ceremonyStore, credentialFailuresOrNone(d.credentialFailures),
+		authflow.NewPasswordPrompt(d.database), authflow.NewPasswordSubmission(d.database, d.auditLogger))
 }
 
 type authLevel2GetDeps struct {

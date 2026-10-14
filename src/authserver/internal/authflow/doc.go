@@ -5,6 +5,10 @@
 // The operations and the routes they serve:
 //
 //   - SelectLevel1Method, GET /auth/level1: chooses the level 1 method, today always the password.
+//   - PasswordPrompt, GET /auth/pwd, and POST /auth/pwd beside a refusal: the client block of the
+//     password form, which the handler renders.
+//   - PasswordSubmission, POST /auth/pwd: checks the password the handler read from the form, and
+//     records level 1 on the ceremony when it is right and the account enabled.
 //   - Level1Completion, GET /auth/level1completed: delivers an authorization error parked by
 //     /auth/authorize, or decides whether level 2 is owed (ceremony.StepUpOwed).
 //   - Level2Selection, GET /auth/level2: chooses the level 2 method (DecideLevel2Arm) and captures
@@ -49,6 +53,10 @@
 //   - A parked error reads the client's provenance before the ceremony is cleared, and the clear
 //     comes before the answer (Level1Completion); so does every access_denied Completion owes.
 //   - A step saves its next state before the handler redirects to it.
+//   - PasswordSubmission rotates the browser session's identifier before it saves the
+//     password-completed ceremony, and saves nothing when the rotation fails (#266). It charges a
+//     refused guess to the rate limiter, through the adapter, before the audit record, and never a
+//     right password (#219).
 //   - Completion decides on the user before either arm binds, so a refusal or a restart writes no
 //     session (#522).
 //   - Completion's reuse arm asks whether its bind is stale before it rotates the browser session's

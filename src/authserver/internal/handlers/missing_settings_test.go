@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -39,11 +38,6 @@ func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/auth/pwd?ceremony="+testCeremonyId, nil)
 	rr := httptest.NewRecorder()
 
-	ceremonyStore.On("GetAuthContext", req).Return(&ceremony.AuthContext{
-		CeremonyId: testCeremonyId,
-		AuthState:  ceremony.AuthStateLevel1Password,
-		ClientId:   "test-client",
-	}, nil)
 	pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
 	auditLogger := handlersmocks.NewAuditLogger(t)
@@ -55,6 +49,7 @@ func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 	}).ServeHTTP(rr, req)
 
 	pageRenderer.AssertExpectations(t)
+	ceremonyStore.AssertNotCalled(t, "GetAuthContext", req)
 	database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
 }
 

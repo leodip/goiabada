@@ -218,3 +218,30 @@ func TestBrowserSession_StartNewUserSessionCarriesTheHandlersWriterAndRequest(t 
 	assert.Equal(t, removals, gotRemovals)
 	userSessionManager.AssertExpectations(t)
 }
+
+// credentialFailureSpy records the requests the rate limiter's port is reached with. A spy here and
+// nowhere else: what the adapter owes is to hand the limiter this request, and the limiter's own
+// accounting is driven for real by TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly.
+type credentialFailureSpy struct {
+	requests []*http.Request
+}
+
+func (s *credentialFailureSpy) RecordCredentialFailure(r *http.Request) {
+	s.requests = append(s.requests, r)
+}
+
+// A failed credential check charges the reservation the limiter placed on this request's context,
+// so the adapter has to hand the limiter the handler's own request: a derived or another request
+// carries no reservation, and the failure would cost nothing (#219).
+func TestBrowserSession_RecordCredentialFailureCarriesTheHandlersRequest(t *testing.T) {
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	spy := &credentialFailureSpy{}
+	rr := httptest.NewRecorder()
+	req := adapterRequest()
+
+	newCredentialCheckingBrowserSession(rr, req, ceremonyStore, spy).RecordCredentialFailure()
+
+	require.Len(t, spy.requests, 1)
+	assert.Same(t, req, spy.requests[0])
+	assert.Equal(t, "this request", requestKeyValue(spy.requests[0]))
+}

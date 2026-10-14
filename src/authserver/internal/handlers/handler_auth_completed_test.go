@@ -1336,7 +1336,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
-		// This ceremony did level 1: handler_auth_pwd sets both of these. Without
+		// This ceremony did level 1: authflow.PasswordSubmission sets both of these. Without
 		// Level1AuthCompleted the #129 gate restarts level 1 rather than starting a
 		// session, so this subtest is also the positive control for that gate.
 		//

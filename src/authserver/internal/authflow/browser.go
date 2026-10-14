@@ -16,3 +16,19 @@ type stepSaver interface {
 type ceremonyClearer interface {
 	ClearAuthContext(ceremonyId string) error
 }
+
+// sessionRotator is the browser-session write that replaces the session's identifier the instant a
+// credential is accepted, so an identifier planted before the sign-in names nothing the sign-in
+// produced (#266). It lands only while the browser session still holds the ceremony, and otherwise
+// answers ceremony.ErrCeremonyReplaced and writes nothing (#579). The handler's per-request adapter
+// satisfies it, over ceremony.Store.
+type sessionRotator interface {
+	RegenerateSession(ceremonyId string) error
+}
+
+// credentialFailureRecorder charges a refused credential to the rate limiter, against the
+// reservation the limiter placed on this request before the handler ran, so the operation names no
+// bucket and no key (#219). The handler's per-request adapter satisfies it, over the rate limiter.
+type credentialFailureRecorder interface {
+	RecordCredentialFailure()
+}

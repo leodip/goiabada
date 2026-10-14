@@ -56,7 +56,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/handlers/accounthandlers/` - Pages reached without a session: self-registration and its activation link, forgot password and its reset link (#435)
 - `internal/handlers/apihandlers/` - Admin API handlers
 - `internal/{ceremony,issuance,signingkeys}/` - Provider-side issuance: codes, tokens, key rotation, ceremony context
-- `internal/authflow/` - The ceremony steps' operations, one per step: its loads, the decision it applies, its database and browser-session writes, and a typed result its handler answers from. It cannot reach HTTP (`import_lint_test.go` refuses `net/http`, chi, `internal/handlers`, `internal/middleware` and `internal/reqctx`): what the request carries arrives as plain values, every browser-session write goes through a port the handler satisfies with a per-request adapter (`handlers.browserSession`), and the handler writes the response after the operation returns. Today `/auth/level1` (`SelectLevel1Method`), `/auth/level1completed` (`Level1Completion`), `/auth/level2` (`Level2Selection`), `/auth/completed` (`Completion`), `/auth/consent` (`ConsentPrompt` on the GET, `ConsentSubmission` on the POST) and `/auth/issue` (`Issuance`); the other steps are still written in `internal/handlers` (#580)
+- `internal/authflow/` - The ceremony steps' operations, one per step: its loads, the decision it applies, its database and browser-session writes, and a typed result its handler answers from. It cannot reach HTTP (`import_lint_test.go` refuses `net/http`, chi, `internal/handlers`, `internal/middleware` and `internal/reqctx`): what the request carries arrives as plain values, every browser-session write goes through a port the handler satisfies with a per-request adapter (`handlers.browserSession`), and the handler writes the response after the operation returns. Today `/auth/level1` (`SelectLevel1Method`), `/auth/level1completed` (`Level1Completion`), `/auth/level2` (`Level2Selection`), `/auth/pwd` (`PasswordPrompt` on the GET and beside a refusal, `PasswordSubmission` on the POST), `/auth/completed` (`Completion`), `/auth/consent` (`ConsentPrompt` on the GET, `ConsentSubmission` on the POST) and `/auth/issue` (`Issuance`); the other steps are still written in `internal/handlers` (#580)
 - `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imageupload,uithemes}/` - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, image uploads, themes
 - `internal/revocation/` - The five revocation operations, their results, reason constants and audit helpers. No handler package owns revocation orchestration or its transactions any more (#387)
 - `internal/reqctx/` - The five request-scoped values (settings, session identifier, bearer token, validated token, and the credential reservation a failures-only rate-limit tier holds), each written by one middleware and read through a typed accessor; services take theirs as parameters, and the context-value guard holds every module file to them with no exemption (#433, #439)
@@ -166,7 +166,7 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 | | `authflow.Completion` | no reusable session and `!Level1AuthCompleted`, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked before any session is bound and again by the session write (restart route 1, through `Restart()`) |
 | | `authflow.Issuance` | bound session gone, expired or foreign, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked again by the issuer, and not `prompt=none` (restart route 2, through `Restart()`) |
 | `level1_password` | `authflow.SelectLevel1Method` | unconditional |
-| `level1_password_completed` | `HandleAuthPwdPost` | password verified, user enabled |
+| `level1_password_completed` | `authflow.PasswordSubmission` | password verified, user enabled |
 | `level1_existing_session` | `HandleAuthorizeGet` | valid session, hint matches, user enabled. The SSO shortcut: password entry is skipped and `/auth/level1completed` accepts this state directly |
 | `requires_level_2` | `authflow.Level1Completion` | target ACR above the owned session's ACR, or above level 1 with no owned session, or the session's `OtpConfigGeneration` differs from the user's and the target is above level 1, or the target is `level2_mandatory` and the user has no authenticator. A ceremony that verified the password itself (`Level1AuthCompleted`) counts no session, so it lands here whenever the target is above level 1 (#537) |
 | `level2_otp` | `authflow.Level2Selection` | `level2_optional` with OTP enabled, or `level2_mandatory` (enrolment happens at `/auth/otp` if needed) |
@@ -214,7 +214,7 @@ not one it accepts (#246, #437):
 |---------|------|---------|
 | `/auth/authorize` | `handler_authorize.go` | Entry point. Validates request, checks existing session, routes to level1. A POST (`handler_authorize_post.go`) only parks the request and redirects to the GET |
 | `/auth/level1` | `handler_auth_level1.go`, `authflow/level1_selection.go` | Selects level1 auth method (currently only password) |
-| `/auth/pwd` | `handler_auth_pwd.go` | Password login form. Validates credentials, creates session |
+| `/auth/pwd` | `handler_auth_pwd.go`, `authflow/password.go` | Password login form. Verifies the password, rotates the browser session's identifier, records level 1 on the ceremony |
 | `/auth/level1completed` | `handler_auth_level1.go`, `authflow/level1_completion.go` | Delivers a deferred authorization error if one is parked (see below), else decides if level2 needed based on ACR and session state |
 | `/auth/level2` | `handler_auth_level2.go`, `authflow/level2_selection.go` | Selects level2 auth method. If `level2_optional` + no OTP → skip to completed |
 | `/auth/otp` | `handler_auth_otp.go` | OTP verification (or enrollment if user doesn't have OTP yet) |
@@ -401,7 +401,7 @@ claims: ending the user's sessions revokes those (#542 decision 1).
 
 Both readers, `authflow.Level1Completion` and `handlePromptNone`, only compare and write nothing,
 so an abandoned ceremony spends no re-prompt. The snapshot is captured onto `AuthContext` at
-`handler_auth_pwd` and on every arm of `authflow.Level2Selection`, and promoted once, at
+`authflow.PasswordSubmission` and on every arm of `authflow.Level2Selection`, and promoted once, at
 `/auth/completed`: `StartNewUserSession` writes it on the create arm, and
 `PromoteUserSessionOtpConfigGeneration` on the reuse arm when the target ACR is above level 1. Both
 columns are `dont-update` (#242).

@@ -42,6 +42,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 
 		rr := httptest.NewRecorder()
 
@@ -73,6 +74,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 
 		rr := httptest.NewRecorder()
 
@@ -386,6 +388,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("POST", "/auth/pwd", nil)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		expectedError := &oauth.ErrorDetail{}
@@ -420,6 +423,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -521,6 +525,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				}
 				req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 				rr := httptest.NewRecorder()
 
 				authContext := &ceremony.AuthContext{

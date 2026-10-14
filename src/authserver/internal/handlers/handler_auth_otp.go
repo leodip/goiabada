@@ -414,7 +414,7 @@ func HandleAuthOtpPost(
 		// on acceptance means an identifier stolen at level 1 is dead the moment the
 		// authenticator code is accepted rather than one redirect later.
 		//
-		// Before the save, for the ordering argument written out in handler_auth_pwd:
+		// Before the save, for the ordering argument on authflow.PasswordSubmission.Run:
 		// rotation persists the contents as they are now, so a failure between the two
 		// leaves a fresh identifier on a session that has not been marked
 		// authentication_completed (#266). It is conditional on this ceremony, as the password

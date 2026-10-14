@@ -53,8 +53,8 @@ type AuthContext struct {
 	IdTokenHintSub                string     // sub claim from id_token_hint (empty if no hint provided)
 	// Level1AuthCompleted records that level 1 authentication happened in THIS ceremony,
 	// as opposed to being inherited from a session the ceremony reused. It is written only
-	// where level 1 is performed, today only handler_auth_pwd, and read by
-	// handler_auth_completed to decide whether a ceremony with no valid session may create
+	// where level 1 is performed, today only authflow.PasswordSubmission, and read by
+	// authflow.Completion to decide whether a ceremony with no valid session may create
 	// one (#129 decision 15).
 	//
 	// AuthenticatedAt cannot answer that question, which is why this field exists: the OTP

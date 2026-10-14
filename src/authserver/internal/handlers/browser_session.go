@@ -22,6 +22,9 @@ type browserSession struct {
 	// userSessionManager is set only for /auth/completed, whose session start rotates the browser
 	// session's identifier and writes the device cookie (newSessionStartingBrowserSession).
 	userSessionManager UserSessionManager
+	// credentialFailures is set only for a step that checks a credential
+	// (newCredentialCheckingBrowserSession).
+	credentialFailures CredentialFailureRecorder
 }
 
 func newBrowserSession(w http.ResponseWriter, r *http.Request, ceremonyStore CeremonyStore) *browserSession {
@@ -33,6 +36,14 @@ func newSessionStartingBrowserSession(w http.ResponseWriter, r *http.Request, ce
 	userSessionManager UserSessionManager) *browserSession {
 
 	return &browserSession{w: w, r: r, ceremonyStore: ceremonyStore, userSessionManager: userSessionManager}
+}
+
+// newCredentialCheckingBrowserSession is newBrowserSession for a step that checks a credential, whose
+// refusals are charged to the rate limiter.
+func newCredentialCheckingBrowserSession(w http.ResponseWriter, r *http.Request, ceremonyStore CeremonyStore,
+	credentialFailures CredentialFailureRecorder) *browserSession {
+
+	return &browserSession{w: w, r: r, ceremonyStore: ceremonyStore, credentialFailures: credentialFailures}
 }
 
 // SaveAuthContext is CeremonyStore.SaveAuthContext, a step's conditional save.
@@ -64,4 +75,10 @@ func (b *browserSession) StartNewUserSession(clientId int64, authentication user
 
 	return b.userSessionManager.StartNewUserSession(b.w, b.r, clientId, authentication, authStateGeneration,
 		otpConfigGeneration, ipAddress, replacing, limits)
+}
+
+// RecordCredentialFailure is CredentialFailureRecorder.RecordCredentialFailure on this request, whose
+// context carries the reservation the rate limiter placed before the handler ran.
+func (b *browserSession) RecordCredentialFailure() {
+	b.credentialFailures.RecordCredentialFailure(b.r)
 }
