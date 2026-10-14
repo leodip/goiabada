@@ -77,7 +77,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		require.NoError(t, err)
@@ -158,7 +167,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		require.NoError(t, err)
@@ -219,7 +237,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=invalid-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		require.NoError(t, err)
@@ -266,7 +293,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		// jwt is JARM, which this server does not implement, and it is what a client asking for an
 		// unsupported mode most plausibly asks for.
@@ -320,7 +356,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&response_mode=query", nil)
@@ -378,7 +423,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		stubRegisteredRedirectURI(database, "https://example.com")
 		client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
@@ -433,7 +487,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=invalid&scope=openid", nil)
@@ -484,7 +547,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=invalid", nil)
@@ -545,7 +617,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=invalid", nil)
@@ -609,7 +690,17 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=invalid", nil)
@@ -670,7 +761,17 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=invalid", nil)
@@ -725,7 +826,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		require.NoError(t, err)
@@ -795,7 +905,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		require.NoError(t, err)
@@ -840,7 +959,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		require.NoError(t, err)
@@ -916,7 +1044,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		form := url.Values{}
 		form.Set("client_id", "test-client")
@@ -981,7 +1118,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		form := url.Values{}
@@ -1047,7 +1193,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET",
 			"/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&ui_locales=pt-BR%20es",
@@ -1111,7 +1266,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		form := url.Values{}
 		form.Set("client_id", "test-client")
@@ -2154,7 +2318,16 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
 		require.NoError(t, err)
@@ -2221,7 +2394,16 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=id_token%20token&scope=openid&nonce=test-nonce", nil)
 		require.NoError(t, err)
@@ -2285,7 +2467,16 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid", nil)
@@ -2345,7 +2536,16 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
 		require.NoError(t, err)
@@ -2458,7 +2658,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=bad-jwt-token", nil)
@@ -2517,7 +2726,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-wrong-issuer", nil)
@@ -2585,7 +2803,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=an-access-token", nil)
@@ -2654,7 +2881,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-no-sub", nil)
@@ -2719,7 +2955,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=expired-jwt-token", nil)
@@ -2803,7 +3048,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-token", nil)
@@ -2887,7 +3141,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		hintSubject := fake.UUID()
 		sessionSubject := fake.UUID()
@@ -2972,7 +3235,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none&id_token_hint=valid-jwt-token", nil)
@@ -3093,7 +3365,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		const requestedScope = "openid res:offline_access_read"
 		userSubject := fake.UUID()
@@ -3199,7 +3480,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		hintSubject := fake.UUID()
 		sessionSubject := fake.UUID()
@@ -3293,7 +3583,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		hintSubject := fake.UUID()
 		sessionSubject := fake.UUID()
@@ -3391,7 +3690,17 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		hintSubject := fake.UUID()
 		sessionSubject := fake.UUID()
@@ -3481,7 +3790,17 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		hintSubject := fake.UUID()
 		sessionSubject := fake.UUID()
@@ -3570,7 +3889,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&state=abc123&request=foo", nil)
@@ -3619,7 +3947,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&state=xyz&request_uri=https://example.com/x", nil)
@@ -3667,7 +4004,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&request=", nil)
@@ -3854,8 +4200,16 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 			tokenParser := handlersmocks.NewTokenParser(t)
 
-			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+			handler := buildAuthorizeGet(authorizeGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				authorizeValidator: authorizeValidator,
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+				tokenParser:        tokenParser,
+			})
 
 			target := "/authorize?client_id=test-client&redirect_uri=" + url.QueryEscape(tc.redirectURI) +
 				"&response_type=code&scope=" + url.QueryEscape("openid bogus")
@@ -3974,8 +4328,16 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 			tokenParser := handlersmocks.NewTokenParser(t)
 
-			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+			handler := buildAuthorizeGet(authorizeGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				authorizeValidator: authorizeValidator,
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+				tokenParser:        tokenParser,
+			})
 
 			target := "/authorize?client_id=test-client&redirect_uri=https%3A%2F%2Flegit.example%2Fcb" +
 				"&response_type=code&scope=" + url.QueryEscape("openid bogus")
@@ -4060,8 +4422,16 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 	permissionChecker := handlersmocks.NewPermissionChecker(t)
 	tokenParser := handlersmocks.NewTokenParser(t)
 
-	handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-		authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+	handler := buildAuthorizeGet(authorizeGetDeps{
+		pageRenderer:       pageRenderer,
+		ceremonyStore:      ceremonyStore,
+		userSessionManager: userSessionManager,
+		database:           database,
+		authorizeValidator: authorizeValidator,
+		auditLogger:        auditLogger,
+		permissionChecker:  permissionChecker,
+		tokenParser:        tokenParser,
+	})
 
 	req := httptest.NewRequest("GET",
 		"/authorize?client_id=test-client&redirect_uri=https%3A%2F%2Flegit.example%2Fcb"+
@@ -4169,8 +4539,16 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 			tokenParser := handlersmocks.NewTokenParser(t)
 
-			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+			handler := buildAuthorizeGet(authorizeGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				authorizeValidator: authorizeValidator,
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+				tokenParser:        tokenParser,
+			})
 
 			target := "/authorize?client_id=test-client&redirect_uri=" + url.QueryEscape(redirectURI) +
 				"&response_type=code&scope=" + url.QueryEscape("openid bogus")

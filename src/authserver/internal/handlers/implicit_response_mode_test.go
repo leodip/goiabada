@@ -297,8 +297,18 @@ func TestHandleIssueGet_ImplicitFlow_FormPost(t *testing.T) {
 	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 	registry := metrics.NewRegistry()
-	handler := HandleIssueGet(pageRenderer, ceremonyStore, web.TemplateFS(), codeIssuer, implicitTokenIssuer, database,
-		auditLogger, userSessionManager, permissionChecker, tokenmetrics.Register(registry), testBaseURL, testAdminConsoleBaseURL)
+	handler := buildIssueGet(issueGetDeps{
+		pageRenderer:        pageRenderer,
+		ceremonyStore:       ceremonyStore,
+		templateFS:          web.TemplateFS(),
+		codeIssuer:          codeIssuer,
+		implicitTokenIssuer: implicitTokenIssuer,
+		database:            database,
+		auditLogger:         auditLogger,
+		userSessionManager:  userSessionManager,
+		permissionChecker:   permissionChecker,
+		tokenMetrics:        tokenmetrics.Register(registry),
+	})
 
 	req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 	rr := httptest.NewRecorder()

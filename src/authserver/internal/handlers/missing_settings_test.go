@@ -47,7 +47,12 @@ func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 	pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL).ServeHTTP(rr, req)
+	buildAuthPwdGet(authPwdGetDeps{
+		pageRenderer:  pageRenderer,
+		ceremonyStore: ceremonyStore,
+		database:      database,
+		auditLogger:   auditLogger,
+	}).ServeHTTP(rr, req)
 
 	pageRenderer.AssertExpectations(t)
 	database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)

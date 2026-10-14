@@ -134,8 +134,17 @@ func newRecheckFixtureFor(t *testing.T, responseType string, prompt string, sess
 	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
 		Return(func(_ context.Context, scope string, _ *record.User) string { return scope }, nil).Maybe()
 
-	handler := HandleIssueGet(f.pageRenderer, f.ceremonyStore, fstest.MapFS{}, f.codeIssuer, f.implicitIssuer,
-		f.database, f.auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+	handler := buildIssueGet(issueGetDeps{
+		pageRenderer:        f.pageRenderer,
+		ceremonyStore:       f.ceremonyStore,
+		templateFS:          fstest.MapFS{},
+		codeIssuer:          f.codeIssuer,
+		implicitTokenIssuer: f.implicitIssuer,
+		database:            f.database,
+		auditLogger:         f.auditLogger,
+		userSessionManager:  userSessionManager,
+		permissionChecker:   permissionChecker,
+	})
 	f.serve = func() { handler.ServeHTTP(f.rr, f.req) }
 	return f
 }

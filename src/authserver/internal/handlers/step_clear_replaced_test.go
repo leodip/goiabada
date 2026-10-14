@@ -248,8 +248,12 @@ func TestHandleAuthOtpPost_AnEnrolmentEndingForAReplacedCeremonyAnswersNoLongerA
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{},
-		testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+	handler := buildAuthOtpPost(authOtpPostDeps{
+		pageRenderer:  pageRenderer,
+		ceremonyStore: ceremonyStore,
+		database:      database,
+		auditLogger:   auditLogger,
+	})
 
 	key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
 	require.NoError(t, err)

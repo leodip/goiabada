@@ -80,8 +80,16 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 			tokenParser := handlersmocks.NewTokenParser(t)
 
-			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+			handler := buildAuthorizeGet(authorizeGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				authorizeValidator: authorizeValidator,
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+				tokenParser:        tokenParser,
+			})
 
 			req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none", nil)
 			require.NoError(t, err)
@@ -159,8 +167,16 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 			tokenParser := handlersmocks.NewTokenParser(t)
 
-			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+			handler := buildAuthorizeGet(authorizeGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				authorizeValidator: authorizeValidator,
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+				tokenParser:        tokenParser,
+			})
 
 			req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none", nil)
 			require.NoError(t, err)
@@ -283,8 +299,16 @@ func TestHandlePromptNone_ManageAccountConsent(t *testing.T) {
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 			tokenParser := handlersmocks.NewTokenParser(t)
 
-			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+			handler := buildAuthorizeGet(authorizeGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				authorizeValidator: authorizeValidator,
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+				tokenParser:        tokenParser,
+			})
 
 			req, err := http.NewRequest("GET", "/authorize?"+url.Values{
 				"client_id":     {tc.clientIdentifier},

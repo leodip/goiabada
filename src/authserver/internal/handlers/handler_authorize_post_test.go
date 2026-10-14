@@ -53,7 +53,11 @@ func newAuthorizePostEndpoint(t *testing.T) *authorizePostEndpoint {
 		validator:    handlersmocks.NewAuthorizeValidator(t),
 		database:     datamocks.NewDatabase(t),
 	}
-	e.handler = HandleAuthorizePost(e.pageRenderer, e.validator, e.database, testBaseURL)
+	e.handler = buildAuthorizePost(authorizePostDeps{
+		pageRenderer:       e.pageRenderer,
+		authorizeValidator: e.validator,
+		database:           e.database,
+	})
 	return e
 }
 

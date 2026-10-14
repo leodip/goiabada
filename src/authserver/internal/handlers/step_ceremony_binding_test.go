@@ -32,68 +32,126 @@ func everyGatedStep() []stepUnderTest {
 		{name: "level1", method: http.MethodGet, path: "/auth/level1", accepted: ceremony.AuthStateRequiresLevel1,
 			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
-				return HandleAuthLevel1Get(pr, cs, al, testBaseURL, testAdminConsoleBaseURL)
+				return buildAuthLevel1Get(authLevel1GetDeps{
+					pageRenderer:  pr,
+					ceremonyStore: cs,
+					auditLogger:   al,
+				})
 			}},
 		{name: "level1completed", method: http.MethodGet, path: "/auth/level1completed",
 			accepted: ceremony.AuthStateLevel1PasswordCompleted,
 			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
-				return HandleAuthLevel1CompletedGet(pr, cs, handlersmocks.NewUserSessionManager(t),
-					datamocks.NewDatabase(t), fstest.MapFS{}, al, testBaseURL, testAdminConsoleBaseURL)
+				return buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+					pageRenderer:       pr,
+					ceremonyStore:      cs,
+					userSessionManager: handlersmocks.NewUserSessionManager(t),
+					database:           datamocks.NewDatabase(t),
+					templateFS:         fstest.MapFS{},
+					auditLogger:        al,
+				})
 			}},
 		{name: "level2", method: http.MethodGet, path: "/auth/level2", accepted: ceremony.AuthStateRequiresLevel2,
 			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
-				return HandleAuthLevel2Get(pr, cs, datamocks.NewDatabase(t), al, testBaseURL, testAdminConsoleBaseURL)
+				return buildAuthLevel2Get(authLevel2GetDeps{
+					pageRenderer:  pr,
+					ceremonyStore: cs,
+					database:      datamocks.NewDatabase(t),
+					auditLogger:   al,
+				})
 			}},
 		{name: "pwd GET", method: http.MethodGet, path: "/auth/pwd", accepted: ceremony.AuthStateLevel1Password,
 			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
-				return HandleAuthPwdGet(pr, cs, datamocks.NewDatabase(t), al, testAdminConsoleBaseURL)
+				return buildAuthPwdGet(authPwdGetDeps{
+					pageRenderer:  pr,
+					ceremonyStore: cs,
+					database:      datamocks.NewDatabase(t),
+					auditLogger:   al,
+				})
 			}},
 		{name: "pwd POST", method: http.MethodPost, path: "/auth/pwd", accepted: ceremony.AuthStateLevel1Password,
 			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
-				return HandleAuthPwdPost(pr, cs, datamocks.NewDatabase(t), al, noCredentialFailures{},
-					testBaseURL, testAdminConsoleBaseURL)
+				return buildAuthPwdPost(authPwdPostDeps{
+					pageRenderer:  pr,
+					ceremonyStore: cs,
+					database:      datamocks.NewDatabase(t),
+					auditLogger:   al,
+				})
 			}},
 		{name: "otp GET", method: http.MethodGet, path: "/auth/otp", accepted: ceremony.AuthStateLevel2OTP,
 			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
-				return HandleAuthOtpGet(pr, cs, datamocks.NewDatabase(t), handlersmocks.NewOtpSecretGenerator(t), al,
-					testAdminConsoleBaseURL)
+				return buildAuthOtpGet(authOtpGetDeps{
+					pageRenderer:       pr,
+					ceremonyStore:      cs,
+					database:           datamocks.NewDatabase(t),
+					otpSecretGenerator: handlersmocks.NewOtpSecretGenerator(t),
+					auditLogger:        al,
+				})
 			}},
 		{name: "otp POST", method: http.MethodPost, path: "/auth/otp", accepted: ceremony.AuthStateLevel2OTP,
 			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
-				return HandleAuthOtpPost(pr, cs, datamocks.NewDatabase(t), al, noCredentialFailures{}, testDataCipher,
-					testBaseURL, testAdminConsoleBaseURL)
+				return buildAuthOtpPost(authOtpPostDeps{
+					pageRenderer:  pr,
+					ceremonyStore: cs,
+					database:      datamocks.NewDatabase(t),
+					auditLogger:   al,
+				})
 			}},
 		{name: "completed", method: http.MethodGet, path: "/auth/completed",
 			accepted: ceremony.AuthStateAuthenticationCompleted,
 			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
-				return HandleAuthCompletedGet(pr, cs, handlersmocks.NewUserSessionManager(t), datamocks.NewDatabase(t),
-					fstest.MapFS{}, al, handlersmocks.NewPermissionChecker(t), testBaseURL, testAdminConsoleBaseURL)
+				return buildAuthCompletedGet(authCompletedGetDeps{
+					pageRenderer:       pr,
+					ceremonyStore:      cs,
+					userSessionManager: handlersmocks.NewUserSessionManager(t),
+					database:           datamocks.NewDatabase(t),
+					templateFS:         fstest.MapFS{},
+					auditLogger:        al,
+					permissionChecker:  handlersmocks.NewPermissionChecker(t),
+				})
 			}},
 		{name: "consent GET", method: http.MethodGet, path: "/auth/consent", accepted: ceremony.AuthStateRequiresConsent,
 			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
-				return HandleConsentGet(pr, cs, datamocks.NewDatabase(t), al, testBaseURL, testAdminConsoleBaseURL)
+				return buildConsentGet(consentGetDeps{
+					pageRenderer:  pr,
+					ceremonyStore: cs,
+					database:      datamocks.NewDatabase(t),
+					auditLogger:   al,
+				})
 			}},
 		{name: "consent POST", method: http.MethodPost, path: "/auth/consent", accepted: ceremony.AuthStateRequiresConsent,
 			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
-				return HandleConsentPost(pr, cs, datamocks.NewDatabase(t), fstest.MapFS{}, al,
-					handlersmocks.NewPermissionChecker(t), testBaseURL, testAdminConsoleBaseURL)
+				return buildConsentPost(consentPostDeps{
+					pageRenderer:      pr,
+					ceremonyStore:     cs,
+					database:          datamocks.NewDatabase(t),
+					templateFS:        fstest.MapFS{},
+					auditLogger:       al,
+					permissionChecker: handlersmocks.NewPermissionChecker(t),
+				})
 			}},
 		{name: "issue", method: http.MethodGet, path: "/auth/issue", accepted: ceremony.AuthStateReadyToIssueCode,
 			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
-				return HandleIssueGet(pr, cs, fstest.MapFS{}, handlersmocks.NewCodeIssuer(t),
-					handlersmocks.NewImplicitTokenIssuer(t), datamocks.NewDatabase(t), al,
-					handlersmocks.NewUserSessionManager(t), handlersmocks.NewPermissionChecker(t),
-					testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+				return buildIssueGet(issueGetDeps{
+					pageRenderer:        pr,
+					ceremonyStore:       cs,
+					templateFS:          fstest.MapFS{},
+					codeIssuer:          handlersmocks.NewCodeIssuer(t),
+					implicitTokenIssuer: handlersmocks.NewImplicitTokenIssuer(t),
+					database:            datamocks.NewDatabase(t),
+					auditLogger:         al,
+					userSessionManager:  handlersmocks.NewUserSessionManager(t),
+					permissionChecker:   handlersmocks.NewPermissionChecker(t),
+				})
 			}},
 	}
 }

@@ -77,7 +77,13 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		otpSecretGenerator := handlersmocks.NewOtpSecretGenerator(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, auditLogger, testAdminConsoleBaseURL)
+		handler := buildAuthOtpGet(authOtpGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			database:           database,
+			otpSecretGenerator: otpSecretGenerator,
+			auditLogger:        auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -102,7 +108,13 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		otpSecretGenerator := handlersmocks.NewOtpSecretGenerator(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, auditLogger, testAdminConsoleBaseURL)
+		handler := buildAuthOtpGet(authOtpGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			database:           database,
+			otpSecretGenerator: otpSecretGenerator,
+			auditLogger:        auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -128,7 +140,13 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		otpSecretGenerator := handlersmocks.NewOtpSecretGenerator(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, auditLogger, testAdminConsoleBaseURL)
+		handler := buildAuthOtpGet(authOtpGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			database:           database,
+			otpSecretGenerator: otpSecretGenerator,
+			auditLogger:        auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -214,7 +232,13 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		otpSecretGenerator := handlersmocks.NewOtpSecretGenerator(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, auditLogger, testAdminConsoleBaseURL)
+		handler := buildAuthOtpGet(authOtpGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			database:           database,
+			otpSecretGenerator: otpSecretGenerator,
+			auditLogger:        auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -324,7 +348,13 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		otpSecretGenerator := handlersmocks.NewOtpSecretGenerator(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, auditLogger, testAdminConsoleBaseURL)
+		handler := buildAuthOtpGet(authOtpGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			database:           database,
+			otpSecretGenerator: otpSecretGenerator,
+			auditLogger:        auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -389,7 +419,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -421,7 +456,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -452,7 +492,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -537,7 +582,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 				database := datamocks.NewDatabase(t)
 				auditLogger := handlersmocks.NewAuditLogger(t)
 
-				handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+				handler := buildAuthOtpPost(authOtpPostDeps{
+					pageRenderer:  pageRenderer,
+					ceremonyStore: ceremonyStore,
+					database:      database,
+					auditLogger:   auditLogger,
+				})
 
 				form := url.Values{}
 				form.Add("otp", "123456")
@@ -583,7 +633,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -619,7 +674,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -668,7 +728,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -718,7 +783,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -785,7 +855,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -842,7 +917,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -898,7 +978,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -951,7 +1036,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1041,7 +1131,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1095,7 +1190,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1226,7 +1326,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1304,7 +1409,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1376,7 +1486,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1470,7 +1585,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1563,7 +1683,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1626,7 +1751,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1713,8 +1843,12 @@ func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{},
-				testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+			handler := buildAuthOtpPost(authOtpPostDeps{
+				pageRenderer:  pageRenderer,
+				ceremonyStore: ceremonyStore,
+				database:      database,
+				auditLogger:   auditLogger,
+			})
 
 			key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
 			require.NoError(t, err)
@@ -1788,8 +1922,12 @@ func TestHandleAuthOtpPost_AnEnrolmentFormAfterAnEnrolmentElsewhereEndsTheSignIn
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{},
-		testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+	handler := buildAuthOtpPost(authOtpPostDeps{
+		pageRenderer:  pageRenderer,
+		ceremonyStore: ceremonyStore,
+		database:      database,
+		auditLogger:   auditLogger,
+	})
 
 	key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
 	require.NoError(t, err)
@@ -1898,7 +2036,13 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 			template, mock.Anything).Return(nil).Maybe()
 
 		rateLimiter := newTestRateLimiter(ceremonyStore)
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, rateLimiter, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			database:           database,
+			auditLogger:        auditLogger,
+			credentialFailures: rateLimiter,
+		})
 		return rateLimiter.LimitOtp(handler), authContext
 	}
 

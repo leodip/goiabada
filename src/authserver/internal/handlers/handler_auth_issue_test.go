@@ -81,7 +81,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -114,7 +124,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -150,7 +170,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		// The positive control for the liveness check (#129 stage 6): the ordinary ceremony,
 		// with a session identifier in the context and a session row behind it. It fails
@@ -236,7 +266,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		// An empty identifier is the shape the terminated ceremony actually arrives in:
 		// middleware.SessionIdentifier finds the row gone, deletes the identifier from the
@@ -295,7 +335,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, fstest.MapFS{}, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          fstest.MapFS{},
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -336,7 +386,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		// The narrower half of the same predicate: the middleware saw the session alive on
 		// this very request and the termination committed immediately afterwards, so the
@@ -389,7 +449,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		// The same empty identifier as the row above, arriving from handlePromptNone rather
 		// than from the consent screen: it validated and bumped the session, redirected here,
@@ -465,7 +535,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -533,7 +613,17 @@ func TestHandleIssueGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -591,7 +681,17 @@ func TestHandleIssueGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -646,7 +746,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 
@@ -694,7 +804,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 
@@ -798,9 +918,17 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 			stubRegisteredRedirectURI(f.database, f.authContext.RedirectURI)
 			stubClientProvenanceLookup(f.database)
 		}
-		handler := HandleIssueGet(f.pageRenderer, f.ceremonyStore, fstest.MapFS{}, f.codeIssuer,
-			handlersmocks.NewImplicitTokenIssuer(t), f.database, f.auditLogger, userSessionManager,
-			permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        f.pageRenderer,
+			ceremonyStore:       f.ceremonyStore,
+			templateFS:          fstest.MapFS{},
+			codeIssuer:          f.codeIssuer,
+			implicitTokenIssuer: handlersmocks.NewImplicitTokenIssuer(t),
+			database:            f.database,
+			auditLogger:         f.auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 		f.ceremonyStore.On("GetAuthContext", f.req).Return(f.authContext, nil)
 		stubLiveSession(f.database, 123)
 		armIssueGate(f.database, userSessionManager, permissionChecker, f.authContext.RedirectURI)
@@ -1043,7 +1171,17 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildIssueGet(issueGetDeps{
+				pageRenderer:        pageRenderer,
+				ceremonyStore:       ceremonyStore,
+				templateFS:          templateFS,
+				codeIssuer:          codeIssuer,
+				implicitTokenIssuer: implicitTokenIssuer,
+				database:            database,
+				auditLogger:         auditLogger,
+				userSessionManager:  userSessionManager,
+				permissionChecker:   permissionChecker,
+			})
 
 			logs := logtest.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -1136,7 +1274,17 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildIssueGet(issueGetDeps{
+				pageRenderer:        pageRenderer,
+				ceremonyStore:       ceremonyStore,
+				templateFS:          templateFS,
+				codeIssuer:          codeIssuer,
+				implicitTokenIssuer: implicitTokenIssuer,
+				database:            database,
+				auditLogger:         auditLogger,
+				userSessionManager:  userSessionManager,
+				permissionChecker:   permissionChecker,
+			})
 
 			logs := logtest.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -1205,7 +1353,17 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -1288,7 +1446,17 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		logs := logtest.CaptureSlog(t)
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -1351,7 +1519,17 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		logs := logtest.CaptureSlog(t)
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -1570,7 +1748,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -1674,7 +1862,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -1765,7 +1963,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -1861,7 +2069,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -1930,7 +2148,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -1991,7 +2219,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -2041,7 +2279,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -2338,7 +2586,17 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -2384,7 +2642,17 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -2435,7 +2703,17 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -3271,7 +3549,17 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		// A live session, since this subtest reaches code creation (#129 stage 6).
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -3354,7 +3642,17 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -3439,7 +3737,17 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -3517,7 +3825,17 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -3587,7 +3905,17 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -3652,7 +3980,17 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		// A live session, since this subtest reaches code creation (#129 stage 6).
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -3728,7 +4066,17 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -3879,7 +4227,17 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildIssueGet(issueGetDeps{
+				pageRenderer:        pageRenderer,
+				ceremonyStore:       ceremonyStore,
+				templateFS:          templateFS,
+				codeIssuer:          codeIssuer,
+				implicitTokenIssuer: implicitTokenIssuer,
+				database:            database,
+				auditLogger:         auditLogger,
+				userSessionManager:  userSessionManager,
+				permissionChecker:   permissionChecker,
+			})
 
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
@@ -3981,7 +4339,17 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 	userSessionManager := handlersmocks.NewUserSessionManager(t)
 	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-	handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+	handler := buildIssueGet(issueGetDeps{
+		pageRenderer:        pageRenderer,
+		ceremonyStore:       ceremonyStore,
+		templateFS:          templateFS,
+		codeIssuer:          codeIssuer,
+		implicitTokenIssuer: implicitTokenIssuer,
+		database:            database,
+		auditLogger:         auditLogger,
+		userSessionManager:  userSessionManager,
+		permissionChecker:   permissionChecker,
+	})
 
 	req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 	rr := httptest.NewRecorder()
@@ -4061,7 +4429,17 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildIssueGet(issueGetDeps{
+				pageRenderer:        pageRenderer,
+				ceremonyStore:       ceremonyStore,
+				templateFS:          templateFS,
+				codeIssuer:          codeIssuer,
+				implicitTokenIssuer: implicitTokenIssuer,
+				database:            database,
+				auditLogger:         auditLogger,
+				userSessionManager:  userSessionManager,
+				permissionChecker:   permissionChecker,
+			})
 
 			logs := logtest.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -4214,7 +4592,17 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildIssueGet(issueGetDeps{
+				pageRenderer:        pageRenderer,
+				ceremonyStore:       ceremonyStore,
+				templateFS:          templateFS,
+				codeIssuer:          codeIssuer,
+				implicitTokenIssuer: implicitTokenIssuer,
+				database:            database,
+				auditLogger:         auditLogger,
+				userSessionManager:  userSessionManager,
+				permissionChecker:   permissionChecker,
+			})
 
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
@@ -4366,8 +4754,17 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
-				database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildIssueGet(issueGetDeps{
+				pageRenderer:        pageRenderer,
+				ceremonyStore:       ceremonyStore,
+				templateFS:          templateFS,
+				codeIssuer:          codeIssuer,
+				implicitTokenIssuer: implicitTokenIssuer,
+				database:            database,
+				auditLogger:         auditLogger,
+				userSessionManager:  userSessionManager,
+				permissionChecker:   permissionChecker,
+			})
 
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
@@ -4442,8 +4839,17 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
-			database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -4513,8 +4919,17 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
-			database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -4634,8 +5049,17 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
-			database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -4684,8 +5108,17 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
-			database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -4726,8 +5159,17 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
-			database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()

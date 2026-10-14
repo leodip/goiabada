@@ -38,7 +38,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		// The reuse bump records the browser's address, read as the rest of the server reads
@@ -185,7 +193,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -384,7 +400,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -494,7 +518,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req.RemoteAddr = "203.0.113.7:4444"
@@ -636,7 +668,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{}, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+			handler := buildAuthCompletedGet(authCompletedGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				templateFS:         fstest.MapFS{},
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+			})
 
 			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 			req.RemoteAddr = "203.0.113.7:4444"
@@ -724,7 +764,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -839,7 +887,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -955,7 +1011,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -1066,7 +1130,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{}, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         fstest.MapFS{},
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -1151,7 +1223,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -1242,7 +1322,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -1357,7 +1445,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -1461,7 +1557,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -1559,7 +1663,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -1655,7 +1767,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -1752,7 +1872,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -1780,7 +1908,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -1809,7 +1945,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -1851,7 +1995,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -1950,7 +2102,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -2042,7 +2202,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -2130,7 +2298,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -2213,7 +2389,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -2314,7 +2498,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -2401,7 +2593,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -2486,7 +2686,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -2571,7 +2779,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -2667,7 +2883,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -2775,7 +2999,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -2846,7 +3078,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -2942,8 +3182,15 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
-				auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+			handler := buildAuthCompletedGet(authCompletedGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				templateFS:         fstest.MapFS{},
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+			})
 
 			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 			req = withSessionSettings(req)
@@ -3091,8 +3338,15 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 				auditLogger := handlersmocks.NewAuditLogger(t)
 				permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-				handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
-					auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+				handler := buildAuthCompletedGet(authCompletedGetDeps{
+					pageRenderer:       pageRenderer,
+					ceremonyStore:      ceremonyStore,
+					userSessionManager: userSessionManager,
+					database:           database,
+					templateFS:         fstest.MapFS{},
+					auditLogger:        auditLogger,
+					permissionChecker:  permissionChecker,
+				})
 
 				req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 				req = withSessionSettings(req)
@@ -3219,8 +3473,15 @@ func TestHandleAuthCompletedGet_AnAuthenticatorRemovedAtTheWriteRestarts(t *test
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
-				auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+			handler := buildAuthCompletedGet(authCompletedGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				templateFS:         fstest.MapFS{},
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+			})
 
 			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 			req = withSessionSettings(req)
@@ -3347,8 +3608,15 @@ func TestHandleAuthCompletedGet_AStaleBindAtTheWriteIsAnsweredAsReplaced(t *test
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
-				auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+			handler := buildAuthCompletedGet(authCompletedGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				templateFS:         fstest.MapFS{},
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+			})
 
 			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 			req = withSessionSettings(req)
@@ -3423,8 +3691,15 @@ func TestHandleAuthCompletedGet_AStaleCeremonyIsRefusedBeforeItRotates(t *testin
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
-				auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+			handler := buildAuthCompletedGet(authCompletedGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				templateFS:         fstest.MapFS{},
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+			})
 
 			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 			req = withSessionSettings(req)
@@ -3507,7 +3782,15 @@ func TestHandleAuthCompletedGet_ASaveFindingItsCeremonyReplacedAnswersNoLongerAc
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{}, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+			handler := buildAuthCompletedGet(authCompletedGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				templateFS:         fstest.MapFS{},
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+			})
 
 			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 			req = withSessionSettings(req)
@@ -3569,7 +3852,15 @@ func TestHandleAuthCompletedGet_ASaveFindingItsCeremonyReplacedAnswersNoLongerAc
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{}, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthCompletedGet(authCompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         fstest.MapFS{},
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)

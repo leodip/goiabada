@@ -48,7 +48,12 @@ func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *test
 	rr := httptest.NewRecorder()
 
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	chimiddleware.RequestID(HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)).ServeHTTP(rr, req)
+	chimiddleware.RequestID(buildAuthLevel2Get(authLevel2GetDeps{
+		pageRenderer:  pageRenderer,
+		ceremonyStore: ceremonyStore,
+		database:      database,
+		auditLogger:   auditLogger,
+	})).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
 

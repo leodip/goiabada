@@ -57,8 +57,12 @@ func TestHandleAuthPwdPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL,
-		testAdminConsoleBaseURL)
+	handler := buildAuthPwdPost(authPwdPostDeps{
+		pageRenderer:  pageRenderer,
+		ceremonyStore: ceremonyStore,
+		database:      database,
+		auditLogger:   auditLogger,
+	})
 
 	passwordHash, err := passwordhash.Hash("testpassword")
 	require.NoError(t, err)
@@ -100,8 +104,12 @@ func TestHandleAuthOtpPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher,
-		testBaseURL, testAdminConsoleBaseURL)
+	handler := buildAuthOtpPost(authOtpPostDeps{
+		pageRenderer:  pageRenderer,
+		ceremonyStore: ceremonyStore,
+		database:      database,
+		auditLogger:   auditLogger,
+	})
 
 	key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
 	require.NoError(t, err)
@@ -149,8 +157,15 @@ func TestHandleAuthCompletedGet_AReuseArmRotationFindingItsCeremonyReplacedAnswe
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	permissionChecker := handlersmocks.NewPermissionChecker(t)
-	handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
-		auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+	handler := buildAuthCompletedGet(authCompletedGetDeps{
+		pageRenderer:       pageRenderer,
+		ceremonyStore:      ceremonyStore,
+		userSessionManager: userSessionManager,
+		database:           database,
+		templateFS:         fstest.MapFS{},
+		auditLogger:        auditLogger,
+		permissionChecker:  permissionChecker,
+	})
 
 	sessionIdentifier := "test-session"
 	req, _ := http.NewRequest(http.MethodGet, "/auth/completed?ceremony="+testCeremonyId, nil)
@@ -257,8 +272,15 @@ func TestHandleAuthCompletedGet_TheCreateArmEndsAndCreatesNothingForAReplacedCer
 			// Strict: a termination, which opens a transaction, fails the case.
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
-			handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
-				auditLogger, handlersmocks.NewPermissionChecker(t), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildAuthCompletedGet(authCompletedGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				templateFS:         fstest.MapFS{},
+				auditLogger:        auditLogger,
+				permissionChecker:  handlersmocks.NewPermissionChecker(t),
+			})
 			req, _ := armCreateArm(t, tc, ceremonyStore, userSessionManager, database)
 			rr := httptest.NewRecorder()
 
@@ -298,8 +320,15 @@ func TestHandleAuthCompletedGet_ACreateArmRotationFindingItsCeremonyReplacedAnsw
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
-			handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
-				auditLogger, handlersmocks.NewPermissionChecker(t), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildAuthCompletedGet(authCompletedGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				templateFS:         fstest.MapFS{},
+				auditLogger:        auditLogger,
+				permissionChecker:  handlersmocks.NewPermissionChecker(t),
+			})
 			req, pwdAuthTime := armCreateArm(t, createArmCases[2], ceremonyStore, userSessionManager, database)
 			rr := httptest.NewRecorder()
 
@@ -378,8 +407,12 @@ func TestHandleAuthPwdPost_ARotationResumingAfterANewerAuthorizeLeavesItsCeremon
 	tabADone := make(chan struct{})
 	go func() {
 		defer close(tabADone)
-		HandleAuthPwdPost(pageRendererA, ceremonyStore, databaseA, auditLoggerA, noCredentialFailures{}, testBaseURL,
-			testAdminConsoleBaseURL).ServeHTTP(rrA, reqA)
+		buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRendererA,
+			ceremonyStore: ceremonyStore,
+			database:      databaseA,
+			auditLogger:   auditLoggerA,
+		}).ServeHTTP(rrA, reqA)
 	}()
 	select {
 	case <-reached:
@@ -392,9 +425,16 @@ func TestHandleAuthPwdPost_ARotationResumingAfterANewerAuthorizeLeavesItsCeremon
 	// Tab B's /auth/authorize, carrying the same cookie, through to its save.
 	e := newSyntaxAuthorizeEndpoint(t)
 	e.stubLoggedOutBrowser()
-	tabB := HandleAuthorizeGet(e.pageRenderer, ceremonyStore, e.userSessionManager, e.database, nil,
-		protocolvalidation.NewAuthorizeValidator(e.database), handlersmocks.NewAuditLogger(t),
-		handlersmocks.NewPermissionChecker(t), handlersmocks.NewTokenParser(t), testBaseURL)
+	tabB := buildAuthorizeGet(authorizeGetDeps{
+		pageRenderer:       e.pageRenderer,
+		ceremonyStore:      ceremonyStore,
+		userSessionManager: e.userSessionManager,
+		database:           e.database,
+		authorizeValidator: protocolvalidation.NewAuthorizeValidator(e.database),
+		auditLogger:        handlersmocks.NewAuditLogger(t),
+		permissionChecker:  handlersmocks.NewPermissionChecker(t),
+		tokenParser:        handlersmocks.NewTokenParser(t),
+	})
 	reqB := withCookies(withSessionSettings(httptest.NewRequest(http.MethodGet,
 		"/auth/authorize?"+syntaxQuery(nil), nil)), cookies)
 	rrB := httptest.NewRecorder()

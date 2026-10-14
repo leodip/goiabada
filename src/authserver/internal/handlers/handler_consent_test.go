@@ -142,7 +142,12 @@ func TestHandleConsentGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentGet(consentGetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -166,7 +171,12 @@ func TestHandleConsentGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentGet(consentGetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -191,7 +201,12 @@ func TestHandleConsentGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentGet(consentGetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -222,7 +237,12 @@ func TestHandleConsentGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentGet(consentGetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -257,7 +277,12 @@ func TestHandleConsentGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentGet(consentGetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -316,7 +341,12 @@ func TestHandleConsentGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentGet(consentGetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -367,7 +397,12 @@ func TestHandleConsentGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentGet(consentGetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -400,7 +435,12 @@ func TestHandleConsentGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentGet(consentGetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -461,7 +501,12 @@ func TestHandleConsentGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentGet(consentGetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -508,7 +553,13 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		req, _ := http.NewRequest("POST", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -534,7 +585,13 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		// The ceremony matches, so the state check is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -628,7 +685,13 @@ func TestHandleConsentPost(t *testing.T) {
 
 				permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-				handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+				handler := buildConsentPost(consentPostDeps{
+					pageRenderer:      pageRenderer,
+					ceremonyStore:     ceremonyStore,
+					database:          database,
+					auditLogger:       auditLogger,
+					permissionChecker: permissionChecker,
+				})
 
 				form := url.Values{}
 				if tc.btn == "btnSubmit" {
@@ -686,7 +749,13 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -735,7 +804,13 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -790,7 +865,14 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			templateFS:        templateFS,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -841,7 +923,14 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			templateFS:        templateFS,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -885,7 +974,13 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		stubUserHoldsEveryScope(permissionChecker)
 
@@ -948,7 +1043,13 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		stubUserHoldsEveryScope(permissionChecker)
 
@@ -998,7 +1099,13 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		stubUserHoldsEveryScope(permissionChecker)
 
@@ -1071,7 +1178,13 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1159,7 +1272,13 @@ func TestHandleConsentPost(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1216,7 +1335,13 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1291,7 +1416,13 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1364,7 +1495,14 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			templateFS:        templateFS,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1428,7 +1566,14 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			templateFS:        templateFS,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1487,7 +1632,13 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1541,7 +1692,13 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1589,7 +1746,14 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			templateFS:        templateFS,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1635,7 +1799,14 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			templateFS:        templateFS,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1895,7 +2066,13 @@ func TestHandleConsentPost(t *testing.T) {
 
 				permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-				handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+				handler := buildConsentPost(consentPostDeps{
+					pageRenderer:      pageRenderer,
+					ceremonyStore:     ceremonyStore,
+					database:          database,
+					auditLogger:       auditLogger,
+					permissionChecker: permissionChecker,
+				})
 
 				scopes := scopeList(tc.scopeCount)
 
@@ -2015,7 +2192,13 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		stubUserHoldsEveryScope(permissionChecker)
 
@@ -2101,7 +2284,12 @@ func TestHandleConsentGet_DescribesManageAccountInPlainWords(t *testing.T) {
 			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
-			handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+			handler := buildConsentGet(consentGetDeps{
+				pageRenderer:  pageRenderer,
+				ceremonyStore: ceremonyStore,
+				database:      database,
+				auditLogger:   auditLogger,
+			})
 
 			req := httptest.NewRequest(http.MethodGet, "/auth/consent?ceremony="+testCeremonyId, nil)
 			req = req.WithContext(i18n.WithLocale(req.Context(), true, tc.locale))

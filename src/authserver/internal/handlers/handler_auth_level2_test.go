@@ -24,7 +24,12 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel2Get(authLevel2GetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -48,7 +53,12 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel2Get(authLevel2GetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -73,7 +83,12 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel2Get(authLevel2GetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -104,7 +119,12 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel2Get(authLevel2GetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -152,7 +172,12 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel2Get(authLevel2GetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -205,7 +230,12 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel2Get(authLevel2GetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -257,7 +287,12 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel2Get(authLevel2GetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -301,7 +336,12 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel2Get(authLevel2GetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()

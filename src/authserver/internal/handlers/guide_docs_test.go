@@ -141,9 +141,13 @@ func TestGuideDocs_ALostAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
 func TestGuideDocs_PromptLoginAsksForTheCodeAgain(t *testing.T) {
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	database := datamocks.NewDatabase(t)
-	handler := HandleAuthLevel1CompletedGet(handlersmocks.NewPageRenderer(t), ceremonyStore,
-		handlersmocks.NewUserSessionManager(t), database, nil, handlersmocks.NewAuditLogger(t),
-		testBaseURL, testAdminConsoleBaseURL)
+	handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+		pageRenderer:       handlersmocks.NewPageRenderer(t),
+		ceremonyStore:      ceremonyStore,
+		userSessionManager: handlersmocks.NewUserSessionManager(t),
+		database:           database,
+		auditLogger:        handlersmocks.NewAuditLogger(t),
+	})
 
 	req, _ := http.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
 	req = withSessionSettings(req)

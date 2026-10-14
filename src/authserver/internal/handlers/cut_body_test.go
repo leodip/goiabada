@@ -112,7 +112,12 @@ func TestCutBody_ThePasswordForm(t *testing.T) {
 		}, nil).Once()
 		prepare(pageRenderer, auditLogger, database, rr, req)
 
-		HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
+		buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		}).ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)

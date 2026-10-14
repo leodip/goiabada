@@ -52,9 +52,16 @@ func newAuthorizeEndpoint(t *testing.T) *authorizeEndpoint {
 		database:           datamocks.NewDatabase(t),
 		validator:          handlersmocks.NewAuthorizeValidator(t),
 	}
-	e.handler = HandleAuthorizeGet(e.pageRenderer, e.ceremonyStore, e.userSessionManager, e.database, nil,
-		e.validator, handlersmocks.NewAuditLogger(t), handlersmocks.NewPermissionChecker(t),
-		handlersmocks.NewTokenParser(t), testBaseURL)
+	e.handler = buildAuthorizeGet(authorizeGetDeps{
+		pageRenderer:       e.pageRenderer,
+		ceremonyStore:      e.ceremonyStore,
+		userSessionManager: e.userSessionManager,
+		database:           e.database,
+		authorizeValidator: e.validator,
+		auditLogger:        handlersmocks.NewAuditLogger(t),
+		permissionChecker:  handlersmocks.NewPermissionChecker(t),
+		tokenParser:        handlersmocks.NewTokenParser(t),
+	})
 	return e
 }
 

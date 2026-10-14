@@ -95,8 +95,15 @@ func TestRestartRoute1_SavesTheRequestWithTheAttemptDiscarded(t *testing.T) {
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-	handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
-		auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+	handler := buildAuthCompletedGet(authCompletedGetDeps{
+		pageRenderer:       pageRenderer,
+		ceremonyStore:      ceremonyStore,
+		userSessionManager: userSessionManager,
+		database:           database,
+		templateFS:         fstest.MapFS{},
+		auditLogger:        auditLogger,
+		permissionChecker:  permissionChecker,
+	})
 
 	sessionIdentifier := "terminated-session"
 	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
@@ -139,8 +146,17 @@ func TestRestartRoute2_SavesTheRequestWithTheAttemptDiscarded(t *testing.T) {
 	userSessionManager := handlersmocks.NewUserSessionManager(t)
 	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-	handler := HandleIssueGet(pageRenderer, ceremonyStore, fstest.MapFS{}, codeIssuer, implicitTokenIssuer,
-		database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+	handler := buildIssueGet(issueGetDeps{
+		pageRenderer:        pageRenderer,
+		ceremonyStore:       ceremonyStore,
+		templateFS:          fstest.MapFS{},
+		codeIssuer:          codeIssuer,
+		implicitTokenIssuer: implicitTokenIssuer,
+		database:            database,
+		auditLogger:         auditLogger,
+		userSessionManager:  userSessionManager,
+		permissionChecker:   permissionChecker,
+	})
 
 	// The session this ceremony bound to at /auth/completed is gone by /auth/issue, and the
 	// request is interactive, so this is route 2.
@@ -181,8 +197,15 @@ func TestAuthCompleted_ALegacyRestartedContextIsDeniedAnEmptyScope(t *testing.T)
 	stubRegisteredRedirectURI(database, "https://example.com/callback")
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
-		auditLogger, permissions.NewChecker(database), testBaseURL, testAdminConsoleBaseURL)
+	handler := buildAuthCompletedGet(authCompletedGetDeps{
+		pageRenderer:       pageRenderer,
+		ceremonyStore:      ceremonyStore,
+		userSessionManager: userSessionManager,
+		database:           database,
+		templateFS:         fstest.MapFS{},
+		auditLogger:        auditLogger,
+		permissionChecker:  permissions.NewChecker(database),
+	})
 
 	sessionIdentifier := "new-test-session"
 	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
