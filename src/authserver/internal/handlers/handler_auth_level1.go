@@ -1,187 +1,62 @@
 package handlers
 
 import (
-	"context"
-	"database/sql"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/core/errs"
 )
 
+// HandleAuthLevel1Get is GET /auth/level1, which accepts requires_level_1 and runs
+// authflow.SelectLevel1Method, then sends the browser to the method it chose.
 func HandleAuthLevel1Get(
 	boundary *CeremonyBoundary,
 	ceremonyStore CeremonyStore,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		authContext, ok := boundary.loadAuthContext(w, r)
+		_, authContext, ok := boundary.beginStep(w, r, ceremony.AuthStateRequiresLevel1)
 		if !ok {
 			return
 		}
 
-		if !boundary.requireAuthState(w, r, authContext, ceremony.AuthStateRequiresLevel1) {
-			return
-		}
-
-		// here we'll select what type of level1 auth we'll use (pwd, pin, magic_link)
-		// today we only support pwd, other types will be added in the future
-
-		authContext.AuthState = ceremony.AuthStateLevel1Password
-		err := ceremonyStore.SaveAuthContext(w, r, authContext)
-		if err != nil {
-			boundary.answerStepSaveFailure(w, r, err)
-			return
-		}
-		boundary.stepRedirect(w, r, "/auth/pwd", authContext)
+		result := authflow.SelectLevel1Method(newBrowserSession(w, r, ceremonyStore), authContext)
+		boundary.redirectAfterSave(w, r, authContext, result.NextStep, result.SaveErr)
 	}
 }
 
-// authLevel1Database is what /auth/level1completed reads: the client and the session behind the
-// step-up decision.
-type authLevel1Database interface {
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
-	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
-}
-
+// HandleAuthLevel1CompletedGet is GET /auth/level1completed, which accepts
+// level1_password_completed and level1_existing_session and runs authflow.Level1Completion. It
+// answers a parked error to the client, or sends the browser to /auth/level2 or /auth/completed.
 func HandleAuthLevel1CompletedGet(
 	boundary *CeremonyBoundary,
 	responder *ClientErrorResponder,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
-	userSessionManager UserSessionManager,
-	database authLevel1Database,
+	level1Completion *authflow.Level1Completion,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		authContext, ok := boundary.loadAuthContext(w, r)
+		settings, authContext, ok := boundary.beginStep(w, r,
+			ceremony.AuthStateLevel1PasswordCompleted, ceremony.AuthStateLevel1ExistingSession)
 		if !ok {
-			return
-		}
-
-		if !boundary.requireAuthState(w, r, authContext,
-			ceremony.AuthStateLevel1PasswordCompleted, ceremony.AuthStateLevel1ExistingSession) {
-			return
-		}
-
-		// An authorization error the endpoint refused to deliver to a logged-out browser is
-		// delivered here, and this is the whole point of the deferral: RFC 9700 4.11.2 requires
-		// that the server "MUST always authenticate the user first ... before redirecting the
-		// user", and this is the first junction reached once level 1 credentials are verified.
-		// Level 2 is about the ACR a client asked for in a token, and no token is issued on this
-		// path, so waiting for it would drag a visitor through OTP for a request the server
-		// already knows is invalid (#213 decision 2).
-		//
-		// After the state gate, and before this handler's own session lookup, because the ceremony
-		// ends here: nothing is persisted, and since the user session row is created at
-		// /auth/completed a visitor who logged in only to receive an error is left without an SSO
-		// session.
-		//
-		// Either state the gate admits is accepted. A parked error can only arrive on
-		// AuthStateLevel1PasswordCompleted today, because the AuthStateLevel1ExistingSession
-		// shortcut is reached only with a valid session and that request was answered at once, but
-		// the delivery does not depend on which one it is.
-		if authContext.DeferredErrorCode != "" {
-			answerClientWithError(w, r, ceremonyStore, boundary, responder, authContext.CeremonyId,
-				redirectErrorFromAuthContext(authContext,
-					responder.clientProvenance(r.Context(), authContext.ClientId),
-					authContext.DeferredErrorCode, authContext.DeferredErrorDescription))
 			return
 		}
 
 		sessionIdentifier, _ := reqctx.SessionIdentifierFrom(r.Context())
-
-		userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
+		result, err := level1Completion.Run(r.Context(), newBrowserSession(w, r, ceremonyStore), settings,
+			authContext, sessionIdentifier)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
-		err = database.UserSessionLoadUser(r.Context(), nil, userSession)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
+		if result.DeferredError != nil {
+			answerClientAfterStepClear(w, r, boundary, responder,
+				redirectErrorFromAuthContext(authContext, result.DeferredError.Client,
+					result.DeferredError.Code, result.DeferredError.Description),
+				result.ClearErr)
 			return
 		}
-
-		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			pageRenderer.InternalServerError(w, r, errs.Errorf("client %v not found", authContext.ClientId))
-			return
-		}
-
-		targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
-
-		// The session only counts when it belongs to the user this ceremony authenticated. The
-		// browser may still hold user A's session cookie while user B signs in, and the step-up
-		// would then be decided from A's ACR: an A session already at or above the target sends B
-		// straight to /auth/completed with a password only, skipping the second factor a level2
-		// client asked for. A session belonging to anyone else is treated as no session, so the
-		// target alone decides, and A's OTP configuration snapshot is left alone (#133).
-		settings, ok := reqctx.SettingsFrom(r.Context())
-		if !ok {
-			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
-			return
-		}
-		//
-		// A ceremony that verified the password itself is a new authentication, and the session
-		// counts for nothing towards its level either (#537). That is a ceremony in
-		// level1_password_completed: prompt=login over a session that is still valid, an
-		// id_token_hint naming someone else, or a restart. OIDC Core 1.0 section 3.1.2.3 says the
-		// server "MUST reauthenticate the End-User even if the End-User is already authenticated",
-		// and section 2 has acr, amr and auth_time all describe "the authentication" performed. So
-		// it owes every factor its target needs, as a sign-in with no session does: a code at level
-		// 3, and at level 2 when the user has an authenticator. Keycloak decides the same way
-		// ("the LoA from previous authentications are not considered"). Letting the session's code
-		// count, as this did until #537, issued acr level 3 beside amr ["pwd"] and a fresh
-		// auth_time, three claims about one authentication that could not all be true.
-		//
-		// Only the SSO shortcut, level1_existing_session, reuses a session's level: that ceremony
-		// verified nothing itself and carries the session's methods and auth time (AdoptSession),
-		// so a step-up from the session's level is the honest answer there. Keyed on
-		// Level1AuthCompleted rather than on the state, because that field is the one record of
-		// "level 1 happened in this ceremony", and any future level 1 method must set it.
-		var reusableSession *record.UserSession
-		if !authContext.Level1AuthCompleted && userSessionManager.HasValidUserSession(userSession,
-			settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds,
-			authContext.RequestedMaxAge()) && authContext.OwnsSession(userSession) {
-			reusableSession = userSession
-		}
-
-		// UserSessionLoadUser above populated userSession.User, so the rule's OTP configuration
-		// comparison costs no query.
-		stepUp, err := ceremony.StepUpOwed(targetAcrLevel, reusableSession)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
-
-		if stepUp != ceremony.StepUpNone {
-			// We need to redirect to level 2
-			authContext.AuthState = ceremony.AuthStateRequiresLevel2
-			err = ceremonyStore.SaveAuthContext(w, r, authContext)
-			if err != nil {
-				boundary.answerStepSaveFailure(w, r, err)
-				return
-			}
-			boundary.stepRedirect(w, r, "/auth/level2", authContext)
-			return
-		} else {
-			// Auth is completed
-			authContext.AuthState = ceremony.AuthStateAuthenticationCompleted
-			err = ceremonyStore.SaveAuthContext(w, r, authContext)
-			if err != nil {
-				boundary.answerStepSaveFailure(w, r, err)
-				return
-			}
-			boundary.stepRedirect(w, r, "/auth/completed", authContext)
-			return
-		}
+		boundary.redirectAfterSave(w, r, authContext, result.NextStep, result.SaveErr)
 	}
 }

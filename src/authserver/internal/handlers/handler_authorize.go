@@ -1164,11 +1164,21 @@ func answerClientWithError(w http.ResponseWriter, r *http.Request, ceremonyStore
 	boundary *CeremonyBoundary, responder *ClientErrorResponder, ceremonyId string, input redirectErrorInput) {
 
 	err := ceremonyStore.ClearAuthContext(w, r, ceremonyId)
-	if errors.Is(err, ceremony.ErrCeremonyReplaced) {
+	answerClientAfterStepClear(w, r, boundary, responder, input, err)
+}
+
+// answerClientAfterStepClear is the second half of answerClientWithError, for a step whose authflow
+// operation made the clear: the "no longer active" page when the clear found the ceremony replaced,
+// sending nothing to the client, and otherwise the responder's answer, which is server_error when the
+// clear failed.
+func answerClientAfterStepClear(w http.ResponseWriter, r *http.Request, boundary *CeremonyBoundary,
+	responder *ClientErrorResponder, input redirectErrorInput, clearErr error) {
+
+	if errors.Is(clearErr, ceremony.ErrCeremonyReplaced) {
 		boundary.answerCeremonyReplaced(w, r)
 		return
 	}
-	responder.answerClientAfterClear(w, r, input, err)
+	responder.answerClientAfterClear(w, r, input, clearErr)
 }
 
 // answerAuthorizeClientWithError is answerClientWithError at /auth/authorize, which answers a request

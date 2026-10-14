@@ -58,6 +58,52 @@ func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 	database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
 }
 
+// The routing hops read their settings through the route boundary before anything else, so a hop
+// reached without them answers the 500 page carrying reqctx.ErrNoSettings and never reads its
+// ceremony: no load, no save, no database read (#580 decision 5).
+func TestMissingSettings_TheRoutingHopsAnswerBeforeReadingTheirCeremony(t *testing.T) {
+	for _, hop := range []struct {
+		name  string
+		path  string
+		build func(t *testing.T, pageRenderer *handlersmocks.PageRenderer, ceremonyStore *handlersmocks.CeremonyStore,
+			database *datamocks.Database) http.Handler
+	}{
+		{"level1", "/auth/level1", func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
+			_ *datamocks.Database) http.Handler {
+			return buildAuthLevel1Get(authLevel1GetDeps{pageRenderer: pr, ceremonyStore: cs,
+				auditLogger: handlersmocks.NewAuditLogger(t)})
+		}},
+		{"level1completed", "/auth/level1completed", func(t *testing.T, pr *handlersmocks.PageRenderer,
+			cs *handlersmocks.CeremonyStore, db *datamocks.Database) http.Handler {
+			return buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{pageRenderer: pr, ceremonyStore: cs,
+				userSessionManager: handlersmocks.NewUserSessionManager(t), database: db,
+				auditLogger: handlersmocks.NewAuditLogger(t)})
+		}},
+		{"level2", "/auth/level2", func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
+			db *datamocks.Database) http.Handler {
+			return buildAuthLevel2Get(authLevel2GetDeps{pageRenderer: pr, ceremonyStore: cs, database: db,
+				auditLogger: handlersmocks.NewAuditLogger(t)})
+		}},
+	} {
+		t.Run(hop.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			database := datamocks.NewDatabase(t)
+
+			req := httptest.NewRequest(http.MethodGet, hop.path+"?ceremony="+testCeremonyId, nil)
+			rr := httptest.NewRecorder()
+			pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
+
+			hop.build(t, pageRenderer, ceremonyStore, database).ServeHTTP(rr, req)
+
+			pageRenderer.AssertExpectations(t)
+			ceremonyStore.AssertNotCalled(t, "GetAuthContext", req)
+			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
 // The token endpoint answers its 500 through the JSON writer, RFC 6749 section 5.2's shape, as
 // every other failure there is answered, and it is refused before the validator sees the request
 // (#435).

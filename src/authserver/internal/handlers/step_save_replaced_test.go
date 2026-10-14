@@ -275,7 +275,7 @@ func TestHandleAuthLevel2Get_AReplacedCeremonyAnswersNoLongerActive(t *testing.T
 		auditLogger:   handlersmocks.NewAuditLogger(t),
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil)
+	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil))
 	rr := httptest.NewRecorder()
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 		CeremonyId: testCeremonyId,

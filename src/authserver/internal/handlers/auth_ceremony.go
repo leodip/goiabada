@@ -10,6 +10,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -46,7 +48,8 @@ func ceremonyMatches(contextCeremonyId string, submitted string) bool {
 // written once and no step can drift from them.
 //
 // It never decides a step and never writes the browser session: a step's saves and clears go through
-// the ceremony store the handler holds. The boundary only reads the auth context.
+// the ceremony store the handler holds, or through the per-request adapter its authflow operation
+// writes through. The boundary only reads the auth context.
 type CeremonyBoundary struct {
 	pageRenderer        PageRenderer
 	ceremonyStore       CeremonyStore
@@ -68,6 +71,47 @@ func NewCeremonyBoundary(pageRenderer PageRenderer, ceremonyStore CeremonyStore,
 		baseURL:             baseURL,
 		adminConsoleBaseURL: adminConsoleBaseURL,
 	}
+}
+
+// beginStep is what a step does before its own work, in order: read the request's settings, load
+// the auth context and check the ceremony id (loadAuthContext), and gate on the states the step
+// accepts (requireAuthState). It reports false when it answered, and the caller then returns without
+// writing anything.
+//
+// The settings come first, before anything is read or written. middleware.Settings runs on every
+// application route and answers its own failure, so a step without settings is a wiring defect; it
+// answers the 500 page carrying reqctx.ErrNoSettings and reads no ceremony. A step hands the
+// settings to its operation as a plain value (#580 decision 5).
+func (b *CeremonyBoundary) beginStep(w http.ResponseWriter, r *http.Request,
+	accepted ...ceremony.AuthState) (*record.Settings, *ceremony.AuthContext, bool) {
+
+	settings, ok := reqctx.SettingsFrom(r.Context())
+	if !ok {
+		b.pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
+		return nil, nil, false
+	}
+
+	authContext, ok := b.loadAuthContext(w, r)
+	if !ok {
+		return nil, nil, false
+	}
+
+	if !b.requireAuthState(w, r, authContext, accepted...) {
+		return nil, nil, false
+	}
+	return settings, authContext, true
+}
+
+// redirectAfterSave answers a step that saved its ceremony towards nextStep: the redirect to it when
+// the save landed, and answerStepSaveFailure's answer when it did not.
+func (b *CeremonyBoundary) redirectAfterSave(w http.ResponseWriter, r *http.Request,
+	authContext *ceremony.AuthContext, nextStep string, saveErr error) {
+
+	if saveErr != nil {
+		b.answerStepSaveFailure(w, r, saveErr)
+		return
+	}
+	b.stepRedirect(w, r, nextStep, authContext)
 }
 
 // rejectCeremonyMismatch answers a request that names a ceremony the session no longer holds, or
@@ -207,11 +251,11 @@ func ceremonyStepURL(baseURL string, path string, authContext *ceremony.AuthCont
 }
 
 // stepRedirect answers with a 302 to the ceremony's next step, at path under the auth server's base
-// URL and naming the ceremony (ceremonyStepURL).
+// URL and naming the ceremony (ceremonyStepURL). path is always one of the ceremony's own routes, a
+// constant in the step's handler or its authflow operation, never anything the request carries.
 func (b *CeremonyBoundary) stepRedirect(w http.ResponseWriter, r *http.Request, path string,
 	authContext *ceremony.AuthContext) {
 
-	//nolint:gosec // G710: every path is one of the ceremony's own routes, a constant at each caller, under the configured base URL
 	http.Redirect(w, r, ceremonyStepURL(b.baseURL, path, authContext), http.StatusFound)
 }
 

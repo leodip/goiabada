@@ -4,9 +4,9 @@ package handlers
 //
 // Two tables there are the answers an integrator writes code against: what a silent request
 // (prompt=none) is refused with, in the order the auth server asks, and which acr and amr a sign-in
-// with no session ends with for each level. Both are decided here, in decideSilentAuthentication and
-// in the step-up rule and decideLevel2Arm, so each table is held to those in both directions: a row
-// the code does not answer fails, and so does an answer the table leaves out.
+// with no session ends with for each level. Both are decided in code, by decideSilentAuthentication
+// and by the step-up rule and authflow.DecideLevel2Arm, so each table is held to those in both
+// directions: a row the code does not answer fails, and so does an answer the table leaves out.
 //
 // It reads files and nothing else.
 
@@ -18,6 +18,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/guard"
@@ -134,7 +135,7 @@ type signInLevel struct {
 // signInLevels is, for every level and both answers to "has the user an authenticator", what a
 // sign-in with no session ends with: the acr is the target, as SetAcrLevel writes it with no
 // session, and the amr is pwd, with otp when the step-up rule sends the ceremony to level 2 and
-// decideLevel2Arm asks for a code there.
+// authflow.DecideLevel2Arm asks for a code there.
 func signInLevels(t *testing.T) []signInLevel {
 	t.Helper()
 	var levels []signInLevel
@@ -150,7 +151,7 @@ func signInLevels(t *testing.T) []signInLevel {
 				t.Fatalf("the step-up rule for %s: %v", level, err)
 			}
 			if stepUp != ceremony.StepUpNone {
-				state, _, err := decideLevel2Arm(level, userHasOTP)
+				state, _, err := authflow.DecideLevel2Arm(level, userHasOTP)
 				if err != nil {
 					t.Fatalf("level 2 for %s: %v", level, err)
 				}

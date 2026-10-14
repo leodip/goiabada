@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
@@ -32,6 +32,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		expectedError := &oauth.ErrorDetail{}
@@ -61,6 +62,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -91,6 +93,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -127,6 +130,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -180,6 +184,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -238,6 +243,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -295,6 +301,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -344,6 +351,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -378,38 +386,56 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 	})
 }
 
-// The whole table for /auth/level2's choice of arm. The handler cases above each drive one arm to
-// its save and redirect; which arm a target and an enrolment get is decided here (#437 seam 1).
-func TestDecideLevel2Arm(t *testing.T) {
-	testCases := []struct {
-		name       string
-		target     record.AcrLevel
-		userHasOTP bool
-		wantState  ceremony.AuthState
-		wantPath   string
-		wantErr    string
+// A failed read of the client or of the user answers 500 carrying the read's own error, and the
+// ceremony is not saved: the user is not read after a failed client read, and nothing is redirected.
+func TestHandleAuthLevel2Get_AFailedReadAnswers500AndSavesNothing(t *testing.T) {
+	readFailure := errors.New("read failed")
+
+	for _, tc := range []struct {
+		name string
+		arm  func(database *datamocks.Database)
 	}{
-		{"optional with OTP asks for it", record.AcrLevel2Optional, true, ceremony.AuthStateLevel2OTP, "/auth/otp", ""},
-		{"optional without OTP skips it", record.AcrLevel2Optional, false, ceremony.AuthStateAuthenticationCompleted, "/auth/completed", ""},
-		{"mandatory with OTP asks for it", record.AcrLevel2Mandatory, true, ceremony.AuthStateLevel2OTP, "/auth/otp", ""},
-		{"mandatory without OTP enrols", record.AcrLevel2Mandatory, false, ceremony.AuthStateLevel2OTP, "/auth/otp", ""},
-		{"level1 never reaches this hop", record.AcrLevel1, true, "", "", "invalid targetAcrLevel: urn:goiabada:level1"},
-		{"an unknown level is refused", "urn:goiabada:level3", false, "", "", "invalid targetAcrLevel: urn:goiabada:level3"},
-	}
-
-	for _, tc := range testCases {
+		{"the client", func(database *datamocks.Database) {
+			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(nil, readFailure).Once()
+		}},
+		{"the user", func(database *datamocks.Database) {
+			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(
+				&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel2Optional}, nil).Once()
+			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, readFailure).Once()
+		}},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
-			state, path, err := decideLevel2Arm(tc.target, tc.userHasOTP)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			database := datamocks.NewDatabase(t)
+			handler := buildAuthLevel2Get(authLevel2GetDeps{
+				pageRenderer:  pageRenderer,
+				ceremonyStore: ceremonyStore,
+				database:      database,
+				auditLogger:   handlersmocks.NewAuditLogger(t),
+			})
 
-			if tc.wantErr != "" {
-				require.EqualError(t, err, tc.wantErr)
-				assert.Empty(t, state)
-				assert.Empty(t, path)
-				return
+			req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil))
+			rr := httptest.NewRecorder()
+			authContext := &ceremony.AuthContext{
+				CeremonyId: testCeremonyId,
+				AuthState:  ceremony.AuthStateRequiresLevel2,
+				ClientId:   "test-client",
+				UserId:     1,
 			}
-			require.NoError(t, err)
-			assert.Equal(t, tc.wantState, state)
-			assert.Equal(t, tc.wantPath, path)
+			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
+			tc.arm(database)
+			pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+				return errors.Is(err, readFailure)
+			})).Return().Once()
+
+			handler.ServeHTTP(rr, req)
+
+			pageRenderer.AssertExpectations(t)
+			database.AssertExpectations(t)
+			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			assert.Nil(t, authContext.OtpConfigGeneration, "no generation is captured from a user never read")
+			assert.Empty(t, rr.Header().Get("Location"))
 		})
 	}
 }

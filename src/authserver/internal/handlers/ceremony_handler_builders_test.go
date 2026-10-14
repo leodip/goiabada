@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 )
@@ -12,8 +13,9 @@ import (
 // the doubles a test already holds, by name, and builds the handler from them, so a change to a
 // handler's constructor changes its builder and no test. A field left out is nil, as the nil a
 // test passed before. The two base URLs are always testBaseURL and testAdminConsoleBaseURL, and the
-// data cipher always testDataCipher. The route boundary and the client-error responder are built
-// from the same doubles the handler takes, as the route table builds them from the same ports.
+// data cipher always testDataCipher. The route boundary, the client-error responder and the authflow
+// operations are built from the same doubles the handler takes, as the route table builds them from
+// the same ports.
 
 // testCeremonyBoundary is the route boundary the route table would build from these doubles.
 func testCeremonyBoundary(pageRenderer PageRenderer, ceremonyStore CeremonyStore, auditLogger AuditLogger) *CeremonyBoundary {
@@ -77,7 +79,7 @@ type authLevel1CompletedGetDeps struct {
 func buildAuthLevel1CompletedGet(d authLevel1CompletedGetDeps) http.HandlerFunc {
 	return HandleAuthLevel1CompletedGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
 		testClientErrorResponder(d.database, d.pageRenderer, d.templateFS),
-		d.pageRenderer, d.ceremonyStore, d.userSessionManager, d.database)
+		d.pageRenderer, d.ceremonyStore, authflow.NewLevel1Completion(d.database, d.userSessionManager))
 }
 
 type authPwdGetDeps struct {
@@ -115,7 +117,7 @@ type authLevel2GetDeps struct {
 
 func buildAuthLevel2Get(d authLevel2GetDeps) http.HandlerFunc {
 	return HandleAuthLevel2Get(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
-		d.pageRenderer, d.ceremonyStore, d.database)
+		d.pageRenderer, d.ceremonyStore, authflow.NewLevel2Selection(d.database))
 }
 
 type authOtpGetDeps struct {

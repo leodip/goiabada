@@ -8,10 +8,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 )
@@ -109,4 +111,43 @@ func TestCeremonyBoundary_RenderCeremonyNoLongerActiveFallsBackToThe500(t *testi
 	pageRenderer.On("InternalServerError", rr, req, assert.AnError).Return().Once()
 
 	testCeremonyBoundary(pageRenderer, nil, nil).renderCeremonyNoLongerActive(rr, req)
+}
+
+// beginStep hands back the request's own settings, the ones middleware.Settings put on its context,
+// and the auth context it loaded, once the ceremony id and the state both pass.
+func TestCeremonyBoundary_BeginStepHandsBackTheRequestsSettings(t *testing.T) {
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	boundary := testCeremonyBoundary(handlersmocks.NewPageRenderer(t), ceremonyStore, handlersmocks.NewAuditLogger(t))
+	settings := &record.Settings{UserSessionIdleTimeoutInSeconds: 1234}
+	req := withSettings(httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil), settings)
+	rr := httptest.NewRecorder()
+	stored := &ceremony.AuthContext{CeremonyId: testCeremonyId, AuthState: ceremony.AuthStateRequiresLevel2}
+	ceremonyStore.On("GetAuthContext", req).Return(stored, nil).Once()
+
+	gotSettings, gotContext, ok := boundary.beginStep(rr, req, ceremony.AuthStateRequiresLevel2)
+
+	require.True(t, ok)
+	assert.Same(t, settings, gotSettings)
+	assert.Same(t, stored, gotContext)
+	assert.Equal(t, http.StatusOK, rr.Code, "nothing is written when the step may go on")
+	assert.Empty(t, rr.Header())
+}
+
+// A state the step does not accept stops it at the gate, after the settings and the load.
+func TestCeremonyBoundary_BeginStepStopsAtTheStateGate(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	boundary := testCeremonyBoundary(pageRenderer, ceremonyStore, handlersmocks.NewAuditLogger(t))
+	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil))
+	rr := httptest.NewRecorder()
+	ceremonyStore.On("GetAuthContext", req).Return(&ceremony.AuthContext{
+		CeremonyId: testCeremonyId, AuthState: ceremony.AuthStateLevel2OTP}, nil).Once()
+	expectAuthStateMismatch(t, pageRenderer, rr, req)
+
+	gotSettings, gotContext, ok := boundary.beginStep(rr, req, ceremony.AuthStateRequiresLevel2)
+
+	assert.False(t, ok)
+	assert.Nil(t, gotSettings)
+	assert.Nil(t, gotContext)
+	pageRenderer.AssertExpectations(t)
 }

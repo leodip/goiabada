@@ -77,6 +77,47 @@ func TestAnswerClientWithError_AReplacedCeremonyAnswersNoLongerActive(t *testing
 	ceremonyStore.AssertExpectations(t)
 }
 
+// The same answer at /auth/level1completed's delivery of a parked error: the clear found another
+// ceremony, so the parked error is sent nowhere. The client's provenance is read before the clear,
+// as the delivery always reads it; the registration read the redirect gate makes is never reached.
+func TestHandleAuthLevel1CompletedGet_AParkedErrorOfAReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	database := datamocks.NewDatabase(t)
+	handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+		pageRenderer:       pageRenderer,
+		ceremonyStore:      ceremonyStore,
+		userSessionManager: handlersmocks.NewUserSessionManager(t),
+		database:           database,
+		auditLogger:        handlersmocks.NewAuditLogger(t),
+	})
+
+	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level1completed?ceremony="+testCeremonyId, nil))
+	rr := httptest.NewRecorder()
+	ceremonyStore.On("GetAuthContext", req).Return(&ceremony.AuthContext{
+		CeremonyId:               testCeremonyId,
+		AuthState:                ceremony.AuthStateLevel1PasswordCompleted,
+		ClientId:                 "test-client",
+		RedirectURI:              "https://legit.example/cb",
+		ResponseType:             "code",
+		State:                    "abc123",
+		DeferredErrorCode:        "invalid_scope",
+		DeferredErrorDescription: "Invalid scope format: 'bogus'.",
+	}, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
+		&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+	expectStepClearReplaced(t, ceremonyStore, pageRenderer, rr, req)
+	logged := logtest.CaptureSlog(t)
+
+	handler.ServeHTTP(rr, req)
+
+	assertAnsweredNoLongerActive(t, rr)
+	assertReplacedAnsweredAtWarn(t, logged)
+	pageRenderer.AssertExpectations(t)
+	ceremonyStore.AssertExpectations(t)
+	database.AssertNotCalled(t, "GetRedirectURIsByClientId", mock.Anything, mock.Anything, int64(1))
+}
+
 // lastComparisonBackend is the in-memory backend with a turn for the test before every conditional
 // write, which is where another request of the browser can land between a clear's fresh read and
 // its write.

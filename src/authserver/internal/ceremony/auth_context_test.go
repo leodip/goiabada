@@ -113,7 +113,7 @@ func TestHasPromptValue_SharedSeparators(t *testing.T) {
 // Tests for GetTargetAcrLevel / parseAcrValuesFromAuthorizeRequest
 //
 // The target ACR level is what decides whether OTP is required for a request:
-// handler_auth_level1.go, handler_auth_level2.go and handler_auth_completed.go
+// authflow's Level1Completion and Level2Selection and handler_auth_completed.go
 // all branch on it. Per OIDC, acr_values is a space-separated list in order of
 // preference, so the FIRST recognized value wins. A regression that picked a
 // different element, or that failed to ignore unknown values, would silently

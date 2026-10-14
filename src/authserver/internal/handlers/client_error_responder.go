@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -131,20 +132,11 @@ func (rsp *ClientErrorResponder) answerClientAfterClear(w http.ResponseWriter, r
 	}
 }
 
-// clientProvenance loads the client behind a ceremony for the trust decision in
-// redirToClientWithError, at the handlers that reach an error response without having loaded it.
-//
-// It answers nil instead of an error. Every caller is already on its way to answering the client
-// with an error, so a lookup that fails must not turn that refusal into a 500; and unresolved
-// provenance is the untrusted case, which withholds the redirect rather than performing it (#108).
+// clientProvenance is authflow.ClientProvenance over the responder's database, for the handlers
+// that reach an error response without having loaded the client: nil when the lookup fails, the
+// untrusted case (#108).
 func (rsp *ClientErrorResponder) clientProvenance(ctx context.Context, clientIdentifier string) *record.Client {
-	client, err := rsp.database.GetClientByClientIdentifier(ctx, nil, clientIdentifier)
-	if err != nil {
-		slog.ErrorContext(ctx, "unable to load the client while answering it with an error, treating its provenance as unresolved",
-			"client_identifier", clientIdentifier, "error", err)
-		return nil
-	}
-	return client
+	return authflow.ClientProvenance(ctx, rsp.database, clientIdentifier)
 }
 
 // redirectWillBeEmitted answers whether an error response to this client would leave the server as a

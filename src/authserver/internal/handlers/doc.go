@@ -11,4 +11,9 @@
 // (#202), and a failed authorization request from a browser with no session is not redirected to
 // the client until a password has been verified (#213). Each handler names the database operations
 // it calls in an unexported port beside it (#386).
+//
+// A ceremony step moved to internal/authflow keeps only its HTTP side here: the route boundary's
+// settings read, ceremony check and state gate (CeremonyBoundary.beginStep), the call of its
+// operation with a browserSession built for the request, and the response its result names, written
+// after the operation has returned (#580).
 package handlers
