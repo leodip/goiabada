@@ -3443,8 +3443,7 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 					"form_post.html": {Data: []byte(keysTemplate)},
 				}
 
-				err := redirToClientWithError(w, r,
-					testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS,
+				err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS).redirToClientWithError(w, r,
 					testRedirectError("access_denied", "Access denied", "form_post",
 						"https://example.com/callback", tc.state, "code"))
 
@@ -3516,8 +3515,7 @@ func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
 				r := httptest.NewRequest("GET", "/auth/authorize", nil)
 				r = withSessionSettings(r)
 
-				err := redirToClientWithError(w, r,
-					testRegisteredDatabase(t, "https://example.com/callback"), nil, web.TemplateFS(),
+				err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, web.TemplateFS()).redirToClientWithError(w, r,
 					testRedirectError("access_denied", "Access denied", "form_post",
 						"https://example.com/callback", tc.state, "code"))
 
@@ -5257,4 +5255,58 @@ func TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom(t *testing.T) {
 		assert.Falsef(t, value.Field(i).IsZero(), "CreateCodeInput.%s is never copied from the ceremony",
 			value.Type().Field(i).Name)
 	}
+}
+
+// The code arm writes its form_post through the template FS the route table gave the client-error
+// responder, the one the error responses of the same ceremony are written through, so a code and an
+// error to the same client render the same operator-supplied form_post.html.
+func TestHandleIssueGet_ACodeInFormPostRendersFromTheRespondersTemplates(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	codeIssuer := handlersmocks.NewCodeIssuer(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	userSessionManager := handlersmocks.NewUserSessionManager(t)
+	permissionChecker := handlersmocks.NewPermissionChecker(t)
+
+	handler := buildIssueGet(issueGetDeps{
+		pageRenderer:       pageRenderer,
+		ceremonyStore:      ceremonyStore,
+		templateFS:         fstest.MapFS{"form_post.html": {Data: []byte(`<form action="{{.redirectURI}}"><input name="code" value="{{.code}}"></form>`)}},
+		codeIssuer:         codeIssuer,
+		database:           database,
+		auditLogger:        auditLogger,
+		userSessionManager: userSessionManager,
+		permissionChecker:  permissionChecker,
+	})
+
+	req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+	rr := httptest.NewRecorder()
+
+	authContext := &ceremony.AuthContext{
+		CeremonyId:   testCeremonyId,
+		AuthState:    ceremony.AuthStateReadyToIssueCode,
+		Scope:        "openid profile",
+		ClientId:     "test-client",
+		UserId:       123,
+		ResponseMode: "form_post",
+		ResponseType: "code",
+		RedirectURI:  "https://example.com/callback",
+	}
+	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
+	stubLiveSession(database, 123)
+	codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).Return(&record.Code{
+		Id: 1, Code: "form-post-code", ClientId: 1, RedirectURI: "https://example.com/callback",
+	}, nil).Once()
+	auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
+	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil).Once()
+	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, `<form action="https://example.com/callback"><input name="code" value="form-post-code"></form>`,
+		rr.Body.String())
+	assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"))
+	pageRenderer.AssertNotCalled(t, "InternalServerError", rr, req, mock.Anything)
 }

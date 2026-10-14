@@ -18,21 +18,19 @@ type authLevel2Database interface {
 }
 
 func HandleAuthLevel2Get(
+	boundary *CeremonyBoundary,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	database authLevel2Database,
-	auditLogger AuditLogger,
-	baseURL string,
-	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
+		authContext, ok := boundary.loadAuthContext(w, r)
 		if !ok {
 			return
 		}
 
-		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateRequiresLevel2) {
+		if !boundary.requireAuthState(w, r, authContext, ceremony.AuthStateRequiresLevel2) {
 			return
 		}
 
@@ -89,11 +87,10 @@ func HandleAuthLevel2Get(
 		authContext.AuthState = nextState
 		err = ceremonyStore.SaveAuthContext(w, r, authContext)
 		if err != nil {
-			answerStepSaveFailure(pageRenderer, w, r, err)
+			boundary.answerStepSaveFailure(w, r, err)
 			return
 		}
-		//nolint:gosec // G710: nextPath is one of decideLevel2Arm's two constant routes, under the configured base URL
-		http.Redirect(w, r, ceremonyStepURL(baseURL, nextPath, authContext), http.StatusFound)
+		boundary.stepRedirect(w, r, nextPath, authContext)
 	}
 }
 

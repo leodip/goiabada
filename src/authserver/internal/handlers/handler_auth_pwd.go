@@ -33,21 +33,19 @@ type authPwdDatabase interface {
 }
 
 func HandleAuthPwdGet(
+	boundary *CeremonyBoundary,
 	pageRenderer PageRenderer,
-	ceremonyStore CeremonyStore,
 	database authPwdDatabase,
-	auditLogger AuditLogger,
-	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
+		authContext, ok := boundary.loadAuthContext(w, r)
 		if !ok {
 			return
 		}
 
-		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateLevel1Password) {
+		if !boundary.requireAuthState(w, r, authContext, ceremony.AuthStateLevel1Password) {
 			return
 		}
 
@@ -99,29 +97,26 @@ func HandleAuthPwdGet(
 }
 
 func HandleAuthPwdPost(
+	boundary *CeremonyBoundary,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	database authPwdDatabase,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
-	baseURL string,
-	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		// loadAuthContext refuses a submission naming another ceremony before the AuthState check, so
-		// a login form left open in another tab gets the 400 mismatch page rather than the 500 that
-		// a replaced context's state would produce, and before anything reads the credentials: a
-		// submission naming a ceremony that is no longer current is answered without ever looking up
-		// a user or verifying a password, so a stale form cannot authenticate anybody for anything
-		// (#79).
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
+		// The boundary refuses a submission naming another ceremony before the state gate, so a login
+		// form left open in another tab gets the "no longer active" page, and before anything reads
+		// the credentials: a stale form is answered without looking up a user or verifying a
+		// password, so it cannot authenticate anybody for anything (#79).
+		authContext, ok := boundary.loadAuthContext(w, r)
 		if !ok {
 			return
 		}
 
-		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateLevel1Password) {
+		if !boundary.requireAuthState(w, r, authContext, ceremony.AuthStateLevel1Password) {
 			return
 		}
 
@@ -298,15 +293,15 @@ func HandleAuthPwdPost(
 		// newer one. One that finds it replaced, or the session gone, writes nothing and answers
 		// the "no longer active" page (#579).
 		if regenerateSessionErr := ceremonyStore.RegenerateSession(w, r, authContext.CeremonyId); regenerateSessionErr != nil {
-			answerStepSaveFailure(pageRenderer, w, r, regenerateSessionErr)
+			boundary.answerStepSaveFailure(w, r, regenerateSessionErr)
 			return
 		}
 
 		err = ceremonyStore.SaveAuthContext(w, r, authContext)
 		if err != nil {
-			answerStepSaveFailure(pageRenderer, w, r, err)
+			boundary.answerStepSaveFailure(w, r, err)
 			return
 		}
-		http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level1completed", authContext), http.StatusFound)
+		boundary.stepRedirect(w, r, "/auth/level1completed", authContext)
 	}
 }

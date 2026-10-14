@@ -6,11 +6,11 @@ import (
 )
 
 // This file is the refusal interstitial: the page a user is shown instead of being redirected to a
-// destination this server will not send them to. redirToClientWithError decides when it renders;
-// everything here is what it renders and the pure function behind the one thing on it a user can
-// act on.
+// destination this server will not send them to. ClientErrorResponder.redirToClientWithError decides
+// when it renders; everything here is what it renders and the pure function behind the one thing on
+// it a user can act on.
 //
-// There are three such destinations, and redirectWillBeEmitted holds all three: one a client
+// There are three such destinations, and the responder's redirectWillBeEmitted holds all three: one a client
 // registered for itself (#108), one whose stored string cannot name the host it appears to (#122),
 // and one the client no longer has registered at all (#241). The page is the same for each,
 // because what it tells the person in front of it is the same: the authorization stopped here and
@@ -46,12 +46,11 @@ func redirectDestinationLabel(redirectURI string) string {
 // renderRedirectBlocked renders the terminal page that replaces an error redirect to a client this
 // server cannot vouch for. The authorization ends here: there is no action on the page, no form, no
 // route and nothing persisted, so the client receives nothing and there is no pending state for
-// anyone to replay (#108, decision 14).
+// anyone to replay (#108 decision 14).
 //
-// Rendered the way rejectCeremonyMismatch renders auth_error.html, and at 200 for the same reason
-// renderErrorUi answers 200: this is an authorization the server refused to complete, reported to
-// the person in front of it, rather than a fault in the HTTP request that carried it.
-func renderRedirectBlocked(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request,
+// At 200: this is an authorization the server refused to complete, reported to the person in front
+// of it, rather than a fault in the HTTP request that carried it.
+func (rsp *ClientErrorResponder) renderRedirectBlocked(w http.ResponseWriter, r *http.Request,
 	input redirectErrorInput) error {
 
 	bind := map[string]interface{}{
@@ -60,12 +59,12 @@ func renderRedirectBlocked(pageRenderer PageRenderer, w http.ResponseWriter, r *
 
 	// The client is nil only when the handler could not resolve one, which is the untrusted case
 	// rather than an exempt one. There is then no name to show and no marking to make: saying the
-	// application registered itself would be a claim this server cannot back at that moment.
+	// application registered itself would be a claim this server cannot back.
 	if input.client != nil {
 		name, unverified := consentClientName(input.client)
 		bind["clientName"] = name
 		bind["clientNameUnverified"] = unverified
 	}
 
-	return pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html", bind)
+	return rsp.pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html", bind)
 }

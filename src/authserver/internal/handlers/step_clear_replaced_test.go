@@ -67,7 +67,7 @@ func TestAnswerClientWithError_AReplacedCeremonyAnswersNoLongerActive(t *testing
 	expectStepClearReplaced(t, ceremonyStore, pageRenderer, rr, req)
 	logged := logtest.CaptureSlog(t)
 
-	answerClientWithError(rr, req, datamocks.NewDatabase(t), pageRenderer, ceremonyStore, nil, testCeremonyId,
+	answerClientWithError(rr, req, ceremonyStore, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil), testCeremonyId,
 		testRedirectError("access_denied", "The user did not provide consent", "query",
 			"https://legit.example/cb", "abc123", "code"))
 
@@ -135,7 +135,7 @@ func TestAnswerClientWithError_ACeremonyReplacedAtTheLastAttemptAnswersNoLongerA
 	expectCeremonyNoLongerActive(t, pageRenderer, rr, req)
 	logged := logtest.CaptureSlog(t)
 
-	answerClientWithError(rr, req, datamocks.NewDatabase(t), pageRenderer, ceremonyStore, nil, testCeremonyId,
+	answerClientWithError(rr, req, ceremonyStore, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil), testCeremonyId,
 		testRedirectError("access_denied", "The user did not provide consent", "query",
 			"https://legit.example/cb", "state-a", "code"))
 

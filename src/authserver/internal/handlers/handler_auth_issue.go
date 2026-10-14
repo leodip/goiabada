@@ -27,11 +27,7 @@ import (
 // authIssueDatabase is what /auth/issue reads before it issues: the client, its redirect URIs, the
 // user and the ambient session. The session row taken before the insert, and the transaction, are
 // the code issuer's (#139).
-//
-// It embeds the authorize port because a refusal here is answered through redirToClientWithError.
 type authIssueDatabase interface {
-	authorizeDatabase
-
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
@@ -39,9 +35,10 @@ type authIssueDatabase interface {
 }
 
 func HandleIssueGet(
+	boundary *CeremonyBoundary,
+	responder *ClientErrorResponder,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
-	templateFS fs.FS,
 	codeIssuer CodeIssuer,
 	implicitTokenIssuer ImplicitTokenIssuer,
 	database authIssueDatabase,
@@ -49,16 +46,14 @@ func HandleIssueGet(
 	userSessionManager UserSessionManager,
 	permissionChecker PermissionChecker,
 	tokenMetrics *tokenmetrics.Recorder,
-	baseURL string,
-	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
+		authContext, ok := boundary.loadAuthContext(w, r)
 		if !ok {
 			return
 		}
 
-		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateReadyToIssueCode) {
+		if !boundary.requireAuthState(w, r, authContext, ceremony.AuthStateReadyToIssueCode) {
 			return
 		}
 
@@ -205,18 +200,18 @@ func HandleIssueGet(
 
 		switch answer.outcome {
 		case issuanceRefuseUnregisteredRedirect:
-			refuseIssuanceUnregisteredRedirect(w, r, authContext, issuingClient, pageRenderer, ceremonyStore, auditLogger)
+			refuseIssuanceUnregisteredRedirect(w, r, authContext, issuingClient, boundary, responder, pageRenderer, ceremonyStore, auditLogger)
 
 		case issuanceRefuseClientDisabled:
-			refuseIssuanceClientDisabled(w, r, authContext, pageRenderer, ceremonyStore)
+			refuseIssuanceClientDisabled(w, r, authContext, boundary, pageRenderer, ceremonyStore)
 
 		case issuanceRefuseImplicitDisabled:
 			refuseIssuanceFlowDisabled(w, r, protocolvalidation.ImplicitNotAuthorizedErrorMsg, authContext, issuingClient,
-				database, pageRenderer, ceremonyStore, templateFS)
+				boundary, responder, ceremonyStore)
 
 		case issuanceRefuseCodeDisabled:
 			refuseIssuanceFlowDisabled(w, r, protocolvalidation.AuthorizationCodeNotSupportedErrorMsg, authContext, issuingClient,
-				database, pageRenderer, ceremonyStore, templateFS)
+				boundary, responder, ceremonyStore)
 
 		case issuanceRefuseAdministrativeScope:
 			// The answer /auth/authorize gives the same condition, arriving later: the client's
@@ -224,7 +219,7 @@ func HandleIssueGet(
 			// now, so it is recorded against the ceremony's user (#499 decisions 7 and 9).
 			auditLogger.Log(r.Context(), audit.EventAdministrativeScopeRefused,
 				administrativeScopeRefusedDetails(issuingClient, facts.refusedAdministrativeScopes, "issue", authContext.UserId))
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
+			answerClientWithError(w, r, ceremonyStore, boundary, responder, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext, issuingClient, "invalid_scope",
 					protocolvalidation.AdministrativeScopeRefusal(facts.refusedAdministrativeScopes).Description()))
 
@@ -234,7 +229,7 @@ func HandleIssueGet(
 			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
 				"user_id": facts.user.Id,
 			})
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
+			answerClientWithError(w, r, ceremonyStore, boundary, responder, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext, issuingClient, "access_denied", userDisabledDescription))
 
 		case issuanceRefuseHintMismatch:
@@ -242,13 +237,13 @@ func HandleIssueGet(
 			// resolved ahead of the dispatch (#108). The registration gate already loaded it and
 			// refused a nil, so issuingClient is that client rather than a clientProvenance call
 			// of its own.
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
+			answerClientWithError(w, r, ceremonyStore, boundary, responder, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext, issuingClient, oidc.ErrorLoginRequired,
 					"The authenticated user does not match the id_token_hint"))
 
 		case issuanceRefuseUnusableSession:
 			refuseIssuanceUnusableSession(w, r, answer.sessionShape, authContext, issuingClient, ambientSession,
-				sessionIdentifier, pageRenderer, ceremonyStore, templateFS, database, auditLogger, baseURL)
+				sessionIdentifier, boundary, responder, ceremonyStore, auditLogger)
 
 		case issuanceUserMissing:
 			pageRenderer.InternalServerError(w, r, errs.Errorf("user %v not found", authContext.UserId))
@@ -266,7 +261,7 @@ func HandleIssueGet(
 
 			// The wording and the error code are /auth/completed's for the same condition,
 			// arriving later: the same removal gets one answer wherever it lands.
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
+			answerClientWithError(w, r, ceremonyStore, boundary, responder, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext, issuingClient, "access_denied",
 					"The user is not authorized to access any of the requested scopes"))
 
@@ -281,12 +276,12 @@ func HandleIssueGet(
 
 			if answer.outcome == issuanceIssueImplicit {
 				issueImplicitGrant(w, r, authContext, sessionIdentifier, issuingClient, facts.user, settings, ambientSession,
-					pageRenderer, ceremonyStore, templateFS, implicitTokenIssuer, database, auditLogger, tokenMetrics, baseURL)
+					boundary, responder, pageRenderer, ceremonyStore, implicitTokenIssuer, auditLogger, tokenMetrics)
 				return
 			}
 
 			issueAuthorizationCodeGrant(w, r, authContext, sessionIdentifier, issuingClient, ambientSession,
-				pageRenderer, ceremonyStore, templateFS, codeIssuer, database, auditLogger, baseURL)
+				boundary, responder, pageRenderer, ceremonyStore, codeIssuer, auditLogger)
 		}
 	}
 }
@@ -567,6 +562,8 @@ func refuseIssuanceUnregisteredRedirect(
 	r *http.Request,
 	authContext *ceremony.AuthContext,
 	issuingClient *record.Client,
+	boundary *CeremonyBoundary,
+	responder *ClientErrorResponder,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	auditLogger AuditLogger,
@@ -595,7 +592,7 @@ func refuseIssuanceUnregisteredRedirect(
 	// page, so one condition keeps one page wherever it fires (#579 decision 2).
 	err := ceremonyStore.ClearAuthContext(w, r, authContext.CeremonyId)
 	if errors.Is(err, ceremony.ErrCeremonyReplaced) {
-		answerCeremonyReplaced(pageRenderer, w, r)
+		boundary.answerCeremonyReplaced(w, r)
 		return
 	}
 	if err != nil {
@@ -611,14 +608,14 @@ func refuseIssuanceUnregisteredRedirect(
 	}
 
 	// Rendered locally, never redirected: this URI must receive nothing, an error response
-	// included. auth_redirect_blocked.html is the page redirToClientWithError already withholds a
+	// included. auth_redirect_blocked.html is the page the responder already withholds a
 	// redirect through, so one condition keeps one page wherever it fires (#241 decision 4, as
 	// amended by decision 11).
 	//
 	// Built directly rather than through redirectErrorFromAuthContext, which fills in an error
 	// code, a description, a state and a response mode: this page carries none of them, and naming
 	// the two fields it does read says so. A nil client is rendered without a name.
-	err = renderRedirectBlocked(pageRenderer, w, r, redirectErrorInput{
+	err = responder.renderRedirectBlocked(w, r, redirectErrorInput{
 		client:      issuingClient,
 		redirectURI: authContext.RedirectURI,
 	})
@@ -636,6 +633,7 @@ func refuseIssuanceClientDisabled(
 	w http.ResponseWriter,
 	r *http.Request,
 	authContext *ceremony.AuthContext,
+	boundary *CeremonyBoundary,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 ) {
@@ -649,7 +647,7 @@ func refuseIssuanceClientDisabled(
 	// answered on the "no longer active" page, as there (#579 decision 2).
 	err := ceremonyStore.ClearAuthContext(w, r, authContext.CeremonyId)
 	if errors.Is(err, ceremony.ErrCeremonyReplaced) {
-		answerCeremonyReplaced(pageRenderer, w, r)
+		boundary.answerCeremonyReplaced(w, r)
 		return
 	}
 	if err != nil {
@@ -671,16 +669,15 @@ func refuseIssuanceFlowDisabled(
 	description string,
 	authContext *ceremony.AuthContext,
 	issuingClient *record.Client,
-	database authIssueDatabase,
-	pageRenderer PageRenderer,
+	boundary *CeremonyBoundary,
+	responder *ClientErrorResponder,
 	ceremonyStore CeremonyStore,
-	templateFS fs.FS,
 ) {
 	slog.WarnContext(r.Context(), "the client is no longer allowed the flow this ceremony is for, so nothing is issued",
 		"client_identifier", authContext.ClientId,
 		"response_type", authContext.ResponseType)
 
-	answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
+	answerClientWithError(w, r, ceremonyStore, boundary, responder, authContext.CeremonyId,
 		redirectErrorFromAuthContext(authContext, issuingClient, "unauthorized_client", description))
 }
 
@@ -693,13 +690,12 @@ func issueAuthorizationCodeGrant(
 	sessionIdentifier string,
 	issuingClient *record.Client,
 	ambientSession *record.UserSession,
+	boundary *CeremonyBoundary,
+	responder *ClientErrorResponder,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
-	templateFS fs.FS,
 	codeIssuer CodeIssuer,
-	database authIssueDatabase,
 	auditLogger AuditLogger,
-	baseURL string,
 ) {
 	createCodeInput := newCreateCodeInput(authContext, sessionIdentifier)
 
@@ -714,7 +710,7 @@ func issueAuthorizationCodeGrant(
 		// authenticator removed between the two is answered as it would have been there, and no
 		// code was written (#542).
 		refuseIssuanceUnusableSession(w, r, sessionAuthenticatorRemoved, authContext, issuingClient, ambientSession,
-			sessionIdentifier, pageRenderer, ceremonyStore, templateFS, database, auditLogger, baseURL)
+			sessionIdentifier, boundary, responder, ceremonyStore, auditLogger)
 		return
 	}
 	if errors.Is(err, issuance.ErrIssuingSessionGone) || errors.Is(err, issuance.ErrIssuingClientGone) {
@@ -737,7 +733,7 @@ func issueAuthorizationCodeGrant(
 		// the session store on a nil transaction, and on SQLite that is the connection the
 		// transaction was holding (#139).
 		refuseIssuanceUnusableSession(w, r, sessionGone, authContext, issuingClient, ambientSession,
-			sessionIdentifier, pageRenderer, ceremonyStore, templateFS, database, auditLogger, baseURL)
+			sessionIdentifier, boundary, responder, ceremonyStore, auditLogger)
 		return
 	}
 
@@ -769,10 +765,10 @@ func issueAuthorizationCodeGrant(
 	// the failed clear leaves it, held by nobody until the sweep (#579 decision 2).
 	err = ceremonyStore.ClearAuthContext(w, r, authContext.CeremonyId)
 	if err != nil {
-		answerStepSaveFailure(pageRenderer, w, r, err)
+		boundary.answerStepSaveFailure(w, r, err)
 		return
 	}
-	err = issueAuthCode(w, r, templateFS, code, authContext.ResponseMode)
+	err = issueAuthCode(w, r, responder.templateFS, code, authContext.ResponseMode)
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 	}
@@ -857,12 +853,10 @@ func refuseIssuanceUnusableSession(
 	issuingClient *record.Client,
 	ambientSession *record.UserSession,
 	sessionIdentifier string,
-	pageRenderer PageRenderer,
+	boundary *CeremonyBoundary,
+	responder *ClientErrorResponder,
 	ceremonyStore CeremonyStore,
-	templateFS fs.FS,
-	database authIssueDatabase,
 	auditLogger AuditLogger,
-	baseURL string,
 ) {
 	// Only the expired shape audits. The foreign and gone shapes are #133's and #129's refusals,
 	// writing no audit row today; this event attests the check #241 added, which is the one an
@@ -918,7 +912,7 @@ func refuseIssuanceUnusableSession(
 		// Provenance is resolved before the dispatch, for the same reason as at the id_token_hint
 		// refusal (#108). The registration gate at the top of the handler loaded the client and
 		// refused a nil, so issuingClient is it.
-		answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
+		answerClientWithError(w, r, ceremonyStore, boundary, responder, authContext.CeremonyId,
 			redirectErrorFromAuthContext(authContext, issuingClient, oidc.ErrorLoginRequired,
 				"User authentication is required"))
 		return
@@ -949,10 +943,10 @@ func refuseIssuanceUnusableSession(
 	authContext.Restart()
 	err := ceremonyStore.SaveAuthContext(w, r, authContext)
 	if err != nil {
-		answerStepSaveFailure(pageRenderer, w, r, err)
+		boundary.answerStepSaveFailure(w, r, err)
 		return
 	}
-	http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level1", authContext), http.StatusFound)
+	boundary.stepRedirect(w, r, "/auth/level1", authContext)
 }
 
 // issueImplicitGrant is the implicit branch: it signs the tokens, bound to the session, and
@@ -978,14 +972,13 @@ func issueImplicitGrant(
 	user *record.User,
 	settings *record.Settings,
 	ambientSession *record.UserSession,
+	boundary *CeremonyBoundary,
+	responder *ClientErrorResponder,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
-	templateFS fs.FS,
 	implicitTokenIssuer ImplicitTokenIssuer,
-	database authIssueDatabase,
 	auditLogger AuditLogger,
 	tokenMetrics *tokenmetrics.Recorder,
-	baseURL string,
 ) {
 	// Determine what tokens to issue based on response_type
 	rtInfo := protocolvalidation.ParseResponseType(authContext.ResponseType)
@@ -1024,14 +1017,14 @@ func issueImplicitGrant(
 	if errors.Is(err, otpcredential.ErrAuthenticatorRemoved) {
 		// As for a code: nothing was signed (#542).
 		refuseIssuanceUnusableSession(w, r, sessionAuthenticatorRemoved, authContext, client, ambientSession,
-			sessionIdentifier, pageRenderer, ceremonyStore, templateFS, database, auditLogger, baseURL)
+			sessionIdentifier, boundary, responder, ceremonyStore, auditLogger)
 		return
 	}
 	if errors.Is(err, issuance.ErrIssuingSessionGone) {
 		// The gone shape, answered exactly as the liveness read answers it: the browser restarts at
 		// level 1 and a prompt=none ceremony is told login_required. Nothing was signed.
 		refuseIssuanceUnusableSession(w, r, sessionGone, authContext, client, ambientSession,
-			sessionIdentifier, pageRenderer, ceremonyStore, templateFS, database, auditLogger, baseURL)
+			sessionIdentifier, boundary, responder, ceremonyStore, auditLogger)
 		return
 	}
 	if err != nil {
@@ -1056,11 +1049,11 @@ func issueImplicitGrant(
 	// (#579 decision 2).
 	err = ceremonyStore.ClearAuthContext(w, r, authContext.CeremonyId)
 	if err != nil {
-		answerStepSaveFailure(pageRenderer, w, r, err)
+		boundary.answerStepSaveFailure(w, r, err)
 		return
 	}
 
-	err = issueImplicitTokens(w, r, templateFS, authContext.ResponseMode, authContext.RedirectURI, authContext.State, tokenResponse)
+	err = issueImplicitTokens(w, r, responder.templateFS, authContext.ResponseMode, authContext.RedirectURI, authContext.State, tokenResponse)
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 	}

@@ -375,7 +375,7 @@ func TestRedirToClientWithError_ImplicitFlow_QueryIsAnsweredInTheFragment(t *tes
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest("GET", "/authorize", nil)
 
-			err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil,
+			err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r,
 				testRedirectError("invalid_request", "Implicit flow does not support response_mode=query.", "query",
 					"https://example.com/callback", "state123", responseType))
 
@@ -394,7 +394,7 @@ func TestRedirToClientWithError_ImplicitFlow_QueryIsAnsweredInTheFragment(t *tes
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil,
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r,
 			testRedirectError("access_denied", "Access denied", "query", "https://example.com/callback", "state123", "code"))
 
 		require.NoError(t, err)

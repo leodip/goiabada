@@ -178,11 +178,16 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 | | `HandleConsentGet` | scope already fully consented, no `offline_access`, no `prompt=consent` |
 | | `HandleConsentPost` | approved with at least one scope |
 
-Every step but `/auth/authorize` first checks, in `loadAuthContext`, that the request names the
-sign-in the browser holds: the `ceremony` query parameter on a GET, built into every redirect between
-steps by `ceremonyStepURL`, and the `ceremonyId` form field on a POST. A missing or differing id gets
-the "no longer active" page, 400. Each route then gates on the state it finds through
-`requireAuthState`, which answers 400 when it is not one it accepts (#246, #437):
+Every step handler takes the route boundary, `handlers.CeremonyBoundary` (`auth_ceremony.go`), and
+every handler that answers a client with an error the client-error responder,
+`handlers.ClientErrorResponder` (`client_error_responder.go`), which holds the emission gates, the
+query, fragment and `form_post` encodings, the refusal interstitial and the `server_error` fallback
+and clears nothing; the route table builds one of each. Every step but `/auth/authorize` first checks,
+in the boundary's `loadAuthContext`, that the request names the sign-in the browser holds: the
+`ceremony` query parameter on a GET, built into every redirect between steps by `stepRedirect`, and
+the `ceremonyId` form field on a POST. A missing or differing id gets the "no longer active" page, 400.
+Each route then gates on the state it finds through `requireAuthState`, which answers 400 when it is
+not one it accepts (#246, #437):
 
 | Route | Method | Accepts | On mismatch |
 |---|---|---|---|
@@ -253,7 +258,7 @@ after its marker expired leaves a newer link's in place.
 `/auth/authorize` never redirects an unauthenticated browser to a client's `redirect_uri` on a failed
 request, per RFC 9700 4.11.2. A validation failure is answered at once when the request is silent
 (`prompt=none`, read from the raw parameter), when the browser holds a valid session and did not ask
-for `prompt=login`, or when no redirect would be emitted anyway (`redirectWillBeEmitted` false).
+for `prompt=login`, or when no redirect would be emitted anyway (the responder's `redirectWillBeEmitted` false).
 Otherwise the error code and description are parked on `AuthContext.DeferredErrorCode` /
 `DeferredErrorDescription`, the visitor goes to `/auth/level1`, and the redirect is emitted from
 `/auth/level1completed` once the password is verified. That ceremony ends there and creates no

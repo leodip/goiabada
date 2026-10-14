@@ -44,7 +44,7 @@ type CeremonyStore interface {
 	// SaveAuthContext is a step's save, which writes only while the browser session still holds
 	// the step's ceremony and otherwise answers ceremony.ErrCeremonyReplaced, writing nothing
 	// (#579). Every step after /auth/authorize saves through it, and answers that error through
-	// answerStepSaveFailure.
+	// CeremonyBoundary.answerStepSaveFailure.
 	SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error
 	// ReplaceAuthContext is /auth/authorize's save, which starts a ceremony and so replaces
 	// whatever the browser session held.

@@ -12,7 +12,19 @@ import (
 // the doubles a test already holds, by name, and builds the handler from them, so a change to a
 // handler's constructor changes its builder and no test. A field left out is nil, as the nil a
 // test passed before. The two base URLs are always testBaseURL and testAdminConsoleBaseURL, and the
-// data cipher always testDataCipher.
+// data cipher always testDataCipher. The route boundary and the client-error responder are built
+// from the same doubles the handler takes, as the route table builds them from the same ports.
+
+// testCeremonyBoundary is the route boundary the route table would build from these doubles.
+func testCeremonyBoundary(pageRenderer PageRenderer, ceremonyStore CeremonyStore, auditLogger AuditLogger) *CeremonyBoundary {
+	return NewCeremonyBoundary(pageRenderer, ceremonyStore, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+}
+
+// testClientErrorResponder is the client-error responder the route table would build from these
+// doubles.
+func testClientErrorResponder(database *datamocks.Database, pageRenderer PageRenderer, templateFS fs.FS) *ClientErrorResponder {
+	return NewClientErrorResponder(database, pageRenderer, templateFS)
+}
 
 type authorizeGetDeps struct {
 	pageRenderer       PageRenderer
@@ -27,8 +39,10 @@ type authorizeGetDeps struct {
 }
 
 func buildAuthorizeGet(d authorizeGetDeps) http.HandlerFunc {
-	return HandleAuthorizeGet(d.pageRenderer, d.ceremonyStore, d.userSessionManager, d.database, d.templateFS,
-		d.authorizeValidator, d.auditLogger, d.permissionChecker, d.tokenParser, testBaseURL)
+	return HandleAuthorizeGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+		testClientErrorResponder(d.database, d.pageRenderer, d.templateFS),
+		d.pageRenderer, d.ceremonyStore, d.userSessionManager, d.database,
+		d.authorizeValidator, d.auditLogger, d.permissionChecker, d.tokenParser)
 }
 
 type authorizePostDeps struct {
@@ -48,7 +62,7 @@ type authLevel1GetDeps struct {
 }
 
 func buildAuthLevel1Get(d authLevel1GetDeps) http.HandlerFunc {
-	return HandleAuthLevel1Get(d.pageRenderer, d.ceremonyStore, d.auditLogger, testBaseURL, testAdminConsoleBaseURL)
+	return HandleAuthLevel1Get(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger), d.ceremonyStore)
 }
 
 type authLevel1CompletedGetDeps struct {
@@ -61,8 +75,9 @@ type authLevel1CompletedGetDeps struct {
 }
 
 func buildAuthLevel1CompletedGet(d authLevel1CompletedGetDeps) http.HandlerFunc {
-	return HandleAuthLevel1CompletedGet(d.pageRenderer, d.ceremonyStore, d.userSessionManager, d.database,
-		d.templateFS, d.auditLogger, testBaseURL, testAdminConsoleBaseURL)
+	return HandleAuthLevel1CompletedGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+		testClientErrorResponder(d.database, d.pageRenderer, d.templateFS),
+		d.pageRenderer, d.ceremonyStore, d.userSessionManager, d.database)
 }
 
 type authPwdGetDeps struct {
@@ -73,7 +88,8 @@ type authPwdGetDeps struct {
 }
 
 func buildAuthPwdGet(d authPwdGetDeps) http.HandlerFunc {
-	return HandleAuthPwdGet(d.pageRenderer, d.ceremonyStore, d.database, d.auditLogger, testAdminConsoleBaseURL)
+	return HandleAuthPwdGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+		d.pageRenderer, d.database)
 }
 
 // authPwdPostDeps.credentialFailures left out records nothing (noCredentialFailures).
@@ -86,8 +102,8 @@ type authPwdPostDeps struct {
 }
 
 func buildAuthPwdPost(d authPwdPostDeps) http.HandlerFunc {
-	return HandleAuthPwdPost(d.pageRenderer, d.ceremonyStore, d.database, d.auditLogger,
-		credentialFailuresOrNone(d.credentialFailures), testBaseURL, testAdminConsoleBaseURL)
+	return HandleAuthPwdPost(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+		d.pageRenderer, d.ceremonyStore, d.database, d.auditLogger, credentialFailuresOrNone(d.credentialFailures))
 }
 
 type authLevel2GetDeps struct {
@@ -98,8 +114,8 @@ type authLevel2GetDeps struct {
 }
 
 func buildAuthLevel2Get(d authLevel2GetDeps) http.HandlerFunc {
-	return HandleAuthLevel2Get(d.pageRenderer, d.ceremonyStore, d.database, d.auditLogger,
-		testBaseURL, testAdminConsoleBaseURL)
+	return HandleAuthLevel2Get(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+		d.pageRenderer, d.ceremonyStore, d.database)
 }
 
 type authOtpGetDeps struct {
@@ -111,8 +127,8 @@ type authOtpGetDeps struct {
 }
 
 func buildAuthOtpGet(d authOtpGetDeps) http.HandlerFunc {
-	return HandleAuthOtpGet(d.pageRenderer, d.ceremonyStore, d.database, d.otpSecretGenerator, d.auditLogger,
-		testAdminConsoleBaseURL)
+	return HandleAuthOtpGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+		d.pageRenderer, d.ceremonyStore, d.database, d.otpSecretGenerator)
 }
 
 // authOtpPostDeps.credentialFailures left out records nothing (noCredentialFailures).
@@ -125,8 +141,9 @@ type authOtpPostDeps struct {
 }
 
 func buildAuthOtpPost(d authOtpPostDeps) http.HandlerFunc {
-	return HandleAuthOtpPost(d.pageRenderer, d.ceremonyStore, d.database, d.auditLogger,
-		credentialFailuresOrNone(d.credentialFailures), testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+	return HandleAuthOtpPost(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+		d.pageRenderer, d.ceremonyStore, d.database, d.auditLogger, credentialFailuresOrNone(d.credentialFailures),
+		testDataCipher)
 }
 
 type authCompletedGetDeps struct {
@@ -140,8 +157,9 @@ type authCompletedGetDeps struct {
 }
 
 func buildAuthCompletedGet(d authCompletedGetDeps) http.HandlerFunc {
-	return HandleAuthCompletedGet(d.pageRenderer, d.ceremonyStore, d.userSessionManager, d.database,
-		d.templateFS, d.auditLogger, d.permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+	return HandleAuthCompletedGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+		testClientErrorResponder(d.database, d.pageRenderer, d.templateFS),
+		d.pageRenderer, d.ceremonyStore, d.userSessionManager, d.database, d.auditLogger, d.permissionChecker)
 }
 
 type consentGetDeps struct {
@@ -152,8 +170,8 @@ type consentGetDeps struct {
 }
 
 func buildConsentGet(d consentGetDeps) http.HandlerFunc {
-	return HandleConsentGet(d.pageRenderer, d.ceremonyStore, d.database, d.auditLogger,
-		testBaseURL, testAdminConsoleBaseURL)
+	return HandleConsentGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+		d.pageRenderer, d.ceremonyStore, d.database)
 }
 
 type consentPostDeps struct {
@@ -166,8 +184,9 @@ type consentPostDeps struct {
 }
 
 func buildConsentPost(d consentPostDeps) http.HandlerFunc {
-	return HandleConsentPost(d.pageRenderer, d.ceremonyStore, d.database, d.templateFS, d.auditLogger,
-		d.permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+	return HandleConsentPost(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+		testClientErrorResponder(d.database, d.pageRenderer, d.templateFS),
+		d.pageRenderer, d.ceremonyStore, d.database, d.auditLogger, d.permissionChecker)
 }
 
 // issueGetDeps.tokenMetrics left out is a recorder over a registry of its own (testTokenMetrics).
@@ -189,9 +208,10 @@ func buildIssueGet(d issueGetDeps) http.HandlerFunc {
 	if tokenMetrics == nil {
 		tokenMetrics = testTokenMetrics()
 	}
-	return HandleIssueGet(d.pageRenderer, d.ceremonyStore, d.templateFS, d.codeIssuer, d.implicitTokenIssuer,
-		d.database, d.auditLogger, d.userSessionManager, d.permissionChecker, tokenMetrics,
-		testBaseURL, testAdminConsoleBaseURL)
+	return HandleIssueGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+		testClientErrorResponder(d.database, d.pageRenderer, d.templateFS),
+		d.pageRenderer, d.ceremonyStore, d.codeIssuer, d.implicitTokenIssuer,
+		d.database, d.auditLogger, d.userSessionManager, d.permissionChecker, tokenMetrics)
 }
 
 func credentialFailuresOrNone(credentialFailures CredentialFailureRecorder) CredentialFailureRecorder {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"io/fs"
 	"log/slog"
 	"net/http"
 
@@ -23,16 +22,16 @@ import (
 )
 
 // authCompletedDatabase is what the end of the authentication ceremony needs: the session it
-// bumps or replaces, and the generation it promotes.
+// bumps or replaces, the generation it promotes, and the consent that decides whether the consent
+// screen is owed.
 //
-// It embeds the authorize port because a refusal here is answered through redirToClientWithError,
-// and the revocation port because an unusable session is terminated through
+// It embeds the revocation port because an unusable session is terminated through
 // revocation.TerminateUserSessionTx.
 type authCompletedDatabase interface {
-	authorizeDatabase
 	revocation.Database
 
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	PromoteUserSessionOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
@@ -40,24 +39,23 @@ type authCompletedDatabase interface {
 }
 
 func HandleAuthCompletedGet(
+	boundary *CeremonyBoundary,
+	responder *ClientErrorResponder,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	userSessionManager UserSessionManager,
 	database authCompletedDatabase,
-	templateFS fs.FS,
 	auditLogger AuditLogger,
 	permissionChecker PermissionChecker,
-	baseURL string,
-	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
+		authContext, ok := boundary.loadAuthContext(w, r)
 		if !ok {
 			return
 		}
 
-		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateAuthenticationCompleted) {
+		if !boundary.requireAuthState(w, r, authContext, ceremony.AuthStateAuthenticationCompleted) {
 			return
 		}
 
@@ -129,7 +127,7 @@ func HandleAuthCompletedGet(
 				auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
 					"user_id": user.Id,
 				})
-				answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
+				answerClientWithError(w, r, ceremonyStore, boundary, responder, authContext.CeremonyId,
 					redirectErrorFromAuthContext(authContext, client, "access_denied", userDisabledDescription))
 				return
 			case beforeBindingGenerationMoved:
@@ -158,10 +156,10 @@ func HandleAuthCompletedGet(
 			authContext.Restart()
 			saveErr := ceremonyStore.SaveAuthContext(w, r, authContext)
 			if saveErr != nil {
-				answerStepSaveFailure(pageRenderer, w, r, saveErr)
+				boundary.answerStepSaveFailure(w, r, saveErr)
 				return
 			}
-			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level1", authContext), http.StatusFound)
+			boundary.stepRedirect(w, r, "/auth/level1", authContext)
 		}
 
 		switch plan.arm {
@@ -211,7 +209,7 @@ func HandleAuthCompletedGet(
 			// had just raised.
 			slog.WarnContext(r.Context(), "a newer authentication has already reached this session, answering this ceremony as one the browser has replaced",
 				"ceremony_user_id", authContext.UserId)
-			renderCeremonyNoLongerActive(pageRenderer, w, r)
+			boundary.renderCeremonyNoLongerActive(w, r)
 			return
 		}
 		if errors.Is(err, ceremony.ErrCeremonyReplaced) || errors.Is(err, sessionstore.ErrNotFound) {
@@ -222,7 +220,7 @@ func HandleAuthCompletedGet(
 			// commit, which StartNewUserSession reports with sessionstore.ErrNotFound when the
 			// session is gone and which has abandoned the new session (decision 4). Either way
 			// nothing was bound to the browser session, and the newer sign-in carries on.
-			answerCeremonyReplaced(pageRenderer, w, r)
+			boundary.answerCeremonyReplaced(w, r)
 			return
 		}
 		if err != nil {
@@ -281,25 +279,25 @@ func HandleAuthCompletedGet(
 
 		switch answer {
 		case afterBindingNoScope:
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
+			answerClientWithError(w, r, ceremonyStore, boundary, responder, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext, client,
 					"access_denied", "The user is not authorized to access any of the requested scopes"))
 		case afterBindingConsent:
 			authContext.AuthState = ceremony.AuthStateRequiresConsent
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				answerStepSaveFailure(pageRenderer, w, r, err)
+				boundary.answerStepSaveFailure(w, r, err)
 				return
 			}
-			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/consent", authContext), http.StatusFound)
+			boundary.stepRedirect(w, r, "/auth/consent", authContext)
 		default:
 			authContext.AuthState = ceremony.AuthStateReadyToIssueCode
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				answerStepSaveFailure(pageRenderer, w, r, err)
+				boundary.answerStepSaveFailure(w, r, err)
 				return
 			}
-			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/issue", authContext), http.StatusFound)
+			boundary.stepRedirect(w, r, "/auth/issue", authContext)
 		}
 	}
 }

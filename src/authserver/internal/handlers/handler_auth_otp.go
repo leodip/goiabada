@@ -34,22 +34,21 @@ type authOTPDatabase interface {
 }
 
 func HandleAuthOtpGet(
+	boundary *CeremonyBoundary,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	database authOTPDatabase,
 	otpSecretGenerator OtpSecretGenerator,
-	auditLogger AuditLogger,
-	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
+		authContext, ok := boundary.loadAuthContext(w, r)
 		if !ok {
 			return
 		}
 
-		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateLevel2OTP) {
+		if !boundary.requireAuthState(w, r, authContext, ceremony.AuthStateLevel2OTP) {
 			return
 		}
 
@@ -87,7 +86,7 @@ func HandleAuthOtpGet(
 
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				answerStepSaveFailure(pageRenderer, w, r, err)
+				boundary.answerStepSaveFailure(w, r, err)
 				return
 			}
 
@@ -157,7 +156,7 @@ func HandleAuthOtpGet(
 
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				answerStepSaveFailure(pageRenderer, w, r, err)
+				boundary.answerStepSaveFailure(w, r, err)
 				return
 			}
 
@@ -184,30 +183,28 @@ func HandleAuthOtpGet(
 }
 
 func HandleAuthOtpPost(
+	boundary *CeremonyBoundary,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	database authOTPDatabase,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
 	dataCipher *encryption.DataCipher,
-	baseURL string,
-	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		// loadAuthContext refuses a submission naming another ceremony before the AuthState check, so
-		// an OTP prompt left open in another tab gets the 400 mismatch page rather than the 500 that
-		// a replaced context's state would produce, and before the code is looked at: MatchStep is
-		// never reached, so TryConsumeUserOTPStep is never reached either, and a stale submission
+		// The boundary refuses a submission naming another ceremony before the state gate, so an OTP
+		// prompt left open in another tab gets the "no longer active" page, and before the code is
+		// looked at: neither MatchStep nor TryConsumeUserOTPStep is reached, so a stale submission
 		// cannot burn a step of a passcode the ceremony the user is actually on still needs (#79,
 		// #111 decision 3).
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
+		authContext, ok := boundary.loadAuthContext(w, r)
 		if !ok {
 			return
 		}
 
-		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateLevel2OTP) {
+		if !boundary.requireAuthState(w, r, authContext, ceremony.AuthStateLevel2OTP) {
 			return
 		}
 
@@ -303,7 +300,7 @@ func HandleAuthOtpPost(
 		// as incorrect, and answered with this form's QR code again, a loop no code could leave.
 		// Found reviewing the ACR and AMR page against the code before 1.7.0.
 		if keyURL != "" && user.OTPEnabled {
-			endLostEnrolment(pageRenderer, ceremonyStore, w, r, user.Id, authContext.CeremonyId)
+			endLostEnrolment(boundary, pageRenderer, ceremonyStore, w, r, user.Id, authContext.CeremonyId)
 			return
 		}
 
@@ -385,7 +382,7 @@ func HandleAuthOtpPost(
 				return
 			}
 			if !established {
-				endLostEnrolment(pageRenderer, ceremonyStore, w, r, user.Id, authContext.CeremonyId)
+				endLostEnrolment(boundary, pageRenderer, ceremonyStore, w, r, user.Id, authContext.CeremonyId)
 				return
 			}
 			verifiedGeneration = generation
@@ -422,16 +419,16 @@ func HandleAuthOtpPost(
 		// authentication_completed (#266). It is conditional on this ceremony, as the password
 		// handler's is (#579).
 		if regenerateSessionErr := ceremonyStore.RegenerateSession(w, r, authContext.CeremonyId); regenerateSessionErr != nil {
-			answerStepSaveFailure(pageRenderer, w, r, regenerateSessionErr)
+			boundary.answerStepSaveFailure(w, r, regenerateSessionErr)
 			return
 		}
 
 		err = ceremonyStore.SaveAuthContext(w, r, authContext)
 		if err != nil {
-			answerStepSaveFailure(pageRenderer, w, r, err)
+			boundary.answerStepSaveFailure(w, r, err)
 			return
 		}
-		http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/completed", authContext), http.StatusFound)
+		boundary.stepRedirect(w, r, "/auth/completed", authContext)
 	}
 }
 
@@ -449,7 +446,7 @@ func HandleAuthOtpPost(
 // replay of the context left behind meets this same refusal or a state gate. Nothing is audited as
 // an enable or a successful second factor, and the passcode's step stays spent, as #111 already
 // accepts for a failed enable.
-func endLostEnrolment(pageRenderer PageRenderer, ceremonyStore CeremonyStore, w http.ResponseWriter,
+func endLostEnrolment(boundary *CeremonyBoundary, pageRenderer PageRenderer, ceremonyStore CeremonyStore, w http.ResponseWriter,
 	r *http.Request, userId int64, ceremonyId string) {
 
 	slog.WarnContext(r.Context(), "the account's authenticator changed during the enrolment, so nothing was stored and the sign-in ends",
@@ -459,7 +456,7 @@ func endLostEnrolment(pageRenderer PageRenderer, ceremonyStore CeremonyStore, w 
 	if errors.Is(err, ceremony.ErrCeremonyReplaced) {
 		// The browser has moved on to another sign-in, which is not the one whose authenticator
 		// changed, so it is answered as every replaced step is (#579 decision 2).
-		answerCeremonyReplaced(pageRenderer, w, r)
+		boundary.answerCeremonyReplaced(w, r)
 		return
 	}
 	if err != nil {

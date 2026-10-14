@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"database/sql"
-	"io/fs"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
@@ -13,20 +12,17 @@ import (
 )
 
 func HandleAuthLevel1Get(
-	pageRenderer PageRenderer,
+	boundary *CeremonyBoundary,
 	ceremonyStore CeremonyStore,
-	auditLogger AuditLogger,
-	baseURL string,
-	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
+		authContext, ok := boundary.loadAuthContext(w, r)
 		if !ok {
 			return
 		}
 
-		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateRequiresLevel1) {
+		if !boundary.requireAuthState(w, r, authContext, ceremony.AuthStateRequiresLevel1) {
 			return
 		}
 
@@ -36,44 +32,37 @@ func HandleAuthLevel1Get(
 		authContext.AuthState = ceremony.AuthStateLevel1Password
 		err := ceremonyStore.SaveAuthContext(w, r, authContext)
 		if err != nil {
-			answerStepSaveFailure(pageRenderer, w, r, err)
+			boundary.answerStepSaveFailure(w, r, err)
 			return
 		}
-		http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/pwd", authContext), http.StatusFound)
+		boundary.stepRedirect(w, r, "/auth/pwd", authContext)
 	}
 }
 
-// authLevel1Database is what the level 1 hops need: the client and the session behind the step-up
-// decision.
-//
-// It embeds the authorize port because a deferred error is delivered through
-// answerClientWithError.
+// authLevel1Database is what /auth/level1completed reads: the client and the session behind the
+// step-up decision.
 type authLevel1Database interface {
-	authorizeDatabase
-
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 }
 
 func HandleAuthLevel1CompletedGet(
+	boundary *CeremonyBoundary,
+	responder *ClientErrorResponder,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	userSessionManager UserSessionManager,
 	database authLevel1Database,
-	templateFS fs.FS,
-	auditLogger AuditLogger,
-	baseURL string,
-	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
+		authContext, ok := boundary.loadAuthContext(w, r)
 		if !ok {
 			return
 		}
 
-		if !requireAuthState(pageRenderer, w, r, authContext,
+		if !boundary.requireAuthState(w, r, authContext,
 			ceremony.AuthStateLevel1PasswordCompleted, ceremony.AuthStateLevel1ExistingSession) {
 			return
 		}
@@ -86,19 +75,19 @@ func HandleAuthLevel1CompletedGet(
 		// path, so waiting for it would drag a visitor through OTP for a request the server
 		// already knows is invalid (#213 decision 2).
 		//
-		// After the state gate above, so a ceremony in an unexpected state still answers 500 as it
-		// does today, and before this handler's own session lookup, because the ceremony ends
-		// here: nothing is persisted, and since the user session row is created at /auth/completed
-		// a visitor who logged in only to receive an error is left without an SSO session.
+		// After the state gate, and before this handler's own session lookup, because the ceremony
+		// ends here: nothing is persisted, and since the user session row is created at
+		// /auth/completed a visitor who logged in only to receive an error is left without an SSO
+		// session.
 		//
 		// Either state the gate admits is accepted. A parked error can only arrive on
 		// AuthStateLevel1PasswordCompleted today, because the AuthStateLevel1ExistingSession
 		// shortcut is reached only with a valid session and that request was answered at once, but
 		// the delivery does not depend on which one it is.
 		if authContext.DeferredErrorCode != "" {
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
+			answerClientWithError(w, r, ceremonyStore, boundary, responder, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext,
-					clientProvenance(r.Context(), database, authContext.ClientId),
+					responder.clientProvenance(r.Context(), authContext.ClientId),
 					authContext.DeferredErrorCode, authContext.DeferredErrorDescription))
 			return
 		}
@@ -178,20 +167,20 @@ func HandleAuthLevel1CompletedGet(
 			authContext.AuthState = ceremony.AuthStateRequiresLevel2
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				answerStepSaveFailure(pageRenderer, w, r, err)
+				boundary.answerStepSaveFailure(w, r, err)
 				return
 			}
-			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level2", authContext), http.StatusFound)
+			boundary.stepRedirect(w, r, "/auth/level2", authContext)
 			return
 		} else {
 			// Auth is completed
 			authContext.AuthState = ceremony.AuthStateAuthenticationCompleted
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				answerStepSaveFailure(pageRenderer, w, r, err)
+				boundary.answerStepSaveFailure(w, r, err)
 				return
 			}
-			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/completed", authContext), http.StatusFound)
+			boundary.stepRedirect(w, r, "/auth/completed", authContext)
 			return
 		}
 	}

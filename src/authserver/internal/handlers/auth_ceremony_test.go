@@ -204,7 +204,7 @@ func TestRequireAuthState(t *testing.T) {
 		req := renderableRequest("/auth/pwd")
 		authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password}
 
-		ok := requireAuthState(stateMismatchPageRenderer(), rr, req, authContext,
+		ok := testCeremonyBoundary(stateMismatchPageRenderer(), nil, nil).requireAuthState(rr, req, authContext,
 			ceremony.AuthStateLevel1Password)
 
 		assert.True(t, ok)
@@ -224,7 +224,7 @@ func TestRequireAuthState(t *testing.T) {
 				rr := httptest.NewRecorder()
 				req := renderableRequest("/auth/level1completed")
 
-				ok := requireAuthState(stateMismatchPageRenderer(), rr, req,
+				ok := testCeremonyBoundary(stateMismatchPageRenderer(), nil, nil).requireAuthState(rr, req,
 					&ceremony.AuthContext{AuthState: actual},
 					ceremony.AuthStateLevel1PasswordCompleted, ceremony.AuthStateLevel1ExistingSession)
 
@@ -240,7 +240,7 @@ func TestRequireAuthState(t *testing.T) {
 		req := renderableRequest("/auth/pwd")
 		authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1PasswordCompleted}
 
-		ok := requireAuthState(stateMismatchPageRenderer(), rr, req, authContext,
+		ok := testCeremonyBoundary(stateMismatchPageRenderer(), nil, nil).requireAuthState(rr, req, authContext,
 			ceremony.AuthStateLevel1Password)
 
 		assert.False(t, ok, "the caller must stop: the response is already written")
@@ -261,7 +261,7 @@ func TestRequireAuthState(t *testing.T) {
 		rr := httptest.NewRecorder()
 		req := renderableRequest("/auth/level1completed")
 
-		ok := requireAuthState(stateMismatchPageRenderer(), rr, req,
+		ok := testCeremonyBoundary(stateMismatchPageRenderer(), nil, nil).requireAuthState(rr, req,
 			&ceremony.AuthContext{AuthState: ceremony.AuthStateReadyToIssueCode},
 			ceremony.AuthStateLevel1PasswordCompleted, ceremony.AuthStateLevel1ExistingSession)
 
@@ -300,7 +300,7 @@ func TestLoadAuthContext(t *testing.T) {
 
 		ceremonyStore.On("GetAuthContext", req).Return(nil, ceremony.ErrNoAuthContext).Once()
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, rr, req, testAdminConsoleBaseURL)
+		authContext, ok := testCeremonyBoundary(pageRenderer, ceremonyStore, auditLogger).loadAuthContext(rr, req)
 
 		assert.False(t, ok)
 		assert.Nil(t, authContext)
@@ -324,7 +324,7 @@ func TestLoadAuthContext(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).
 			Return(nil, errs.Wrap(ceremony.ErrNoAuthContext, "reading the session")).Once()
 
-		_, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, rr, req, testAdminConsoleBaseURL)
+		_, ok := testCeremonyBoundary(pageRenderer, ceremonyStore, auditLogger).loadAuthContext(rr, req)
 
 		assert.False(t, ok)
 		assert.Equal(t, http.StatusFound, rr.Code)
@@ -340,7 +340,7 @@ func TestLoadAuthContext(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Return(nil, assert.AnError).Once()
 		pageRenderer.On("InternalServerError", rr, req, assert.AnError).Return().Once()
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, rr, req, testAdminConsoleBaseURL)
+		authContext, ok := testCeremonyBoundary(pageRenderer, ceremonyStore, auditLogger).loadAuthContext(rr, req)
 
 		assert.False(t, ok)
 		assert.Nil(t, authContext)
@@ -361,7 +361,7 @@ func TestLoadAuthContext(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(stored, nil).Once()
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, rr, req, testAdminConsoleBaseURL)
+		authContext, ok := testCeremonyBoundary(pageRenderer, ceremonyStore, auditLogger).loadAuthContext(rr, req)
 
 		assert.True(t, ok)
 		assert.Same(t, stored, authContext)
@@ -455,7 +455,7 @@ func TestLoadAuthContext_CeremonyId(t *testing.T) {
 				expectCeremonyMismatch(t, pageRenderer, auditLogger, rr, req)
 			}
 
-			authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, rr, req, testAdminConsoleBaseURL)
+			authContext, ok := testCeremonyBoundary(pageRenderer, ceremonyStore, auditLogger).loadAuthContext(rr, req)
 
 			assert.Equal(t, tc.accept, ok)
 			if tc.accept {
@@ -484,7 +484,7 @@ func TestLoadAuthContext_CeremonyId(t *testing.T) {
 
 				ceremonyStore.On("GetAuthContext", req).Return(nil, ceremony.ErrNoAuthContext).Once()
 
-				_, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, rr, req, testAdminConsoleBaseURL)
+				_, ok := testCeremonyBoundary(pageRenderer, ceremonyStore, auditLogger).loadAuthContext(rr, req)
 
 				assert.False(t, ok)
 				assert.Equal(t, http.StatusFound, rr.Code)
@@ -591,7 +591,7 @@ func TestRejectCeremonyMismatch_AuditsUnderTheRequestsContext(t *testing.T) {
 	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 		mock.Anything).Return(nil).Once()
 
-	rejectCeremonyMismatch(pageRenderer, auditLogger, rr, req, &ceremony.AuthContext{
+	testCeremonyBoundary(pageRenderer, nil, auditLogger).rejectCeremonyMismatch(rr, req, &ceremony.AuthContext{
 		ClientId:  "test-client",
 		AuthState: ceremony.AuthStateLevel1Password,
 	})

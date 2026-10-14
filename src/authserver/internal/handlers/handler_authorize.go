@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -21,7 +20,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/authserver/internal/userconsent"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -80,29 +78,28 @@ func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser To
 	return sub, nil
 }
 
-// authorizeDatabase is what the authorization endpoint needs: the client and its redirect URIs,
-// the consent already given, the session a browser may arrive with, and the request a POST parked
-// for a GET carrying its handle.
+// authorizeDatabase is what the authorization endpoint reads: the client, the consent already
+// given, the session a browser may arrive with, and the request a POST parked for a GET carrying its
+// handle. The client's redirect URIs are the client-error responder's to read.
 type authorizeDatabase interface {
 	authorizerequest.Consuming
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
-	GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.RedirectURI, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 }
 
 func HandleAuthorizeGet(
+	boundary *CeremonyBoundary,
+	responder *ClientErrorResponder,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	userSessionManager UserSessionManager,
 	database authorizeDatabase,
-	templateFS fs.FS,
 	authorizeValidator AuthorizeValidator,
 	auditLogger AuditLogger,
 	permissionChecker PermissionChecker,
 	tokenParser TokenParser,
-	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -275,7 +272,7 @@ func HandleAuthorizeGet(
 				// that need not agree, and a no here is what makes answering the client at once
 				// safe, so it is carried to the emitter as a floor rather than recomputed there.
 				// redirectAlreadyWithheld is where it lands and why.
-				emitted := redirectWillBeEmitted(r.Context(), database, client, authContext.RedirectURI,
+				emitted := responder.redirectWillBeEmitted(r.Context(), client, authContext.RedirectURI,
 					authContext.ResponseType, "authorize")
 				facts.redirectEmitted = &emitted
 
@@ -361,7 +358,7 @@ func HandleAuthorizeGet(
 			// and the emitter asks for itself.
 			input.redirectAlreadyWithheld = facts.redirectEmitted != nil && !*facts.redirectEmitted
 
-			answerAuthorizeClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, input)
+			answerAuthorizeClientWithError(w, r, ceremonyStore, responder, input)
 		}
 
 		saveAndRedirect := func(path string) {
@@ -370,7 +367,7 @@ func HandleAuthorizeGet(
 				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, ceremonyStepURL(baseURL, path, &authContext), http.StatusFound)
+			boundary.stepRedirect(w, r, path, &authContext)
 		}
 
 		switch route {
@@ -411,7 +408,7 @@ func HandleAuthorizeGet(
 			saveAndRedirect("/auth/level1")
 
 		case authorizeRoutePromptNone:
-			handlePromptNone(w, r, pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, &authContext, client, sessionIdentifier, settings, baseURL)
+			handlePromptNone(w, r, boundary, responder, pageRenderer, ceremonyStore, userSessionManager, database, auditLogger, permissionChecker, &authContext, client, sessionIdentifier, settings)
 
 		case authorizeRouteForceLogin, authorizeRouteLevel1:
 			authContext.AuthState = ceremony.AuthStateRequiresLevel1
@@ -847,7 +844,7 @@ func decideAuthorizeRoute(f authorizeRouteFacts) (authorizeRoute, authorizeFact)
 // handlePromptNone handles the OIDC prompt=none flow for silent authentication. It performs all
 // necessary checks without displaying any UI and either answers the client with an error when
 // silent authentication is not possible, or goes on to issue a code silently.
-func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer, ceremonyStore CeremonyStore, userSessionManager UserSessionManager, database authorizeDatabase, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *record.Client, sessionIdentifier string, settings *record.Settings, baseURL string) {
+func handlePromptNone(w http.ResponseWriter, r *http.Request, boundary *CeremonyBoundary, responder *ClientErrorResponder, pageRenderer PageRenderer, ceremonyStore CeremonyStore, userSessionManager UserSessionManager, database authorizeDatabase, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *record.Client, sessionIdentifier string, settings *record.Settings) {
 	// Helper to clear the auth context and then redirect with error. The clear-then-answer
 	// sequence and its server_error fallback live in answerAuthorizeClientWithError, which derives that
 	// fallback from the input handed to it, so this path keeps answering from the stored ceremony
@@ -857,7 +854,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 	// as "retry later" rather than "start an interactive login", which on a genuine server fault
 	// is the accurate instruction of the two.
 	redirectWithError := func(errorCode string, errorDescription string) {
-		answerAuthorizeClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+		answerAuthorizeClientWithError(w, r, ceremonyStore, responder,
 			redirectErrorFromAuthContext(authContext, client, errorCode, errorDescription))
 	}
 
@@ -975,7 +972,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 		return
 	}
 
-	http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/issue", authContext), http.StatusFound)
+	boundary.stepRedirect(w, r, "/auth/issue", authContext)
 }
 
 // silentFact is a fact decideSilentAuthentication needs and has not been given. handlePromptNone
@@ -1145,46 +1142,6 @@ func silentStepUpRefusal(stepUp ceremony.StepUp, err error) (code, description s
 	}
 }
 
-// redirectErrorInput carries what an error response to a client is built from. It is a struct
-// rather than a longer parameter list because the redirect now has to know which client it is
-// answering as well as what to say: RFC 9700 4.11.2 hands the "is this redirection URI trusted"
-// decision to the server and names the source of the redirect URI among its inputs, and a
-// ten-argument call repeated across sixteen sites is not something anyone can read (#108).
-type redirectErrorInput struct {
-	// client is the client being answered, or nil when the handler could not resolve it before
-	// the error arose. Nil means "provenance unknown", never "there is no client": the trust
-	// decision is about where the redirect URI came from, so an unresolved client is the
-	// untrusted case rather than an exempt one.
-	client *record.Client
-
-	code         string
-	description  string
-	responseMode string
-	redirectURI  string
-	state        string
-	responseType string
-
-	// redirectAlreadyWithheld records that redirectWillBeEmitted has ALREADY answered no for this
-	// request, so the emitter must not ask again and get a different answer. It is a floor, never a
-	// ceiling: false means "nothing has refused yet", not "a redirect is permitted", and the
-	// emitter still runs the live gates on top of it.
-	//
-	// The gate began reading the database (#241 decision 11), which made it non-monotonic across
-	// the two readers one authorization request has. HandleAuthorizeGet asks it before routing, to
-	// decide whether a validation failure may be answered at once or has to be parked behind a
-	// login: a refusal there makes answerClientNow true, on the reasoning that no redirect leaves
-	// this server so RFC 9700 4.11.2 has nothing to govern. The emitter then asks again. When the
-	// first answer was a transient registration-read failure, or the callback was re-added between
-	// the two reads, the second answer can be yes, and the refusal that made answering at once safe
-	// has been discarded: a logged-out browser holding one crafted link is redirected to the
-	// client's host on a request this server refused, which is attack 1 of RFC 9700 4.11.2 verbatim
-	// and the exact harm the deferral machinery exists to prevent (#213, #241).
-	//
-	// So a later read may narrow yes to no, which is a removal taking effect, and may never widen
-	// no to yes.
-	redirectAlreadyWithheld bool
-}
-
 // userDisabledDescription is the error_description of the access_denied a ceremony is answered with
 // when its user turns out to be disabled. Three steps ask the question, each at the moment it is
 // cheapest to: the session shortcut here, /auth/completed once the credential is accepted, and
@@ -1192,308 +1149,35 @@ type redirectErrorInput struct {
 // reading the description sees one condition wherever it was found.
 const userDisabledDescription = "The user account is disabled."
 
-// redirectErrorFromAuthContext builds the input for an error redirect whose response parameters
-// come from the ceremony, which is where every error redirect takes them from. At /auth/authorize
-// that is the literal HandleAuthorizeGet has just built, which holds the four as the request sent
-// them before anything is validated, so an error arising there answers what the request carried.
-func redirectErrorFromAuthContext(authContext *ceremony.AuthContext, client *record.Client,
-	code string, description string) redirectErrorInput {
-
-	return redirectErrorInput{
-		client:       client,
-		code:         code,
-		description:  description,
-		responseMode: authContext.ResponseMode,
-		redirectURI:  authContext.RedirectURI,
-		state:        authContext.State,
-		responseType: authContext.ResponseType,
-	}
-}
-
-// answerClientWithError clears the auth context and then answers the client with an error, which
-// is the sequence every error response from a step of an authorization ceremony owes. At
-// /auth/authorize it is answerAuthorizeClientWithError.
+// answerClientWithError clears the auth context and then answers the client with an error, which is
+// the sequence every error response from a step of an authorization ceremony owes. At /auth/authorize
+// it is answerAuthorizeClientWithError.
 //
-// The clear goes FIRST. ClearAuthContext persists the deletion through a Set-Cookie on w, and
-// redirToClientWithError commits the response in every response mode, so clearing afterwards
-// leaves the header on a response already written and the browser keeps an auth context it can
-// replay (#141).
-//
-// The clear lands only while the browser session still holds this ceremony. When another
-// /auth/authorize has replaced it, or the session is gone, the clear writes nothing and the client
-// is not answered: the browser has abandoned this ceremony, and a client keeping one pending state
-// per browser could take this error as the answer to the newer request. The step answers the "no
-// longer active" page instead, as a request naming another ceremony is (#579 decision 2, #79
-// decision 5).
-//
-// On a clear that failed otherwise the client is owed an error response regardless: its redirect
-// URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies, and RFC 6749 4.1.2.1
-// mints server_error for exactly this condition (#141). The fallback is the caller's own input with
-// its code and description swapped, so each call site keeps the parameter source it built the input
-// from and neither has to restate it.
-func answerClientWithError(w http.ResponseWriter, r *http.Request, database authorizeDatabase,
-	pageRenderer PageRenderer, ceremonyStore CeremonyStore, templateFS fs.FS, ceremonyId string, input redirectErrorInput) {
+// The clear goes first: it persists the deletion through a Set-Cookie on w, and every response mode
+// commits the response (#141). The clear lands only while the browser session still holds this
+// ceremony. When another /auth/authorize has replaced it, or the session is gone, the clear writes
+// nothing and the client is not answered: the browser has abandoned this ceremony, and a client
+// keeping one pending state per browser could take this error as the answer to the newer request.
+// The step answers the "no longer active" page instead (#579 decision 2, #79 decision 5). A clear that
+// failed otherwise is answered with server_error (ClientErrorResponder.answerClientAfterClear).
+func answerClientWithError(w http.ResponseWriter, r *http.Request, ceremonyStore CeremonyStore,
+	boundary *CeremonyBoundary, responder *ClientErrorResponder, ceremonyId string, input redirectErrorInput) {
 
 	err := ceremonyStore.ClearAuthContext(w, r, ceremonyId)
 	if errors.Is(err, ceremony.ErrCeremonyReplaced) {
-		answerCeremonyReplaced(pageRenderer, w, r)
+		boundary.answerCeremonyReplaced(w, r)
 		return
 	}
-	answerClientAfterClear(w, r, database, pageRenderer, templateFS, input, err)
+	responder.answerClientAfterClear(w, r, input, err)
 }
 
 // answerAuthorizeClientWithError is answerClientWithError at /auth/authorize, which answers a request
 // it refused at once. There the clear has no ceremony to check, since this request starts one: it
 // ends whatever ceremony the browser held, as /auth/authorize's saves replace it, and writes nothing
 // for a browser with no stored session (#579 decision 6).
-func answerAuthorizeClientWithError(w http.ResponseWriter, r *http.Request, database authorizeDatabase,
-	pageRenderer PageRenderer, ceremonyStore CeremonyStore, templateFS fs.FS, input redirectErrorInput) {
+func answerAuthorizeClientWithError(w http.ResponseWriter, r *http.Request, ceremonyStore CeremonyStore,
+	responder *ClientErrorResponder, input redirectErrorInput) {
 
 	err := ceremonyStore.DiscardAuthContext(w, r)
-	answerClientAfterClear(w, r, database, pageRenderer, templateFS, input, err)
-}
-
-// answerClientAfterClear answers the client with input once the clear has run, or with server_error
-// when the clear failed.
-func answerClientAfterClear(w http.ResponseWriter, r *http.Request, database authorizeDatabase,
-	pageRenderer PageRenderer, templateFS fs.FS, input redirectErrorInput, clearErr error) {
-
-	if clearErr != nil {
-		// The clear failed, so Save wrote no cookie and the browser still holds the auth context.
-		slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
-			"error", clearErr)
-
-		fallback := input
-		fallback.code = "server_error"
-		fallback.description = "Internal server error"
-
-		err := redirToClientWithError(w, r, database, pageRenderer, templateFS, fallback)
-		if err != nil {
-			// Nowhere left to send the client, so the 500 is the last resort here.
-			pageRenderer.InternalServerError(w, r, err)
-		}
-		return
-	}
-
-	err := redirToClientWithError(w, r, database, pageRenderer, templateFS, input)
-	if err != nil {
-		pageRenderer.InternalServerError(w, r, err)
-		return
-	}
-}
-
-// clientProvenance loads the client behind a ceremony for the sole benefit of the trust decision in
-// redirToClientWithError, at the handlers that reach an error redirect without having loaded one.
-//
-// It answers nil instead of an error on purpose. Every caller is already on its way to returning an
-// error response to the client, so a lookup that fails must not turn a refusal that works today
-// into a 500; and unresolved provenance is the untrusted case, which errs towards withholding a
-// redirect rather than towards performing one (#108).
-func clientProvenance(ctx context.Context, database authorizeDatabase, clientIdentifier string) *record.Client {
-	client, err := database.GetClientByClientIdentifier(ctx, nil, clientIdentifier)
-	if err != nil {
-		slog.ErrorContext(ctx, "unable to load the client while answering it with an error, treating its provenance as unresolved",
-			"client_identifier", clientIdentifier, "error", err)
-		return nil
-	}
-	return client
-}
-
-// redirectWillBeEmitted answers whether an error response to this client would actually leave the
-// server as a redirect, or whether it would be withheld and replaced by the refusal interstitial.
-// It is the three gates below, asked as one question, so the callers that need the answer BEFORE
-// building a response and the emitter that enforces it at the last moment cannot drift apart.
-//
-// site names the caller for the log line inside checkRedirectURIEmittable, which records where a
-// refusal happened and deliberately never records the URI itself (#159).
-//
-// Gate 3. RFC 9700 4.11.2: an attacker who registers a client anonymously can use this server's own
-// error redirect to deliver a victim to a host they control, either by getting the user to
-// decline (attack 2) or by sending a deliberately invalid request (attack 1). The RFC leaves
-// "trusted" to the server and names the source of the redirect URI among its inputs, so a
-// client that registered itself is the untrusted case and an administrator-registered one,
-// whose redirect URI a human vetted, is not. An unresolved client is untrusted too: the
-// question is where the redirect URI came from, and "we could not find out" is not an answer
-// that justifies using it.
-//
-// A silent request is NOT exempt, and an earlier version of this guard had it the other way
-// round. RFC 9700 4.11.2 lists three attacks, and the third is the exemption written out:
-// "Intentionally send a valid silent authentication request (prompt=none) with client_id and
-// redirect_uri controlled by the attacker. In this case, the authorization server will
-// automatically redirect the user agent to the phishing site." It needs neither a session nor
-// any victim interaction, which makes it the cheapest of the three rather than a corner. The
-// exception clause in the same section, "with the exception of the silent authentication use
-// case", sits inside the requirement to prompt for credentials, not inside the "MUST take
-// precautions to prevent these threats" that governs the list attack 3 is in.
-//
-// OIDC Core 3.1.2.1 is not violated by rendering the interstitial instead: it forbids displaying
-// "any authentication or consent user interface pages", and that page asks for neither. What it
-// costs is real and was accepted knowingly: a self-registered client's silent renewal stops
-// receiving a readable consent_required and has to fall back to an interactive authorization
-// (#108, decision 15).
-//
-// Gate 4, the last resort, and a separate statement from the gate above rather than a third
-// clause on it: that one weighs where the redirect URI came from, this one weighs whether the
-// string can name the host it appears to. An administrator-registered client passes the
-// provenance test and can still hold a row stored before these rules existed, which is the case
-// the gate above cannot cover and this one does. Unreachable once the authorization endpoint has
-// refused the URI, and kept so that a test enforces it (#122).
-//
-// The registration gate, last of the three and the only one that reads anything. The two above
-// weigh the redirect URI as it was stored when the ceremony began; this one weighs it against what
-// the client has registered right now. An authorization ceremony can sit on the consent screen for
-// as long as a person takes to read it, and an administrator who deletes a callback in that window
-// expects the deletion to reach the sign-in already running. Without this gate it reaches only what
-// /auth/issue mints: six other places answer the client from a ceremony in progress, every one of
-// them an error redirect, and every one of them navigates the browser to the URI stored at the
-// start. Delivering one to a host the operator has just disowned is RFC 9700 section 4.11.2's harm
-// whichever of the seven sites produced it, which is why the check lives in the one predicate they
-// share rather than at each of them: a registration test copied to every site is the shape a later
-// edit gets out of step (#241 decision 11).
-//
-// The flag to RedirectURIIsRegistered is computed from the response type, by the same token-sequence
-// test protocolvalidation.ValidateClientAndRedirectURI and /auth/issue apply, so exactly one token equal to
-// "code" buys loopback port flexibility and every implicit response stays strict. An earlier version
-// of this gate passed false unconditionally, reasoning that flexibility exists for a native app's
-// ephemeral port on a code request and an error redirect carries no code. That reasoning asks the
-// wrong question. This gate weighs whether the destination is one the client still has registered,
-// and RFC 8252 section 7.3 settles what "registered" means for a loopback URI: "The authorization
-// server MUST allow any port to be specified at the time of the request for loopback IP redirect
-// URIs, to accommodate clients that obtain an available ephemeral port from the operating system at
-// the time of the request." So http://127.0.0.1:49152/cb IS covered by a registered
-// http://127.0.0.1/cb on a code request, and calling it unregistered here withholds an error the
-// client is owed: RFC 6749 section 4.1.2.1 confines the MUST NOT redirect to a request that "fails
-// due to a missing, invalid, or mismatching redirection URI", and for every other failure "the
-// authorization server informs the client by adding the following parameters to the query component
-// of the redirection URI". Passing false made a native app's consent cancellation, deferred
-// validation error and scope refusal vanish into this server's interstitial with nothing on the
-// wire, which is a hang rather than an error it can report.
-//
-// Strictness is not free here, which is why it is not the default: this gate can only refuse, so an
-// over-strict answer is a delivery failure with no security to show for it. The relaxation admits
-// nothing new either. The same flexible rule already ran over the same URI at /auth/authorize, on
-// the same ceremony, so a destination this arm now accepts is one the front door accepted, and a
-// loopback IP literal names the browser's own machine, which is not a host somebody else controls.
-// Each caller supplies the flag from what it knows, per urlmatch's package contract (#41), and what
-// this caller knows is the response type the ceremony carries (#241).
-//
-// A failed load answers no, matching clientProvenance above and for the reason that function
-// states: every caller is already on its way to returning an error response, so a lookup that fails
-// must not turn a refusal that works today into a 500, and an unresolved registration is the
-// untrusted case rather than an exempt one.
-//
-// This predicate is asked twice within one authorization request, and the second answer may not be
-// more permissive than the first: see redirectErrorInput.redirectAlreadyWithheld, which carries the
-// first refusal into the emitter.
-func redirectWillBeEmitted(ctx context.Context, database authorizeDatabase, client *record.Client, redirectURI string,
-	responseType string, site string) bool {
-
-	if client == nil || client.CreatedViaDCR {
-		return false
-	}
-
-	if err := checkRedirectURIEmittable(ctx, site, redirectURI); err != nil {
-		return false
-	}
-
-	redirectURIs, err := database.GetRedirectURIsByClientId(ctx, nil, client.Id)
-	if err != nil {
-		// The client identifier is a bounded stored value and is safe to log; the URI is not,
-		// matching checkRedirectURIEmittable, which records where a refusal happened and
-		// deliberately never records the value (#159).
-		slog.ErrorContext(ctx, "unable to load the client's redirect URIs while answering it with an error, withholding the redirect",
-			"client_identifier", client.ClientIdentifier, "site", site, "error", err)
-		return false
-	}
-
-	registered := make([]string, 0, len(redirectURIs))
-	for _, uri := range redirectURIs {
-		registered = append(registered, uri.URI)
-	}
-
-	// IsCodeOnly, for the reason stated at protocolvalidation.ValidateClientAndRedirectURI: only the
-	// exact type "code" buys an arbitrary loopback port, and the parser reports "code code" and
-	// "code foo" as what they are (#244).
-	allowLoopbackPortFlexibility := protocolvalidation.ParseResponseType(responseType).IsCodeOnly()
-
-	if !urlmatch.RedirectURIIsRegistered(registered, redirectURI, allowLoopbackPortFlexibility) {
-		slog.WarnContext(ctx, "the redirect URI this client would be answered at is no longer registered on it, so the redirect is withheld",
-			"client_identifier", client.ClientIdentifier, "site", site)
-		return false
-	}
-
-	return true
-}
-
-func redirToClientWithError(w http.ResponseWriter, r *http.Request, database authorizeDatabase,
-	pageRenderer PageRenderer, templateFS fs.FS, input redirectErrorInput) error {
-
-	// All three gates, asked through the one predicate so this emitter and the callers that ask the
-	// same question before building a response cannot answer it differently. The reasoning for each
-	// gate travels with redirectWillBeEmitted (#108, #122, #241).
-	//
-	// redirectAlreadyWithheld is read FIRST and short-circuits the live gates, so a caller that has
-	// already been told no cannot have that refusal overturned by a second read of a registration
-	// table that has changed, or recovered, since. The predicate is a database read now, so the two
-	// answers one request gets are not guaranteed to agree, and only one direction of disagreement
-	// is safe: see the field's own comment.
-	//
-	// The call sits above the response-mode dispatch so it covers query, fragment and form_post
-	// alike, and it can only ever withhold a redirect: nothing below it is reached, no state is
-	// written and no route is added, so there is nothing here for an attacker to drive. The
-	// interstitial names the destination and the authorization stops, rather than this server
-	// forwarding a browser to a host of somebody else's choosing on a request it just refused.
-	if input.redirectAlreadyWithheld ||
-		!redirectWillBeEmitted(r.Context(), database, input.client, input.redirectURI, input.responseType,
-			"redirToClientWithError") {
-		return renderRedirectBlocked(pageRenderer, w, r, input)
-	}
-
-	// The description becomes an error_description on the wire from here down, so it is conformed to
-	// RFC 6749 Appendix A.8's NQSCHAR once, here, and every response mode reads the conformed value
-	// from the parameter list below. Descriptions interpolate request text, so an emoji or a Cyrillic
-	// word in a rejected scope otherwise puts a byte the RFC forbids into a protocol parameter (#213).
-	//
-	// This function rather than answerClientWithError, which wraps it: a wrapper cannot cover a caller
-	// that reaches this emitter without going through it.
-	//
-	// Below the redirect guard, deliberately. renderRedirectBlocked above puts the description on an
-	// HTML page, which is a user interface and not a protocol parameter, so the interstitial keeps the
-	// text as the validator wrote it and only what actually leaves as a redirect is filtered.
-	description := oauth.ConformErrorDescription(input.description)
-
-	// Per RFC 6749 4.2.2.1 and OIDC Core 3.2.2.5: implicit flow errors MUST be returned in fragment,
-	// or in the form_post the request asked for; an explicit query is answered in the fragment too,
-	// which is what the refusal of that very request needs (#231).
-	rtInfo := protocolvalidation.ParseResponseType(input.responseType)
-	effectiveResponseMode := input.responseMode
-	if rtInfo.IsImplicitFlow() {
-		effectiveResponseMode = implicitResponseMode(input.responseMode)
-	}
-
-	// The error response's parameters, in the order they reach the client, built once for all three
-	// response modes because all three answer with the same three fields.
-	//
-	// state is appended on its value being non-empty and nothing else. There is no TrimSpace, and
-	// no separate "was the parameter present" flag either, because at this endpoint the two
-	// questions have one answer: RFC 6749 section 3.1 says "Parameters sent without a value MUST be
-	// treated as if they were omitted from the request", so "?state=" and "?state" are requests
-	// that carried no state. Appendix A.5 then defines the response element as "state = 1*VSCHAR",
-	// which admits no empty value in the response either. Space is %x20 and so is VSCHAR, which is
-	// why a whitespace-only state is a real state and is echoed byte for byte: trimming it away was
-	// this server substituting its own judgement for "the exact value received from the client"
-	// (RFC 6749 4.1.2.1). Undoing this and reinstating a trim would put that back (#146).
-	//
-	// The end_session_endpoint deliberately does NOT work this way: see buildPostLogoutRedirect,
-	// where a supplied-but-empty state does come back as "state=". RP-Initiated Logout 1.0 carries
-	// no valueless-parameter rule, so the two endpoints differ because their specifications do.
-	params := []responseParam{
-		{"error", input.code},
-		{"error_description", description},
-	}
-	if input.state != "" {
-		params = append(params, responseParam{"state", input.state})
-	}
-
-	return writeAuthorizationResponse(w, r, templateFS, effectiveResponseMode, input.redirectURI, params)
+	responder.answerClientAfterClear(w, r, input, err)
 }

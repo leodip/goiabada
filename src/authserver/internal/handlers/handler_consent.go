@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -72,11 +71,9 @@ func buildScopeInfoArray(ctx context.Context, scope string, consent *record.User
 // consentDatabase is what the consent screen needs: the client, the consent it reads and records,
 // and the user granting it.
 //
-// It embeds the authorize port because a refusal is answered through redirToClientWithError, the
-// client display port because the screen renders through getClientDisplayInfo, and the consent
-// writer's port because a grant is recorded through userconsent.Record.
+// It embeds the client display port because the screen renders through getClientDisplayInfo, and
+// the consent writer's port because a grant is recorded through userconsent.Record.
 type consentDatabase interface {
-	authorizeDatabase
 	clientDisplayDatabase
 	userconsent.Database
 
@@ -85,20 +82,18 @@ type consentDatabase interface {
 }
 
 func HandleConsentGet(
+	boundary *CeremonyBoundary,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	database consentDatabase,
-	auditLogger AuditLogger,
-	baseURL string,
-	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
+		authContext, ok := boundary.loadAuthContext(w, r)
 		if !ok {
 			return
 		}
 
-		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateRequiresConsent) {
+		if !boundary.requireAuthState(w, r, authContext, ceremony.AuthStateRequiresConsent) {
 			return
 		}
 
@@ -175,10 +170,10 @@ func HandleConsentGet(
 		authContext.AuthState = ceremony.AuthStateReadyToIssueCode
 		err = ceremonyStore.SaveAuthContext(w, r, authContext)
 		if err != nil {
-			answerStepSaveFailure(pageRenderer, w, r, err)
+			boundary.answerStepSaveFailure(w, r, err)
 			return
 		}
-		http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/issue", authContext), http.StatusFound)
+		boundary.stepRedirect(w, r, "/auth/issue", authContext)
 	}
 }
 
@@ -196,26 +191,25 @@ func consentScreenOwed(scopes []ScopeInfo, scope string, promptConsent bool) boo
 }
 
 func HandleConsentPost(
+	boundary *CeremonyBoundary,
+	responder *ClientErrorResponder,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	database consentDatabase,
-	templateFS fs.FS,
 	auditLogger AuditLogger,
 	permissionChecker PermissionChecker,
-	baseURL string,
-	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// loadAuthContext refuses a submission naming another ceremony before the AuthState check, so
-		// a form left open in another tab gets the 400 mismatch page rather than the 500 that a
-		// replaced context's state would produce, and before the btnSubmit/btnCancel dispatch, so a
-		// stale cancel cannot clear the auth context of the ceremony that is actually current (#79).
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
+		// The boundary refuses a submission naming another ceremony before the state gate, so a form
+		// left open in another tab gets the "no longer active" page, and before the btnSubmit/btnCancel
+		// dispatch, so a stale cancel cannot clear the auth context of the ceremony that is actually
+		// current (#79).
+		authContext, ok := boundary.loadAuthContext(w, r)
 		if !ok {
 			return
 		}
 
-		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateRequiresConsent) {
+		if !boundary.requireAuthState(w, r, authContext, ceremony.AuthStateRequiresConsent) {
 			return
 		}
 
@@ -279,13 +273,13 @@ func HandleConsentPost(
 			// A refusal answers the client with an error redirect, and an error redirect carries
 			// the client it is answering, so provenance is resolved here, where no client has
 			// been loaded; no request reaches both this and the load above (#108).
-			refusedClient := clientProvenance(r.Context(), database, authContext.ClientId)
+			refusedClient := responder.clientProvenance(r.Context(), authContext.ClientId)
 
 			// The clear goes FIRST, inside answerClientWithError: a Set-Cookie written after the
 			// error redirect has committed never reaches the wire, so the browser would keep an
 			// auth context in requires_consent, which GET /auth/consent accepts, and replaying it
 			// could turn access_denied into a code for the same authorization request (#141).
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
+			answerClientWithError(w, r, ceremonyStore, boundary, responder, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext, refusedClient,
 					"access_denied", "The user did not provide consent"))
 		case consentSubmissionNothingHeld:
@@ -298,7 +292,7 @@ func HandleConsentPost(
 			// selection an administrator emptied, which is not. The wording and the error code
 			// are /auth/completed's for the same condition arriving later, so the same removal
 			// gets one answer wherever it lands (#241 decision 3).
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
+			answerClientWithError(w, r, ceremonyStore, boundary, responder, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext, client,
 					"access_denied", "The user is not authorized to access any of the requested scopes"))
 		default:
@@ -319,10 +313,10 @@ func HandleConsentPost(
 			authContext.AuthState = ceremony.AuthStateReadyToIssueCode
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				answerStepSaveFailure(pageRenderer, w, r, err)
+				boundary.answerStepSaveFailure(w, r, err)
 				return
 			}
-			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/issue", authContext), http.StatusFound)
+			boundary.stepRedirect(w, r, "/auth/issue", authContext)
 		}
 	}
 }
