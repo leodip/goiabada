@@ -1660,6 +1660,7 @@
 "handler.client_redirect_uris.empty" = "Redirect URI cannot be empty"
 "handler.client_redirect_uris.too_long" = "Redirect URI is too long ({{.length}} bytes, the maximum is {{.max}}): {{.prefix}}..."
 "handler.client_redirect_uris.invalid" = "Invalid redirect URI: {{.uri}}"
+"handler.client_redirect_uris.insecure_http" = "Redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): {{.uri}}"
 "handler.client_redirect_uris.not_absolute" = "Redirect URI must be an absolute URI (a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host): {{.uri}}"
 "handler.client_redirect_uris.duplicate" = "Duplicate redirect URIs are not allowed"
 "handler.client_web_origins.empty" = "Web origin cannot be empty"

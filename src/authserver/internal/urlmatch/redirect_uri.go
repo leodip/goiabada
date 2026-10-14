@@ -56,6 +56,28 @@ func IsLoopbackHost(host string) bool {
 	return false
 }
 
+// IsInsecureHTTPRedirectURI reports whether raw is an http URI on a host other than the
+// loopback interface. RFC 9700 section 2.6 forbids carrying an authorization response over
+// an unencrypted connection, with the single exception of native clients redirected to the
+// loopback interface (RFC 8252 section 7.3), which is what the loopback half of this
+// predicate keeps working.
+//
+// Callers reach it only after their own parse and absolute-URI gates: dynamic registration
+// parses first and the admin API checks IsAbsoluteRedirectURI ahead of it. A value that does
+// not parse answers false, because refusing one is those gates' job, not this one's. A
+// hostless http URI answers true on its own, so a caller that ever skips its gate still
+// refuses one. The scheme is lower-cased by the parse, so HTTP and http are the same rule.
+func IsInsecureHTTPRedirectURI(raw string) bool {
+	parsed, err := url.ParseRequestURI(raw)
+	if err != nil {
+		return false
+	}
+	if parsed.Scheme != "http" {
+		return false
+	}
+	return !IsLoopbackHost(parsed.Host)
+}
+
 // IsAbsoluteRedirectURI reports whether raw is usable as a redirect URI: an absolute-URI per
 // RFC 3986 section 4.3, as RFC 6749 section 3.1.2 requires,
 //

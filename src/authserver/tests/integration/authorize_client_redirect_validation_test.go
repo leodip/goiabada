@@ -288,3 +288,51 @@ func TestAuthorize_ValidateClientAndRedirectURI_RendersInTheRequestedLocale(t *t
 	assert.Equal(t, "Parâmetro client_id inválido. O cliente não existe.", errorMsg,
 		"the refusal page message did not render in pt-BR; the handler is rendering the English fallback rather than the request locale")
 }
+
+// TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPStillProceeds pins the other
+// half of the RFC 9700 section 2.6 fix: the http rule is a save gate, not an authorize
+// gate. A redirect URI stored before the rule keeps working at /auth/authorize, which is
+// what keeps an upgrade from locking out an integration that already runs over plain
+// http - including, in the worst case, the admin console's own client, whose redirect URIs
+// bootstrap seeds from GOIABADA_ADMINCONSOLE_BASEURL. The request below must proceed past
+// redirect validation and into the ceremony, not land on the refusal page.
+func TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPStillProceeds(t *testing.T) {
+	client := &record.Client{
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+	}
+	err := database.CreateClient(context.Background(), nil, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+
+	stored := "http://app.example.com/callback"
+	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: stored})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier + "&redirect_uri=" + url.QueryEscape(stored)
+
+	httpClient := createHttpClient(t)
+
+	resp, err := httpClient.Get(destUrl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	title := strings.TrimSpace(doc.Find("h1").First().Text())
+	assert.NotEqual(t, "Unable to authorize", title,
+		"a stored http redirect URI must not be refused at /auth/authorize; the rule is a save gate only")
+	errorMsg := doc.Find("p#errorMsg").Text()
+	assert.Equal(t, "", errorMsg,
+		"validation must proceed past a stored http redirect URI into the ceremony")
+}

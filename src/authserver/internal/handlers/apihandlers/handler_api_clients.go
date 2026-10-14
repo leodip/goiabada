@@ -1097,6 +1097,27 @@ func HandleClientRedirectURIsPut(
 				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURINotAbsolute, map[string]any{"uri": uri}), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
+			// RFC 9700 section 2.6: an authorization response MUST NOT travel over an
+			// unencrypted connection, so a redirect URI may use http only on the loopback
+			// interface (RFC 8252 section 7.3). Dynamic registration already refuses this
+			// shape; the admin API did not, and a saved http URI then received the code in
+			// the clear. The MUST binds an administrator as it binds a registrant, exactly
+			// as the absolute-URI rule above does (#122).
+			//
+			// Refused when saving only, not re-checked at /auth/authorize: a stored http URI
+			// belongs to an integration that works today, and an authorize-time gate would
+			// stop it at upgrade with no warning. The worst case is the admin console's own
+			// client, whose redirect URIs bootstrap seeds from GOIABADA_ADMINCONSOLE_BASEURL:
+			// an installation serving the console over http on a non-loopback host would
+			// lock its administrators out.
+			//
+			// Same accepted cost as the absolute-URI rule: the PUT replaces the whole set,
+			// so a client holding a legacy http row cannot save its list until that URI
+			// moves to https or loopback. The message names the offending URI.
+			if urlmatch.IsInsecureHTTPRedirectURI(uri) {
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIInsecureHTTP, map[string]any{"uri": uri}), "VALIDATION_ERROR", http.StatusBadRequest)
+				return
+			}
 			if _, exists := seen[uri]; exists {
 				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIsDuplicate, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return

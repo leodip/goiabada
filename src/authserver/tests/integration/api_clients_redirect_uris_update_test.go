@@ -542,3 +542,57 @@ func TestAPIClientRedirectURIsPut_InsufficientScope(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 }
+
+// TestAPIClientRedirectURIsPut_PlainHTTPOnNonLoopbackRefused owns the RFC 9700 section 2.6
+// save gate. Dynamic registration has refused this shape since #105; the admin API did not,
+// so an administrator could save http://app.example.com/callback and the authorization
+// code then travelled to it in the clear.
+//
+// The refusal is when saving only. The loopback http that RFC 8252 section 7.3 keeps
+// working for native and MCP clients, and a custom scheme an administrator has legitimate
+// reason to register (#122), save beside https in the same PUT: the gate must refuse
+// exactly the URIs the RFC forbids and nothing else.
+func TestAPIClientRedirectURIsPut_PlainHTTPOnNonLoopbackRefused(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	client := newRedirectURIsClient(t, "redir-http-")
+	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
+
+	loaded := readRedirectURIs(t, accessToken, client.Id)
+
+	refused := []struct {
+		uri    string
+		reason string
+	}{
+		{"http://app.example.com/callback", "the reported shape: a plain host over cleartext http"},
+		{"http://app.example.com:8443/callback", "a port does not make the connection private"},
+		{"http://192.168.1.50/callback", "a private-use IP literal is not the loopback interface"},
+		{"http://[2001:db8::1]/callback", "a global IPv6 literal is not the loopback interface"},
+		{"HTTP://app.example.com/callback", "the parse folds the scheme, so an uppercase HTTP is the same cleartext http"},
+	}
+	for _, tc := range refused {
+		t.Run(tc.uri, func(t *testing.T) {
+			req := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{tc.uri}, ExpectedRedirectURIs: loaded}
+			resp := makeAPIRequest(t, "PUT", baseURL, accessToken, req)
+			defer func() { _ = resp.Body.Close() }()
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, tc.reason)
+			var body map[string]interface{}
+			_ = json.NewDecoder(resp.Body).Decode(&body)
+			msg, ok := body["error_description"].(string)
+			assert.True(t, ok, "the response must carry an error_description")
+			assert.Equal(t, "Redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): "+tc.uri, msg)
+		})
+	}
+
+	// The gate must not have swallowed the legitimate shapes: https, RFC 8252 loopback
+	// http on any port, and a custom scheme, save together in one PUT.
+	reqOK := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{
+		"https://legit.example/cb",
+		"http://127.0.0.1:8765/cb",
+		"http://[::1]/cb",
+		"http://localhost:3000/cb",
+		"com.example.app:/oauth2redirect/example-provider",
+	}, ExpectedRedirectURIs: loaded}
+	respOK := makeAPIRequest(t, "PUT", baseURL, accessToken, reqOK)
+	defer func() { _ = respOK.Body.Close() }()
+	assert.Equal(t, http.StatusOK, respOK.StatusCode, "https, loopback http and custom schemes must still be accepted")
+}

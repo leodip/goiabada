@@ -385,9 +385,11 @@ func validateRedirectURI(uri string, isPublic bool) error {
 	// a strings.HasPrefix test, which accepted any host merely starting with a loopback
 	// name, localhost.attacker.com included. See issue #105.
 	if isPublic {
-		// Allow loopback HTTP (MCP use case)
+		// Allow loopback HTTP (MCP use case). The refusal half of the decision is the
+		// shared RFC 9700 section 2.6 predicate, so registration and the admin API cannot
+		// drift apart (#575); only the message a caller wraps it in is its own.
 		if parsed.Scheme == "http" {
-			if urlmatch.IsLoopbackHost(parsed.Host) {
+			if !urlmatch.IsInsecureHTTPRedirectURI(uri) {
 				return nil
 			}
 			return errs.Errorf("public clients can only use http redirect_uris on the loopback hosts 127.0.0.1, [::1] or localhost: %s", uri)
@@ -409,7 +411,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 	}
 
 	if parsed.Scheme == "http" {
-		if urlmatch.IsLoopbackHost(parsed.Host) {
+		if !urlmatch.IsInsecureHTTPRedirectURI(uri) {
 			return nil
 		}
 		return errs.Errorf("http redirect_uris must use the loopback hosts 127.0.0.1, [::1] or localhost: %s", uri)
