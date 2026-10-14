@@ -224,6 +224,8 @@ func TestAuthCompleted_ALegacyRestartedContextIsDeniedAnEmptyScope(t *testing.T)
 		args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 	}).Return(nil)
 
+	expectCeremonyConfirmed(ceremonyStore, rr, req)
+
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)

@@ -44,10 +44,10 @@ type Server struct {
 	// to every constructor and each one narrows it to a port of its own (#386 decision 8).
 	database data.Database
 	// The concrete store rather than sessionstore.Store: routes.go hands it to the two
-	// constructors whose ports name Regenerate, which is what proves at compile time that the
+	// constructors whose ports name a rotation, which is what proves at compile time that the
 	// store this server runs rotates the session identifier at sign-in (#431). A
-	// ConditionalStore, so a port that names its conditional writes compiles against it too
-	// (#579).
+	// ConditionalStore, because that rotation is its conditional one, as are the ceremony's
+	// saves and clears (#579).
 	sessionStore *sessionstore.ConditionalStore
 	// Built by main from the configured data key and handed to every consumer routes.go
 	// constructs, so no service reads a process-wide key (#434).

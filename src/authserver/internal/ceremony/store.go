@@ -10,15 +10,17 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-// authSessionStore is what Store calls on the browser session store. Regenerate is in
-// it, so a store that cannot rotate does not compile here, where it used to make
-// RegenerateSession a silent no-op (#431). So is ChangeAndSave, the conditional write every
-// step's save is made with, which only sessionstore.ConditionalStore has (#579).
+// authSessionStore is what Store calls on the browser session store. A rotation is in it, so a
+// store that cannot rotate does not compile here, where it used to make RegenerateSession a silent
+// no-op (#431). It is ChangeAndRegenerate, the conditional rotation, beside ChangeAndSave, the
+// conditional write every step's save is made with, both of which only
+// sessionstore.ConditionalStore has (#579).
 type authSessionStore interface {
 	Get(r *http.Request, name string) (*sessionstore.Session, error)
 	Save(r *http.Request, w http.ResponseWriter, session *sessionstore.Session) error
-	Regenerate(w http.ResponseWriter, r *http.Request, session *sessionstore.Session) error
 	ChangeAndSave(r *http.Request, w http.ResponseWriter, session *sessionstore.Session,
+		change func(values map[string]any) error) error
+	ChangeAndRegenerate(w http.ResponseWriter, r *http.Request, session *sessionstore.Session,
 		change func(values map[string]any) error) error
 }
 
@@ -91,37 +93,49 @@ func (s *Store) changeOwnCeremony(w http.ResponseWriter, r *http.Request, ceremo
 		return err
 	}
 
-	err = s.sessionStore.ChangeAndSave(r, w, sess, func(values map[string]any) error {
-		owned, ownedErr := holdsCeremony(values, ceremonyId)
-		if ownedErr != nil {
-			return ownedErr
-		}
-		if !owned {
-			return errs.WithStack(ErrCeremonyReplaced)
+	held := Held(ceremonyId)
+	return goneIsReplaced(s.sessionStore.ChangeAndSave(r, w, sess, func(values map[string]any) error {
+		if err := held(values); err != nil {
+			return err
 		}
 		change(values)
 		return nil
-	})
+	}))
+}
+
+// goneIsReplaced reads a conditional write that found the session this step loaded gone as a
+// replaced ceremony: signed out in another tab, rotated away by another request of this browser,
+// or expired. Its ceremony is not in the browser's session any more, and the write has not put it
+// back (#579 decision 3).
+func goneIsReplaced(err error) error {
 	if errors.Is(err, sessionstore.ErrNotFound) {
-		// The session this step loaded is gone: signed out in another tab, rotated away by another
-		// request of this browser, or expired. Its ceremony is not in the browser's session any
-		// more, which is a replaced ceremony too, and ChangeAndSave has not put it back.
 		return errs.Wrap(ErrCeremonyReplaced, "the browser session is gone")
 	}
 	return err
 }
 
-// holdsCeremony reports whether the session values a fresh read found hold the ceremony named.
-func holdsCeremony(values map[string]any, ceremonyId string) (bool, error) {
-	jsonData, ok := values[sessionkeys.AuthContext].(string)
-	if !ok || ceremonyId == "" {
-		return false, nil
+// Held is the condition every write of the ceremony named makes on the browser session, applied to
+// the session's values as a fresh read found them: nil while they hold that ceremony, and
+// ErrCeremonyReplaced when they hold another, none, or a context naming none, since an empty id is
+// never held, as ceremonyMatches refuses it (#579). A context that does not decode is a fault and
+// is returned as one. The store's own writes are made on it, and /auth/completed's create arm hands
+// it to the rotation that binds a new user session to the browser session, which is the one write of
+// a ceremony made outside this type.
+func Held(ceremonyId string) func(values map[string]any) error {
+	return func(values map[string]any) error {
+		jsonData, ok := values[sessionkeys.AuthContext].(string)
+		if !ok || ceremonyId == "" {
+			return errs.WithStack(ErrCeremonyReplaced)
+		}
+		var stored AuthContext
+		if err := json.Unmarshal([]byte(jsonData), &stored); err != nil {
+			return errs.Wrap(err, "unable to read the auth context the browser session holds")
+		}
+		if stored.CeremonyId != ceremonyId {
+			return errs.WithStack(ErrCeremonyReplaced)
+		}
+		return nil
 	}
-	var stored AuthContext
-	if err := json.Unmarshal([]byte(jsonData), &stored); err != nil {
-		return false, errs.Wrap(err, "unable to read the auth context the browser session holds")
-	}
-	return stored.CeremonyId == ceremonyId, nil
 }
 
 // ReplaceAuthContext is /auth/authorize's save. It starts a ceremony, so it replaces whatever the
@@ -167,18 +181,60 @@ func (s *Store) DiscardAuthContext(w http.ResponseWriter, r *http.Request) error
 	return s.sessionStore.Save(r, w, sess)
 }
 
-// RegenerateSession replaces the browser session's identifier, keeping its contents.
+// RegenerateSession replaces the browser session's identifier, keeping its contents, only while the
+// session still holds the ceremony named (#579). The step loaded its context when its request began,
+// and another tab's /auth/authorize may have replaced it since, so the session is read afresh, its
+// ceremony compared with this one, and the new row written from what that read found; the old row
+// is removed on condition nothing wrote it in between, through ChangeAndRegenerate. A rotation from
+// the request's own copy put the replaced ceremony back under the new identifier and deleted the row
+// holding the newer one.
+//
+// It answers ErrCeremonyReplaced, having written nothing and set no cookie, when the session holds
+// another ceremony, none, or is gone. A gone session is not re-created under a new name: that is
+// what would let a stalled step end a newer ceremony that has passed its own rotation meanwhile
+// (#579 decision 3).
 //
 // Handlers reach rotation through here rather than through the store, so the one port that
-// names Regenerate is this type's and sessionstore.Store stays Get and Save for the
+// names a rotation is this type's and sessionstore.Store stays Get and Save for the
 // hundred places that take it (#266, #431).
-func (s *Store) RegenerateSession(w http.ResponseWriter, r *http.Request) error {
+func (s *Store) RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string) error {
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return err
 	}
 
-	return s.sessionStore.Regenerate(w, r, sess)
+	return goneIsReplaced(s.sessionStore.ChangeAndRegenerate(w, r, sess, Held(ceremonyId)))
+}
+
+// errCeremonyConfirmed is the refusal ConfirmCeremony's change answers when the session holds its
+// ceremony, so the conditional write it reads through writes nothing either way.
+var errCeremonyConfirmed = errors.New("the browser session holds this ceremony")
+
+// ConfirmCeremony reads the browser session afresh and answers nil while it holds the ceremony
+// named, and ErrCeremonyReplaced when it holds another, none, or is gone. It writes nothing and sets
+// no cookie, whatever it answers. /auth/completed's create arm asks it before it ends a foreign
+// session or opens the transaction that creates the new one, so a ceremony the browser has
+// abandoned ends and creates nothing (#579 decision 4).
+//
+// The read is ChangeAndSave's fresh read, through a change that refuses in every case, since a
+// refused change writes nothing.
+func (s *Store) ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremonyId string) error {
+	sess, err := s.sessionStore.Get(r, s.sessionName)
+	if err != nil {
+		return err
+	}
+
+	held := Held(ceremonyId)
+	err = goneIsReplaced(s.sessionStore.ChangeAndSave(r, w, sess, func(values map[string]any) error {
+		if heldErr := held(values); heldErr != nil {
+			return heldErr
+		}
+		return errCeremonyConfirmed
+	}))
+	if errors.Is(err, errCeremonyConfirmed) {
+		return nil
+	}
+	return err
 }
 
 func (s *Store) UILocales(r *http.Request) []string {

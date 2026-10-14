@@ -419,9 +419,10 @@ func HandleAuthOtpPost(
 		// Before the save, for the ordering argument written out in handler_auth_pwd:
 		// rotation persists the contents as they are now, so a failure between the two
 		// leaves a fresh identifier on a session that has not been marked
-		// authentication_completed (#266).
-		if regenerateSessionErr := ceremonyStore.RegenerateSession(w, r); regenerateSessionErr != nil {
-			pageRenderer.InternalServerError(w, r, regenerateSessionErr)
+		// authentication_completed (#266). It is conditional on this ceremony, as the password
+		// handler's is (#579).
+		if regenerateSessionErr := ceremonyStore.RegenerateSession(w, r, authContext.CeremonyId); regenerateSessionErr != nil {
+			answerStepSaveFailure(pageRenderer, w, r, regenerateSessionErr)
 			return
 		}
 

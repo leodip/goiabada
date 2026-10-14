@@ -1007,7 +1007,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// browser arrived with names a row already marked authentication_completed, which is
 		// what a planted identifier needs (#266 decision 20).
 		authContextSaved := false
-		ceremonyStore.On("RegenerateSession", rr, req).Return(nil).Once().
+		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId).Return(nil).Once().
 			Run(func(mock.Arguments) {
 				assert.False(t, authContextSaved,
 					"rotation must run before the auth context recording the OTP is saved")
@@ -1077,7 +1077,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
 			Return(true, nil)
 		auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything).Return().Once()
-		ceremonyStore.On("RegenerateSession", rr, req).Return(nil).Once()
+		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId).Return(nil).Once()
 		expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)
 
 		handler.ServeHTTP(rr, req)
@@ -1172,7 +1172,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// Rotation joins the ordering this case already tracks, which is what makes the
 		// sequence readable in one assertion: the enrolment commits, THEN the identifier is
 		// replaced, THEN the acceptance is recorded (#266 decision 20).
-		ceremonyStore.On("RegenerateSession", rr, req).Return(nil).Once().
+		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId).Return(nil).Once().
 			Run(func(mock.Arguments) { calls = append(calls, "rotate") })
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
@@ -1768,7 +1768,7 @@ func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 			database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
 			database.AssertNotCalled(t, "ClearPendingOTPEnrollment", mock.Anything, mock.Anything, mock.Anything)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-			ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything)
 			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 			pageRenderer.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 				"/auth_otp_enrollment.html", mock.Anything)
@@ -1866,7 +1866,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		// Only the accepted-code case reaches it, and this table covers both outcomes.
-		ceremonyStore.On("RegenerateSession", mock.Anything, mock.Anything).Return(nil).Maybe()
+		ceremonyStore.On("RegenerateSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 		user := &record.User{Id: 1, Enabled: true, OTPEnabled: enrolled, OtpConfigGeneration: 3}
 		template := "/auth_otp.html"

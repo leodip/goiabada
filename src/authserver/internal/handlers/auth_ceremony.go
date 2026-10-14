@@ -95,10 +95,11 @@ func renderCeremonyNoLongerActive(pageRenderer PageRenderer, w http.ResponseWrit
 	}
 }
 
-// answerStepSaveFailure answers a step whose save or clear of its auth context failed. One that
-// found the browser session no longer holding this ceremony (ceremony.ErrCeremonyReplaced: another
-// /auth/authorize replaced it, it ended, or the session is gone) wrote nothing, and is answered by
-// answerCeremonyReplaced. Any other failure is the 500 it always was.
+// answerStepSaveFailure answers a step whose save or clear of its auth context, or rotation of the
+// browser session's identifier, failed. One that found the browser session no longer holding this
+// ceremony (ceremony.ErrCeremonyReplaced: another /auth/authorize replaced it, it ended, or the
+// session is gone) wrote nothing, and is answered by answerCeremonyReplaced. Any other failure is
+// the 500 it always was.
 func answerStepSaveFailure(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, ceremony.ErrCeremonyReplaced) {
 		answerCeremonyReplaced(pageRenderer, w, r)

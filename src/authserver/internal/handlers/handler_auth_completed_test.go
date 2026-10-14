@@ -114,7 +114,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// target ACR is the one the session already holds. Rotating here would replace the
 		// identifier on every page a signed-in user visits, and two concurrent requests
 		// from one browser would each strand the other's cookie (#266 decision 6).
-		ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything)
+		ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -308,6 +308,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(newAuthTime)
 		})).Return(nil)
 
+		expectCeremonyConfirmed(ceremonyStore, rr, req)
+
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
@@ -464,6 +466,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(newAuthTime)
 		})).Return(nil)
 
+		expectCeremonyConfirmed(ceremonyStore, rr, req)
+
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
@@ -580,6 +584,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(newAuthTime)
 		})).Return(nil)
 
+		expectCeremonyConfirmed(ceremonyStore, rr, req)
+
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
@@ -682,6 +688,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				Return(nil, tc.removed, startError)
 
 			pageRenderer.On("InternalServerError", rr, req, startError).Run(func(mock.Arguments) { answered = true }).Return().Once()
+			expectCeremonyConfirmed(ceremonyStore, rr, req)
 
 			handler.ServeHTTP(rr, req)
 
@@ -781,6 +788,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == deleteError.Error()
 		})).Return().Once()
+
+		expectCeremonyConfirmed(ceremonyStore, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
@@ -903,6 +912,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == startError.Error()
 		})).Return().Once()
+
+		expectCeremonyConfirmed(ceremonyStore, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
@@ -1312,6 +1323,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(sessionAuthTime)
 		})).Return(nil)
 
+		expectCeremonyConfirmed(ceremonyStore, rr, req)
+
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
@@ -1400,7 +1413,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// staleness check, which finds nothing newer on the session here (#538).
 		userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier, mock.Anything).
 			Return(false, nil).Once()
-		ceremonyStore.On("RegenerateSession", rr, req).Return(nil).Once()
+		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId).Return(nil).Once()
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
 			boundWith("pwd otp", record.AcrLevel2Optional), mock.Anything, "").Return(userSession, nil)
@@ -1502,7 +1515,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// staleness check, which finds nothing newer on the session here (#538).
 		userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier, mock.Anything).
 			Return(false, nil).Once()
-		ceremonyStore.On("RegenerateSession", rr, req).Return(nil).Once()
+		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId).Return(nil).Once()
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
 			boundWith("pwd", record.AcrLevel1), mock.Anything, "").Return(userSession, nil)
@@ -1601,7 +1614,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// staleness check, which finds nothing newer on the session here (#538).
 		userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier, mock.Anything).
 			Return(false, nil).Once()
-		ceremonyStore.On("RegenerateSession", rr, req).Return(nil).Once()
+		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId).Return(nil).Once()
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
 			boundWith("pwd otp", record.AcrLevel2Optional), mock.Anything, "").Return(userSession, nil)
@@ -1696,11 +1709,11 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			OtpConfigGeneration: 4,
 		}
 		userSessionManager.On("StartNewUserSession", rr, req, int64(1),
-			usersession.Authentication{
+			signedInWith(usersession.Authentication{
 				UserId: 1, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Optional,
 				AuthTime: &pwdAuthTime, PasswordAuthTime: &pwdAuthTime,
 				OTPClaim: otpcredential.OTPClaim{Claimed: true, Generation: &captured},
-			}, int64(7), &captured, "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
+			}), int64(7), &captured, "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
@@ -1712,6 +1725,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode
 		})).Return(nil)
+
+		expectCeremonyConfirmed(ceremonyStore, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
@@ -2628,6 +2643,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(sessionAuthTime)
 		})).Return(nil)
 
+		expectCeremonyConfirmed(ceremonyStore, rr, req)
+
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
@@ -2720,6 +2737,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			return ac.AuthState == ceremony.AuthStateRequiresConsent &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(sessionAuthTime)
 		})).Return(nil)
+
+		expectCeremonyConfirmed(ceremonyStore, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
@@ -2969,7 +2988,7 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 			userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier,
 				boundWith("pwd otp", record.AcrLevel2Optional)).Return(false, errAt(precheck)).Once()
 			if tc.failedAt > precheck {
-				ceremonyStore.On("RegenerateSession", rr, req).Return(errAt(regenerate)).Once()
+				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId).Return(errAt(regenerate)).Once()
 			}
 			if tc.failedAt > regenerate {
 				bindErr := errAt(bind)
@@ -2992,7 +3011,7 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 			permissionChecker.AssertNotCalled(t, "FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything)
 			if tc.failedAt < regenerate {
-				ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything)
+				ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything)
 			}
 			if tc.failedAt < bind {
 				userSessionManager.AssertNotCalled(t, "BindUserSession", mock.Anything, mock.Anything, mock.Anything,
@@ -3157,8 +3176,24 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 
 // signedInAs is what /auth/completed hands the session manager for a sign-in by userId that entered
 // a password at at and no code after it, so the password's instant is the credential's.
-func signedInAs(userId int64, methods string, acr record.AcrLevel, at *time.Time) usersession.Authentication {
-	return usersession.Authentication{UserId: userId, AuthMethods: methods, AcrLevel: acr, AuthTime: at, PasswordAuthTime: at}
+func signedInAs(userId int64, methods string, acr record.AcrLevel, at *time.Time) interface{} {
+	return signedInWith(usersession.Authentication{UserId: userId, AuthMethods: methods, AcrLevel: acr, AuthTime: at,
+		PasswordAuthTime: at})
+}
+
+// signedInWith matches the authentication /auth/completed hands the session manager when it is want
+// with this ceremony's browser-session condition.
+func signedInWith(want usersession.Authentication) interface{} {
+	return mock.MatchedBy(func(a usersession.Authentication) bool {
+		// The rotation binding the new session is made on this ceremony's condition (#579
+		// decision 4). A func compares equal to nothing, so it is checked by what it answers and the
+		// rest of the authentication by value.
+		if !heldOnlyBy(a.BrowserSessionCondition, testCeremonyId) {
+			return false
+		}
+		a.BrowserSessionCondition = nil
+		return assert.ObjectsAreEqual(want, a)
+	})
 }
 
 // boundWith matches the authentication /auth/completed binds a reused session with, on its methods
@@ -3231,6 +3266,7 @@ func TestHandleAuthCompletedGet_AnAuthenticatorRemovedAtTheWriteRestarts(t *test
 				return a.OTPClaim.Claimed && a.OTPClaim.Generation != nil && *a.OTPClaim.Generation == generation
 			})
 			if create {
+				expectCeremonyConfirmed(ceremonyStore, rr, req)
 				userSessionManager.On("StartNewUserSession", rr, req, int64(1), claimed, int64(0), &generation, "",
 					(*record.UserSession)(nil), testSessionLimits).Return(nil, nil, removed).Once()
 			} else {
@@ -3351,7 +3387,7 @@ func TestHandleAuthCompletedGet_AStaleBindAtTheWriteIsAnsweredAsReplaced(t *test
 
 			// The newer ceremony's auth context, stored in this browser's session, is left as it is.
 			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
-			ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 			database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
@@ -3432,7 +3468,7 @@ func TestHandleAuthCompletedGet_AStaleCeremonyIsRefusedBeforeItRotates(t *testin
 			userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier, handed).
 				Return(tc.staleAtCheck, nil).Once()
 			if tc.wantRotationAndBind {
-				ceremonyStore.On("RegenerateSession", rr, req).Return(nil).Once()
+				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId).Return(nil).Once()
 				userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1), handed, false, "").
 					Return(nil, errs.WithStack(usersession.ErrStaleAuthentication)).Once()
 			}
@@ -3441,7 +3477,7 @@ func TestHandleAuthCompletedGet_AStaleCeremonyIsRefusedBeforeItRotates(t *testin
 			handler.ServeHTTP(rr, req)
 
 			if !tc.wantRotationAndBind {
-				ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything)
+				ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything)
 				userSessionManager.AssertNotCalled(t, "BindUserSession", mock.Anything, mock.Anything, mock.Anything,
 					mock.Anything, mock.Anything, mock.Anything)
 			}
@@ -3510,6 +3546,8 @@ func TestHandleAuthCompletedGet_ASaveFindingItsCeremonyReplacedAnswersNoLongerAc
 			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 			expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)
+
+			expectCeremonyConfirmed(ceremonyStore, rr, req)
 
 			handler.ServeHTTP(rr, req)
 

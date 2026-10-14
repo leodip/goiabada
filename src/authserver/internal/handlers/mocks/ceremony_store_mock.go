@@ -115,6 +115,69 @@ func (_c *CeremonyStore_ClearAuthContext_Call) RunAndReturn(run func(w http.Resp
 	return _c
 }
 
+// ConfirmCeremony provides a mock function for the type CeremonyStore
+func (_mock *CeremonyStore) ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremonyId string) error {
+	ret := _mock.Called(w, r, ceremonyId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ConfirmCeremony")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, string) error); ok {
+		r0 = returnFunc(w, r, ceremonyId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// CeremonyStore_ConfirmCeremony_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ConfirmCeremony'
+type CeremonyStore_ConfirmCeremony_Call struct {
+	*mock.Call
+}
+
+// ConfirmCeremony is a helper method to define mock.On call
+//   - w http.ResponseWriter
+//   - r *http.Request
+//   - ceremonyId string
+func (_e *CeremonyStore_Expecter) ConfirmCeremony(w any, r any, ceremonyId any) *CeremonyStore_ConfirmCeremony_Call {
+	return &CeremonyStore_ConfirmCeremony_Call{Call: _e.mock.On("ConfirmCeremony", w, r, ceremonyId)}
+}
+
+func (_c *CeremonyStore_ConfirmCeremony_Call) Run(run func(w http.ResponseWriter, r *http.Request, ceremonyId string)) *CeremonyStore_ConfirmCeremony_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 http.ResponseWriter
+		if args[0] != nil {
+			arg0 = args[0].(http.ResponseWriter)
+		}
+		var arg1 *http.Request
+		if args[1] != nil {
+			arg1 = args[1].(*http.Request)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *CeremonyStore_ConfirmCeremony_Call) Return(err error) *CeremonyStore_ConfirmCeremony_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *CeremonyStore_ConfirmCeremony_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, ceremonyId string) error) *CeremonyStore_ConfirmCeremony_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DiscardAuthContext provides a mock function for the type CeremonyStore
 func (_mock *CeremonyStore) DiscardAuthContext(w http.ResponseWriter, r *http.Request) error {
 	ret := _mock.Called(w, r)
@@ -235,16 +298,16 @@ func (_c *CeremonyStore_GetAuthContext_Call) RunAndReturn(run func(r *http.Reque
 }
 
 // RegenerateSession provides a mock function for the type CeremonyStore
-func (_mock *CeremonyStore) RegenerateSession(w http.ResponseWriter, r *http.Request) error {
-	ret := _mock.Called(w, r)
+func (_mock *CeremonyStore) RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string) error {
+	ret := _mock.Called(w, r, ceremonyId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RegenerateSession")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request) error); ok {
-		r0 = returnFunc(w, r)
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, string) error); ok {
+		r0 = returnFunc(w, r, ceremonyId)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -259,11 +322,12 @@ type CeremonyStore_RegenerateSession_Call struct {
 // RegenerateSession is a helper method to define mock.On call
 //   - w http.ResponseWriter
 //   - r *http.Request
-func (_e *CeremonyStore_Expecter) RegenerateSession(w any, r any) *CeremonyStore_RegenerateSession_Call {
-	return &CeremonyStore_RegenerateSession_Call{Call: _e.mock.On("RegenerateSession", w, r)}
+//   - ceremonyId string
+func (_e *CeremonyStore_Expecter) RegenerateSession(w any, r any, ceremonyId any) *CeremonyStore_RegenerateSession_Call {
+	return &CeremonyStore_RegenerateSession_Call{Call: _e.mock.On("RegenerateSession", w, r, ceremonyId)}
 }
 
-func (_c *CeremonyStore_RegenerateSession_Call) Run(run func(w http.ResponseWriter, r *http.Request)) *CeremonyStore_RegenerateSession_Call {
+func (_c *CeremonyStore_RegenerateSession_Call) Run(run func(w http.ResponseWriter, r *http.Request, ceremonyId string)) *CeremonyStore_RegenerateSession_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 http.ResponseWriter
 		if args[0] != nil {
@@ -273,9 +337,14 @@ func (_c *CeremonyStore_RegenerateSession_Call) Run(run func(w http.ResponseWrit
 		if args[1] != nil {
 			arg1 = args[1].(*http.Request)
 		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -286,7 +355,7 @@ func (_c *CeremonyStore_RegenerateSession_Call) Return(err error) *CeremonyStore
 	return _c
 }
 
-func (_c *CeremonyStore_RegenerateSession_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request) error) *CeremonyStore_RegenerateSession_Call {
+func (_c *CeremonyStore_RegenerateSession_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, ceremonyId string) error) *CeremonyStore_RegenerateSession_Call {
 	_c.Call.Return(run)
 	return _c
 }

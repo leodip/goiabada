@@ -135,3 +135,77 @@ func TestCeremonyStore_AStepWhoseSessionIsGoneDoesNotPutItBack(t *testing.T) {
 	_, err = backend.Load(context.Background(), id)
 	require.ErrorIs(t, err, sessionstore.ErrNotFound, "the signed-out session is not re-created from tab A's copy")
 }
+
+// The same interleaving at a rotation, the password's or a code's: the rotation used to write tab
+// A's copy under a new identifier and delete the row holding ceremony B. Over the real backend it
+// rotates nothing, and the identifier the browser holds still names its session with ceremony B.
+func TestCeremonyStore_ARotationThatResumesAfterANewerAuthorizeLeavesTheNewerCeremonyStored(t *testing.T) {
+	ceremonyStore, _, _ := newDatabaseCeremonyStore(t)
+	cookies := startCeremony(t, ceremonyStore, "ceremony-a")
+
+	tabA := ceremonyRequest(cookies)
+	loaded, err := ceremonyStore.GetAuthContext(tabA)
+	require.NoError(t, err)
+	require.Equal(t, "ceremony-a", loaded.CeremonyId)
+
+	require.NoError(t, ceremonyStore.ReplaceAuthContext(httptest.NewRecorder(), ceremonyRequest(cookies),
+		&ceremony.AuthContext{CeremonyId: "ceremony-b", ClientId: "client-b", AuthState: ceremony.AuthStateRequiresLevel1}))
+
+	rr := httptest.NewRecorder()
+	err = ceremonyStore.RegenerateSession(rr, tabA, loaded.CeremonyId)
+
+	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
+	assert.Empty(t, rr.Result().Cookies(), "tab A rotated nothing, so it tells the browser nothing")
+
+	stored, err := ceremonyStore.GetAuthContext(ceremonyRequest(cookies))
+	require.NoError(t, err, "the identifier the browser holds still names its session")
+	assert.Equal(t, "ceremony-b", stored.CeremonyId, "the browser session keeps the newer ceremony")
+	assert.Equal(t, "client-b", stored.ClientId)
+}
+
+// A rotation of the ceremony the browser still holds lands: the new identifier names the session,
+// and the old one names nothing.
+func TestCeremonyStore_ARotationThatStillHoldsItsCeremonyRotates(t *testing.T) {
+	ceremonyStore, store, backend := newDatabaseCeremonyStore(t)
+	cookies := startCeremony(t, ceremonyStore, "ceremony-a")
+	oldId, err := store.OpenCookie(interleavingSessionName, cookies[0].Value)
+	require.NoError(t, err)
+
+	tabA := ceremonyRequest(cookies)
+	_, err = ceremonyStore.GetAuthContext(tabA)
+	require.NoError(t, err)
+
+	rr := httptest.NewRecorder()
+	require.NoError(t, ceremonyStore.RegenerateSession(rr, tabA, "ceremony-a"))
+
+	rotated := rr.Result().Cookies()
+	require.Len(t, rotated, 1)
+	newId, err := store.OpenCookie(interleavingSessionName, rotated[0].Value)
+	require.NoError(t, err)
+	assert.NotEqual(t, oldId, newId)
+	stored, err := ceremonyStore.GetAuthContext(ceremonyRequest(rotated))
+	require.NoError(t, err)
+	assert.Equal(t, "ceremony-a", stored.CeremonyId)
+	_, err = backend.Load(context.Background(), oldId)
+	require.ErrorIs(t, err, sessionstore.ErrNotFound, "the identifier the browser arrived with names nothing any more")
+}
+
+// A rotation whose session is gone, signed out in another tab, is not re-created under a new name.
+func TestCeremonyStore_ARotationWhoseSessionIsGoneDoesNotPutItBack(t *testing.T) {
+	ceremonyStore, store, backend := newDatabaseCeremonyStore(t)
+	cookies := startCeremony(t, ceremonyStore, "ceremony-a")
+
+	tabA := ceremonyRequest(cookies)
+	_, err := ceremonyStore.GetAuthContext(tabA)
+	require.NoError(t, err)
+
+	id, err := store.OpenCookie(interleavingSessionName, cookies[0].Value)
+	require.NoError(t, err)
+	require.NoError(t, backend.Delete(context.Background(), id))
+
+	rr := httptest.NewRecorder()
+	err = ceremonyStore.RegenerateSession(rr, tabA, "ceremony-a")
+
+	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
+	assert.Empty(t, rr.Result().Cookies(), "no cookie names a session re-created from tab A's copy")
+}

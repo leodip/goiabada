@@ -7,7 +7,7 @@
 {{define "body"}}
 
     <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "auth.otp.title" }}</h2>
-    <form action="" method="post">
+    <form action="" method="post" onsubmit="return submitOnce(this)">
 
         <input type="hidden" name="ceremonyId" value="{{.ceremonyId}}" />
 

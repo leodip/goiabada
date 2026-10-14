@@ -57,8 +57,13 @@ type CeremonyStore interface {
 	DiscardAuthContext(w http.ResponseWriter, r *http.Request) error
 	// RegenerateSession replaces the browser session's identifier without losing its
 	// contents, which is what a server-side session store must do at every privilege
-	// change to match a cookie store's structural immunity to session fixation (#266).
-	RegenerateSession(w http.ResponseWriter, r *http.Request) error
+	// change to match a cookie store's structural immunity to session fixation (#266). It
+	// rotates only while the browser session still holds the ceremony named, and otherwise
+	// answers ceremony.ErrCeremonyReplaced, writing nothing (#579).
+	RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string) error
+	// ConfirmCeremony answers nil while the browser session, read afresh, still holds the
+	// ceremony named, and ceremony.ErrCeremonyReplaced otherwise. It writes nothing (#579).
+	ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremonyId string) error
 }
 
 type OtpSecretGenerator interface {

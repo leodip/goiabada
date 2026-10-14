@@ -44,12 +44,15 @@ type userSessionManagerDatabase interface {
 // others.
 const sessionCleanupTimeout = 10 * time.Second
 
-// userSessionStore is what the manager calls on the browser session store. Regenerate is in
-// it, so a store that cannot rotate does not compile here, where it used to fall back to a
-// plain save that bound the new user session to the identifier the browser arrived with (#431).
+// userSessionStore is what the manager calls on the browser session store. A rotation is in it,
+// so a store that cannot rotate does not compile here, where it used to fall back to a plain save
+// that bound the new user session to the identifier the browser arrived with (#431). It is the
+// conditional rotation, which only sessionstore.ConditionalStore has, so the new user session is
+// bound only to a browser session that still holds the ceremony completing (#579).
 type userSessionStore interface {
 	Get(r *http.Request, name string) (*sessionstore.Session, error)
-	Regenerate(w http.ResponseWriter, r *http.Request, session *sessionstore.Session) error
+	ChangeAndRegenerate(w http.ResponseWriter, r *http.Request, session *sessionstore.Session,
+		change func(values map[string]any) error) error
 }
 
 // Manager creates, bumps and judges the user sessions a browser signs in to.
@@ -113,6 +116,13 @@ type Authentication struct {
 	// reached since the adoption is not one this ceremony may still write, however many of
 	// its methods it merges back (#538). Nil on every bind that adopted no session.
 	AdoptedAuthTime *time.Time
+	// BrowserSessionCondition is what StartNewUserSession's rotation of the browser session is
+	// written on, applied to the session's values as a fresh read finds them: the ceremony this
+	// sign-in completes must still be the one the browser holds (ceremony.Held). An error from it
+	// refuses the rotation, and the new user session is abandoned as a failed rotation abandons it
+	// (#579 decision 4). StartNewUserSession refuses nil before anything is written. The binds
+	// write no browser session and ignore it.
+	BrowserSessionCondition func(values map[string]any) error
 }
 
 // ErrStaleAuthentication is returned by a bind that refused to write onto a session a newer
@@ -172,6 +182,9 @@ type Removal struct {
 // lowers auth_time to (#542), and the same handler sets it. authentication.OTPClaim is checked on
 // the user under the user's row lock, first in the transaction, so a session is never created
 // claiming a code from an authenticator a removal took away meanwhile (otpcredential.OTPClaim.Recheck).
+// authentication.BrowserSessionCondition is what the rotation binding the new session to the browser
+// session is written on, and is refused alike when nil; a rotation it refuses abandons the new
+// session, as any failed rotation does (#579 decision 4).
 //
 // ipAddress is the browser's address as the caller read it, and becomes the session's one
 // recorded address. The device is the browser's device cookie, which this function reads, records
@@ -205,6 +218,9 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	}
 	if authentication.PasswordAuthTime == nil || authentication.PasswordAuthTime.IsZero() {
 		return nil, nil, errs.New("no password instant captured; refusing to mint a session whose password_auth_time would be invented")
+	}
+	if authentication.BrowserSessionCondition == nil {
+		return nil, nil, errs.New("no browser session condition given; refusing to bind a session to whatever the browser session holds")
 	}
 	if replacing != nil && replacing.UserId != userId {
 		return nil, nil, errs.Errorf("refusing to replace user session %v: it belongs to user %v, not %v",
@@ -380,8 +396,6 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		return nil, nil, err
 	}
 
-	sess.Values[sessionkeys.SessionIdentifier] = userSession.SessionIdentifier
-
 	// The browser session's identifier is replaced as the user session is bound to it, so
 	// no identifier that existed before this ceremony can name the session the ceremony
 	// produced.
@@ -394,15 +408,30 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	// immunity back, and it covers a different user signing in on the same browser for
 	// free, being the same code path (#266).
 	//
-	// The identifier is written into the session before the rotation rather than after
-	// so that the whole sign-in reaches the browser as one Set-Cookie carrying the
-	// authenticated expiry. Nothing is persisted under the new identifier until
-	// Regenerate runs, and the row it deletes never held the identifier, so the ordering
+	// The identifier is written into the session as part of the rotation rather than after
+	// it so that the whole sign-in reaches the browser as one Set-Cookie carrying the
+	// authenticated expiry. Nothing is persisted under the new identifier until the
+	// rotation runs, and the row it deletes never held the identifier, so the ordering
 	// changes no outcome an attacker could use.
+	//
+	// The rotation is conditional (#579 decision 4). It reads the browser session afresh, asks
+	// the caller's condition of what it found, that the ceremony completing is still the one the
+	// browser holds, and builds the new row from that read with only the identifier added,
+	// removing the old row on condition nothing wrote it in between. A rotation from the
+	// request's own copy put a ceremony another tab's /auth/authorize had replaced back over the
+	// newer one. A refusal, or a session gone since (sessionstore.ErrNotFound, which is not
+	// re-created), writes nothing to the browser session and is answered as a failed rotation.
 	//
 	// A failure here comes after the commit, so the rows the sweep removed are gone whatever
 	// abandonUserSession manages, and they go back to the caller beside the error to be audited.
-	if regenerateErr := u.sessionStore.Regenerate(w, r, sess); regenerateErr != nil {
+	regenerateErr := u.sessionStore.ChangeAndRegenerate(w, r, sess, func(values map[string]any) error {
+		if err := authentication.BrowserSessionCondition(values); err != nil {
+			return err
+		}
+		values[sessionkeys.SessionIdentifier] = userSession.SessionIdentifier
+		return nil
+	})
+	if regenerateErr != nil {
 		return nil, removed, u.abandonUserSession(r.Context(), userSession, errs.Wrap(regenerateErr, "unable to rotate the browser session identifier"))
 	}
 
@@ -460,7 +489,7 @@ func sessionsOverCap(others []record.UserSession, now time.Time, limits SessionL
 // failed for that reason and the caller must be told that one, not what this cleanup did.
 //
 // It is the compensation for the single step that cannot join the transaction. RunInTransaction
-// reruns its body when the engine aborts it as a deadlock victim, and a rerun of Regenerate
+// reruns its body when the engine aborts it as a deadlock victim, and a rerun of the rotation
 // would write Set-Cookie twice, so the browser-store write stays after the commit. Without
 // this, the row stayed: no browser held a cookie naming it, nothing was ever issued against it,
 // and it sat in the admin console's session list until its own idle timeout expired (#198).
