@@ -142,7 +142,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Get("/level1", handlers.HandleAuthLevel1Get(ceremonyBoundary, ceremonyStore))
 		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewLevel1Completion(s.database, userSessionManager)))
 		r.Get("/level2", handlers.HandleAuthLevel2Get(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewLevel2Selection(s.database)))
-		r.Get("/completed", handlers.HandleAuthCompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, userSessionManager, s.database, auditLogger, permissionChecker))
+		r.Get("/completed", handlers.HandleAuthCompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, userSessionManager, authflow.NewCompletion(s.database, userSessionManager, auditLogger, permissionChecker)))
 		r.Get("/issue", handlers.HandleIssueGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, codeIssuer, tokenIssuer, s.database, auditLogger, userSessionManager, permissionChecker, tokenMetrics))
 		r.Get("/pwd", handlers.HandleAuthPwdGet(ceremonyBoundary, httpHelper, s.database))
 		r.With(rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(ceremonyBoundary, httpHelper, ceremonyStore, s.database, auditLogger, rateLimiter))

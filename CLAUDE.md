@@ -56,7 +56,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/handlers/accounthandlers/` - Pages reached without a session: self-registration and its activation link, forgot password and its reset link (#435)
 - `internal/handlers/apihandlers/` - Admin API handlers
 - `internal/{ceremony,issuance,signingkeys}/` - Provider-side issuance: codes, tokens, key rotation, ceremony context
-- `internal/authflow/` - The ceremony steps' operations, one per step: its loads, the decision it applies, its database and browser-session writes, and a typed result its handler answers from. It cannot reach HTTP (`import_lint_test.go` refuses `net/http`, chi, `internal/handlers`, `internal/middleware` and `internal/reqctx`): what the request carries arrives as plain values, every browser-session write goes through a port the handler satisfies with a per-request adapter (`handlers.browserSession`), and the handler writes the response after the operation returns. Today `/auth/level1` (`SelectLevel1Method`), `/auth/level1completed` (`Level1Completion`) and `/auth/level2` (`Level2Selection`); the other steps are still written in `internal/handlers` (#580)
+- `internal/authflow/` - The ceremony steps' operations, one per step: its loads, the decision it applies, its database and browser-session writes, and a typed result its handler answers from. It cannot reach HTTP (`import_lint_test.go` refuses `net/http`, chi, `internal/handlers`, `internal/middleware` and `internal/reqctx`): what the request carries arrives as plain values, every browser-session write goes through a port the handler satisfies with a per-request adapter (`handlers.browserSession`), and the handler writes the response after the operation returns. Today `/auth/level1` (`SelectLevel1Method`), `/auth/level1completed` (`Level1Completion`), `/auth/level2` (`Level2Selection`) and `/auth/completed` (`Completion`); the other steps are still written in `internal/handlers` (#580)
 - `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imageupload,uithemes}/` - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, image uploads, themes
 - `internal/revocation/` - The five revocation operations, their results, reason constants and audit helpers. No handler package owns revocation orchestration or its transactions any more (#387)
 - `internal/reqctx/` - The five request-scoped values (settings, session identifier, bearer token, validated token, and the credential reservation a failures-only rate-limit tier holds), each written by one middleware and read through a typed accessor; services take theirs as parameters, and the context-value guard holds every module file to them with no exemption (#433, #439)
@@ -163,7 +163,7 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 | State | Assigned by | When |
 |---|---|---|
 | `requires_level_1` | `HandleAuthorizeGet` | four conditions: a deferred error is parked; `prompt=login`; `id_token_hint` names another user; no valid session |
-| | `HandleAuthCompletedGet` | no reusable session and `!Level1AuthCompleted`, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked before any session is bound and again by the session write (restart route 1, through `Restart()`) |
+| | `authflow.Completion` | no reusable session and `!Level1AuthCompleted`, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked before any session is bound and again by the session write (restart route 1, through `Restart()`) |
 | | `refuseIssuanceUnusableSession` | bound session gone, expired or foreign, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked again by the issuer, and not `prompt=none` (restart route 2, through `Restart()`) |
 | `level1_password` | `authflow.SelectLevel1Method` | unconditional |
 | `level1_password_completed` | `HandleAuthPwdPost` | password verified, user enabled |
@@ -173,9 +173,9 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 | `authentication_completed` | `authflow.Level1Completion` | no step-up needed |
 | | `authflow.Level2Selection` | `level2_optional` and no OTP enrolled, which is the skip that bypasses `/auth/otp` entirely |
 | | `HandleAuthOtpPost` | OTP verified or enrolled |
-| `requires_consent` | `HandleAuthCompletedGet` | `prompt=consent`, or `client.ConsentRequired`, or `offline_access` in scope, or `authserver:manage-account` still in scope, the client not the admin console's, and no stored consent covering it (`userconsent.AlwaysOwed`, #509) |
+| `requires_consent` | `authflow.Completion` | `prompt=consent`, or `client.ConsentRequired`, or `offline_access` in scope, or `authserver:manage-account` still in scope, the client not the admin console's, and no stored consent covering it (`userconsent.AlwaysOwed`, #509) |
 | `ready_to_issue_code` | `handlePromptNone` | every silent check passed, skipping every hop between |
-| | `HandleAuthCompletedGet` | no consent needed |
+| | `authflow.Completion` | no consent needed |
 | | `HandleConsentGet` | scope already fully consented, no `offline_access`, no `prompt=consent` |
 | | `HandleConsentPost` | approved with at least one scope |
 
@@ -218,7 +218,7 @@ not one it accepts (#246, #437):
 | `/auth/level1completed` | `handler_auth_level1.go`, `authflow/level1_completion.go` | Delivers a deferred authorization error if one is parked (see below), else decides if level2 needed based on ACR and session state |
 | `/auth/level2` | `handler_auth_level2.go`, `authflow/level2_selection.go` | Selects level2 auth method. If `level2_optional` + no OTP → skip to completed |
 | `/auth/otp` | `handler_auth_otp.go` | OTP verification (or enrollment if user doesn't have OTP yet) |
-| `/auth/completed` | `handler_auth_completed.go` | Final auth check (a disabled user refused, a moved-on generation restarted, both before any session is bound), session bump/create, scope filtering, consent check |
+| `/auth/completed` | `handler_auth_completed.go`, `authflow/completion.go` | Final auth check (a disabled user refused, a moved-on generation restarted, both before any session is bound), session bump/create, scope filtering, consent check |
 | `/auth/consent` | `handler_consent.go` | User consent screen (if required) |
 | `/auth/issue` | `handler_auth_issue.go` | Issues authorization code, redirects to client |
 
@@ -228,7 +228,7 @@ accepted, including `RequestedScope`, the scope as asked for before any hop narr
 user holds; the attempt is everything an authentication writes. A restart keeps the request and
 discards the attempt: `AuthContext.Restart()` zeroes every attempt field, puts `Scope` back from
 `RequestedScope` and sets `requires_level_1`, so the second pass earns its own `amr`, scope and
-consent (#140, #436). There are two restart routes: `HandleAuthCompletedGet` when no session is
+consent (#140, #436). There are two restart routes: `authflow.Completion` when no session is
 reusable and level 1 was never completed, or when the user's generation has moved on, or when the
 ceremony names `otp` from an authenticator the user no longer has (#542), decided before
 it binds a session (#522), and `refuseIssuanceUnusableSession` at `/auth/issue` when the

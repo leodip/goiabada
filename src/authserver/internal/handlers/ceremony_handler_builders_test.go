@@ -161,7 +161,8 @@ type authCompletedGetDeps struct {
 func buildAuthCompletedGet(d authCompletedGetDeps) http.HandlerFunc {
 	return HandleAuthCompletedGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
 		testClientErrorResponder(d.database, d.pageRenderer, d.templateFS),
-		d.pageRenderer, d.ceremonyStore, d.userSessionManager, d.database, d.auditLogger, d.permissionChecker)
+		d.pageRenderer, d.ceremonyStore, d.userSessionManager,
+		authflow.NewCompletion(d.database, d.userSessionManager, d.auditLogger, d.permissionChecker))
 }
 
 type consentGetDeps struct {

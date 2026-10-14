@@ -9,14 +9,17 @@
 //     /auth/authorize, or decides whether level 2 is owed (ceremony.StepUpOwed).
 //   - Level2Selection, GET /auth/level2: chooses the level 2 method (DecideLevel2Arm) and captures
 //     the user's OTP configuration generation.
+//   - Completion, GET /auth/completed: decides on the user (decideBeforeBinding), binds the ceremony
+//     to a user session by reusing the browser's or creating one, or restarts it at level 1
+//     (decideCompletion), then sends it to consent or to issuance (DecideAfterBinding).
 //
 // The other steps are still written in internal/handlers.
 //
 // Rules every operation keeps:
 //
 //   - No HTTP. Nothing here imports net/http, chi, internal/handlers, internal/middleware or
-//     internal/reqctx (import_lint_test.go). What the request carries, its settings and its session
-//     identifier, reaches an operation as a plain value the handler read.
+//     internal/reqctx (import_lint_test.go). What the request carries, its settings, its session
+//     identifier and the browser's address, reaches an operation as a plain value the handler read.
 //   - Every browser-session write goes through the port an operation declares for it, which the
 //     handler satisfies with an adapter built for that one request (handlers.browserSession), holding
 //     the request and the response writer the handler holds. An operation never stores one.
@@ -27,7 +30,16 @@
 //     depends on it is written (#141), and no step answers before its save.
 //   - A load or a decision that fails is returned as an error, and the handler answers 500.
 //
-// The orderings the steps here keep: a parked error reads the client's provenance before the
-// ceremony is cleared, and the clear comes before the answer (Level1Completion); a step saves its
-// next state before the handler redirects to it.
+// The orderings the steps here keep:
+//
+//   - A parked error reads the client's provenance before the ceremony is cleared, and the clear
+//     comes before the answer (Level1Completion); so does every access_denied Completion owes.
+//   - A step saves its next state before the handler redirects to it.
+//   - Completion decides on the user before either arm binds, so a refusal or a restart writes no
+//     session (#522).
+//   - Completion's reuse arm asks whether its bind is stale before it rotates the browser session's
+//     identifier, and rotates before the bind commits the raised level (#538, #266).
+//   - Completion's create arm confirms the browser session still holds the ceremony before it ends a
+//     foreign session or creates one, and the session start commits before its rotation (#579).
+//   - Audit records of a session write follow its commit.
 package authflow

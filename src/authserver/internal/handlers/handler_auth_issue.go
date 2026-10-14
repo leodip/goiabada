@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -64,7 +65,7 @@ func HandleIssueGet(
 			responseType:             authContext.ResponseType,
 			hintSubject:              authContext.IdTokenHintSub,
 			authStateGeneration:      authContext.AuthStateGeneration,
-			otpClaim:                 otpClaimOf(authContext),
+			otpClaim:                 authflow.OTPClaimOf(authContext),
 			sessionIdentifierPresent: sessionIdentifier != "",
 		}
 
@@ -230,7 +231,7 @@ func HandleIssueGet(
 				"user_id": facts.user.Id,
 			})
 			answerClientWithError(w, r, ceremonyStore, boundary, responder, authContext.CeremonyId,
-				redirectErrorFromAuthContext(authContext, issuingClient, "access_denied", userDisabledDescription))
+				redirectErrorFromAuthContext(authContext, issuingClient, "access_denied", authflow.UserDisabledDescription))
 
 		case issuanceRefuseHintMismatch:
 			// An error redirect carries the client it is answering, so its provenance has to be
@@ -796,7 +797,7 @@ func newCreateCodeInput(authContext *ceremony.AuthContext, sessionIdentifier str
 		AuthenticatedAt:     authContext.AuthenticatedAt,
 		AuthStateGeneration: authContext.AuthStateGeneration,
 		SessionIdentifier:   sessionIdentifier,
-		OTPClaim:            otpClaimOf(authContext),
+		OTPClaim:            authflow.OTPClaimOf(authContext),
 	}
 }
 
@@ -1010,7 +1011,7 @@ func issueImplicitGrant(
 		AuthenticatedAt:   authenticatedAt,
 
 		AuthStateGeneration: authContext.AuthStateGeneration,
-		OTPClaim:            otpClaimOf(authContext),
+		OTPClaim:            authflow.OTPClaimOf(authContext),
 	}
 
 	tokenResponse, err := implicitTokenIssuer.IssueImplicitTx(r.Context(), settings, implicitInput, issueAccessToken, issueIdToken)
