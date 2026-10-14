@@ -128,7 +128,7 @@ type CompletionResult struct {
 //
 //  1. Loads the browser's user session by sessionIdentifier with its user, then the client; a failed
 //     read or a client not found is returned as an error.
-//  2. Decides the arm (decideCompletion): reuse, create, or restart at level 1.
+//  2. Decides the mode (decideCompletion): reuseSession, createSession or restartAtLevel1.
 //  3. Unless it restarts, loads the ceremony's user and decides on it before anything is bound
 //     (decideBeforeBinding): a missing user is an error, a disabled one is audited and answered
 //     access_denied after the ceremony is cleared, and a moved generation or a removed
@@ -189,7 +189,7 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 	})
 
 	var user *record.User
-	if plan.arm != completionArmRestart {
+	if _, restarts := plan.(restartPlan); !restarts {
 		user, err = o.database.GetUserById(ctx, nil, authContext.UserId)
 		if err != nil {
 			return CompletionResult{}, err
@@ -209,28 +209,29 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 		case beforeBindingGenerationMoved:
 			slog.WarnContext(ctx, "the user's authentication generation has moved on since this ceremony authenticated, restarting level 1 instead of binding a session",
 				"ceremony_user_id", authContext.UserId)
-			plan = completionPlan{arm: completionArmRestart}
+			plan = restartAtLevel1()
 		case beforeBindingAuthenticatorRemoved:
 			slog.WarnContext(ctx, "this ceremony names a one-time code from an authenticator the user no longer has, restarting level 1 instead of binding a session",
 				"ceremony_user_id", authContext.UserId)
-			plan = completionPlan{arm: completionArmRestart}
+			plan = restartAtLevel1()
 		}
 	}
 
 	var boundSession *record.UserSession
-	switch plan.arm {
-	case completionArmRestart:
-		return restartCompletion(browser, authContext), nil
-	case completionArmReuse:
-		boundSession, err = o.bindReusedSession(ctx, browser, plan, authContext, client, sessionIdentifier,
+	switch mode := plan.(type) {
+	case reuseSessionPlan:
+		boundSession, err = o.bindReusedSession(ctx, browser, mode, authContext, client, sessionIdentifier,
 			targetAcrLevel, ipAddress)
-	default:
-		boundSession, err = o.bindNewSession(ctx, browser, plan, authContext, client, userSession, targetAcrLevel,
+	case createSessionPlan:
+		boundSession, err = o.bindNewSession(ctx, browser, mode, authContext, client, userSession, targetAcrLevel,
 			ipAddress, usersession.SessionLimits{
 				IdleTimeoutInSeconds: settings.UserSessionIdleTimeoutInSeconds,
 				MaxLifetimeInSeconds: settings.UserSessionMaxLifetimeInSeconds,
 				MaxSessionsPerUser:   settings.MaxUserSessionsPerUser,
 			})
+	default:
+		// restartPlan, the third mode.
+		return restartCompletion(browser, authContext), nil
 	}
 	switch {
 	case errors.Is(err, otpcredential.ErrAuthenticatorRemoved):
@@ -318,9 +319,9 @@ func restartCompletion(browser stepSaver, authContext *ceremony.AuthContext) Com
 // bindReusedSession is the reuse arm: it binds the ceremony to the session the browser arrived with,
 // as plan says, and answers the bound row. In order:
 //
-//  1. When the plan rotates: asks whether the bind would be refused as stale (#538), and refuses
-//     here, before rotating, so a stale ceremony rotates nothing; then rotates the browser session's
-//     identifier (RegenerateSession).
+//  1. When the plan rotates (rotateIdentifier): asks whether the bind would be refused as stale
+//     (#538), and refuses here, before rotating, so a stale ceremony rotates nothing; then rotates the
+//     browser session's identifier (RegenerateSession).
 //  2. Binds (BindUserSession), in one transaction under the session's row, which raises the
 //     session's level and methods to this ceremony's or, with replaceAuthentication, writes them over
 //     it, and asks again whether the bind is stale and whether the ceremony's code still stands.
@@ -337,7 +338,7 @@ func restartCompletion(browser stepSaver, authContext *ceremony.AuthContext) Com
 // here: auth_time is what max_age is measured against, "the last time the End-User was actively
 // authenticated by the OP" (OIDC Core 1.0 section 3.1.2.1), and a tab paused after the password and
 // resumed hours later must not be told it signed in just now (#252 decision 8).
-func (o *Completion) bindReusedSession(ctx context.Context, browser completionBrowser, plan completionPlan,
+func (o *Completion) bindReusedSession(ctx context.Context, browser completionBrowser, plan reuseSessionPlan,
 	authContext *ceremony.AuthContext, client *record.Client, sessionIdentifier string,
 	targetAcrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error) {
 
@@ -410,7 +411,7 @@ func (o *Completion) bindReusedSession(ctx context.Context, browser completionBr
 //
 // A failed termination is returned before anything is created, with the browser still holding the
 // old session: the fail-closed direction.
-func (o *Completion) bindNewSession(ctx context.Context, browser completionBrowser, plan completionPlan,
+func (o *Completion) bindNewSession(ctx context.Context, browser completionBrowser, plan createSessionPlan,
 	authContext *ceremony.AuthContext, client *record.Client, userSession *record.UserSession,
 	targetAcrLevel record.AcrLevel, ipAddress string, limits usersession.SessionLimits) (*record.UserSession, error) {
 
@@ -422,7 +423,7 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 	// its refresh tokens working. StartNewUserSession sweeps only the new user's sessions, so it would
 	// never reach this one. Both sweeps key on the session identifier, so the previous user's other
 	// devices are untouched (#133).
-	if plan.terminateForeignSession {
+	if plan.terminatesForeignSession() {
 		terminationResult, err := revocation.TerminateUserSessionTx(ctx, o.database, userSession)
 		if err != nil {
 			return nil, err
@@ -453,7 +454,7 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 	// authorized is revoked, the policy for a same-user sign-in (#133, #243). A foreign session was
 	// terminated above and is not passed.
 	var replacing *record.UserSession
-	if plan.replaceOwnSession {
+	if plan.replacesOwnSession() {
 		replacing = userSession
 	}
 	// AuthenticatedAt is always set here: decideCompletion takes this arm only with

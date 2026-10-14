@@ -8,19 +8,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/userconsent"
 )
 
-// completionArm is how Completion binds the ceremony to a session.
-type completionArm int
-
-const (
-	// completionArmReuse binds the session the browser arrived with, raising it to this ceremony's
-	// authentication or, when the ceremony authenticated afresh, replacing it (#537).
-	completionArmReuse completionArm = iota + 1
-	// completionArmCreate starts a new session.
-	completionArmCreate
-	// completionArmRestart sends the ceremony back to level 1 (restart route 1).
-	completionArmRestart
-)
-
 // completionFacts is what decideCompletion decides from, every one of them read before the
 // decision.
 type completionFacts struct {
@@ -39,25 +26,93 @@ type completionFacts struct {
 	target                      record.AcrLevel
 }
 
-// completionPlan is decideCompletion's answer: the arm, and what that arm does beyond its core
-// write. The reuse arm's four flags and the create arm's two are false on every other arm.
-type completionPlan struct {
-	arm completionArm
+// completionPlan is decideCompletion's answer, one of three modes: reuseSessionPlan,
+// createSessionPlan or restartPlan. Each carries only what its own arm does beyond its core write, and
+// each is built by its constructor alone (reuseSession, createSession, restartAtLevel1), which
+// completion_plan_lint_test.go holds, so every attribute Completion acts on is one a decision chose.
+type completionPlan interface {
+	// completionPlan seals the set to the three modes.
+	completionPlan()
+}
 
-	// rotateIdentifier rotates the browser session's identifier before the bind.
+// reuseSessionPlan binds the session the browser arrived with, valid and this user's, raising it to
+// this ceremony's authentication or, when the ceremony authenticated afresh, replacing it (#537).
+// Its four attributes are independent of each other.
+type reuseSessionPlan struct {
+	// rotateIdentifier rotates the browser session's identifier before the bind (#266).
 	rotateIdentifier bool
 	// refreshAuthTime writes the credential's instant onto the bound session.
 	refreshAuthTime bool
-	// replaceAuthentication writes this ceremony's level and methods onto the bound session, as the
-	// create arm would stamp them on a new one: the ceremony authenticated afresh (#537).
+	// replaceAuthentication writes this ceremony's level, methods and password instant onto the bound
+	// session, as the create arm would stamp them on a new one (#537).
 	replaceAuthentication bool
-	// promoteOtpConfigGeneration records the generation the session answered level 2 against.
+	// promoteOtpConfigGeneration records the generation the session answered level 2 against (#242).
 	promoteOtpConfigGeneration bool
+}
 
-	// terminateForeignSession ends the arrived-with session, which is another user's.
-	terminateForeignSession bool
-	// replaceOwnSession has the new session replace the arrived-with one, which is this user's.
-	replaceOwnSession bool
+func (reuseSessionPlan) completionPlan() {}
+
+// reuseSession is the reuse mode with the attributes given.
+func reuseSession(rotateIdentifier, refreshAuthTime, replaceAuthentication,
+	promoteOtpConfigGeneration bool) reuseSessionPlan {
+
+	return reuseSessionPlan{
+		rotateIdentifier:           rotateIdentifier,
+		refreshAuthTime:            refreshAuthTime,
+		replaceAuthentication:      replaceAuthentication,
+		promoteOtpConfigGeneration: promoteOtpConfigGeneration,
+	}
+}
+
+// arrivedWithSession is the session the browser arrived with, as the create arm meets it: none,
+// another user's, or this user's and not reusable. The three exclude each other, so a session is
+// never both terminated and replaced.
+type arrivedWithSession int
+
+const (
+	// arrivedWithNoSession: the browser carried no session, and the new one replaces nothing.
+	arrivedWithNoSession arrivedWithSession = iota + 1
+	// arrivedWithForeignSession: another user's, valid or not, which is terminated before the new one
+	// is started (#133).
+	arrivedWithForeignSession
+	// arrivedWithOwnSession: this user's, expired, idle or older than max_age, which the new one
+	// replaces without revoking what it authorized (#133, #243).
+	arrivedWithOwnSession
+)
+
+// createSessionPlan starts a new session, after ending the arrived-with session when it is another
+// user's.
+type createSessionPlan struct {
+	arrivedWith arrivedWithSession
+}
+
+func (createSessionPlan) completionPlan() {}
+
+// createSession is the create mode, for the session the browser arrived with.
+func createSession(arrivedWith arrivedWithSession) createSessionPlan {
+	return createSessionPlan{arrivedWith: arrivedWith}
+}
+
+// terminatesForeignSession reports whether the arrived-with session is another user's, which the
+// create arm terminates with its codes and refresh tokens.
+func (p createSessionPlan) terminatesForeignSession() bool {
+	return p.arrivedWith == arrivedWithForeignSession
+}
+
+// replacesOwnSession reports whether the arrived-with session is this user's, which the new session
+// replaces.
+func (p createSessionPlan) replacesOwnSession() bool {
+	return p.arrivedWith == arrivedWithOwnSession
+}
+
+// restartPlan sends the ceremony back to level 1 (restart route 1), binding nothing.
+type restartPlan struct{}
+
+func (restartPlan) completionPlan() {}
+
+// restartAtLevel1 is the restart mode.
+func restartAtLevel1() restartPlan {
+	return restartPlan{}
 }
 
 // decideCompletion decides how the end of an authentication ceremony binds it to a session.
@@ -66,7 +121,7 @@ type completionPlan struct {
 // while user B authenticates (prompt=login and an id_token_hint naming someone else both reach the
 // password form without clearing it, and an invalid session row keeps its cookie), and reusing A's
 // session for B's ceremony would bind B's code to a session B does not own and rewrite A's session
-// (#133). On that arm:
+// (#133). On that arm, reuseSession:
 //
 //   - the identifier rotates when the bind will raise a privilege, OWASP's "regenerate on any
 //     privilege level change", since this server's ACR levels are privilege levels (#266 decision 6).
@@ -89,34 +144,36 @@ type completionPlan struct {
 //     discharge a level 2 obligation it never addressed (#242 decision 3).
 //
 // With no session this ceremony may reuse, only level 1 performed in this ceremony
-// (level1Completed) creates one; otherwise the ceremony restarts at level 1, so a ceremony whose
-// session ended mid-flight never mints a session from its UserId with no proof anyone authenticated
-// (#129 decision 6). It reads level1Completed, not credentialEntered, because AuthenticatedAt is also
+// (level1Completed) creates one; otherwise the ceremony restarts at level 1 (restartAtLevel1), so a
+// ceremony whose session ended mid-flight never mints a session from its UserId with no proof anyone
+// authenticated (#129 decision 6). It reads level1Completed, not credentialEntered, because AuthenticatedAt is also
 // set by a code entered over a reused session, with no password (#129 decision 15). The second pass
 // sets level1Completed at the password step, so the restart does not loop, and a session deleted
 // before the user signs in afresh still succeeds (#46).
 //
-// On the create arm, an arrived-with session that is another user's is terminated, valid or not:
-// the browser carries its cookie either way, and its offline grants would keep working on a row
-// nobody can resume (#133). One that is this user's is not reusable (expired, idle, or older than
+// On the create arm, createSession, an arrived-with session that is another user's is terminated,
+// valid or not: the browser carries its cookie either way, and its offline grants would keep working
+// on a row nobody can resume (#133). One that is this user's is not reusable (expired, idle, or older than
 // the max_age asked for), so the new session replaces it (#133, #243).
 func decideCompletion(f completionFacts) completionPlan {
 	if f.sessionValid && f.sessionOwned {
-		return completionPlan{
-			arm:                        completionArmReuse,
-			rotateIdentifier:           f.raisesPrivilege,
-			refreshAuthTime:            f.credentialEntered,
-			replaceAuthentication:      f.level1Completed,
-			promoteOtpConfigGeneration: f.otpConfigGenerationCaptured && ceremony.TargetRequiresSecondFactor(f.target),
-		}
+		return reuseSession(
+			f.raisesPrivilege,   // rotateIdentifier
+			f.credentialEntered, // refreshAuthTime
+			f.level1Completed,   // replaceAuthentication
+			f.otpConfigGenerationCaptured && ceremony.TargetRequiresSecondFactor(f.target), // promoteOtpConfigGeneration
+		)
 	}
 	if !f.level1Completed {
-		return completionPlan{arm: completionArmRestart}
+		return restartAtLevel1()
 	}
-	return completionPlan{
-		arm:                     completionArmCreate,
-		terminateForeignSession: f.sessionPresent && !f.sessionOwned,
-		replaceOwnSession:       f.sessionPresent && f.sessionOwned,
+	switch {
+	case !f.sessionPresent:
+		return createSession(arrivedWithNoSession)
+	case f.sessionOwned:
+		return createSession(arrivedWithOwnSession)
+	default:
+		return createSession(arrivedWithForeignSession)
 	}
 }
 

@@ -356,7 +356,7 @@ the End-User even if the End-User is already authenticated", and section 2 defin
    it when the user has one, whatever the session already gave. Keycloak does the same ("the LoA from
    previous authentications are not considered").
 2. **Replaces the session's authentication** on `/auth/completed`'s reuse arm
-   (`completionPlan.replaceAuthentication`): the session takes the target level, this ceremony's
+   (`reuseSessionPlan.replaceAuthentication`): the session takes the target level, this ceremony's
    methods, its credential's instant and its password's, as the create arm would stamp a new session. That can lower
    the session (`prompt=login` at a level 1 client over a level 3 session leaves it at level 1, `pwd`),
    and the next level 3 request then steps up. The session row is kept, not replaced, so other clients'

@@ -11,46 +11,47 @@ import (
 
 // Every arm /auth/completed can bind a ceremony through, and what each arm does beyond its core
 // write. The handler cases show each arm reaching its act; which arm a ceremony takes is decided
-// here (#437 seam 1).
+// here (#437 seam 1). Each plan is read in the frozen reference's shape (frozenShapeOf), which
+// TestDecideCompletion_MatchesTheFrozenReferenceForEveryCombination holds the decision to whole.
 func TestDecideCompletion(t *testing.T) {
 	testCases := []struct {
 		name  string
 		facts completionFacts
-		want  completionPlan
+		want  frozenCompletionPlan
 	}{
 		// Reuse: the arrived-with session is valid and the ceremony's (#133).
 		{
 			name:  "a valid owned session is reused, with nothing else to do for an SSO pass",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, target: record.AcrLevel1},
-			want:  completionPlan{arm: completionArmReuse},
+			want:  frozenCompletionPlan{arm: frozenArmReuse},
 		},
 		{
 			// Reuse asks nothing of level 1: an SSO pass never saw the password form.
 			name:  "reuse does not need level 1 completed in this ceremony",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, level1Completed: false},
-			want:  completionPlan{arm: completionArmReuse},
+			want:  frozenCompletionPlan{arm: frozenArmReuse},
 		},
 		{
 			name:  "a bump that raises a privilege rotates the identifier first",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, raisesPrivilege: true},
-			want:  completionPlan{arm: completionArmReuse, rotateIdentifier: true},
+			want:  frozenCompletionPlan{arm: frozenArmReuse, rotateIdentifier: true},
 		},
 		{
 			name:  "a credential entered in this ceremony refreshes AuthTime",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, credentialEntered: true},
-			want:  completionPlan{arm: completionArmReuse, refreshAuthTime: true},
+			want:  frozenCompletionPlan{arm: frozenArmReuse, refreshAuthTime: true},
 		},
 		{
 			name: "a captured OTP generation is promoted for level2_optional",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
 				otpConfigGenerationCaptured: true, target: record.AcrLevel2Optional},
-			want: completionPlan{arm: completionArmReuse, promoteOtpConfigGeneration: true},
+			want: frozenCompletionPlan{arm: frozenArmReuse, promoteOtpConfigGeneration: true},
 		},
 		{
 			name: "a captured OTP generation is promoted for level2_mandatory",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
 				otpConfigGenerationCaptured: true, target: record.AcrLevel2Mandatory},
-			want: completionPlan{arm: completionArmReuse, promoteOtpConfigGeneration: true},
+			want: frozenCompletionPlan{arm: frozenArmReuse, promoteOtpConfigGeneration: true},
 		},
 		{
 			// The password handler captures too, and a level 1 target never addressed level 2 (#242
@@ -58,12 +59,12 @@ func TestDecideCompletion(t *testing.T) {
 			name: "a captured OTP generation is not promoted for a level 1 target",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
 				otpConfigGenerationCaptured: true, target: record.AcrLevel1},
-			want: completionPlan{arm: completionArmReuse},
+			want: frozenCompletionPlan{arm: frozenArmReuse},
 		},
 		{
 			name:  "nothing is promoted without a capture, whatever the target",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, target: record.AcrLevel2Mandatory},
-			want:  completionPlan{arm: completionArmReuse},
+			want:  frozenCompletionPlan{arm: frozenArmReuse},
 		},
 		{
 			// prompt=login over the user's own valid session: a new authentication, so the session
@@ -72,7 +73,7 @@ func TestDecideCompletion(t *testing.T) {
 			name: "level 1 completed in this ceremony replaces the reused session's authentication",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, level1Completed: true,
 				credentialEntered: true, target: record.AcrLevel1},
-			want: completionPlan{arm: completionArmReuse, refreshAuthTime: true, replaceAuthentication: true},
+			want: frozenCompletionPlan{arm: frozenArmReuse, refreshAuthTime: true, replaceAuthentication: true},
 		},
 		{
 			// A step-up over an SSO pass entered a credential, the code, but verified no password,
@@ -80,13 +81,13 @@ func TestDecideCompletion(t *testing.T) {
 			name: "a code entered over a reused session refreshes AuthTime and replaces nothing",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
 				credentialEntered: true, otpConfigGenerationCaptured: true, target: record.AcrLevel2Mandatory},
-			want: completionPlan{arm: completionArmReuse, refreshAuthTime: true, promoteOtpConfigGeneration: true},
+			want: frozenCompletionPlan{arm: frozenArmReuse, refreshAuthTime: true, promoteOtpConfigGeneration: true},
 		},
 		{
 			name: "every reuse flag at once",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, raisesPrivilege: true,
 				level1Completed: true, credentialEntered: true, otpConfigGenerationCaptured: true, target: record.AcrLevel2Optional},
-			want: completionPlan{arm: completionArmReuse, rotateIdentifier: true, refreshAuthTime: true,
+			want: frozenCompletionPlan{arm: frozenArmReuse, rotateIdentifier: true, refreshAuthTime: true,
 				replaceAuthentication: true, promoteOtpConfigGeneration: true},
 		},
 
@@ -94,59 +95,59 @@ func TestDecideCompletion(t *testing.T) {
 		{
 			name:  "no session and no level 1 restarts",
 			facts: completionFacts{},
-			want:  completionPlan{arm: completionArmRestart},
+			want:  frozenCompletionPlan{arm: frozenArmRestart},
 		},
 		{
 			// AuthenticatedAt has two writers, and OTP alone is not level 1 (#129 decision 15).
 			name:  "a credential entered without level 1 still restarts",
 			facts: completionFacts{credentialEntered: true, otpConfigGenerationCaptured: true, target: record.AcrLevel2Optional},
-			want:  completionPlan{arm: completionArmRestart},
+			want:  frozenCompletionPlan{arm: frozenArmRestart},
 		},
 		{
 			name:  "an expired owned session without level 1 restarts, and is not replaced",
 			facts: completionFacts{sessionPresent: true, sessionValid: false, sessionOwned: true},
-			want:  completionPlan{arm: completionArmRestart},
+			want:  frozenCompletionPlan{arm: frozenArmRestart},
 		},
 		{
 			// Destroying somebody's session must follow a real authentication in this ceremony.
 			name:  "a foreign session without level 1 restarts, and is not terminated",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: false},
-			want:  completionPlan{arm: completionArmRestart},
+			want:  frozenCompletionPlan{arm: frozenArmRestart},
 		},
 
 		// Create: no reusable session, level 1 done in this ceremony.
 		{
 			name:  "no session with level 1 creates one, terminating and replacing nothing",
 			facts: completionFacts{level1Completed: true},
-			want:  completionPlan{arm: completionArmCreate},
+			want:  frozenCompletionPlan{arm: frozenArmCreate},
 		},
 		{
 			name:  "a valid foreign session is terminated before the new one is created",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: false, level1Completed: true},
-			want:  completionPlan{arm: completionArmCreate, terminateForeignSession: true},
+			want:  frozenCompletionPlan{arm: frozenArmCreate, terminateForeignSession: true},
 		},
 		{
 			// A row that can never be resumed is still a cookie in this browser with grants behind it.
 			name:  "an expired foreign session is terminated as well",
 			facts: completionFacts{sessionPresent: true, sessionValid: false, sessionOwned: false, level1Completed: true},
-			want:  completionPlan{arm: completionArmCreate, terminateForeignSession: true},
+			want:  frozenCompletionPlan{arm: frozenArmCreate, terminateForeignSession: true},
 		},
 		{
 			name:  "an expired owned session is replaced by the new one, not terminated",
 			facts: completionFacts{sessionPresent: true, sessionValid: false, sessionOwned: true, level1Completed: true},
-			want:  completionPlan{arm: completionArmCreate, replaceOwnSession: true},
+			want:  frozenCompletionPlan{arm: frozenArmCreate, replaceOwnSession: true},
 		},
 		{
 			name: "the reuse flags stay off on the create arm",
 			facts: completionFacts{level1Completed: true, raisesPrivilege: true, credentialEntered: true,
 				otpConfigGenerationCaptured: true, target: record.AcrLevel2Mandatory},
-			want: completionPlan{arm: completionArmCreate},
+			want: frozenCompletionPlan{arm: frozenArmCreate},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, decideCompletion(tc.facts))
+			assert.Equal(t, tc.want, frozenShapeOf(t, decideCompletion(tc.facts)))
 		})
 	}
 }
