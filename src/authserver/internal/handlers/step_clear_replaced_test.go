@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -19,7 +20,10 @@ import (
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
 
 // A step's clear ends the ceremony only while the browser session still holds it, and a step whose
@@ -71,6 +75,78 @@ func TestAnswerClientWithError_AReplacedCeremonyAnswersNoLongerActive(t *testing
 	assertReplacedAnsweredAtWarn(t, logged)
 	pageRenderer.AssertExpectations(t)
 	ceremonyStore.AssertExpectations(t)
+}
+
+// lastComparisonBackend is the in-memory backend with a turn for the test before every conditional
+// write, which is where another request of the browser can land between a clear's fresh read and
+// its write.
+type lastComparisonBackend struct {
+	*sessiontest.MemoryBackend
+	beforeConditional func()
+}
+
+func (b *lastComparisonBackend) UpdateIfUnchanged(ctx context.Context, id string, expected, data []byte, authenticated bool) (time.Time, error) {
+	b.beforeConditional()
+	return b.MemoryBackend.UpdateIfUnchanged(ctx, id, expected, data, authenticated)
+}
+
+// The shared error answer over the real ceremony store, when the clear loses its first two
+// comparisons to unrelated writes of the browser and its last to another tab's /auth/authorize. It
+// is the same replaced ceremony as on a first attempt, and answered the same: the page, with
+// neither the error nor its state sent to the client, and ceremony B kept. Read as a clear that ran
+// out of attempts, it answered server_error by redirect (#579 decision 2).
+func TestAnswerClientWithError_ACeremonyReplacedAtTheLastAttemptAnswersNoLongerActive(t *testing.T) {
+	backend := &lastComparisonBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
+	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionIdentifier, false,
+		sessionstore.PersistentCookie, sessionstore.KeyPair{
+			AuthenticationKey: []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+			EncryptionKey:     []byte("0123456789abcdef0123456789abcdef"),
+		}, nil)
+	require.NoError(t, err)
+	conditional, err := sessionstore.NewConditionalStore(store, backend)
+	require.NoError(t, err)
+	ceremonyStore := ceremony.NewStore(conditional, stepSaveSessionName)
+
+	seed := httptest.NewRecorder()
+	require.NoError(t, ceremonyStore.ReplaceAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil),
+		&ceremony.AuthContext{CeremonyId: testCeremonyId, AuthState: ceremony.AuthStateRequiresConsent}))
+	cookies := seed.Result().Cookies()
+	req := withCookies(httptest.NewRequest(http.MethodGet, "/auth/consent?ceremony="+testCeremonyId, nil), cookies)
+	_, err = ceremonyStore.GetAuthContext(req)
+	require.NoError(t, err)
+
+	comparisons := 0
+	backend.beforeConditional = func() {
+		comparisons++
+		other := withCookies(httptest.NewRequest(http.MethodGet, "/auth/authorize", nil), cookies)
+		if comparisons == 3 {
+			require.NoError(t, ceremonyStore.ReplaceAuthContext(httptest.NewRecorder(), other,
+				&ceremony.AuthContext{CeremonyId: "ceremony-b", AuthState: ceremony.AuthStateRequiresLevel1}))
+			return
+		}
+		sess, getErr := store.Get(other, stepSaveSessionName)
+		require.NoError(t, getErr)
+		sess.Values["unrelated"] = comparisons
+		require.NoError(t, store.Save(other, httptest.NewRecorder(), sess))
+	}
+
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	rr := httptest.NewRecorder()
+	expectCeremonyNoLongerActive(t, pageRenderer, rr, req)
+	logged := logtest.CaptureSlog(t)
+
+	answerClientWithError(rr, req, datamocks.NewDatabase(t), pageRenderer, ceremonyStore, nil, testCeremonyId,
+		testRedirectError("access_denied", "The user did not provide consent", "query",
+			"https://legit.example/cb", "state-a", "code"))
+
+	assert.Equal(t, 3, comparisons)
+	assertAnsweredNoLongerActive(t, rr)
+	assertReplacedAnsweredAtWarn(t, logged)
+	assert.Empty(t, rr.Result().Cookies())
+	stored, err := ceremonyStore.GetAuthContext(withCookies(httptest.NewRequest(http.MethodGet, "/auth/level1", nil), cookies))
+	require.NoError(t, err)
+	assert.Equal(t, "ceremony-b", stored.CeremonyId)
+	pageRenderer.AssertExpectations(t)
 }
 
 // The same answer through a step's handler: /auth/issue refusing a user disabled since

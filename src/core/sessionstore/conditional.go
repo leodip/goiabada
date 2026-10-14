@@ -73,7 +73,8 @@ func NewConditionalStore(store *ServerSideStore, backend ConditionalBackend) (*C
 //     began with
 //  2. apply change to the values that read found, so only this caller's change is written
 //  3. write on condition the stored contents are still the ones read, and on losing to another
-//     write go back to 1, at most conditionalAttempts times in all, then fail with ErrChanged
+//     write go back to 1, at most conditionalAttempts times in all, then read once more and fail
+//     as that read answers (see outOfAttempts)
 //  4. update the request's session with what was stored, and name it with a cookie as Save does
 //
 // A session the request loaded that is gone by the fresh read is not put back: the answer is
@@ -117,7 +118,7 @@ func (s *ConditionalStore) ChangeAndSave(r *http.Request, w http.ResponseWriter,
 		return s.setCookie(w, session, session.ID, expiresAt)
 	}
 
-	return errs.Wrapf(ErrChanged, "unable to update the browser session after %d attempts", conditionalAttempts)
+	return s.outOfAttempts(ctx, session, change, "update")
 }
 
 // ChangeAndRegenerate applies change to the session as it is stored now and writes the result
@@ -125,7 +126,7 @@ func (s *ConditionalStore) ChangeAndSave(r *http.Request, w http.ResponseWriter,
 // request read (#579). Each attempt reads afresh and applies change as ChangeAndSave does,
 // writes the new row, and removes the old one on condition it is still what was read. When
 // another write landed in between the old row is kept, the new row removed, and the attempt
-// repeated, at most conditionalAttempts times in all.
+// repeated, at most conditionalAttempts times in all, and then answered as outOfAttempts reads it.
 //
 // The order is Regenerate's and for its reason: new row, old row gone, then the cookie, and every
 // failure before the cookie emits no header. A session the request loaded that is gone by the
@@ -182,7 +183,24 @@ func (s *ConditionalStore) ChangeAndRegenerate(w http.ResponseWriter, r *http.Re
 		return s.setCookie(w, session, newId, expiresAt)
 	}
 
-	return errs.Wrapf(ErrChanged, "unable to rotate the browser session after %d attempts", conditionalAttempts)
+	return s.outOfAttempts(ctx, session, change, "rotate")
+}
+
+// outOfAttempts is the answer once every attempt has lost. The write that won the last comparison
+// may have been the one the caller's change refuses, another ceremony or none, or the row's removal,
+// and that answer must not depend on which attempt it landed at: so the session is read once more
+// and change applied to what the read found, writing nothing, and a gone row is ErrNotFound and a
+// refusal returned as it is, as on any attempt. ErrChanged is left for a session still there whose
+// change still applies, the bounded loss to unrelated writes (#579).
+func (s *ConditionalStore) outOfAttempts(ctx context.Context, session *Session, change func(values map[string]any) error, verb string) error {
+	_, values, err := s.freshRead(ctx, session)
+	if err != nil {
+		return err
+	}
+	if changeErr := change(values); changeErr != nil {
+		return changeErr
+	}
+	return errs.Wrapf(ErrChanged, "unable to %s the browser session after %d attempts", verb, conditionalAttempts)
 }
 
 // freshRead loads the stored row the session names, bypassing the request's cache, and opens

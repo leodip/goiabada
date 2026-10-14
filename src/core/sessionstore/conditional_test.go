@@ -240,6 +240,73 @@ func TestConditionalStore_ChangeAndSaveGivesUpAfterThreeAttempts(t *testing.T) {
 	assert.Empty(t, w.Result().Cookies())
 }
 
+// losesLastTo is the interleaving the bound must not misread: two unrelated writes win the first
+// two comparisons, and then last wins the third. The change refuses any session not holding
+// ceremony A, as a ceremony's writes do.
+type losesLastTo struct {
+	name string
+	last func(t *testing.T, store *ConditionalStore, backend *fakeBackend, cookie *http.Cookie, id string)
+	want error
+}
+
+var errNotCeremonyA = errors.New("the session no longer holds ceremony A")
+
+func onlyWhileCeremonyA(key string, value any) func(map[string]any) error {
+	return func(values map[string]any) error {
+		if values["ceremony"] != "A" {
+			return errNotCeremonyA
+		}
+		values[key] = value
+		return nil
+	}
+}
+
+var lastLosses = []losesLastTo{
+	{"the row removed", func(_ *testing.T, _ *ConditionalStore, backend *fakeBackend, _ *http.Cookie, id string) {
+		delete(backend.rows, id)
+	}, ErrNotFound},
+	{"a write the change refuses", func(t *testing.T, store *ConditionalStore, _ *fakeBackend, cookie *http.Cookie, _ string) {
+		anotherRequestWrites(t, store, cookie, "ceremony", "B")
+	}, errNotCeremonyA},
+}
+
+// What won the last comparison is answered as it would be had it won the first: a row removed is
+// ErrNotFound and a write the change refuses is the change's refusal, not the bounded loss to
+// unrelated writes, which the ceremony store would answer as a fault rather than as a replaced
+// ceremony (#579).
+func TestConditionalStore_ChangeAndSaveThatLosesLastAnswersWhatWon(t *testing.T) {
+	for _, tc := range lastLosses {
+		t.Run(tc.name, func(t *testing.T) {
+			backend := newFakeBackend()
+			store := newConditionalTestStore(backend)
+			cookie := saveNew(t, store.ServerSideStore, map[string]any{"ceremony": "A"})
+			id := decodeCookieId(t, store.ServerSideStore, cookie)
+
+			req, session := loadedRequest(t, store, cookie)
+			attempt := 0
+			backend.beforeConditional = func(string) {
+				attempt++
+				if attempt == conditionalAttempts {
+					tc.last(t, store, backend, cookie, id)
+					return
+				}
+				anotherRequestWrites(t, store, cookie, "counter", attempt)
+			}
+
+			w := httptest.NewRecorder()
+			err := store.ChangeAndSave(req, w, session, onlyWhileCeremonyA("locale", "pt-BR"))
+
+			require.ErrorIs(t, err, tc.want)
+			require.NotErrorIs(t, err, ErrChanged)
+			assert.Equal(t, conditionalAttempts, backend.conditionalUpdates)
+			if _, stored := backend.rows[id]; stored {
+				assert.NotContains(t, storedValues(t, store, backend, id), "locale")
+			}
+			assert.Empty(t, w.Result().Cookies())
+		})
+	}
+}
+
 func TestConditionalStore_ChangeAndSaveFailureIsReturnedAndSetsNoCookie(t *testing.T) {
 	backend := newFakeBackend()
 	store := newConditionalTestStore(backend)
@@ -442,6 +509,42 @@ func TestConditionalStore_ChangeAndRegenerateGivesUpAfterThreeAttempts(t *testin
 	assert.Equal(t, map[string]any{"ceremony": "A", "counter": 3}, storedValues(t, store, backend, oldId))
 	assert.Empty(t, w.Result().Cookies())
 	assert.Equal(t, oldId, session.ID)
+}
+
+// The rotation's twin of ChangeAndSaveThatLosesLastAnswersWhatWon: the third losing attempt's new
+// row is removed as every losing one is, and then what won is answered.
+func TestConditionalStore_ChangeAndRegenerateThatLosesLastAnswersWhatWon(t *testing.T) {
+	for _, tc := range lastLosses {
+		t.Run(tc.name, func(t *testing.T) {
+			backend := newFakeBackend()
+			store := newConditionalTestStore(backend)
+			cookie := saveNew(t, store.ServerSideStore, map[string]any{"ceremony": "A"})
+			oldId := decodeCookieId(t, store.ServerSideStore, cookie)
+
+			req, session := loadedRequest(t, store, cookie)
+			attempt := 0
+			backend.beforeConditional = func(string) {
+				attempt++
+				if attempt == conditionalAttempts {
+					tc.last(t, store, backend, cookie, oldId)
+					return
+				}
+				anotherRequestWrites(t, store, cookie, "counter", attempt)
+			}
+
+			w := httptest.NewRecorder()
+			err := store.ChangeAndRegenerate(w, req, session, onlyWhileCeremonyA("state", "password verified"))
+
+			require.ErrorIs(t, err, tc.want)
+			require.NotErrorIs(t, err, ErrChanged)
+			assert.Equal(t, conditionalAttempts, backend.conditionalDeletes)
+			for rowId := range backend.rows {
+				assert.Equal(t, oldId, rowId, "every losing attempt's new row is removed")
+			}
+			assert.Empty(t, w.Result().Cookies())
+			assert.Equal(t, oldId, session.ID)
+		})
+	}
 }
 
 // The order a rotation rests on (#266) holds for the conditional one: a failure before the

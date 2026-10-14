@@ -1109,6 +1109,113 @@ func TestConfirmCeremony(t *testing.T) {
 	})
 }
 
+// lastAttemptBackend is the in-memory backend with a turn for the test before every conditional
+// comparison, which is where another request of the browser can land between a step's fresh read
+// and its write. It records the rows it creates, so a case can say every losing rotation's row is
+// gone.
+type lastAttemptBackend struct {
+	*sessiontest.MemoryBackend
+	beforeConditional func(id string)
+	comparisons       int
+	createdIds        []string
+}
+
+func (b *lastAttemptBackend) Create(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
+	b.createdIds = append(b.createdIds, id)
+	return b.MemoryBackend.Create(ctx, id, data, authenticated)
+}
+
+func (b *lastAttemptBackend) UpdateIfUnchanged(ctx context.Context, id string, expected, data []byte, authenticated bool) (time.Time, error) {
+	b.comparisons++
+	b.beforeConditional(id)
+	return b.MemoryBackend.UpdateIfUnchanged(ctx, id, expected, data, authenticated)
+}
+
+func (b *lastAttemptBackend) DeleteIfUnchanged(ctx context.Context, id string, expected []byte) error {
+	b.comparisons++
+	b.beforeConditional(id)
+	return b.MemoryBackend.DeleteIfUnchanged(ctx, id, expected)
+}
+
+// A step's save, clear and rotation answer a replaced ceremony the same whichever comparison the
+// replacement wins: here the first two lose to unrelated writes of the same browser and the third
+// to another ceremony, to none, or to the row's removal. The answer is ErrCeremonyReplaced, not the
+// fault that losing every attempt to unrelated writes is, so the step answers the "no longer
+// active" page and sends nothing to the client (#579 decision 2).
+func TestStepWrites_ReplacedAtTheLastAttemptAnswerReplaced(t *testing.T) {
+	const lastAttempt = 3
+	for _, operation := range []string{"save", "clear", "rotate"} {
+		for _, replacement := range []string{"another ceremony", "no ceremony", "the row removed"} {
+			t.Run(operation+" finding "+replacement, func(t *testing.T) {
+				backend := &lastAttemptBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
+				store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionIdentifier, false,
+					sessionstore.PersistentCookie, sessionstore.KeyPair{
+						AuthenticationKey: []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+						EncryptionKey:     []byte("0123456789abcdef0123456789abcdef"),
+					}, nil)
+				require.NoError(t, err)
+				conditional, err := sessionstore.NewConditionalStore(store, backend)
+				require.NoError(t, err)
+				ceremonyStore := NewStore(conditional, realStoreSessionName)
+				cookies, stepReq, loaded := loadedStep(t, ceremonyStore)
+				oldId := sessionIdentifier(t, store, cookies[0])
+
+				backend.beforeConditional = func(id string) {
+					if backend.comparisons == lastAttempt && replacement == "the row removed" {
+						require.NoError(t, backend.Delete(context.Background(), id))
+						return
+					}
+					other := browserRequest(cookies)
+					sess, getErr := store.Get(other, realStoreSessionName)
+					require.NoError(t, getErr)
+					switch {
+					case backend.comparisons < lastAttempt:
+						sess.Values["unrelated"] = backend.comparisons
+					case replacement == "another ceremony":
+						sess.Values[sessionkeys.AuthContext] = authContextJSON(t,
+							&AuthContext{CeremonyId: ceremonyB, AuthState: AuthStateRequiresLevel1})
+					default:
+						delete(sess.Values, sessionkeys.AuthContext)
+					}
+					require.NoError(t, store.Save(other, httptest.NewRecorder(), sess))
+				}
+
+				rr := httptest.NewRecorder()
+				switch operation {
+				case "save":
+					loaded.AuthState = AuthStateLevel1Password
+					err = ceremonyStore.SaveAuthContext(rr, stepReq, loaded)
+				case "clear":
+					err = ceremonyStore.ClearAuthContext(rr, stepReq, ceremonyA)
+				case "rotate":
+					err = ceremonyStore.RegenerateSession(rr, stepReq, ceremonyA)
+				}
+
+				require.ErrorIs(t, err, ErrCeremonyReplaced)
+				assert.Equal(t, lastAttempt, backend.comparisons)
+				assert.Empty(t, rr.Result().Cookies(), "a step that wrote nothing tells the browser nothing")
+				for _, id := range backend.createdIds[1:] {
+					_, loadErr := backend.Load(context.Background(), id)
+					require.ErrorIs(t, loadErr, sessionstore.ErrNotFound, "every losing rotation's row is removed")
+				}
+				switch replacement {
+				case "the row removed":
+					_, loadErr := backend.Load(context.Background(), oldId)
+					require.ErrorIs(t, loadErr, sessionstore.ErrNotFound, "a gone session is not put back")
+				case "another ceremony":
+					stored, loadErr := ceremonyStore.GetAuthContext(browserRequest(cookies))
+					require.NoError(t, loadErr)
+					assert.Equal(t, ceremonyB, stored.CeremonyId, "the newer ceremony is what the browser session keeps")
+				default:
+					_, loadErr := ceremonyStore.GetAuthContext(browserRequest(cookies))
+					require.ErrorIs(t, loadErr, ErrNoAuthContext)
+					requireSessionDecoded(t, store, browserRequest(cookies))
+				}
+			})
+		}
+	}
+}
+
 // Held is the condition a write of this ceremony to the browser session is made on, for a writer
 // outside this package: /auth/completed's create arm hands it to the rotation that binds the new
 // user session (#579 decision 4).
