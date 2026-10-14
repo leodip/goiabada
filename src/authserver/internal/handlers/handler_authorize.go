@@ -350,7 +350,7 @@ func HandleAuthorizeGet(
 		}
 
 		// answerClientImmediately answers the client with an error now, whoever is at the browser.
-		// answerClientWithError clears the context before answering, and derives its own
+		// answerAuthorizeClientWithError clears the context before answering, and derives its own
 		// server_error fallback from this same input (#141).
 		answerClientImmediately := func(errorDetail *oauth.ErrorDetail) {
 			input := redirectErrorFromAuthContext(&authContext, client,
@@ -361,11 +361,11 @@ func HandleAuthorizeGet(
 			// and the emitter asks for itself.
 			input.redirectAlreadyWithheld = facts.redirectEmitted != nil && !*facts.redirectEmitted
 
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, input)
+			answerAuthorizeClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, input)
 		}
 
 		saveAndRedirect := func(path string) {
-			err := ceremonyStore.SaveAuthContext(w, r, &authContext)
+			err := ceremonyStore.ReplaceAuthContext(w, r, &authContext)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return
@@ -849,7 +849,7 @@ func decideAuthorizeRoute(f authorizeRouteFacts) (authorizeRoute, authorizeFact)
 // silent authentication is not possible, or goes on to issue a code silently.
 func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer, ceremonyStore CeremonyStore, userSessionManager UserSessionManager, database authorizeDatabase, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *record.Client, sessionIdentifier string, settings *record.Settings, baseURL string) {
 	// Helper to clear the auth context and then redirect with error. The clear-then-answer
-	// sequence and its server_error fallback live in answerClientWithError, which derives that
+	// sequence and its server_error fallback live in answerAuthorizeClientWithError, which derives that
 	// fallback from the input handed to it, so this path keeps answering from the stored ceremony
 	// exactly as it did when the sequence was written out here (#141).
 	//
@@ -857,7 +857,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 	// as "retry later" rather than "start an interactive login", which on a genuine server fault
 	// is the accurate instruction of the two.
 	redirectWithError := func(errorCode string, errorDescription string) {
-		answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+		answerAuthorizeClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
 			redirectErrorFromAuthContext(authContext, client, errorCode, errorDescription))
 	}
 
@@ -969,7 +969,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 
 	// Ready to issue code
 	authContext.AuthState = ceremony.AuthStateReadyToIssueCode
-	err = ceremonyStore.SaveAuthContext(w, r, authContext)
+	err = ceremonyStore.ReplaceAuthContext(w, r, authContext)
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 		return
@@ -1211,32 +1211,63 @@ func redirectErrorFromAuthContext(authContext *ceremony.AuthContext, client *rec
 }
 
 // answerClientWithError clears the auth context and then answers the client with an error, which
-// is the sequence every error response from an authorization ceremony owes.
+// is the sequence every error response from a step of an authorization ceremony owes. At
+// /auth/authorize it is answerAuthorizeClientWithError.
 //
 // The clear goes FIRST. ClearAuthContext persists the deletion through a Set-Cookie on w, and
 // redirToClientWithError commits the response in every response mode, so clearing afterwards
 // leaves the header on a response already written and the browser keeps an auth context it can
 // replay (#141).
 //
-// On a failed clear the client is owed an error response regardless: its redirect URI was
-// validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies, and RFC 6749 4.1.2.1 mints
-// server_error for exactly this condition (#141). The fallback is the caller's own input with its
-// code and description swapped, so each call site keeps the parameter source it built the input
+// The clear lands only while the browser session still holds this ceremony. When another
+// /auth/authorize has replaced it, or the session is gone, the clear writes nothing and the client
+// is not answered: the browser has abandoned this ceremony, and a client keeping one pending state
+// per browser could take this error as the answer to the newer request. The step answers the "no
+// longer active" page instead, as a request naming another ceremony is (#579 decision 2, #79
+// decision 5).
+//
+// On a clear that failed otherwise the client is owed an error response regardless: its redirect
+// URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies, and RFC 6749 4.1.2.1
+// mints server_error for exactly this condition (#141). The fallback is the caller's own input with
+// its code and description swapped, so each call site keeps the parameter source it built the input
 // from and neither has to restate it.
 func answerClientWithError(w http.ResponseWriter, r *http.Request, database authorizeDatabase,
+	pageRenderer PageRenderer, ceremonyStore CeremonyStore, templateFS fs.FS, ceremonyId string, input redirectErrorInput) {
+
+	err := ceremonyStore.ClearAuthContext(w, r, ceremonyId)
+	if errors.Is(err, ceremony.ErrCeremonyReplaced) {
+		answerCeremonyReplaced(pageRenderer, w, r)
+		return
+	}
+	answerClientAfterClear(w, r, database, pageRenderer, templateFS, input, err)
+}
+
+// answerAuthorizeClientWithError is answerClientWithError at /auth/authorize, which answers a request
+// it refused at once. There the clear has no ceremony to check, since this request starts one: it
+// ends whatever ceremony the browser held, as /auth/authorize's saves replace it, and writes nothing
+// for a browser with no stored session (#579 decision 6).
+func answerAuthorizeClientWithError(w http.ResponseWriter, r *http.Request, database authorizeDatabase,
 	pageRenderer PageRenderer, ceremonyStore CeremonyStore, templateFS fs.FS, input redirectErrorInput) {
 
-	err := ceremonyStore.ClearAuthContext(w, r)
-	if err != nil {
+	err := ceremonyStore.DiscardAuthContext(w, r)
+	answerClientAfterClear(w, r, database, pageRenderer, templateFS, input, err)
+}
+
+// answerClientAfterClear answers the client with input once the clear has run, or with server_error
+// when the clear failed.
+func answerClientAfterClear(w http.ResponseWriter, r *http.Request, database authorizeDatabase,
+	pageRenderer PageRenderer, templateFS fs.FS, input redirectErrorInput, clearErr error) {
+
+	if clearErr != nil {
 		// The clear failed, so Save wrote no cookie and the browser still holds the auth context.
 		slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
-			"error", err)
+			"error", clearErr)
 
 		fallback := input
 		fallback.code = "server_error"
 		fallback.description = "Internal server error"
 
-		err = redirToClientWithError(w, r, database, pageRenderer, templateFS, fallback)
+		err := redirToClientWithError(w, r, database, pageRenderer, templateFS, fallback)
 		if err != nil {
 			// Nowhere left to send the client, so the 500 is the last resort here.
 			pageRenderer.InternalServerError(w, r, err)
@@ -1244,7 +1275,7 @@ func answerClientWithError(w http.ResponseWriter, r *http.Request, database auth
 		return
 	}
 
-	err = redirToClientWithError(w, r, database, pageRenderer, templateFS, input)
+	err := redirToClientWithError(w, r, database, pageRenderer, templateFS, input)
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 		return

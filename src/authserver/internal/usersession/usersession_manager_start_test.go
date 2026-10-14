@@ -97,14 +97,15 @@ func (b *armableBackend) Create(ctx context.Context, id string, data []byte, aut
 }
 
 // startSessionMocks is the strict database mock and the real browser session store. The store is
-// the production ServerSideStore over an in-memory backend since #431: the manager's port names
-// Regenerate, which the generated sessionstore mock does not have, so what the sign-in wrote to
-// the browser is read back through the store with the cookies a browser would hold.
+// the production store over an in-memory backend since #431: the manager's port names a rotation,
+// which the generated sessionstore mock does not have, so what the sign-in wrote to the browser is
+// read back through the store with the cookies a browser would hold. It is the auth server's
+// ConditionalStore since #579, whose conditional rotation the manager binds the new session with.
 type startSessionMocks struct {
 	t       *testing.T
 	db      *datamocks.Database
 	backend *armableBackend
-	store   *sessionstore.ServerSideStore
+	store   *sessionstore.ConditionalStore
 	manager *Manager
 }
 
@@ -118,14 +119,16 @@ func newStartSessionMocks(t *testing.T) *startSessionMocks {
 			EncryptionKey:     []byte("0123456789abcdef0123456789abcdef"),
 		}, nil)
 	require.NoError(t, err)
+	conditional, err := sessionstore.NewConditionalStore(store, backend)
+	require.NoError(t, err)
 	return &startSessionMocks{
 		t:       t,
 		db:      db,
 		backend: backend,
-		store:   store,
+		store:   conditional,
 		manager: &Manager{
 			database:     db,
-			sessionStore: store,
+			sessionStore: conditional,
 			sessionName:  testSessionName,
 		},
 	}
@@ -904,8 +907,9 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 // and a rerun would write Set-Cookie twice -- so it is compensated, and these are the
 // tests for that.
 //
-// The write is the real store's Regenerate since #431, which the manager's port requires: there
-// is no Save arm left to cover, and a failure is reached by arming the backend under the store.
+// The write is the real store's rotation since #431, conditional since #579, which the manager's
+// port requires: there is no Save arm left to cover, and a failure is reached by arming the backend
+// under the store.
 // -----------------------------------------------------------------------------
 
 // The control for the compensation tests below: when the rotation succeeds there is nothing to
@@ -966,7 +970,7 @@ func TestStartNewUserSession_DeletesTheRowWhenTheRotationFails(t *testing.T) {
 // finding 9).
 //
 // net/http cancels a request's context the moment the client disconnects, and a disconnected
-// client is exactly why a browser-store write fails. So the two arrive together: Regenerate
+// client is exactly why a browser-store write fails. So the two arrive together: the rotation
 // reports a failure, and the DeleteUserSession that undoes the committed row is handed a context
 // that is already done. Before this, that left #198's orphan behind in precisely the case the
 // compensation was written for -- and only in that case, which is why every other test in this
@@ -1040,6 +1044,133 @@ func TestStartNewUserSession_WrapsSessionStoreReadError(t *testing.T) {
 
 	require.ErrorIs(t, err, errLoadRefused)
 	assert.Contains(t, err.Error(), "unable to get the session")
+}
+
+// The rotation that binds the new user session to the browser session is written on the caller's
+// condition, asked of the session as it is stored now (#579 decision 4). When the condition refuses,
+// the rotation writes nothing and the new user session is abandoned exactly as a failed rotation
+// abandons it: the committed row is deleted outside the transaction, the rows the sweep removed come
+// back to be audited, no cookie is set, and the caller is told the condition's refusal.
+func TestStartNewUserSession_ARotationTheConditionRefusesAbandonsTheNewSession(t *testing.T) {
+	m := newStartSessionMocks(t)
+	preSignIn := m.seed(map[string]any{"ceremony": "B"})
+	req := withCookies(newSessionRequest("192.168.1.50:54321", chromeUserAgent), preSignIn)
+	rr := httptest.NewRecorder()
+	creates := m.backend.creates
+	replaced := errors.New("the browser holds another ceremony")
+
+	m.expectPersistThroughCommit(123, []record.UserSession{
+		{Id: 42, SessionIdentifier: "an-older-session", IpAddress: "192.168.1.50", DeviceId: thisDeviceId},
+	})
+	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
+	m.db.On("DeleteUserSession", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil).Once()
+
+	authentication := authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant())
+	authentication.BrowserSessionCondition = func(values map[string]any) error {
+		if values["ceremony"] != "A" {
+			return replaced
+		}
+		return nil
+	}
+	result, removed, err := m.manager.StartNewUserSession(rr, req, 7, authentication, 0, nil, "192.168.1.50", nil, SessionLimits{})
+
+	require.ErrorIs(t, err, replaced)
+	assert.Nil(t, result)
+	assert.Equal(t, []int64{42}, removedIds(removed), "the sweep committed, so its removals are still reported")
+	assert.Empty(t, rr.Result().Cookies(), "no cookie names a session the ceremony abandoned, and no device cookie is written")
+	assert.Equal(t, creates, m.backend.creates, "no browser session row is written under a new identifier")
+
+	kept := m.readBack(preSignIn)
+	assert.False(t, kept.IsNew, "the browser's identifier still names its session")
+	assert.Equal(t, "B", kept.Values["ceremony"], "the session keeps what it holds")
+	assert.Nil(t, kept.Values[sessionkeys.SessionIdentifier], "no pointer to the abandoned user session is written")
+	m.db.AssertExpectations(t)
+}
+
+// The condition is asked of the session as it is stored now, not of the copy the request read when
+// it began, and the rotated session is built from the same fresh read: a value written by another
+// request of this browser in between is what the condition sees and what the new row keeps.
+func TestStartNewUserSession_TheConditionIsAskedOfTheSessionAsItIsStoredNow(t *testing.T) {
+	m := newStartSessionMocks(t)
+	preSignIn := m.seed(map[string]any{"ceremony": "A"})
+	req := withCookies(newSessionRequest("192.168.1.50:54321", chromeUserAgent), preSignIn)
+	_, err := m.store.Get(req, testSessionName)
+	require.NoError(t, err, "the request has read its session, as /auth/completed's has by this point")
+
+	other := withCookies(httptest.NewRequest("GET", "/", nil), preSignIn)
+	otherSess, err := m.store.Get(other, testSessionName)
+	require.NoError(t, err)
+	otherSess.Values["ceremony"] = "B"
+	require.NoError(t, m.store.Save(other, httptest.NewRecorder(), otherSess))
+
+	m.expectPersistThroughCommit(123, nil)
+	m.db.On("DeleteUserSession", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil).Once()
+
+	var seen any
+	authentication := authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant())
+	authentication.BrowserSessionCondition = func(values map[string]any) error {
+		seen = values["ceremony"]
+		if seen != "A" {
+			return errCeremonyReplacedForTest
+		}
+		return nil
+	}
+	rr := httptest.NewRecorder()
+	result, _, err := m.manager.StartNewUserSession(rr, req, 7, authentication, 0, nil, "192.168.1.50", nil, SessionLimits{})
+
+	require.ErrorIs(t, err, errCeremonyReplacedForTest)
+	assert.Nil(t, result)
+	assert.Equal(t, "B", seen, "the condition is handed the values stored now")
+	assert.Empty(t, sessionCookiesOf(rr))
+	assert.Equal(t, "B", m.readBack(preSignIn).Values["ceremony"], "the newer write is not put back over")
+}
+
+// errCeremonyReplacedForTest is a condition's refusal, told apart from any other error.
+var errCeremonyReplacedForTest = errors.New("the browser session no longer holds this ceremony")
+
+// A browser session gone between the request's read and the rotation is not re-created under a new
+// name: the rotation answers sessionstore.ErrNotFound, which the caller reads as a ceremony the
+// browser no longer holds, and the new user session is abandoned as on any failed rotation (#579
+// decision 3).
+func TestStartNewUserSession_ABrowserSessionGoneBeforeTheRotationIsNotRecreated(t *testing.T) {
+	m := newStartSessionMocks(t)
+	preSignIn := m.seed(map[string]any{"ceremony": "A"})
+	req := withCookies(newSessionRequest("192.168.1.50:54321", chromeUserAgent), preSignIn)
+	_, err := m.store.Get(req, testSessionName)
+	require.NoError(t, err)
+	require.NoError(t, m.backend.Delete(context.Background(), m.identifier(preSignIn[0])))
+	creates := m.backend.creates
+
+	m.expectPersistThroughCommit(123, nil)
+	m.db.On("DeleteUserSession", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil).Once()
+
+	rr := httptest.NewRecorder()
+	result, _, err := m.manager.StartNewUserSession(rr, req, 7,
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, SessionLimits{})
+
+	require.ErrorIs(t, err, sessionstore.ErrNotFound)
+	assert.Nil(t, result)
+	assert.Empty(t, rr.Result().Cookies())
+	assert.Equal(t, creates, m.backend.creates, "the request's own copy is not put back under a new name")
+	m.db.AssertExpectations(t)
+}
+
+// No session is created without the condition its rotation is written on: a sign-in that could bind
+// itself to whatever the browser session holds is the write #579 removes, one broken caller away.
+func TestStartNewUserSession_RefusesAMissingBrowserSessionCondition(t *testing.T) {
+	m := newStartSessionMocks(t)
+	rr := httptest.NewRecorder()
+	authentication := authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant())
+	authentication.BrowserSessionCondition = nil
+
+	result, removed, err := m.manager.StartNewUserSession(rr, newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
+		authentication, 0, nil, "192.168.1.50", nil, SessionLimits{})
+
+	require.ErrorContains(t, err, "no browser session condition")
+	assert.Nil(t, result)
+	assert.Empty(t, removed)
+	assert.Empty(t, rr.Result().Cookies())
+	m.db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 }
 
 // =============================================================================
@@ -1245,5 +1376,10 @@ func TestStartNewUserSession_RefusesAMissingCredentialInstant(t *testing.T) {
 // authenticationOf is a sign-in by userId with a password and nothing after it, so the credential
 // instant is the password's too.
 func authenticationOf(userId int64, methods string, acr record.AcrLevel, at *time.Time) Authentication {
-	return Authentication{UserId: userId, AuthMethods: methods, AcrLevel: acr, AuthTime: at, PasswordAuthTime: at}
+	return Authentication{UserId: userId, AuthMethods: methods, AcrLevel: acr, AuthTime: at, PasswordAuthTime: at,
+		BrowserSessionCondition: anyBrowserSession}
 }
+
+// anyBrowserSession is the browser-session condition of the tests that are not about it: whatever
+// the session holds, the rotation is written. /auth/completed passes ceremony.Held.
+func anyBrowserSession(map[string]any) error { return nil }

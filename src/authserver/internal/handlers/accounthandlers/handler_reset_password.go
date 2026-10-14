@@ -11,7 +11,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/sessionstore"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
@@ -249,7 +248,7 @@ type resetPasswordDatabase interface {
 // link simply fails. Resolving the hash is what keeps that true (#112, #266).
 //
 // Returns (nil, nil) when the request was refused, having already audited and responded.
-func resolveResetPasswordMarker(pageRenderer PageRenderer, httpSession sessionstore.Store,
+func resolveResetPasswordMarker(pageRenderer PageRenderer, httpSession linkMarkerSessionStore,
 	database resetPasswordDatabase, auditLogger AuditLogger, w http.ResponseWriter, r *http.Request,
 	httpStatus int) (*emaillinks.LinkMarker, *record.User) {
 
@@ -296,7 +295,7 @@ func resolveResetPasswordMarker(pageRenderer PageRenderer, httpSession sessionst
 // unreserved, so there is no encoding step left to get wrong.
 func HandleResetPasswordGet(
 	pageRenderer PageRenderer,
-	httpSession sessionstore.Store,
+	httpSession linkMarkerSessionStore,
 	database resetPasswordDatabase,
 	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,
@@ -334,7 +333,7 @@ func HandleResetPasswordGet(
 // previewer that prefetches the URL therefore writes a marker into its own throwaway cookie
 // jar and leaves the code usable for the real user; consuming here would let any prefetching
 // gateway burn the code before the user ever saw the message.
-func handleResetPasswordLinkFollowed(pageRenderer PageRenderer, httpSession sessionstore.Store,
+func handleResetPasswordLinkFollowed(pageRenderer PageRenderer, httpSession linkMarkerSessionStore,
 	database resetPasswordDatabase, auditLogger AuditLogger, dataCipher *encryption.DataCipher,
 	w http.ResponseWriter, r *http.Request, code string) {
 
@@ -410,7 +409,7 @@ func handleResetPasswordLinkFollowed(pageRenderer PageRenderer, httpSession sess
 
 func HandleResetPasswordPost(
 	pageRenderer PageRenderer,
-	httpSession sessionstore.Store,
+	httpSession linkMarkerSessionStore,
 	database resetPasswordDatabase,
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
@@ -582,7 +581,7 @@ func HandleResetPasswordPost(
 		// A failure here is logged rather than answered with a 500, because the password has
 		// already changed and telling the caller the reset failed would be false. The stale
 		// marker it leaves behind resolves to nothing on its next use.
-		if clearLinkMarkerErr := emaillinks.ClearLinkMarker(httpSession, w, r); clearLinkMarkerErr != nil {
+		if clearLinkMarkerErr := emaillinks.ClearLinkMarker(httpSession, w, r, marker.ContinuationId); clearLinkMarkerErr != nil {
 			slog.ErrorContext(r.Context(), "unable to clear the reset password link marker after a completed reset",
 				"user_id", user.Id, "error", clearLinkMarkerErr)
 		}

@@ -89,7 +89,7 @@ func HandleAuthLevel2Get(
 		authContext.AuthState = nextState
 		err = ceremonyStore.SaveAuthContext(w, r, authContext)
 		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
+			answerStepSaveFailure(pageRenderer, w, r, err)
 			return
 		}
 		//nolint:gosec // G710: nextPath is one of decideLevel2Arm's two constant routes, under the configured base URL

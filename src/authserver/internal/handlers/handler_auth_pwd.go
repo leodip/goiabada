@@ -291,14 +291,20 @@ func HandleAuthPwdPost(
 		// planted identifier naming a row that IS password-completed, which is exactly the
 		// state the attacker needs. Same ordering, and the same reason, as the step-up arm
 		// in handler_auth_completed.
-		if regenerateSessionErr := ceremonyStore.RegenerateSession(w, r); regenerateSessionErr != nil {
-			pageRenderer.InternalServerError(w, r, regenerateSessionErr)
+		//
+		// The rotation lands only while the browser session still holds this ceremony, and builds
+		// the new row from the session as it is stored now rather than from this request's copy,
+		// which would put a ceremony another tab's /auth/authorize has replaced back over the
+		// newer one. One that finds it replaced, or the session gone, writes nothing and answers
+		// the "no longer active" page (#579).
+		if regenerateSessionErr := ceremonyStore.RegenerateSession(w, r, authContext.CeremonyId); regenerateSessionErr != nil {
+			answerStepSaveFailure(pageRenderer, w, r, regenerateSessionErr)
 			return
 		}
 
 		err = ceremonyStore.SaveAuthContext(w, r, authContext)
 		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
+			answerStepSaveFailure(pageRenderer, w, r, err)
 			return
 		}
 		http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level1completed", authContext), http.StatusFound)

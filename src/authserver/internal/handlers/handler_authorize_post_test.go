@@ -349,7 +349,7 @@ func TestHandleAuthorizeGet_ARequestHandleRunsTheCeremonyFromTheParkedRequest(t 
 	var direct, replayed ceremony.AuthContext
 	capture := func(into *ceremony.AuthContext) func(*testing.T, *authorizeEndpoint) {
 		return func(t *testing.T, e *authorizeEndpoint) {
-			e.ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			e.ceremonyStore.On("ReplaceAuthContext", mock.Anything, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 				*into = *ac
 				return true
 			})).Return(nil).Once()
@@ -410,7 +410,7 @@ func TestHandleAuthorizeGet_ARequestHandleBesideAnotherParameterIsRefused(t *tes
 	t.Run("a parameter the endpoint does not read is ignored", func(t *testing.T) {
 		e := newBoundedAuthorizeEndpoint(t)
 		e.stubLoggedOutBrowser()
-		e.ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		e.ceremonyStore.On("ReplaceAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		e.consumes(parkedHandle, url.Values{
 			"client_id": {"test-client"}, "redirect_uri": {"https://example.com"}, "response_type": {"code"}, "scope": {"openid"},
 		}, true)

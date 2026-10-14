@@ -273,6 +273,100 @@ func (d *Database) DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, 
 	return nil
 }
 
+// UpdateBrowserSessionDataIfUnchanged is UpdateBrowserSessionData on condition that the row's
+// data is still expectedData, the value the store's fresh read returned (#579).
+//
+// The condition compares the ciphertext, and that is exact on every engine: the column's
+// collation is utf8mb4_0900_as_cs on MySQL and Latin1_General_100_CS_AS_KS_WS_SC_UTF8 on SQL
+// Server, the deterministic default on PostgreSQL and BINARY on SQLite. The value is the store's
+// base64url, so it carries no trailing space for SQL Server's padding rule to ignore. Every
+// content write seals with a fresh nonce, so any write in between changes the value; a touch
+// writes no data, so it never makes this lose.
+//
+// RowsAffected counts as UpdateBrowserSessionData says, and for the same reason it cannot report
+// a matched row as unchanged on MySQL: the data written is freshly sealed.
+func (d *Database) UpdateBrowserSessionDataIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIdHash,
+	expectedData, data string, now, expiresAt time.Time) (bool, error) {
+
+	if owner == "" {
+		return false, errs.New("can't update a browser session with an empty owner")
+	}
+
+	if sessionIdHash == "" {
+		return false, errs.New("can't update a browser session with an empty session id hash")
+	}
+
+	ub := sqlbuilder.NewUpdateBuilder()
+	ub.Update("browser_sessions")
+	ub.Set(
+		ub.Assign("data", data),
+		ub.Assign("last_accessed", now),
+		ub.Assign("expires_at", expiresAt),
+		ub.Assign("updated_at", now),
+	)
+	ub.Where(
+		ub.Equal("owner", owner),
+		ub.Equal("session_id_hash", sessionIdHash),
+		ub.Equal("data", expectedData),
+		ub.GreaterThan("expires_at", now),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to update browser session data")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errs.Wrap(err, "unable to get rows affected when updating browser session data")
+	}
+
+	return rowsAffected == 1, nil
+}
+
+// DeleteBrowserSessionIfUnchanged removes one live session on condition that its data is still
+// expectedData, and reports whether it did. It is the half of a rotation that removes the row the
+// rotation read: when another write landed since, the row is kept and the rotation tries again
+// (#579). Unlike DeleteBrowserSession it carries the expires_at > now term, because the caller
+// is asking whether the live session it read is the one removed, and an expired row is no such
+// session; the reaper removes it.
+func (d *Database) DeleteBrowserSessionIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIdHash,
+	expectedData string, now time.Time) (bool, error) {
+
+	if owner == "" {
+		return false, errs.New("can't delete a browser session with an empty owner")
+	}
+
+	if sessionIdHash == "" {
+		return false, errs.New("can't delete a browser session with an empty session id hash")
+	}
+
+	browserSessionStruct := sqlbuilder.NewStruct(new(record.BrowserSession)).
+		For(d.Flavor)
+
+	deleteBuilder := browserSessionStruct.DeleteFrom("browser_sessions")
+	deleteBuilder.Where(
+		deleteBuilder.Equal("owner", owner),
+		deleteBuilder.Equal("session_id_hash", sessionIdHash),
+		deleteBuilder.Equal("data", expectedData),
+		deleteBuilder.GreaterThan("expires_at", now),
+	)
+
+	query, args := deleteBuilder.Build()
+	result, err := d.ExecSQL(ctx, tx, query, args...)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to delete browser session")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errs.Wrap(err, "unable to get rows affected when deleting browser session")
+	}
+
+	return rowsAffected == 1, nil
+}
+
 // DeleteExpiredBrowserSessions reaps on expires_at alone, across both owners. Every row
 // it removes was already unusable, by the expires_at > now term the read and both
 // conditional updates carry; this is what stops the table growing rather than what makes

@@ -342,12 +342,18 @@ func (s *ServerSideStore) openWithEither(pick func(*sealer) cipher.AEAD, name, v
 // blob and a ceiling enforced on one path is not a ceiling. It is applied to the sealed
 // length, which is what the backend and the wire actually carry.
 func (s *ServerSideStore) sealSessionData(session *Session) (string, error) {
+	return s.sealValues(session.Name(), session.Values)
+}
+
+// sealValues is sealSessionData for values that are not yet a session's: what a conditional
+// write builds from a fresh read before it knows the write will land.
+func (s *ServerSideStore) sealValues(name string, values map[string]any) (string, error) {
 	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(session.Values); err != nil {
+	if err := gob.NewEncoder(&buf).Encode(values); err != nil {
 		return "", errs.Wrap(err, "unable to encode the browser session")
 	}
 
-	encoded, err := seal(s.random, s.current.data, session.Name(), buf.Bytes())
+	encoded, err := seal(s.random, s.current.data, name, buf.Bytes())
 	if err != nil {
 		return "", errs.Wrap(err, "unable to encode the browser session")
 	}
@@ -359,6 +365,22 @@ func (s *ServerSideStore) sealSessionData(session *Session) (string, error) {
 	}
 
 	return encoded, nil
+}
+
+// openSessionData opens and decodes a stored blob, the reverse of sealValues. The map is never
+// nil, which is the contract NewSession gives every caller of Values.
+func (s *ServerSideStore) openSessionData(name string, data []byte) (map[string]any, error) {
+	plaintext, err := s.openWithEither(func(sl *sealer) cipher.AEAD { return sl.data }, name, string(data))
+	if err != nil {
+		return nil, err
+	}
+
+	values := make(map[string]any)
+	//nolint:gosec // G709: plaintext is what the AEAD just authenticated under this deployment's key, so only this store can have written it
+	if err := gob.NewDecoder(bytes.NewReader(plaintext)).Decode(&values); err != nil {
+		return nil, errs.Wrap(err, "unable to decode the browser session")
+	}
+	return values, nil
 }
 
 // CookieName is the name the cookie physically carries, which is not the name callers
@@ -467,19 +489,13 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*Session, error) {
 		return session, errs.Wrap(err, "unable to load the browser session")
 	}
 
-	plaintext, err := s.openWithEither(
-		func(sl *sealer) cipher.AEAD { return sl.data }, name, string(record.Data))
+	values, err := s.openSessionData(name, record.Data)
 	if err != nil {
 		slog.WarnContext(requestContext(r), "stored browser session data did not decode, starting a fresh session",
 			"error", err, "session_name", name)
 		return session, nil
 	}
-
-	if err := gob.NewDecoder(bytes.NewReader(plaintext)).Decode(&session.Values); err != nil {
-		slog.WarnContext(requestContext(r), "stored browser session data did not decode, starting a fresh session",
-			"error", err, "session_name", name)
-		return session, nil
-	}
+	session.Values = values
 
 	session.ID = id
 	session.IsNew = false
@@ -680,7 +696,11 @@ func (s *ServerSideStore) buildCookie(logicalName, value string, options *Option
 // see inside the blob; what it produces is a boolean about the container, not about the
 // contents, which is why it can cross a module boundary without telling anyone anything.
 func (s *ServerSideStore) isAuthenticated(session *Session) bool {
-	value, ok := session.Values[s.authenticatedKey]
+	return s.valuesAreAuthenticated(session.Values)
+}
+
+func (s *ServerSideStore) valuesAreAuthenticated(values map[string]any) bool {
+	value, ok := values[s.authenticatedKey]
 	if !ok || value == nil {
 		return false
 	}

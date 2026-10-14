@@ -224,7 +224,7 @@ func HandleIssueGet(
 			// now, so it is recorded against the ceremony's user (#499 decisions 7 and 9).
 			auditLogger.Log(r.Context(), audit.EventAdministrativeScopeRefused,
 				administrativeScopeRefusedDetails(issuingClient, facts.refusedAdministrativeScopes, "issue", authContext.UserId))
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext, issuingClient, "invalid_scope",
 					protocolvalidation.AdministrativeScopeRefusal(facts.refusedAdministrativeScopes).Description()))
 
@@ -234,7 +234,7 @@ func HandleIssueGet(
 			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
 				"user_id": facts.user.Id,
 			})
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext, issuingClient, "access_denied", userDisabledDescription))
 
 		case issuanceRefuseHintMismatch:
@@ -242,7 +242,7 @@ func HandleIssueGet(
 			// resolved ahead of the dispatch (#108). The registration gate already loaded it and
 			// refused a nil, so issuingClient is that client rather than a clientProvenance call
 			// of its own.
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext, issuingClient, oidc.ErrorLoginRequired,
 					"The authenticated user does not match the id_token_hint"))
 
@@ -266,7 +266,7 @@ func HandleIssueGet(
 
 			// The wording and the error code are /auth/completed's for the same condition,
 			// arriving later: the same removal gets one answer wherever it lands.
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext, issuingClient, "access_denied",
 					"The user is not authorized to access any of the requested scopes"))
 
@@ -590,8 +590,14 @@ func refuseIssuanceUnregisteredRedirect(
 
 	// The clear goes FIRST, the order every refusal in this handler uses: ClearAuthContext persists
 	// the deletion through a Set-Cookie on w, and the render below commits the response, so
-	// clearing afterwards leaves the header on a response already written (#141).
-	err := ceremonyStore.ClearAuthContext(w, r)
+	// clearing afterwards leaves the header on a response already written (#141). A ceremony the
+	// browser has replaced since is answered as every replaced step is, on the "no longer active"
+	// page, so one condition keeps one page wherever it fires (#579 decision 2).
+	err := ceremonyStore.ClearAuthContext(w, r, authContext.CeremonyId)
+	if errors.Is(err, ceremony.ErrCeremonyReplaced) {
+		answerCeremonyReplaced(pageRenderer, w, r)
+		return
+	}
 	if err != nil {
 		// This is the ONE refusal in the file whose fallback is not "answer the client with
 		// server_error", and so the one that does not go through answerClientWithError. Answering
@@ -639,8 +645,13 @@ func refuseIssuanceClientDisabled(
 	// The clear goes FIRST, the order every refusal in this handler uses (#141). Its failure does not
 	// change the answer, for the reason refuseIssuanceUnregisteredRedirect gives: the page reaches no
 	// client, and a replay of the context that stays behind comes back to this gate and is refused
-	// again for as long as the client stays disabled.
-	err := ceremonyStore.ClearAuthContext(w, r)
+	// again for as long as the client stays disabled. A ceremony the browser has replaced since is
+	// answered on the "no longer active" page, as there (#579 decision 2).
+	err := ceremonyStore.ClearAuthContext(w, r, authContext.CeremonyId)
+	if errors.Is(err, ceremony.ErrCeremonyReplaced) {
+		answerCeremonyReplaced(pageRenderer, w, r)
+		return
+	}
 	if err != nil {
 		slog.ErrorContext(r.Context(), "unable to clear the auth context while refusing a disabled client, rendering the refusal anyway",
 			"error", err)
@@ -669,7 +680,7 @@ func refuseIssuanceFlowDisabled(
 		"client_identifier", authContext.ClientId,
 		"response_type", authContext.ResponseType)
 
-	answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+	answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
 		redirectErrorFromAuthContext(authContext, issuingClient, "unauthorized_client", description))
 }
 
@@ -752,9 +763,13 @@ func issueAuthorizationCodeGrant(
 	// worker's code sweep deletes the orphaned row once it is past its grace cutoff. Clearing before
 	// minting would strand the user on a transient mint fault where a reload now retries (#248 part
 	// 6, #436).
-	err = ceremonyStore.ClearAuthContext(w, r)
+	//
+	// A clear that finds the ceremony replaced by another /auth/authorize since this request loaded
+	// it answers the "no longer active" page, and the code is not delivered: it is left exactly as
+	// the failed clear leaves it, held by nobody until the sweep (#579 decision 2).
+	err = ceremonyStore.ClearAuthContext(w, r, authContext.CeremonyId)
 	if err != nil {
-		pageRenderer.InternalServerError(w, r, err)
+		answerStepSaveFailure(pageRenderer, w, r, err)
 		return
 	}
 	err = issueAuthCode(w, r, templateFS, code, authContext.ResponseMode)
@@ -903,7 +918,7 @@ func refuseIssuanceUnusableSession(
 		// Provenance is resolved before the dispatch, for the same reason as at the id_token_hint
 		// refusal (#108). The registration gate at the top of the handler loaded the client and
 		// refused a nil, so issuingClient is it.
-		answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+		answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
 			redirectErrorFromAuthContext(authContext, issuingClient, oidc.ErrorLoginRequired,
 				"User authentication is required"))
 		return
@@ -934,7 +949,7 @@ func refuseIssuanceUnusableSession(
 	authContext.Restart()
 	err := ceremonyStore.SaveAuthContext(w, r, authContext)
 	if err != nil {
-		pageRenderer.InternalServerError(w, r, err)
+		answerStepSaveFailure(pageRenderer, w, r, err)
 		return
 	}
 	http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level1", authContext), http.StatusFound)
@@ -1036,10 +1051,12 @@ func issueImplicitGrant(
 	})
 	tokenMetrics.Issued(oidc.GrantTypeImplicit)
 
-	// Clear auth context
-	err = ceremonyStore.ClearAuthContext(w, r)
+	// Clear auth context. A ceremony replaced by another /auth/authorize since this request loaded
+	// it is answered on the "no longer active" page, and the tokens just signed are not delivered
+	// (#579 decision 2).
+	err = ceremonyStore.ClearAuthContext(w, r, authContext.CeremonyId)
 	if err != nil {
-		pageRenderer.InternalServerError(w, r, err)
+		answerStepSaveFailure(pageRenderer, w, r, err)
 		return
 	}
 

@@ -2974,6 +2974,96 @@ func (_c *Database_DeleteBrowserSession_Call) RunAndReturn(run func(ctx context.
 	return _c
 }
 
+// DeleteBrowserSessionIfUnchanged provides a mock function for the type Database
+func (_mock *Database) DeleteBrowserSessionIfUnchanged(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, expectedData string, now time.Time) (bool, error) {
+	ret := _mock.Called(ctx, tx, owner, sessionIdHash, expectedData, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteBrowserSessionIfUnchanged")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, string, string, time.Time) (bool, error)); ok {
+		return returnFunc(ctx, tx, owner, sessionIdHash, expectedData, now)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, string, string, time.Time) bool); ok {
+		r0 = returnFunc(ctx, tx, owner, sessionIdHash, expectedData, now)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string, string, string, time.Time) error); ok {
+		r1 = returnFunc(ctx, tx, owner, sessionIdHash, expectedData, now)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_DeleteBrowserSessionIfUnchanged_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteBrowserSessionIfUnchanged'
+type Database_DeleteBrowserSessionIfUnchanged_Call struct {
+	*mock.Call
+}
+
+// DeleteBrowserSessionIfUnchanged is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - owner string
+//   - sessionIdHash string
+//   - expectedData string
+//   - now time.Time
+func (_e *Database_Expecter) DeleteBrowserSessionIfUnchanged(ctx any, tx any, owner any, sessionIdHash any, expectedData any, now any) *Database_DeleteBrowserSessionIfUnchanged_Call {
+	return &Database_DeleteBrowserSessionIfUnchanged_Call{Call: _e.mock.On("DeleteBrowserSessionIfUnchanged", ctx, tx, owner, sessionIdHash, expectedData, now)}
+}
+
+func (_c *Database_DeleteBrowserSessionIfUnchanged_Call) Run(run func(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, expectedData string, now time.Time)) *Database_DeleteBrowserSessionIfUnchanged_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
+		var arg5 time.Time
+		if args[5] != nil {
+			arg5 = args[5].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteBrowserSessionIfUnchanged_Call) Return(b bool, err error) *Database_DeleteBrowserSessionIfUnchanged_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_DeleteBrowserSessionIfUnchanged_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, expectedData string, now time.Time) (bool, error)) *Database_DeleteBrowserSessionIfUnchanged_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteClient provides a mock function for the type Database
 func (_mock *Database) DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error {
 	ret := _mock.Called(ctx, tx, clientId)
@@ -15073,6 +15163,108 @@ func (_c *Database_UpdateBrowserSessionData_Call) Return(b bool, err error) *Dat
 }
 
 func (_c *Database_UpdateBrowserSessionData_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, data string, now time.Time, expiresAt time.Time) (bool, error)) *Database_UpdateBrowserSessionData_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateBrowserSessionDataIfUnchanged provides a mock function for the type Database
+func (_mock *Database) UpdateBrowserSessionDataIfUnchanged(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, expectedData string, data string, now time.Time, expiresAt time.Time) (bool, error) {
+	ret := _mock.Called(ctx, tx, owner, sessionIdHash, expectedData, data, now, expiresAt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateBrowserSessionDataIfUnchanged")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, string, string, string, time.Time, time.Time) (bool, error)); ok {
+		return returnFunc(ctx, tx, owner, sessionIdHash, expectedData, data, now, expiresAt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, string, string, string, time.Time, time.Time) bool); ok {
+		r0 = returnFunc(ctx, tx, owner, sessionIdHash, expectedData, data, now, expiresAt)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string, string, string, string, time.Time, time.Time) error); ok {
+		r1 = returnFunc(ctx, tx, owner, sessionIdHash, expectedData, data, now, expiresAt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_UpdateBrowserSessionDataIfUnchanged_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateBrowserSessionDataIfUnchanged'
+type Database_UpdateBrowserSessionDataIfUnchanged_Call struct {
+	*mock.Call
+}
+
+// UpdateBrowserSessionDataIfUnchanged is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - owner string
+//   - sessionIdHash string
+//   - expectedData string
+//   - data string
+//   - now time.Time
+//   - expiresAt time.Time
+func (_e *Database_Expecter) UpdateBrowserSessionDataIfUnchanged(ctx any, tx any, owner any, sessionIdHash any, expectedData any, data any, now any, expiresAt any) *Database_UpdateBrowserSessionDataIfUnchanged_Call {
+	return &Database_UpdateBrowserSessionDataIfUnchanged_Call{Call: _e.mock.On("UpdateBrowserSessionDataIfUnchanged", ctx, tx, owner, sessionIdHash, expectedData, data, now, expiresAt)}
+}
+
+func (_c *Database_UpdateBrowserSessionDataIfUnchanged_Call) Run(run func(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, expectedData string, data string, now time.Time, expiresAt time.Time)) *Database_UpdateBrowserSessionDataIfUnchanged_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
+		var arg5 string
+		if args[5] != nil {
+			arg5 = args[5].(string)
+		}
+		var arg6 time.Time
+		if args[6] != nil {
+			arg6 = args[6].(time.Time)
+		}
+		var arg7 time.Time
+		if args[7] != nil {
+			arg7 = args[7].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+			arg7,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_UpdateBrowserSessionDataIfUnchanged_Call) Return(b bool, err error) *Database_UpdateBrowserSessionDataIfUnchanged_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_UpdateBrowserSessionDataIfUnchanged_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, expectedData string, data string, now time.Time, expiresAt time.Time) (bool, error)) *Database_UpdateBrowserSessionDataIfUnchanged_Call {
 	_c.Call.Return(run)
 	return _c
 }

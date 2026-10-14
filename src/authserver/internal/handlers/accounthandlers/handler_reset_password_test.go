@@ -24,9 +24,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/hashutil"
-	"github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
 // The address httptest.NewRequest gives every request, which is what the audit entry now
@@ -135,7 +133,7 @@ func postResetRequest(password, passwordConfirmation, continuationId string) *ht
 // continuation id the form rendered from that marker would have carried. Built together
 // because the id only exists once the marker does, which is exactly the coupling the check
 // enforces at runtime.
-func postWithMarker(t *testing.T, store sessionstore.Store, password, passwordConfirmation string,
+func postWithMarker(t *testing.T, store *sessionstore.ConditionalStore, password, passwordConfirmation string,
 	flow emaillinks.LinkMarkerFlow, id int64, codeHash string) *http.Request {
 	t.Helper()
 
@@ -190,7 +188,7 @@ func postResetWithCredentialsInQuery(password, passwordConfirmation, continuatio
 // handler would never have rendered: the gate must still refuse it, because a marker supplied
 // by a URL is not a submission and reading one from a URL reintroduces the shape #201 removed
 // from the reset link, one indirection later (#202, decision 3).
-func postWithMarkerContinuationInQuery(t *testing.T, store sessionstore.Store,
+func postWithMarkerContinuationInQuery(t *testing.T, store *sessionstore.ConditionalStore,
 	password, passwordConfirmation string, flow emaillinks.LinkMarkerFlow, id int64, codeHash string) *http.Request {
 	t.Helper()
 
@@ -591,21 +589,21 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 	// Each of these is audited under the reason emaillinks.GetLinkMarker itself reported, so the audit
 	// vocabulary and the control flow cannot drift apart.
 	t.Run("no marker at all", func(t *testing.T) {
-		assertCleanGetRefused(t, string(emaillinks.LinkMarkerMissing), func(t *testing.T, store sessionstore.Store,
+		assertCleanGetRefused(t, string(emaillinks.LinkMarkerMissing), func(t *testing.T, store *sessionstore.ConditionalStore,
 			database *datamocks.Database) *http.Request {
 			return resetCleanGetRequest()
 		})
 	})
 
 	t.Run("a marker left by the activation flow", func(t *testing.T) {
-		assertCleanGetRefused(t, string(emaillinks.LinkMarkerWrongFlow), func(t *testing.T, store sessionstore.Store,
+		assertCleanGetRefused(t, string(emaillinks.LinkMarkerWrongFlow), func(t *testing.T, store *sessionstore.ConditionalStore,
 			database *datamocks.Database) *http.Request {
 			return withMarker(t, store, resetCleanGetRequest(), emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash)
 		})
 	})
 
 	t.Run("a marker past its window", func(t *testing.T) {
-		assertCleanGetRefused(t, string(emaillinks.LinkMarkerExpired), func(t *testing.T, store sessionstore.Store,
+		assertCleanGetRefused(t, string(emaillinks.LinkMarkerExpired), func(t *testing.T, store *sessionstore.ConditionalStore,
 			database *datamocks.Database) *http.Request {
 			return withRawMarker(t, store, resetCleanGetRequest(),
 				expiredMarkerJSON(t, emaillinks.LinkMarkerFlowResetPassword, 1, codeHash))
@@ -616,7 +614,7 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 	// no longer outstanding. That is what a captured cookie looks like after the reset
 	// completed, after a newer code was issued, or after any other password change.
 	t.Run("a live marker whose hash no longer resolves", func(t *testing.T) {
-		assertCleanGetRefused(t, auditReasonCodeNoLongerOutstanding, func(t *testing.T, store sessionstore.Store,
+		assertCleanGetRefused(t, auditReasonCodeNoLongerOutstanding, func(t *testing.T, store *sessionstore.ConditionalStore,
 			database *datamocks.Database) *http.Request {
 			database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 				Return(nil, nil).Once()
@@ -626,7 +624,7 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 }
 
 func assertCleanGetRefused(t *testing.T, wantReason string,
-	arrange func(t *testing.T, store sessionstore.Store, database *datamocks.Database) *http.Request) {
+	arrange func(t *testing.T, store *sessionstore.ConditionalStore, database *datamocks.Database) *http.Request) {
 	t.Helper()
 
 	pageRenderer := handlersmocks.NewPageRenderer(t)
@@ -802,19 +800,19 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 		// is compared once the submission is known to be a password worth setting, while the
 		// marker itself is resolved before the password is read.
 		validated bool
-		arrange   func(t *testing.T, store sessionstore.Store, database *datamocks.Database) *http.Request
+		arrange   func(t *testing.T, store *sessionstore.ConditionalStore, database *datamocks.Database) *http.Request
 	}{
 		{
 			name:       "no marker at all",
 			wantReason: string(emaillinks.LinkMarkerMissing),
-			arrange: func(t *testing.T, store sessionstore.Store, database *datamocks.Database) *http.Request {
+			arrange: func(t *testing.T, store *sessionstore.ConditionalStore, database *datamocks.Database) *http.Request {
 				return postResetRequest(newPassword, newPassword, "")
 			},
 		},
 		{
 			name:       "a marker left by the activation flow",
 			wantReason: string(emaillinks.LinkMarkerWrongFlow),
-			arrange: func(t *testing.T, store sessionstore.Store, database *datamocks.Database) *http.Request {
+			arrange: func(t *testing.T, store *sessionstore.ConditionalStore, database *datamocks.Database) *http.Request {
 				return postWithMarker(t, store, newPassword, newPassword,
 					emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash)
 			},
@@ -822,7 +820,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 		{
 			name:       "a marker past its window",
 			wantReason: string(emaillinks.LinkMarkerExpired),
-			arrange: func(t *testing.T, store sessionstore.Store, database *datamocks.Database) *http.Request {
+			arrange: func(t *testing.T, store *sessionstore.ConditionalStore, database *datamocks.Database) *http.Request {
 				return withRawMarker(t, store, postResetRequest(newPassword, newPassword, ""),
 					expiredMarkerJSON(t, emaillinks.LinkMarkerFlowResetPassword, 1, codeHash))
 			},
@@ -830,7 +828,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 		{
 			name:       "a live marker whose hash no longer resolves",
 			wantReason: auditReasonCodeNoLongerOutstanding,
-			arrange: func(t *testing.T, store sessionstore.Store, database *datamocks.Database) *http.Request {
+			arrange: func(t *testing.T, store *sessionstore.ConditionalStore, database *datamocks.Database) *http.Request {
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(nil, nil).Once()
 				return postWithMarker(t, store, newPassword, newPassword,
@@ -847,7 +845,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			wantReason: auditReasonContinuationMismatch,
 			wantUserId: 1,
 			validated:  true,
-			arrange: func(t *testing.T, store sessionstore.Store, database *datamocks.Database) *http.Request {
+			arrange: func(t *testing.T, store *sessionstore.ConditionalStore, database *datamocks.Database) *http.Request {
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&record.User{Id: 1, Enabled: true}, nil).Once()
 				return withMarker(t, store,
@@ -860,7 +858,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			wantReason: auditReasonContinuationMismatch,
 			wantUserId: 1,
 			validated:  true,
-			arrange: func(t *testing.T, store sessionstore.Store, database *datamocks.Database) *http.Request {
+			arrange: func(t *testing.T, store *sessionstore.ConditionalStore, database *datamocks.Database) *http.Request {
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&record.User{Id: 1, Enabled: true}, nil).Once()
 				return withMarker(t, store, postResetRequest(newPassword, newPassword, ""),
@@ -876,7 +874,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			wantReason: auditReasonContinuationMismatch,
 			wantUserId: 1,
 			validated:  true,
-			arrange: func(t *testing.T, store sessionstore.Store, database *datamocks.Database) *http.Request {
+			arrange: func(t *testing.T, store *sessionstore.ConditionalStore, database *datamocks.Database) *http.Request {
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&record.User{Id: 1, Enabled: true}, nil).Once()
 				return postWithMarkerContinuationInQuery(t, store, newPassword, newPassword,
@@ -891,7 +889,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			wantReason: auditReasonContinuationMismatch,
 			wantUserId: 1,
 			validated:  true,
-			arrange: func(t *testing.T, store sessionstore.Store, database *datamocks.Database) *http.Request {
+			arrange: func(t *testing.T, store *sessionstore.ConditionalStore, database *datamocks.Database) *http.Request {
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&record.User{Id: 1, Enabled: true}, nil).Once()
 				return withRawMarker(t, store, postResetRequest(newPassword, newPassword, ""),
@@ -1815,12 +1813,10 @@ func TestResetPassword_GenuineFaultsStayInternalServerErrors(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		store := sessionstoremocks.NewStore(t)
+		store := unreadableSessionStore{t: t, err: errors.New("session store is unavailable")}
 
 		user, codeHash := userWithCode(t, 1, code, time.Now().UTC())
 		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
-		store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).
-			Return(nil, errors.New("session store is unavailable"))
 		pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 		handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)

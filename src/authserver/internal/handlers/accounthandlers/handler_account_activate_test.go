@@ -542,7 +542,7 @@ func TestHandleActivateGet_Clean(t *testing.T) {
 
 		for _, tc := range []struct {
 			name    string
-			request func(t *testing.T, store sessionstore.Store) *http.Request
+			request func(t *testing.T, store *sessionstore.ConditionalStore) *http.Request
 			// resolves is true when the handler gets far enough to look the hash up.
 			resolves bool
 			// reason is what the refusal entry names, the one place the rows differ.
@@ -550,21 +550,21 @@ func TestHandleActivateGet_Clean(t *testing.T) {
 		}{
 			{
 				name: "no marker at all, a bookmarked clean URL",
-				request: func(t *testing.T, store sessionstore.Store) *http.Request {
+				request: func(t *testing.T, store *sessionstore.ConditionalStore) *http.Request {
 					return activationCleanGetRequest()
 				},
 				reason: "marker_missing",
 			},
 			{
 				name: "a marker left by the reset flow",
-				request: func(t *testing.T, store sessionstore.Store) *http.Request {
+				request: func(t *testing.T, store *sessionstore.ConditionalStore) *http.Request {
 					return withMarker(t, store, activationCleanGetRequest(), emaillinks.LinkMarkerFlowResetPassword, 7, codeHash)
 				},
 				reason: "marker_wrong_flow",
 			},
 			{
 				name: "a marker past its window",
-				request: func(t *testing.T, store sessionstore.Store) *http.Request {
+				request: func(t *testing.T, store *sessionstore.ConditionalStore) *http.Request {
 					return withRawMarker(t, store, activationCleanGetRequest(),
 						expiredMarkerJSON(t, emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash))
 				},
@@ -575,7 +575,7 @@ func TestHandleActivateGet_Clean(t *testing.T) {
 				// the cookie taken beforehand still decodes. What refuses it is the hash no
 				// longer resolving, since a client-side cookie cannot be recalled.
 				name: "a live marker whose code hash no longer resolves",
-				request: func(t *testing.T, store sessionstore.Store) *http.Request {
+				request: func(t *testing.T, store *sessionstore.ConditionalStore) *http.Request {
 					return withMarker(t, store, activationCleanGetRequest(), emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash)
 				},
 				resolves: true,
@@ -626,17 +626,17 @@ func TestHandleActivateGet_SelfRegistrationDisabled(t *testing.T) {
 
 	for _, tc := range []struct {
 		name    string
-		request func(t *testing.T, store sessionstore.Store, codeHash string) *http.Request
+		request func(t *testing.T, store *sessionstore.ConditionalStore, codeHash string) *http.Request
 	}{
 		{
 			name: "the first hop, carrying a live code",
-			request: func(t *testing.T, store sessionstore.Store, codeHash string) *http.Request {
+			request: func(t *testing.T, store *sessionstore.ConditionalStore, codeHash string) *http.Request {
 				return activationLinkFollowedRequest(code)
 			},
 		},
 		{
 			name: "the clean hop, carrying a live marker",
-			request: func(t *testing.T, store sessionstore.Store, codeHash string) *http.Request {
+			request: func(t *testing.T, store *sessionstore.ConditionalStore, codeHash string) *http.Request {
 				return withMarker(t, store, activationCleanGetRequest(), emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash)
 			},
 		},
@@ -809,7 +809,7 @@ func postActivationRequest(password, passwordConfirmation, continuationId string
 // postActivationWithMarker is the ordinary submission: the cookies the first hop set, and the
 // continuation id the form rendered from that marker carries, read back the way the clean GET
 // reads it so the test cannot invent one the handler would never have rendered.
-func postActivationWithMarker(t *testing.T, store sessionstore.Store, password, passwordConfirmation string,
+func postActivationWithMarker(t *testing.T, store *sessionstore.ConditionalStore, password, passwordConfirmation string,
 	id int64, codeHash string) *http.Request {
 	t.Helper()
 
@@ -1001,7 +1001,7 @@ func TestHandleActivatePost_RefusalsCreateNothing(t *testing.T) {
 
 	for _, tc := range []struct {
 		name    string
-		request func(t *testing.T, store sessionstore.Store) *http.Request
+		request func(t *testing.T, store *sessionstore.ConditionalStore) *http.Request
 		arrange func(database *datamocks.Database, passwordValidator *accounthandlersmocks.PasswordValidator)
 		reason  string
 		// wantPreRegistrationId is 0 where the key must be absent.
@@ -1009,7 +1009,7 @@ func TestHandleActivatePost_RefusalsCreateNothing(t *testing.T) {
 	}{
 		{
 			name: "no marker at all",
-			request: func(t *testing.T, store sessionstore.Store) *http.Request {
+			request: func(t *testing.T, store *sessionstore.ConditionalStore) *http.Request {
 				return postActivationRequest(chosenPassword, chosenPassword, "")
 			},
 			arrange: func(*datamocks.Database, *accounthandlersmocks.PasswordValidator) {},
@@ -1017,7 +1017,7 @@ func TestHandleActivatePost_RefusalsCreateNothing(t *testing.T) {
 		},
 		{
 			name: "a marker left by the reset flow",
-			request: func(t *testing.T, store sessionstore.Store) *http.Request {
+			request: func(t *testing.T, store *sessionstore.ConditionalStore) *http.Request {
 				return withMarker(t, store, postActivationRequest(chosenPassword, chosenPassword, ""),
 					emaillinks.LinkMarkerFlowResetPassword, 7, codeHash)
 			},
@@ -1026,7 +1026,7 @@ func TestHandleActivatePost_RefusalsCreateNothing(t *testing.T) {
 		},
 		{
 			name: "a marker past its window",
-			request: func(t *testing.T, store sessionstore.Store) *http.Request {
+			request: func(t *testing.T, store *sessionstore.ConditionalStore) *http.Request {
 				return withRawMarker(t, store, postActivationRequest(chosenPassword, chosenPassword, ""),
 					expiredMarkerJSON(t, emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash))
 			},
@@ -1036,7 +1036,7 @@ func TestHandleActivatePost_RefusalsCreateNothing(t *testing.T) {
 		{
 			// A replayed submission after the activation completed: the row is gone.
 			name: "a live marker whose code hash no longer resolves",
-			request: func(t *testing.T, store sessionstore.Store) *http.Request {
+			request: func(t *testing.T, store *sessionstore.ConditionalStore) *http.Request {
 				return postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash)
 			},
 			arrange: func(database *datamocks.Database, _ *accounthandlersmocks.PasswordValidator) {
@@ -1048,7 +1048,7 @@ func TestHandleActivatePost_RefusalsCreateNothing(t *testing.T) {
 			// A page rendered for one pending registration must not activate another: the form
 			// names a continuation other than the one the session holds.
 			name: "a form naming another continuation",
-			request: func(t *testing.T, store sessionstore.Store) *http.Request {
+			request: func(t *testing.T, store *sessionstore.ConditionalStore) *http.Request {
 				return withMarker(t, store, postActivationRequest(chosenPassword, chosenPassword, "a-stale-continuation"),
 					emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash)
 			},

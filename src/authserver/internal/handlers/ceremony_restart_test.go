@@ -220,9 +220,11 @@ func TestAuthCompleted_ALegacyRestartedContextIsDeniedAnEmptyScope(t *testing.T)
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1, Enabled: true}, nil)
 
 	const clearedContextCookie = "cleared-auth-context"
-	ceremonyStore.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Run(func(args mock.Arguments) {
 		args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 	}).Return(nil)
+
+	expectCeremonyConfirmed(ceremonyStore, rr, req)
 
 	handler.ServeHTTP(rr, req)
 

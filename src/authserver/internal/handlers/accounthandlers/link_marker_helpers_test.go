@@ -28,10 +28,12 @@ import (
 // newMarkerTestStore is a real store rather than the mock, because these cases turn on the marker
 // surviving a round trip between the two hops and a mock cannot show one. A ServerSideStore over
 // an in-memory backend since #266 moved the session out of the browser: every copy of the cookie
-// names the same row, so clearing the marker reaches all of them.
-func newMarkerTestStore() *sessionstore.ServerSideStore {
+// names the same row, so clearing the marker reaches all of them. The conditional store over it,
+// as the auth server builds it, since the marker's save and clear are conditional writes (#579).
+func newMarkerTestStore() *sessionstore.ConditionalStore {
+	backend := sessiontest.NewMemoryBackend()
 	store, err := sessionstore.NewServerSideStore(
-		sessiontest.NewMemoryBackend(),
+		backend,
 		sessionkeys.SessionIdentifier,
 		false,
 		sessionstore.PersistentCookie,
@@ -46,7 +48,11 @@ func newMarkerTestStore() *sessionstore.ServerSideStore {
 		// unreachable. Panicking rather than dropping it keeps it that way.
 		panic(err)
 	}
-	return store
+	conditional, err := sessionstore.NewConditionalStore(store, backend)
+	if err != nil {
+		panic(err)
+	}
+	return conditional
 }
 
 // markerSeedRequest is the request a marker is written through before the request under test
@@ -57,7 +63,7 @@ func markerSeedRequest() *http.Request {
 
 // withMarker attaches the session cookies a first hop would have set, which is what makes a
 // request a clean-hop request rather than a bare one.
-func withMarker(t *testing.T, store sessionstore.Store, req *http.Request, flow emaillinks.LinkMarkerFlow,
+func withMarker(t *testing.T, store *sessionstore.ConditionalStore, req *http.Request, flow emaillinks.LinkMarkerFlow,
 	id int64, codeHash string) *http.Request {
 	t.Helper()
 
@@ -73,7 +79,7 @@ func withMarker(t *testing.T, store sessionstore.Store, req *http.Request, flow 
 
 // withRawMarker attaches cookies holding an arbitrary marker value, for the states
 // emaillinks.SaveLinkMarker cannot produce: an already-expired marker, and a corrupt one.
-func withRawMarker(t *testing.T, store sessionstore.Store, req *http.Request, value interface{}) *http.Request {
+func withRawMarker(t *testing.T, store *sessionstore.ConditionalStore, req *http.Request, value interface{}) *http.Request {
 	t.Helper()
 
 	seed := markerSeedRequest()
@@ -141,4 +147,20 @@ func nextBrowserRequest(t *testing.T, sent *http.Request, rr *httptest.ResponseR
 		next.AddCookie(byName[name])
 	}
 	return next
+}
+
+// unreadableSessionStore is a browser session store whose read fails, so no write can follow it.
+type unreadableSessionStore struct {
+	t   *testing.T
+	err error
+}
+
+func (s unreadableSessionStore) Get(*http.Request, string) (*sessionstore.Session, error) {
+	return nil, s.err
+}
+
+func (s unreadableSessionStore) ChangeAndSave(*http.Request, http.ResponseWriter, *sessionstore.Session,
+	func(map[string]any) error) error {
+	s.t.Error("a session that could not be read must not be written")
+	return nil
 }

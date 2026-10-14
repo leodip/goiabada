@@ -204,7 +204,8 @@ func TestStartNewUserSession_RecordsThePasswordInstant(t *testing.T) {
 	codeAt := passwordAt.Add(time.Minute)
 
 	result, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		Authentication{UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory, AuthTime: &codeAt, PasswordAuthTime: &passwordAt},
+		Authentication{UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory, AuthTime: &codeAt, PasswordAuthTime: &passwordAt,
+			BrowserSessionCondition: anyBrowserSession},
 		0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
@@ -220,7 +221,8 @@ func TestStartNewUserSession_RefusesAMissingPasswordInstant(t *testing.T) {
 	at := time.Now().UTC()
 
 	_, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		Authentication{UserId: 123, AuthMethods: "pwd", AcrLevel: record.AcrLevel1, AuthTime: &at},
+		Authentication{UserId: 123, AuthMethods: "pwd", AcrLevel: record.AcrLevel1, AuthTime: &at,
+			BrowserSessionCondition: anyBrowserSession},
 		0, nil, "192.168.1.50", nil, SessionLimits{})
 
 	require.ErrorContains(t, err, "no password instant captured")
@@ -241,7 +243,8 @@ func TestStartNewUserSession_AClaimThatNoLongerStandsCreatesNothing(t *testing.T
 	result, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
 		Authentication{
 			UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory, AuthTime: &at, PasswordAuthTime: &at,
-			OTPClaim: otpcredential.OTPClaim{Claimed: true, Generation: &generation},
+			OTPClaim:                otpcredential.OTPClaim{Claimed: true, Generation: &generation},
+			BrowserSessionCondition: anyBrowserSession,
 		},
 		0, &generation, "192.168.1.50", nil, SessionLimits{})
 

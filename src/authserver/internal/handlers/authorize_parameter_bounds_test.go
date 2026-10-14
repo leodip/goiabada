@@ -119,7 +119,7 @@ func TestHandleAuthorizeGet_AnOverlongValueIsRefusedThroughTheDeferralPath(t *te
 		t.Run(tc.name+", answered at once to a session holder", func(t *testing.T) {
 			e := newBoundedAuthorizeEndpoint(t)
 			stubAuthenticatedBrowser(e.database, e.userSessionManager)
-			e.ceremonyStore.On("ClearAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
+			e.ceremonyStore.On("DiscardAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
 
 			rr := e.get(t, boundedQuery(tc.overrides))
 
@@ -138,7 +138,7 @@ func TestHandleAuthorizeGet_AnOverlongValueIsRefusedThroughTheDeferralPath(t *te
 		t.Run(tc.name+", parked behind a login for a logged-out browser", func(t *testing.T) {
 			e := newBoundedAuthorizeEndpoint(t)
 			e.stubLoggedOutBrowser()
-			e.ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			e.ceremonyStore.On("ReplaceAuthContext", mock.Anything, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 				return ac.DeferredErrorCode == tc.wantCode && ac.DeferredErrorDescription == tc.wantDescription
 			})).Return(nil).Once()
 
@@ -184,7 +184,7 @@ func TestHandleAuthorizeGet_AValueAtTheBoundProceeds(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			e := newBoundedAuthorizeEndpoint(t)
 			e.stubLoggedOutBrowser()
-			e.ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			e.ceremonyStore.On("ReplaceAuthContext", mock.Anything, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 				if ac.DeferredErrorCode != "" || ac.AuthState != ceremony.AuthStateRequiresLevel1 {
 					return false
 				}

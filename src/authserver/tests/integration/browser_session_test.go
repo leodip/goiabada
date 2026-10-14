@@ -61,6 +61,44 @@ func TestBrowserSession_CostsExactlyOneSmallCookie(t *testing.T) {
 	assert.Len(t, device.Value, 64, "the device cookie is an identifier and nothing else")
 }
 
+// TestBrowserSession_AnAuthorizeAnsweredAtOnceLeavesNoSessionBehind is #579 decision 6. A browser
+// that sends no cookie, and whose /auth/authorize is answered at once with an error, is told
+// nothing about a session: the clear before the answer finds nothing stored and writes nothing,
+// where it used to create a row holding nothing for the session's lifetime and a cookie naming it.
+// prompt=none with no session is the plainest such request, answered login_required. The error
+// still reaches the client.
+func TestBrowserSession_AnAuthorizeAnsweredAtOnceLeavesNoSessionBehind(t *testing.T) {
+	client, redirectUri := createTestClientAndRedirectURI(t)
+	httpClient := createHttpClient(t)
+
+	requestState := fake.LetterN(8)
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + fake.LetterN(43) +
+		"&scope=" + url.QueryEscape("openid profile") +
+		"&state=" + requestState +
+		"&prompt=none"
+
+	resp, err := httpClient.Get(destUrl)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Equal(t, http.StatusFound, resp.StatusCode)
+	errorCode, _, state := getErrorFromUrl(t, resp)
+	assert.Equal(t, "login_required", errorCode, "the client is still answered")
+	assert.Equal(t, requestState, state)
+
+	for _, cookie := range resp.Cookies() {
+		assert.NotEqual(t, browserSessionCookieName(), cookie.Name,
+			"no session cookie is set for a browser that held none: %s", cookie.String())
+	}
+	for _, cookie := range browserCookies(t, httpClient) {
+		assert.NotEqual(t, browserSessionCookieName(), cookie.Name, "the browser holds no session cookie")
+	}
+}
+
 // TestBrowserSession_IdentifierRotatesAtSignIn is the property that makes a server-side
 // session store safe, and it is the one property a cookie store gave for free.
 //

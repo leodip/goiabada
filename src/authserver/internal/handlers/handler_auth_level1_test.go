@@ -886,7 +886,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 			// deletion through a Set-Cookie on w, and the answer commits the response, so a clear
 			// afterwards would leave the browser holding a context it could replay (#141).
 			const clearedContextCookie = "cleared-auth-context"
-			ceremonyStore.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+			ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Run(func(args mock.Arguments) {
 				args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 			}).Return(nil)
 
@@ -930,7 +930,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		parked.DeferredErrorCode = "invalid_request"
 		parked.DeferredErrorDescription = "The max_age parameter must be a non-negative integer."
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(parked, nil)
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
@@ -962,7 +962,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(
 			newParkedContext(ceremony.AuthStateLevel1PasswordCompleted), nil)
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(assert.AnError)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(assert.AnError)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
@@ -1006,7 +1006,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		authContext := newParkedContext(ceremony.AuthStateLevel1PasswordCompleted)
 		authContext.ResponseMode = "form_post"
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
@@ -1035,7 +1035,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(
 			newParkedContext(ceremony.AuthStateLevel1PasswordCompleted), nil)
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&record.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: true}, nil)
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",

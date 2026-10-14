@@ -9,14 +9,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
-
-	"github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
 // The marker tests run against a real store rather than the store mock. The marker's
@@ -28,9 +25,10 @@ import (
 // under the cookie store a copy of the cookie taken before the clear kept working, and
 // under this one it does not, because every copy names the same row. See
 // TestClearedLinkMarkerDoesNotSurviveInACapturedCookie.
-func newMarkerTestStore() *sessionstore.ServerSideStore {
+func newMarkerTestStore() *sessionstore.ConditionalStore {
+	backend := sessiontest.NewMemoryBackend()
 	store, err := sessionstore.NewServerSideStore(
-		sessiontest.NewMemoryBackend(),
+		backend,
 		sessionkeys.SessionIdentifier,
 		false,
 		sessionstore.PersistentCookie,
@@ -45,7 +43,11 @@ func newMarkerTestStore() *sessionstore.ServerSideStore {
 		// unreachable. Panicking rather than dropping it keeps it that way.
 		panic(err)
 	}
-	return store
+	conditional, err := sessionstore.NewConditionalStore(store, backend)
+	if err != nil {
+		panic(err)
+	}
+	return conditional
 }
 
 // requestCarrying builds a request holding the cookies a previous response set, which
@@ -61,7 +63,7 @@ func requestCarrying(t *testing.T, rr *httptest.ResponseRecorder) *http.Request 
 
 // writeRawMarker puts an arbitrary value under the marker key, for the states
 // SaveLinkMarker cannot produce: an already-expired marker and a corrupt one.
-func writeRawMarker(t *testing.T, store sessionstore.Store, value interface{}) *http.Request {
+func writeRawMarker(t *testing.T, store *sessionstore.ConditionalStore, value interface{}) *http.Request {
 	t.Helper()
 	req := httptest.NewRequest("GET", "/reset-password", nil)
 	rr := httptest.NewRecorder()
@@ -76,13 +78,26 @@ func writeRawMarker(t *testing.T, store sessionstore.Store, value interface{}) *
 
 // requireMarkerSaved writes a marker and fails if it was refused, for the cases whose
 // subject is something other than the refusal rule.
-func requireMarkerSaved(t *testing.T, store sessionstore.Store, rr *httptest.ResponseRecorder,
+func requireMarkerSaved(t *testing.T, store *sessionstore.ConditionalStore, rr *httptest.ResponseRecorder,
 	r *http.Request, flow LinkMarkerFlow, id int64, codeHash string) {
 	t.Helper()
 
 	rejection, err := SaveLinkMarker(store, rr, r, flow, id, codeHash)
 	require.NoError(t, err)
 	require.Empty(t, rejection)
+}
+
+// consumeMarker reads the live marker of flow on r, as a consuming handler does before it clears
+// the marker of the continuation it read.
+func consumeMarker(t *testing.T, store *sessionstore.ConditionalStore, r *http.Request,
+	flow LinkMarkerFlow) *LinkMarker {
+	t.Helper()
+
+	marker, rejection, err := GetLinkMarker(store, r, flow)
+	require.NoError(t, err)
+	require.Empty(t, rejection)
+	require.NotNil(t, marker)
+	return marker
 }
 
 func marshalMarker(t *testing.T, marker *LinkMarker) string {
@@ -401,8 +416,9 @@ func TestClearLinkMarker(t *testing.T) {
 	requireMarkerSaved(t, store, rr, req, LinkMarkerFlowResetPassword, 42, "the-code-hash")
 
 	clearReq := requestCarrying(t, rr)
+	consumed := consumeMarker(t, store, clearReq, LinkMarkerFlowResetPassword)
 	clearRr := httptest.NewRecorder()
-	require.NoError(t, ClearLinkMarker(store, clearRr, clearReq))
+	require.NoError(t, ClearLinkMarker(store, clearRr, clearReq, consumed.ContinuationId))
 
 	marker, rejection, err := GetLinkMarker(store, requestCarrying(t, clearRr), LinkMarkerFlowResetPassword)
 
@@ -430,8 +446,10 @@ func TestClearedLinkMarkerDoesNotSurviveInACapturedCookie(t *testing.T) {
 	// What an attacker holding the pre-clear cookies would replay.
 	captured := requestCarrying(t, rr)
 
+	clearReq := requestCarrying(t, rr)
+	consumed := consumeMarker(t, store, clearReq, LinkMarkerFlowResetPassword)
 	clearRr := httptest.NewRecorder()
-	require.NoError(t, ClearLinkMarker(store, clearRr, requestCarrying(t, rr)))
+	require.NoError(t, ClearLinkMarker(store, clearRr, clearReq, consumed.ContinuationId))
 
 	// The browser now holds the cleared cookies, and refuses.
 	_, rejection, err := GetLinkMarker(store, requestCarrying(t, clearRr), LinkMarkerFlowResetPassword)
@@ -495,11 +513,9 @@ func TestGetLinkMarkerNonStringValueIsMissing(t *testing.T) {
 // A session store failure is an error on every entry point, never a rejection.
 func TestLinkMarkerStoreFailures(t *testing.T) {
 	expectedError := errors.New("session store is unavailable")
+	store := unreadableSessionStore{t: t, err: expectedError}
 
 	t.Run("save", func(t *testing.T) {
-		store := sessionstoremocks.NewStore(t)
-		store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(nil, expectedError)
-
 		rejection, err := SaveLinkMarker(store, httptest.NewRecorder(),
 			httptest.NewRequest("GET", "/reset-password", nil),
 			LinkMarkerFlowResetPassword, 42, "the-code-hash")
@@ -509,9 +525,6 @@ func TestLinkMarkerStoreFailures(t *testing.T) {
 	})
 
 	t.Run("get", func(t *testing.T) {
-		store := sessionstoremocks.NewStore(t)
-		store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(nil, expectedError)
-
 		marker, rejection, err := GetLinkMarker(store,
 			httptest.NewRequest("GET", "/reset-password", nil), LinkMarkerFlowResetPassword)
 
@@ -521,12 +534,25 @@ func TestLinkMarkerStoreFailures(t *testing.T) {
 	})
 
 	t.Run("clear", func(t *testing.T) {
-		store := sessionstoremocks.NewStore(t)
-		store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(nil, expectedError)
-
 		err := ClearLinkMarker(store, httptest.NewRecorder(),
-			httptest.NewRequest("GET", "/reset-password", nil))
+			httptest.NewRequest("GET", "/reset-password", nil), "the-continuation-id")
 
-		assert.ErrorIs(t, err, expectedError)
+		require.ErrorIs(t, err, expectedError)
 	})
+}
+
+// unreadableSessionStore is a session store whose read fails, so no write can follow it.
+type unreadableSessionStore struct {
+	t   *testing.T
+	err error
+}
+
+func (s unreadableSessionStore) Get(*http.Request, string) (*sessionstore.Session, error) {
+	return nil, s.err
+}
+
+func (s unreadableSessionStore) ChangeAndSave(*http.Request, http.ResponseWriter, *sessionstore.Session,
+	func(map[string]any) error) error {
+	s.t.Error("a session that could not be read must not be written")
+	return nil
 }

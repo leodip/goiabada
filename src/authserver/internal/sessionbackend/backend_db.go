@@ -28,10 +28,12 @@ import (
 type BrowserSessionDatabase interface {
 	CreateBrowserSession(ctx context.Context, tx *sql.Tx, browserSession *record.BrowserSession) error
 	DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string) error
+	DeleteBrowserSessionIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, expectedData string, now time.Time) (bool, error)
 	GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now time.Time) (*record.BrowserSession, error)
 	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
 	TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now, expiresAt time.Time) (bool, error)
 	UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, data string, now, expiresAt time.Time) (bool, error)
+	UpdateBrowserSessionDataIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, expectedData, data string, now, expiresAt time.Time) (bool, error)
 }
 
 // dbBackend keeps browser sessions in the database this deployment already runs. It is
@@ -47,8 +49,11 @@ type dbBackend struct {
 	now      func() time.Time
 }
 
-// NewAuthServerBackend returns a database backend scoped to the auth server's rows.
-func NewAuthServerBackend(database BrowserSessionDatabase) sessionstore.Backend {
+// NewAuthServerBackend returns a database backend scoped to the auth server's rows. It is a
+// ConditionalBackend, which the auth server's store is built with (#579); the admin console's,
+// below, is the same type returned as a plain Backend, because nothing writes its rows on
+// condition.
+func NewAuthServerBackend(database BrowserSessionDatabase) sessionstore.ConditionalBackend {
 	return newBackend(database, sessionkeys.AuthServerSessionName)
 }
 
@@ -157,6 +162,42 @@ func (b *dbBackend) Touch(ctx context.Context, id string, authenticated bool) (t
 func (b *dbBackend) Delete(ctx context.Context, id string) error {
 	if err := b.database.DeleteBrowserSession(ctx, nil, b.owner, hashutil.HashString(id)); err != nil {
 		return errs.Wrap(err, "unable to delete the browser session")
+	}
+	return nil
+}
+
+// UpdateIfUnchanged is Update with the contents the store read in the statement's WHERE, so the
+// write lands only while the row still holds them (#579). The deadline is computed as Update
+// computes it.
+func (b *dbBackend) UpdateIfUnchanged(ctx context.Context, id string, expected, data []byte, authenticated bool) (time.Time, error) {
+	now := b.now()
+	hash := hashutil.HashString(id)
+
+	expiresAt, err := b.expiryFor(ctx, hash, authenticated, now)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	updated, err := b.database.UpdateBrowserSessionDataIfUnchanged(ctx, nil, b.owner, hash, string(expected), string(data),
+		now, expiresAt)
+	if err != nil {
+		return time.Time{}, errs.Wrap(err, "unable to update the browser session")
+	}
+	if !updated {
+		return time.Time{}, sessionstore.ErrChanged
+	}
+
+	return expiresAt, nil
+}
+
+// DeleteIfUnchanged removes the row only while it still holds the contents the store read.
+func (b *dbBackend) DeleteIfUnchanged(ctx context.Context, id string, expected []byte) error {
+	deleted, err := b.database.DeleteBrowserSessionIfUnchanged(ctx, nil, b.owner, hashutil.HashString(id), string(expected), b.now())
+	if err != nil {
+		return errs.Wrap(err, "unable to delete the browser session")
+	}
+	if !deleted {
+		return sessionstore.ErrChanged
 	}
 	return nil
 }

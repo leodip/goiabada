@@ -329,7 +329,7 @@ func TestHandleIssueGet_ImplicitFlow_FormPost(t *testing.T) {
 	auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return()
 
 	// The context is cleared, and only then does the response go out.
-	ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 	stubLiveSession(database, 123)
 	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)

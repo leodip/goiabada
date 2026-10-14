@@ -175,7 +175,7 @@ func TestHandleIssueGet_ADisabledClientIsRefusedOnThePage(t *testing.T) {
 			f.client.Enabled = false
 
 			var order []string
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).
 				Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()
 			wantMessage := i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientDisabled, nil).Localize(f.req.Context())
 			f.pageRenderer.On("RenderTemplate", f.rr, f.req, "/layouts/no_menu_layout.html", "/auth_error.html",
@@ -203,7 +203,7 @@ func TestHandleIssueGet_ADisabledClientIsRefusedOnThePage(t *testing.T) {
 		f.client.Enabled = false
 		logs := logtest.CaptureSlog(t)
 
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(errs.New("the store is unreachable")).Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(errs.New("the store is unreachable")).Once()
 		f.pageRenderer.On("RenderTemplate", f.rr, f.req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.Anything).
 			Return(nil).Once()
 
@@ -267,7 +267,7 @@ func TestHandleIssueGet_AFlowSwitchedOffIsAnsweredUnauthorizedClient(t *testing.
 			tc.edit(f)
 
 			var order []string
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).
 				Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()
 
 			f.serve()
@@ -288,7 +288,7 @@ func TestHandleIssueGet_AFlowSwitchedOffIsAnsweredUnauthorizedClient(t *testing.
 			f := newRecheckFixture(t, tc.responseType, "")
 			tc.edit(f)
 
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(errs.New("the store is unreachable")).Once()
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(errs.New("the store is unreachable")).Once()
 
 			f.serve()
 
@@ -310,7 +310,7 @@ func TestHandleIssueGet_AFlowSwitchedOffIsAnsweredUnauthorizedClient(t *testing.
 			Return(&record.Code{Id: 1, Code: "the-code", ClientId: 1, RedirectURI: "https://example.com/callback",
 				State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil).Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
 
 		f.serve()
 
@@ -325,7 +325,7 @@ func TestHandleIssueGet_AFlowSwitchedOffIsAnsweredUnauthorizedClient(t *testing.
 		f.implicitIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, true, false).
 			Return(&issuance.ImplicitGrantResponse{AccessToken: "the-token", TokenType: "Bearer", ExpiresIn: 60, Scope: "openid"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return().Once()
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil).Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
 
 		f.serve()
 
@@ -354,7 +354,7 @@ func TestHandleIssueGet_ADisabledUserIsAnsweredAccessDenied(t *testing.T) {
 			f.auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
 				"user_id": int64(123),
 			}).Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).
 				Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()
 
 			f.serve()
@@ -403,7 +403,7 @@ func TestHandleIssueGet_AStaleGenerationRestartsTheCeremony(t *testing.T) {
 			assert.Equal(t, "openid", saved.Scope, "the request survives the restart")
 			f.assertNothingIssued(t)
 			f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-			f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+			f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything, mock.Anything)
 
 			warning, ok := warningSaying(t, logs, "authentication generation has moved on")
 			if ok {
@@ -415,7 +415,7 @@ func TestHandleIssueGet_AStaleGenerationRestartsTheCeremony(t *testing.T) {
 			f := newRecheckFixture(t, tc.responseType, "none")
 			f.user.AuthStateGeneration = recheckGeneration + 1
 
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil).Once()
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
 
 			f.serve()
 
@@ -476,7 +476,7 @@ func TestHandleIssueGet_ARemovedAuthenticatorRestartsTheCeremony(t *testing.T) {
 			require.NotNil(t, saved)
 			assert.Empty(t, saved.AuthMethods, "the attempt, and the code it named, are discarded with the restart")
 			f.assertNothingIssued(t)
-			f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+			f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything, mock.Anything)
 
 			warning, ok := warningSaying(t, logs, "the user no longer has an authenticator")
 			if ok {
@@ -489,7 +489,7 @@ func TestHandleIssueGet_ARemovedAuthenticatorRestartsTheCeremony(t *testing.T) {
 			f.authContext.AuthMethods = "pwd otp"
 			f.user.OTPEnabled = false
 
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil).Once()
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
 
 			f.serve()
 
@@ -554,7 +554,7 @@ func TestHandleIssueGet_AnAuthenticatorRemovedAtTheIssuerIsAnsweredAsAtTheCheck(
 			f := newRecheckFixture(t, tc.responseType, "none")
 			var order []string
 			arm(f, &order)
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil).Once()
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
 
 			f.serve()
 
@@ -590,7 +590,7 @@ func TestHandleIssueGet_AnImplicitSessionEndedAtTheSigningIsAnsweredAsAGoneSessi
 		assert.Equal(t, testCeremonyId, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"))
 		assert.Equal(t, []string{"issued", "save"}, order, "the refusal writes the store only after the issuer has rolled back")
 		f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-		f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+		f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything, mock.Anything)
 		f.pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 	})
 
@@ -599,7 +599,7 @@ func TestHandleIssueGet_AnImplicitSessionEndedAtTheSigningIsAnsweredAsAGoneSessi
 
 		f.implicitIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, true, false).
 			Return(nil, errs.WithStack(issuance.ErrIssuingSessionGone)).Once()
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil).Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
 
 		f.serve()
 
@@ -628,7 +628,7 @@ func TestHandleIssueGet_AnImplicitSessionEndedAtTheSigningIsAnsweredAsAGoneSessi
 		assert.Empty(t, f.rr.Header().Get("Location"))
 		f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		f.ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
-		f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+		f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything, mock.Anything)
 		f.pageRenderer.AssertExpectations(t)
 	})
 }
@@ -668,7 +668,7 @@ func TestHandleIssueGet_TheImplicitIssuerIsHandedTheSessionAndAnswersAfterItsCom
 			ExpiresIn: 60, Scope: "openid"}, nil).Once()
 	f.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).
 		Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
-	f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).
+	f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).
 		Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()
 
 	f.serve()

@@ -561,6 +561,14 @@ type Database interface {
 	// session and the idle timeout would behave as an absolute one.
 	TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now, expiresAt time.Time) (bool, error)
 	DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string) error
+	// UpdateBrowserSessionDataIfUnchanged is UpdateBrowserSessionData on condition that the
+	// row's data is still expectedData, the value a fresh read returned. false means no row
+	// transitioned: another write changed the data since, or the session is gone or expired. A
+	// touch moves no data, so it never makes this lose (#579).
+	UpdateBrowserSessionDataIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, expectedData, data string, now, expiresAt time.Time) (bool, error)
+	// DeleteBrowserSessionIfUnchanged removes one live session on the same condition, and
+	// reports whether it did: a rotation removes the row it read and nothing written since (#579).
+	DeleteBrowserSessionIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, expectedData string, now time.Time) (bool, error)
 	// DeleteExpiredBrowserSessions reaps on expires_at alone, across both owners. The
 	// row was already unusable before this ran, by the predicate above; this is what
 	// stops the table growing.

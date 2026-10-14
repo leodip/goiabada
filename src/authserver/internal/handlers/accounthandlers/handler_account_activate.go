@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/sessionstore"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
@@ -164,7 +163,7 @@ var errActivationNoLongerOutstanding = errors.New("the pending registration no l
 // (#425 decision 6).
 func HandleActivateGet(
 	pageRenderer PageRenderer,
-	httpSession sessionstore.Store,
+	httpSession linkMarkerSessionStore,
 	database accountActivateDatabase,
 	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,
@@ -211,7 +210,7 @@ func HandleActivateGet(
 // It validates but does not consume the code (#112 decision 7). A mail scanner that prefetches
 // the URL writes a marker into its own throwaway cookie jar and leaves the code usable for the
 // real user.
-func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession sessionstore.Store,
+func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession linkMarkerSessionStore,
 	database accountActivateDatabase, auditLogger AuditLogger, dataCipher *encryption.DataCipher,
 	w http.ResponseWriter, r *http.Request, code string) {
 
@@ -311,7 +310,7 @@ func isVerificationCodeExpired(preRegistration *record.PreRegistration) bool {
 // form to fill in, as the reset flow refuses a disabled account (#207 decision 10).
 //
 // Returns (nil, nil) when the request was refused, having already audited and responded.
-func resolveActivationMarker(pageRenderer PageRenderer, httpSession sessionstore.Store,
+func resolveActivationMarker(pageRenderer PageRenderer, httpSession linkMarkerSessionStore,
 	database accountActivateDatabase, auditLogger AuditLogger, w http.ResponseWriter, r *http.Request,
 	httpStatus int) (*emaillinks.LinkMarker, *record.PreRegistration) {
 
@@ -392,7 +391,7 @@ func refuseActivationAddressTaken(pageRenderer PageRenderer, database accountAct
 // elsewhere, is found there by the fenced consumption and refused as code_no_longer_outstanding.
 func HandleActivatePost(
 	pageRenderer PageRenderer,
-	httpSession sessionstore.Store,
+	httpSession linkMarkerSessionStore,
 	database accountActivateDatabase,
 	userCreator TransactionalUserCreator,
 	passwordValidator PasswordValidator,
@@ -535,7 +534,7 @@ func HandleActivatePost(
 		// Hygiene, and not the thing that makes the marker single-use: the deletion above is. A
 		// failure here is logged rather than answered with a 500, because the account has already
 		// been created and telling the caller the activation failed would be false.
-		if clearLinkMarkerErr := emaillinks.ClearLinkMarker(httpSession, w, r); clearLinkMarkerErr != nil {
+		if clearLinkMarkerErr := emaillinks.ClearLinkMarker(httpSession, w, r, marker.ContinuationId); clearLinkMarkerErr != nil {
 			slog.ErrorContext(r.Context(), "unable to clear the account activation link marker after a completed activation",
 				"email", createdUser.Email, "error", clearLinkMarkerErr)
 		}

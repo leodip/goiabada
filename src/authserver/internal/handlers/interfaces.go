@@ -41,12 +41,29 @@ type JSONWriter interface {
 // here: only the locale middleware reads it, and no handler does (#435).
 type CeremonyStore interface {
 	GetAuthContext(r *http.Request) (*ceremony.AuthContext, error)
+	// SaveAuthContext is a step's save, which writes only while the browser session still holds
+	// the step's ceremony and otherwise answers ceremony.ErrCeremonyReplaced, writing nothing
+	// (#579). Every step after /auth/authorize saves through it, and answers that error through
+	// answerStepSaveFailure.
 	SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error
-	ClearAuthContext(w http.ResponseWriter, r *http.Request) error
+	// ReplaceAuthContext is /auth/authorize's save, which starts a ceremony and so replaces
+	// whatever the browser session held.
+	ReplaceAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error
+	// ClearAuthContext is a step's clear, which ends the ceremony only while the browser session
+	// still holds it and otherwise answers ceremony.ErrCeremonyReplaced, writing nothing (#579).
+	ClearAuthContext(w http.ResponseWriter, r *http.Request, ceremonyId string) error
+	// DiscardAuthContext is /auth/authorize's clear, which ends whatever ceremony the browser
+	// session held, and writes nothing for a browser with no stored session.
+	DiscardAuthContext(w http.ResponseWriter, r *http.Request) error
 	// RegenerateSession replaces the browser session's identifier without losing its
 	// contents, which is what a server-side session store must do at every privilege
-	// change to match a cookie store's structural immunity to session fixation (#266).
-	RegenerateSession(w http.ResponseWriter, r *http.Request) error
+	// change to match a cookie store's structural immunity to session fixation (#266). It
+	// rotates only while the browser session still holds the ceremony named, and otherwise
+	// answers ceremony.ErrCeremonyReplaced, writing nothing (#579).
+	RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string) error
+	// ConfirmCeremony answers nil while the browser session, read afresh, still holds the
+	// ceremony named, and ceremony.ErrCeremonyReplaced otherwise. It writes nothing (#579).
+	ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremonyId string) error
 }
 
 type OtpSecretGenerator interface {

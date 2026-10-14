@@ -213,7 +213,7 @@ func TestHandleAuthorizeGet_ARepeatedRequestParameterIsInvalidRequest(t *testing
 		e := newAuthorizeEndpoint(t)
 		e.passesDeliveryChecks()
 		stubAuthenticatedBrowser(e.database, e.userSessionManager)
-		e.ceremonyStore.On("ClearAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
+		e.ceremonyStore.On("DiscardAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
 
 		rr := e.get(t, query)
 
@@ -267,7 +267,7 @@ func TestHandleAuthorizeGet_ARepeatedRequestParameterIsInvalidRequest(t *testing
 		e.passesDeliveryChecks()
 		e.database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 		e.userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
-		e.ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		e.ceremonyStore.On("ReplaceAuthContext", mock.Anything, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.DeferredErrorCode == "invalid_request" &&
 				strings.Contains(ac.DeferredErrorDescription, "'state'") &&
 				ac.State == ""
@@ -285,7 +285,7 @@ func TestHandleAuthorizeGet_ARepeatedRequestParameterIsInvalidRequest(t *testing
 	t.Run("a copy of prompt asking for none is answered at once", func(t *testing.T) {
 		e := newAuthorizeEndpoint(t)
 		e.passesDeliveryChecks()
-		e.ceremonyStore.On("ClearAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
+		e.ceremonyStore.On("DiscardAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
 
 		rr := e.get(t, validAuthorizeQuery+"&prompt=login&prompt=none")
 
@@ -300,7 +300,7 @@ func TestHandleAuthorizeGet_ARepeatedRequestParameterIsInvalidRequest(t *testing
 	t.Run("two copies of prompt asking for none are answered at once", func(t *testing.T) {
 		e := newAuthorizeEndpoint(t)
 		e.passesDeliveryChecks()
-		e.ceremonyStore.On("ClearAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
+		e.ceremonyStore.On("DiscardAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
 
 		rr := e.get(t, validAuthorizeQuery+"&prompt=none&prompt=none")
 

@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/leodip/goiabada/core/sessionstore/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -52,12 +51,27 @@ func faultRequest() *http.Request {
 	return req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, faultRequestId))
 }
 
-// sessionWithIdentifier is a session whose cookie names sid, which is what sends the session
-// middleware to the database.
-func sessionWithIdentifier(store sessionstore.Store, sid string) *sessionstore.Session {
-	session := sessionstore.NewSession(store, sessionkeys.AuthServerSessionName)
-	session.Values[sessionkeys.SessionIdentifier] = sid
-	return session
+// faultingSessionStore is a browser session store answering the session middleware's read with
+// getErr, or a session whose cookie names sid, which is what sends the middleware to the database, and
+// its conditional write with changeErr.
+type faultingSessionStore struct {
+	sid       string
+	getErr    error
+	changeErr error
+}
+
+func (s faultingSessionStore) Get(*http.Request, string) (*sessionstore.Session, error) {
+	if s.getErr != nil {
+		return nil, s.getErr
+	}
+	session := sessionstore.NewSession(nil, sessionkeys.AuthServerSessionName)
+	session.Values[sessionkeys.SessionIdentifier] = s.sid
+	return session, nil
+}
+
+func (s faultingSessionStore) ChangeAndSave(*http.Request, http.ResponseWriter, *sessionstore.Session,
+	func(map[string]any) error) error {
+	return s.changeErr
 }
 
 // TestServerFaults_EachFaultInEachFormat drives the four places the settings and session middleware
@@ -87,8 +101,7 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 		{
 			name: "the session store cannot be read",
 			middleware: func(t *testing.T, faults ServerFaults) func(http.Handler) http.Handler {
-				store := sessionstoremocks.NewStore(t)
-				store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(nil, errors.New("the session backend is down"))
+				store := faultingSessionStore{getErr: errors.New("the session backend is down")}
 				return SessionIdentifier(store, datamocks.NewDatabase(t), faults)
 			},
 			pageSentence: "fatal failure in session middleware. For additional information, refer to the server logs. Request Id: " + faultRequestId,
@@ -98,8 +111,7 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 		{
 			name: "the session row the cookie names cannot be read",
 			middleware: func(t *testing.T, faults ServerFaults) func(http.Handler) http.Handler {
-				store := sessionstoremocks.NewStore(t)
-				store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(sessionWithIdentifier(store, "sid-1"), nil)
+				store := faultingSessionStore{sid: "sid-1"}
 				db := datamocks.NewDatabase(t)
 				db.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").Return(nil, errors.New("the database is down"))
 				return SessionIdentifier(store, db, faults)
@@ -111,9 +123,7 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 		{
 			name: "the session cannot be saved after its row was found gone",
 			middleware: func(t *testing.T, faults ServerFaults) func(http.Handler) http.Handler {
-				store := sessionstoremocks.NewStore(t)
-				store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(sessionWithIdentifier(store, "sid-1"), nil)
-				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("the session backend is down"))
+				store := faultingSessionStore{sid: "sid-1", changeErr: errors.New("the session backend is down")}
 				db := datamocks.NewDatabase(t)
 				db.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").Return(nil, nil)
 				return SessionIdentifier(store, db, faults)

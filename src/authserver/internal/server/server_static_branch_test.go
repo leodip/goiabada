@@ -117,9 +117,10 @@ func newStaticBranchTestServer(database *datamocks.Database) *Server {
 // The keys are literals rather than freshly generated ones, matching the pattern the
 // store's other test callers already use. They never vary and nothing reads them, so
 // generating them would only add an error to check in a helper that cannot fail.
-func newTestSessionStore() *sessionstore.ServerSideStore {
+func newTestSessionStore() *sessionstore.ConditionalStore {
+	backend := sessiontest.NewMemoryBackend()
 	store, err := sessionstore.NewServerSideStore(
-		sessiontest.NewMemoryBackend(),
+		backend,
 		sessionkeys.SessionIdentifier,
 		false,
 		sessionstore.PersistentCookie,
@@ -134,5 +135,9 @@ func newTestSessionStore() *sessionstore.ServerSideStore {
 		// unreachable. Panicking rather than dropping it keeps it that way.
 		panic(err)
 	}
-	return store
+	conditional, err := sessionstore.NewConditionalStore(store, backend)
+	if err != nil {
+		panic(err)
+	}
+	return conditional
 }

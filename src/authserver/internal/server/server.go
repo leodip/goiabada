@@ -44,9 +44,11 @@ type Server struct {
 	// to every constructor and each one narrows it to a port of its own (#386 decision 8).
 	database data.Database
 	// The concrete store rather than sessionstore.Store: routes.go hands it to the two
-	// constructors whose ports name Regenerate, which is what proves at compile time that the
-	// store this server runs rotates the session identifier at sign-in (#431).
-	sessionStore *sessionstore.ServerSideStore
+	// constructors whose ports name a rotation, which is what proves at compile time that the
+	// store this server runs rotates the session identifier at sign-in (#431). A
+	// ConditionalStore, because that rotation is its conditional one, as are the ceremony's
+	// saves and clears (#579).
+	sessionStore *sessionstore.ConditionalStore
 	// Built by main from the configured data key and handed to every consumer routes.go
 	// constructs, so no service reads a process-wide key (#434).
 	dataCipher *encryption.DataCipher
@@ -77,7 +79,7 @@ type Server struct {
 	tokenMetrics *tokenmetrics.Recorder
 }
 
-func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionstore.ServerSideStore,
+func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionstore.ConditionalStore,
 	dataCipher *encryption.DataCipher, trustedProxies []*net.IPNet, cfg *config.Config) *Server {
 
 	registry := metrics.NewRegistry()

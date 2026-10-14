@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/userconsent"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 // authCompletedDatabase is what the end of the authentication ceremony needs: the session it
@@ -128,7 +129,7 @@ func HandleAuthCompletedGet(
 				auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
 					"user_id": user.Id,
 				})
-				answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+				answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
 					redirectErrorFromAuthContext(authContext, client, "access_denied", userDisabledDescription))
 				return
 			case beforeBindingGenerationMoved:
@@ -157,7 +158,7 @@ func HandleAuthCompletedGet(
 			authContext.Restart()
 			saveErr := ceremonyStore.SaveAuthContext(w, r, authContext)
 			if saveErr != nil {
-				pageRenderer.InternalServerError(w, r, saveErr)
+				answerStepSaveFailure(pageRenderer, w, r, saveErr)
 				return
 			}
 			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level1", authContext), http.StatusFound)
@@ -171,7 +172,7 @@ func HandleAuthCompletedGet(
 			boundSession, err = bindReusedSession(w, r, plan, ceremonyStore, userSessionManager, database,
 				auditLogger, authContext, client, sessionIdentifier, targetAcrLevel)
 		default:
-			boundSession, err = bindNewSession(w, r, plan, userSessionManager, database, auditLogger,
+			boundSession, err = bindNewSession(w, r, plan, ceremonyStore, userSessionManager, database, auditLogger,
 				authContext, client, userSession, targetAcrLevel, usersession.SessionLimits{
 					IdleTimeoutInSeconds: settings.UserSessionIdleTimeoutInSeconds,
 					MaxLifetimeInSeconds: settings.UserSessionMaxLifetimeInSeconds,
@@ -198,10 +199,9 @@ func HandleAuthCompletedGet(
 			// identifier asked the rule before rotating (bindReusedSession), so nothing was rotated
 			// either unless the newer sign-in landed between that check and the rotation. This
 			// request does not put its own ceremony back over the newer one (rejectCeremonyMismatch).
-			// That is all it establishes: the browser-session store is last-writer-wins, so a
-			// ceremony that is still current can write over one started after it loaded, at any
-			// step (#579). The user starts again from the application, which is plain SSO over the
-			// session as it is now.
+			// Its other writes are held to the same end by their own condition: each lands only while
+			// the browser session still holds this ceremony (#579). The user starts again from the
+			// application, which is plain SSO over the session as it is now.
 			//
 			// A restart at level 1 is not the answer here, as it is for a code whose authenticator
 			// is gone: the session is valid and this user's. A restarted ceremony verifies the
@@ -212,6 +212,17 @@ func HandleAuthCompletedGet(
 			slog.WarnContext(r.Context(), "a newer authentication has already reached this session, answering this ceremony as one the browser has replaced",
 				"ceremony_user_id", authContext.UserId)
 			renderCeremonyNoLongerActive(pageRenderer, w, r)
+			return
+		}
+		if errors.Is(err, ceremony.ErrCeremonyReplaced) || errors.Is(err, sessionstore.ErrNotFound) {
+			// The browser session no longer holds this ceremony: another tab's /auth/authorize
+			// replaced it, or the session is gone, which a rotation does not re-create (#579
+			// decision 3). Found by the reuse arm's rotation before it binds, by the create arm's
+			// check before it ends or creates anything, or by the create arm's rotation after its
+			// commit, which StartNewUserSession reports with sessionstore.ErrNotFound when the
+			// session is gone and which has abandoned the new session (decision 4). Either way
+			// nothing was bound to the browser session, and the newer sign-in carries on.
+			answerCeremonyReplaced(pageRenderer, w, r)
 			return
 		}
 		if err != nil {
@@ -270,14 +281,14 @@ func HandleAuthCompletedGet(
 
 		switch answer {
 		case afterBindingNoScope:
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext, client,
 					"access_denied", "The user is not authorized to access any of the requested scopes"))
 		case afterBindingConsent:
 			authContext.AuthState = ceremony.AuthStateRequiresConsent
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
+				answerStepSaveFailure(pageRenderer, w, r, err)
 				return
 			}
 			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/consent", authContext), http.StatusFound)
@@ -285,7 +296,7 @@ func HandleAuthCompletedGet(
 			authContext.AuthState = ceremony.AuthStateReadyToIssueCode
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
+				answerStepSaveFailure(pageRenderer, w, r, err)
 				return
 			}
 			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/issue", authContext), http.StatusFound)
@@ -544,13 +555,13 @@ func bindReusedSession(
 	// stop. Deciding from the pre-bump session and rotating first means a failure between the two
 	// leaves a fresh identifier on a session that has not been raised, which is the safe direction.
 	//
-	// A ceremony the bind would refuse as stale (#538) is refused here instead, before the rotation.
-	// Regenerate writes this request's own copy of the browser session, read when the request
-	// began, under the new identifier and deletes the old one, so rotating for a ceremony that a
-	// newer sign-in has overtaken would put this ceremony's auth context back over the newer one's
-	// and end it. The bind asks again under the session's row lock, for a sign-in landing between
-	// the two. A ceremony that is still current rotates from the same copy, over a ceremony started
-	// after this request loaded, as any of its writes would: the store is last-writer-wins (#579).
+	// A ceremony the bind would refuse as stale (#538) is refused here instead, before the rotation,
+	// so it rotates nothing and binds nothing. The bind asks again under the session's row lock,
+	// for a sign-in landing between the two. The rotation itself lands only while the browser
+	// session still holds this ceremony, and builds the new row from the session as it is stored
+	// now, so a ceremony started after this request loaded is neither written over nor ended by it:
+	// one the rotation finds replaced, or a session gone, binds nothing and answers the "no longer
+	// active" page (#579).
 	if plan.rotateIdentifier {
 		stale, err := userSessionManager.AuthenticationIsStale(r.Context(), sessionIdentifier, authentication)
 		if err != nil {
@@ -559,7 +570,7 @@ func bindReusedSession(
 		if stale {
 			return nil, errs.WithStack(usersession.ErrStaleAuthentication)
 		}
-		if err = ceremonyStore.RegenerateSession(w, r); err != nil {
+		if err = ceremonyStore.RegenerateSession(w, r, authContext.CeremonyId); err != nil {
 			return nil, err
 		}
 	}
@@ -599,13 +610,14 @@ func bindReusedSession(
 	return bumpedSession, nil
 }
 
-// bindNewSession is the create arm: it ends the arrived-with session when plan says it is another
-// user's, starts a new one, and answers it. limits is the settings' bounds on the user's sessions,
-// which the new one is started under.
+// bindNewSession is the create arm: it confirms the browser session still holds this ceremony, ends
+// the arrived-with session when plan says it is another user's, starts a new one, and answers it.
+// limits is the settings' bounds on the user's sessions, which the new one is started under.
 func bindNewSession(
 	w http.ResponseWriter,
 	r *http.Request,
 	plan completionPlan,
+	ceremonyStore CeremonyStore,
 	userSessionManager UserSessionManager,
 	database authCompletedDatabase,
 	auditLogger AuditLogger,
@@ -615,6 +627,18 @@ func bindNewSession(
 	targetAcrLevel record.AcrLevel,
 	limits usersession.SessionLimits,
 ) (*record.UserSession, error) {
+	// The browser session is read afresh first, and the arm goes on only while it still holds this
+	// ceremony (#579 decision 4). Everything after this ends or deletes something: another user's
+	// session with its codes and refresh tokens, and in the transaction that creates the new
+	// session, the browser's own previous one and the user's sessions from this device or over the
+	// cap. A ceremony the browser has abandoned for a newer sign-in must do none of that, or it
+	// would revoke another user's grants, or delete the session a newer SSO ceremony adopted, which
+	// would then ask for a password nobody needed. The rotation after the commit is conditional on
+	// the ceremony too, for a newer sign-in landing between this check and it.
+	if err := ceremonyStore.ConfirmCeremony(w, r, authContext.CeremonyId); err != nil {
+		return nil, err
+	}
+
 	// The browser changed hands, so the session it was carrying is ended rather than left behind.
 	// StartNewUserSession below does not do this: it sweeps sibling sessions of the NEW user, so
 	// the previous user's row is never a candidate and would survive orphaned, its refresh tokens
@@ -695,6 +719,9 @@ func bindNewSession(
 			AuthTime:         authContext.AuthenticatedAt,
 			PasswordAuthTime: authContext.PasswordVerifiedAt,
 			OTPClaim:         otpClaimOf(authContext),
+			// The rotation that binds the new session to the browser session lands only while the
+			// browser session still holds this ceremony (#579 decision 4).
+			BrowserSessionCondition: ceremony.Held(authContext.CeremonyId),
 		},
 		authContext.AuthStateGeneration, authContext.OtpConfigGeneration,
 		middleware.ClientIP(r), replacing, limits)
