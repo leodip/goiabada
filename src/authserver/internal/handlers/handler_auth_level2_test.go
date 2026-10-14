@@ -212,7 +212,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		// **The skip arm captures too**, and that is the case worth pinning: a user who has
 		// removed their authenticator answers the level 2 question by having nothing to
 		// answer with, so this ceremony must discharge the obligation. Without the capture
-		// here every session of such a user stays permanently behind and handlePromptNone
+		// here every session of such a user stays permanently behind and prompt=none
 		// answers interaction_required for the rest of each session's life (#242 decision 3).
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateAuthenticationCompleted &&

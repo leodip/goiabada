@@ -56,7 +56,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/handlers/accounthandlers/` - Pages reached without a session: self-registration and its activation link, forgot password and its reset link (#435)
 - `internal/handlers/apihandlers/` - Admin API handlers
 - `internal/{ceremony,issuance,signingkeys}/` - Provider-side issuance: codes, tokens, key rotation, ceremony context
-- `internal/authflow/` - The ceremony steps' operations, one per step: its loads, the decision it applies, its database and browser-session writes, and a typed result its handler answers from. It cannot reach HTTP (`import_lint_test.go` refuses `net/http`, chi, `internal/handlers`, `internal/middleware` and `internal/reqctx`): what the request carries arrives as plain values, every browser-session write goes through a port the handler satisfies with a per-request adapter (`handlers.browserSession`), and the handler writes the response after the operation returns. Today `/auth/level1` (`SelectLevel1Method`), `/auth/level1completed` (`Level1Completion`), `/auth/level2` (`Level2Selection`), `/auth/pwd` (`PasswordPrompt` on the GET and beside a refusal, `PasswordSubmission` on the POST), `/auth/otp` (`OTPPrompt` on the GET, `OTPSubmission` on the POST), `/auth/completed` (`Completion`), `/auth/consent` (`ConsentPrompt` on the GET, `ConsentSubmission` on the POST) and `/auth/issue` (`Issuance`); the other steps are still written in `internal/handlers` (#580)
+- `internal/authflow/` - The ceremony steps' operations, one per step: its loads, the decision it applies, its database and browser-session writes, and a typed result its handler answers from. It cannot reach HTTP (`import_lint_test.go` refuses `net/http`, chi, `internal/handlers`, `internal/middleware` and `internal/reqctx`): what the request carries arrives as plain values, every browser-session write goes through a port the handler satisfies with a per-request adapter (`handlers.browserSession`), and the handler writes the response after the operation returns. Today `/auth/level1` (`SelectLevel1Method`), `/auth/level1completed` (`Level1Completion`), `/auth/level2` (`Level2Selection`), `/auth/pwd` (`PasswordPrompt` on the GET and beside a refusal, `PasswordSubmission` on the POST), `/auth/otp` (`OTPPrompt` on the GET, `OTPSubmission` on the POST), `/auth/completed` (`Completion`), `/auth/consent` (`ConsentPrompt` on the GET, `ConsentSubmission` on the POST), `/auth/issue` (`Issuance`) and a `prompt=none` request at `/auth/authorize` (`SilentAuthentication`, with `DecideSilentAuthentication`); the rest of `/auth/authorize` is still written in `internal/handlers` (#580)
 - `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imageupload,uithemes}/` - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, image uploads, themes
 - `internal/revocation/` - The five revocation operations, their results, reason constants and audit helpers. No handler package owns revocation orchestration or its transactions any more (#387)
 - `internal/reqctx/` - The five request-scoped values (settings, session identifier, bearer token, validated token, and the credential reservation a failures-only rate-limit tier holds), each written by one middleware and read through a typed accessor; services take theirs as parameters, and the context-value guard holds every module file to them with no exemption (#433, #439)
@@ -174,7 +174,7 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 | | `authflow.Level2Selection` | `level2_optional` and no OTP enrolled, which is the skip that bypasses `/auth/otp` entirely |
 | | `authflow.OTPSubmission` | OTP verified or enrolled |
 | `requires_consent` | `authflow.Completion` | `prompt=consent`, or `client.ConsentRequired`, or `offline_access` in scope, or `authserver:manage-account` still in scope, the client not the admin console's, and no stored consent covering it (`userconsent.AlwaysOwed`, #509) |
-| `ready_to_issue_code` | `handlePromptNone` | every silent check passed, skipping every hop between |
+| `ready_to_issue_code` | `authflow.SilentAuthentication` | every silent check passed, skipping every hop between |
 | | `authflow.Completion` | no consent needed |
 | | `authflow.ConsentPrompt` | scope already fully consented, no `offline_access`, no `prompt=consent` |
 | | `authflow.ConsentSubmission` | approved with at least one scope the user still holds |
@@ -212,7 +212,7 @@ not one it accepts (#246, #437):
 ### Flow Handlers (in order)
 | Handler | File | Purpose |
 |---------|------|---------|
-| `/auth/authorize` | `handler_authorize.go` | Entry point. Validates request, checks existing session, routes to level1. A POST (`handler_authorize_post.go`) only parks the request and redirects to the GET |
+| `/auth/authorize` | `handler_authorize.go`, `authflow/silent_authentication.go` | Entry point. Validates request, checks existing session, routes to level1; a `prompt=none` request is answered by `authflow.SilentAuthentication`, without a page. A POST (`handler_authorize_post.go`) only parks the request and redirects to the GET |
 | `/auth/level1` | `handler_auth_level1.go`, `authflow/level1_selection.go` | Selects level1 auth method (currently only password) |
 | `/auth/pwd` | `handler_auth_pwd.go`, `authflow/password.go` | Password login form. Verifies the password, rotates the browser session's identifier, records level 1 on the ceremony |
 | `/auth/level1completed` | `handler_auth_level1.go`, `authflow/level1_completion.go` | Delivers a deferred authorization error if one is parked (see below), else decides if level2 needed based on ACR and session state |
@@ -327,7 +327,7 @@ Valid if ALL true:
 3. If `max_age` param: `now <= AuthTime + max_age` (`Started` when `AuthTime` is zero)
 
 ### ACR Step-Up Logic (`ceremony/step_up.go`)
-One rule, `StepUpOwed`, read by `authflow.Level1Completion` and `handlePromptNone`. Uses `record.AcrLevel.IsHigherThan()` for comparison (priority: level1=1, level2_optional=2, level2_mandatory=3).
+One rule, `StepUpOwed`, read by `authflow.Level1Completion` and `authflow.SilentAuthentication`. Uses `record.AcrLevel.IsHigherThan()` for comparison (priority: level1=1, level2_optional=2, level2_mandatory=3).
 
 **With valid session:**
 - Target ACR higher than session ACR → redirect to level2 (step-up)
@@ -399,7 +399,7 @@ takes first, so a removal landing after the handler's check either waits for the
 lowers it, or is seen. Tokens already issued, and the refresh tokens that renew them, keep their
 claims: ending the user's sessions revokes those (#542 decision 1).
 
-Both readers, `authflow.Level1Completion` and `handlePromptNone`, only compare and write nothing,
+Both readers, `authflow.Level1Completion` and `authflow.SilentAuthentication`, only compare and write nothing,
 so an abandoned ceremony spends no re-prompt. The snapshot is captured onto `AuthContext` at
 `authflow.PasswordSubmission` and on every arm of `authflow.Level2Selection`, and promoted once, at
 `/auth/completed`: `StartNewUserSession` writes it on the create arm, and

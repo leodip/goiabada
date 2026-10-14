@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -3294,6 +3295,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			UserId:      789,
 			AcrLevel:    record.AcrLevel1,
 			AuthMethods: "pwd",
+			AuthTime:    time.Date(2026, 10, 14, 8, 0, 0, 0, time.UTC),
 			// Session at 7, user at 9. The prompt=none path is a SEPARATE session-reuse
 			// site from the interactive one, and it must inherit from the session too, or a
 			// silent re-issue would launder an old ceremony forward (#106 decision 11(d)).
@@ -3421,6 +3423,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			UserId:              789,
 			AcrLevel:            record.AcrLevel1,
 			AuthMethods:         "pwd",
+			AuthTime:            time.Date(2026, 10, 14, 8, 0, 0, 0, time.UTC),
 			AuthStateGeneration: 7,
 			User: record.User{
 				Id:                  789,
@@ -3547,9 +3550,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
-		// Same sentinel as the "Invalid scopes" case, for handlePromptNone's own refusal
-		// closure: rr.Result() reads the header snapshot taken at commit time, so the sentinel
-		// only appears there if the clear ran before the client response was committed.
+		// Same sentinel as the "Invalid scopes" case, for the silent path's own refusal
+		// (authflow.SilentAuthentication): rr.Result() reads the header snapshot taken at commit
+		// time, so the sentinel only appears there if the clear ran before the client response was
+		// committed.
 		const clearedContextCookie = "cleared-auth-context"
 		ceremonyStore.On("DiscardAuthContext", rr, req).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
@@ -3685,8 +3689,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		// handlePromptNone's closure carries its own copy of the last-resort 500, so removing
-		// site 1's copy leaves this one and vice versa. Each is pinned at its own site.
+		// The silent path answers its refusal from its own call to the responder, so the
+		// last-resort 500 is pinned here as well as at site 1.
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
@@ -4290,9 +4294,9 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 //
 // §4 wrote hasValidUserSession as a plain local assigned above the predicate. That would query the
 // session on every request reaching it, including a prompt=none request that queries again inside
-// handlePromptNone and a prompt=login request that never looked at one before this change, and it
-// would let a database fault answer 500 where the server used to answer correctly without a session
-// at all. The three rows below are the difference, and each fails if the assignment is made eager.
+// authflow.SilentAuthentication and a prompt=login request that never looked at one before this
+// change, and it would let a database fault answer 500 where the server used to answer correctly
+// without a session at all. The three rows below are the difference, and each fails if the assignment is made eager.
 func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 	for _, tc := range []struct {
 		name      string

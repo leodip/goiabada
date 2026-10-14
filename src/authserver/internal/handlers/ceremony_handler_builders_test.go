@@ -44,7 +44,8 @@ func buildAuthorizeGet(d authorizeGetDeps) http.HandlerFunc {
 	return HandleAuthorizeGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
 		testClientErrorResponder(d.database, d.pageRenderer, d.templateFS),
 		d.pageRenderer, d.ceremonyStore, d.userSessionManager, d.database,
-		d.authorizeValidator, d.auditLogger, d.permissionChecker, d.tokenParser)
+		d.authorizeValidator, d.auditLogger, d.tokenParser,
+		authflow.NewSilentAuthentication(d.database, d.userSessionManager, d.permissionChecker, d.auditLogger))
 }
 
 type authorizePostDeps struct {

@@ -461,7 +461,7 @@ func TestHandleIssueGet(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		// The same empty identifier as the row above, arriving from handlePromptNone rather
+		// The same empty identifier as the row above, arriving from prompt=none rather
 		// than from the consent screen: it validated and bumped the session, redirected here,
 		// and the session was ended in that hop. Restarting level 1 would render a password
 		// form, which this request forbids (#129 decision 16).

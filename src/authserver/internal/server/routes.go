@@ -137,7 +137,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// A POST is parked and answered with a 303 to a GET, which runs the ceremony from it: the
 		// POST arrives cross-site without the Lax session cookie and must not touch the browser's
 		// own session (#246).
-		r.Get("/authorize", handlers.HandleAuthorizeGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, userSessionManager, s.database, authorizeValidator, auditLogger, permissionChecker, tokenParser))
+		r.Get("/authorize", handlers.HandleAuthorizeGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, userSessionManager, s.database, authorizeValidator, auditLogger, tokenParser, authflow.NewSilentAuthentication(s.database, userSessionManager, permissionChecker, auditLogger)))
 		r.Post("/authorize", handlers.HandleAuthorizePost(httpHelper, authorizeValidator, s.database, baseURL))
 		r.Get("/level1", handlers.HandleAuthLevel1Get(ceremonyBoundary, ceremonyStore))
 		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewLevel1Completion(s.database, userSessionManager)))

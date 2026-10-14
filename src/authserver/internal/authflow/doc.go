@@ -27,6 +27,10 @@
 //   - ConsentSubmission, POST /auth/consent: reads the user's answer from the submitted body, weighs
 //     the ticked scopes against the permissions the user holds now (decideConsentSubmission), and
 //     records the consent (userconsent.Record) or refuses with access_denied.
+//   - SilentAuthentication, GET /auth/authorize with prompt=none, once the request is accepted:
+//     decides whether the browser's session answers it without showing anything
+//     (DecideSilentAuthentication), and either refuses it for the client or adopts the session,
+//     bumps it and sends the ceremony straight to /auth/issue.
 //   - Issuance, GET /auth/issue: checks again what may have changed since /auth/authorize
 //     (decideIssuance), restarts a ceremony whose session can no longer carry a grant, and issues an
 //     authorization code or the implicit grant's tokens. The handler delivers them: the encoders of
@@ -35,7 +39,7 @@
 // GetClientDisplayInfo is the client block every sign-in screen shows, and ConsentClientName the
 // name the consent screen and the redirect-blocked page give a client.
 //
-// The other steps are still written in internal/handlers.
+// The rest of /auth/authorize, its POST included, is still written in internal/handlers.
 //
 // Rules every operation keeps:
 //
@@ -78,6 +82,10 @@
 //   - ConsentSubmission narrows the ticked scopes to what the user holds before it reads or writes a
 //     consent, so a selection the narrowing empties writes nothing (#241). Its refusals read the
 //     client's provenance before the clear, and the clear comes before the answer (#141).
+//   - SilentAuthentication reads nothing past the check that refused, and its refusal writes nothing
+//     but the discard of the ceremony, which comes before the answer (#141). It refuses a session
+//     with no auth time before it bumps the session or saves the ceremony, and records
+//     bumped_user_session after the bump.
 //   - Issuance clears the ceremony only after the code or the tokens are committed and audited, and
 //     a failed clear withholds them (#248). An issuer's refusal, a session or an authenticator gone
 //     by the time of the write, is answered after the issuer has rolled back (#139, #542).

@@ -407,8 +407,8 @@ func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 // the client's level and the ceremony reaches the OTP form anyway (#240).
 //
 // This is the interactive counterpart to TestPromptNone_AcrValuesCannotLowerTheClientFloor: between
-// them they cover both consumers of the target, the silent path inside handlePromptNone and the
-// interactive one through /auth/level1completed, /auth/level2 and /auth/completed.
+// them they cover both consumers of the target, the silent path inside authflow.SilentAuthentication
+// and the interactive one through /auth/level1completed, /auth/level2 and /auth/completed.
 //
 // It fails for its stated reason in both directions, because assertRedirect fails when the location
 // is not the path it was given: without the floor /auth/level1completed answers /auth/completed,

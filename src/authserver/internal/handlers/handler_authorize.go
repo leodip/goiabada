@@ -21,7 +21,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/authserver/internal/userconsent"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -79,13 +78,13 @@ func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser To
 	return sub, nil
 }
 
-// authorizeDatabase is what the authorization endpoint reads: the client, the consent already
-// given, the session a browser may arrive with, and the request a POST parked for a GET carrying its
-// handle. The client's redirect URIs are the client-error responder's to read.
+// authorizeDatabase is what the authorization endpoint reads: the client, the session a browser may
+// arrive with, and the request a POST parked for a GET carrying its handle. The client's redirect
+// URIs are the client-error responder's to read, and what a prompt=none request reads is
+// authflow.SilentAuthentication's.
 type authorizeDatabase interface {
 	authorizerequest.Consuming
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 }
@@ -99,8 +98,8 @@ func HandleAuthorizeGet(
 	database authorizeDatabase,
 	authorizeValidator AuthorizeValidator,
 	auditLogger AuditLogger,
-	permissionChecker PermissionChecker,
 	tokenParser TokenParser,
+	silentAuthentication *authflow.SilentAuthentication,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -260,7 +259,7 @@ func HandleAuthorizeGet(
 		// The loads. decideAuthorizeRoute names the next fact it needs, or the route once it needs
 		// none, and each fact is loaded here once and only when asked for. That is what keeps the
 		// reads what they were: a prompt=none request never reads the session here, because
-		// handlePromptNone does its own lookup; a prompt=login request never reads it at all; and a
+		// authflow.SilentAuthentication does its own lookup; a prompt=login request never reads it at all; and a
 		// session read that fails answers 500 before any validation runs, rather than being taken
 		// for "no session" and turning a database fault into a login prompt for somebody already
 		// signed in (#213).
@@ -319,8 +318,8 @@ func HandleAuthorizeGet(
 					// retroactively change what the ceremony was required to do: raising it after
 					// the step-up decision has been taken stamps an acr naming a second factor that
 					// was never performed, and lowering it takes /auth/level2's target outside its
-					// switch and answers 500. This is also the last point before handlePromptNone
-					// reads the target (#240).
+					// switch and answers 500. This is also the last point before
+					// authflow.SilentAuthentication reads the target (#240).
 					authContext.SetTargetAcrLevel(client.DefaultAcrLevel)
 				}
 				facts.validated = true
@@ -409,7 +408,25 @@ func HandleAuthorizeGet(
 			saveAndRedirect("/auth/level1")
 
 		case authorizeRoutePromptNone:
-			handlePromptNone(w, r, boundary, responder, pageRenderer, ceremonyStore, userSessionManager, database, auditLogger, permissionChecker, &authContext, client, sessionIdentifier, settings)
+			result, err := silentAuthentication.Run(r.Context(), newBrowserSession(w, r, ceremonyStore), settings,
+				&authContext, client, sessionIdentifier, middleware.ClientIP(r))
+			if err != nil {
+				pageRenderer.InternalServerError(w, r, err)
+				return
+			}
+			if result.Refusal != nil {
+				// On the silent path the server_error fallback for a failed discard is worth naming: a
+				// silent-renewal iframe reads it as "retry later" rather than "start an interactive
+				// login", the accurate instruction on a server fault (#141).
+				responder.answerClientAfterClear(w, r, redirectErrorFromAuthContext(&authContext,
+					result.Refusal.Client, result.Refusal.Code, result.Refusal.Description), result.DiscardErr)
+				return
+			}
+			if result.SaveErr != nil {
+				pageRenderer.InternalServerError(w, r, result.SaveErr)
+				return
+			}
+			boundary.stepRedirect(w, r, "/auth/issue", &authContext)
 
 		case authorizeRouteForceLogin, authorizeRouteLevel1:
 			authContext.AuthState = ceremony.AuthStateRequiresLevel1
@@ -840,307 +857,6 @@ func decideAuthorizeRoute(f authorizeRouteFacts) (authorizeRoute, authorizeFact)
 		return authorizeRouteDisabledUser, authorizeFactNone
 	}
 	return authorizeRouteSSO, authorizeFactNone
-}
-
-// handlePromptNone handles the OIDC prompt=none flow for silent authentication. It performs all
-// necessary checks without displaying any UI and either answers the client with an error when
-// silent authentication is not possible, or goes on to issue a code silently.
-func handlePromptNone(w http.ResponseWriter, r *http.Request, boundary *CeremonyBoundary, responder *ClientErrorResponder, pageRenderer PageRenderer, ceremonyStore CeremonyStore, userSessionManager UserSessionManager, database authorizeDatabase, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *record.Client, sessionIdentifier string, settings *record.Settings) {
-	// Helper to clear the auth context and then redirect with error. The clear-then-answer
-	// sequence and its server_error fallback live in answerAuthorizeClientWithError, which derives that
-	// fallback from the input handed to it, so this path keeps answering from the stored ceremony
-	// exactly as it did when the sequence was written out here (#141).
-	//
-	// On the silent path the fallback is worth naming: a silent-renewal iframe reads server_error
-	// as "retry later" rather than "start an interactive login", which on a genuine server fault
-	// is the accurate instruction of the two.
-	redirectWithError := func(errorCode string, errorDescription string) {
-		answerAuthorizeClientWithError(w, r, ceremonyStore, responder,
-			redirectErrorFromAuthContext(authContext, client, errorCode, errorDescription))
-	}
-
-	idleTimeout, maxLifetime := settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds
-	requestedMaxAge := authContext.RequestedMaxAge()
-	facts := silentAuthenticationFacts{
-		maxAgeRequested:  requestedMaxAge != nil,
-		hintSubject:      authContext.IdTokenHintSub,
-		target:           authContext.GetTargetAcrLevel(client.DefaultAcrLevel),
-		consentRequired:  client.ConsentRequired,
-		clientIdentifier: client.ClientIdentifier,
-	}
-
-	// The loads, each made once and only when decideSilentAuthentication asks for it, so a refusal
-	// reads nothing past the check that refused.
-	answer, need := decideSilentAuthentication(facts)
-	for need != silentFactNone {
-		switch need {
-		case silentFactSession:
-			userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
-			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
-				return
-			}
-			if userSession != nil {
-				err = database.UserSessionLoadUser(r.Context(), nil, userSession)
-				if err != nil {
-					pageRenderer.InternalServerError(w, r, err)
-					return
-				}
-			}
-			facts.sessionLoaded = true
-			facts.session = userSession
-
-		case silentFactValidity:
-			valid := userSessionManager.HasValidUserSession(facts.session, idleTimeout, maxLifetime, requestedMaxAge)
-			facts.sessionValid = &valid
-
-		case silentFactValidityWithoutMaxAge:
-			valid := userSessionManager.HasValidUserSession(facts.session, idleTimeout, maxLifetime, nil)
-			facts.sessionValidWithoutMaxAge = &valid
-
-		case silentFactEffectiveScope:
-			effectiveScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(r.Context(),
-				authContext.Scope, &facts.session.User)
-			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
-				return
-			}
-			facts.effectiveScope = &effectiveScope
-
-		case silentFactConsent:
-			consent, err := database.GetConsentByUserIdAndClientId(r.Context(), nil, facts.session.User.Id, client.Id)
-			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
-				return
-			}
-			facts.consentLoaded = true
-			facts.consent = consent
-		}
-		answer, need = decideSilentAuthentication(facts)
-	}
-
-	if answer.errorCode != "" {
-		if answer.userDisabled {
-			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
-				"user_id": facts.session.UserId,
-			})
-		}
-		redirectWithError(answer.errorCode, answer.errorDescription)
-		return
-	}
-
-	// All checks passed: the ceremony reuses the session and goes on to issue a code silently.
-	userSession := facts.session
-	authContext.AdoptSession(userSession)
-	authContext.SetScope(*facts.effectiveScope)
-
-	// Preserve the original session's auth_time for the token
-	if userSession.AuthTime.IsZero() {
-		// Fallback for legacy sessions without AuthTime
-		authContext.AuthenticatedAt = &userSession.Started
-	} else {
-		authContext.AuthenticatedAt = &userSession.AuthTime
-	}
-
-	// Set ACR level (takes max of target and session ACR)
-	err := authContext.SetAcrLevel(facts.target, userSession)
-	if err != nil {
-		pageRenderer.InternalServerError(w, r, err)
-		return
-	}
-
-	// Bump the user session to update LastAccessed time. It passes no methods and no level: a
-	// silent request reuses the session only when it already holds the level asked for, so the
-	// session's own were all it could pass, and writing them back would undo a removal of the
-	// user's authenticator that lowered the session after it was read above (#542).
-	_, err = userSessionManager.BumpUserSession(r.Context(), sessionIdentifier, client.Id,
-		"", "", middleware.ClientIP(r))
-	if err != nil {
-		pageRenderer.InternalServerError(w, r, err)
-		return
-	}
-
-	auditLogger.Log(r.Context(), audit.EventBumpedUserSession, map[string]interface{}{
-		"user_id":   authContext.UserId,
-		"client_id": client.Id,
-	})
-
-	// Ready to issue code
-	authContext.AuthState = ceremony.AuthStateReadyToIssueCode
-	err = ceremonyStore.ReplaceAuthContext(w, r, authContext)
-	if err != nil {
-		pageRenderer.InternalServerError(w, r, err)
-		return
-	}
-
-	boundary.stepRedirect(w, r, "/auth/issue", authContext)
-}
-
-// silentFact is a fact decideSilentAuthentication needs and has not been given. handlePromptNone
-// loads it and asks again.
-type silentFact int
-
-const (
-	// silentFactNone means the answer is decided.
-	silentFactNone silentFact = iota
-	// silentFactSession is the browser's session with its user, or none.
-	silentFactSession
-	// silentFactValidity is whether the session is valid with the request's max_age applied.
-	silentFactValidity
-	// silentFactValidityWithoutMaxAge is whether it would be valid without max_age.
-	silentFactValidityWithoutMaxAge
-	// silentFactEffectiveScope is the requested scope narrowed to what the user holds.
-	silentFactEffectiveScope
-	// silentFactConsent is the user's consent to this client, or none.
-	silentFactConsent
-)
-
-// silentAuthenticationFacts is what decideSilentAuthentication decides from. The first four are
-// known from the ceremony and its client; every other fact is unknown until handlePromptNone has
-// loaded it, a nil pointer or a false loaded flag.
-type silentAuthenticationFacts struct {
-	maxAgeRequested bool
-	hintSubject     string
-	target          record.AcrLevel
-	// consentRequired is the client's ConsentRequired.
-	consentRequired bool
-	// clientIdentifier is the client's ClientIdentifier.
-	clientIdentifier string
-
-	// sessionLoaded is set once the session has been looked up; session is nil when there is none,
-	// and otherwise carries its User.
-	sessionLoaded             bool
-	session                   *record.UserSession
-	sessionValid              *bool
-	sessionValidWithoutMaxAge *bool
-	effectiveScope            *string
-	// consentLoaded is set once the consent has been looked up; consent is nil when there is none.
-	consentLoaded bool
-	consent       *record.UserConsent
-}
-
-// silentAuthenticationAnswer is decideSilentAuthentication's answer: an error for the client, or
-// an empty errorCode to proceed.
-type silentAuthenticationAnswer struct {
-	errorCode        string
-	errorDescription string
-	// userDisabled says the refusal is for a disabled account, which is audited.
-	userDisabled bool
-}
-
-// decideSilentAuthentication decides whether a prompt=none request can be answered silently, or
-// names the next fact it needs to decide that. The checks run in a fixed order and the first that
-// fails is the answer, so each fact is asked for only once every check before it has passed:
-//
-//  1. a session exists;
-//  2. it is valid, and when it is not only because of max_age, the answer says so;
-//  3. its user is enabled;
-//  4. an id_token_hint names that user (OIDC Core 3.1.2.1: "MUST NOT reply with an ID Token for a
-//     different user");
-//  5. the step-up rule asks for no higher level (an unknown session ACR is insufficient);
-//  6. level2_mandatory has an authenticator to satisfy it;
-//  7. the user's authenticator has not changed since the session last answered the level 2
-//     question, when the target asks it. A reader only: it refuses and promotes nothing, because no
-//     interaction happened, which is what makes an identical second prompt=none request get the
-//     identical answer (#242 decision 1). Steps 5 to 7 are the step-up rule's three answers, in
-//     the order it gives them;
-//  8. the user holds at least one requested scope;
-//  9. when the client requires consent or offline_access is asked for, a consent covers every
-//     scope, and otherwise it covers authserver:manage-account when the scope holds it and the
-//     client is not the admin console's (userconsent.AlwaysOwed, #509 decision 3).
-func decideSilentAuthentication(f silentAuthenticationFacts) (silentAuthenticationAnswer, silentFact) {
-	refuse := func(code, description string) (silentAuthenticationAnswer, silentFact) {
-		return silentAuthenticationAnswer{errorCode: code, errorDescription: description}, silentFactNone
-	}
-
-	if !f.sessionLoaded {
-		return silentAuthenticationAnswer{}, silentFactSession
-	}
-	if f.session == nil {
-		return refuse(oidc.ErrorLoginRequired, "User authentication is required")
-	}
-
-	if f.sessionValid == nil {
-		return silentAuthenticationAnswer{}, silentFactValidity
-	}
-	if !*f.sessionValid {
-		if f.maxAgeRequested {
-			if f.sessionValidWithoutMaxAge == nil {
-				return silentAuthenticationAnswer{}, silentFactValidityWithoutMaxAge
-			}
-			if *f.sessionValidWithoutMaxAge {
-				return refuse(oidc.ErrorLoginRequired, "Session age exceeds max_age")
-			}
-		}
-		return refuse(oidc.ErrorLoginRequired, "User session has expired")
-	}
-
-	user := &f.session.User
-	if !user.Enabled {
-		return silentAuthenticationAnswer{
-			errorCode:        "access_denied",
-			errorDescription: "The user account is disabled",
-			userDisabled:     true,
-		}, silentFactNone
-	}
-
-	if f.hintSubject != "" && user.Subject != f.hintSubject {
-		return refuse(oidc.ErrorLoginRequired, "The current session user does not match the id_token_hint")
-	}
-
-	if code, description, refused := silentStepUpRefusal(ceremony.StepUpOwed(f.target, f.session)); refused {
-		return refuse(code, description)
-	}
-
-	if f.effectiveScope == nil {
-		return silentAuthenticationAnswer{}, silentFactEffectiveScope
-	}
-	if len(strings.TrimSpace(*f.effectiveScope)) == 0 {
-		return refuse("access_denied", "The user is not authorized to access any of the requested scopes")
-	}
-
-	// The scopes a stored consent must cover: every one when the client requires consent or
-	// offline_access is asked for, and otherwise those owed a consent whatever the client says
-	// (#509 decision 3).
-	mustCover := userconsent.AlwaysOwed(f.clientIdentifier, *f.effectiveScope)
-	if f.consentRequired || oidc.HasOfflineAccessScope(*f.effectiveScope) {
-		mustCover = oidc.SplitScope(*f.effectiveScope)
-	}
-	if len(mustCover) > 0 {
-		if !f.consentLoaded {
-			return silentAuthenticationAnswer{}, silentFactConsent
-		}
-		if f.consent == nil {
-			return refuse(oidc.ErrorConsentRequired, "User consent is required")
-		}
-		if !userconsent.Covers(f.consent, mustCover) {
-			return refuse(oidc.ErrorConsentRequired, "Additional consent is required")
-		}
-	}
-
-	return silentAuthenticationAnswer{}, silentFactNone
-}
-
-// silentStepUpRefusal is decideSilentAuthentication's answer to the step-up a session still owes a
-// prompt=none request: none passes, each reason ceremony.StepUp names is refused with its own
-// description, and a value it does not name is refused too, so a reason added to StepUp later fails
-// closed here, rather than letting the silent flow issue a code its target was not met for, until
-// this switch names it (#542).
-func silentStepUpRefusal(stepUp ceremony.StepUp, err error) (code, description string, refused bool) {
-	if err != nil {
-		return oidc.ErrorInteractionRequired, "Higher authentication level required", true
-	}
-	switch stepUp {
-	case ceremony.StepUpNone:
-		return "", "", false
-	case ceremony.StepUpAuthenticatorMissing:
-		return oidc.ErrorInteractionRequired, "Additional authentication setup required", true
-	case ceremony.StepUpOtpConfigChanged:
-		return oidc.ErrorInteractionRequired, "Authentication configuration has changed", true
-	default:
-		// ceremony.StepUpLevel, and any value this switch does not name.
-		return oidc.ErrorInteractionRequired, "Higher authentication level required", true
-	}
 }
 
 // answerClientWithError clears the auth context and then answers the client with an error, which is
