@@ -15,6 +15,7 @@ package emaillinks
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -70,6 +71,23 @@ const (
 // more entropy than this value needs. It is not guessed at: nobody outside the
 // session ever sees it, and it authorizes nothing on its own.
 const continuationIdLength = 32
+
+// markerSessionStore is what the marker's functions call on the browser session store: the request's
+// session, and the conditional write the marker's save and clear are made with, which only
+// sessionstore.ConditionalStore has (#579).
+type markerSessionStore interface {
+	Get(r *http.Request, name string) (*sessionstore.Session, error)
+	ChangeAndSave(r *http.Request, w http.ResponseWriter, session *sessionstore.Session,
+		change func(values map[string]any) error) error
+}
+
+// errContinuationInFlight is the refusal SaveLinkMarker's change answers when the stored session
+// holds another live continuation, so nothing is written.
+var errContinuationInFlight = errors.New("another emailed-link continuation is in flight")
+
+// errNoMarkerStored is the refusal ClearLinkMarker's change answers when the stored session holds no
+// marker, so nothing is written.
+var errNoMarkerStored = errors.New("the browser session holds no link marker")
 
 // LinkMarker records that an emailed link was followed and its code was valid, so
 // every later step of the flow can run on a URL with no credential in it (#112).
@@ -141,7 +159,7 @@ func (m *LinkMarker) expired(now time.Time) bool {
 // linkMarkerLifetime, and someone who can steer one navigation can pin a session with a
 // marker of their own and deny a reset for that window. A bounded availability loss in
 // place of a wrong-account credential write.
-func SaveLinkMarker(httpSession sessionstore.Store, w http.ResponseWriter, r *http.Request,
+func SaveLinkMarker(httpSession markerSessionStore, w http.ResponseWriter, r *http.Request,
 	flow LinkMarkerFlow, id int64, codeHash string) (LinkMarkerRejection, error) {
 
 	sess, err := httpSession.Get(r, sessionkeys.AuthServerSessionName)
@@ -151,40 +169,51 @@ func SaveLinkMarker(httpSession sessionstore.Store, w http.ResponseWriter, r *ht
 
 	now := time.Now().UTC()
 
-	held, err := decodeLinkMarker(sess)
-	if err != nil {
-		return "", err
-	}
+	// The rule is decided on the session as it is stored when the marker is written, not on the copy
+	// this request read when it began: another request of the browser may have started a continuation
+	// since, and the copy would not show it. Only the marker's key is written, onto those values, on
+	// condition nothing wrote the session in between, so whatever else another request wrote is kept
+	// (#579).
+	err = httpSession.ChangeAndSave(r, w, sess, func(values map[string]any) error {
+		held, err := decodeLinkMarker(values)
+		if err != nil {
+			return err
+		}
 
-	live := held != nil && !held.expired(now)
-	if live && held.CodeHash != codeHash {
+		live := held != nil && !held.expired(now)
+		if live && held.CodeHash != codeHash {
+			return errContinuationInFlight
+		}
+
+		// A live marker with this code hash is this same continuation, so it keeps its id.
+		// Rotating here would refuse the form that link had already rendered, which is the
+		// legitimate sequence "the user clicked the emailed link again".
+		continuationId := ""
+		if live {
+			continuationId = held.ContinuationId
+		}
+		if continuationId == "" {
+			continuationId = securerandom.String(continuationIdLength)
+		}
+
+		jsonData, err := json.Marshal(&LinkMarker{
+			Flow:           flow,
+			Id:             id,
+			CodeHash:       codeHash,
+			ExpiresAt:      now.Add(linkMarkerLifetime),
+			ContinuationId: continuationId,
+		})
+		if err != nil {
+			return errs.Wrap(err, "unable to marshal link marker")
+		}
+
+		values[sessionkeys.LinkMarker] = string(jsonData)
+		return nil
+	})
+	if errors.Is(err, errContinuationInFlight) {
 		return LinkMarkerContinuationInFlight, nil
 	}
-
-	// A live marker with this code hash is this same continuation, so it keeps its id.
-	// Rotating here would refuse the form that link had already rendered, which is the
-	// legitimate sequence "the user clicked the emailed link again".
-	continuationId := ""
-	if live {
-		continuationId = held.ContinuationId
-	}
-	if continuationId == "" {
-		continuationId = securerandom.String(continuationIdLength)
-	}
-
-	jsonData, err := json.Marshal(&LinkMarker{
-		Flow:           flow,
-		Id:             id,
-		CodeHash:       codeHash,
-		ExpiresAt:      now.Add(linkMarkerLifetime),
-		ContinuationId: continuationId,
-	})
-	if err != nil {
-		return "", errs.Wrap(err, "unable to marshal link marker")
-	}
-
-	sess.Values[sessionkeys.LinkMarker] = string(jsonData)
-	return "", httpSession.Save(r, w, sess)
+	return "", err
 }
 
 // GetLinkMarker returns the session's marker if it belongs to the wanted flow and is
@@ -195,7 +224,7 @@ func SaveLinkMarker(httpSession sessionstore.Store, w http.ResponseWriter, r *ht
 // which keeps its stack trace and keeps alerting rather than being answered as a bad
 // link. A value that will not unmarshal is a fault, not a miss: the session cookie is
 // encrypted and signed, so nobody outside this process can put one there.
-func GetLinkMarker(httpSession sessionstore.Store, r *http.Request,
+func GetLinkMarker(httpSession markerSessionStore, r *http.Request,
 	want LinkMarkerFlow) (*LinkMarker, LinkMarkerRejection, error) {
 
 	sess, err := httpSession.Get(r, sessionkeys.AuthServerSessionName)
@@ -206,7 +235,7 @@ func GetLinkMarker(httpSession sessionstore.Store, r *http.Request,
 	return readLinkMarker(sess, want, time.Now().UTC())
 }
 
-// decodeLinkMarker returns whatever marker the session holds, of either flow and
+// decodeLinkMarker returns whatever marker the session's values hold, of either flow and
 // whether or not it is still live, or nil when the slot is empty.
 //
 // Separate from readLinkMarker because the two callers ask different questions of the
@@ -217,8 +246,8 @@ func GetLinkMarker(httpSession sessionstore.Store, r *http.Request,
 //
 // A value that will not unmarshal is a fault rather than an empty slot: the session
 // cookie is encrypted and signed, so nobody outside this process can put one there.
-func decodeLinkMarker(sess *sessionstore.Session) (*LinkMarker, error) {
-	jsonData, ok := sess.Values[sessionkeys.LinkMarker].(string)
+func decodeLinkMarker(values map[string]any) (*LinkMarker, error) {
+	jsonData, ok := values[sessionkeys.LinkMarker].(string)
 	if !ok {
 		return nil, nil
 	}
@@ -236,7 +265,7 @@ func decodeLinkMarker(sess *sessionstore.Session) (*LinkMarker, error) {
 func readLinkMarker(sess *sessionstore.Session, want LinkMarkerFlow,
 	now time.Time) (*LinkMarker, LinkMarkerRejection, error) {
 
-	marker, err := decodeLinkMarker(sess)
+	marker, err := decodeLinkMarker(sess.Values)
 	if err != nil {
 		return nil, "", err
 	}
@@ -268,12 +297,25 @@ func readLinkMarker(sess *sessionstore.Session, want LinkMarkerFlow,
 // and that is still worth keeping: it refuses a marker whose code has since been consumed
 // or reissued, which clearing at the end of a flow says nothing about. Defence in depth
 // now rather than the boundary itself.
-func ClearLinkMarker(httpSession sessionstore.Store, w http.ResponseWriter, r *http.Request) error {
+func ClearLinkMarker(httpSession markerSessionStore, w http.ResponseWriter, r *http.Request) error {
 	sess, err := httpSession.Get(r, sessionkeys.AuthServerSessionName)
 	if err != nil {
 		return err
 	}
 
-	delete(sess.Values, sessionkeys.LinkMarker)
-	return httpSession.Save(r, w, sess)
+	// Only the marker's key is removed, from the session as it is stored now, on condition nothing
+	// wrote it in between, so whatever another request of the browser wrote since this one began is
+	// kept (#579). A session holding no marker, or gone, has nothing to remove, and nothing is written.
+	err = httpSession.ChangeAndSave(r, w, sess, func(values map[string]any) error {
+		if _, held := values[sessionkeys.LinkMarker]; !held {
+			return errNoMarkerStored
+		}
+		delete(values, sessionkeys.LinkMarker)
+		return nil
+	})
+	if errors.Is(err, errNoMarkerStored) || errors.Is(err, sessionstore.ErrNotFound) {
+		delete(sess.Values, sessionkeys.LinkMarker)
+		return nil
+	}
+	return err
 }

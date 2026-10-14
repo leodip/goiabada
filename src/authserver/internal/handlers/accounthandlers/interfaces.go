@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 // The collaborator ports this package's handlers take, declared here rather than imported from
@@ -25,6 +26,16 @@ import (
 //
 // Per-file database ports stay per-file, beside the function taking them: the database is the
 // dependency that genuinely varies from handler to handler, and these six do not.
+
+// linkMarkerSessionStore is the browser session store the two emailed-link flows keep their marker
+// in: the request's session, and the conditional write the marker's save and clear are made with,
+// which only sessionstore.ConditionalStore has, so neither puts back the copy of the session its
+// request read when it began (#579). Shared by the reset and activation handlers, whose marker it is.
+type linkMarkerSessionStore interface {
+	Get(r *http.Request, name string) (*sessionstore.Session, error)
+	ChangeAndSave(r *http.Request, w http.ResponseWriter, session *sessionstore.Session,
+		change func(values map[string]any) error) error
+}
 
 // AuditLogger records one security event. The context is first because every audit event raised
 // while serving a request is correlated to that request: the installed slog handler reads chi's

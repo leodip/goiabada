@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -22,11 +23,24 @@ type sessionIdentifierDatabase interface {
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 }
 
+// sessionIdentifierStore is what the session identifier middleware calls on the browser session
+// store: the request's session, and the conditional write its removal of a dangling pointer is made
+// with, which only sessionstore.ConditionalStore has (#579).
+type sessionIdentifierStore interface {
+	Get(r *http.Request, name string) (*sessionstore.Session, error)
+	ChangeAndSave(r *http.Request, w http.ResponseWriter, session *sessionstore.Session,
+		change func(values map[string]any) error) error
+}
+
+// errPointerNotStored is the refusal removeDanglingPointer's change answers when the browser session
+// no longer holds the pointer it was asked to remove, so nothing is written.
+var errPointerNotStored = errors.New("the browser session no longer holds the session pointer")
+
 // SessionIdentifier puts on the request's context the session identifier the session
 // cookie names, when that session still exists. A failure to read the session or its row is
 // answered through faults, in the format of the branch it is mounted on; on a page route it is
 // text/plain (#435).
-func SessionIdentifier(sessionStore sessionstore.Store, database sessionIdentifierDatabase, faults ServerFaults) func(next http.Handler) http.Handler {
+func SessionIdentifier(sessionStore sessionIdentifierStore, database sessionIdentifierDatabase, faults ServerFaults) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -60,8 +74,7 @@ func SessionIdentifier(sessionStore sessionstore.Store, database sessionIdentifi
 					// session has been deleted from DB, clear only the session identifier
 					// but preserve other session data (like AuthContext for ongoing auth flows)
 					slog.WarnContext(ctx, "session not found in the database, clearing the session identifier")
-					delete(sess.Values, sessionkeys.SessionIdentifier)
-					err = sessionStore.Save(r, w, sess)
+					err = removeDanglingPointer(sessionStore, w, r, sess, sessionIdentifier)
 					if err != nil {
 						if faults.answered(w, r, errs.Wrap(err, "unable to save the session")) {
 							return
@@ -79,4 +92,29 @@ func SessionIdentifier(sessionStore sessionstore.Store, database sessionIdentifi
 		}
 		return http.HandlerFunc(fn)
 	}
+}
+
+// removeDanglingPointer removes the pointer to a user session that no longer exists from the browser
+// session, and writes only that removal: onto the session as it is stored now, on condition nothing
+// wrote it in between, through ChangeAndSave (#579). The copy the request read when it began would put
+// back whatever another request of this browser wrote since, such as a ceremony another tab started.
+//
+// It removes that pointer and no other, so a pointer to a newer user session written meanwhile is
+// kept, and it writes nothing when the session no longer holds the pointer, or is gone, since the
+// pointer is then already removed. Either way the request's own session no longer holds it.
+func removeDanglingPointer(sessionStore sessionIdentifierStore, w http.ResponseWriter, r *http.Request,
+	sess *sessionstore.Session, sessionIdentifier string) error {
+
+	err := sessionStore.ChangeAndSave(r, w, sess, func(values map[string]any) error {
+		if values[sessionkeys.SessionIdentifier] != sessionIdentifier {
+			return errPointerNotStored
+		}
+		delete(values, sessionkeys.SessionIdentifier)
+		return nil
+	})
+	if errors.Is(err, errPointerNotStored) || errors.Is(err, sessionstore.ErrNotFound) {
+		delete(sess.Values, sessionkeys.SessionIdentifier)
+		return nil
+	}
+	return err
 }
