@@ -199,10 +199,9 @@ func HandleAuthCompletedGet(
 			// identifier asked the rule before rotating (bindReusedSession), so nothing was rotated
 			// either unless the newer sign-in landed between that check and the rotation. This
 			// request does not put its own ceremony back over the newer one (rejectCeremonyMismatch).
-			// That is all it establishes: the browser-session store is last-writer-wins, so a
-			// ceremony that is still current can write over one started after it loaded, at any
-			// step (#579). The user starts again from the application, which is plain SSO over the
-			// session as it is now.
+			// Its other writes are held to the same end by their own condition: each lands only while
+			// the browser session still holds this ceremony (#579). The user starts again from the
+			// application, which is plain SSO over the session as it is now.
 			//
 			// A restart at level 1 is not the answer here, as it is for a code whose authenticator
 			// is gone: the session is valid and this user's. A restarted ceremony verifies the

@@ -48,7 +48,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `oauth/` - The OAuth/OIDC values both processes share: token, JWT and JWKS types, the PKCE challenge helper, and the error response of RFC 6749 section 5.2. `ErrorDetail` is a comparable struct of code, description, HTTP status and WWW-Authenticate challenge, read through `Code()`, `Description()`, `HTTPStatus()` and `WWWAuthenticate()`, whose `Is` compares with `==`; `ConformErrorDescription` replaces every character RFC 6749 Appendix A.8 forbids in an `error_description` and bounds the result to 512 bytes, because a description interpolates request text and, since #213's deferral, is parked on an auth context every request of that ceremony then carries. Both were `core/customerrors`, the detail a map, until #442. The admin console's client of the protocol — JWKS parser, token client, authorize redirect — is `adminconsole/internal/oauthclient`; `response_type` parsing is the provider's and is in `authserver/internal/protocolvalidation` (#385). `IsWellFormedSpaceDelimited` and `SplitSpaceDelimited`, the one grammar and the one splitter of the five space-delimited request parameters (exactly one space between values, none at either end, and no other separator), are here because `core/i18n` reads `ui_locales` with them in a middleware both processes mount (#244)
 - `phonecountries/` - The phone country list a user picks a phone number's country from: one entry per country and E.164 calling code, built once from `countries/`, sorted by country name, with `ByUniqueID` its lookup. An entry's id, `<alpha3>_<index>`, is stored on the user row, so the order of a country's codes is stored data (#432). It left core for `authserver/internal/phonecountries` in #344, when no console code read it, and came back in #563 so the admin console's two phone pages can build their list from it instead of asking the admin API, which refuses a token carrying `authserver:manage-account` alone
 - `securerandom/` - Random strings over `crypto/rand`, drawn by rejection sampling so an alphabet whose length does not divide 256 introduces no modulo bias: `String(n)` over the alphabet ids, secrets and security tokens are minted over, `StringFromAlphabet(n, alphabet)` over one the caller names, at most 256 bytes. Neither returns an error, because a CSPRNG failure ends the process (#211). It was `core/stringutil` until #442, which deleted the auth server's `randomstring` wrapper beside it
-- `sessionstore/` - The server-side session store and its codec, which is where an `AuthContext` lives; the cookie carries the key and nothing else (#266). `Options` is the six cookie attributes this repository sets rather than an `http.Cookie`, so a MaxAge below zero is the one way to say "delete this" and there is no `Expires` beside it to disagree (#269). It holds the one session-key rule both configurations apply, `ParseKeys`, whose refusals name the variable each value was configured under (#434)
+- `sessionstore/` - The server-side session store and its codec, which is where an `AuthContext` lives; the cookie carries the key and nothing else (#266). `Options` is the six cookie attributes this repository sets rather than an `http.Cookie`, so a MaxAge below zero is the one way to say "delete this" and there is no `Expires` beside it to disagree (#269). It holds the one session-key rule both configurations apply, `ParseKeys`, whose refusals name the variable each value was configured under (#434). `ConditionalStore` writes a session on condition nothing wrote it since a fresh read, which the auth server's store is built with and the admin console's is not, so the console's browser session stays last-writer-wins (#579)
 - `timezones/` - The IANA zone table a user's zone is picked from, one row per country and zone, generated from the tzdata release and SHA-256 its generator pins. Nothing loads it at startup; a test checks every zone loads (#49, #432)
 
 ### Auth Server (`src/authserver/`)
@@ -233,11 +233,19 @@ page, saving no auth context, because the newer sign-in's own `/auth/authorize` 
 replaced the ceremony. A restart would make it verify the password itself, so its bind would
 replace the session's authentication, asking an SSO ceremony for a password nobody requested. A
 reuse arm that rotates the browser session's identifier asks the same rule first
-(`AuthenticationIsStale`) and answers the same page without rotating: the rotation writes the
-request's own copy of the browser session, read when it began, over the newer ceremony's. That
-keeps a stale ceremony from writing over the newer one. It does not keep a ceremony that is still
-current from writing over one started after it loaded, at any step: the browser-session store is
-last-writer-wins (#579).
+(`AuthenticationIsStale`) and answers the same page without rotating. Beyond that rule, every write
+a step after `/auth/authorize` makes to the browser session lands only while the session still
+holds that step's ceremony (#579): the ceremony store's save, clear and rotation read the session
+afresh, refuse when it holds another ceremony, none, or is gone (signed out, expired, or rotated
+away by another request of the browser), apply only their own change to what they read, and write
+on condition the stored row is unchanged, trying again at most three times in all when an unrelated
+write lands between. A step so refused writes nothing and answers the "no longer active" page
+(`ceremony.ErrCeremonyReplaced`), so a ceremony started after the step loaded carries on. The
+create arm of `/auth/completed` asks first (`ConfirmCeremony`), before it ends a foreign session or
+commits a new one, and its rotation carries the same condition. `/auth/authorize` still replaces
+whatever ceremony the session held, and logout still deletes it whole; two requests of one ceremony
+stay last-writer-wins between themselves, so a double-submitted consent form works. The
+session-identifier middleware and the emailed-link marker write only their own key the same way.
 
 ### Deferred error redirects (#213)
 `/auth/authorize` never redirects an unauthenticated browser to a client's `redirect_uri` on a failed
