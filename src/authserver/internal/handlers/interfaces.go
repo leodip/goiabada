@@ -8,7 +8,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/oauth"
 
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -16,9 +15,7 @@ import (
 
 // PageRenderer and JSONWriter are the two ways a handler here answers, and a handler is handed
 // exactly one of them. The token, userinfo, JWKS and discovery endpoints take JSONWriter alone, so
-// an HTML error page on one of them is a compile error rather than a review finding: a client
-// parsing those endpoints as JSON got an HTML 500 on 23 fault paths while one port carried both
-// writers (#435). Every other handler answers pages and takes PageRenderer. The concrete
+// an HTML error page on one of them is a compile error rather than a review finding (#435). Every other handler answers pages and takes PageRenderer. The concrete
 // render.Renderer satisfies both, so routes.go builds it once.
 type PageRenderer interface {
 	InternalServerError(w http.ResponseWriter, r *http.Request, err error)
@@ -36,9 +33,12 @@ type JSONWriter interface {
 	EncodeJSON(w http.ResponseWriter, r *http.Request, data interface{})
 }
 
-// CeremonyStore is what the ceremony handlers call on ceremony.Store, which keeps the
-// AuthContext in the browser session between hops. UILocales is on the concrete type and not
-// here: only the locale middleware reads it, and no handler does (#435).
+// CeremonyStore is what the ceremony's HTTP side calls on ceremony.Store, which keeps the
+// AuthContext in the browser session between hops: the route boundary loads the ceremony through
+// it, and every write an authflow operation makes reaches it through the per-request adapter
+// (browserSession), with the request and the response writer of the request at hand. UILocales is
+// on the concrete type and not here: only the locale middleware reads it, and no handler does
+// (#435).
 type CeremonyStore interface {
 	GetAuthContext(r *http.Request) (*ceremony.AuthContext, error)
 	// SaveAuthContext is a step's save, which writes only while the browser session still holds
@@ -70,10 +70,6 @@ type CeremonyStore interface {
 	ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremonyId string) error
 }
 
-type OtpSecretGenerator interface {
-	GenerateKeyURL(email string, appName string) (string, error)
-}
-
 // TokenIssuer redeems a validated grant at the token endpoint, one method per grant. Each owns its
 // grant from the claim on what is redeemed to the minted tokens, so the handler parses, dispatches,
 // audits and answers, and writes nothing of a grant itself (#437).
@@ -84,61 +80,6 @@ type TokenIssuer interface {
 	// IssuePasswordGrant issues the resource owner password credentials grant, RFC 6749 section 4.3.
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 	IssuePasswordGrant(ctx context.Context, settings *record.Settings, input *issuance.ROPCGrantInput) (*oauth.TokenResponse, error)
-}
-
-// ImplicitTokenIssuer is the one issuance /auth/issue performs itself: the implicit grant's tokens,
-// signed in a transaction that takes the session row first (#197). The token endpoint issues the other
-// four grants, through TokenIssuer.
-type ImplicitTokenIssuer interface {
-	IssueImplicitTx(ctx context.Context, settings *record.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error)
-}
-
-type AuthorizeValidator interface {
-	ValidateScopes(ctx context.Context, scope string) error
-	ValidateClientAndRedirectURI(ctx context.Context, input *protocolvalidation.ValidateClientAndRedirectURIInput) error
-	ValidateRequest(input *protocolvalidation.ValidateRequestInput) error
-	ValidatePrompt(prompt string) (string, error)
-	ValidateUnsupportedRequestParameters(input *protocolvalidation.ValidateUnsupportedRequestParametersInput) error
-}
-
-// CodeIssuer issues an authorization code in a transaction of its own, which takes the session row
-// before the insert (#139). The handler opens no transaction for it.
-type CodeIssuer interface {
-	IssueAuthCodeTx(ctx context.Context, input *issuance.CreateCodeInput) (*record.Code, error)
-}
-
-type UserSessionManager interface {
-	HasValidUserSession(userSession *record.UserSession, idleTimeoutInSeconds int, maxLifetimeInSeconds int, requestedMaxAgeInSeconds *int64) bool
-	// StartNewUserSession creates the create arm's session in one transaction and answers it with
-	// the rows it removed. It writes nothing to the browser: the caller binds the session to the
-	// browser session after it returns, and abandons it when that fails.
-	StartNewUserSession(ctx context.Context, clientId int64, authentication usersession.Authentication,
-		authStateGeneration int64, otpConfigGeneration *int64, device usersession.Device, ipAddress string,
-		replacing *record.UserSession, limits usersession.SessionLimits) (*record.UserSession, []usersession.Removal, error)
-	// AbandonUserSession deletes a session StartNewUserSession committed when binding it to the
-	// browser session failed, and returns cause, joined with the delete's failure if it failed.
-	AbandonUserSession(ctx context.Context, userSession *record.UserSession, cause error) error
-
-	// BumpUserSession updates an existing session's last accessed time and client list.
-	// It also handles ACR/AMR step-up: if the user completed a higher level of authentication
-	// (e.g., added OTP to a password-only session), the session's AuthMethods and AcrLevel
-	// are upgraded to reflect the stronger authentication that was performed.
-	// Note: ACR is only upgraded, never downgraded, during a session's lifetime.
-	// A non-empty ipAddress replaces the session's recorded address; empty leaves it.
-	BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
-		authMethods string, acrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error)
-
-	// BindUserSession is BumpUserSession for a completed sign-in: under the session's row lock, it
-	// checks the sign-in's one-time code claim on the user, raises the session or, with replace,
-	// writes the sign-in's authentication over it, and sets its auth_time (#542).
-	BindUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
-		authentication usersession.Authentication, replace bool, ipAddress string) (*record.UserSession, error)
-
-	// AuthenticationIsStale answers, without locking or writing, whether BindUserSession would
-	// refuse authentication as older than the session's (#538), so the reuse arm can refuse before
-	// it rotates the browser session's identifier rather than after.
-	AuthenticationIsStale(ctx context.Context, sessionIdentifier string,
-		authentication usersession.Authentication) (bool, error)
 }
 
 type TokenValidator interface {
@@ -163,14 +104,9 @@ type AuditLogger interface {
 // the rate limiter charges the reservation it is holding instead of dropping it.
 //
 // A handler names no bucket and no key: the limiter chose those before the handler ran, and
-// a handler that derived them again would be free to disagree with the limiter about which
-// account the request is, which is exactly how the per-account tiers came to be worth
-// nothing (#219). *middleware.RateLimiter satisfies it, and the call is a
+// a handler deriving them again could disagree with the limiter about which account the
+// request is (#219). *middleware.RateLimiter satisfies it, and the call is a
 // no-op on a request that carries no reservation.
 type CredentialFailureRecorder interface {
 	RecordCredentialFailure(r *http.Request)
-}
-
-type PermissionChecker interface {
-	FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, scope string, user *record.User) (string, error)
 }

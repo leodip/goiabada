@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -15,11 +14,9 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// clientErrorDatabase is what the client-error responder reads: the client behind a ceremony, for
-// the provenance of its redirect URI, and the redirect URIs it has registered now, for the
-// registration gate. *data.Database satisfies it.
+// clientErrorDatabase is what the client-error responder reads: the redirect URIs a client has
+// registered now, for the registration gate. data.Database satisfies it.
 type clientErrorDatabase interface {
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.RedirectURI, error)
 }
 
@@ -54,8 +51,8 @@ func NewClientErrorResponder(database clientErrorDatabase, pageRenderer PageRend
 // and how to say it, and which client is being answered, since RFC 9700 4.11.2 makes the source of
 // the redirect URI an input to whether it is trusted (#108).
 type redirectErrorInput struct {
-	// client is the client being answered, or nil when the handler could not resolve it before
-	// the error arose. Nil means "provenance unknown", never "there is no client": the trust
+	// client is the client being answered, or nil when its provenance could not be resolved
+	// (authflow.ClientError.Client). Nil means "provenance unknown", never "there is no client": the trust
 	// decision is about where the redirect URI came from, so an unresolved client is the
 	// untrusted case rather than an exempt one.
 	client *record.Client
@@ -132,20 +129,13 @@ func (rsp *ClientErrorResponder) answerClientAfterClear(w http.ResponseWriter, r
 	}
 }
 
-// clientProvenance is authflow.ClientProvenance over the responder's database, for the handlers
-// that reach an error response without having loaded the client: nil when the lookup fails, the
-// untrusted case (#108).
-func (rsp *ClientErrorResponder) clientProvenance(ctx context.Context, clientIdentifier string) *record.Client {
-	return authflow.ClientProvenance(ctx, rsp.database, clientIdentifier)
-}
-
 // RedirectWillBeEmitted answers whether an error response to this client would leave the server as a
 // redirect, or would be withheld and replaced by the refusal interstitial. It is three gates asked as
 // one question, so the callers that need the answer before building a response and the emitter that
 // enforces it cannot drift apart. site names the caller for the log line; the URI itself is never
 // logged (#159).
 //
-// Gate 3, provenance. RFC 9700 4.11.2: an attacker who registers a client anonymously can use this
+// The provenance gate. RFC 9700 4.11.2: an attacker who registers a client anonymously can use this
 // server's own error redirect to deliver a victim to a host they control, by getting the user to
 // decline (attack 2), by sending a deliberately invalid request (attack 1), or by sending a valid
 // silent request with prompt=none (attack 3). The RFC leaves "trusted" to the server and names the
@@ -157,10 +147,10 @@ func (rsp *ClientErrorResponder) clientProvenance(ctx context.Context, clientIde
 // self-registered client's silent renewal receives no readable error and falls back to an
 // interactive authorization (#108 decision 15).
 //
-// Gate 4, emittability: whether the string can name the host it appears to
+// The emittability gate: whether the string can name the host it appears to
 // (checkRedirectURIEmittable). An administrator-registered client passes the provenance gate and can
-// still hold a row stored before these rules existed. Unreachable once the authorization endpoint has
-// refused the URI, and kept so that a test enforces it (#122).
+// still hold a stored URI that does not. Unreachable once the authorization endpoint has refused the
+// URI; kept so that a test enforces it (#122).
 //
 // The registration gate, the only one that reads anything: the redirect URI must still be one the
 // client has registered now. A ceremony can sit on the consent screen as long as a person takes to
@@ -173,7 +163,7 @@ func (rsp *ClientErrorResponder) clientProvenance(ctx context.Context, clientIde
 // it unregistered here would withhold an error RFC 6749 4.1.2.1 says the client is owed. Every
 // implicit response stays strict.
 //
-// A failed load answers no, for clientProvenance's reason.
+// A failed load answers no: an unresolved answer is the untrusted case, as an unresolved client is.
 //
 // This predicate is asked twice within one authorization request, first by authflow.Authorization
 // through its port, and the second answer may not be more permissive than the first: see

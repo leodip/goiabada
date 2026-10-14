@@ -119,8 +119,8 @@ func issueImplicitTokens(
 	state string,
 	tokenResponse *issuance.ImplicitGrantResponse,
 ) error {
-	// Gate 4, the last resort, ABOVE the response-mode dispatch so that it covers the fragment and
-	// form_post alike, as issueAuthCode's does. This flow hands over access and ID tokens rather than
+	// checkRedirectURIEmittable, the last resort, above the response-mode dispatch so that it covers
+	// the fragment and form_post alike, as issueAuthCode's does. This flow hands over access and ID tokens rather than
 	// a code, so a redirect URI that resolves to a host the operator never registered exfiltrates
 	// credentials directly rather than something still to be exchanged, and the form's action is the
 	// one place html/template's URL filter passes a scheme-relative value through untouched. Nothing
@@ -130,15 +130,14 @@ func issueImplicitTokens(
 		return err
 	}
 
-	// The response's parameters, in the order they reach the client. Each carries the condition it
-	// already had; what changed is the construction underneath and the rule for state.
+	// The response's parameters, in the order they reach the client.
 	//
 	// state is appended on its value being non-empty and nothing else. There is no TrimSpace: RFC
 	// 6749 section 3.1 says "Parameters sent without a value MUST be treated as if they were
 	// omitted from the request", so "?state=" and "?state" are requests that carried no state, and
 	// Appendix A.5's "state = 1*VSCHAR" admits no empty value in the response either. Space is
 	// %x20 and so is VSCHAR, so a whitespace-only state is a value the client chose and section
-	// 4.2.2 requires "the exact value received from the client": trimming it away substituted this
+	// 4.2.2 requires "the exact value received from the client": trimming it would substitute this
 	// server's judgement for the client's (#146).
 	params := make([]responseParam, 0, 6)
 
@@ -178,8 +177,8 @@ func issueImplicitTokens(
 
 func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, code *record.Code, responseMode string) error {
 
-	// Gate 4, the last resort, ABOVE the response-mode dispatch so that it covers query, fragment
-	// and form_post alike. All three emit the stored value: the first two into a Location header,
+	// checkRedirectURIEmittable, the last resort, above the response-mode dispatch so that it covers
+	// query, fragment and form_post alike. All three emit the stored value: the first two into a Location header,
 	// the third into the action of an auto-submitting form, which html/template's URL filter passes
 	// through untouched for a scheme-relative value. Unreachable once the authorization endpoint has
 	// refused the URI, and kept so that a test enforces it (#122).
@@ -197,8 +196,7 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 	// emitter states at length: RFC 6749 section 3.1 makes a parameter sent without a value an
 	// omitted one, and Appendix A.5's "state = 1*VSCHAR" admits no empty value in the response. A
 	// whitespace-only state is a real value, because space is %x20 and so is VSCHAR, and section
-	// 4.1.2 requires "the exact value received from the client", so the TrimSpace that used to drop
-	// it is gone (#146).
+	// 4.1.2 requires "the exact value received from the client", so it is never trimmed (#146).
 	params := []responseParam{{"code", code.Code}}
 	if code.State != "" {
 		params = append(params, responseParam{"state", code.State})

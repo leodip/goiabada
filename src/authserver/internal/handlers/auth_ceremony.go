@@ -24,13 +24,10 @@ const ceremonyIdField = "ceremonyId"
 // ceremonyMatches reports whether a submitted form, or a step's page load, belongs to the ceremony
 // the session currently holds.
 //
-// An empty stored id is refused rather than matched against an empty submission. Only an auth
-// context written by a binary from before #79 can carry one, and treating "" as equal to ""
-// would make such a context accept a form naming no ceremony at all, which is every forged
-// form. The cost is that a user mid-flow across a deploy is refused once and starts the
-// authorization again.
+// An empty stored id is refused rather than matched against an empty submission: "" equal to ""
+// would accept a form naming no ceremony at all, which is every forged form (#79).
 //
-// Constant time, like emailedCodeMatches and the client secret comparison in
+// Constant time, like accounthandlers' emailedCodeMatches and the client secret comparison in
 // protocolvalidation.ValidateTokenRequest. Not because this value is guessed at, but because a
 // plain comparison stopping at the first differing byte is the kind of thing that is cheap to avoid
 // and expensive to notice later.
@@ -47,9 +44,9 @@ func ceremonyMatches(contextCeremonyId string, submitted string) bool {
 // that failed. The route table builds one and hands it to every step handler, so these answers are
 // written once and no step can drift from them.
 //
-// It never decides a step and never writes the browser session: a step's saves and clears go through
-// the ceremony store the handler holds, or through the per-request adapter its authflow operation
-// writes through. The boundary only reads the auth context.
+// It never decides a step and never writes the browser session: a step's saves, clears and rotations
+// go through the per-request adapter (browserSession) its authflow operation writes through. The
+// boundary only reads the auth context.
 type CeremonyBoundary struct {
 	pageRenderer        PageRenderer
 	ceremonyStore       CeremonyStore

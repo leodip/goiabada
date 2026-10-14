@@ -14,7 +14,7 @@ import (
 )
 
 // passwordPromptDatabase is what PasswordPrompt reads: the ceremony's client, and whether it has a
-// logo for the form. *data.Database satisfies it.
+// logo for the form. data.Database satisfies it.
 //
 // No user session is read: the form prefills no address, because an ended session's address is
 // what a shared machine should not show (#248, #436).
@@ -35,7 +35,7 @@ func NewPasswordPrompt(database passwordPromptDatabase) *PasswordPrompt {
 	return &PasswordPrompt{database: database}
 }
 
-// Run loads the ceremony's client and returns its block (GetClientDisplayInfo). A failed read, or a
+// Run loads the ceremony's client and returns its block (getClientDisplayInfo). A failed read, or a
 // client not found, is returned as an error. It writes nothing.
 func (o *PasswordPrompt) Run(ctx context.Context, authContext *ceremony.AuthContext) (*ClientDisplayInfo, error) {
 	client, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientId)
@@ -45,11 +45,11 @@ func (o *PasswordPrompt) Run(ctx context.Context, authContext *ceremony.AuthCont
 	if client == nil {
 		return nil, errs.New("client not found")
 	}
-	return GetClientDisplayInfo(ctx, o.database, client), nil
+	return getClientDisplayInfo(ctx, o.database, client), nil
 }
 
 // passwordSubmissionDatabase is what PasswordSubmission reads: the account the address names.
-// *data.Database satisfies it.
+// data.Database satisfies it.
 type passwordSubmissionDatabase interface {
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
 }

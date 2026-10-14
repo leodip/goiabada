@@ -282,6 +282,23 @@ func TestRequireAuthState(t *testing.T) {
 		assert.NotContains(t, logged.Text(), "level=ERROR",
 			"the Back button must not page whoever watches error-level lines")
 	})
+
+	t.Run("a refusal whose page cannot be rendered answers the 500 page", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		rr := httptest.NewRecorder()
+		req := renderableRequest("/auth/pwd")
+		renderErr := errs.New("the template is broken")
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
+			mock.Anything).Return(renderErr).Once()
+		pageRenderer.On("InternalServerError", rr, req, renderErr).Return().Once()
+
+		ok := testCeremonyBoundary(pageRenderer, nil, nil).requireAuthState(rr, req,
+			&ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1PasswordCompleted},
+			ceremony.AuthStateLevel1Password)
+
+		assert.False(t, ok, "the caller must stop: the 500 page is the answer")
+		pageRenderer.AssertExpectations(t)
+	})
 }
 
 // The loader's arms that involve no ceremony id: a missing context, a store fault and a context the

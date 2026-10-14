@@ -15,17 +15,18 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// UserDisabledDescription is the error_description of the access_denied a ceremony is answered with
-// when its user turns out to be disabled. Three steps ask the question, each at the moment it is
-// cheapest to: the session shortcut at /auth/authorize, /auth/completed once the credential is
-// accepted (Completion), and /auth/issue before anything is minted (#197). They say the same thing,
-// so an application reading the description sees one condition wherever it was found.
-const UserDisabledDescription = "The user account is disabled."
+// userDisabledDescription is the error_description of the access_denied a ceremony is answered with
+// when its user turns out to be disabled. Three steps answer with it, each at the moment it is
+// cheapest to ask: the session shortcut at /auth/authorize, /auth/completed once the credential is
+// accepted (Completion), and /auth/issue before anything is minted (#197). DecideSilentAuthentication
+// answers the same condition with its own description, which the silent checks table on the docs'
+// prompt page holds.
+const userDisabledDescription = "The user account is disabled."
 
 // completionDatabase is what Completion reads and writes: the browser's session with its user, the
 // client, the ceremony's user, the stored consent, and the OTP configuration generation it promotes.
 // It embeds revocation.Database because a foreign session is ended through
-// revocation.TerminateUserSessionTx. *data.Database satisfies it.
+// revocation.TerminateUserSessionTx. data.Database satisfies it.
 type completionDatabase interface {
 	revocation.Database
 
@@ -52,25 +53,26 @@ type completionSessions interface {
 	AbandonUserSession(ctx context.Context, userSession *record.UserSession, cause error) error
 }
 
-// scopeFilter narrows a scope to what the user holds. *permissions.PermissionChecker satisfies it.
+// scopeFilter narrows a scope to what the user holds. *permissions.Checker satisfies it.
 type scopeFilter interface {
 	FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, scope string, user *record.User) (string, error)
 }
 
-// auditLogger records one security event under the request's context. *audit.AuditLogger
+// auditLogger records one security event under the request's context. *audit.Logger
 // satisfies it.
 type auditLogger interface {
 	Log(ctx context.Context, auditEvent string, details map[string]interface{})
 }
 
-// completionBrowser is every browser-session write Completion makes. Each lands only while the
-// browser session still holds this ceremony, and otherwise answers ceremony.ErrCeremonyReplaced and
-// writes nothing (#579). The handler's per-request adapter satisfies it.
+// completionBrowser is what Completion does through the handler's per-request adapter, which
+// satisfies it. Its save, clear and rotations land only while the browser session still holds this
+// ceremony, and otherwise answer ceremony.ErrCeremonyReplaced and write nothing (#579); the device
+// cookie is written once the create arm has bound its session.
 type completionBrowser interface {
 	stepSaver
 	ceremonyClearer
-	// RegenerateSession rotates the browser session's identifier, the reuse arm's rotation.
-	RegenerateSession(ceremonyId string) error
+	// sessionRotator is the reuse arm's rotation.
+	sessionRotator
 	// ConfirmCeremony writes nothing: it answers nil while the browser session, read afresh, still
 	// holds the ceremony, the create arm's check before it ends or creates anything.
 	ConfirmCeremony(ceremonyId string) error
@@ -201,7 +203,7 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 			return CompletionResult{}, err
 		}
 
-		switch decideBeforeBinding(user, authContext.AuthStateGeneration, OTPClaimOf(authContext)) {
+		switch decideBeforeBinding(user, authContext.AuthStateGeneration, otpClaimOf(authContext)) {
 		case beforeBindingUserMissing:
 			return CompletionResult{}, errs.New("user not found")
 		case beforeBindingUserDisabled:
@@ -209,7 +211,7 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 				"user_id": user.Id,
 			})
 			return CompletionResult{
-				ClientError: &ClientError{Client: client, Code: "access_denied", Description: UserDisabledDescription},
+				ClientError: &ClientError{Client: client, Code: "access_denied", Description: userDisabledDescription},
 				ClearErr:    browser.ClearAuthContext(authContext.CeremonyId),
 			}, nil
 		case beforeBindingGenerationMoved:
@@ -352,7 +354,7 @@ func (o *Completion) bindReusedSession(ctx context.Context, browser completionBr
 		UserId:      authContext.UserId,
 		AuthMethods: authContext.AuthMethods,
 		AcrLevel:    targetAcrLevel,
-		OTPClaim:    OTPClaimOf(authContext),
+		OTPClaim:    otpClaimOf(authContext),
 		// The instant the ceremony adopted the session at, nil for one that authenticated afresh. The
 		// bind's ordering rule compares it with the locked row (#538).
 		AdoptedAuthTime: authContext.AdoptedSessionAuthTime,
@@ -486,7 +488,7 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 		AcrLevel:         targetAcrLevel,
 		AuthTime:         authContext.AuthenticatedAt,
 		PasswordAuthTime: authContext.PasswordVerifiedAt,
-		OTPClaim:         OTPClaimOf(authContext),
+		OTPClaim:         otpClaimOf(authContext),
 	}, authContext.AuthStateGeneration, authContext.OtpConfigGeneration, device, ipAddress, replacing, limits)
 	if err == nil {
 		if rotateErr := browser.RegenerateSessionAndBind(authContext.CeremonyId, newSession.SessionIdentifier); rotateErr != nil {
@@ -515,9 +517,9 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 	return newSession, nil
 }
 
-// OTPClaimOf is the ceremony's claim to a one-time code: whether its methods name one, and the
+// otpClaimOf is the ceremony's claim to a one-time code: whether its methods name one, and the
 // generation of the authenticator it came from, adopted from the session or recorded when the code
 // was entered (#542).
-func OTPClaimOf(authContext *ceremony.AuthContext) otpcredential.OTPClaim {
+func otpClaimOf(authContext *ceremony.AuthContext) otpcredential.OTPClaim {
 	return otpcredential.OTPClaim{Claimed: authContext.ClaimsOTP(), Generation: authContext.OtpClaimGeneration}
 }

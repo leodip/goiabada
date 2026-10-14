@@ -1063,7 +1063,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		// The client's redirect URI was validated upstream, so it is owed an error response even
 		// when this server cannot tidy up after itself, and RFC 6749 4.1.2.1 mints server_error for
 		// exactly this condition (#141). This delivery point gets that behaviour by going through
-		// answerClientWithError rather than by re-implementing it from memory, which is the whole
+		// answerClientAfterStepClear rather than by re-implementing it from memory, which is the whole
 		// reason that helper was extracted.
 		location := rr.Header().Get("Location")
 		assert.Contains(t, location, "error=server_error")

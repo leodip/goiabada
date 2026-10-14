@@ -10,45 +10,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging/logtest"
 )
 
 // The responder's emission gates and encodings are pinned in handler_authorize_test.go, which calls
-// them as its methods; these cases own its two other answers: the provenance lookup and the
-// server_error fallback after a failed clear.
-
-func TestClientErrorResponder_ClientProvenance(t *testing.T) {
-	t.Run("the client the identifier names", func(t *testing.T) {
-		database := datamocks.NewDatabase(t)
-		client := &record.Client{Id: 7, ClientIdentifier: "provenance-client"}
-		req := httptest.NewRequest(http.MethodGet, "/auth/consent", nil)
-		database.On("GetClientByClientIdentifier", req.Context(), mock.Anything, "provenance-client").Return(client, nil).Once()
-
-		got := testClientErrorResponder(database, nil, nil).clientProvenance(req.Context(), "provenance-client")
-
-		assert.Same(t, client, got)
-	})
-
-	t.Run("a failed load is unresolved provenance, logged at error", func(t *testing.T) {
-		logged := logtest.CaptureSlog(t)
-		database := datamocks.NewDatabase(t)
-		req := httptest.NewRequest(http.MethodGet, "/auth/consent", nil)
-		database.On("GetClientByClientIdentifier", req.Context(), mock.Anything, "provenance-client").Return(nil, assert.AnError).Once()
-
-		got := testClientErrorResponder(database, nil, nil).clientProvenance(req.Context(), "provenance-client")
-
-		assert.Nil(t, got)
-		records := logged.Records()
-		require.Len(t, records, 1)
-		assert.Equal(t, "ERROR", records[0].Level.String())
-		assert.Equal(t, "unable to load the client while answering it with an error, treating its provenance as unresolved",
-			records[0].Message)
-		assert.Equal(t, "provenance-client", records[0].Attrs["client_identifier"])
-	})
-}
+// them as its methods; these cases own its other answer: the server_error fallback after a failed
+// clear.
 
 func TestClientErrorResponder_AnswerClientAfterClear(t *testing.T) {
 	input := testRedirectError("access_denied", "The user did not provide consent", "query",

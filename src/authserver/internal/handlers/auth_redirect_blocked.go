@@ -9,7 +9,8 @@ import (
 
 // This file is the refusal interstitial: the page a user is shown instead of being redirected to a
 // destination this server will not send them to. ClientErrorResponder.redirToClientWithError decides
-// when it renders; everything here is what it renders and the pure function behind the one thing on
+// when it replaces an error redirect, and HandleIssueGet renders it for a redirect URI no longer
+// registered (#241); everything here is what it renders and the pure function behind the one thing on
 // it a user can act on.
 //
 // There are three such destinations, and the responder's RedirectWillBeEmitted holds all three: one a client
@@ -59,8 +60,8 @@ func (rsp *ClientErrorResponder) renderRedirectBlocked(w http.ResponseWriter, r 
 		"destination": redirectDestinationLabel(input.redirectURI),
 	}
 
-	// The client is nil only when the handler could not resolve one, which is the untrusted case
-	// rather than an exempt one. There is then no name to show and no marking to make: saying the
+	// The client is nil when its provenance could not be resolved, or at /auth/issue when it no
+	// longer exists: the untrusted case rather than an exempt one. There is then no name to show and no marking to make: saying the
 	// application registered itself would be a claim this server cannot back.
 	if input.client != nil {
 		name, unverified := authflow.ConsentClientName(input.client)

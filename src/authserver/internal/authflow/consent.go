@@ -15,7 +15,7 @@ import (
 )
 
 // consentPromptDatabase is what ConsentPrompt reads: the user, the client, the user's stored
-// consent to it, and whether the client has a logo for the screen. *data.Database satisfies it.
+// consent to it, and whether the client has a logo for the screen. data.Database satisfies it.
 type consentPromptDatabase interface {
 	clientDisplayDatabase
 
@@ -74,7 +74,7 @@ type ConsentPromptResult struct {
 //     user or client not found, is returned as an error, and nothing is saved.
 //  2. Builds the screen's rows from the ceremony's scope and the stored consent, and decides whether
 //     the screen is owed (ConsentScreenOwed).
-//  3. Owed: reads the client block (GetClientDisplayInfo) and returns the screen. Not owed: saves
+//  3. Owed: reads the client block (getClientDisplayInfo) and returns the screen. Not owed: saves
 //     the ceremony in ready_to_issue_code and returns /auth/issue.
 func (o *ConsentPrompt) Run(ctx context.Context, browser stepSaver,
 	authContext *ceremony.AuthContext) (ConsentPromptResult, error) {
@@ -103,7 +103,7 @@ func (o *ConsentPrompt) Run(ctx context.Context, browser stepSaver,
 	scopes := buildScopeInfoArray(ctx, authContext.Scope, consent)
 
 	if ConsentScreenOwed(scopes, authContext.Scope, authContext.HasPromptValue("consent")) {
-		displayInfo := GetClientDisplayInfo(ctx, o.database, client)
+		displayInfo := getClientDisplayInfo(ctx, o.database, client)
 		clientName, clientNameUnverified := ConsentClientName(client)
 
 		clientDescription := displayInfo.Description
@@ -131,7 +131,7 @@ func (o *ConsentPrompt) Run(ctx context.Context, browser stepSaver,
 }
 
 // consentSubmissionDatabase is what ConsentSubmission reads and writes: the client and the user the
-// selection is weighed for, and the consent row userconsent.Record writes. *data.Database satisfies
+// selection is weighed for, and the consent row userconsent.Record writes. data.Database satisfies
 // it.
 type consentSubmissionDatabase interface {
 	userconsent.Database
@@ -189,7 +189,7 @@ type ConsentSubmissionResult struct {
 //  2. Only when that asks for the held scope: loads the client and the user, and narrows the ticked
 //     selection to the permissions the user holds now; a failed read, or a client or user not found,
 //     is returned as an error, and nothing is written.
-//  3. A refusal: the cancel and the empty selection read the client's provenance (ClientProvenance),
+//  3. A refusal: the cancel and the empty selection read the client's provenance (clientProvenance),
 //     since nothing loaded it; the selection holding nothing is logged at warn. Each clears the
 //     ceremony and returns ClientError.
 //  4. A grant: records the consent (userconsent.Record), sets the consented scope, audits
@@ -245,7 +245,7 @@ func (o *ConsentSubmission) Run(ctx context.Context, browser consentSubmissionBr
 	switch answer {
 	case consentSubmissionDeclined, consentSubmissionNothingTicked:
 		// No request reaches both this read and the load above (#108).
-		refusedClient := ClientProvenance(ctx, o.database, authContext.ClientId)
+		refusedClient := clientProvenance(ctx, o.database, authContext.ClientId)
 		return ConsentSubmissionResult{
 			ClientError: &ClientError{Client: refusedClient, Code: "access_denied",
 				Description: "The user did not provide consent"},

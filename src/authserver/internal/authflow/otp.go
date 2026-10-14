@@ -16,7 +16,7 @@ import (
 )
 
 // otpStepDatabase is what both OTP operations read: the ceremony's user and client, and whether the
-// client has a logo for the form. *data.Database satisfies it.
+// client has a logo for the form. data.Database satisfies it.
 type otpStepDatabase interface {
 	clientDisplayDatabase
 
@@ -44,7 +44,7 @@ func loadOTPStep(ctx context.Context, database otpStepDatabase,
 	if client == nil {
 		return nil, nil, errs.New("client not found")
 	}
-	return user, GetClientDisplayInfo(ctx, database, client), nil
+	return user, getClientDisplayInfo(ctx, database, client), nil
 }
 
 // otpKeyGenerator mints the otpauth:// URL of a new TOTP key for an enrolling user, under the
@@ -150,7 +150,7 @@ func (o *OTPPrompt) Run(ctx context.Context, browser stepSaver, authContext *cer
 
 // otpSubmissionDatabase is what OTPSubmission reads and writes: the user and the client, and the
 // stored authenticator a code is verified against or established on (otpcredential, which owns the
-// single-use step claim as well as the write, #387). *data.Database satisfies it.
+// single-use step claim as well as the write, #387). data.Database satisfies it.
 type otpSubmissionDatabase interface {
 	otpStepDatabase
 	otpcredential.Database

@@ -107,7 +107,7 @@ func authorizeParameters(r *http.Request) (url.Values, error) {
 		return nil, err
 	}
 	// net/http's defaultMaxMemory, the limit r.FormValue parses with.
-	//nolint:gosec // G120: bounded by the server's request-body table, as r.FormValue's own parse was; G120 flags every multipart parse
+	//nolint:gosec // G120: bounded by the server's request-body table, the same bound r.FormValue's own parse applies; G120 flags every multipart parse
 	if err := r.ParseMultipartForm(32 << 20); err != nil && !errors.Is(err, http.ErrNotMultipart) {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func authorizeParameters(r *http.Request) (url.Values, error) {
 
 // renderAuthorizeRefusal is the refusal page, which is how the authorization endpoint answers
 // anything it must not send to the client. The status is a parameter because the conditions that
-// reach it differ on it: a bad client_id or redirect_uri has always answered 200, while an
+// reach it differ on it: a bad client_id or redirect_uri answers 200, while an
 // unsupported response_mode is answered 400 because OIDC Core 3.1.2.6 names that code (#213), and
 // a request that cannot be parsed, repeats a delivery parameter or names a handle that is no longer
 // good is 400 as the malformed request it is (#228, #246).
@@ -168,28 +168,14 @@ func withUILocales(r *http.Request, uiLocales []string) *http.Request {
 	return r.WithContext(i18n.WithLocale(r.Context(), true, uiLocales...))
 }
 
-// answerClientWithError clears the auth context and then answers the client with an error, which is
-// the sequence every error response from a step of an authorization ceremony owes. At /auth/authorize
-// it is answerAuthorizeClientWithError.
-//
-// The clear goes first: it persists the deletion through a Set-Cookie on w, and every response mode
-// commits the response (#141). The clear lands only while the browser session still holds this
-// ceremony. When another /auth/authorize has replaced it, or the session is gone, the clear writes
-// nothing and the client is not answered: the browser has abandoned this ceremony, and a client
-// keeping one pending state per browser could take this error as the answer to the newer request.
-// The step answers the "no longer active" page instead (#579 decision 2, #79 decision 5). A clear that
-// failed otherwise is answered with server_error (ClientErrorResponder.answerClientAfterClear).
-func answerClientWithError(w http.ResponseWriter, r *http.Request, ceremonyStore CeremonyStore,
-	boundary *CeremonyBoundary, responder *ClientErrorResponder, ceremonyId string, input redirectErrorInput) {
-
-	err := ceremonyStore.ClearAuthContext(w, r, ceremonyId)
-	answerClientAfterStepClear(w, r, boundary, responder, input, err)
-}
-
-// answerClientAfterStepClear is the second half of answerClientWithError, for a step whose authflow
-// operation made the clear: the "no longer active" page when the clear found the ceremony replaced,
-// sending nothing to the client, and otherwise the responder's answer, which is server_error when the
-// clear failed.
+// answerClientAfterStepClear answers the client with an error once the step's authflow operation
+// has made its clear, which comes first because every response mode commits the response and the
+// clear persists through a Set-Cookie on w (#141). A clear that found the ceremony replaced, by
+// another /auth/authorize or a session gone, wrote nothing, and the client is not answered: the
+// browser has abandoned this ceremony, and a client keeping one pending state per browser could take
+// this error as the answer to the newer request, so the step answers the "no longer active" page
+// (#579 decision 2, #79 decision 5). Otherwise the responder answers, with server_error when the
+// clear failed (ClientErrorResponder.answerClientAfterClear).
 func answerClientAfterStepClear(w http.ResponseWriter, r *http.Request, boundary *CeremonyBoundary,
 	responder *ClientErrorResponder, input redirectErrorInput, clearErr error) {
 

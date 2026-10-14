@@ -22,7 +22,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			ShowDisplayName:  true,
 		}
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		assert.True(t, info.ShowSection)
 		assert.Equal(t, "My Awesome App", info.ClientName)
@@ -44,7 +44,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			ShowDisplayName:  true,
 		}
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		assert.True(t, info.ShowSection)
 		assert.Equal(t, "my-client", info.ClientName)
@@ -66,7 +66,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			ShowDisplayName:  false,
 		}
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		assert.True(t, info.ShowSection)
 		assert.Equal(t, "my-client", info.ClientName)
@@ -89,7 +89,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 
 		database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(true, nil)
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		assert.True(t, info.ShowSection)
 		assert.Equal(t, "my-client", info.ClientName)
@@ -112,7 +112,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 
 		database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(false, nil)
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		assert.True(t, info.ShowSection)
 		assert.Equal(t, "my-client", info.ClientName)
@@ -133,7 +133,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			ShowLogo:         false,
 		}
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		assert.True(t, info.ShowSection)
 		assert.Equal(t, "my-client", info.ClientName)
@@ -155,7 +155,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			ShowDescription:  true,
 		}
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		assert.True(t, info.ShowSection)
 		assert.Equal(t, "my-client", info.ClientName)
@@ -177,7 +177,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			ShowDescription:  true,
 		}
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		assert.True(t, info.ShowSection)
 		assert.Equal(t, "my-client", info.ClientName)
@@ -199,7 +199,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			ShowDescription:  false,
 		}
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		assert.True(t, info.ShowSection)
 		assert.Equal(t, "my-client", info.ClientName)
@@ -221,7 +221,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			ShowWebsiteURL:   true,
 		}
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		assert.True(t, info.ShowSection)
 		assert.Equal(t, "my-client", info.ClientName)
@@ -243,7 +243,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			ShowWebsiteURL:   true,
 		}
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		assert.True(t, info.ShowSection)
 		assert.Equal(t, "my-client", info.ClientName)
@@ -265,7 +265,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			ShowWebsiteURL:   false,
 		}
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		assert.True(t, info.ShowSection)
 		assert.Equal(t, "my-client", info.ClientName)
@@ -294,7 +294,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 
 		database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(true, nil)
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		assert.True(t, info.ShowSection)
 		assert.Equal(t, "My Awesome App", info.ClientName)
@@ -321,7 +321,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			ShowWebsiteURL:   false,
 		}
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		assert.True(t, info.ShowSection)
 		assert.Equal(t, "my-client", info.ClientName)
@@ -343,7 +343,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			CreatedViaDCR:    true,
 		}
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		// The password and OTP screens read this function and must keep showing the identifier,
 		// so the unverified marking is confined to the consent screen (#108).
@@ -364,7 +364,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 
 		database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(false, assert.AnError)
 
-		info := GetClientDisplayInfo(context.Background(), database, client)
+		info := getClientDisplayInfo(context.Background(), database, client)
 
 		assert.True(t, info.ShowSection)
 		assert.Equal(t, "my-client", info.ClientName)

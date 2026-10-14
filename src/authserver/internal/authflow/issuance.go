@@ -18,7 +18,7 @@ import (
 
 // issuanceDatabase is what Issuance reads before it issues: the client with its redirect URIs, the
 // user and the browser's session. The session row taken before the write, and the transaction, are
-// the issuers' (#139). *data.Database satisfies it.
+// the issuers' (#139). data.Database satisfies it.
 type issuanceDatabase interface {
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
@@ -117,8 +117,9 @@ type IssuanceResult struct {
 //     the client with its redirect URIs, its flows, the user, the browser's session and its validity,
 //     and the scope narrowed to what the user holds. A failed read, and a user who no longer exists,
 //     is returned as an error.
-//  2. A refusal is audited where it is audited, then the ceremony is cleared, or restarted at level 1
-//     for an unusable session that is not prompt=none (refuseUnusableSession).
+//  2. A refusal is logged, and audited where its kind has an audit event, then the ceremony is
+//     cleared, or restarted at level 1 for an unusable session that is not prompt=none
+//     (refuseUnusableSession).
 //  3. Otherwise the narrowed scope replaces the one the issuer reads, and the code (issueCode) or the
 //     implicit tokens (issueImplicit) are issued, audited after the commit, and the ceremony cleared.
 //
@@ -135,7 +136,7 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 		responseType:             authContext.ResponseType,
 		hintSubject:              authContext.IdTokenHintSub,
 		authStateGeneration:      authContext.AuthStateGeneration,
-		otpClaim:                 OTPClaimOf(authContext),
+		otpClaim:                 otpClaimOf(authContext),
 		sessionIdentifierPresent: sessionIdentifier != "",
 	}
 
@@ -254,7 +255,7 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 		o.auditLogger.Log(ctx, audit.EventUserDisabled, map[string]interface{}{
 			"user_id": facts.user.Id,
 		})
-		return answerClient(browser, authContext, client, "access_denied", UserDisabledDescription), nil
+		return answerClient(browser, authContext, client, "access_denied", userDisabledDescription), nil
 
 	case issuanceRefuseHintMismatch:
 		return answerClient(browser, authContext, client, oidc.ErrorLoginRequired,
@@ -492,7 +493,7 @@ func newCreateCodeInput(authContext *ceremony.AuthContext, sessionIdentifier str
 		AuthenticatedAt:     authContext.AuthenticatedAt,
 		AuthStateGeneration: authContext.AuthStateGeneration,
 		SessionIdentifier:   sessionIdentifier,
-		OTPClaim:            OTPClaimOf(authContext),
+		OTPClaim:            otpClaimOf(authContext),
 	}
 }
 
@@ -533,7 +534,7 @@ func (o *Issuance) issueImplicit(ctx context.Context, browser issuanceBrowser, s
 		Nonce:               authContext.Nonce,
 		AuthenticatedAt:     *authContext.AuthenticatedAt,
 		AuthStateGeneration: authContext.AuthStateGeneration,
-		OTPClaim:            OTPClaimOf(authContext),
+		OTPClaim:            otpClaimOf(authContext),
 	}, issueAccessToken, issueIdToken)
 	if errors.Is(err, otpcredential.ErrAuthenticatorRemoved) {
 		return o.refuseUnusableSession(ctx, browser, sessionAuthenticatorRemoved, authContext, client, ambientSession,

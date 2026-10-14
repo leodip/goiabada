@@ -2219,7 +2219,7 @@ func TestRedirToClientWithError_PassesTheResponseTypeIntoTheGate(t *testing.T) {
 	}
 }
 
-// answerClientWithError builds its fallback as a copy of the caller's own input with the code and
+// answerClientAfterClear builds its fallback as a copy of the caller's own input with the code and
 // description swapped, so every OTHER field has to survive the swap. Nothing above reaches that
 // copy: the clear succeeds in the cases that assert redirect shape, and the cases where it fails
 // carry an ordinary registered callback, no earlier refusal and a code response type, so erasing
@@ -2228,7 +2228,7 @@ func TestRedirToClientWithError_PassesTheResponseTypeIntoTheGate(t *testing.T) {
 // These are the three fields whose erasure survived a mutation of the copy. The other three,
 // client, response mode and redirect URI, are already caught by the prompt=none clear-failure
 // cases in TestHandleAuthorizeGet_PromptNone (#241).
-func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.T) {
+func TestAnswerClientAfterStepClear_TheFallbackPreservesWhatItDoesNotSwap(t *testing.T) {
 	// newRequest is per-subtest because the mocks key their expectations on the exact w and r.
 	setup := func(t *testing.T) (*handlersmocks.PageRenderer, *handlersmocks.CeremonyStore,
 		*httptest.ResponseRecorder, *http.Request) {
@@ -2259,7 +2259,8 @@ func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.
 		// No expectation on the database at all, exactly as TestRedirToClientWithError_HonoursAnEarlierRefusal
 		// does: a registration read reaching this mock fails the case. That is stronger than stubbing a
 		// recovered read and asserting it was ignored, because it proves the second read never happens.
-		answerClientWithError(w, r, ceremonyStore, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil), testCeremonyId, input)
+		answerClientAfterStepClear(w, r, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil), input,
+			ceremonyStore.ClearAuthContext(w, r, testCeremonyId))
 
 		assert.Empty(t, w.Header().Get("Location"),
 			"swapping the code for server_error must not launder away a refusal the request already earned: "+
@@ -2278,7 +2279,8 @@ func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.
 		input := testRedirectError("invalid_scope", "Invalid scope", "query",
 			"http://127.0.0.1:49152/cb", "", "code")
 
-		answerClientWithError(w, r, ceremonyStore, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(database, pageRenderer, nil), testCeremonyId, input)
+		answerClientAfterStepClear(w, r, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(database, pageRenderer, nil), input,
+			ceremonyStore.ClearAuthContext(w, r, testCeremonyId))
 
 		assert.Contains(t, w.Header().Get("Location"), "http://127.0.0.1:49152/cb?error=server_error",
 			"the fallback runs the registration gate again with its own copy, so a dropped response type "+
@@ -2297,7 +2299,8 @@ func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.
 		input := testRedirectError("invalid_scope", "Invalid scope", "query", "https://legit.example/cb",
 			"abc123", "code")
 
-		answerClientWithError(w, r, ceremonyStore, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(database, pageRenderer, nil), testCeremonyId, input)
+		answerClientAfterStepClear(w, r, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(database, pageRenderer, nil), input,
+			ceremonyStore.ClearAuthContext(w, r, testCeremonyId))
 
 		location := w.Header().Get("Location")
 		assert.Contains(t, location, "error=server_error")

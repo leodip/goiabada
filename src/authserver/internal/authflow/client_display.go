@@ -19,16 +19,16 @@ type ClientDisplayInfo struct {
 	WebsiteURL  string // empty if not to be shown
 }
 
-// clientDisplayDatabase is the read GetClientDisplayInfo makes: whether the client has a logo to
-// show. *data.Database satisfies it.
+// clientDisplayDatabase is the read getClientDisplayInfo makes: whether the client has a logo to
+// show. data.Database satisfies it.
 type clientDisplayDatabase interface {
 	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
 }
 
-// GetClientDisplayInfo is the client block for client, from its display settings. The logo is read
+// getClientDisplayInfo is the client block for client, from its display settings. The logo is read
 // only when the client shows one, and a failed read shows none, with a warn record: the block is
 // decoration, and a sign-in does not fail over it.
-func GetClientDisplayInfo(ctx context.Context, database clientDisplayDatabase, client *record.Client) *ClientDisplayInfo {
+func getClientDisplayInfo(ctx context.Context, database clientDisplayDatabase, client *record.Client) *ClientDisplayInfo {
 	info := &ClientDisplayInfo{}
 
 	if client.ShowDisplayName && client.DisplayName != "" {
@@ -71,7 +71,7 @@ func GetClientDisplayInfo(ctx context.Context, database clientDisplayDatabase, c
 // that name, so the marking drops with it. The client itself cannot reach either of the first two
 // rungs, because it cannot set DisplayName and cannot clear created_via_dcr.
 //
-// Consent, and the redirect-blocked page that names the same client, only. GetClientDisplayInfo
+// Consent, and the redirect-blocked page that names the same client, only. getClientDisplayInfo
 // keeps the identifier, so the password and OTP screens show it: a warning repeated on three screens
 // stops being read, and consent is the one screen where the user grants authority.
 func ConsentClientName(client *record.Client) (name string, unverified bool) {

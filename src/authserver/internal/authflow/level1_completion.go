@@ -11,7 +11,7 @@ import (
 
 // level1CompletionDatabase is what Level1Completion reads: the browser's user session with its
 // user, and the client, for the step-up decision, and the client again for a parked error's
-// provenance. *data.Database satisfies it.
+// provenance. data.Database satisfies it.
 type level1CompletionDatabase interface {
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
@@ -19,7 +19,7 @@ type level1CompletionDatabase interface {
 }
 
 // sessionValidity is the check of a user session against the idle timeout, the maximum lifetime and
-// the request's max_age. *usersession.UserSessionManager satisfies it.
+// the request's max_age. *usersession.Manager satisfies it.
 type sessionValidity interface {
 	HasValidUserSession(userSession *record.UserSession, idleTimeoutInSeconds int, maxLifetimeInSeconds int,
 		requestedMaxAgeInSeconds *int64) bool
@@ -67,7 +67,7 @@ type Level1CompletionResult struct {
 
 // Run, in order:
 //
-//  1. A parked error: reads the client's provenance (ClientProvenance), clears the ceremony and
+//  1. A parked error: reads the client's provenance (clientProvenance), clears the ceremony and
 //     returns DeferredError. Nothing past this is read.
 //  2. Loads the browser's user session by sessionIdentifier with its user, then the client; a
 //     failed read or a client not found is returned as an error, and nothing is saved.
@@ -91,7 +91,7 @@ type Level1CompletionResult struct {
 //     End-User even if the End-User is already authenticated", and section 2 has acr, amr and
 //     auth_time describe that one authentication. It owes every factor its target needs, as a
 //     sign-in with no session does, so a session's code never counts towards it. Do not undo this:
-//     counting it issued acr level 3 beside amr ["pwd"] and a fresh auth_time (#537).
+//     counting it would issue acr level 3 beside amr ["pwd"] and a fresh auth_time (#537).
 //   - The session is valid for these settings and the request's max_age.
 //   - The session belongs to the user this ceremony authenticated. A browser may hold user A's
 //     session while user B signs in, and A's level must not decide B's step-up (#133).
@@ -102,7 +102,7 @@ func (o *Level1Completion) Run(ctx context.Context, browser level1CompletionBrow
 	authContext *ceremony.AuthContext, sessionIdentifier string) (Level1CompletionResult, error) {
 
 	if authContext.DeferredErrorCode != "" {
-		client := ClientProvenance(ctx, o.database, authContext.ClientId)
+		client := clientProvenance(ctx, o.database, authContext.ClientId)
 		return Level1CompletionResult{
 			DeferredError: &ClientError{
 				Client:      client,

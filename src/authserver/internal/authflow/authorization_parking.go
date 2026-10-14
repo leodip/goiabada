@@ -18,7 +18,8 @@ import (
 // parameter read later cannot be left out and silently vanish between a POST and its GET.
 var authorizeParkedParameters = append(slices.Clone(authorizeRequestParameters), "request", "request_uri")
 
-// AuthorizeParkedParameters answers a copy of the parameters a POST parks for its GET.
+// AuthorizeParkedParameters answers a copy of the parameters a POST parks for its GET. Exported for
+// the handler test that sends each one beside a request handle.
 func AuthorizeParkedParameters() []string {
 	return slices.Clone(authorizeParkedParameters)
 }

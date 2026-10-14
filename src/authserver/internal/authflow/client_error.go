@@ -20,18 +20,18 @@ type ClientError struct {
 	Description string
 }
 
-// clientReader is the read ClientProvenance makes. *data.Database satisfies it.
+// clientReader is the read clientProvenance makes. data.Database satisfies it.
 type clientReader interface {
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 }
 
-// ClientProvenance loads the client behind a ceremony for the trust decision of an error response,
+// clientProvenance loads the client behind a ceremony for the trust decision of an error response,
 // where a step reaches one without having loaded the client.
 //
 // It answers nil instead of an error. The step is already on its way to answering the client with
 // an error, so a lookup that fails must not turn that refusal into a 500; and unresolved provenance
 // is the untrusted case, which withholds the redirect rather than performing it (#108).
-func ClientProvenance(ctx context.Context, database clientReader, clientIdentifier string) *record.Client {
+func clientProvenance(ctx context.Context, database clientReader, clientIdentifier string) *record.Client {
 	client, err := database.GetClientByClientIdentifier(ctx, nil, clientIdentifier)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to load the client while answering it with an error, treating its provenance as unresolved",

@@ -11,7 +11,7 @@ import (
 )
 
 // silentAuthenticationDatabase is what SilentAuthentication reads: the browser's user session with
-// its user, and the user's consent to the client. *data.Database satisfies it.
+// its user, and the user's consent to the client. data.Database satisfies it.
 type silentAuthenticationDatabase interface {
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
@@ -19,7 +19,7 @@ type silentAuthenticationDatabase interface {
 }
 
 // silentAuthenticationSessions is what SilentAuthentication asks of the user sessions: whether the
-// browser's is valid, and the bump of the one it reuses. *usersession.UserSessionManager satisfies
+// browser's is valid, and the bump of the one it reuses. *usersession.Manager satisfies
 // it.
 type silentAuthenticationSessions interface {
 	sessionValidity
@@ -70,7 +70,8 @@ type SilentAuthenticationResult struct {
 //     the client. A failed read is returned as an error, never taken for "no session" or "no
 //     consent", so a database fault is no login_required or consent_required.
 //  2. A refusal: records user_disabled when it is for a disabled account, discards the ceremony and
-//     returns Refusal. Nothing past the check that refused is read, and nothing is written.
+//     returns Refusal. Nothing past the check that refused is read, and nothing but the discard is
+//     written.
 //  3. Otherwise adopts the session onto the ceremony, with the narrowed scope and the session's
 //     AuthTime as the ceremony's AuthenticatedAt. A session with a zero AuthTime is returned as an
 //     error before anything is written: no auth_time is invented for it (#580 decision 5).

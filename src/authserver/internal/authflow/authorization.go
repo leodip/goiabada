@@ -43,7 +43,7 @@ var authorizeRequestParameters = []string{
 }
 
 // AuthorizeDeliveryParameters answers a copy of the parameters whose repeat is answered on the
-// refusal page.
+// refusal page. Exported for the handler tests that send each one twice.
 func AuthorizeDeliveryParameters() []string {
 	return slices.Clone(authorizeDeliveryParameters)
 }
@@ -60,7 +60,7 @@ func AuthorizeUILocales(params url.Values) []string {
 // authorizationDatabase is what Authorization reads: the request a POST parked, the client, and the
 // browser's user session with its user. The client's redirect URIs are the client-error
 // responder's to read, and what a prompt=none request reads is SilentAuthentication's.
-// *data.Database satisfies it.
+// data.Database satisfies it.
 type authorizationDatabase interface {
 	authorizerequest.Consuming
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
@@ -84,8 +84,7 @@ type authorizeRequestValidator interface {
 	ValidatePrompt(prompt string) (string, error)
 }
 
-// idTokenHintParser verifies an id_token_hint's signature. *oauth's token parser, the auth server's
-// tokenParser, satisfies it.
+// idTokenHintParser verifies an id_token_hint's signature. *signingkeys.TokenParser satisfies it.
 type idTokenHintParser interface {
 	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JwtToken, error)
 }
@@ -205,7 +204,7 @@ type AuthorizationResult struct {
 }
 
 // ResolveParked answers the parameters an authorization request runs from: params as they are when
-// they name no request_handle, and what HandleAuthorizePost parked when they do. A GET carrying a
+// they name no request_handle, and what a POST parked (AuthorizationParking) when they do. A GET carrying a
 // handle is the second half of a POST, and the ceremony runs from the parked request exactly as it
 // would from the same parameters in the query (#246). It answers a refusal when the handle is
 // unusable, and an error when the parked request could not be read.
@@ -400,12 +399,9 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 			authContext.Prompt = validation.prompt
 			authContext.IdTokenHintSub = validation.hintSubject
 			if refusal == nil {
-				// The level this ceremony must reach is fixed once, here, where the request is
-				// accepted, and every later step reads the snapshot rather than the client's row. An
-				// administrator editing default_acr_level mid-ceremony would otherwise change what the
-				// ceremony was required to do after the step-up decision was taken: raising it stamps
-				// an acr naming a factor never performed, and lowering it takes /auth/level2's target
-				// outside its switch. SilentAuthentication reads the target after this (#240).
+				// Fixed once, where the request is accepted: every later step, SilentAuthentication
+				// included, reads this snapshot and not the client's row, so an edit to
+				// default_acr_level mid-ceremony cannot change what the step-up decided (#240).
 				authContext.SetTargetAcrLevel(client.DefaultAcrLevel)
 			}
 			facts.validated = true
@@ -506,7 +502,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 		})
 		// Answered at once, never parked: the browser holds a valid session, so somebody has
 		// authenticated already, and a disabled user sent to the login page could not finish it (#213).
-		return answerClient("access_denied", UserDisabledDescription), nil
+		return answerClient("access_denied", userDisabledDescription), nil
 
 	case authorizeRouteSSO:
 		// The session completed level 1 already, so the ceremony goes to /auth/level1completed,

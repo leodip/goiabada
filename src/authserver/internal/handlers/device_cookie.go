@@ -65,8 +65,9 @@ func (d *DeviceCookie) read(r *http.Request) usersession.Device {
 	return device
 }
 
-// isDeviceIdentifier is whether value is one this server mints: deviceIdBytes as lower-case hex. A
-// browser cannot choose its identifier beyond presenting one it was given.
+// isDeviceIdentifier is whether value has the shape this server mints: deviceIdBytes as lower-case
+// hex. Only the shape is checked, so a browser can present any such value, which is why the
+// identifier only ever ends that user's own earlier sessions (#564).
 func isDeviceIdentifier(value string) bool {
 	decoded, err := hex.DecodeString(value)
 	return err == nil && len(decoded) == deviceIdBytes && hex.EncodeToString(decoded) == value

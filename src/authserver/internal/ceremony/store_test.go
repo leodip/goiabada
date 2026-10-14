@@ -267,6 +267,28 @@ func TestSaveAuthContext(t *testing.T) {
 		require.NotErrorIs(t, err, ErrCeremonyReplaced)
 		assert.Empty(t, rr.Result().Cookies())
 	})
+
+	t.Run("AContextThatCannotBeEncodedIsNotWritten", func(t *testing.T) {
+		ceremonyStore, _, backend := newRealStore(t)
+		_, stepReq, loaded := loadedStep(t, ceremonyStore)
+		loaded.AuthenticatedAt = unencodableInstant()
+		created := backend.created
+		rr := httptest.NewRecorder()
+
+		err := ceremonyStore.SaveAuthContext(rr, stepReq, loaded)
+
+		require.Error(t, err)
+		require.NotErrorIs(t, err, ErrCeremonyReplaced)
+		assert.Empty(t, rr.Result().Cookies())
+		assert.Equal(t, created, backend.created)
+	})
+}
+
+// unencodableInstant is an instant encoding/json refuses, a year past 9999, which is the one way an
+// AuthContext fails to encode.
+func unencodableInstant() *time.Time {
+	instant := time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC)
+	return &instant
 }
 
 // ReplaceAuthContext is /auth/authorize's save, which starts a ceremony and so replaces whatever
@@ -309,6 +331,34 @@ func TestReplaceAuthContext(t *testing.T) {
 
 		require.ErrorIs(t, err, errCreateRefused)
 		assert.Empty(t, rr.Result().Cookies(), "no cookie names a row that was never written")
+	})
+
+	t.Run("SessionError", func(t *testing.T) {
+		ceremonyStore, store, backend := newRealStore(t)
+		cookies := seedBrowserSession(t, store, map[string]any{
+			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{CeremonyId: "older"}),
+		})
+		backend.failLoad = true
+		created := backend.created
+		rr := httptest.NewRecorder()
+
+		err := ceremonyStore.ReplaceAuthContext(rr, browserRequest(cookies), &AuthContext{CeremonyId: "newer"})
+
+		require.ErrorIs(t, err, errLoadRefused)
+		assert.Empty(t, rr.Result().Cookies())
+		assert.Equal(t, created, backend.created)
+	})
+
+	t.Run("AContextThatCannotBeEncodedIsNotWritten", func(t *testing.T) {
+		ceremonyStore, _, backend := newRealStore(t)
+		rr := httptest.NewRecorder()
+
+		err := ceremonyStore.ReplaceAuthContext(rr, browserRequest(nil),
+			&AuthContext{CeremonyId: "c", AuthenticatedAt: unencodableInstant()})
+
+		require.Error(t, err)
+		assert.Empty(t, rr.Result().Cookies())
+		assert.Zero(t, backend.created)
 	})
 }
 
@@ -1033,6 +1083,23 @@ func TestRegenerateSession(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, AuthStateLevel1PasswordCompleted, saved.AuthState)
 	})
+
+	t.Run("SessionError", func(t *testing.T) {
+		ceremonyStore, store, backend := newRealStore(t)
+		cookies := seedBrowserSession(t, store, map[string]any{
+			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{CeremonyId: ceremonyA}),
+		})
+		backend.failLoad = true
+		created := backend.created
+		rr := httptest.NewRecorder()
+
+		err := ceremonyStore.RegenerateSession(rr, browserRequest(cookies), ceremonyA)
+
+		require.ErrorIs(t, err, errLoadRefused)
+		require.NotErrorIs(t, err, ErrCeremonyReplaced)
+		assert.Empty(t, rr.Result().Cookies())
+		assert.Equal(t, created, backend.created)
+	})
 }
 
 // ConfirmCeremony is /auth/completed's create arm asking, before it ends or creates anything, whether
@@ -1106,6 +1173,21 @@ func TestConfirmCeremony(t *testing.T) {
 
 		require.ErrorIs(t, err, errLoadRefused)
 		require.NotErrorIs(t, err, ErrCeremonyReplaced)
+	})
+
+	t.Run("SessionError", func(t *testing.T) {
+		ceremonyStore, store, backend := newRealStore(t)
+		cookies := seedBrowserSession(t, store, map[string]any{
+			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{CeremonyId: ceremonyA}),
+		})
+		backend.failLoad = true
+		rr := httptest.NewRecorder()
+
+		err := ceremonyStore.ConfirmCeremony(rr, browserRequest(cookies), ceremonyA)
+
+		require.ErrorIs(t, err, errLoadRefused)
+		require.NotErrorIs(t, err, ErrCeremonyReplaced)
+		assert.Empty(t, rr.Result().Cookies())
 	})
 }
 

@@ -10,7 +10,7 @@ import (
 )
 
 // level2SelectionDatabase is what Level2Selection reads: the client, for the ceremony's target
-// level, and the user, whose authenticator decides the arm. *data.Database satisfies it.
+// level, and the user, whose authenticator decides the arm. data.Database satisfies it.
 type level2SelectionDatabase interface {
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
@@ -97,6 +97,9 @@ func (o *Level2Selection) Run(ctx context.Context, browser stepSaver,
 //   - level2_mandatory always asks; a user with no authenticator enrols at /auth/otp.
 //   - Any other target never reaches this step, since /auth/level1completed sends only a target
 //     above level 1 here, and is answered with an error.
+//
+// Exported for the sign-in table on the docs' acr-and-amr page, which handlers' concept_docs_test.go
+// holds to this function.
 func DecideLevel2Arm(target record.AcrLevel, userHasOTP bool) (ceremony.AuthState, string, error) {
 	switch target {
 	case record.AcrLevel2Optional:

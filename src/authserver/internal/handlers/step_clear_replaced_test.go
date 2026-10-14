@@ -60,7 +60,7 @@ func assertReplacedAnsweredAtWarn(t *testing.T, logged *logtest.SlogCapture) {
 // are not sent into a browser where a newer sign-in is in progress. The database mock has no
 // expectation, so the redirect gate's registration read, which only an emitted error makes, fails
 // the case on its own.
-func TestAnswerClientWithError_AReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
+func TestAnswerClientAfterStepClear_AReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	rr := httptest.NewRecorder()
@@ -68,9 +68,10 @@ func TestAnswerClientWithError_AReplacedCeremonyAnswersNoLongerActive(t *testing
 	expectStepClearReplaced(t, ceremonyStore, pageRenderer, rr, req)
 	logged := logtest.CaptureSlog(t)
 
-	answerClientWithError(rr, req, ceremonyStore, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil), testCeremonyId,
+	answerClientAfterStepClear(rr, req, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil),
 		testRedirectError("access_denied", "The user did not provide consent", "query",
-			"https://legit.example/cb", "abc123", "code"))
+			"https://legit.example/cb", "abc123", "code"),
+		ceremonyStore.ClearAuthContext(rr, req, testCeremonyId))
 
 	assertAnsweredNoLongerActive(t, rr)
 	assertReplacedAnsweredAtWarn(t, logged)
@@ -137,7 +138,7 @@ func (b *lastComparisonBackend) UpdateIfUnchanged(ctx context.Context, id string
 // is the same replaced ceremony as on a first attempt, and answered the same: the page, with
 // neither the error nor its state sent to the client, and ceremony B kept. Read as a clear that ran
 // out of attempts, it answered server_error by redirect (#579 decision 2).
-func TestAnswerClientWithError_ACeremonyReplacedAtTheLastAttemptAnswersNoLongerActive(t *testing.T) {
+func TestAnswerClientAfterStepClear_ACeremonyReplacedAtTheLastAttemptAnswersNoLongerActive(t *testing.T) {
 	backend := &lastComparisonBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
 	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionIdentifier, false,
 		sessionstore.PersistentCookie, sessionstore.KeyPair{
@@ -177,9 +178,10 @@ func TestAnswerClientWithError_ACeremonyReplacedAtTheLastAttemptAnswersNoLongerA
 	expectCeremonyNoLongerActive(t, pageRenderer, rr, req)
 	logged := logtest.CaptureSlog(t)
 
-	answerClientWithError(rr, req, ceremonyStore, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil), testCeremonyId,
+	answerClientAfterStepClear(rr, req, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil),
 		testRedirectError("access_denied", "The user did not provide consent", "query",
-			"https://legit.example/cb", "state-a", "code"))
+			"https://legit.example/cb", "state-a", "code"),
+		ceremonyStore.ClearAuthContext(rr, req, testCeremonyId))
 
 	assert.Equal(t, 3, comparisons)
 	assertAnsweredNoLongerActive(t, rr)

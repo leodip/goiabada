@@ -52,7 +52,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `timezones/` - The IANA zone table a user's zone is picked from, one row per country and zone, generated from the tzdata release and SHA-256 its generator pins. Nothing loads it at startup; a test checks every zone loads (#49, #432)
 
 ### Auth Server (`src/authserver/`)
-- `internal/handlers/` - HTTP handlers (auth flows, token, userinfo, DCR)
+- `internal/handlers/` - HTTP handlers (auth flows, token, userinfo, DCR). A ceremony handler keeps only the HTTP side of its step: the route boundary (`CeremonyBoundary`, `auth_ceremony.go`), its `internal/authflow` operation called with a per-request browser adapter (`browserSession`, `browser_session.go`), and the response its result names, written through the client-error responder (`ClientErrorResponder`) or a step redirect. The device cookie is read and written here (`device_cookie.go`). `doubled_services.go` declares, whole, the six services the route table hands straight to the operations, which no handler takes, so mockery generates the doubles the handler tests build every operation from (#580)
 - `internal/handlers/accounthandlers/` - Pages reached without a session: self-registration and its activation link, forgot password and its reset link (#435)
 - `internal/handlers/apihandlers/` - Admin API handlers
 - `internal/{ceremony,issuance,signingkeys}/` - Provider-side issuance: codes, tokens, key rotation, ceremony context
@@ -183,10 +183,10 @@ Every step handler takes the route boundary, `handlers.CeremonyBoundary` (`auth_
 every handler that answers a client with an error the client-error responder,
 `handlers.ClientErrorResponder` (`client_error_responder.go`), which holds the emission gates, the
 query, fragment and `form_post` encodings, the refusal interstitial and the `server_error` fallback
-and clears nothing; the route table builds one of each. A step moved to `internal/authflow` begins
+and clears nothing; the route table builds one of each. Every step but `/auth/authorize` begins
 with the boundary's `beginStep`, which reads the request's settings before anything else (a request
-without them is the 500 page carrying `reqctx.ErrNoSettings`), then loads the ceremony and gates its
-state as below. Every step but `/auth/authorize` first checks,
+without them is the 500 page carrying `reqctx.ErrNoSettings`, as it is at `/auth/authorize`, which
+reads them first too), then loads the ceremony and gates its state as below. It first checks,
 in the boundary's `loadAuthContext`, that the request names the sign-in the browser holds: the
 `ceremony` query parameter on a GET, built into every redirect between steps by `stepRedirect`, and
 the `ceremonyId` form field on a POST. A missing or differing id gets the "no longer active" page, 400.
@@ -218,7 +218,7 @@ not one it accepts (#246, #437):
 | `/auth/level1completed` | `handler_auth_level1.go`, `authflow/level1_completion.go` | Delivers a deferred authorization error if one is parked (see below), else decides if level2 needed based on ACR and session state |
 | `/auth/level2` | `handler_auth_level2.go`, `authflow/level2_selection.go` | Selects level2 auth method. If `level2_optional` + no OTP → skip to completed |
 | `/auth/otp` | `handler_auth_otp.go`, `authflow/otp.go` | OTP verification (or enrollment if user doesn't have OTP yet). Rotates the browser session's identifier, records level 2 on the ceremony |
-| `/auth/completed` | `handler_auth_completed.go`, `authflow/completion.go` | Final auth check (a disabled user refused, a moved-on generation restarted, both before any session is bound), session bump/create, scope filtering, consent check |
+| `/auth/completed` | `handler_auth_completed.go`, `authflow/completion.go` | Final auth check (a disabled user refused, a moved-on generation restarted, both before any session is bound), session bump/create, scope filtering, consent check. The plan is one of three modes (`authflow/completion_decide.go`): reuse, which rotates the browser session's identifier before the bind when it raises the session; create, which confirms the ceremony, starts the session (`StartNewUserSession`, which writes nothing to the browser), then rotates and binds it to the browser session (`RegenerateSessionAndBind`), deletes it when that fails, and writes the device cookie only after; and restart |
 | `/auth/consent` | `handler_consent.go`, `authflow/consent.go` | User consent screen (if required), and the submission weighed against the permissions the user holds now, recorded through `userconsent` |
 | `/auth/issue` | `handler_auth_issue.go`, `authflow/issuance.go` | Final re-checks (redirect URI, client, flow, hint, session, user, scope), then issues the authorization code or the implicit tokens, redirects to client |
 
@@ -445,7 +445,7 @@ Three test types:
 1. **Unit Tests** - Throughout codebase alongside source files (`*_test.go`)
    - Handler tests: `src/authserver/internal/handlers/*_test.go`
    - Provider tests: `src/authserver/internal/{ceremony,issuance,signingkeys}/*_test.go`
-   - Ceremony step operations: `src/authserver/internal/authflow/*_test.go`, its decisions' tables and its import lint; the steps' behaviour is pinned by the handler tests, which build each operation from the same doubles
+   - Ceremony step operations: `src/authserver/internal/authflow/*_test.go`, its decisions' tables, the completion plan's constructor lint and its import lint; the steps' behaviour is pinned by the handler tests, which build each operation through one builder per handler (`ceremony_handler_builders_test.go`) from the same doubles, those of `handlers/doubled_services.go` among them
    - Core logic tests: `src/core/oauth/*_test.go`, `src/core/inputvalidation/*_test.go`
    - Validator tests: `src/authserver/internal/{protocol,account}validation/*_test.go`
 
