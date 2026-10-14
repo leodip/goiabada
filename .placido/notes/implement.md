@@ -31,3 +31,12 @@
   the latest version in the present tense; put breaking changes and migration
   steps in release notes. For docs or OpenAPI changes, build the site from `site/`
   on the host as `site/README.md` describes; the devcontainer has no Node.js.
+- **Browser tests:** never run anything under `e2e/`. Its scripts rebuild a shared
+  environment on a VPS, which only the owner does, by hand. Write or update the
+  Playwright specs the agreement names, following the rules under "Browser tests"
+  in `e2e/README.md`: unique names through the fixtures, nothing global outside
+  `*.system.ts`. When you change a page, a message, or a flow, search
+  `e2e/playwright/tests/` for what you changed and update the specs that assert it.
+  Check their types on the host with `cd e2e/playwright && npm ci && npm run
+  typecheck`. In your evidence, list the specs you changed as typechecked but not
+  run.
