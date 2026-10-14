@@ -12,10 +12,19 @@
 //   - Completion, GET /auth/completed: decides on the user (decideBeforeBinding), binds the ceremony
 //     to a user session by reusing the browser's or creating one, or restarts it at level 1
 //     (decideCompletion), then sends it to consent or to issuance (DecideAfterBinding).
+//   - ConsentPrompt, GET /auth/consent: shows the consent screen (ConsentScreenOwed), handing its
+//     data to the handler to render, or moves a ceremony whose scope is already consented on to
+//     issuance.
+//   - ConsentSubmission, POST /auth/consent: reads the user's answer from the submitted body, weighs
+//     the ticked scopes against the permissions the user holds now (decideConsentSubmission), and
+//     records the consent (userconsent.Record) or refuses with access_denied.
 //   - Issuance, GET /auth/issue: checks again what may have changed since /auth/authorize
 //     (decideIssuance), restarts a ceremony whose session can no longer carry a grant, and issues an
 //     authorization code or the implicit grant's tokens. The handler delivers them: the encoders of
 //     the authorization response are response writers and stay in internal/handlers.
+//
+// GetClientDisplayInfo is the client block every sign-in screen shows, and ConsentClientName the
+// name the consent screen and the redirect-blocked page give a client.
 //
 // The other steps are still written in internal/handlers.
 //
@@ -23,7 +32,8 @@
 //
 //   - No HTTP. Nothing here imports net/http, chi, internal/handlers, internal/middleware or
 //     internal/reqctx (import_lint_test.go). What the request carries, its settings, its session
-//     identifier and the browser's address, reaches an operation as a plain value the handler read.
+//     identifier, the browser's address and a form's submitted body, reaches an operation as a plain
+//     value the handler read.
 //   - Every browser-session write goes through the port an operation declares for it, which the
 //     handler satisfies with an adapter built for that one request (handlers.browserSession), holding
 //     the request and the response writer the handler holds. An operation never stores one.
@@ -45,7 +55,10 @@
 //     identifier, and rotates before the bind commits the raised level (#538, #266).
 //   - Completion's create arm confirms the browser session still holds the ceremony before it ends a
 //     foreign session or creates one, and the session start commits before its rotation (#579).
-//   - Audit records of a session write follow its commit.
+//   - Audit records of a session write, and of a recorded consent, follow its commit.
+//   - ConsentSubmission narrows the ticked scopes to what the user holds before it reads or writes a
+//     consent, so a selection the narrowing empties writes nothing (#241). Its refusals read the
+//     client's provenance before the clear, and the clear comes before the answer (#141).
 //   - Issuance clears the ceremony only after the code or the tokens are committed and audited, and
 //     a failed clear withholds them (#248). An issuer's refusal, a session or an authenticator gone
 //     by the time of the write, is answered after the issuer has rolled back (#139, #542).

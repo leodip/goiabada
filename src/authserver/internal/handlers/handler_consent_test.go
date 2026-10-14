@@ -13,6 +13,7 @@ import (
 	"testing/fstest"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
@@ -41,100 +42,6 @@ func stubUserHoldsEveryScope(permissionChecker *handlersmocks.PermissionChecker)
 		Return(func(_ context.Context, scope string, user *record.User) string { return scope }, nil)
 }
 
-func TestBuildScopeInfoArray(t *testing.T) {
-	t.Run("Empty scope", func(t *testing.T) {
-		result := buildScopeInfoArray(context.Background(), "", nil)
-		assert.Empty(t, result)
-	})
-
-	t.Run("Single ID token scope", func(t *testing.T) {
-		result := buildScopeInfoArray(context.Background(), "openid", nil)
-		assert.Len(t, result, 1)
-		assert.Equal(t, ScopeInfo{
-			Scope:            "openid",
-			Description:      "Authenticate your user and identify you via a unique ID",
-			AlreadyConsented: false,
-		}, result[0])
-	})
-
-	t.Run("Multiple ID token scopes", func(t *testing.T) {
-		result := buildScopeInfoArray(context.Background(), "openid profile email", nil)
-		assert.Len(t, result, 3)
-		assert.Equal(t, ScopeInfo{
-			Scope:            "openid",
-			Description:      "Authenticate your user and identify you via a unique ID",
-			AlreadyConsented: false,
-		}, result[0])
-		assert.Equal(t, ScopeInfo{
-			Scope:            "profile",
-			Description:      "Access to claims: name, family_name, given_name, middle_name, nickname, preferred_username, profile, website, gender, birthdate, zoneinfo, locale, and updated_at",
-			AlreadyConsented: false,
-		}, result[1])
-		assert.Equal(t, ScopeInfo{
-			Scope:            "email",
-			Description:      "Access to claims: email, email_verified",
-			AlreadyConsented: false,
-		}, result[2])
-	})
-
-	t.Run("Offline access scope", func(t *testing.T) {
-		result := buildScopeInfoArray(context.Background(), "openid offline_access", nil)
-		assert.Len(t, result, 2)
-		assert.Equal(t, ScopeInfo{
-			Scope:            "offline_access",
-			Description:      "Access to an offline refresh token, allowing the client to obtain a new access token without requiring your immediate interaction",
-			AlreadyConsented: false,
-		}, result[1])
-	})
-
-	t.Run("Custom scope", func(t *testing.T) {
-		result := buildScopeInfoArray(context.Background(), "openid custom:read", nil)
-		assert.Len(t, result, 2)
-		assert.Equal(t, ScopeInfo{
-			Scope:            "custom:read",
-			Description:      "Permission read on resource custom",
-			AlreadyConsented: false,
-		}, result[1])
-	})
-
-	t.Run("With existing consent", func(t *testing.T) {
-		consent := &record.UserConsent{
-			Scope: "openid profile",
-		}
-		result := buildScopeInfoArray(context.Background(), "openid profile email", consent)
-		assert.Len(t, result, 3)
-		assert.True(t, result[0].AlreadyConsented)
-		assert.True(t, result[1].AlreadyConsented)
-		assert.False(t, result[2].AlreadyConsented)
-	})
-
-	t.Run("Mixed scopes with consent", func(t *testing.T) {
-		consent := &record.UserConsent{
-			Scope: "openid custom:read",
-		}
-		result := buildScopeInfoArray(context.Background(), "openid profile custom:read custom:write", consent)
-		assert.Len(t, result, 4)
-		assert.True(t, result[0].AlreadyConsented)
-		assert.False(t, result[1].AlreadyConsented)
-		assert.True(t, result[2].AlreadyConsented)
-		assert.False(t, result[3].AlreadyConsented)
-	})
-
-	// Guards §6.9: consent scope descriptions (OIDC scopes and the
-	// resource-permission template) must localize to the active locale, not
-	// render hardcoded English.
-	t.Run("Localizes descriptions in pt-BR", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/auth/consent?ceremony="+testCeremonyId, nil)
-		req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
-
-		result := buildScopeInfoArray(req.Context(), "openid offline_access custom:read", nil)
-		assert.Len(t, result, 3)
-		assert.Equal(t, "Autenticar seu usuário e identificá-lo por um ID único", result[0].Description)
-		assert.Contains(t, result[1].Description, "token de atualização offline")
-		assert.Equal(t, "Permissão read no recurso custom", result[2].Description)
-	})
-}
-
 func TestHandleConsentGet(t *testing.T) {
 	t.Run("Error when getting AuthContext", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
@@ -150,6 +57,7 @@ func TestHandleConsentGet(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
+		req = withSettings(req, &record.Settings{})
 		rr := httptest.NewRecorder()
 
 		expectedError := &oauth.ErrorDetail{}
@@ -179,6 +87,7 @@ func TestHandleConsentGet(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
+		req = withSettings(req, &record.Settings{})
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -209,6 +118,7 @@ func TestHandleConsentGet(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
+		req = withSettings(req, &record.Settings{})
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -245,6 +155,7 @@ func TestHandleConsentGet(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
+		req = withSettings(req, &record.Settings{})
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -285,6 +196,7 @@ func TestHandleConsentGet(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
+		req = withSettings(req, &record.Settings{})
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -315,7 +227,7 @@ func TestHandleConsentGet(t *testing.T) {
 		database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(true, nil)
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/consent.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			scopes, ok := data["scopes"].([]ScopeInfo)
+			scopes, ok := data["scopes"].([]authflow.ScopeInfo)
 			return ok && len(scopes) == 3 &&
 				data["showClientSection"] == true &&
 				data["clientName"] == "test-client" &&
@@ -349,6 +261,7 @@ func TestHandleConsentGet(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
+		req = withSettings(req, &record.Settings{})
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -405,6 +318,7 @@ func TestHandleConsentGet(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
+		req = withSettings(req, &record.Settings{})
 		rr := httptest.NewRecorder()
 
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
@@ -443,6 +357,7 @@ func TestHandleConsentGet(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
+		req = withSettings(req, &record.Settings{})
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -473,7 +388,7 @@ func TestHandleConsentGet(t *testing.T) {
 		database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(consent, nil)
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/consent.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			scopes, ok := data["scopes"].([]ScopeInfo)
+			scopes, ok := data["scopes"].([]authflow.ScopeInfo)
 			return ok && len(scopes) == 3 &&
 				data["showClientSection"] == true &&
 				data["clientName"] == "test-client" &&
@@ -509,6 +424,7 @@ func TestHandleConsentGet(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
+		req = withSettings(req, &record.Settings{})
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -562,6 +478,7 @@ func TestHandleConsentPost(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("POST", "/auth/consent", nil)
+		req = withSettings(req, &record.Settings{})
 		rr := httptest.NewRecorder()
 
 		expectedError := &oauth.ErrorDetail{}
@@ -598,6 +515,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -709,6 +627,7 @@ func TestHandleConsentPost(t *testing.T) {
 					}
 				}
 				req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
+				req = withSettings(req, &record.Settings{})
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				rr := httptest.NewRecorder()
 
@@ -761,6 +680,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add("btnCancel", "cancel")
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -816,6 +736,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add("btnCancel", "cancel")
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -878,6 +799,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add("btnCancel", "cancel")
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -936,6 +858,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add("btnCancel", "cancel")
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -990,6 +913,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add("consent0", "openid")
 		form.Add("consent1", "profile")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -1059,6 +983,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add("consent0", "openid")
 		form.Add("consent1", "profile")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -1115,6 +1040,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add("consent0", "openid")
 		form.Add("consent1", "profile")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -1193,6 +1119,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add("consent1", "backend:read")
 		form.Add("consent2", "backend:write")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -1286,6 +1213,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add("consent0", "openid")
 		form.Add("consent1", "backend:read")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -1348,6 +1276,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("consent0", "backend:read")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -1429,6 +1358,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("consent0", "backend:read")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -1509,6 +1439,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("consent0", "backend:read")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -1580,6 +1511,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("consent0", "backend:read")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -1644,6 +1576,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add("btnSubmit", "submit")
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -1704,6 +1637,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add("btnSubmit", "submit")
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -1759,6 +1693,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add("btnSubmit", "submit")
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -1812,6 +1747,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add("btnSubmit", "submit")
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -2089,6 +2025,7 @@ func TestHandleConsentPost(t *testing.T) {
 					contentType = "application/x-www-form-urlencoded"
 				}
 				req, _ := http.NewRequest("POST", target, strings.NewReader(body))
+				req = withSettings(req, &record.Settings{})
 				req.Header.Add("Content-Type", contentType)
 				rr := httptest.NewRecorder()
 
@@ -2207,6 +2144,7 @@ func TestHandleConsentPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("consent2", "[on]")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -2293,6 +2231,7 @@ func TestHandleConsentGet_DescribesManageAccountInPlainWords(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodGet, "/auth/consent?ceremony="+testCeremonyId, nil)
 			req = req.WithContext(i18n.WithLocale(req.Context(), true, tc.locale))
+			req = withSettings(req, &record.Settings{})
 			rr := httptest.NewRecorder()
 
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
@@ -2317,12 +2256,118 @@ func TestHandleConsentGet_DescribesManageAccountInPlainWords(t *testing.T) {
 			handler.ServeHTTP(rr, req)
 
 			require.NotNil(t, rendered, "the consent screen is rendered")
-			scopes, ok := rendered["scopes"].([]ScopeInfo)
+			scopes, ok := rendered["scopes"].([]authflow.ScopeInfo)
 			require.True(t, ok)
 			require.Len(t, scopes, 4)
-			assert.Equal(t, ScopeInfo{Scope: "authserver:manage-account", Description: tc.manageAccount}, scopes[1])
-			assert.Equal(t, ScopeInfo{Scope: "authserver:manage-users", Description: tc.manageUsers}, scopes[2])
-			assert.Equal(t, ScopeInfo{Scope: "custom:read", Description: tc.customRead}, scopes[3])
+			assert.Equal(t, authflow.ScopeInfo{Scope: "authserver:manage-account", Description: tc.manageAccount}, scopes[1])
+			assert.Equal(t, authflow.ScopeInfo{Scope: "authserver:manage-users", Description: tc.manageUsers}, scopes[2])
+			assert.Equal(t, authflow.ScopeInfo{Scope: "custom:read", Description: tc.customRead}, scopes[3])
 		})
 	}
+}
+
+// A self-registered client whose name is its own claim: the screen shows that name marked
+// unverified, and no description line, since the description is that same self-asserted string and
+// would otherwise be printed twice, even with the administrator's "show description" ticked (#108).
+func TestHandleConsentGet_ASelfNamedClientIsShownAsAClaim(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	database := datamocks.NewDatabase(t)
+	handler := buildConsentGet(consentGetDeps{
+		pageRenderer:  pageRenderer,
+		ceremonyStore: ceremonyStore,
+		database:      database,
+		auditLogger:   handlersmocks.NewAuditLogger(t),
+	})
+
+	req := withSettings(httptest.NewRequest(http.MethodGet, "/auth/consent?ceremony="+testCeremonyId, nil),
+		&record.Settings{})
+	rr := httptest.NewRecorder()
+
+	ceremonyStore.On("GetAuthContext", req).Return(&ceremony.AuthContext{
+		CeremonyId: testCeremonyId,
+		AuthState:  ceremony.AuthStateRequiresConsent,
+		UserId:     1,
+		ClientId:   "dcr_a3f9e1b2",
+		Scope:      "openid",
+	}, nil)
+	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "dcr_a3f9e1b2").
+		Return(&record.Client{
+			Id:               7,
+			ClientIdentifier: "dcr_a3f9e1b2",
+			Description:      "Payroll Portal",
+			ShowDescription:  true,
+			CreatedViaDCR:    true,
+		}, nil)
+	database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(7)).Return(nil, nil)
+
+	var rendered map[string]interface{}
+	pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/consent.html",
+		mock.MatchedBy(func(data map[string]interface{}) bool {
+			rendered = data
+			return true
+		})).Return(nil).Once()
+
+	handler.ServeHTTP(rr, req)
+
+	require.NotNil(t, rendered)
+	assert.Equal(t, "Payroll Portal", rendered["clientName"])
+	assert.Equal(t, true, rendered["clientNameUnverified"])
+	assert.Contains(t, rendered, "clientDescription")
+	assert.Empty(t, rendered["clientDescription"])
+	assert.Equal(t, true, rendered["showClientSection"])
+	assert.Equal(t, testCeremonyId, rendered["ceremonyId"])
+	ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "ClientHasLogo", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// prompt=consent shows the screen even when the stored consent already covers every scope, as OIDC
+// Core 1.0 section 3.1.2.1 requires ("The Authorization Server SHOULD prompt the End-User for
+// consent before returning information to the Client"): the ceremony is not saved towards issuance,
+// and every row is shown as already consented.
+func TestHandleConsentGet_PromptConsentShowsAFullyConsentedScope(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	database := datamocks.NewDatabase(t)
+	handler := buildConsentGet(consentGetDeps{
+		pageRenderer:  pageRenderer,
+		ceremonyStore: ceremonyStore,
+		database:      database,
+		auditLogger:   handlersmocks.NewAuditLogger(t),
+	})
+
+	req := withSettings(httptest.NewRequest(http.MethodGet, "/auth/consent?ceremony="+testCeremonyId, nil),
+		&record.Settings{})
+	rr := httptest.NewRecorder()
+
+	ceremonyStore.On("GetAuthContext", req).Return(&ceremony.AuthContext{
+		CeremonyId: testCeremonyId,
+		AuthState:  ceremony.AuthStateRequiresConsent,
+		UserId:     1,
+		ClientId:   "test-client",
+		Scope:      "openid profile",
+		Prompt:     "consent",
+	}, nil)
+	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
+		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+	database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).
+		Return(&record.UserConsent{Id: 1, UserId: 1, ClientId: 1, Scope: "openid profile"}, nil)
+
+	var rendered map[string]interface{}
+	pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/consent.html",
+		mock.MatchedBy(func(data map[string]interface{}) bool {
+			rendered = data
+			return true
+		})).Return(nil).Once()
+
+	handler.ServeHTTP(rr, req)
+
+	require.NotNil(t, rendered)
+	assert.Equal(t, []authflow.ScopeInfo{
+		{Scope: "openid", Description: "Authenticate your user and identify you via a unique ID", AlreadyConsented: true},
+		{Scope: "profile", Description: "Access to claims: name, family_name, given_name, middle_name, nickname, preferred_username, profile, website, gender, birthdate, zoneinfo, locale, and updated_at", AlreadyConsented: true},
+	}, rendered["scopes"])
+	ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 }

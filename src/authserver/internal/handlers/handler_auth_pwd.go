@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -19,15 +20,14 @@ import (
 
 // authPwdDatabase is what the password hop needs: the client and the user being authenticated.
 //
-// It embeds the client display port because the screen renders through getClientDisplayInfo.
+// ClientHasLogo is authflow.GetClientDisplayInfo's read, for the screen's client block.
 //
 // No session lookup: the GET used to read the browser's session to prefill the email field, but
 // GetUserSessionBySessionIdentifier never loads the session's User, so the address was always
 // empty. It was removed rather than repaired, because prefilling an ended session's address is
 // what a shared machine should not do (#248, #436).
 type authPwdDatabase interface {
-	clientDisplayDatabase
-
+	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
 }
@@ -66,7 +66,7 @@ func HandleAuthPwdGet(
 			return
 		}
 
-		displayInfo := getClientDisplayInfo(r.Context(), database, client)
+		displayInfo := authflow.GetClientDisplayInfo(r.Context(), database, client)
 
 		bind := map[string]interface{}{
 			"error": nil,
@@ -152,7 +152,7 @@ func HandleAuthPwdPost(
 			return
 		}
 
-		displayInfo := getClientDisplayInfo(r.Context(), database, client)
+		displayInfo := authflow.GetClientDisplayInfo(r.Context(), database, client)
 
 		// renderError closes over r so a subsequent locale refinement
 		// is picked up by the closure on its next invocation.

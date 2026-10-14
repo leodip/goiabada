@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/otp"
@@ -22,13 +23,13 @@ import (
 // authOTPDatabase is what the OTP hop needs: the client, the user, and the OTP credential
 // lifecycle this hop verifies against and may establish.
 //
-// It embeds the client display port because the screen renders through getClientDisplayInfo, and
-// the OTP credential port because verifying a passcode and installing an authenticator both run
-// through otpcredential, which owns the step claim as well as the write (#387).
+// It embeds the OTP credential port because verifying a passcode and installing an authenticator
+// both run through otpcredential, which owns the step claim as well as the write (#387).
+// ClientHasLogo is authflow.GetClientDisplayInfo's read, for the screen's client block.
 type authOTPDatabase interface {
-	clientDisplayDatabase
 	otpcredential.Database
 
+	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 }
@@ -73,7 +74,7 @@ func HandleAuthOtpGet(
 			return
 		}
 
-		displayInfo := getClientDisplayInfo(r.Context(), database, client)
+		displayInfo := authflow.GetClientDisplayInfo(r.Context(), database, client)
 
 		if user.OTPEnabled {
 
@@ -248,7 +249,7 @@ func HandleAuthOtpPost(
 			return
 		}
 
-		displayInfo := getClientDisplayInfo(r.Context(), database, client)
+		displayInfo := authflow.GetClientDisplayInfo(r.Context(), database, client)
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{

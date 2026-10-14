@@ -174,7 +174,7 @@ type consentGetDeps struct {
 
 func buildConsentGet(d consentGetDeps) http.HandlerFunc {
 	return HandleConsentGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
-		d.pageRenderer, d.ceremonyStore, d.database)
+		d.pageRenderer, d.ceremonyStore, authflow.NewConsentPrompt(d.database))
 }
 
 type consentPostDeps struct {
@@ -189,7 +189,8 @@ type consentPostDeps struct {
 func buildConsentPost(d consentPostDeps) http.HandlerFunc {
 	return HandleConsentPost(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
 		testClientErrorResponder(d.database, d.pageRenderer, d.templateFS),
-		d.pageRenderer, d.ceremonyStore, d.database, d.auditLogger, d.permissionChecker)
+		d.pageRenderer, d.ceremonyStore,
+		authflow.NewConsentSubmission(d.database, d.permissionChecker, d.auditLogger))
 }
 
 // issueGetDeps.tokenMetrics left out is a recorder over a registry of its own (testTokenMetrics).

@@ -8,7 +8,7 @@ package handlers
 // the scope holds authserver:manage-account, the client is not the admin console's and the user's
 // stored consent does not cover it (authflow.DecideAfterBinding, #509), and /auth/consent then skips
 // the screen when every scope is already consented, unless offline_access or prompt=consent is there
-// (consentScreenOwed). The table states the two together, so it is held to both, for every
+// (authflow.ConsentScreenOwed). The table states the two together, so it is held to both, for every
 // combination of its five conditions and of the client being the admin console's or not, which the
 // manage-account column folds in.
 //
@@ -82,7 +82,7 @@ func consentWorlds() []consentWorld {
 
 // consentScreenShown is whether a sign-in in world sees the consent screen:
 // authflow.DecideAfterBinding's answer for a user holding every scope asked for, given stored consent covering the scopes this
-// world requires or none, and, when that is the consent step, consentScreenOwed's for the same
+// world requires or none, and, when that is the consent step, authflow.ConsentScreenOwed's for the same
 // consent. With Consent required off, manage-account alone is enough even when another requested
 // scope was never approved; this partial-consent case keeps the table's approval column honest.
 func consentScreenShown(t *testing.T, world consentWorld) bool {
@@ -128,11 +128,11 @@ func consentScreenShown(t *testing.T, world consentWorld) bool {
 	default:
 		t.Fatalf("%s: DecideAfterBinding answered %d, neither issuance nor the consent step", world, answer)
 	}
-	var scopes []ScopeInfo
+	var scopes []authflow.ScopeInfo
 	for _, s := range strings.Split(scope, " ") {
-		scopes = append(scopes, ScopeInfo{Scope: s, AlreadyConsented: storedConsent != nil && storedConsent.HasScope(s)})
+		scopes = append(scopes, authflow.ScopeInfo{Scope: s, AlreadyConsented: storedConsent != nil && storedConsent.HasScope(s)})
 	}
-	return consentScreenOwed(scopes, scope, world.promptConsent)
+	return authflow.ConsentScreenOwed(scopes, scope, world.promptConsent)
 }
 
 // consentScreens is consentScreenShown for every world.
