@@ -25,13 +25,13 @@ import (
 //
 // User A is signed in and the browser holds A's session cookie. User B then authenticates in the
 // same browser. Three requests reach that handover, and each takes a different route out of
-// HandleAuthorizeGet while leaving A's cookie in place:
+// authflow.Authorization.Run while leaving A's cookie in place:
 //
-//   - prompt=login, which returns before the session is even loaded;
-//   - an id_token_hint naming somebody other than the session's owner, which returns from inside
-//     the valid-session block;
+//   - prompt=login, which is sent to log in before the session is even loaded;
+//   - an id_token_hint naming somebody other than the session's owner, sent to log in over a valid
+//     session;
 //   - max_age=0, which is neither of those: the session loads, HasValidUserSession refuses it, and
-//     the request leaves at the function's final return.
+//     the request is sent to log in for want of a valid session.
 //
 // The rule this file proves is one sentence: a ceremony binds only to a session belonging to the
 // user it authenticated. Before it held, B's authorization code carried A's session identifier, A's
@@ -469,11 +469,11 @@ func TestCrossUser_IdTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsAcr(t
 // path, the one neither prompt=login nor an id_token_hint reaches.
 //
 // max_age=0 makes HasValidUserSession refuse a session that is otherwise perfectly alive: the
-// request carries no prompt, so HandleAuthorizeGet loads A's session, finds it too old for the
-// requested max_age and leaves at its final return. The row survives and so does the cookie, so the
-// handover happens with an invalid foreign session rather than a valid one, which decision 4 treats
-// the same way and for the same reason: a row nobody can resume is worth nothing to A and its
-// grants are still live.
+// request carries no prompt, so authflow.Authorization.Run loads A's session, finds it too old for
+// the requested max_age and sends the ceremony to log in. The row survives and so does the cookie,
+// so the handover happens with an invalid foreign session rather than a valid one, which decision 4
+// treats the same way and for the same reason: a row nobody can resume is worth nothing to A and
+// its grants are still live.
 //
 // The chain is the assertion that pins the path. Send the same request without max_age=0 and A's
 // session is reused, so /auth/authorize answers /auth/level1completed and B never sees a password

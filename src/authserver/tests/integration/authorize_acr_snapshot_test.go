@@ -23,7 +23,7 @@ import (
 // mid-ceremony therefore redefined, retroactively, what that ceremony had been required to do.
 //
 // This is the case that could not be caught anywhere else: every unit case can pass with
-// HandleAuthorizeGet never calling SetTargetAcrLevel at all, because they call the reader and the
+// authflow.Authorization.Run never calling SetTargetAcrLevel at all, because they call the reader and the
 // writer directly. Only a real ceremony proves the snapshot is taken and carried.
 
 // TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr drives a password-only ceremony on a

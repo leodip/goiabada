@@ -13,6 +13,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -24,8 +25,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
 // stubAuthenticatedBrowser gives HandleAuthorizeGet a browser that has already authenticated.
@@ -41,7 +42,7 @@ import (
 // stubRegisteredRedirectURI gives a ceremony's client the registrations the error emitter now reads
 // before it will emit anything.
 //
-// Since #241 decision 11, redirectWillBeEmitted weighs the destination against what the client has
+// Since #241 decision 11, RedirectWillBeEmitted weighs the destination against what the client has
 // registered right now, not only against where the URI came from and whether it names a host. Every
 // test below that asserts the SHAPE of an error redirect is asserting what a client receives, which
 // is orthogonal to whether an administrator has since deleted the callback, so each is handed its
@@ -251,6 +252,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=invalid-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		require.NoError(t, err)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 
 		rr := httptest.NewRecorder()
 
@@ -309,6 +311,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// unsupported mode most plausibly asks for.
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&response_mode=jwt", nil)
 		require.NoError(t, err)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 
 		rr := httptest.NewRecorder()
 
@@ -1910,7 +1913,7 @@ func TestRedirToClientWithError_NonAbsoluteRedirectURIRendersTheBlockedPage(t *t
 	}
 }
 
-// redirectWillBeEmitted is the one definition of "would an error response to this client actually
+// RedirectWillBeEmitted is the one definition of "would an error response to this client actually
 // leave the server", and it now has two readers: the emitter, which withholds the redirect and
 // renders the interstitial, and the handler, which asks the same question earlier to decide whether
 // anything has to be authenticated first. Two call sites that must agree is exactly the shape a
@@ -2101,7 +2104,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := testClientErrorResponder(tc.database(t), nil, nil).redirectWillBeEmitted(context.Background(), tc.client, tc.redirectURI, tc.responseType,
+			got := testClientErrorResponder(tc.database(t), nil, nil).RedirectWillBeEmitted(context.Background(), tc.client, tc.redirectURI, tc.responseType,
 				"TestRedirectWillBeEmitted")
 
 			assert.Equal(t, tc.want, got, tc.why)
@@ -2144,7 +2147,7 @@ func TestRedirToClientWithError_HonoursAnEarlierRefusal(t *testing.T) {
 	pageRenderer.AssertExpectations(t)
 }
 
-// The three gates live in redirectWillBeEmitted and TestRedirectWillBeEmitted's table owns their
+// The three gates live in RedirectWillBeEmitted and TestRedirectWillBeEmitted's table owns their
 // answers. What the table cannot see is whether the emitter actually HANDS it the ceremony's
 // response type, because it calls the predicate directly. This is that seam: the same loopback
 // rows, driven through redirToClientWithError, so an edit that stopped propagating input's
@@ -2600,51 +2603,6 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
-}
-
-// TestValidateIdTokenHint_TypeOfToken: a validly signed token of this server that is not an ID
-// Token is refused as a hint, with the answer a hint that does not parse gets, so the reply does
-// not say which kind of token was sent (#401). ID Tokens carry no typ at all, so the absent row is
-// the one a real hint takes.
-func TestValidateIdTokenHint_TypeOfToken(t *testing.T) {
-	settings := &record.Settings{Issuer: "https://test-issuer.com"}
-
-	tests := []struct {
-		name     string
-		typ      interface{} // nil leaves the claim out
-		accepted bool
-	}{
-		{name: "ID Token, no typ", typ: nil, accepted: true},
-		{name: "access token", typ: "Bearer"},
-		{name: "session refresh token", typ: "Refresh"},
-		{name: "offline refresh token", typ: "Offline"},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			claims := jwt.MapClaims{"iss": "https://test-issuer.com", "sub": "user-123"}
-			if tc.typ != nil {
-				claims["typ"] = tc.typ
-			}
-			tokenParser := handlersmocks.NewTokenParser(t)
-			tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-hint", false).
-				Return(&oauth.JwtToken{TokenBase64: "the-hint", Claims: claims}, nil)
-
-			sub, err := validateIdTokenHint(context.Background(), "the-hint", tokenParser, settings)
-
-			if tc.accepted {
-				require.NoError(t, err)
-				assert.Equal(t, "user-123", sub)
-				return
-			}
-			assert.Empty(t, sub)
-			var detail *oauth.ErrorDetail
-			require.ErrorAs(t, err, &detail)
-			assert.Equal(t, "invalid_request", detail.Code())
-			assert.Equal(t, "The id_token_hint is invalid.", detail.Description())
-			assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
-		})
-	}
 }
 
 func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
@@ -4238,7 +4196,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 					"Invalid scope format: 'bogus'.", http.StatusBadRequest))
 
 			// Maybe, for the reason the session lookup below is Maybe: the registration read is
-			// the third gate inside redirectWillBeEmitted, so the DCR rows and the unemittable-URI
+			// the third gate inside RedirectWillBeEmitted, so the DCR rows and the unemittable-URI
 			// row are refused above it and never query. The rows that do reach it hold their own
 			// destination registered, which is what keeps them about the routing they are named
 			// for rather than about a deleted callback (#241 decision 11).
@@ -4474,7 +4432,7 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 	ceremonyStore.AssertExpectations(t)
 }
 
-// One authorization request asks redirectWillBeEmitted twice: HandleAuthorizeGet asks it before
+// One authorization request asks RedirectWillBeEmitted twice: HandleAuthorizeGet asks it before
 // routing, to decide whether a validation failure may be answered at once or has to be parked behind
 // a login, and the emitter asks it again at the last moment. Since the predicate started reading the
 // registration table (#241 decision 11) those two answers need not agree, and the disagreement has a
@@ -4608,4 +4566,36 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			ceremonyStore.AssertExpectations(t)
 		})
 	}
+}
+
+// A refusal whose reason the handler does not know names no message or status to answer with, so it
+// is the 500 page rather than a refusal page with a guessed text.
+func TestAnswerAuthorizePageRefusal_AnUnknownReasonIsA500(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	req := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
+	rr := httptest.NewRecorder()
+	pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		return err != nil && strings.Contains(err.Error(), "unknown reason")
+	})).Return().Once()
+
+	answerAuthorizePageRefusal(pageRenderer, rr, req, &authflow.AuthorizePageRefusal{})
+
+	pageRenderer.AssertExpectations(t)
+	pageRenderer.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+		mock.Anything)
+}
+
+// A refusal page that cannot be rendered is the 500 page carrying the render's failure.
+func TestRenderAuthorizeRefusal_ARenderFailureIsA500(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	req := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
+	rr := httptest.NewRecorder()
+	renderErr := errors.New("template exploded")
+	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.Anything).
+		Return(renderErr).Once()
+	pageRenderer.On("InternalServerError", rr, req, renderErr).Return().Once()
+
+	renderAuthorizeRefusal(pageRenderer, rr, req, "refused", http.StatusBadRequest)
+
+	pageRenderer.AssertExpectations(t)
 }

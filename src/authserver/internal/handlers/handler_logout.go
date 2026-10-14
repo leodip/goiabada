@@ -225,19 +225,6 @@ type hintClassification struct {
 	sessionIdentifier string
 }
 
-// nonIdTokenTypValues are the "typ" claim values Goiabada stamps on tokens that are NOT ID Tokens:
-// issuance.TokenTypeBearer on access tokens, and the two refresh-token markers TokenTypeRefresh and
-// TokenTypeOffline. generateIdTokenCore emits no typ at all, and neither does the short-lived hint
-// HandleAccountLogoutRequestPost mints, so this rejects nothing an RP can legitimately present.
-//
-// It is a denylist rather than a requirement that typ be "ID" for exactly that reason: no ID Token
-// this server issues carries the claim, so requiring it would reject every real hint.
-var nonIdTokenTypValues = map[string]bool{
-	issuance.TokenTypeBearer.String():  true, // "Bearer", access tokens
-	issuance.TokenTypeRefresh.String(): true, // "Refresh", session-bound refresh tokens
-	issuance.TokenTypeOffline.String(): true, // "Offline", offline refresh tokens
-}
-
 // rejectIdTokenHint is the one answer for a hint classifyIdTokenHint refuses: the record every
 // refusal writes, and the classification the caller falls back to a hintless logout on. The gate
 // rides as an attribute rather than inside the message, so the twenty rejections are one greppable
@@ -339,7 +326,7 @@ func classifyIdTokenHint(
 	// token carries iss, sub, iat, nbf, exp and a session-bound sid, and its aud is the resource
 	// identifier, so GetClientByClientIdentifier resolves it under the collision. Confirming it would
 	// skip the consent page entirely and end that client's half of the session (#109).
-	if typ := idToken.StringClaim("typ"); nonIdTokenTypValues[typ] {
+	if typ := idToken.StringClaim("typ"); issuance.IsNotIDTokenTyp(typ) {
 		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "typ names a token that is not an ID Token", "typ", typ)
 	}
 

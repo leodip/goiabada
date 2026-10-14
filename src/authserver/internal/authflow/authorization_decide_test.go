@@ -1,27 +1,13 @@
-package handlers
+package authflow
 
 import (
-	"bytes"
-	"context"
-	"errors"
-	"mime/multipart"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
-	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
-// authorizeWorld is what HandleAuthorizeGet would load, answered from the row instead of from a
+// authorizeWorld is what Authorization.Run would load, answered from the row instead of from a
 // database, so a decideAuthorizeRoute case is a table row with no HTTP harness and no mocks.
 type authorizeWorld struct {
 	silent, login           bool // the raw prompt's none and login tokens
@@ -34,7 +20,7 @@ type authorizeWorld struct {
 	userEnabled             bool
 }
 
-// driveAuthorizeRoute runs decideAuthorizeRoute as HandleAuthorizeGet does, loading each fact it
+// driveAuthorizeRoute runs decideAuthorizeRoute as Authorization.Run does, loading each fact it
 // asks for from the world, and answers the route and the facts in the order they were asked for.
 func driveAuthorizeRoute(t *testing.T, world authorizeWorld) (authorizeRoute, []authorizeFact) {
 	t.Helper()
@@ -230,190 +216,5 @@ func TestDecideAuthorizeRoute_RefusalAnswersNowOnThreeClauses(t *testing.T) {
 				}
 			}
 		}
-	}
-}
-
-// The request's parameters are read from one url.Values, the query and a form body merged as
-// r.FormValue merges them, the query's value first.
-func TestAuthorizeParameters(t *testing.T) {
-	t.Run("the query and the form body are one source", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/auth/authorize?client_id=from-query&state=query-state",
-			strings.NewReader("redirect_uri="+url.QueryEscape("https://example.com/cb")+"&state=body-state"))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-		params, err := authorizeParameters(req)
-		require.NoError(t, err)
-
-		assert.Equal(t, "from-query", params.Get("client_id"))
-		assert.Equal(t, "https://example.com/cb", params.Get("redirect_uri"))
-		assert.Equal(t, "body-state", params.Get("state"), "the body's value comes first, as r.FormValue answers")
-		assert.Equal(t, req.FormValue("state"), params.Get("state"))
-	})
-
-	t.Run("a form already parsed is read as it stands", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/auth/authorize?client_id=from-query", nil)
-		req.Form = url.Values{"client_id": {"parsed-earlier"}}
-
-		params, err := authorizeParameters(req)
-		require.NoError(t, err)
-		assert.Equal(t, "parsed-earlier", params.Get("client_id"))
-	})
-
-	t.Run("a multipart body is read, as r.FormValue reads it", func(t *testing.T) {
-		var body bytes.Buffer
-		form := multipart.NewWriter(&body)
-		require.NoError(t, form.WriteField("state", "multipart-state"))
-		require.NoError(t, form.Close())
-		req := httptest.NewRequest(http.MethodPost, "/auth/authorize?client_id=from-query", &body)
-		req.Header.Set("Content-Type", form.FormDataContentType())
-
-		params, err := authorizeParameters(req)
-		require.NoError(t, err)
-		assert.Equal(t, "from-query", params.Get("client_id"))
-		assert.Equal(t, "multipart-state", params.Get("state"))
-	})
-
-	// Until #228 a parse failure was ignored and the field holding it dropped, as r.FormValue does;
-	// now it is returned, and HandleAuthorizeGet answers it on the refusal page.
-	t.Run("a body that does not parse is an error", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/auth/authorize?client_id=from-query",
-			strings.NewReader("state=%zz"))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-		_, err := authorizeParameters(req)
-		assert.Error(t, err)
-	})
-
-	t.Run("a query that does not parse is an error", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/auth/authorize?client_id=from-query&state=%zz", nil)
-
-		_, err := authorizeParameters(req)
-		assert.Error(t, err)
-	})
-
-	t.Run("a multipart body that does not parse is an error", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/auth/authorize", strings.NewReader("not a multipart body"))
-		req.Header.Set("Content-Type", "multipart/form-data; boundary=xyz")
-
-		_, err := authorizeParameters(req)
-		assert.Error(t, err)
-	})
-}
-
-// The five validations run in order and the first refusal ends them; a validator's fault is
-// returned rather than taken for a refusal; and the prompt, once accepted, is kept when the hint
-// after it is refused, so a parked ceremony carries it as it always did. The handler cases show
-// each validation's refusal reaching the client (#437 seam 4).
-func TestValidateAuthorizeRequest(t *testing.T) {
-	requestRefusal := oauth.NewErrorDetailWithHTTPStatus("invalid_request", "The request is invalid.", http.StatusBadRequest)
-
-	testCases := []struct {
-		name            string
-		hint            string
-		scope           string
-		requestErr      error
-		scopesErr       error
-		wantRefusalCode string
-		wantPrompt      string
-		wantHint        string
-		wantFault       bool
-		wantCalls       []string
-	}{
-		{
-			name:       "every validation accepts",
-			wantPrompt: "login",
-			wantCalls:  []string{"ValidateUnsupportedRequestParameters", "ValidateRequest", "ValidateScopes", "ValidatePrompt"},
-		},
-		{
-			name:            "the first refusal ends the validations",
-			requestErr:      requestRefusal,
-			wantRefusalCode: "invalid_request",
-			wantCalls:       []string{"ValidateUnsupportedRequestParameters", "ValidateRequest"},
-		},
-		{
-			name:      "a validator's fault is returned, not refused",
-			scopesErr: errors.New("the database is unavailable"),
-			wantFault: true,
-			wantCalls: []string{"ValidateUnsupportedRequestParameters", "ValidateRequest", "ValidateScopes"},
-		},
-		{
-			// After the scopes, which establish that it exists, and before the prompt (#499).
-			name:            "an administrative scope the client may not request is refused after the scopes",
-			scope:           "openid authserver:manage",
-			wantRefusalCode: "invalid_scope",
-			wantCalls:       []string{"ValidateUnsupportedRequestParameters", "ValidateRequest", "ValidateScopes"},
-		},
-		{
-			name:            "a refused hint keeps the accepted prompt",
-			hint:            "not-a-token",
-			wantRefusalCode: "invalid_request",
-			wantPrompt:      "login",
-			wantCalls:       []string{"ValidateUnsupportedRequestParameters", "ValidateRequest", "ValidateScopes", "ValidatePrompt", "DecodeAndValidateTokenString"},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
-			tokenParser := handlersmocks.NewTokenParser(t)
-			var calls []string
-			recordCall := func(name string) func(mock.Arguments) {
-				return func(mock.Arguments) { calls = append(calls, name) }
-			}
-
-			authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).
-				Run(recordCall("ValidateUnsupportedRequestParameters")).Return(nil).Maybe()
-			authorizeValidator.On("ValidateRequest", mock.Anything).
-				Run(recordCall("ValidateRequest")).Return(tc.requestErr).Maybe()
-			scope := "openid"
-			if tc.scope != "" {
-				scope = tc.scope
-			}
-			authorizeValidator.On("ValidateScopes", mock.Anything, scope).
-				Run(recordCall("ValidateScopes")).Return(tc.scopesErr).Maybe()
-			authorizeValidator.On("ValidatePrompt", "login").
-				Run(recordCall("ValidatePrompt")).Return("login", nil).Maybe()
-			tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "not-a-token", false).
-				Run(recordCall("DecodeAndValidateTokenString")).Return(nil, errors.New("malformed")).Maybe()
-
-			// ValidateScopes is handed the scope as sent, never the request's normalized copy, whose
-			// spaces would hide a malformed one (#244): the copy below differs, so a call with it
-			// matches no expectation.
-			params := url.Values{"prompt": {"login"}, "scope": {scope}}
-			if tc.hint != "" {
-				params.Set("id_token_hint", tc.hint)
-			}
-
-			// The administrative check reads the request's normalized copy, which here is the scope
-			// as sent, so a row asking for an administrative scope is judged on it.
-			normalized := "the normalized copy"
-			if tc.scope != "" {
-				normalized = tc.scope
-			}
-			validation, err := validateAuthorizeRequest(context.Background(), authorizeValidator, tokenParser,
-				&record.Settings{Issuer: "https://test-issuer.com"}, &record.Client{ClientIdentifier: "test-client"}, params,
-				&protocolvalidation.ValidateRequestInput{Scope: normalized})
-
-			assert.Equal(t, tc.wantCalls, calls)
-			if tc.wantFault {
-				require.Error(t, err)
-				assert.Nil(t, validation.refusal)
-				return
-			}
-			require.NoError(t, err)
-			if tc.wantRefusalCode == "" {
-				assert.Nil(t, validation.refusal)
-			} else {
-				require.NotNil(t, validation.refusal)
-				assert.Equal(t, tc.wantRefusalCode, validation.refusal.Code())
-			}
-			if tc.scope != "" {
-				assert.Equal(t, []string{"authserver:manage"}, validation.refusedAdministrativeScopes)
-			} else {
-				assert.Nil(t, validation.refusedAdministrativeScopes)
-			}
-			assert.Equal(t, tc.wantPrompt, validation.prompt)
-			assert.Equal(t, tc.wantHint, validation.hintSubject)
-		})
 	}
 }

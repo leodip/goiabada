@@ -138,7 +138,7 @@ type AuthContext struct {
 	// replaced sign-in that reaches its next step gets the "no longer active" page instead of
 	// acting on the newer one (#246, #437).
 	//
-	// Generated only in HandleAuthorizeGet, through NewId, the sole creation site, so no other
+	// Generated only in authflow.Authorization.Run, through NewId, the sole creation site, so no other
 	// path can mint one. Absent from a context written by an older binary it unmarshals as "", which
 	// ceremonyMatches refuses rather than matching against an empty submission: a user mid-flow
 	// across a deploy is refused once and restarts the authorization, bounded by the session
@@ -246,7 +246,7 @@ func (ac *AuthContext) SetScope(scope string) {
 // by every request of the ceremony that parked it (#213 decision 10, #266).
 //
 // Both fields are request fields, so this is a setter the request-field guard holds to
-// HandleAuthorizeGet like a direct write (#437).
+// authflow.Authorization.Run like a direct write (#437).
 func (ac *AuthContext) ParkDeferredError(code, description string) {
 	ac.DeferredErrorCode = code
 	ac.DeferredErrorDescription = oauth.ConformErrorDescription(description)

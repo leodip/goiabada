@@ -27,19 +27,11 @@ type silentAuthenticationSessions interface {
 		authMethods string, acrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error)
 }
 
-// silentAuthenticationBrowser is the two browser-session writes SilentAuthentication makes, both
-// /auth/authorize's, which starts a ceremony and so writes without a condition (#579 decision 6):
-// the save that replaces whatever ceremony the browser session held, and the discard that ends it
-// before the client is answered with an error. The handler's per-request adapter satisfies it.
-type silentAuthenticationBrowser interface {
-	ReplaceAuthContext(authContext *ceremony.AuthContext) error
-	DiscardAuthContext() error
-}
-
 // SilentAuthentication is GET /auth/authorize for a request carrying prompt=none (OIDC Core 1.0
 // section 3.1.2.1), once the request is accepted: it answers the client without showing the
 // browser anything, either with an error or by sending the ceremony straight to /auth/issue on the
-// browser's session. The route table builds one.
+// browser's session. Authorization.Run hands it such a request; the route table builds one and gives
+// it to NewAuthorization.
 type SilentAuthentication struct {
 	database    silentAuthenticationDatabase
 	sessions    silentAuthenticationSessions
@@ -92,7 +84,7 @@ type SilentAuthenticationResult struct {
 // The bump passes no methods and no level: the session is reused only when it already holds the
 // level asked for, so its own were all it could pass, and writing them back would undo a removal
 // of the user's authenticator that lowered the session after it was read here (#542).
-func (o *SilentAuthentication) Run(ctx context.Context, browser silentAuthenticationBrowser,
+func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser,
 	settings *record.Settings, authContext *ceremony.AuthContext, client *record.Client, sessionIdentifier string,
 	ipAddress string) (SilentAuthenticationResult, error) {
 

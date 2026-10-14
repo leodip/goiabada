@@ -562,8 +562,9 @@ func (o *Issuance) issueImplicit(ctx context.Context, browser issuanceBrowser, s
 
 // administrativeScopeRefusedDetails is an administrative_scope_refused record's payload: the client
 // refused, the administrative scopes it asked for, the checkpoint that refused them, and the user
-// they were asked for (#499 decision 9). handlers declares the same payload for /auth/authorize and
-// the token endpoint; the audit log's key catalog holds both to the documented keys.
+// they were asked for (#499 decision 9). Authorization and Issuance record it here; handlers declares
+// the same payload for the token endpoint, and the audit log's key catalog holds both to the
+// documented keys.
 func administrativeScopeRefusedDetails(client *record.Client, scopes []string, checkpoint string,
 	userId int64) map[string]interface{} {
 

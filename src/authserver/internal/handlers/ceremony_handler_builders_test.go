@@ -41,11 +41,12 @@ type authorizeGetDeps struct {
 }
 
 func buildAuthorizeGet(d authorizeGetDeps) http.HandlerFunc {
+	responder := testClientErrorResponder(d.database, d.pageRenderer, d.templateFS)
 	return HandleAuthorizeGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
-		testClientErrorResponder(d.database, d.pageRenderer, d.templateFS),
-		d.pageRenderer, d.ceremonyStore, d.userSessionManager, d.database,
-		d.authorizeValidator, d.auditLogger, d.tokenParser,
-		authflow.NewSilentAuthentication(d.database, d.userSessionManager, d.permissionChecker, d.auditLogger))
+		responder, d.pageRenderer, d.ceremonyStore,
+		authflow.NewAuthorization(d.database, d.userSessionManager, d.authorizeValidator, d.tokenParser,
+			responder, d.auditLogger,
+			authflow.NewSilentAuthentication(d.database, d.userSessionManager, d.permissionChecker, d.auditLogger)))
 }
 
 type authorizePostDeps struct {
@@ -55,7 +56,7 @@ type authorizePostDeps struct {
 }
 
 func buildAuthorizePost(d authorizePostDeps) http.HandlerFunc {
-	return HandleAuthorizePost(d.pageRenderer, d.authorizeValidator, d.database, testBaseURL)
+	return HandleAuthorizePost(d.pageRenderer, authflow.NewAuthorizationParking(d.authorizeValidator, d.database), testBaseURL)
 }
 
 type authLevel1GetDeps struct {

@@ -99,6 +99,7 @@ func TestHandleAuthorizeGet_ARefusalWritesNoAuthContext(t *testing.T) {
 			})
 
 			req := httptest.NewRequest("GET", "/authorize?"+tc.query, nil)
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 			rr := httptest.NewRecorder()
 
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,

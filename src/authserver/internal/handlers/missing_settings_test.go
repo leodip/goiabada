@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -27,6 +27,38 @@ import (
 
 func isErrNoSettings(err error) bool {
 	return errors.Is(err, reqctx.ErrNoSettings)
+}
+
+// The authorization endpoint reads its settings before its parameters, so a request reached without
+// them answers the 500 page carrying reqctx.ErrNoSettings and reads nothing else: not a parked
+// request a handle names, not the validator, and no refusal page for a request that does not parse
+// (#580 decision 5).
+func TestMissingSettings_TheAuthorizationEndpointAnswersBeforeReadingItsRequest(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		query string
+	}{
+		{"a request naming a parked request", "request_handle=" + strings.Repeat("A", 43)},
+		{"a request that does not parse", "client_id=test-client&state=%zz"},
+		{"a well-formed request", validAuthorizeQuery},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newAuthorizeEndpoint(t)
+			req := httptest.NewRequest(http.MethodGet, "/auth/authorize?"+tc.query, nil)
+			rr := httptest.NewRecorder()
+			e.pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
+
+			e.handler.ServeHTTP(rr, req)
+
+			e.pageRenderer.AssertExpectations(t)
+			e.pageRenderer.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
+				mock.Anything, mock.Anything)
+			e.database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+			e.validator.AssertNotCalled(t, "ValidateClientAndRedirectURI", mock.Anything, mock.Anything)
+			e.ceremonyStore.AssertNotCalled(t, "ReplaceAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			e.ceremonyStore.AssertNotCalled(t, "DiscardAuthContext", mock.Anything, mock.Anything)
+		})
+	}
 }
 
 // A browser page answers the 500 page through PageRenderer.

@@ -72,7 +72,7 @@ func (r ResponseTypeInfo) IsImplicitFlow() bool {
 // nothing else was, recognised or not, nothing was asked for twice, and no space came with it.
 //
 // It is what scopes RFC 8252 section 7.3's loopback port flexibility to the authorization code
-// flow, at the three places that decide it (ValidateClientAndRedirectURI, redirectWillBeEmitted and
+// flow, at the three places that decide it (ValidateClientAndRedirectURI, RedirectWillBeEmitted and
 // /auth/issue's registration gate). They used to recover this from the raw token sequence, because
 // the parser ignored unrecognised values and collapsed duplicates, which made HasCode && !HasToken
 // && !HasIdToken true for "code foo" and "code code". The parser reports both now, so the parsed

@@ -12,7 +12,7 @@ import (
 // when it renders; everything here is what it renders and the pure function behind the one thing on
 // it a user can act on.
 //
-// There are three such destinations, and the responder's redirectWillBeEmitted holds all three: one a client
+// There are three such destinations, and the responder's RedirectWillBeEmitted holds all three: one a client
 // registered for itself (#108), one whose stored string cannot name the host it appears to (#122),
 // and one the client no longer has registered at all (#241). The page is the same for each,
 // because what it tells the person in front of it is the same: the authorization stopped here and

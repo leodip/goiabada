@@ -4,6 +4,14 @@
 //
 // The operations and the routes they serve:
 //
+//   - Authorization, GET /auth/authorize: swaps in a request a POST parked (ResolveParked), then
+//     creates the ceremony, the one place an AuthContext is created and a request field written,
+//     refuses on the page a request no answer can be addressed to, validates the rest, fixes the
+//     target ACR, and routes the ceremony (decideAuthorizeRoute): the error answered to the client
+//     now or parked behind a login (#213), /auth/level1, the session's SSO shortcut to
+//     /auth/level1completed, or SilentAuthentication.
+//   - AuthorizationParking, POST /auth/authorize: refuses what the GET would refuse on the page, and
+//     parks the rest under a one-time handle for the GET the handler redirects to (#246).
 //   - SelectLevel1Method, GET /auth/level1: chooses the level 1 method, today always the password.
 //   - PasswordPrompt, GET /auth/pwd, and POST /auth/pwd beside a refusal: the client block of the
 //     password form, which the handler renders.
@@ -27,8 +35,8 @@
 //   - ConsentSubmission, POST /auth/consent: reads the user's answer from the submitted body, weighs
 //     the ticked scopes against the permissions the user holds now (decideConsentSubmission), and
 //     records the consent (userconsent.Record) or refuses with access_denied.
-//   - SilentAuthentication, GET /auth/authorize with prompt=none, once the request is accepted:
-//     decides whether the browser's session answers it without showing anything
+//   - SilentAuthentication, GET /auth/authorize with prompt=none, once Authorization has accepted
+//     it: decides whether the browser's session answers it without showing anything
 //     (DecideSilentAuthentication), and either refuses it for the client or adopts the session,
 //     bumps it and sends the ceremony straight to /auth/issue.
 //   - Issuance, GET /auth/issue: checks again what may have changed since /auth/authorize
@@ -38,8 +46,6 @@
 //
 // GetClientDisplayInfo is the client block every sign-in screen shows, and ConsentClientName the
 // name the consent screen and the redirect-blocked page give a client.
-//
-// The rest of /auth/authorize, its POST included, is still written in internal/handlers.
 //
 // Rules every operation keeps:
 //
@@ -59,6 +65,12 @@
 //
 // The orderings the steps here keep:
 //
+//   - Authorization creates the ceremony before it judges the request and saves it only once a
+//     route has given it a state, so a request refused on the page writes nothing (#436). It
+//     loads the client before every answer that can redirect (#108), asks the responder's emission
+//     gate before the session and the session before the validations, and reads the session only
+//     when the route turns on it: never for prompt=login, and a failed read is an error, never "no
+//     session" (#213). A refusal answered now discards the ceremony before the answer (#141).
 //   - A parked error reads the client's provenance before the ceremony is cleared, and the clear
 //     comes before the answer (Level1Completion); so does every access_denied Completion owes.
 //   - A step saves its next state before the handler redirects to it.

@@ -5056,7 +5056,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		// The gate's own registration read, and separately the emitter's: the refusal below is an
-		// answer to the client, so it passes through redirectWillBeEmitted too (#241 decision 11).
+		// answer to the client, so it passes through RedirectWillBeEmitted too (#241 decision 11).
 		issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 		database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).

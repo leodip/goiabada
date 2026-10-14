@@ -24,7 +24,7 @@ type clientErrorDatabase interface {
 }
 
 // ClientErrorResponder answers a client with an authorization error response: it decides whether
-// the response may leave this server at all (redirectWillBeEmitted's three gates), writes it in the
+// the response may leave this server at all (RedirectWillBeEmitted's three gates), writes it in the
 // query, the fragment or a form_post, renders the refusal interstitial in its place when it may not,
 // and answers server_error when the step's clear of its auth context failed. The route table builds
 // one and hands it to every handler that answers a client with an error.
@@ -67,13 +67,13 @@ type redirectErrorInput struct {
 	state        string
 	responseType string
 
-	// redirectAlreadyWithheld records that redirectWillBeEmitted has already answered no for this
+	// redirectAlreadyWithheld records that RedirectWillBeEmitted has already answered no for this
 	// request, so the emitter does not ask again. It is a floor, never a ceiling: false means
 	// "nothing has refused yet", not "a redirect is permitted", and the emitter still runs the live
 	// gates on top of it.
 	//
 	// The registration gate reads the database, so the two answers one authorization request can get
-	// may differ. HandleAuthorizeGet asks before routing, and a refusal there is what lets it answer a
+	// may differ. authflow.Authorization asks before routing, and a refusal there is what lets it answer a
 	// validation failure at once instead of parking it behind a login: no redirect leaves this server,
 	// so RFC 9700 4.11.2 has nothing to govern. Were the emitter to ask again and get yes (a transient
 	// read failure the first time, or the callback re-added between the reads), a logged-out browser
@@ -85,7 +85,7 @@ type redirectErrorInput struct {
 
 // redirectErrorFromAuthContext builds the input for an error response whose parameters come from
 // the ceremony, which is where every error response takes them from. At /auth/authorize that is the
-// context HandleAuthorizeGet has just built, holding the four as the request sent them before
+// context authflow.Authorization has just built, holding the four as the request sent them before
 // anything is validated, so an error arising there answers what the request carried.
 func redirectErrorFromAuthContext(authContext *ceremony.AuthContext, client *record.Client,
 	code string, description string) redirectErrorInput {
@@ -139,7 +139,7 @@ func (rsp *ClientErrorResponder) clientProvenance(ctx context.Context, clientIde
 	return authflow.ClientProvenance(ctx, rsp.database, clientIdentifier)
 }
 
-// redirectWillBeEmitted answers whether an error response to this client would leave the server as a
+// RedirectWillBeEmitted answers whether an error response to this client would leave the server as a
 // redirect, or would be withheld and replaced by the refusal interstitial. It is three gates asked as
 // one question, so the callers that need the answer before building a response and the emitter that
 // enforces it cannot drift apart. site names the caller for the log line; the URI itself is never
@@ -175,9 +175,10 @@ func (rsp *ClientErrorResponder) clientProvenance(ctx context.Context, clientIde
 //
 // A failed load answers no, for clientProvenance's reason.
 //
-// This predicate is asked twice within one authorization request, and the second answer may not be
-// more permissive than the first: see redirectErrorInput.redirectAlreadyWithheld.
-func (rsp *ClientErrorResponder) redirectWillBeEmitted(ctx context.Context, client *record.Client, redirectURI string,
+// This predicate is asked twice within one authorization request, first by authflow.Authorization
+// through its port, and the second answer may not be more permissive than the first: see
+// redirectErrorInput.redirectAlreadyWithheld.
+func (rsp *ClientErrorResponder) RedirectWillBeEmitted(ctx context.Context, client *record.Client, redirectURI string,
 	responseType string, site string) bool {
 
 	if client == nil || client.CreatedViaDCR {
@@ -215,7 +216,7 @@ func (rsp *ClientErrorResponder) redirectWillBeEmitted(ctx context.Context, clie
 }
 
 // redirToClientWithError answers the client with an error response, or renders the refusal
-// interstitial in its place when redirectWillBeEmitted, or an earlier refusal carried on the input,
+// interstitial in its place when RedirectWillBeEmitted, or an earlier refusal carried on the input,
 // says the redirect may not leave this server. It returns an error only when no response could be
 // written, and the caller then answers 500.
 //
@@ -239,7 +240,7 @@ func (rsp *ClientErrorResponder) redirToClientWithError(w http.ResponseWriter, r
 	input redirectErrorInput) error {
 
 	if input.redirectAlreadyWithheld ||
-		!rsp.redirectWillBeEmitted(r.Context(), input.client, input.redirectURI, input.responseType,
+		!rsp.RedirectWillBeEmitted(r.Context(), input.client, input.redirectURI, input.responseType,
 			"redirToClientWithError") {
 		return rsp.renderRedirectBlocked(w, r, input)
 	}
