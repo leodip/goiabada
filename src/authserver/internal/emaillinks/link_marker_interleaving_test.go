@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -134,13 +135,60 @@ func TestClearLinkMarker_KeepsWhatAnotherRequestWroteMeanwhile(t *testing.T) {
 		LinkMarkerFlowResetPassword, 42, "hash-a")
 
 	reqA := loadedRequest(t, store, seed)
+	consumed := consumeMarker(t, store, reqA, LinkMarkerFlowResetPassword)
 	writeMeanwhile(t, store, seed, sessionkeys.AuthContext, "ceremony B")
-	require.NoError(t, ClearLinkMarker(store, httptest.NewRecorder(), reqA))
+	require.NoError(t, ClearLinkMarker(store, httptest.NewRecorder(), reqA, consumed.ContinuationId))
 
 	values := storedValues(t, store, seed)
 	assert.Equal(t, "ceremony B", values[sessionkeys.AuthContext],
 		"the marker's clear must not put back the copy its request began with")
 	assert.NotContains(t, values, sessionkeys.LinkMarker)
+}
+
+// A clear removes only the marker of the continuation its request consumed. That marker may expire
+// while its request finishes, and a different link followed in another tab may take the slot then,
+// which SaveLinkMarker allows once a marker has expired; the older request's clear must leave the
+// newer continuation's marker in place, or its next step is refused as marker_missing (#579).
+func TestClearLinkMarker_KeepsANewerContinuationsMarker(t *testing.T) {
+	for _, flow := range []LinkMarkerFlow{LinkMarkerFlowResetPassword, LinkMarkerFlowAccountActivate} {
+		t.Run(string(flow), func(t *testing.T) {
+			store := newMarkerTestStore()
+			expiresAt := time.Now().UTC().Add(-time.Second)
+			seed := seedSession(t, store, map[string]any{sessionkeys.LinkMarker: marshalMarker(t, &LinkMarker{
+				Flow:           flow,
+				Id:             42,
+				CodeHash:       "hash-a",
+				ExpiresAt:      expiresAt,
+				ContinuationId: "the-older-continuation-id",
+			})})
+
+			// Request A read marker A while it was still live, and is finishing its flow.
+			reqA := loadedRequest(t, store, seed)
+			sessA, err := store.Get(reqA, sessionkeys.AuthServerSessionName)
+			require.NoError(t, err)
+			consumed, rejection, err := readLinkMarker(sessA, flow, expiresAt.Add(-time.Second))
+			require.NoError(t, err)
+			require.Empty(t, rejection)
+			require.NotNil(t, consumed)
+
+			// Meanwhile marker A expired, and another tab followed a different link.
+			rrB := httptest.NewRecorder()
+			requireMarkerSaved(t, store, rrB, requestCarrying(t, seed), flow, 99, "hash-b")
+			newer := consumeMarker(t, store, requestCarrying(t, rrB), flow)
+			require.NotEqual(t, consumed.ContinuationId, newer.ContinuationId)
+
+			rrA := httptest.NewRecorder()
+			require.NoError(t, ClearLinkMarker(store, rrA, reqA, consumed.ContinuationId))
+
+			assert.Empty(t, rrA.Result().Cookies(), "a clear with nothing of its own to remove must not write the session")
+			marker, rejection, err := GetLinkMarker(store, requestCarrying(t, rrB), flow)
+			require.NoError(t, err)
+			require.Empty(t, rejection, "the newer continuation's marker must survive the older request's clear")
+			require.NotNil(t, marker)
+			assert.Equal(t, newer.ContinuationId, marker.ContinuationId)
+			assert.Equal(t, "hash-b", marker.CodeHash)
+		})
+	}
 }
 
 // A clear finding no marker stored, because another request cleared it meanwhile, has nothing to
@@ -152,10 +200,12 @@ func TestClearLinkMarker_WritesNothingWhenNoMarkerIsStored(t *testing.T) {
 		LinkMarkerFlowResetPassword, 42, "hash-a")
 
 	reqA := loadedRequest(t, store, seed)
-	require.NoError(t, ClearLinkMarker(store, httptest.NewRecorder(), requestCarrying(t, seed)))
+	consumed := consumeMarker(t, store, reqA, LinkMarkerFlowResetPassword)
+	require.NoError(t, ClearLinkMarker(store, httptest.NewRecorder(), requestCarrying(t, seed),
+		consumed.ContinuationId))
 
 	rrA := httptest.NewRecorder()
-	require.NoError(t, ClearLinkMarker(store, rrA, reqA))
+	require.NoError(t, ClearLinkMarker(store, rrA, reqA, consumed.ContinuationId))
 
 	assert.Empty(t, rrA.Result().Cookies(), "a clear with nothing to remove must not write the session")
 	_, rejection, err := GetLinkMarker(store, reqA, LinkMarkerFlowResetPassword)
@@ -172,10 +222,11 @@ func TestClearLinkMarker_ASessionGoneMeanwhileIsCleared(t *testing.T) {
 		LinkMarkerFlowResetPassword, 42, "hash-a")
 
 	reqA := loadedRequest(t, store, seed)
+	consumed := consumeMarker(t, store, reqA, LinkMarkerFlowResetPassword)
 	deleteMeanwhile(t, store, seed)
 
 	rrA := httptest.NewRecorder()
-	require.NoError(t, ClearLinkMarker(store, rrA, reqA))
+	require.NoError(t, ClearLinkMarker(store, rrA, reqA, consumed.ContinuationId))
 
 	assert.Empty(t, rrA.Result().Cookies(), "a gone session must not be put back")
 	assert.Empty(t, storedValues(t, store, seed), "a gone session must not be put back")

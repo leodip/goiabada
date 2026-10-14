@@ -581,7 +581,7 @@ func HandleResetPasswordPost(
 		// A failure here is logged rather than answered with a 500, because the password has
 		// already changed and telling the caller the reset failed would be false. The stale
 		// marker it leaves behind resolves to nothing on its next use.
-		if clearLinkMarkerErr := emaillinks.ClearLinkMarker(httpSession, w, r); clearLinkMarkerErr != nil {
+		if clearLinkMarkerErr := emaillinks.ClearLinkMarker(httpSession, w, r, marker.ContinuationId); clearLinkMarkerErr != nil {
 			slog.ErrorContext(r.Context(), "unable to clear the reset password link marker after a completed reset",
 				"user_id", user.Id, "error", clearLinkMarkerErr)
 		}

@@ -245,7 +245,9 @@ create arm of `/auth/completed` asks first (`ConfirmCeremony`), before it ends a
 commits a new one, and its rotation carries the same condition. `/auth/authorize` still replaces
 whatever ceremony the session held, and logout still deletes it whole; two requests of one ceremony
 stay last-writer-wins between themselves, so a double-submitted consent form works. The
-session-identifier middleware and the emailed-link marker write only their own key the same way.
+session-identifier middleware and the emailed-link marker write only their own key the same way, and
+the marker's clear removes only the marker of the continuation that consumed it, so a flow finishing
+after its marker expired leaves a newer link's in place.
 
 ### Deferred error redirects (#213)
 `/auth/authorize` never redirects an unauthenticated browser to a client's `redirect_uri` on a failed

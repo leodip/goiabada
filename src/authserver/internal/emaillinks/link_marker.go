@@ -85,9 +85,9 @@ type markerSessionStore interface {
 // holds another live continuation, so nothing is written.
 var errContinuationInFlight = errors.New("another emailed-link continuation is in flight")
 
-// errNoMarkerStored is the refusal ClearLinkMarker's change answers when the stored session holds no
-// marker, so nothing is written.
-var errNoMarkerStored = errors.New("the browser session holds no link marker")
+// errMarkerNotHeld is the refusal ClearLinkMarker's change answers when the stored session holds no
+// marker of the continuation being cleared, none at all or another's, so nothing is written.
+var errMarkerNotHeld = errors.New("the browser session holds no link marker of this continuation")
 
 // LinkMarker records that an emailed link was followed and its code was valid, so
 // every later step of the flow can run on a URL with no credential in it (#112).
@@ -286,18 +286,26 @@ func readLinkMarker(sess *sessionstore.Session, want LinkMarkerFlow,
 	return marker, "", nil
 }
 
-// ClearLinkMarker removes the marker from the session.
+// ClearLinkMarker removes the marker of the continuation named by continuationId, the one
+// its caller consumed, from the session.
 //
 // This does invalidate the marker, for every copy of it: the session is a row in the
 // database and the browser holds only an identifier naming it, so removing the value
 // removes the only copy there is. That inverted with #266; before it, clearing replaced
 // the browser's own copy and could not reach one an attacker had captured.
 //
+// Only that continuation's marker is removed. The consumed marker may have expired while its
+// request finished, and a different link followed in another tab may have taken the slot
+// since, as SaveLinkMarker allows once a marker has expired; removing whatever the slot holds
+// would refuse that newer continuation's next step as marker_missing (#579).
+//
 // The consuming handlers still re-resolve the marker's CodeHash on every clean request,
 // and that is still worth keeping: it refuses a marker whose code has since been consumed
 // or reissued, which clearing at the end of a flow says nothing about. Defence in depth
 // now rather than the boundary itself.
-func ClearLinkMarker(httpSession markerSessionStore, w http.ResponseWriter, r *http.Request) error {
+func ClearLinkMarker(httpSession markerSessionStore, w http.ResponseWriter, r *http.Request,
+	continuationId string) error {
+
 	sess, err := httpSession.Get(r, sessionkeys.AuthServerSessionName)
 	if err != nil {
 		return err
@@ -305,17 +313,22 @@ func ClearLinkMarker(httpSession markerSessionStore, w http.ResponseWriter, r *h
 
 	// Only the marker's key is removed, from the session as it is stored now, on condition nothing
 	// wrote it in between, so whatever another request of the browser wrote since this one began is
-	// kept (#579). A session holding no marker, or gone, has nothing to remove, and nothing is written.
-	err = httpSession.ChangeAndSave(r, w, sess, func(values map[string]any) error {
-		if _, held := values[sessionkeys.LinkMarker]; !held {
-			return errNoMarkerStored
+	// kept (#579). A session holding no marker of this continuation, or gone, has nothing to remove,
+	// and nothing is written.
+	clearErr := httpSession.ChangeAndSave(r, w, sess, func(values map[string]any) error {
+		held, err := decodeLinkMarker(values)
+		if err != nil {
+			return err
+		}
+		if held == nil || held.ContinuationId != continuationId {
+			return errMarkerNotHeld
 		}
 		delete(values, sessionkeys.LinkMarker)
 		return nil
 	})
-	if errors.Is(err, errNoMarkerStored) || errors.Is(err, sessionstore.ErrNotFound) {
+	if errors.Is(clearErr, errMarkerNotHeld) || errors.Is(clearErr, sessionstore.ErrNotFound) {
 		delete(sess.Values, sessionkeys.LinkMarker)
 		return nil
 	}
-	return err
+	return clearErr
 }

@@ -87,6 +87,19 @@ func requireMarkerSaved(t *testing.T, store *sessionstore.ConditionalStore, rr *
 	require.Empty(t, rejection)
 }
 
+// consumeMarker reads the live marker of flow on r, as a consuming handler does before it clears
+// the marker of the continuation it read.
+func consumeMarker(t *testing.T, store *sessionstore.ConditionalStore, r *http.Request,
+	flow LinkMarkerFlow) *LinkMarker {
+	t.Helper()
+
+	marker, rejection, err := GetLinkMarker(store, r, flow)
+	require.NoError(t, err)
+	require.Empty(t, rejection)
+	require.NotNil(t, marker)
+	return marker
+}
+
 func marshalMarker(t *testing.T, marker *LinkMarker) string {
 	t.Helper()
 	data, err := json.Marshal(marker)
@@ -403,8 +416,9 @@ func TestClearLinkMarker(t *testing.T) {
 	requireMarkerSaved(t, store, rr, req, LinkMarkerFlowResetPassword, 42, "the-code-hash")
 
 	clearReq := requestCarrying(t, rr)
+	consumed := consumeMarker(t, store, clearReq, LinkMarkerFlowResetPassword)
 	clearRr := httptest.NewRecorder()
-	require.NoError(t, ClearLinkMarker(store, clearRr, clearReq))
+	require.NoError(t, ClearLinkMarker(store, clearRr, clearReq, consumed.ContinuationId))
 
 	marker, rejection, err := GetLinkMarker(store, requestCarrying(t, clearRr), LinkMarkerFlowResetPassword)
 
@@ -432,8 +446,10 @@ func TestClearedLinkMarkerDoesNotSurviveInACapturedCookie(t *testing.T) {
 	// What an attacker holding the pre-clear cookies would replay.
 	captured := requestCarrying(t, rr)
 
+	clearReq := requestCarrying(t, rr)
+	consumed := consumeMarker(t, store, clearReq, LinkMarkerFlowResetPassword)
 	clearRr := httptest.NewRecorder()
-	require.NoError(t, ClearLinkMarker(store, clearRr, requestCarrying(t, rr)))
+	require.NoError(t, ClearLinkMarker(store, clearRr, clearReq, consumed.ContinuationId))
 
 	// The browser now holds the cleared cookies, and refuses.
 	_, rejection, err := GetLinkMarker(store, requestCarrying(t, clearRr), LinkMarkerFlowResetPassword)
@@ -519,7 +535,7 @@ func TestLinkMarkerStoreFailures(t *testing.T) {
 
 	t.Run("clear", func(t *testing.T) {
 		err := ClearLinkMarker(store, httptest.NewRecorder(),
-			httptest.NewRequest("GET", "/reset-password", nil))
+			httptest.NewRequest("GET", "/reset-password", nil), "the-continuation-id")
 
 		require.ErrorIs(t, err, expectedError)
 	})
