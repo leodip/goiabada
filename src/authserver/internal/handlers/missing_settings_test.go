@@ -61,6 +61,36 @@ func TestMissingSettings_TheAuthorizationEndpointAnswersBeforeReadingItsRequest(
 	}
 }
 
+// A POST to the authorization endpoint reads its settings before its parameters too, so a request
+// reached without them answers the 500 page carrying reqctx.ErrNoSettings with nothing validated or
+// parked, and no refusal page for a body that does not parse (#580 decision 5).
+func TestMissingSettings_TheAuthorizationEndpointPostAnswersBeforeReadingItsRequest(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+	}{
+		{"a body that does not parse", "client_id=test-client&state=%zz"},
+		{"a well-formed body", validAuthorizeQuery},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newAuthorizePostEndpoint(t)
+			req := httptest.NewRequest(http.MethodPost, "/auth/authorize", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rr := httptest.NewRecorder()
+			e.pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
+
+			e.handler.ServeHTTP(rr, req)
+
+			e.pageRenderer.AssertExpectations(t)
+			e.pageRenderer.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
+				mock.Anything, mock.Anything)
+			e.validator.AssertNotCalled(t, "ValidateClientAndRedirectURI", mock.Anything, mock.Anything)
+			e.database.AssertNotCalled(t, "CreateAuthorizeRequest", mock.Anything, mock.Anything, mock.Anything)
+			assert.Empty(t, rr.Header().Get("Location"))
+		})
+	}
+}
+
 // A browser page answers the 500 page through PageRenderer.
 func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)

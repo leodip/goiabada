@@ -22,6 +22,7 @@ import (
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -60,6 +61,7 @@ func newAuthorizePostEndpoint(t *testing.T) *authorizePostEndpoint {
 func (e *authorizePostEndpoint) post(query, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/auth/authorize?"+query, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 	rr := httptest.NewRecorder()
 	e.handler.ServeHTTP(rr, req)
 	return rr
