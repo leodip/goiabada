@@ -49,7 +49,7 @@ type AuthContext struct {
 	UserId                        int64
 	AuthState                     AuthState
 	Prompt                        string     // Normalized prompt values (space-delimited, deduplicated)
-	AuthenticatedAt               *time.Time // Optional: override for auth_time in code issuance (used by prompt=none)
+	AuthenticatedAt               *time.Time // auth_time of what is issued: set by /auth/completed or prompt=none; issuance refuses nil
 	IdTokenHintSub                string     // sub claim from id_token_hint (empty if no hint provided)
 	// Level1AuthCompleted records that level 1 authentication happened in THIS ceremony,
 	// as opposed to being inherited from a session the ceremony reused. It is written only

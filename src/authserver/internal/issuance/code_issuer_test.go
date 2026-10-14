@@ -39,6 +39,13 @@ func assertAuthCodeShape(t *testing.T, authCode string) {
 	}
 }
 
+// codeAuthTime is the auth time a ceremony hands the issuer with every code: IssueAuthCode refuses a
+// code without one.
+func codeAuthTime() *time.Time {
+	authTime := time.Date(2026, time.October, 14, 9, 30, 0, 0, time.UTC)
+	return &authTime
+}
+
 func TestCreateAuthCode(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	codeIssuer := NewCodeIssuer(mockDB)
@@ -66,6 +73,7 @@ func TestCreateAuthCode(t *testing.T) {
 		IpAddress:           "127.0.0.1",
 		AcrLevel:            record.AcrLevel1,
 		AuthMethods:         "pwd",
+		AuthenticatedAt:     codeAuthTime(),
 		SessionIdentifier:   "session123",
 	}
 
@@ -90,7 +98,8 @@ func TestCreateAuthCode(t *testing.T) {
 	assert.False(t, code.Used)
 	assertAuthCodeShape(t, code.Code)
 	assert.NotEmpty(t, code.CodeHash)
-	assert.WithinDuration(t, time.Now(), code.AuthenticatedAt, time.Second)
+	assert.Equal(t, *input.AuthenticatedAt, code.AuthenticatedAt,
+		"the code's auth_time is the ceremony's, never the moment it was issued")
 
 	mockDB.AssertExpectations(t)
 }
@@ -158,6 +167,7 @@ func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
 				IpAddress:         "127.0.0.1",
 				AcrLevel:          record.AcrLevel1,
 				AuthMethods:       "pwd",
+				AuthenticatedAt:   codeAuthTime(),
 				SessionIdentifier: "session123",
 			})
 
@@ -186,6 +196,7 @@ func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {
 		ClientId: "test-client",
 		UserId:   123,
 		// ResponseMode is intentionally left empty
+		AuthenticatedAt:   codeAuthTime(),
 		SessionIdentifier: "session123",
 	}
 
@@ -243,6 +254,7 @@ func TestCreateAuthCode_ScopeHandling(t *testing.T) {
 				UserId:            123,
 				ConsentedScope:    tc.consentedScope,
 				Scope:             tc.scope,
+				AuthenticatedAt:   codeAuthTime(),
 				SessionIdentifier: "session123",
 			}
 
@@ -272,6 +284,7 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 	input := &CreateCodeInput{
 		ClientId:          "test-client",
 		UserId:            123,
+		AuthenticatedAt:   codeAuthTime(),
 		SessionIdentifier: "session123",
 	}
 
@@ -334,6 +347,7 @@ func issueCodeInput() *CreateCodeInput {
 		RedirectURI:       "https://example.com/callback",
 		AcrLevel:          record.AcrLevel1,
 		AuthMethods:       "pwd",
+		AuthenticatedAt:   codeAuthTime(),
 		SessionIdentifier: issueSid,
 	}
 }
@@ -440,6 +454,34 @@ func TestIssueAuthCode_RefusesANilTransaction(t *testing.T) {
 	assert.Contains(t, err.Error(), "requires a transaction")
 	assert.Nil(t, code)
 	assert.Empty(t, mockDB.Calls, "no statement may run without the transaction")
+}
+
+// TestIssueAuthCode_RefusesACodeWithNoAuthTime: a code's auth time becomes the auth_time of every
+// token redeemed from it, and every ceremony that reaches issuance carries one, so a missing one is
+// a defect. The issuer used to stamp the moment of issuance in its place, which tells a client
+// checking max_age that the user had just authenticated; it refuses instead, before any statement,
+// as the implicit arm refuses the same ceremony.
+func TestIssueAuthCode_RefusesACodeWithNoAuthTime(t *testing.T) {
+	cases := map[string]*time.Time{
+		"nil":  nil,
+		"zero": {},
+	}
+	for name, authenticatedAt := range cases {
+		t.Run(name, func(t *testing.T) {
+			mockDB := datamocks.NewDatabase(t)
+			input := issueCodeInput()
+			input.AuthenticatedAt = authenticatedAt
+
+			code, err := NewCodeIssuer(mockDB).IssueAuthCode(context.Background(), issueTx, input)
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "no auth time")
+			require.NotErrorIs(t, err, ErrIssuingSessionGone, "a defect is answered 500, not by restarting the ceremony")
+			require.NotErrorIs(t, err, ErrIssuingClientGone, "a defect is answered 500, not by restarting the ceremony")
+			assert.Nil(t, code)
+			assert.Empty(t, mockDB.Calls, "nothing is read, and no code is stored")
+		})
+	}
 }
 
 // TestIssueAuthCodeTx_FailuresAreNotRefusals: a statement that did not run has not established that

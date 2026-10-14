@@ -46,6 +46,7 @@ func propagationCodeInput() *CreateCodeInput {
 		IpAddress:         "127.0.0.1",
 		AcrLevel:          record.AcrLevel1,
 		AuthMethods:       "pwd",
+		AuthenticatedAt:   codeAuthTime(),
 		SessionIdentifier: "session-propagation",
 	}
 }
